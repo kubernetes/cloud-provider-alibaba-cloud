@@ -12,9 +12,6 @@ import (
 	"testing"
 )
 
-var keyid string = "LTAIdwVoOES5YYj2"
-var keysecret string = "0NBaap8GkqBpo9TnJ7svT2sNDQ9MzZ"
-
 var (
 	listenPort1 int32 = 80
 	listenPort2 int32 = 90
