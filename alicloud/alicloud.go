@@ -4,17 +4,19 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"os"
+	"strconv"
+
 	"github.com/denverdino/aliyungo/common"
 	"github.com/denverdino/aliyungo/metadata"
 	"github.com/denverdino/aliyungo/slb"
 	"github.com/golang/glog"
-	"io"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/version"
-	"strconv"
 )
 
 // ProviderName is the name of this cloud provider.
@@ -59,17 +61,21 @@ type CloudConfig struct {
 func init() {
 	cloudprovider.RegisterCloudProvider(ProviderName,
 		func(config io.Reader) (cloudprovider.Interface, error) {
-			if config == nil {
-				return nil, errors.New("Alicloud: config must be provided!")
+			cfg := &CloudConfig{}
+			if config != nil {
+				if err := json.NewDecoder(config).Decode(cfg); err != nil {
+					return nil, err
+				}
 			}
-			var cfg CloudConfig
-			if err := json.NewDecoder(config).Decode(&cfg); err != nil {
-				return nil, err
+			if cfg.Global.AccessKeyID == "" || cfg.Global.AccessKeySecret == "" {
+				glog.Infof("Read access ID/secret from cloud config failed, try to use environment settings")
+				cfg.Global.AccessKeyID = os.Getenv("ACCESS_KEY_ID")
+				cfg.Global.AccessKeySecret = os.Getenv("ACCESS_KEY_SECRET")
 			}
 			if cfg.Global.AccessKeyID == "" || cfg.Global.AccessKeySecret == "" {
 				return nil, errors.New("Alicloud: Provider AccessKeyID and AccessKeySecret must be provided!")
 			}
-			return newAliCloud(&cfg)
+			return newAliCloud(cfg)
 		})
 }
 
