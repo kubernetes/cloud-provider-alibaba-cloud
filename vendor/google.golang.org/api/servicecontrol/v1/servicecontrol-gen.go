@@ -87,34 +87,44 @@ type ServicesService struct {
 	s *Service
 }
 
+type AllocateInfo struct {
+	// UnusedArguments: A list of label keys that were unused by the server
+	// in processing the
+	// request. Thus, for similar requests repeated in a certain future
+	// time
+	// window, the caller can choose to ignore these labels in the
+	// requests
+	// to achieve better client-side cache hits and quota aggregation.
+	UnusedArguments []string `json:"unusedArguments,omitempty"`
+
+	// ForceSendFields is a list of field names (e.g. "UnusedArguments") to
+	// unconditionally include in API requests. By default, fields with
+	// empty values are omitted from API requests. However, any non-pointer,
+	// non-interface field appearing in ForceSendFields will be sent to the
+	// server regardless of whether the field is empty or not. This may be
+	// used to include empty fields in Patch requests.
+	ForceSendFields []string `json:"-"`
+
+	// NullFields is a list of field names (e.g. "UnusedArguments") to
+	// include in API requests with the JSON null value. By default, fields
+	// with empty values are omitted from API requests. However, any field
+	// with an empty value appearing in NullFields will be sent to the
+	// server as null. It is an error if a field in this list has a
+	// non-empty value. This may be used to include null fields in Patch
+	// requests.
+	NullFields []string `json:"-"`
+}
+
+func (s *AllocateInfo) MarshalJSON() ([]byte, error) {
+	type noMethod AllocateInfo
+	raw := noMethod(*s)
+	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
+}
+
 // AllocateQuotaRequest: Request message for the AllocateQuota method.
 type AllocateQuotaRequest struct {
 	// AllocateOperation: Operation that describes the quota allocation.
 	AllocateOperation *QuotaOperation `json:"allocateOperation,omitempty"`
-
-	// AllocationMode: Allocation mode for this operation.
-	// Deprecated: use QuotaMode inside the QuotaOperation.
-	//
-	// Possible values:
-	//   "UNSPECIFIED"
-	//   "NORMAL" - Allocates quota for the amount specified in the service
-	// configuration or
-	// specified using the quota_metrics. If the amount is higher than
-	// the
-	// available quota, allocation error will be returned and no quota will
-	// be
-	// allocated.
-	//   "BEST_EFFORT" - Allocates quota for the amount specified in the
-	// service configuration or
-	// specified using the quota_metrics. If the amount is higher than
-	// the
-	// available quota, request does not fail but all available quota will
-	// be
-	// allocated.
-	//   "CHECK_ONLY" - Only checks if there is enough quota available and
-	// does not change the
-	// available quota. No lock is placed on the available quota either.
-	AllocationMode string `json:"allocationMode,omitempty"`
 
 	// ServiceConfigId: Specifies which version of service configuration
 	// should be used to process
@@ -152,6 +162,10 @@ type AllocateQuotaResponse struct {
 	// AllocateErrors: Indicates the decision of the allocate.
 	AllocateErrors []*QuotaError `json:"allocateErrors,omitempty"`
 
+	// AllocateInfo: WARNING: DO NOT use this field until this warning
+	// message is removed.
+	AllocateInfo *AllocateInfo `json:"allocateInfo,omitempty"`
+
 	// OperationId: The same operation_id value used in the
 	// AllocateQuotaRequest. Used for
 	// logging and diagnostics purposes.
@@ -161,27 +175,15 @@ type AllocateQuotaResponse struct {
 	// Depending on the
 	// request, one or more of the following metrics will be included:
 	//
-	// 1. For rate quota, per quota group or per quota metric incremental
-	// usage
-	// will be specified using the following delta metric:
+	// 1. Per quota group or per quota metric incremental usage will be
+	// specified
+	// using the following delta metric :
 	//   "serviceruntime.googleapis.com/api/consumer/quota_used_count"
 	//
-	// 2. For allocation quota, per quota metric total usage will be
-	// specified
-	// using the following gauge metric:
-	//
-	// "serviceruntime.googleapis.com/allocation/consumer/quota_used_count"
-	//
-	//
-	// 3. For both rate quota and allocation quota, the quota limit
-	// reached
-	// condition will be specified using the following boolean metric:
+	// 2. The quota limit reached condition will be specified using the
+	// following
+	// boolean metric :
 	//   "serviceruntime.googleapis.com/quota/exceeded"
-	//
-	// 4. For allocation quota, value for each quota limit associated
-	// with
-	// the metrics will be specified using the following gauge metric:
-	//   "serviceruntime.googleapis.com/quota/limit"
 	QuotaMetrics []*MetricValueSet `json:"quotaMetrics,omitempty"`
 
 	// ServiceConfigId: ID of the actual config used to process the request.
@@ -228,6 +230,11 @@ type AuditLog struct {
 	// resources or permissions involved, then there is
 	// one AuthorizationInfo element for each {resource, permission} tuple.
 	AuthorizationInfo []*AuthorizationInfo `json:"authorizationInfo,omitempty"`
+
+	// Metadata: Other service-specific data about the request, response,
+	// and other
+	// information associated with the current audited event.
+	Metadata googleapi.RawMessage `json:"metadata,omitempty"`
 
 	// MethodName: The name of the service method or operation.
 	// For API calls, this should be the name of the API method.
@@ -279,8 +286,9 @@ type AuditLog struct {
 	// name will be indicated in the `@type` property.
 	Response googleapi.RawMessage `json:"response,omitempty"`
 
-	// ServiceData: Other service-specific data about the request, response,
-	// and other
+	// ServiceData: Deprecated, use `metadata` field instead.
+	// Other service-specific data about the request, response, and
+	// other
 	// activities.
 	ServiceData googleapi.RawMessage `json:"serviceData,omitempty"`
 
@@ -504,6 +512,7 @@ func (s *CheckError) MarshalJSON() ([]byte, error) {
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
+// CheckInfo: Contains additional information about the check operation.
 type CheckInfo struct {
 	// ConsumerInfo: Consumer info of this check.
 	ConsumerInfo *ConsumerInfo `json:"consumerInfo,omitempty"`
@@ -774,6 +783,8 @@ func (s *Distribution) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+// EndReconciliationRequest: Request message for
+// QuotaController.EndReconciliation.
 type EndReconciliationRequest struct {
 	// ReconciliationOperation: Operation that describes the quota
 	// reconciliation.
@@ -811,6 +822,8 @@ func (s *EndReconciliationRequest) MarshalJSON() ([]byte, error) {
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
+// EndReconciliationResponse: Response message for
+// QuotaController.EndReconciliation.
 type EndReconciliationResponse struct {
 	// OperationId: The same operation_id value used in the
 	// EndReconciliationRequest. Used for
@@ -1386,11 +1399,15 @@ type Operation struct {
 
 	// QuotaProperties: Represents the properties needed for quota check.
 	// Applicable only if this
-	// operation is for a quota check request.
+	// operation is for a quota check request. If this is not specified, no
+	// quota
+	// check will be performed.
 	QuotaProperties *QuotaProperties `json:"quotaProperties,omitempty"`
 
-	// ResourceContainer: The resource name of the parent of a resource in
-	// the resource hierarchy.
+	// ResourceContainer: DO NOT USE. This field is deprecated, use
+	// "resources" field instead.
+	// The resource name of the parent of a resource in the resource
+	// hierarchy.
 	//
 	// This can be in one of the following formats:
 	//     - “projects/<project-id or project-number>”
@@ -1398,6 +1415,7 @@ type Operation struct {
 	//     - “organizations/<organization-id>”
 	ResourceContainer string `json:"resourceContainer,omitempty"`
 
+	// Resources: The resources that are involved in the operation.
 	Resources []*ResourceInfo `json:"resources,omitempty"`
 
 	// StartTime: Required. Start time of the operation.
@@ -1405,7 +1423,9 @@ type Operation struct {
 
 	// UserLabels: User defined labels for the resource that this operation
 	// is associated
-	// with.
+	// with. Only a combination of 1000 user labels per consumer project
+	// are
+	// allowed.
 	UserLabels map[string]string `json:"userLabels,omitempty"`
 
 	// ForceSendFields is a list of field names (e.g. "ConsumerId") to
@@ -1431,6 +1451,7 @@ func (s *Operation) MarshalJSON() ([]byte, error) {
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
+// QuotaError: Represents error information for QuotaOperation.
 type QuotaError struct {
 	// Code: Error code.
 	//
@@ -1593,10 +1614,12 @@ type QuotaOperation struct {
 	// quota operation is
 	// requested. This name is used for matching quota rules or metric rules
 	// and
-	// billing status rules defined in service configuration. This field is
-	// not
-	// required if the quota operation is performed on non-API
-	// resources.
+	// billing status rules defined in service configuration.
+	//
+	// This field should not be set if any of the following is true:
+	// (1) the quota operation is performed on non-API resources.
+	// (2) quota_metrics is set because the caller is doing quota
+	// override.
 	//
 	// Example of an RPC method name:
 	//     google.example.library.v1.LibraryService.CreateShelf
@@ -1631,12 +1654,14 @@ type QuotaOperation struct {
 	// MetricValue
 	// instances, the entire request is rejected with
 	// an invalid argument error.
+	//
+	// This field is mutually exclusive with method_name.
 	QuotaMetrics []*MetricValueSet `json:"quotaMetrics,omitempty"`
 
 	// QuotaMode: Quota mode for this operation.
 	//
 	// Possible values:
-	//   "UNSPECIFIED"
+	//   "UNSPECIFIED" - Guard against implicit default. Must not be used.
 	//   "NORMAL" - For AllocateQuota request, allocates quota for the
 	// amount specified in
 	// the service configuration or specified using the quota metrics. If
@@ -1644,41 +1669,18 @@ type QuotaOperation struct {
 	// amount is higher than the available quota, allocation error will
 	// be
 	// returned and no quota will be allocated.
-	// For ReleaseQuota request, this mode is supported only for precise
-	// quota
-	// limits. In this case, this operation releases quota for the
-	// amount
-	// specified in the service configuration or specified using the
-	// quota
-	// metrics. If the release can make used quota negative, release
-	// error
-	// will be returned and no quota will be released.
-	//   "BEST_EFFORT" - For AllocateQuota request, this mode is supported
-	// only for imprecise
-	// quota limits. In this case, the operation allocates quota for the
-	// amount
-	// specified in the service configuration or specified using the
-	// quota
-	// metrics. If the amount is higher than the available quota, request
-	// does
-	// not fail but all available quota will be allocated.
-	// For ReleaseQuota request, this mode is supported for both precise
-	// quota
-	// limits and imprecise quota limits. In this case, this operation
-	// releases
-	// quota for the amount specified in the service configuration or
-	// specified
-	// using the quota metrics. If the release can make used quota
-	// negative, request does not fail but only the used quota will
-	// be
-	// released. After the ReleaseQuota request completes, the used
-	// quota
-	// will be 0, and never goes to negative.
+	//   "BEST_EFFORT" - The operation allocates quota for the amount
+	// specified in the service
+	// configuration or specified using the quota metrics. If the amount
+	// is
+	// higher than the available quota, request does not fail but all
+	// available
+	// quota will be allocated.
 	//   "CHECK_ONLY" - For AllocateQuota request, only checks if there is
 	// enough quota
 	// available and does not change the available quota. No lock is placed
 	// on
-	// the available quota either. Not supported for ReleaseQuota request.
+	// the available quota either.
 	QuotaMode string `json:"quotaMode,omitempty"`
 
 	// ForceSendFields is a list of field names (e.g. "ConsumerId") to
@@ -1707,28 +1709,6 @@ func (s *QuotaOperation) MarshalJSON() ([]byte, error) {
 // QuotaProperties: Represents the properties needed for quota
 // operations.
 type QuotaProperties struct {
-	// LimitByIds: LimitType IDs that should be used for checking quota. Key
-	// in this map
-	// should be a valid LimitType string, and the value is the ID to be
-	// used. For
-	// example, an entry <USER, 123> will cause all user quota limits to use
-	// 123
-	// as the user ID. See google/api/quota.proto for the definition of
-	// LimitType.
-	// CLIENT_PROJECT: Not supported.
-	// USER: Value of this entry will be used for enforcing user-level
-	// quota
-	//       limits. If none specified, caller IP passed in the
-	//       servicecontrol.googleapis.com/caller_ip label will be used
-	// instead.
-	//       If the server cannot resolve a value for this LimitType, an
-	// error
-	//       will be thrown. No validation will be performed on this
-	// ID.
-	// Deprecated: use servicecontrol.googleapis.com/user label to send user
-	// ID.
-	LimitByIds map[string]string `json:"limitByIds,omitempty"`
-
 	// QuotaMode: Quota mode for this operation.
 	//
 	// Possible values:
@@ -1751,7 +1731,7 @@ type QuotaProperties struct {
 	// operation.
 	QuotaMode string `json:"quotaMode,omitempty"`
 
-	// ForceSendFields is a list of field names (e.g. "LimitByIds") to
+	// ForceSendFields is a list of field names (e.g. "QuotaMode") to
 	// unconditionally include in API requests. By default, fields with
 	// empty values are omitted from API requests. However, any non-pointer,
 	// non-interface field appearing in ForceSendFields will be sent to the
@@ -1759,7 +1739,7 @@ type QuotaProperties struct {
 	// used to include empty fields in Patch requests.
 	ForceSendFields []string `json:"-"`
 
-	// NullFields is a list of field names (e.g. "LimitByIds") to include in
+	// NullFields is a list of field names (e.g. "QuotaMode") to include in
 	// API requests with the JSON null value. By default, fields with empty
 	// values are omitted from API requests. However, any field with an
 	// empty value appearing in NullFields will be sent to the server as
@@ -1904,6 +1884,7 @@ func (s *ReportError) MarshalJSON() ([]byte, error) {
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
+// ReportInfo: Contains additional info about the report operation.
 type ReportInfo struct {
 	// OperationId: The Operation.operation_id value from the request.
 	OperationId string `json:"operationId,omitempty"`
@@ -2058,17 +2039,32 @@ type RequestMetadata struct {
 	// CallerIp: The IP address of the caller.
 	// For caller from internet, this will be public IPv4 or IPv6
 	// address.
-	// For caller from GCE VM with external IP address, this will be the
-	// VM's
-	// external IP address. For caller from GCE VM without external IP
-	// address, if
-	// the VM is in the same GCP organization (or project) as the
-	// accessed
-	// resource, `caller_ip` will be the GCE VM's internal IPv4 address,
-	// otherwise
-	// it will be redacted to "gce-internal-ip".
+	// For caller from a Compute Engine VM with external IP address,
+	// this
+	// will be the VM's external IP address. For caller from a
+	// Compute
+	// Engine VM without external IP address, if the VM is in the
+	// same
+	// organization (or project) as the accessed resource, `caller_ip`
+	// will
+	// be the VM's internal IPv4 address, otherwise the `caller_ip` will
+	// be
+	// redacted to "gce-internal-ip".
 	// See https://cloud.google.com/compute/docs/vpc/ for more information.
 	CallerIp string `json:"callerIp,omitempty"`
+
+	// CallerNetwork: The network of the caller.
+	// Set only if the network host project is part of the same GCP
+	// organization
+	// (or project) as the accessed resource.
+	// See https://cloud.google.com/compute/docs/vpc/ for more
+	// information.
+	// This is a scheme-less URI full resource name. For example:
+	//
+	//
+	// "//compute.googleapis.com/projects/PROJECT_ID/global/networks/NETWORK_
+	// ID"
+	CallerNetwork string `json:"callerNetwork,omitempty"`
 
 	// CallerSuppliedUserAgent: The user agent of the caller.
 	// This information is not authenticated and should be treated
@@ -2108,8 +2104,7 @@ func (s *RequestMetadata) MarshalJSON() ([]byte, error) {
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
-// ResourceInfo: DO NOT USE.
-// This definition is not ready for use yet.
+// ResourceInfo: Describes a resource associated with this operation.
 type ResourceInfo struct {
 	// ResourceContainer: The identifier of the parent of this resource
 	// instance.
@@ -2147,6 +2142,8 @@ func (s *ResourceInfo) MarshalJSON() ([]byte, error) {
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
+// StartReconciliationRequest: Request message for
+// QuotaController.StartReconciliation.
 type StartReconciliationRequest struct {
 	// ReconciliationOperation: Operation that describes the quota
 	// reconciliation.
@@ -2184,6 +2181,8 @@ func (s *StartReconciliationRequest) MarshalJSON() ([]byte, error) {
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
+// StartReconciliationResponse: Response message for
+// QuotaController.StartReconciliation.
 type StartReconciliationResponse struct {
 	// OperationId: The same operation_id value used in the
 	// StartReconciliationRequest. Used
@@ -2377,20 +2376,16 @@ type ServicesAllocateQuotaCall struct {
 //
 // This method requires the
 // `servicemanagement.services.quota`
-// permission on the specified service. For more information,
-// see
-// [Google Cloud IAM](https://cloud.google.com/iam).
+// permission on the specified service. For more information, see
+// [Cloud IAM](https://cloud.google.com/iam).
 //
-// **NOTE:** the client code **must** fail-open if the server returns
-// one
-// of the following quota errors:
-// -   `PROJECT_STATUS_UNAVAILABLE`
-// -   `SERVICE_STATUS_UNAVAILABLE`
-// -   `BILLING_STATUS_UNAVAILABLE`
-// -   `QUOTA_SYSTEM_UNAVAILABLE`
-//
-// The server may inject above errors to prohibit any hard dependency
-// on the quota system.
+// **NOTE:** The client **must** fail-open on server errors
+// `INTERNAL`,
+// `UNKNOWN`, `DEADLINE_EXCEEDED`, and `UNAVAILABLE`. To ensure
+// system
+// reliability, the server may inject these errors to prohibit any
+// hard
+// dependency on the quota functionality.
 func (r *ServicesService) AllocateQuota(serviceName string, allocatequotarequest *AllocateQuotaRequest) *ServicesAllocateQuotaCall {
 	c := &ServicesAllocateQuotaCall{s: r.s, urlParams_: make(gensupport.URLParams)}
 	c.serviceName = serviceName
@@ -2484,7 +2479,7 @@ func (c *ServicesAllocateQuotaCall) Do(opts ...googleapi.CallOption) (*AllocateQ
 	}
 	return ret, nil
 	// {
-	//   "description": "Attempts to allocate quota for the specified consumer. It should be called\nbefore the operation is executed.\n\nThis method requires the `servicemanagement.services.quota`\npermission on the specified service. For more information, see\n[Google Cloud IAM](https://cloud.google.com/iam).\n\n**NOTE:** the client code **must** fail-open if the server returns one\nof the following quota errors:\n-   `PROJECT_STATUS_UNAVAILABLE`\n-   `SERVICE_STATUS_UNAVAILABLE`\n-   `BILLING_STATUS_UNAVAILABLE`\n-   `QUOTA_SYSTEM_UNAVAILABLE`\n\nThe server may inject above errors to prohibit any hard dependency\non the quota system.",
+	//   "description": "Attempts to allocate quota for the specified consumer. It should be called\nbefore the operation is executed.\n\nThis method requires the `servicemanagement.services.quota`\npermission on the specified service. For more information, see\n[Cloud IAM](https://cloud.google.com/iam).\n\n**NOTE:** The client **must** fail-open on server errors `INTERNAL`,\n`UNKNOWN`, `DEADLINE_EXCEEDED`, and `UNAVAILABLE`. To ensure system\nreliability, the server may inject these errors to prohibit any hard\ndependency on the quota functionality.",
 	//   "flatPath": "v1/services/{serviceName}:allocateQuota",
 	//   "httpMethod": "POST",
 	//   "id": "servicecontrol.services.allocateQuota",
@@ -2825,20 +2820,17 @@ type ServicesReleaseQuotaCall struct {
 //
 // This method requires the
 // `servicemanagement.services.quota`
-// permission on the specified service. For more information,
-// see
-// [Google Cloud IAM](https://cloud.google.com/iam).
+// permission on the specified service. For more information, see
+// [Cloud IAM](https://cloud.google.com/iam).
 //
-// **NOTE:** the client code **must** fail-open if the server returns
-// one
-// of the following quota errors:
-// -   `PROJECT_STATUS_UNAVAILABLE`
-// -   `SERVICE_STATUS_UNAVAILABLE`
-// -   `BILLING_STATUS_UNAVAILABLE`
-// -   `QUOTA_SYSTEM_UNAVAILABLE`
 //
-// The server may inject above errors to prohibit any hard dependency
-// on the quota system.
+// **NOTE:** The client **must** fail-open on server errors
+// `INTERNAL`,
+// `UNKNOWN`, `DEADLINE_EXCEEDED`, and `UNAVAILABLE`. To ensure
+// system
+// reliability, the server may inject these errors to prohibit any
+// hard
+// dependency on the quota functionality.
 func (r *ServicesService) ReleaseQuota(serviceName string, releasequotarequest *ReleaseQuotaRequest) *ServicesReleaseQuotaCall {
 	c := &ServicesReleaseQuotaCall{s: r.s, urlParams_: make(gensupport.URLParams)}
 	c.serviceName = serviceName
@@ -2932,7 +2924,7 @@ func (c *ServicesReleaseQuotaCall) Do(opts ...googleapi.CallOption) (*ReleaseQuo
 	}
 	return ret, nil
 	// {
-	//   "description": "Releases previously allocated quota done through AllocateQuota method.\n\nThis method requires the `servicemanagement.services.quota`\npermission on the specified service. For more information, see\n[Google Cloud IAM](https://cloud.google.com/iam).\n\n**NOTE:** the client code **must** fail-open if the server returns one\nof the following quota errors:\n-   `PROJECT_STATUS_UNAVAILABLE`\n-   `SERVICE_STATUS_UNAVAILABLE`\n-   `BILLING_STATUS_UNAVAILABLE`\n-   `QUOTA_SYSTEM_UNAVAILABLE`\n\nThe server may inject above errors to prohibit any hard dependency\non the quota system.",
+	//   "description": "Releases previously allocated quota done through AllocateQuota method.\n\nThis method requires the `servicemanagement.services.quota`\npermission on the specified service. For more information, see\n[Cloud IAM](https://cloud.google.com/iam).\n\n\n**NOTE:** The client **must** fail-open on server errors `INTERNAL`,\n`UNKNOWN`, `DEADLINE_EXCEEDED`, and `UNAVAILABLE`. To ensure system\nreliability, the server may inject these errors to prohibit any hard\ndependency on the quota functionality.",
 	//   "flatPath": "v1/services/{serviceName}:releaseQuota",
 	//   "httpMethod": "POST",
 	//   "id": "servicecontrol.services.releaseQuota",

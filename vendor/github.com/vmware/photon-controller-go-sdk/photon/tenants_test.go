@@ -1,4 +1,4 @@
-// Copyright (c) 2016 VMware, Inc. All Rights Reserved.
+// Copyright (c) 2017 VMware, Inc. All Rights Reserved.
 //
 // This product is licensed to you under the Apache License, Version 2.0 (the "License").
 // You may not use this product except in compliance with the License.
@@ -11,6 +11,7 @@ package photon
 
 import (
 	"fmt"
+	"reflect"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -19,8 +20,9 @@ import (
 
 var _ = Describe("Tenant", func() {
 	var (
-		server *mocks.Server
-		client *Client
+		server   *mocks.Server
+		client   *Client
+		tenantID string
 	)
 
 	BeforeEach(func() {
@@ -231,57 +233,87 @@ var _ = Describe("Tenant", func() {
 		})
 
 	})
-})
 
-var _ = Describe("ResourceTicket", func() {
-	var (
-		server   *mocks.Server
-		client   *Client
-		tenantID string
-	)
+	Describe("TenantQuota", func() {
 
-	BeforeEach(func() {
-		server, client = testSetup()
-		tenantID = createTenant(server, client)
-	})
+		It("Get Tenant Quota succeeds", func() {
+			mockQuota := createMockQuota()
 
-	AfterEach(func() {
-		cleanTenants(client)
-		server.Close()
-	})
+			// Create Tenant
+			tenantID = createTenant(server, client)
 
-	Describe("CreateAndGetResourceTicket", func() {
-		It("Resource ticket create and get succeeds", func() {
-			mockTask := createMockTask("CREATE_RESOURCE_TICKET", "COMPLETED")
+			// Get current Quota
+			server.SetResponseJson(200, mockQuota)
+			quota, err := client.Tenants.GetQuota(tenantID)
+
+			GinkgoT().Log(err)
+			eq := reflect.DeepEqual(quota.QuotaLineItems, mockQuota.QuotaLineItems)
+			Expect(eq).Should(Equal(true))
+		})
+
+		It("Set Tenant Quota succeeds", func() {
+			mockQuotaSpec := &QuotaSpec{
+				"vmCpu":        {Unit: "COUNT", Limit: 10, Usage: 0},
+				"vmMemory":     {Unit: "GB", Limit: 18, Usage: 0},
+				"diskCapacity": {Unit: "GB", Limit: 100, Usage: 0},
+			}
+
+			// Create Tenant
+			tenantID = createTenant(server, client)
+
+			mockTask := createMockTask("SET_QUOTA", "COMPLETED")
 			server.SetResponseJson(200, mockTask)
-			spec := &ResourceTicketCreateSpec{
-				Name:   randomString(10),
-				Limits: []QuotaLineItem{QuotaLineItem{Unit: "GB", Value: 16, Key: "vm.memory"}},
-			}
-			task, err := client.Tenants.CreateResourceTicket(tenantID, spec)
 
+			task, err := client.Tenants.SetQuota(tenantID, mockQuotaSpec)
+			task, err = client.Tasks.Wait(task.ID)
 			GinkgoT().Log(err)
 			Expect(err).Should(BeNil())
 			Expect(task).ShouldNot(BeNil())
-			Expect(task.Operation).Should(Equal("CREATE_RESOURCE_TICKET"))
+			Expect(task.Operation).Should(Equal("SET_QUOTA"))
 			Expect(task.State).Should(Equal("COMPLETED"))
+		})
 
-			mockResList := createMockResourceTicketsPage(ResourceTicket{TenantId: tenantID, Name: spec.Name, Limits: spec.Limits})
-			server.SetResponseJson(200, mockResList)
-			resList, err := client.Tenants.GetResourceTickets(tenantID, &ResourceTicketGetOptions{spec.Name})
+		It("Update Tenant Quota succeeds", func() {
+			mockQuotaSpec := &QuotaSpec{
+				"vmCpu":        {Unit: "COUNT", Limit: 30, Usage: 0},
+				"vmMemory":     {Unit: "GB", Limit: 40, Usage: 0},
+				"diskCapacity": {Unit: "GB", Limit: 150, Usage: 0},
+			}
+
+			// Create Tenant
+			tenantID = createTenant(server, client)
+
+			mockTask := createMockTask("UPDATE_QUOTA", "COMPLETED")
+			server.SetResponseJson(200, mockTask)
+
+			task, err := client.Tenants.UpdateQuota(tenantID, mockQuotaSpec)
+			task, err = client.Tasks.Wait(task.ID)
 			GinkgoT().Log(err)
 			Expect(err).Should(BeNil())
 			Expect(task).ShouldNot(BeNil())
-			Expect(resList).ShouldNot(BeNil())
+			Expect(task.Operation).Should(Equal("UPDATE_QUOTA"))
+			Expect(task.State).Should(Equal("COMPLETED"))
+		})
 
-			var found bool
-			for _, res := range resList.Items {
-				if res.Name == spec.Name && res.ID == task.Entity.ID {
-					found = true
-					break
-				}
+		It("Exclude Tenant Quota Items succeeds", func() {
+			mockQuotaSpec := &QuotaSpec{
+				"vmCpu2":    {Unit: "COUNT", Limit: 10, Usage: 0},
+				"vmMemory3": {Unit: "GB", Limit: 18, Usage: 0},
 			}
-			Expect(found).Should(BeTrue())
+
+			// Create Tenant
+			tenantID = createTenant(server, client)
+
+			mockTask := createMockTask("DELETE_QUOTA", "COMPLETED")
+			server.SetResponseJson(200, mockTask)
+
+			task, err := client.Tenants.ExcludeQuota(tenantID, mockQuotaSpec)
+			task, err = client.Tasks.Wait(task.ID)
+			GinkgoT().Log(err)
+			Expect(err).Should(BeNil())
+			Expect(task).ShouldNot(BeNil())
+			Expect(task.Operation).Should(Equal("DELETE_QUOTA"))
+			Expect(task.State).Should(Equal("COMPLETED"))
 		})
 	})
 })
@@ -291,13 +323,11 @@ var _ = Describe("Project", func() {
 		server   *mocks.Server
 		client   *Client
 		tenantID string
-		resName  string
 	)
 
 	BeforeEach(func() {
 		server, client = testSetup()
 		tenantID = createTenant(server, client)
-		resName = createResTicket(server, client, tenantID)
 	})
 
 	AfterEach(func() {
@@ -310,10 +340,6 @@ var _ = Describe("Project", func() {
 			mockTask := createMockTask("CREATE_PROJECT", "COMPLETED")
 			server.SetResponseJson(200, mockTask)
 			projSpec := &ProjectCreateSpec{
-				ResourceTicket: ResourceTicketReservation{
-					resName,
-					[]QuotaLineItem{QuotaLineItem{"GB", 2, "vm.memory"}},
-				},
 				Name: randomString(10, "go-sdk-project-"),
 			}
 			task, err := client.Tenants.CreateProject(tenantID, projSpec)
@@ -399,5 +425,63 @@ var _ = Describe("Project", func() {
 			Expect(task.State).Should(Equal("COMPLETED"))
 		})
 	})
+})
 
+var _ = Describe("IAM", func() {
+	var (
+		server   *mocks.Server
+		client   *Client
+		tenantID string
+	)
+
+	BeforeEach(func() {
+		server, client = testSetup()
+		tenantID = createTenant(server, client)
+	})
+
+	AfterEach(func() {
+		cleanTenants(client)
+		server.Close()
+	})
+
+	Describe("ManageTenantIamPolicy", func() {
+		It("Set IAM Policy succeeds", func() {
+			mockTask := createMockTask("SET_IAM_POLICY", "COMPLETED")
+			server.SetResponseJson(200, mockTask)
+			var policy []*RoleBinding
+			policy = []*RoleBinding{{Role: "owner", Subjects: []string{"joe@photon.local"}}}
+			task, err := client.Tenants.SetIam(tenantID, policy)
+			task, err = client.Tasks.Wait(task.ID)
+			GinkgoT().Log(err)
+			Expect(err).Should(BeNil())
+			Expect(task).ShouldNot(BeNil())
+			Expect(task.Operation).Should(Equal("SET_IAM_POLICY"))
+			Expect(task.State).Should(Equal("COMPLETED"))
+		})
+
+		It("Modify IAM Policy succeeds", func() {
+			mockTask := createMockTask("MODIFY_IAM_POLICY", "COMPLETED")
+			server.SetResponseJson(200, mockTask)
+			var delta []*RoleBindingDelta
+			delta = []*RoleBindingDelta{{Subject: "joe@photon.local", Action: "ADD", Role: "owner"}}
+			task, err := client.Tenants.ModifyIam(tenantID, delta)
+			task, err = client.Tasks.Wait(task.ID)
+			GinkgoT().Log(err)
+			Expect(err).Should(BeNil())
+			Expect(task).ShouldNot(BeNil())
+			Expect(task.Operation).Should(Equal("MODIFY_IAM_POLICY"))
+			Expect(task.State).Should(Equal("COMPLETED"))
+		})
+
+		It("Get IAM Policy succeeds", func() {
+			var policy []*RoleBinding
+			policy = []*RoleBinding{{Role: "owner", Subjects: []string{"joe@photon.local"}}}
+			server.SetResponseJson(200, policy)
+			response, err := client.Tenants.GetIam(tenantID)
+			GinkgoT().Log(err)
+			Expect(err).Should(BeNil())
+			Expect(response[0].Subjects).Should(Equal(policy[0].Subjects))
+			Expect(response[0].Role).Should(Equal(policy[0].Role))
+		})
+	})
 })

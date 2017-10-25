@@ -159,6 +159,7 @@ func (client *OIDCClient) setTransport(tr http.RoundTripper) {
 const tokenPath string = "/openidconnect/token"
 const passwordGrantFormatString = "grant_type=password&username=%s&password=%s&scope=%s"
 const refreshTokenGrantFormatString = "grant_type=refresh_token&refresh_token=%s"
+const clientGrantFormatString = "grant_type=password&username=%s&password=%s&scope=%s&client_id=%s"
 
 type OIDCTokenResponse struct {
 	AccessToken  string `json:"access_token"`
@@ -172,6 +173,14 @@ func (client *OIDCClient) GetTokenByPasswordGrant(username string, password stri
 	username = url.QueryEscape(username)
 	password = url.QueryEscape(password)
 	body := fmt.Sprintf(passwordGrantFormatString, username, password, client.Options.TokenScope)
+	return client.getToken(body)
+}
+
+func (client *OIDCClient) GetClientTokenByPasswordGrant(username string, password string, clientID string) (tokens *OIDCTokenResponse, err error) {
+	username = url.QueryEscape(username)
+	password = url.QueryEscape(password)
+	clientID = url.QueryEscape(clientID)
+	body := fmt.Sprintf(clientGrantFormatString, username, password, client.Options.TokenScope, clientID)
 	return client.getToken(body)
 }
 

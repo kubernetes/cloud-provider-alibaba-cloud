@@ -21,15 +21,13 @@ var _ = Describe("Router", func() {
 		client           *Client
 		routerCreateSpec *RouterCreateSpec
 		tenantID         string
-		resName          string
 		projID           string
 	)
 
 	BeforeEach(func() {
 		server, client = testSetup()
 		tenantID = createTenant(server, client)
-		resName = createResTicket(server, client, tenantID)
-		projID = createProject(server, client, tenantID, resName)
+		projID = createProject(server, client, tenantID)
 		routerCreateSpec = &RouterCreateSpec{Name: "router-1", PrivateIpCidr: "cidr1"}
 	})
 
@@ -113,4 +111,49 @@ var _ = Describe("Router", func() {
 			Expect(task.State).Should(Equal("COMPLETED"))
 		})
 	})
+
+	Describe("GetRouterSubnets", func() {
+		It("GetAll returns subnet", func() {
+			mockTask := createMockTask("CREATE_SUBNET", "COMPLETED")
+			server.SetResponseJson(200, mockTask)
+			subnetSpec := &SubnetCreateSpec{
+				Name:          "subnet_name",
+				Description:   "subnet description",
+				PrivateIpCidr: "192.168.0.1/24",
+			}
+
+			task, err := client.Routers.CreateSubnet("router-id", subnetSpec)
+			task, err = client.Tasks.Wait(task.ID)
+			GinkgoT().Log(err)
+			Expect(err).Should(BeNil())
+
+			subnetMock := Subnet{
+				Name:          subnetSpec.Name,
+				Description:   subnetSpec.Description,
+				PrivateIpCidr: subnetSpec.PrivateIpCidr,
+			}
+			server.SetResponseJson(200, &Subnets{[]Subnet{subnetMock}})
+			subnetList, err := client.Routers.GetSubnets("router-id", &SubnetGetOptions{})
+			GinkgoT().Log(err)
+			Expect(err).Should(BeNil())
+			Expect(subnetList).ShouldNot(BeNil())
+
+			var found bool
+			for _, subnet := range subnetList.Items {
+				if subnet.Name == subnetSpec.Name && subnet.ID == task.Entity.ID {
+					found = true
+					break
+				}
+			}
+			Expect(found).Should(BeTrue())
+
+			mockTask = createMockTask("DELETE_SUBNET", "COMPLETED")
+			server.SetResponseJson(200, mockTask)
+			task, err = client.Subnets.Delete(task.Entity.ID)
+			task, err = client.Tasks.Wait(task.ID)
+			GinkgoT().Log(err)
+			Expect(err).Should(BeNil())
+		})
+	})
+
 })

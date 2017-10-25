@@ -1,12 +1,13 @@
 package storage
 
 import (
+	"context"
 	"path"
 
 	"github.com/docker/distribution"
-	"github.com/docker/distribution/context"
-	"github.com/docker/distribution/digest"
+	dcontext "github.com/docker/distribution/context"
 	"github.com/docker/distribution/registry/storage/driver"
+	"github.com/opencontainers/go-digest"
 )
 
 // blobStore implements the read side of the blob store interface over a
@@ -64,7 +65,7 @@ func (bs *blobStore) Put(ctx context.Context, mediaType string, p []byte) (distr
 		// content already present
 		return desc, nil
 	} else if err != distribution.ErrBlobUnknown {
-		context.GetLogger(ctx).Errorf("blobStore: error stating content (%v): %v", dgst, err)
+		dcontext.GetLogger(ctx).Errorf("blobStore: error stating content (%v): %v", dgst, err)
 		// real error, return it
 		return distribution.Descriptor{}, err
 	}
@@ -145,7 +146,7 @@ func (bs *blobStore) readlink(ctx context.Context, path string) (digest.Digest, 
 		return "", err
 	}
 
-	linked, err := digest.ParseDigest(string(content))
+	linked, err := digest.Parse(string(content))
 	if err != nil {
 		return "", err
 	}
@@ -195,7 +196,7 @@ func (bs *blobStatter) Stat(ctx context.Context, dgst digest.Digest) (distributi
 		// NOTE(stevvooe): This represents a corruption situation. Somehow, we
 		// calculated a blob path and then detected a directory. We log the
 		// error and then error on the side of not knowing about the blob.
-		context.GetLogger(ctx).Warnf("blob path should not be a directory: %q", path)
+		dcontext.GetLogger(ctx).Warnf("blob path should not be a directory: %q", path)
 		return distribution.Descriptor{}, distribution.ErrBlobUnknown
 	}
 

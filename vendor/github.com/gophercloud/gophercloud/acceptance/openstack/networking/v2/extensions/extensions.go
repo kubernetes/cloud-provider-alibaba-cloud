@@ -21,12 +21,16 @@ func CreateExternalNetwork(t *testing.T, client *gophercloud.ServiceClient) (*ne
 
 	adminStateUp := true
 	isExternal := true
-	createOpts := external.CreateOpts{
-		External: &isExternal,
+
+	networkCreateOpts := networks.CreateOpts{
+		Name:         networkName,
+		AdminStateUp: &adminStateUp,
 	}
 
-	createOpts.Name = networkName
-	createOpts.AdminStateUp = &adminStateUp
+	createOpts := external.CreateOptsExt{
+		CreateOptsBuilder: networkCreateOpts,
+		External:          &isExternal,
+	}
 
 	network, err := networks.Create(client, createOpts).Extract()
 	if err != nil {
@@ -51,7 +55,7 @@ func CreatePortWithSecurityGroup(t *testing.T, client *gophercloud.ServiceClient
 		Name:           portName,
 		AdminStateUp:   &iFalse,
 		FixedIPs:       []ports.IP{ports.IP{SubnetID: subnetID}},
-		SecurityGroups: []string{secGroupID},
+		SecurityGroups: &[]string{secGroupID},
 	}
 
 	port, err := ports.Create(client, createOpts).Extract()

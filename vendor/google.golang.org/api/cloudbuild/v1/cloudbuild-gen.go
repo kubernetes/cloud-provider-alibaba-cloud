@@ -141,6 +141,7 @@ type ProjectsTriggersService struct {
 // - $REVISION_ID or $COMMIT_SHA: the commit SHA specified by RepoSource
 // or
 //   resolved from the specified branch or tag.
+// - $SHORT_SHA: first 7 characters of $REVISION_ID or $COMMIT_SHA.
 type Build struct {
 	// BuildTriggerId: The ID of the BuildTrigger that triggered this build,
 	// if it was
@@ -317,6 +318,20 @@ func (s *BuildOperationMetadata) MarshalJSON() ([]byte, error) {
 // BuildOptions: Optional arguments to enable specific features of
 // builds.
 type BuildOptions struct {
+	// LogStreamingOption: LogStreamingOption to define build log streaming
+	// behavior to Google Cloud
+	// Storage.
+	//
+	// Possible values:
+	//   "STREAM_DEFAULT" - Service may automatically determine build log
+	// streaming behavior.
+	//   "STREAM_ON" - Build logs should be streamed to Google Cloud
+	// Storage.
+	//   "STREAM_OFF" - Build logs should not be streamed to Google Cloud
+	// Storage; they will be
+	// written when the build is completed.
+	LogStreamingOption string `json:"logStreamingOption,omitempty"`
+
 	// RequestedVerifyOption: Requested verifiability options.
 	//
 	// Possible values:
@@ -342,16 +357,15 @@ type BuildOptions struct {
 	// checks.
 	SubstitutionOption string `json:"substitutionOption,omitempty"`
 
-	// ForceSendFields is a list of field names (e.g.
-	// "RequestedVerifyOption") to unconditionally include in API requests.
-	// By default, fields with empty values are omitted from API requests.
-	// However, any non-pointer, non-interface field appearing in
-	// ForceSendFields will be sent to the server regardless of whether the
-	// field is empty or not. This may be used to include empty fields in
-	// Patch requests.
+	// ForceSendFields is a list of field names (e.g. "LogStreamingOption")
+	// to unconditionally include in API requests. By default, fields with
+	// empty values are omitted from API requests. However, any non-pointer,
+	// non-interface field appearing in ForceSendFields will be sent to the
+	// server regardless of whether the field is empty or not. This may be
+	// used to include empty fields in Patch requests.
 	ForceSendFields []string `json:"-"`
 
-	// NullFields is a list of field names (e.g. "RequestedVerifyOption") to
+	// NullFields is a list of field names (e.g. "LogStreamingOption") to
 	// include in API requests with the JSON null value. By default, fields
 	// with empty values are omitted from API requests. However, any field
 	// with an empty value appearing in NullFields will be sent to the

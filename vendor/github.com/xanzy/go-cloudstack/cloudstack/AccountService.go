@@ -1,5 +1,5 @@
 //
-// Copyright 2016, Sander van Harmelen
+// Copyright 2017, Sander van Harmelen
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -203,6 +203,10 @@ func (s *AccountService) NewCreateAccountParams(accounttype int, email string, f
 func (s *AccountService) CreateAccount(p *CreateAccountParams) (*CreateAccountResponse, error) {
 	resp, err := s.cs.newRequest("createAccount", p.toURLValues())
 	if err != nil {
+		return nil, err
+	}
+
+	if resp, err = getRawValue(resp); err != nil {
 		return nil, err
 	}
 

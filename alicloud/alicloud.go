@@ -4,19 +4,18 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
-	"os"
-	"strconv"
-
 	"github.com/denverdino/aliyungo/common"
 	"github.com/denverdino/aliyungo/metadata"
 	"github.com/denverdino/aliyungo/slb"
 	"github.com/golang/glog"
+	"io"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/version"
+	"strconv"
+	 b64 "encoding/base64"
 )
 
 // ProviderName is the name of this cloud provider.
@@ -61,21 +60,27 @@ type CloudConfig struct {
 func init() {
 	cloudprovider.RegisterCloudProvider(ProviderName,
 		func(config io.Reader) (cloudprovider.Interface, error) {
-			cfg := &CloudConfig{}
-			if config != nil {
-				if err := json.NewDecoder(config).Decode(cfg); err != nil {
-					return nil, err
-				}
+			if config == nil {
+				return nil, errors.New("Alicloud: config must be provided!")
 			}
-			if cfg.Global.AccessKeyID == "" || cfg.Global.AccessKeySecret == "" {
-				glog.Infof("Read access ID/secret from cloud config failed, try to use environment settings")
-				cfg.Global.AccessKeyID = os.Getenv("ACCESS_KEY_ID")
-				cfg.Global.AccessKeySecret = os.Getenv("ACCESS_KEY_SECRET")
+			var cfg CloudConfig
+			if err := json.NewDecoder(config).Decode(&cfg); err != nil {
+				return nil, err
 			}
 			if cfg.Global.AccessKeyID == "" || cfg.Global.AccessKeySecret == "" {
 				return nil, errors.New("Alicloud: Provider AccessKeyID and AccessKeySecret must be provided!")
 			}
-			return newAliCloud(cfg)
+			key,err := b64.StdEncoding.DecodeString(cfg.Global.AccessKeyID)
+			if err != nil {
+				return nil, err
+			}
+			cfg.Global.AccessKeyID =  string(key)
+			secret,err := b64.StdEncoding.DecodeString(cfg.Global.AccessKeySecret)
+			if err != nil {
+				return nil, err
+			}
+			cfg.Global.AccessKeySecret = string(secret)
+			return newAliCloud(&cfg)
 		})
 }
 
@@ -169,16 +174,16 @@ func (c *Cloud) EnsureLoadBalancer(clusterName string, service *v1.Service, node
 	vswitchid := ""
 	if len(ns) <= 0 {
 		var err error
-		vswitchid, err = c.meta.VswitchID()
+		vswitchid,err = c.meta.VswitchID()
 		if err != nil {
 			return nil, err
 		}
-		glog.V(2).Infof("DEBUG: vswitchid = %s#", vswitchid)
+		glog.V(2).Infof("DEBUG: vswitchid = %s#",vswitchid)
 		if vswitchid == "" {
 			glog.Warningf("Alicloud.EnsureLoadBalancer: can not find vswitch id, this will prevent you " +
 				"from creating VPC intranet SLB. But classic LB is still avaliable.")
 		}
-	} else {
+	}else {
 		for _, v := range ns {
 			i, err := c.ins.findInstanceByNode(types.NodeName(v.Name))
 			if err != nil {
@@ -305,6 +310,18 @@ func (c *Cloud) CurrentNodeName(hostname string) (types.NodeName, error) {
 	return types.NodeName(fmt.Sprintf("%s.%s", region, nodeName)), nil
 }
 
+// InstanceExistsByProviderID returns true if the instance for the given provider id still is running.
+// If false is returned with no error, the instance will be immediately deleted by the cloud controller manager.
+func (c *Cloud) InstanceExistsByProviderID(providerID string) (bool, error) {
+	_, err := c.ins.findInstanceByNode(types.NodeName(providerID))
+	if err == cloudprovider.InstanceNotFound {
+
+		glog.V(2).Infof("Alicloud.InstanceExistsByProviderID(\"%s\"), err=%s", providerID,err.Error())
+		return false, err
+	}
+	return true, err
+}
+
 // ListRoutes lists all managed routes that belong to the specified clusterName
 func (c *Cloud) ListRoutes(clusterName string) ([]*cloudprovider.Route, error) {
 	routes := []*cloudprovider.Route{}
@@ -381,6 +398,33 @@ func (c *Cloud) GetZone() (cloudprovider.Zone, error) {
 		FailureDomain: i.ZoneId,
 	}, nil
 }
+// GetZoneByNodeName returns the Zone containing the current zone and locality region of the node specified by node name
+// This method is particularly used in the context of external cloud providers where node initialization must be down
+// outside the kubelets.
+func (c *Cloud) GetZoneByNodeName(nodeName types.NodeName) (cloudprovider.Zone, error){
+
+	i, err := c.ins.findInstanceByNode(nodeName)
+	if err != nil {
+		return cloudprovider.Zone{}, errors.New(fmt.Sprintf("Alicloud.GetZoneByNodeName(), error findInstanceByNode(): %s", err.Error()))
+	}
+	return cloudprovider.Zone{
+		Region:        string(c.region),
+		FailureDomain: i.ZoneId,
+	}, nil
+}
+// GetZoneByProviderID returns the Zone containing the current zone and locality region of the node specified by providerId
+// This method is particularly used in the context of external cloud providers where node initialization must be down
+// outside the kubelets.
+func (c *Cloud) GetZoneByProviderID(providerID string) (cloudprovider.Zone, error) {
+	i, err := c.ins.findInstanceByNode(types.NodeName(providerID))
+	if err != nil {
+		return cloudprovider.Zone{}, errors.New(fmt.Sprintf("Alicloud.GetZoneByProviderID(), error findInstanceByNode(): %s", err.Error()))
+	}
+	return cloudprovider.Zone{
+		Region:        string(c.region),
+		FailureDomain: i.ZoneId,
+	}, nil
+}
 
 // ListClusters lists the names of the available clusters.
 func (c *Cloud) ListClusters() ([]string, error) {
@@ -429,6 +473,11 @@ func (c *Cloud) Routes() (cloudprovider.Routes, bool) {
 		return c, true
 	}
 	return nil, false
+}
+
+// HasClusterID returns true if a ClusterID is required and set
+func (c *Cloud) HasClusterID() bool{
+	return false
 }
 
 // filterOutByRegion Used for multi-region or multi-vpc. works for single region or vpc too.

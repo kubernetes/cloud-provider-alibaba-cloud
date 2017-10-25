@@ -325,3 +325,58 @@ func (api *VmAPI) CreateImage(id string, options *ImageCreateSpec) (task *Task, 
 	task, err = getTask(getError(res))
 	return
 }
+
+// Gets IAM Policy on a VM.
+func (api *VmAPI) GetIam(id string) (policy []*RoleBinding, err error) {
+	res, err := api.client.restClient.Get(
+		api.client.Endpoint+vmUrl+id+"/iam",
+		api.client.options.TokenOptions)
+	if err != nil {
+		return
+	}
+	defer res.Body.Close()
+	res, err = getError(res)
+	if err != nil {
+		return
+	}
+	err = json.NewDecoder(res.Body).Decode(&policy)
+	return policy, err
+}
+
+// Sets IAM Policy on a VM.
+func (api *VmAPI) SetIam(id string, policy []*RoleBinding) (task *Task, err error) {
+	body, err := json.Marshal(policy)
+	if err != nil {
+		return
+	}
+	res, err := api.client.restClient.Post(
+		api.client.Endpoint+vmUrl+id+"/iam",
+		"application/json",
+		bytes.NewReader(body),
+		api.client.options.TokenOptions)
+	if err != nil {
+		return
+	}
+	defer res.Body.Close()
+	task, err = getTask(getError(res))
+	return
+}
+
+// Modifies IAM Policy on a VM.
+func (api *VmAPI) ModifyIam(id string, policyDelta []*RoleBindingDelta) (task *Task, err error) {
+	body, err := json.Marshal(policyDelta)
+	if err != nil {
+		return
+	}
+	res, err := api.client.restClient.Patch(
+		api.client.Endpoint+vmUrl+id+"/iam",
+		"application/json",
+		bytes.NewReader(body),
+		api.client.options.TokenOptions)
+	if err != nil {
+		return
+	}
+	defer res.Body.Close()
+	task, err = getTask(getError(res))
+	return
+}

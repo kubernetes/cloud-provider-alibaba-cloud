@@ -10,33 +10,13 @@
 package photon
 
 import (
-	"encoding/json"
 	"fmt"
-
 	"github.com/vmware/photon-controller-go-sdk/photon/lightwave"
 )
 
 // Contains functionality for auth API.
 type AuthAPI struct {
 	client *Client
-}
-
-const authUrl string = rootUrl + "/auth"
-
-// Gets authentication info.
-func (api *AuthAPI) Get() (info *AuthInfo, err error) {
-	res, err := api.client.restClient.Get(api.client.Endpoint+authUrl, nil)
-	if err != nil {
-		return
-	}
-	defer res.Body.Close()
-	res, err = getError(res)
-	if err != nil {
-		return
-	}
-	info = &AuthInfo{}
-	err = json.NewDecoder(res.Body).Decode(info)
-	return
 }
 
 // Gets Tokens from username/password.
@@ -47,6 +27,21 @@ func (api *AuthAPI) GetTokensByPassword(username string, password string) (token
 	}
 
 	tokenResponse, err := oidcClient.GetTokenByPasswordGrant(username, password)
+	if err != nil {
+		return
+	}
+
+	return api.toTokenOptions(tokenResponse), nil
+}
+
+// Gets tokens for client from username, password and a client ID.
+func (api *AuthAPI) GetClientTokensByPassword(username string, password string, clientID string) (tokenOptions *TokenOptions, err error) {
+	oidcClient, err := api.buildOIDCClient()
+	if err != nil {
+		return
+	}
+
+	tokenResponse, err := oidcClient.GetClientTokenByPasswordGrant(username, password, clientID)
 	if err != nil {
 		return
 	}
@@ -86,7 +81,7 @@ func (api *AuthAPI) GetTokensByRefreshToken(refreshtoken string) (tokenOptions *
 }
 
 func (api *AuthAPI) getAuthEndpoint() (endpoint string, err error) {
-	authInfo, err := api.client.Auth.Get()
+	authInfo, err := api.client.System.GetAuthInfo()
 	if err != nil {
 		return
 	}

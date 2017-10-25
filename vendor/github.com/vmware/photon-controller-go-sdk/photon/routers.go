@@ -34,7 +34,7 @@ func (api *RoutersAPI) Get(id string) (router *Router, err error) {
 	}
 	var result Router
 	err = json.NewDecoder(res.Body).Decode(&result)
-	return &result, nil
+	return &result, err
 }
 
 // Updates router's attributes.
@@ -44,7 +44,7 @@ func (api *RoutersAPI) UpdateRouter(id string, routerSpec *RouterUpdateSpec) (ta
 		return
 	}
 
-	res, err := api.client.restClient.Put(
+	res, err := api.client.restClient.Patch(
 		api.client.Endpoint+routerUrl+id,
 		"application/json",
 		bytes.NewReader(body),
@@ -86,5 +86,22 @@ func (api *RoutersAPI) CreateSubnet(routerID string, spec *SubnetCreateSpec) (ta
 	}
 	defer res.Body.Close()
 	task, err = getTask(getError(res))
+	return
+}
+
+// Gets subnets for router with the specified ID, using options to filter the results.
+// If options is nil, no filtering will occur.
+func (api *RoutersAPI) GetSubnets(routerID string, options *SubnetGetOptions) (result *Subnets, err error) {
+	uri := api.client.Endpoint + routerUrl + routerID + "/subnets"
+	if options != nil {
+		uri += getQueryString(options)
+	}
+	res, err := api.client.restClient.GetList(api.client.Endpoint, uri, api.client.options.TokenOptions)
+	if err != nil {
+		return
+	}
+
+	result = &Subnets{}
+	err = json.Unmarshal(res, result)
 	return
 }

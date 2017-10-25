@@ -23,6 +23,10 @@
 
 [[constraint]]
   branch = "master"
+  name = "github.com/AliyunContainerService/alicloud-controller-manager"
+
+[[constraint]]
+  branch = "master"
   name = "github.com/denverdino/aliyungo"
 
 [[constraint]]
@@ -34,8 +38,25 @@
   version = "1.0.0"
 
 [[constraint]]
+  revision = "6c6dac0277229b9e9578c5ca3f74a4345d35cdc2"
+  name = "k8s.io/api"
+
+[[constraint]]
+  revision = "019ae5ada31de202164b118aee88ee2d14075c31"
+  name = "k8s.io/apimachinery"
+
+[[constraint]]
+  revision = "a35277792fddcf69f8cbbb8a9cb7727b23077409"
   name = "k8s.io/apiserver"
 
 [[constraint]]
   name = "k8s.io/kubernetes"
-  version = "1.7.2"
+  revision = "f38e43b221d08850172a9a4ea785a86a3ffa3b3a"
+
+[[constraint]]
+  name = "github.com/docker/distribution"
+  branch = "master"
+
+[[override]]
+  name = "github.com/docker/distribution"
+  branch = "master"
