@@ -12,6 +12,7 @@ package photon
 import (
 	"bytes"
 	"crypto/tls"
+	"log"
 	"math/rand"
 	"net/http"
 	"os"
@@ -27,20 +28,14 @@ type MockTasksPage struct {
 	PreviousPageLink string `json:"previousPageLink"`
 }
 
-type MockAvailZonesPage struct {
-	Items            []AvailabilityZone `json:"items"`
-	NextPageLink     string             `json:"nextPageLink"`
-	PreviousPageLink string             `json:"previousPageLink"`
+type MockZonesPage struct {
+	Items            []Zone `json:"items"`
+	NextPageLink     string `json:"nextPageLink"`
+	PreviousPageLink string `json:"previousPageLink"`
 }
 
 type MockProjectsPage struct {
 	Items            []ProjectCompact `json:"items"`
-	NextPageLink     string           `json:"nextPageLink"`
-	PreviousPageLink string           `json:"previousPageLink"`
-}
-
-type MockResourceTicketsPage struct {
-	Items            []ResourceTicket `json:"items"`
 	NextPageLink     string           `json:"nextPageLink"`
 	PreviousPageLink string           `json:"previousPageLink"`
 }
@@ -68,16 +63,10 @@ type MockFlavorsPage struct {
 	PreviousPageLink string   `json:"previousPageLink"`
 }
 
-type MockNetworksPage struct {
-	Items            []Network `json:"items"`
-	NextPageLink     string    `json:"nextPageLink"`
-	PreviousPageLink string    `json:"previousPageLink"`
-}
-
-type MockVirtualSubnetsPage struct {
-	Items            []VirtualSubnet `json:"items"`
-	NextPageLink     string          `json:"nextPageLink"`
-	PreviousPageLink string          `json:"previousPageLink"`
+type MockSubnetsPage struct {
+	Items            []Subnet `json:"items"`
+	NextPageLink     string   `json:"nextPageLink"`
+	PreviousPageLink string   `json:"previousPageLink"`
 }
 
 type MockServicesPage struct {
@@ -113,10 +102,6 @@ func testSetup() (server *mocks.Server, client *Client) {
 	options := &ClientOptions{
 		IgnoreCertificate: true,
 	}
-	if os.Getenv("API_ACCESS_TOKEN") != "" {
-		options.TokenOptions.AccessToken = os.Getenv("API_ACCESS_TOKEN")
-	}
-
 	transport := &http.Transport{
 		TLSClientConfig: &tls.Config{
 			InsecureSkipVerify: options.IgnoreCertificate,
@@ -124,6 +109,21 @@ func testSetup() (server *mocks.Server, client *Client) {
 	}
 
 	httpClient := &http.Client{Transport: transport}
+	if os.Getenv("API_ACCESS_TOKEN") != "" {
+		options.TokenOptions.AccessToken = os.Getenv("API_ACCESS_TOKEN")
+	}
+	if os.Getenv("TEST_ENDPOINT") != "" && os.Getenv("API_ACCESS_TOKEN") == "" {
+		username := os.Getenv("USERNAME")
+		password := os.Getenv("PASSWORD")
+
+		client = NewTestClient(uri, options, httpClient)
+		tokens, err := client.Auth.GetTokensByPassword(username, password)
+		if err != nil {
+			log.Fatal(err)
+		}
+		options.TokenOptions = tokens
+	}
+
 	client = NewTestClient(uri, options, httpClient)
 	return
 }
@@ -146,14 +146,14 @@ func createMockTasksPage(tasks ...Task) *MockTasksPage {
 	return &tasksPage
 }
 
-func createMockAvailZonesPage(availZones ...AvailabilityZone) *MockAvailZonesPage {
-	availZonesPage := MockAvailZonesPage{
-		Items:            availZones,
+func createMockZonesPage(zones ...Zone) *MockZonesPage {
+	zonesPage := MockZonesPage{
+		Items:            zones,
 		NextPageLink:     "",
 		PreviousPageLink: "",
 	}
 
-	return &availZonesPage
+	return &zonesPage
 }
 
 func createMockProjectsPage(projects ...ProjectCompact) *MockProjectsPage {
@@ -164,16 +164,6 @@ func createMockProjectsPage(projects ...ProjectCompact) *MockProjectsPage {
 	}
 
 	return &projectsPage
-}
-
-func createMockResourceTicketsPage(resourceTickets ...ResourceTicket) *MockResourceTicketsPage {
-	resourceTicketsPage := MockResourceTicketsPage{
-		Items:            resourceTickets,
-		NextPageLink:     "",
-		PreviousPageLink: "",
-	}
-
-	return &resourceTicketsPage
 }
 
 func createMockTenantsPage(tenants ...Tenant) *MockTenantsPage {
@@ -214,24 +204,14 @@ func createMockFlavorsPage(flavors ...Flavor) *MockFlavorsPage {
 	return &flavorsPage
 }
 
-func createMockNetworksPage(networks ...Network) *MockNetworksPage {
-	networksPage := MockNetworksPage{
-		Items:            networks,
+func createMockSubnetsPage(subnets ...Subnet) *MockSubnetsPage {
+	subnetsPage := MockSubnetsPage{
+		Items:            subnets,
 		NextPageLink:     "",
 		PreviousPageLink: "",
 	}
 
-	return &networksPage
-}
-
-func createMockVirtualSubnetsPage(networks ...VirtualSubnet) *MockVirtualSubnetsPage {
-	virtualSubnetsPage := MockVirtualSubnetsPage{
-		Items:            networks,
-		NextPageLink:     "",
-		PreviousPageLink: "",
-	}
-
-	return &virtualSubnetsPage
+	return &subnetsPage
 }
 
 func createMockServicesPage(services ...Service) *MockServicesPage {

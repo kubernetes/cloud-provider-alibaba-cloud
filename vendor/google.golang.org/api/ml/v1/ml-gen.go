@@ -373,7 +373,9 @@ func (s *GoogleCloudMlV1__GetConfigResponse) MarshalJSON() ([]byte, error) {
 // list
 // of HyperparameterOutput objects, one for each successful trial.
 type GoogleCloudMlV1__HyperparameterOutput struct {
-	// AllMetrics: All recorded object metrics for this trial.
+	// AllMetrics: All recorded object metrics for this trial. This field is
+	// not currently
+	// populated.
 	AllMetrics []*GoogleCloudMlV1HyperparameterOutputHyperparameterMetric `json:"allMetrics,omitempty"`
 
 	// FinalMetric: The final objective metric seen for this trial.
@@ -1418,16 +1420,39 @@ type GoogleCloudMlV1__TrainingInput struct {
 	//   <dd>
 	//   A machine equivalent to <code
 	// suppresswarning="true">standard</code> that
-	//   also includes a
+	//   also includes a single NVIDIA Tesla K80 GPU. See more about
 	//   <a href="/ml-engine/docs/how-tos/using-gpus">
-	//   GPU that you can use in your trainer</a>.
+	//   using GPUs for training your model</a>.
 	//   </dd>
 	//   <dt>complex_model_m_gpu</dt>
 	//   <dd>
 	//   A machine equivalent to
 	//   <code suppresswarning="true">complex_model_m</code> that also
 	// includes
-	//   four GPUs.
+	//   four NVIDIA Tesla K80 GPUs.
+	//   </dd>
+	//   <dt>complex_model_l_gpu</dt>
+	//   <dd>
+	//   A machine equivalent to
+	//   <code suppresswarning="true">complex_model_l</code> that also
+	// includes
+	//   eight NVIDIA Tesla K80 GPUs.
+	//   </dd>
+	//   <dt>standard_p100</dt>
+	//   <dd>
+	//   A machine equivalent to <code
+	// suppresswarning="true">standard</code> that
+	//   also includes a single NVIDIA Tesla P100 GPU. The availability of
+	// these
+	//   GPUs is in the Alpha launch stage.
+	//   </dd>
+	//   <dt>complex_model_m_p100</dt>
+	//   <dd>
+	//   A machine equivalent to
+	//   <code suppresswarning="true">complex_model_m</code> that also
+	// includes
+	//   four NVIDIA Tesla P100 GPUs. The availability of these GPUs is in
+	//   the Alpha launch stage.
 	//   </dd>
 	// </dl>
 	//
@@ -1491,6 +1516,7 @@ type GoogleCloudMlV1__TrainingInput struct {
 	//   "BASIC_GPU" - A single worker instance [with
 	// a
 	// GPU](/ml-engine/docs/how-tos/using-gpus).
+	//   "BASIC_TPU" - A single worker instance with a [Cloud TPU](/tpu)
 	//   "CUSTOM" - The CUSTOM tier is not a set tier, but rather enables
 	// you to use your
 	// own cluster specification. When you use this tier, set values
@@ -1641,7 +1667,7 @@ func (s *GoogleCloudMlV1__TrainingOutput) UnmarshalJSON(data []byte) error {
 // [projects.models.versions.list](/ml-engine/reference/rest/v1/p
 // rojects.models.versions/list).
 //
-// Next ID: 18
+// Next ID: 19
 // LINT.IfChange
 type GoogleCloudMlV1__Version struct {
 	// AutoScaling: Automatically scale the number of nodes used to serve
@@ -4412,6 +4438,13 @@ func (r *ProjectsModelsService) List(parent string) *ProjectsModelsListCall {
 	return c
 }
 
+// Filter sets the optional parameter "filter": Specifies the subset of
+// models to retrieve.
+func (c *ProjectsModelsListCall) Filter(filter string) *ProjectsModelsListCall {
+	c.urlParams_.Set("filter", filter)
+	return c
+}
+
 // PageSize sets the optional parameter "pageSize": The number of models
 // to retrieve per "page" of results. If there
 // are more remaining results than this number, the response message
@@ -4538,6 +4571,11 @@ func (c *ProjectsModelsListCall) Do(opts ...googleapi.CallOption) (*GoogleCloudM
 	//     "parent"
 	//   ],
 	//   "parameters": {
+	//     "filter": {
+	//       "description": "Optional. Specifies the subset of models to retrieve.",
+	//       "location": "query",
+	//       "type": "string"
+	//     },
 	//     "pageSize": {
 	//       "description": "Optional. The number of models to retrieve per \"page\" of results. If there\nare more remaining results than this number, the response message will\ncontain a valid value in the `next_page_token` field.\n\nThe default value is 20, and the maximum page size is 100.",
 	//       "format": "int32",
@@ -4587,6 +4625,182 @@ func (c *ProjectsModelsListCall) Pages(ctx context.Context, f func(*GoogleCloudM
 		}
 		c.PageToken(x.NextPageToken)
 	}
+}
+
+// method id "ml.projects.models.patch":
+
+type ProjectsModelsPatchCall struct {
+	s                      *Service
+	name                   string
+	googlecloudmlv1__model *GoogleCloudMlV1__Model
+	urlParams_             gensupport.URLParams
+	ctx_                   context.Context
+	header_                http.Header
+}
+
+// Patch: Updates a specific model resource.
+//
+// Currently the only supported fields to update are `description`
+// and
+// `default_version.name`.
+func (r *ProjectsModelsService) Patch(name string, googlecloudmlv1__model *GoogleCloudMlV1__Model) *ProjectsModelsPatchCall {
+	c := &ProjectsModelsPatchCall{s: r.s, urlParams_: make(gensupport.URLParams)}
+	c.name = name
+	c.googlecloudmlv1__model = googlecloudmlv1__model
+	return c
+}
+
+// UpdateMask sets the optional parameter "updateMask": Required.
+// Specifies the path, relative to `Model`, of the field to update.
+//
+// For example, to change the description of a model to "foo" and set
+// its
+// default version to "version_1", the `update_mask` parameter would
+// be
+// specified as `description`, `default_version.name`, and the
+// `PATCH`
+// request body would specify the new value, as follows:
+//     {
+//       "description": "foo",
+//       "defaultVersion": {
+//         "name":"version_1"
+//       }
+//     }
+// In this example, the model is blindly overwritten since no etag is
+// given.
+//
+// To adopt etag mechanism, include `etag` field in the mask, and
+// include the
+// `etag` value in your model resource.
+//
+// Currently the supported update masks are
+// `description`,
+// `default_version.name`, `labels`, and `etag`.
+func (c *ProjectsModelsPatchCall) UpdateMask(updateMask string) *ProjectsModelsPatchCall {
+	c.urlParams_.Set("updateMask", updateMask)
+	return c
+}
+
+// Fields allows partial responses to be retrieved. See
+// https://developers.google.com/gdata/docs/2.0/basics#PartialResponse
+// for more information.
+func (c *ProjectsModelsPatchCall) Fields(s ...googleapi.Field) *ProjectsModelsPatchCall {
+	c.urlParams_.Set("fields", googleapi.CombineFields(s))
+	return c
+}
+
+// Context sets the context to be used in this call's Do method. Any
+// pending HTTP request will be aborted if the provided context is
+// canceled.
+func (c *ProjectsModelsPatchCall) Context(ctx context.Context) *ProjectsModelsPatchCall {
+	c.ctx_ = ctx
+	return c
+}
+
+// Header returns an http.Header that can be modified by the caller to
+// add HTTP headers to the request.
+func (c *ProjectsModelsPatchCall) Header() http.Header {
+	if c.header_ == nil {
+		c.header_ = make(http.Header)
+	}
+	return c.header_
+}
+
+func (c *ProjectsModelsPatchCall) doRequest(alt string) (*http.Response, error) {
+	reqHeaders := make(http.Header)
+	for k, v := range c.header_ {
+		reqHeaders[k] = v
+	}
+	reqHeaders.Set("User-Agent", c.s.userAgent())
+	var body io.Reader = nil
+	body, err := googleapi.WithoutDataWrapper.JSONReader(c.googlecloudmlv1__model)
+	if err != nil {
+		return nil, err
+	}
+	reqHeaders.Set("Content-Type", "application/json")
+	c.urlParams_.Set("alt", alt)
+	urls := googleapi.ResolveRelative(c.s.BasePath, "v1/{+name}")
+	urls += "?" + c.urlParams_.Encode()
+	req, _ := http.NewRequest("PATCH", urls, body)
+	req.Header = reqHeaders
+	googleapi.Expand(req.URL, map[string]string{
+		"name": c.name,
+	})
+	return gensupport.SendRequest(c.ctx_, c.s.client, req)
+}
+
+// Do executes the "ml.projects.models.patch" call.
+// Exactly one of *GoogleLongrunning__Operation or error will be
+// non-nil. Any non-2xx status code is an error. Response headers are in
+// either *GoogleLongrunning__Operation.ServerResponse.Header or (if a
+// response was returned at all) in error.(*googleapi.Error).Header. Use
+// googleapi.IsNotModified to check whether the returned error was
+// because http.StatusNotModified was returned.
+func (c *ProjectsModelsPatchCall) Do(opts ...googleapi.CallOption) (*GoogleLongrunning__Operation, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
+	res, err := c.doRequest("json")
+	if res != nil && res.StatusCode == http.StatusNotModified {
+		if res.Body != nil {
+			res.Body.Close()
+		}
+		return nil, &googleapi.Error{
+			Code:   res.StatusCode,
+			Header: res.Header,
+		}
+	}
+	if err != nil {
+		return nil, err
+	}
+	defer googleapi.CloseBody(res)
+	if err := googleapi.CheckResponse(res); err != nil {
+		return nil, err
+	}
+	ret := &GoogleLongrunning__Operation{
+		ServerResponse: googleapi.ServerResponse{
+			Header:         res.Header,
+			HTTPStatusCode: res.StatusCode,
+		},
+	}
+	target := &ret
+	if err := json.NewDecoder(res.Body).Decode(target); err != nil {
+		return nil, err
+	}
+	return ret, nil
+	// {
+	//   "description": "Updates a specific model resource.\n\nCurrently the only supported fields to update are `description` and\n`default_version.name`.",
+	//   "flatPath": "v1/projects/{projectsId}/models/{modelsId}",
+	//   "httpMethod": "PATCH",
+	//   "id": "ml.projects.models.patch",
+	//   "parameterOrder": [
+	//     "name"
+	//   ],
+	//   "parameters": {
+	//     "name": {
+	//       "description": "Required. The project name.",
+	//       "location": "path",
+	//       "pattern": "^projects/[^/]+/models/[^/]+$",
+	//       "required": true,
+	//       "type": "string"
+	//     },
+	//     "updateMask": {
+	//       "description": "Required. Specifies the path, relative to `Model`, of the field to update.\n\nFor example, to change the description of a model to \"foo\" and set its\ndefault version to \"version_1\", the `update_mask` parameter would be\nspecified as `description`, `default_version.name`, and the `PATCH`\nrequest body would specify the new value, as follows:\n    {\n      \"description\": \"foo\",\n      \"defaultVersion\": {\n        \"name\":\"version_1\"\n      }\n    }\nIn this example, the model is blindly overwritten since no etag is given.\n\nTo adopt etag mechanism, include `etag` field in the mask, and include the\n`etag` value in your model resource.\n\nCurrently the supported update masks are `description`,\n`default_version.name`, `labels`, and `etag`.",
+	//       "format": "google-fieldmask",
+	//       "location": "query",
+	//       "type": "string"
+	//     }
+	//   },
+	//   "path": "v1/{+name}",
+	//   "request": {
+	//     "$ref": "GoogleCloudMlV1__Model"
+	//   },
+	//   "response": {
+	//     "$ref": "GoogleLongrunning__Operation"
+	//   },
+	//   "scopes": [
+	//     "https://www.googleapis.com/auth/cloud-platform"
+	//   ]
+	// }
+
 }
 
 // method id "ml.projects.models.setIamPolicy":
@@ -5325,6 +5539,13 @@ func (r *ProjectsModelsVersionsService) List(parent string) *ProjectsModelsVersi
 	return c
 }
 
+// Filter sets the optional parameter "filter": Specifies the subset of
+// versions to retrieve.
+func (c *ProjectsModelsVersionsListCall) Filter(filter string) *ProjectsModelsVersionsListCall {
+	c.urlParams_.Set("filter", filter)
+	return c
+}
+
 // PageSize sets the optional parameter "pageSize": The number of
 // versions to retrieve per "page" of results. If
 // there are more remaining results than this number, the response
@@ -5451,6 +5672,11 @@ func (c *ProjectsModelsVersionsListCall) Do(opts ...googleapi.CallOption) (*Goog
 	//     "parent"
 	//   ],
 	//   "parameters": {
+	//     "filter": {
+	//       "description": "Optional. Specifies the subset of versions to retrieve.",
+	//       "location": "query",
+	//       "type": "string"
+	//     },
 	//     "pageSize": {
 	//       "description": "Optional. The number of versions to retrieve per \"page\" of results. If\nthere are more remaining results than this number, the response message\nwill contain a valid value in the `next_page_token` field.\n\nThe default value is 20, and the maximum page size is 100.",
 	//       "format": "int32",
@@ -5500,6 +5726,176 @@ func (c *ProjectsModelsVersionsListCall) Pages(ctx context.Context, f func(*Goog
 		}
 		c.PageToken(x.NextPageToken)
 	}
+}
+
+// method id "ml.projects.models.versions.patch":
+
+type ProjectsModelsVersionsPatchCall struct {
+	s                        *Service
+	name                     string
+	googlecloudmlv1__version *GoogleCloudMlV1__Version
+	urlParams_               gensupport.URLParams
+	ctx_                     context.Context
+	header_                  http.Header
+}
+
+// Patch: Updates the specified Version resource.
+//
+// Currently the only supported field to update is `description`.
+func (r *ProjectsModelsVersionsService) Patch(name string, googlecloudmlv1__version *GoogleCloudMlV1__Version) *ProjectsModelsVersionsPatchCall {
+	c := &ProjectsModelsVersionsPatchCall{s: r.s, urlParams_: make(gensupport.URLParams)}
+	c.name = name
+	c.googlecloudmlv1__version = googlecloudmlv1__version
+	return c
+}
+
+// UpdateMask sets the optional parameter "updateMask": Required.
+// Specifies the path, relative to `Version`, of the field to
+// update. Must be present and non-empty.
+//
+// For example, to change the description of a version to "foo",
+// the
+// `update_mask` parameter would be specified as `description`, and
+// the
+// `PATCH` request body would specify the new value, as follows:
+//     {
+//       "description": "foo"
+//     }
+// In this example, the version is blindly overwritten since no etag is
+// given.
+//
+// To adopt etag mechanism, include `etag` field in the mask, and
+// include the
+// `etag` value in your version resource.
+//
+// Currently the only supported update masks are `description`,
+// `labels`, and
+// `etag`.
+func (c *ProjectsModelsVersionsPatchCall) UpdateMask(updateMask string) *ProjectsModelsVersionsPatchCall {
+	c.urlParams_.Set("updateMask", updateMask)
+	return c
+}
+
+// Fields allows partial responses to be retrieved. See
+// https://developers.google.com/gdata/docs/2.0/basics#PartialResponse
+// for more information.
+func (c *ProjectsModelsVersionsPatchCall) Fields(s ...googleapi.Field) *ProjectsModelsVersionsPatchCall {
+	c.urlParams_.Set("fields", googleapi.CombineFields(s))
+	return c
+}
+
+// Context sets the context to be used in this call's Do method. Any
+// pending HTTP request will be aborted if the provided context is
+// canceled.
+func (c *ProjectsModelsVersionsPatchCall) Context(ctx context.Context) *ProjectsModelsVersionsPatchCall {
+	c.ctx_ = ctx
+	return c
+}
+
+// Header returns an http.Header that can be modified by the caller to
+// add HTTP headers to the request.
+func (c *ProjectsModelsVersionsPatchCall) Header() http.Header {
+	if c.header_ == nil {
+		c.header_ = make(http.Header)
+	}
+	return c.header_
+}
+
+func (c *ProjectsModelsVersionsPatchCall) doRequest(alt string) (*http.Response, error) {
+	reqHeaders := make(http.Header)
+	for k, v := range c.header_ {
+		reqHeaders[k] = v
+	}
+	reqHeaders.Set("User-Agent", c.s.userAgent())
+	var body io.Reader = nil
+	body, err := googleapi.WithoutDataWrapper.JSONReader(c.googlecloudmlv1__version)
+	if err != nil {
+		return nil, err
+	}
+	reqHeaders.Set("Content-Type", "application/json")
+	c.urlParams_.Set("alt", alt)
+	urls := googleapi.ResolveRelative(c.s.BasePath, "v1/{+name}")
+	urls += "?" + c.urlParams_.Encode()
+	req, _ := http.NewRequest("PATCH", urls, body)
+	req.Header = reqHeaders
+	googleapi.Expand(req.URL, map[string]string{
+		"name": c.name,
+	})
+	return gensupport.SendRequest(c.ctx_, c.s.client, req)
+}
+
+// Do executes the "ml.projects.models.versions.patch" call.
+// Exactly one of *GoogleLongrunning__Operation or error will be
+// non-nil. Any non-2xx status code is an error. Response headers are in
+// either *GoogleLongrunning__Operation.ServerResponse.Header or (if a
+// response was returned at all) in error.(*googleapi.Error).Header. Use
+// googleapi.IsNotModified to check whether the returned error was
+// because http.StatusNotModified was returned.
+func (c *ProjectsModelsVersionsPatchCall) Do(opts ...googleapi.CallOption) (*GoogleLongrunning__Operation, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
+	res, err := c.doRequest("json")
+	if res != nil && res.StatusCode == http.StatusNotModified {
+		if res.Body != nil {
+			res.Body.Close()
+		}
+		return nil, &googleapi.Error{
+			Code:   res.StatusCode,
+			Header: res.Header,
+		}
+	}
+	if err != nil {
+		return nil, err
+	}
+	defer googleapi.CloseBody(res)
+	if err := googleapi.CheckResponse(res); err != nil {
+		return nil, err
+	}
+	ret := &GoogleLongrunning__Operation{
+		ServerResponse: googleapi.ServerResponse{
+			Header:         res.Header,
+			HTTPStatusCode: res.StatusCode,
+		},
+	}
+	target := &ret
+	if err := json.NewDecoder(res.Body).Decode(target); err != nil {
+		return nil, err
+	}
+	return ret, nil
+	// {
+	//   "description": "Updates the specified Version resource.\n\nCurrently the only supported field to update is `description`.",
+	//   "flatPath": "v1/projects/{projectsId}/models/{modelsId}/versions/{versionsId}",
+	//   "httpMethod": "PATCH",
+	//   "id": "ml.projects.models.versions.patch",
+	//   "parameterOrder": [
+	//     "name"
+	//   ],
+	//   "parameters": {
+	//     "name": {
+	//       "description": "Required. The name of the model.",
+	//       "location": "path",
+	//       "pattern": "^projects/[^/]+/models/[^/]+/versions/[^/]+$",
+	//       "required": true,
+	//       "type": "string"
+	//     },
+	//     "updateMask": {
+	//       "description": "Required. Specifies the path, relative to `Version`, of the field to\nupdate. Must be present and non-empty.\n\nFor example, to change the description of a version to \"foo\", the\n`update_mask` parameter would be specified as `description`, and the\n`PATCH` request body would specify the new value, as follows:\n    {\n      \"description\": \"foo\"\n    }\nIn this example, the version is blindly overwritten since no etag is given.\n\nTo adopt etag mechanism, include `etag` field in the mask, and include the\n`etag` value in your version resource.\n\nCurrently the only supported update masks are `description`, `labels`, and\n`etag`.",
+	//       "format": "google-fieldmask",
+	//       "location": "query",
+	//       "type": "string"
+	//     }
+	//   },
+	//   "path": "v1/{+name}",
+	//   "request": {
+	//     "$ref": "GoogleCloudMlV1__Version"
+	//   },
+	//   "response": {
+	//     "$ref": "GoogleLongrunning__Operation"
+	//   },
+	//   "scopes": [
+	//     "https://www.googleapis.com/auth/cloud-platform"
+	//   ]
+	// }
+
 }
 
 // method id "ml.projects.models.versions.setDefault":

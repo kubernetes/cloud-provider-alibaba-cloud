@@ -1,5 +1,5 @@
 //
-// Copyright 2016, Sander van Harmelen
+// Copyright 2017, Sander van Harmelen
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -150,12 +150,12 @@ func main() {
 		log.Fatal(err)
 	}
 
-	if err := as.WriteGeneralCode(); err != nil {
+	if err = as.WriteGeneralCode(); err != nil {
 		log.Fatal(err)
 	}
 
 	for _, s := range as.services {
-		if err := s.WriteGeneratedCode(); err != nil {
+		if err = s.WriteGeneratedCode(); err != nil {
 			errors = append(errors, &generateError{s, err})
 		}
 	}
@@ -206,7 +206,7 @@ func (as *allServices) GeneralCode() ([]byte, error) {
 		p(format+"\n", args...)
 	}
 	pn("//")
-	pn("// Copyright 2016, Sander van Harmelen")
+	pn("// Copyright 2017, Sander van Harmelen")
 	pn("//")
 	pn("// Licensed under the Apache License, Version 2.0 (the \"License\");")
 	pn("// you may not use this file except in compliance with the License.")
@@ -548,7 +548,7 @@ func (s *service) GenerateCode() ([]byte, error) {
 	pn := s.pn
 
 	pn("//")
-	pn("// Copyright 2016, Sander van Harmelen")
+	pn("// Copyright 2017, Sander van Harmelen")
 	pn("//")
 	pn("// Licensed under the Apache License, Version 2.0 (the \"License\");")
 	pn("// you may not use this file except in compliance with the License.")
@@ -650,6 +650,60 @@ func (s *service) GenerateCode() ([]byte, error) {
 		pn("	return json.Marshal(raw.Egressrule[0])")
 		pn("}")
 		pn("")
+	}
+	if s.name == "CustomService" {
+		pn("type CustomServiceParams struct {")
+		pn("	p map[string]interface{}")
+		pn("}")
+		pn("")
+		pn("func (p *CustomServiceParams) toURLValues() url.Values {")
+		pn("	u := url.Values{}")
+		pn("	if p.p == nil {")
+		pn("		return u")
+		pn("	}")
+		pn("")
+		pn("	for k, v := range p.p {")
+		pn("		switch t := v.(type) {")
+		pn("		case bool:")
+		pn("			u.Set(k, strconv.FormatBool(t))")
+		pn("		case int:")
+		pn("			u.Set(k, strconv.Itoa(t))")
+		pn("		case int64:")
+		pn("			vv := strconv.FormatInt(t, 10)")
+		pn("			u.Set(k, vv)")
+		pn("		case string:")
+		pn("			u.Set(k, t)")
+		pn("		case []string:")
+		pn("			u.Set(k, strings.Join(t, \", \"))")
+		pn("		case map[string]string:")
+		pn("			i := 0")
+		pn("			for kk, vv := range t {")
+		pn("				u.Set(fmt.Sprintf(\"k[%%d].key\", i), kk)")
+		pn("				u.Set(fmt.Sprintf(\"k[%%d].value\", i), vv)")
+		pn("				i++")
+		pn("			}")
+		pn("		}")
+		pn("	}")
+		pn("")
+		pn("	return u")
+		pn("}")
+		pn("")
+		pn("func (p *CustomServiceParams) SetParam(param string, v interface{}) {")
+		pn("	if p.p == nil {")
+		pn("		p.p = make(map[string]interface{})")
+		pn("	}")
+		pn("	p.p[param] = v")
+		pn("	return")
+		pn("}")
+		pn("")
+		pn("func (s *CustomService) CustomRequest(api string, p *CustomServiceParams, result interface{}) error {")
+		pn("	resp, err := s.cs.newRequest(api, p.toURLValues())")
+		pn("	if err != nil {")
+		pn("		return err")
+		pn("	}")
+		pn("")
+		pn("	return json.Unmarshal(resp, result)")
+		pn("}")
 	}
 
 	for _, a := range s.apis {
@@ -1060,7 +1114,7 @@ func (s *service) generateNewAPICallFunc(a *API) {
 	pn("	}")
 	pn("")
 	switch n {
-	case "CreateNetwork", "CreateNetworkOffering", "CreateSecurityGroup", "CreateServiceOffering", "CreateSSHKeyPair", "RegisterSSHKeyPair":
+	case "CreateAccount", "CreateUser", "RegisterUserKeys", "CreateNetwork", "CreateNetworkOffering", "CreateSecurityGroup", "CreateServiceOffering", "CreateSSHKeyPair", "RegisterSSHKeyPair":
 		pn("	if resp, err = getRawValue(resp); err != nil {")
 		pn("		return nil, err")
 		pn("	}")
@@ -1259,6 +1313,10 @@ func getAllServices() (*allServices, []error, error) {
 		}
 		as.services = append(as.services, s)
 	}
+
+	// Add an extra field to enable adding a custom service
+	as.services = append(as.services, &service{name: "CustomService"})
+
 	sort.Sort(as.services)
 	return as, errors, nil
 }

@@ -134,50 +134,37 @@ func (client *restClient) GetList(endpoint string, url string, tokens *TokenOpti
 }
 
 func (client *restClient) Post(url string, contentType string, body io.ReadSeeker, tokens *TokenOptions) (res *http.Response, err error) {
-	if contentType == "" {
-		contentType = appJson
-	}
-
-	req := request{"POST", url, contentType, body, tokens}
-	rewinder := func() io.Reader {
-		body.Seek(0, 0)
-		return body
-	}
-	res, err = client.SendRequest(&req, rewinder)
+	res, err = client.SendRequestCommon("POST", url, contentType, body, tokens)
 	return
 }
 
 func (client *restClient) Patch(url string, contentType string, body io.ReadSeeker, tokens *TokenOptions) (res *http.Response, err error) {
-	if contentType == "" {
-		contentType = appJson
-	}
-
-	req := request{"PATCH", url, contentType, body, tokens}
-	rewinder := func() io.Reader {
-		body.Seek(0, 0)
-		return body
-	}
-	res, err = client.SendRequest(&req, rewinder)
+	res, err = client.SendRequestCommon("PATCH", url, contentType, body, tokens)
 	return
 }
 
 func (client *restClient) Put(url string, contentType string, body io.ReadSeeker, tokens *TokenOptions) (res *http.Response, err error) {
-	if contentType == "" {
-		contentType = appJson
-	}
-
-	req := request{"PUT", url, contentType, body, tokens}
-	rewinder := func() io.Reader {
-		body.Seek(0, 0)
-		return body
-	}
-	res, err = client.SendRequest(&req, rewinder)
+	res, err = client.SendRequestCommon("PUT", url, contentType, body, tokens)
 	return
 }
 
 func (client *restClient) Delete(url string, tokens *TokenOptions) (res *http.Response, err error) {
 	req := request{"DELETE", url, "", nil, tokens}
 	res, err = client.SendRequest(&req, nil)
+	return
+}
+
+func (client *restClient) SendRequestCommon(method string, url string, contentType string, body io.ReadSeeker, tokens *TokenOptions) (res *http.Response, err error) {
+	if contentType == "" {
+		contentType = appJson
+	}
+
+	req := request{method, url, contentType, body, tokens}
+	rewinder := func() io.Reader {
+		body.Seek(0, 0)
+		return body
+	}
+	res, err = client.SendRequest(&req, rewinder)
 	return
 }
 
@@ -234,13 +221,13 @@ func (client *restClient) SendRequest(req *request, bodyRewinder bodyRewinder) (
 		req.Body = bodyRewinder()
 	}
 	res, err = client.sendRequestHelper(req)
-	return res, nil
+	return res, err
 }
 
 func (client *restClient) sendRequestHelper(req *request) (res *http.Response, err error) {
 	r, err := http.NewRequest(req.Method, req.URL, req.Body)
 	if err != nil {
-		client.logger.Printf("An error occured creating request %s on %s. Error: %s", req.Method, req.URL, err)
+		client.logger.Printf("An error occurred creating request %s on %s. Error: %s", req.Method, req.URL, err)
 		return
 	}
 	if req.ContentType != "" {
@@ -251,7 +238,7 @@ func (client *restClient) sendRequestHelper(req *request) (res *http.Response, e
 	}
 	res, err = client.httpClient.Do(r)
 	if err != nil {
-		client.logger.Printf("An error occured when calling %s on %s. Error: %s", req.Method, req.URL, err)
+		client.logger.Printf("An error occurred when calling %s on %s. Error: %s", req.Method, req.URL, err)
 		return
 	}
 

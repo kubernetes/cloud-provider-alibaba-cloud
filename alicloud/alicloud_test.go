@@ -7,10 +7,14 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/api/core/v1"
 	"strings"
 	"testing"
+	b64 "encoding/base64"
 )
+
+var keyid string = ""
+var keysecret string = ""
 
 var (
 	listenPort1 int32 = 80
@@ -28,6 +32,15 @@ var (
 	certID            = "1745547945134207_157f665c830"
 	nodeName          = "iZuf694l8lw6xvdx6gh7tkZ"
 )
+
+func TestBase64(t *testing.T) {
+	data := "YWJjCg=="
+	key,err := b64.StdEncoding.DecodeString(data)
+	if err != nil {
+		t.Fail()
+	}
+	t.Log(string(key))
+}
 
 func TestCloudConfigInit(t *testing.T) {
 	config := strings.NewReader(con)

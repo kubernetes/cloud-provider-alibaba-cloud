@@ -13,6 +13,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 )
 
 // Contains functionality for tenants API.
@@ -72,42 +73,6 @@ func (api *TenantsAPI) Delete(id string) (task *Task, err error) {
 	}
 	defer res.Body.Close()
 	task, err = getTask(getError(res))
-	return
-}
-
-// Creates a resource ticket on the specified tenant.
-func (api *TenantsAPI) CreateResourceTicket(tenantId string, spec *ResourceTicketCreateSpec) (task *Task, err error) {
-	body, err := json.Marshal(spec)
-	if err != nil {
-		return
-	}
-	res, err := api.client.restClient.Post(
-		api.client.Endpoint+tenantUrl+"/"+tenantId+"/resource-tickets",
-		"application/json",
-		bytes.NewReader(body),
-		api.client.options.TokenOptions)
-	if err != nil {
-		return
-	}
-	defer res.Body.Close()
-	task, err = getTask(getError(res))
-	return
-}
-
-// Gets resource tickets for tenant with the specified ID, using options to filter the results.
-// If options is nil, no filtering will occur.
-func (api *TenantsAPI) GetResourceTickets(tenantId string, options *ResourceTicketGetOptions) (tickets *ResourceList, err error) {
-	uri := api.client.Endpoint + tenantUrl + "/" + tenantId + "/resource-tickets"
-	if options != nil {
-		uri += getQueryString(options)
-	}
-	res, err := api.client.restClient.GetList(api.client.Endpoint, uri, api.client.options.TokenOptions)
-	if err != nil {
-		return
-	}
-
-	tickets = &ResourceList{}
-	err = json.Unmarshal(res, tickets)
 	return
 }
 
@@ -172,6 +137,9 @@ func (api *TenantsAPI) Get(identity string) (tenant *Tenant, err error) {
 	}
 	defer res.Body.Close()
 	res, err = getError(res)
+	if err != nil {
+		return
+	}
 	tenant = &Tenant{}
 	if res != nil {
 		err = json.NewDecoder(res.Body).Decode(tenant)
@@ -210,4 +178,123 @@ func (api *TenantsAPI) SetSecurityGroups(id string, securityGroups *SecurityGrou
 
 func (api *TenantsAPI) getEntityUrl(id string) (url string) {
 	return api.client.Endpoint + tenantUrl + "/" + id
+}
+
+// Get quota for project with the specified ID.
+func (api *TenantsAPI) GetQuota(tenantId string) (quota *Quota, err error) {
+	uri := api.client.Endpoint + tenantUrl + "/" + tenantId + "/quota"
+	res, err := api.client.restClient.Get(uri, api.client.options.TokenOptions)
+
+	if err != nil {
+		return
+	}
+
+	defer res.Body.Close()
+	res, err = getError(res)
+	if err != nil {
+		return
+	}
+
+	body, err := ioutil.ReadAll(res.Body)
+	if err != nil {
+		return
+	}
+
+	quota = &Quota{}
+	err = json.Unmarshal(body, quota)
+	return
+}
+
+// Set (replace) the whole project quota with the quota line items specified in quota spec.
+func (api *TenantsAPI) SetQuota(tenantId string, spec *QuotaSpec) (task *Task, err error) {
+	task, err = api.modifyQuota("PUT", tenantId, spec)
+	return
+}
+
+// Update portion of the project quota with the quota line items specified in quota spec.
+func (api *TenantsAPI) UpdateQuota(tenantId string, spec *QuotaSpec) (task *Task, err error) {
+	task, err = api.modifyQuota("PATCH", tenantId, spec)
+	return
+}
+
+// Exclude project quota line items from the specific quota spec.
+func (api *TenantsAPI) ExcludeQuota(tenantId string, spec *QuotaSpec) (task *Task, err error) {
+	task, err = api.modifyQuota("DELETE", tenantId, spec)
+	return
+}
+
+// A private common function for modifying quota for the specified project with the quota line items specified
+// in quota spec.
+func (api *TenantsAPI) modifyQuota(method string, tenantId string, spec *QuotaSpec) (task *Task, err error) {
+	body, err := json.Marshal(spec)
+	if err != nil {
+		return
+	}
+	res, err := api.client.restClient.SendRequestCommon(
+		method,
+		api.client.Endpoint+tenantUrl+"/"+tenantId+"/quota",
+		"application/json",
+		bytes.NewReader(body),
+		api.client.options.TokenOptions)
+	if err != nil {
+		return
+	}
+	defer res.Body.Close()
+	task, err = getTask(getError(res))
+	return
+}
+
+// Gets IAM Policy of a tenant.
+func (api *TenantsAPI) GetIam(tenantId string) (policy []*RoleBinding, err error) {
+	res, err := api.client.restClient.Get(
+		api.client.Endpoint+tenantUrl+"/"+tenantId+"/iam",
+		api.client.options.TokenOptions)
+	if err != nil {
+		return
+	}
+	defer res.Body.Close()
+	res, err = getError(res)
+	if err != nil {
+		return
+	}
+	err = json.NewDecoder(res.Body).Decode(&policy)
+	return policy, err
+}
+
+// Sets IAM Policy on a tenant.
+func (api *TenantsAPI) SetIam(tenantId string, policy []*RoleBinding) (task *Task, err error) {
+	body, err := json.Marshal(policy)
+	if err != nil {
+		return
+	}
+	res, err := api.client.restClient.Post(
+		api.client.Endpoint+tenantUrl+"/"+tenantId+"/iam",
+		"application/json",
+		bytes.NewReader(body),
+		api.client.options.TokenOptions)
+	if err != nil {
+		return
+	}
+	defer res.Body.Close()
+	task, err = getTask(getError(res))
+	return
+}
+
+// Modifies IAM Policy on a tenant.
+func (api *TenantsAPI) ModifyIam(tenantId string, policyDelta []*RoleBindingDelta) (task *Task, err error) {
+	body, err := json.Marshal(policyDelta)
+	if err != nil {
+		return
+	}
+	res, err := api.client.restClient.Patch(
+		api.client.Endpoint+tenantUrl+"/"+tenantId+"/iam",
+		"application/json",
+		bytes.NewReader(body),
+		api.client.options.TokenOptions)
+	if err != nil {
+		return
+	}
+	defer res.Body.Close()
+	task, err = getTask(getError(res))
+	return
 }

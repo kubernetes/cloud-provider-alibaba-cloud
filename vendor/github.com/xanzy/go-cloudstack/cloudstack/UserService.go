@@ -1,5 +1,5 @@
 //
-// Copyright 2016, Sander van Harmelen
+// Copyright 2017, Sander van Harmelen
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -153,6 +153,10 @@ func (s *UserService) NewCreateUserParams(account string, email string, firstnam
 func (s *UserService) CreateUser(p *CreateUserParams) (*CreateUserResponse, error) {
 	resp, err := s.cs.newRequest("createUser", p.toURLValues())
 	if err != nil {
+		return nil, err
+	}
+
+	if resp, err = getRawValue(resp); err != nil {
 		return nil, err
 	}
 
@@ -987,6 +991,10 @@ func (s *UserService) NewRegisterUserKeysParams(id string) *RegisterUserKeysPara
 func (s *UserService) RegisterUserKeys(p *RegisterUserKeysParams) (*RegisterUserKeysResponse, error) {
 	resp, err := s.cs.newRequest("registerUserKeys", p.toURLValues())
 	if err != nil {
+		return nil, err
+	}
+
+	if resp, err = getRawValue(resp); err != nil {
 		return nil, err
 	}
 

@@ -14,6 +14,33 @@ The cloudstack package is always generated against the latest stable CloudStack 
 
 Please see the package documentation on [GoDocs](http://godoc.org/github.com/xanzy/go-cloudstack/cloudstack).
 
+## Example
+
+```go
+// Create a new API client
+cs := cloudstack.NewAsyncClient("https://cloudstack.company.com", "your-api-key", "your-api-secret", false)
+
+// Create a new parameter struct
+p := cs.VirtualMachine.NewDeployVirtualMachineParams("service-offering-id", "template-id", "zone-id")
+
+// Set the name
+name := "server-1"
+p.SetName(name)
+
+// Set the display name
+p.SetDisplayname("Test server 1")
+
+// Set any other options required by your setup in the same way
+
+// Create the new instance
+r, err := cs.VirtualMachine.DeployVirtualMachine(p)
+if err != nil {
+	log.Fatalf("Error creating the new instance %s: %s", name, err)
+}
+
+fmt.Printf("UUID or the newly created machine: %s", r.ID)
+```
+
 ## Features
 
 Next to the API commands CloudStack itself offers, there are a few additional features/function that are helpful. For starters there are two clients, an normal one (created with `NewClient(...)`) and an async client (created with `NewAsyncClient(...)`). The async client has a buildin waiting/polling feature that waits for a configured amount of time (defaults to 300 seconds) on running async jobs. This is very helpfull if you do not want to continue with your program execution until the async job is done.

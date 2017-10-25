@@ -11,12 +11,9 @@ import (
 	"k8s.io/kubernetes/cmd/cloud-controller-manager/app/options"
 	_ "k8s.io/kubernetes/pkg/client/metrics/prometheus"
 	"k8s.io/kubernetes/pkg/cloudprovider"
-	_ "k8s.io/kubernetes/pkg/cloudprovider/providers"
 	_ "k8s.io/kubernetes/pkg/version/prometheus"
 	"k8s.io/kubernetes/pkg/version/verflag"
-
-	_ "github.com/AliyunContainerService/alicloud-controller-manager/alicloud"
-
+	_ "gitlab.alibaba-inc.com/acs/alicloud-controller-manager/alicloud"
 	"github.com/golang/glog"
 	"github.com/spf13/pflag"
 )

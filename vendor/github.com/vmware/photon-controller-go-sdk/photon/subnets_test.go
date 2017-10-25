@@ -17,25 +17,28 @@ import (
 
 var _ = Describe("Subnet", func() {
 	var (
-		server           *mocks.Server
-		client           *Client
-		subnetCreateSpec *SubnetCreateSpec
-		tenantID         string
-		resName          string
-		projID           string
-		routerID         string
+		server                   *mocks.Server
+		client                   *Client
+		subnetCreateSpec         *SubnetCreateSpec
+		subnetSpecWithPortGroups *SubnetCreateSpec
+		portGroups               *PortGroups
+		tenantID                 string
+		projID                   string
+		routerID                 string
 	)
 
 	BeforeEach(func() {
 		server, client = testSetup()
 		tenantID = createTenant(server, client)
-		resName = createResTicket(server, client, tenantID)
-		projID = createProject(server, client, tenantID, resName)
+		projID = createProject(server, client, tenantID)
 		routerID = createRouter(server, client, projID)
+		portGroups = &PortGroups{Names: []string{"portGroup"}}
 		subnetCreateSpec = &SubnetCreateSpec{Name: "subnet-1", Description: "Test subnet", PrivateIpCidr: "cidr1"}
+		subnetSpecWithPortGroups = &SubnetCreateSpec{Name: "subnet-1", Description: "Test subnet", PrivateIpCidr: "cidr1"}
 	})
 
 	AfterEach(func() {
+		cleanSubnets(client)
 		cleanTenants(client)
 		server.Close()
 	})
@@ -61,6 +64,31 @@ var _ = Describe("Subnet", func() {
 			Expect(err).Should(BeNil())
 			Expect(task).ShouldNot(BeNil())
 			Expect(task.Operation).Should(Equal("DELETE_SUBNET"))
+			Expect(task.State).Should(Equal("COMPLETED"))
+		})
+	})
+
+	Describe("CreateDeletePortGroup", func() {
+		It("PortGroup create and delete succeeds", func() {
+			mockTask := createMockTask("CREATE_PORT_GROUP", "COMPLETED")
+			server.SetResponseJson(200, mockTask)
+
+			task, err := client.Subnets.Create(subnetSpecWithPortGroups)
+			task, err = client.Tasks.Wait(task.ID)
+			GinkgoT().Log(err)
+			Expect(err).Should(BeNil())
+			Expect(task).ShouldNot(BeNil())
+			Expect(task.Operation).Should(Equal("CREATE_PORT_GROUP"))
+			Expect(task.State).Should(Equal("COMPLETED"))
+
+			mockTask = createMockTask("DELETE_PORT_GROUP", "COMPLETED")
+			server.SetResponseJson(200, mockTask)
+			task, err = client.Subnets.Delete(task.Entity.ID)
+			task, err = client.Tasks.Wait(task.ID)
+			GinkgoT().Log(err)
+			Expect(err).Should(BeNil())
+			Expect(task).ShouldNot(BeNil())
+			Expect(task.Operation).Should(Equal("DELETE_PORT_GROUP"))
 			Expect(task.State).Should(Equal("COMPLETED"))
 		})
 	})
@@ -98,6 +126,71 @@ var _ = Describe("Subnet", func() {
 			GinkgoT().Log(err)
 			Expect(err).Should(BeNil())
 		})
+
+		It("GetAll Subnet succeeds", func() {
+			mockTask := createMockTask("CREATE_SUBNET", "COMPLETED")
+			server.SetResponseJson(200, mockTask)
+			task, err := client.Subnets.Create(subnetSpecWithPortGroups)
+			task, err = client.Tasks.Wait(task.ID)
+			GinkgoT().Log(err)
+			Expect(err).Should(BeNil())
+
+			server.SetResponseJson(200, createMockSubnetsPage(Subnet{Name: subnetSpecWithPortGroups.Name}))
+			subnets, err := client.Subnets.GetAll(&SubnetGetOptions{})
+
+			GinkgoT().Log(err)
+			Expect(err).Should(BeNil())
+			Expect(subnets).ShouldNot(BeNil())
+
+			var found bool
+			for _, subnet := range subnets.Items {
+				if subnet.Name == subnetSpecWithPortGroups.Name && subnet.ID == task.Entity.ID {
+					found = true
+					break
+				}
+			}
+			Expect(found).Should(BeTrue())
+
+			mockTask = createMockTask("DELETE_SUBNET", "COMPLETED")
+			server.SetResponseJson(200, mockTask)
+			task, err = client.Subnets.Delete(task.Entity.ID)
+			task, err = client.Tasks.Wait(task.ID)
+			GinkgoT().Log(err)
+			Expect(err).Should(BeNil())
+		})
+
+		It("GetAll PortGroups with optional name succeeds", func() {
+			mockTask := createMockTask("CREATE_PORT_GROUP", "COMPLETED")
+			server.SetResponseJson(200, mockTask)
+			task, err := client.Subnets.Create(subnetSpecWithPortGroups)
+			task, err = client.Tasks.Wait(task.ID)
+			GinkgoT().Log(err)
+			Expect(err).Should(BeNil())
+
+			server.SetResponseJson(200, createMockSubnetsPage(Subnet{Name: subnetSpecWithPortGroups.Name}))
+			subnets, err := client.Subnets.GetAll(&SubnetGetOptions{Name: subnetSpecWithPortGroups.Name})
+
+			GinkgoT().Log(err)
+			Expect(err).Should(BeNil())
+			Expect(subnets).ShouldNot(BeNil())
+
+			var found bool
+			for _, subnet := range subnets.Items {
+				if subnet.Name == subnetSpecWithPortGroups.Name && subnet.ID == task.Entity.ID {
+					found = true
+					break
+				}
+			}
+			Expect(len(subnets.Items)).Should(Equal(1))
+			Expect(found).Should(BeTrue())
+
+			mockTask = createMockTask("DELETE_PORT_GROUP", "COMPLETED")
+			server.SetResponseJson(200, mockTask)
+			task, err = client.Subnets.Delete(task.Entity.ID)
+			task, err = client.Tasks.Wait(task.ID)
+			GinkgoT().Log(err)
+			Expect(err).Should(BeNil())
+		})
 	})
 
 	Describe("UpdateSubnet", func() {
@@ -112,6 +205,20 @@ var _ = Describe("Subnet", func() {
 			Expect(err).Should(BeNil())
 			Expect(task).ShouldNot(BeNil())
 			Expect(task.Operation).Should(Equal("UPDATE_SUBNET"))
+			Expect(task.State).Should(Equal("COMPLETED"))
+		})
+	})
+
+	Describe("SetDefaultSubnet", func() {
+		It("Set default subnet succeeds", func() {
+			mockTask := createMockTask("SET_DEFAULT_SUBNET", "COMPLETED")
+			server.SetResponseJson(200, mockTask)
+
+			task, err := client.Subnets.SetDefault("subnetId")
+			GinkgoT().Log(err)
+			Expect(err).Should(BeNil())
+			Expect(task).ShouldNot(BeNil())
+			Expect(task.Operation).Should(Equal("SET_DEFAULT_SUBNET"))
 			Expect(task.State).Should(Equal("COMPLETED"))
 		})
 	})

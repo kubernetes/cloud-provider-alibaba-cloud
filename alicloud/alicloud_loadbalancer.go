@@ -6,11 +6,11 @@ import (
 	"github.com/denverdino/aliyungo/common"
 	"github.com/denverdino/aliyungo/slb"
 	"github.com/golang/glog"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"strings"
+	"k8s.io/apimachinery/pkg/types"
 )
 
 // ServiceAnnotationLoadBalancerSSLPorts is the annotation used on the service
@@ -49,14 +49,14 @@ const ServiceAnnotationLoadBalancerHealthCheckConnectTimeout = "service.beta.kub
 const ServiceAnnotationLoadBalancerHealthCheckTimeout = "service.beta.kubernetes.io/alicloud-loadbalancer-HealthCheckTimeout"
 
 type AnnotationRequest struct {
-	SSLPorts       string
-	AddressType    slb.AddressType
+	SSLPorts    string
+	AddressType slb.AddressType
 	SLBNetworkType string
 
-	ChargeType slb.InternetChargeType
-	Region     common.Region
-	Bandwidth  int
-	CertID     string
+	ChargeType  slb.InternetChargeType
+	Region      common.Region
+	Bandwidth   int
+	CertID      string
 
 	HealthCheck            slb.FlagType
 	HealthCheckURI         string
@@ -113,11 +113,11 @@ func (s *SDKClientSLB) EnsureLoadBalancer(service *v1.Service, nodes []*v1.Node,
 	}
 	ar := ExtractAnnotationRequest(service)
 	opts := s.getLoadBalancerOpts(ar)
-	if strings.Compare(string(opts.AddressType),
-		string(slb.IntranetAddressType)) == 0 && ar.SLBNetworkType != "classic" {
+	if strings.Compare(string(opts.AddressType) ,
+		string(slb.IntranetAddressType)) == 0 && ar.SLBNetworkType != "classic"{
 
-		glog.V(2).Infof("Create VPC intranet SLB, Alicloud.AddreesType:%s, "+
-			"slb: %s, switch: %s\n", opts.AddressType, slb.IntranetAddressType, vswitchid)
+		glog.V(2).Infof("Create VPC intranet SLB, Alicloud.AddreesType:%s, " +
+			"slb: %s, switch: %s\n",opts.AddressType,slb.IntranetAddressType,vswitchid)
 		opts.VSwitchId = vswitchid
 	}
 	opts.LoadBalancerName = lbn
@@ -570,6 +570,7 @@ func (s *SDKClientSLB) createListener(lb *slb.LoadBalancerType, pp PortListener)
 
 func (s *SDKClientSLB) getLoadBalancerOpts(ar *AnnotationRequest) *slb.CreateLoadBalancerArgs {
 
+
 	return &slb.CreateLoadBalancerArgs{
 		AddressType:        ar.AddressType,
 		InternetChargeType: ar.ChargeType,
@@ -584,10 +585,10 @@ func (s *SDKClientSLB) diffServers(nodes []*v1.Node, lb *slb.LoadBalancerType) (
 	additions, deletions := []slb.BackendServerType{}, []slb.BackendServerType{}
 	for _, n1 := range nodes {
 		found := false
-		_, id, err := nodeid(types.NodeName(n1.Spec.ExternalID))
+		_,id,err := nodeid(types.NodeName(n1.Spec.ExternalID))
 		for _, n2 := range lb.BackendServers.BackendServer {
-			if err != nil {
-				glog.Errorf("Alicloud.diffServers(): Spec.ExternalID=%s is not right.skip added", n1.Spec.ExternalID)
+			if err != nil{
+				glog.Errorf("Alicloud.diffServers(): Spec.ExternalID=%s is not right.skip added",n1.Spec.ExternalID)
 				continue
 			}
 			if string(id) == n2.ServerId {
@@ -602,9 +603,9 @@ func (s *SDKClientSLB) diffServers(nodes []*v1.Node, lb *slb.LoadBalancerType) (
 	for _, n1 := range lb.BackendServers.BackendServer {
 		found := false
 		for _, n2 := range nodes {
-			_, id, err := nodeid(types.NodeName(n2.Spec.ExternalID))
-			if err != nil {
-				glog.Errorf("Alicloud.diffServers(): Spec.ExternalID=%s is not right. skip deleted", n2.Spec.ExternalID)
+			_,id,err := nodeid(types.NodeName(n2.Spec.ExternalID))
+			if err != nil{
+				glog.Errorf("Alicloud.diffServers(): Spec.ExternalID=%s is not right. skip deleted",n2.Spec.ExternalID)
 				continue
 			}
 			if n1.ServerId == string(id) {

@@ -32,9 +32,6 @@ const (
 	ExtendedPropertyMasterIP         = "master_ip"
 	ExtendedPropertyMasterIP2        = "master_ip2"
 	ExtendedPropertyContainerNetwork = "container_network"
-	ExtendedPropertyZookeeperIP1     = "zookeeper_ip1"
-	ExtendedPropertyZookeeperIP2     = "zookeeper_ip2"
-	ExtendedPropertyZookeeperIP3     = "zookeeper_ip3"
 	ExtendedPropertyNumberOfETCDs    = "number_of_etcds"
 	ExtendedPropertyETCDIP1          = "etcd_ip1"
 	ExtendedPropertyETCDIP2          = "etcd_ip2"
@@ -68,7 +65,7 @@ func (api *ServicesAPI) Get(id string) (service *Service, err error) {
 	}
 	var result Service
 	err = json.NewDecoder(res.Body).Decode(&result)
-	return &result, nil
+	return &result, err
 }
 
 // Gets vms for service with the specified ID.

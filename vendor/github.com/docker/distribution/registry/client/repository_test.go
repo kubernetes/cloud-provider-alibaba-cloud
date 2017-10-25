@@ -9,6 +9,8 @@ import (
 	"log"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
+	"sort"
 	"strconv"
 	"strings"
 	"testing"
@@ -16,7 +18,6 @@ import (
 
 	"github.com/docker/distribution"
 	"github.com/docker/distribution/context"
-	"github.com/docker/distribution/digest"
 	"github.com/docker/distribution/manifest"
 	"github.com/docker/distribution/manifest/schema1"
 	"github.com/docker/distribution/reference"
@@ -25,6 +26,7 @@ import (
 	"github.com/docker/distribution/testutil"
 	"github.com/docker/distribution/uuid"
 	"github.com/docker/libtrust"
+	"github.com/opencontainers/go-digest"
 )
 
 func testServer(rrm testutil.RequestResponseMap) (string, func()) {
@@ -100,7 +102,7 @@ func addTestCatalog(route string, content []byte, link string, m *testutil.Reque
 func TestBlobDelete(t *testing.T) {
 	dgst, _ := newRandomBlob(1024)
 	var m testutil.RequestResponseMap
-	repo, _ := reference.ParseNamed("test.example.com/repo1")
+	repo, _ := reference.WithName("test.example.com/repo1")
 	m = append(m, testutil.RequestResponseMapping{
 		Request: testutil.Request{
 			Method: "DELETE",
@@ -118,7 +120,7 @@ func TestBlobDelete(t *testing.T) {
 	defer c()
 
 	ctx := context.Background()
-	r, err := NewRepository(ctx, repo, e, nil)
+	r, err := NewRepository(repo, e, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -139,8 +141,8 @@ func TestBlobFetch(t *testing.T) {
 	defer c()
 
 	ctx := context.Background()
-	repo, _ := reference.ParseNamed("test.example.com/repo1")
-	r, err := NewRepository(ctx, repo, e, nil)
+	repo, _ := reference.WithName("test.example.com/repo1")
+	r, err := NewRepository(repo, e, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -160,7 +162,7 @@ func TestBlobFetch(t *testing.T) {
 func TestBlobExistsNoContentLength(t *testing.T) {
 	var m testutil.RequestResponseMap
 
-	repo, _ := reference.ParseNamed("biff")
+	repo, _ := reference.WithName("biff")
 	dgst, content := newRandomBlob(1024)
 	m = append(m, testutil.RequestResponseMapping{
 		Request: testutil.Request{
@@ -194,7 +196,7 @@ func TestBlobExistsNoContentLength(t *testing.T) {
 	defer c()
 
 	ctx := context.Background()
-	r, err := NewRepository(ctx, repo, e, nil)
+	r, err := NewRepository(repo, e, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -219,8 +221,8 @@ func TestBlobExists(t *testing.T) {
 	defer c()
 
 	ctx := context.Background()
-	repo, _ := reference.ParseNamed("test.example.com/repo1")
-	r, err := NewRepository(ctx, repo, e, nil)
+	repo, _ := reference.WithName("test.example.com/repo1")
+	r, err := NewRepository(repo, e, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -251,7 +253,7 @@ func TestBlobUploadChunked(t *testing.T) {
 		b1[512:513],
 		b1[513:1024],
 	}
-	repo, _ := reference.ParseNamed("test.example.com/uploadrepo")
+	repo, _ := reference.WithName("test.example.com/uploadrepo")
 	uuids := []string{uuid.Generate().String()}
 	m = append(m, testutil.RequestResponseMapping{
 		Request: testutil.Request{
@@ -325,7 +327,7 @@ func TestBlobUploadChunked(t *testing.T) {
 	defer c()
 
 	ctx := context.Background()
-	r, err := NewRepository(ctx, repo, e, nil)
+	r, err := NewRepository(repo, e, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -366,7 +368,7 @@ func TestBlobUploadChunked(t *testing.T) {
 func TestBlobUploadMonolithic(t *testing.T) {
 	dgst, b1 := newRandomBlob(1024)
 	var m testutil.RequestResponseMap
-	repo, _ := reference.ParseNamed("test.example.com/uploadrepo")
+	repo, _ := reference.WithName("test.example.com/uploadrepo")
 	uploadID := uuid.Generate().String()
 	m = append(m, testutil.RequestResponseMapping{
 		Request: testutil.Request{
@@ -435,7 +437,7 @@ func TestBlobUploadMonolithic(t *testing.T) {
 	defer c()
 
 	ctx := context.Background()
-	r, err := NewRepository(ctx, repo, e, nil)
+	r, err := NewRepository(repo, e, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -474,9 +476,9 @@ func TestBlobUploadMonolithic(t *testing.T) {
 func TestBlobMount(t *testing.T) {
 	dgst, content := newRandomBlob(1024)
 	var m testutil.RequestResponseMap
-	repo, _ := reference.ParseNamed("test.example.com/uploadrepo")
+	repo, _ := reference.WithName("test.example.com/uploadrepo")
 
-	sourceRepo, _ := reference.ParseNamed("test.example.com/sourcerepo")
+	sourceRepo, _ := reference.WithName("test.example.com/sourcerepo")
 	canonicalRef, _ := reference.WithDigest(sourceRepo, dgst)
 
 	m = append(m, testutil.RequestResponseMapping{
@@ -512,7 +514,7 @@ func TestBlobMount(t *testing.T) {
 	defer c()
 
 	ctx := context.Background()
-	r, err := NewRepository(ctx, repo, e, nil)
+	r, err := NewRepository(repo, e, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -647,7 +649,38 @@ func addTestManifest(repo reference.Named, reference string, mediatype string, c
 			}),
 		},
 	})
+}
 
+func addTestManifestWithoutDigestHeader(repo reference.Named, reference string, mediatype string, content []byte, m *testutil.RequestResponseMap) {
+	*m = append(*m, testutil.RequestResponseMapping{
+		Request: testutil.Request{
+			Method: "GET",
+			Route:  "/v2/" + repo.Name() + "/manifests/" + reference,
+		},
+		Response: testutil.Response{
+			StatusCode: http.StatusOK,
+			Body:       content,
+			Headers: http.Header(map[string][]string{
+				"Content-Length": {fmt.Sprint(len(content))},
+				"Last-Modified":  {time.Now().Add(-1 * time.Second).Format(time.ANSIC)},
+				"Content-Type":   {mediatype},
+			}),
+		},
+	})
+	*m = append(*m, testutil.RequestResponseMapping{
+		Request: testutil.Request{
+			Method: "HEAD",
+			Route:  "/v2/" + repo.Name() + "/manifests/" + reference,
+		},
+		Response: testutil.Response{
+			StatusCode: http.StatusOK,
+			Headers: http.Header(map[string][]string{
+				"Content-Length": {fmt.Sprint(len(content))},
+				"Last-Modified":  {time.Now().Add(-1 * time.Second).Format(time.ANSIC)},
+				"Content-Type":   {mediatype},
+			}),
+		},
+	})
 }
 
 func checkEqualManifest(m1, m2 *schema1.SignedManifest) error {
@@ -678,7 +711,7 @@ func checkEqualManifest(m1, m2 *schema1.SignedManifest) error {
 
 func TestV1ManifestFetch(t *testing.T) {
 	ctx := context.Background()
-	repo, _ := reference.ParseNamed("test.example.com/repo")
+	repo, _ := reference.WithName("test.example.com/repo")
 	m1, dgst, _ := newRandomSchemaV1Manifest(repo, "latest", 6)
 	var m testutil.RequestResponseMap
 	_, pl, err := m1.Payload()
@@ -692,7 +725,7 @@ func TestV1ManifestFetch(t *testing.T) {
 	e, c := testServer(m)
 	defer c()
 
-	r, err := NewRepository(context.Background(), repo, e, nil)
+	r, err := NewRepository(repo, e, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -755,7 +788,7 @@ func TestV1ManifestFetch(t *testing.T) {
 }
 
 func TestManifestFetchWithEtag(t *testing.T) {
-	repo, _ := reference.ParseNamed("test.example.com/repo/by/tag")
+	repo, _ := reference.WithName("test.example.com/repo/by/tag")
 	_, d1, p1 := newRandomSchemaV1Manifest(repo, "latest", 6)
 	var m testutil.RequestResponseMap
 	addTestManifestWithEtag(repo, "latest", p1, &m, d1.String())
@@ -764,7 +797,7 @@ func TestManifestFetchWithEtag(t *testing.T) {
 	defer c()
 
 	ctx := context.Background()
-	r, err := NewRepository(ctx, repo, e, nil)
+	r, err := NewRepository(repo, e, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -784,8 +817,67 @@ func TestManifestFetchWithEtag(t *testing.T) {
 	}
 }
 
+func TestManifestFetchWithAccept(t *testing.T) {
+	ctx := context.Background()
+	repo, _ := reference.WithName("test.example.com/repo")
+	_, dgst, _ := newRandomSchemaV1Manifest(repo, "latest", 6)
+	headers := make(chan []string, 1)
+	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		headers <- req.Header["Accept"]
+	}))
+	defer close(headers)
+	defer s.Close()
+
+	r, err := NewRepository(repo, s.URL, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ms, err := r.Manifests(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	testCases := []struct {
+		// the media types we send
+		mediaTypes []string
+		// the expected Accept headers the server should receive
+		expect []string
+		// whether to sort the request and response values for comparison
+		sort bool
+	}{
+		{
+			mediaTypes: []string{},
+			expect:     distribution.ManifestMediaTypes(),
+			sort:       true,
+		},
+		{
+			mediaTypes: []string{"test1", "test2"},
+			expect:     []string{"test1", "test2"},
+		},
+		{
+			mediaTypes: []string{"test1"},
+			expect:     []string{"test1"},
+		},
+		{
+			mediaTypes: []string{""},
+			expect:     []string{""},
+		},
+	}
+	for _, testCase := range testCases {
+		ms.Get(ctx, dgst, distribution.WithManifestMediaTypes(testCase.mediaTypes))
+		actual := <-headers
+		if testCase.sort {
+			sort.Strings(actual)
+			sort.Strings(testCase.expect)
+		}
+		if !reflect.DeepEqual(actual, testCase.expect) {
+			t.Fatalf("unexpected Accept header values: %v", actual)
+		}
+	}
+}
+
 func TestManifestDelete(t *testing.T) {
-	repo, _ := reference.ParseNamed("test.example.com/repo/delete")
+	repo, _ := reference.WithName("test.example.com/repo/delete")
 	_, dgst1, _ := newRandomSchemaV1Manifest(repo, "latest", 6)
 	_, dgst2, _ := newRandomSchemaV1Manifest(repo, "latest", 6)
 	var m testutil.RequestResponseMap
@@ -805,7 +897,7 @@ func TestManifestDelete(t *testing.T) {
 	e, c := testServer(m)
 	defer c()
 
-	r, err := NewRepository(context.Background(), repo, e, nil)
+	r, err := NewRepository(repo, e, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -825,7 +917,7 @@ func TestManifestDelete(t *testing.T) {
 }
 
 func TestManifestPut(t *testing.T) {
-	repo, _ := reference.ParseNamed("test.example.com/repo/delete")
+	repo, _ := reference.WithName("test.example.com/repo/delete")
 	m1, dgst, _ := newRandomSchemaV1Manifest(repo, "other", 6)
 
 	_, payload, err := m1.Payload()
@@ -868,7 +960,7 @@ func TestManifestPut(t *testing.T) {
 	e, c := testServer(m)
 	defer c()
 
-	r, err := NewRepository(context.Background(), repo, e, nil)
+	r, err := NewRepository(repo, e, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -890,7 +982,7 @@ func TestManifestPut(t *testing.T) {
 }
 
 func TestManifestTags(t *testing.T) {
-	repo, _ := reference.ParseNamed("test.example.com/repo/tags/list")
+	repo, _ := reference.WithName("test.example.com/repo/tags/list")
 	tagsList := []byte(strings.TrimSpace(`
 {
 	"name": "test.example.com/repo/tags/list",
@@ -921,7 +1013,7 @@ func TestManifestTags(t *testing.T) {
 	e, c := testServer(m)
 	defer c()
 
-	r, err := NewRepository(context.Background(), repo, e, nil)
+	r, err := NewRepository(repo, e, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -952,7 +1044,7 @@ func TestManifestTags(t *testing.T) {
 }
 
 func TestObtainsErrorForMissingTag(t *testing.T) {
-	repo, _ := reference.ParseNamed("test.example.com/repo")
+	repo, _ := reference.WithName("test.example.com/repo")
 
 	var m testutil.RequestResponseMap
 	var errors errcode.Errors
@@ -978,7 +1070,7 @@ func TestObtainsErrorForMissingTag(t *testing.T) {
 	defer c()
 
 	ctx := context.Background()
-	r, err := NewRepository(ctx, repo, e, nil)
+	r, err := NewRepository(repo, e, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -994,11 +1086,41 @@ func TestObtainsErrorForMissingTag(t *testing.T) {
 	}
 }
 
+func TestObtainsManifestForTagWithoutHeaders(t *testing.T) {
+	repo, _ := reference.WithName("test.example.com/repo")
+
+	var m testutil.RequestResponseMap
+	m1, dgst, _ := newRandomSchemaV1Manifest(repo, "latest", 6)
+	_, pl, err := m1.Payload()
+	if err != nil {
+		t.Fatal(err)
+	}
+	addTestManifestWithoutDigestHeader(repo, "1.0.0", schema1.MediaTypeSignedManifest, pl, &m)
+
+	e, c := testServer(m)
+	defer c()
+
+	ctx := context.Background()
+	r, err := NewRepository(repo, e, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tagService := r.Tags(ctx)
+
+	desc, err := tagService.Get(ctx, "1.0.0")
+	if err != nil {
+		t.Fatalf("Expected no error")
+	}
+	if desc.Digest != dgst {
+		t.Fatalf("Unexpected digest")
+	}
+}
 func TestManifestTagsPaginated(t *testing.T) {
 	s := httptest.NewServer(http.NotFoundHandler())
 	defer s.Close()
 
-	repo, _ := reference.ParseNamed("test.example.com/repo/tags/list")
+	repo, _ := reference.WithName("test.example.com/repo/tags/list")
 	tagsList := []string{"tag1", "tag2", "funtag"}
 	var m testutil.RequestResponseMap
 	for i := 0; i < 3; i++ {
@@ -1037,7 +1159,7 @@ func TestManifestTagsPaginated(t *testing.T) {
 
 	s.Config.Handler = testutil.NewHandler(m)
 
-	r, err := NewRepository(context.Background(), repo, s.URL, nil)
+	r, err := NewRepository(repo, s.URL, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1067,7 +1189,7 @@ func TestManifestTagsPaginated(t *testing.T) {
 }
 
 func TestManifestUnauthorized(t *testing.T) {
-	repo, _ := reference.ParseNamed("test.example.com/repo")
+	repo, _ := reference.WithName("test.example.com/repo")
 	_, dgst, _ := newRandomSchemaV1Manifest(repo, "latest", 6)
 	var m testutil.RequestResponseMap
 
@@ -1085,7 +1207,7 @@ func TestManifestUnauthorized(t *testing.T) {
 	e, c := testServer(m)
 	defer c()
 
-	r, err := NewRepository(context.Background(), repo, e, nil)
+	r, err := NewRepository(repo, e, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1122,7 +1244,7 @@ func TestCatalog(t *testing.T) {
 
 	entries := make([]string, 5)
 
-	r, err := NewRegistry(context.Background(), e, nil)
+	r, err := NewRegistry(e, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1154,7 +1276,7 @@ func TestCatalogInParts(t *testing.T) {
 
 	entries := make([]string, 2)
 
-	r, err := NewRegistry(context.Background(), e, nil)
+	r, err := NewRegistry(e, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

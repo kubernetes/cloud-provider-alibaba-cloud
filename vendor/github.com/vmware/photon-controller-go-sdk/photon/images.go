@@ -84,7 +84,7 @@ func (api *ImagesAPI) Get(imageID string) (image *Image, err error) {
 	}
 	var result Image
 	err = json.NewDecoder(res.Body).Decode(&result)
-	return &result, nil
+	return &result, err
 }
 
 // Deletes image with the specified ID.
@@ -117,7 +117,7 @@ func (api *ImagesAPI) GetTasks(id string, options *TaskGetOptions) (result *Task
 }
 
 // Gets IAM Policy of an image.
-func (api *ImagesAPI) GetIam(imageID string) (policy *[]PolicyEntry, err error) {
+func (api *ImagesAPI) GetIam(imageID string) (policy []*RoleBinding, err error) {
 	res, err := api.client.restClient.Get(
 		api.client.Endpoint+imageUrl+"/"+imageID+"/iam",
 		api.client.options.TokenOptions)
@@ -129,13 +129,12 @@ func (api *ImagesAPI) GetIam(imageID string) (policy *[]PolicyEntry, err error) 
 	if err != nil {
 		return
 	}
-	var result []PolicyEntry
-	err = json.NewDecoder(res.Body).Decode(&result)
-	return &result, nil
+	err = json.NewDecoder(res.Body).Decode(&policy)
+	return policy, err
 }
 
 // Sets IAM Policy on an image.
-func (api *ImagesAPI) SetIam(imageID string, policy *[]PolicyEntry) (task *Task, err error) {
+func (api *ImagesAPI) SetIam(imageID string, policy []*RoleBinding) (task *Task, err error) {
 	body, err := json.Marshal(policy)
 	if err != nil {
 		return
@@ -154,12 +153,12 @@ func (api *ImagesAPI) SetIam(imageID string, policy *[]PolicyEntry) (task *Task,
 }
 
 // Modifies IAM Policy on an image.
-func (api *ImagesAPI) ModifyIam(imageID string, policyDelta *PolicyDelta) (task *Task, err error) {
+func (api *ImagesAPI) ModifyIam(imageID string, policyDelta []*RoleBindingDelta) (task *Task, err error) {
 	body, err := json.Marshal(policyDelta)
 	if err != nil {
 		return
 	}
-	res, err := api.client.restClient.Put(
+	res, err := api.client.restClient.Patch(
 		api.client.Endpoint+imageUrl+"/"+imageID+"/iam",
 		"application/json",
 		bytes.NewReader(body),

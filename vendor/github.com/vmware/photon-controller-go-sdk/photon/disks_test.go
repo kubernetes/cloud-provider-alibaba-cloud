@@ -20,7 +20,6 @@ var _ = Describe("Disk", func() {
 		server     *mocks.Server
 		client     *Client
 		tenantID   string
-		resName    string
 		projID     string
 		flavorName string
 		flavorID   string
@@ -30,8 +29,7 @@ var _ = Describe("Disk", func() {
 	BeforeEach(func() {
 		server, client = testSetup()
 		tenantID = createTenant(server, client)
-		resName = createResTicket(server, client, tenantID)
-		projID = createProject(server, client, tenantID, resName)
+		projID = createProject(server, client, tenantID)
 		flavorName, flavorID = createFlavor(server, client)
 		diskSpec = &DiskCreateSpec{
 			Flavor:     flavorName,
@@ -135,6 +133,126 @@ var _ = Describe("Disk", func() {
 			task, err = client.Tasks.Wait(task.ID)
 			GinkgoT().Log(err)
 			Expect(err).Should(BeNil())
+		})
+	})
+
+	Describe("ManageDiskIamPolicy", func() {
+		It("Set IAM Policy succeeds", func() {
+			mockTask := createMockTask("CREATE_DISK", "COMPLETED")
+			server.SetResponseJson(200, mockTask)
+
+			task, err := client.Projects.CreateDisk(projID, diskSpec)
+			task, err = client.Tasks.Wait(task.ID)
+			GinkgoT().Log(err)
+			Expect(err).Should(BeNil())
+			Expect(task).ShouldNot(BeNil())
+			Expect(task.Operation).Should(Equal("CREATE_DISK"))
+			Expect(task.State).Should(Equal("COMPLETED"))
+
+			diskID := task.Entity.ID
+			mockTask = createMockTask("SET_IAM_POLICY", "COMPLETED")
+			server.SetResponseJson(200, mockTask)
+			var policy []*RoleBinding
+			policy = []*RoleBinding{{Role: "owner", Subjects: []string{"joe@photon.local"}}}
+			task, err = client.Disks.SetIam(diskID, policy)
+			task, err = client.Tasks.Wait(task.ID)
+			GinkgoT().Log(err)
+			Expect(err).Should(BeNil())
+			Expect(task).ShouldNot(BeNil())
+			Expect(task.Operation).Should(Equal("SET_IAM_POLICY"))
+			Expect(task.State).Should(Equal("COMPLETED"))
+
+			mockTask = createMockTask("DELETE_DISK", "COMPLETED")
+			server.SetResponseJson(200, mockTask)
+			task, err = client.Disks.Delete(diskID)
+			task, err = client.Tasks.Wait(task.ID)
+
+			GinkgoT().Log(err)
+			Expect(err).Should(BeNil())
+			Expect(task).ShouldNot(BeNil())
+			Expect(task.Operation).Should(Equal("DELETE_DISK"))
+			Expect(task.State).Should(Equal("COMPLETED"))
+		})
+
+		It("Modify IAM Policy succeeds", func() {
+			mockTask := createMockTask("CREATE_DISK", "COMPLETED")
+			server.SetResponseJson(200, mockTask)
+
+			task, err := client.Projects.CreateDisk(projID, diskSpec)
+			task, err = client.Tasks.Wait(task.ID)
+			GinkgoT().Log(err)
+			Expect(err).Should(BeNil())
+			Expect(task).ShouldNot(BeNil())
+			Expect(task.Operation).Should(Equal("CREATE_DISK"))
+			Expect(task.State).Should(Equal("COMPLETED"))
+
+			diskID := task.Entity.ID
+			mockTask = createMockTask("MODIFY_IAM_POLICY", "COMPLETED")
+			server.SetResponseJson(200, mockTask)
+			var delta []*RoleBindingDelta
+			delta = []*RoleBindingDelta{{Subject: "joe@photon.local", Action: "ADD", Role: "owner"}}
+			task, err = client.Disks.ModifyIam(diskID, delta)
+			task, err = client.Tasks.Wait(task.ID)
+			GinkgoT().Log(err)
+			Expect(err).Should(BeNil())
+			Expect(task).ShouldNot(BeNil())
+			Expect(task.Operation).Should(Equal("MODIFY_IAM_POLICY"))
+			Expect(task.State).Should(Equal("COMPLETED"))
+
+			mockTask = createMockTask("DELETE_DISK", "COMPLETED")
+			server.SetResponseJson(200, mockTask)
+			task, err = client.Disks.Delete(diskID)
+			task, err = client.Tasks.Wait(task.ID)
+
+			GinkgoT().Log(err)
+			Expect(err).Should(BeNil())
+			Expect(task).ShouldNot(BeNil())
+			Expect(task.Operation).Should(Equal("DELETE_DISK"))
+			Expect(task.State).Should(Equal("COMPLETED"))
+		})
+
+		It("Get IAM Policy succeeds", func() {
+			mockTask := createMockTask("CREATE_DISK", "COMPLETED")
+			server.SetResponseJson(200, mockTask)
+
+			task, err := client.Projects.CreateDisk(projID, diskSpec)
+			task, err = client.Tasks.Wait(task.ID)
+			GinkgoT().Log(err)
+			Expect(err).Should(BeNil())
+			Expect(task).ShouldNot(BeNil())
+			Expect(task.Operation).Should(Equal("CREATE_DISK"))
+			Expect(task.State).Should(Equal("COMPLETED"))
+
+			diskID := task.Entity.ID
+			mockTask = createMockTask("SET_IAM_POLICY", "COMPLETED")
+			server.SetResponseJson(200, mockTask)
+			var policy []*RoleBinding
+			policy = []*RoleBinding{{Role: "owner", Subjects: []string{"joe@photon.local"}}}
+			task, err = client.Disks.SetIam(diskID, policy)
+			task, err = client.Tasks.Wait(task.ID)
+			GinkgoT().Log(err)
+			Expect(err).Should(BeNil())
+			Expect(task).ShouldNot(BeNil())
+			Expect(task.Operation).Should(Equal("SET_IAM_POLICY"))
+			Expect(task.State).Should(Equal("COMPLETED"))
+
+			server.SetResponseJson(200, policy)
+			response, err := client.Disks.GetIam(diskID)
+			GinkgoT().Log(err)
+			Expect(err).Should(BeNil())
+			Expect(response[0].Subjects).Should(Equal(policy[0].Subjects))
+			Expect(response[0].Role).Should(Equal(policy[0].Role))
+
+			mockTask = createMockTask("DELETE_DISK", "COMPLETED")
+			server.SetResponseJson(200, mockTask)
+			task, err = client.Disks.Delete(diskID)
+			task, err = client.Tasks.Wait(task.ID)
+
+			GinkgoT().Log(err)
+			Expect(err).Should(BeNil())
+			Expect(task).ShouldNot(BeNil())
+			Expect(task.Operation).Should(Equal("DELETE_DISK"))
+			Expect(task.State).Should(Equal("COMPLETED"))
 		})
 	})
 })

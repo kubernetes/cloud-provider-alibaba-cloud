@@ -20,7 +20,7 @@ import (
 )
 
 // Reads an error out of the HTTP response, or does nothing if
-// no error occured.
+// no error occurred.
 func getError(res *http.Response) (*http.Response, error) {
 	// Do nothing if the response is a successful 2xx
 	if res.StatusCode/100 == 2 {

@@ -91,6 +91,38 @@ var _ = Describe("Image", func() {
 			Expect(task.Operation).Should(Equal("DELETE_IMAGE"))
 			Expect(task.State).Should(Equal("COMPLETED"))
 		})
+
+		It("Image create at project scope succeeds", func() {
+			mockTask := createMockTask("CREATE_IMAGE", "COMPLETED", createMockStep("UPLOAD_IMAGE", "COMPLETED"))
+			server.SetResponseJson(200, mockTask)
+
+			imagePath := "../testdata/tty_tiny.ova"
+			file, err := os.Open(imagePath)
+			GinkgoT().Log(err)
+			Expect(err).Should(BeNil())
+			task, err := client.Projects.CreateImage("projectID", file, "tty_tiny.ova", &ImageCreateOptions{ReplicationType: "ON_DEMAND"})
+			task, err = client.Tasks.Wait(task.ID)
+
+			GinkgoT().Log(err)
+			Expect(err).Should(BeNil())
+			Expect(task).ShouldNot(BeNil())
+			Expect(task.Operation).Should(Equal("CREATE_IMAGE"))
+			Expect(task.State).Should(Equal("COMPLETED"))
+
+			err = file.Close()
+			Expect(err).Should(BeNil())
+
+			mockTask = createMockTask("DELETE_IMAGE", "COMPLETED")
+			server.SetResponseJson(200, mockTask)
+			task, err = client.Images.Delete(task.Entity.ID)
+			task, err = client.Tasks.Wait(task.ID)
+
+			GinkgoT().Log(err)
+			Expect(err).Should(BeNil())
+			Expect(task).ShouldNot(BeNil())
+			Expect(task.Operation).Should(Equal("DELETE_IMAGE"))
+			Expect(task.State).Should(Equal("COMPLETED"))
+		})
 	})
 
 	Describe("GetImage", func() {
@@ -228,9 +260,9 @@ var _ = Describe("Image", func() {
 		It("Set IAM Policy succeeds", func() {
 			mockTask := createMockTask("SET_IAM_POLICY", "COMPLETED")
 			server.SetResponseJson(200, mockTask)
-			var policy []PolicyEntry
-			policy = []PolicyEntry{{Principal: "joe@coke.com", Roles: []string{"owner"}}}
-			task, err := client.Images.SetIam("imageId", &policy)
+			var policy []*RoleBinding
+			policy = []*RoleBinding{{Role: "owner", Subjects: []string{"joe@photon.local"}}}
+			task, err := client.Images.SetIam("imageId", policy)
 			task, err = client.Tasks.Wait(task.ID)
 			GinkgoT().Log(err)
 			Expect(err).Should(BeNil())
@@ -242,9 +274,9 @@ var _ = Describe("Image", func() {
 		It("Modify IAM Policy succeeds", func() {
 			mockTask := createMockTask("MODIFY_IAM_POLICY", "COMPLETED")
 			server.SetResponseJson(200, mockTask)
-			var delta PolicyDelta
-			delta = PolicyDelta{Principal: "joe@coke.com", Action: "ADD", Role: "owner"}
-			task, err := client.Images.ModifyIam("imageId", &delta)
+			var delta []*RoleBindingDelta
+			delta = []*RoleBindingDelta{{Subject: "joe@photon.local", Action: "ADD", Role: "owner"}}
+			task, err := client.Images.ModifyIam("imageId", delta)
 			task, err = client.Tasks.Wait(task.ID)
 			GinkgoT().Log(err)
 			Expect(err).Should(BeNil())
@@ -254,15 +286,15 @@ var _ = Describe("Image", func() {
 		})
 
 		It("Get IAM Policy succeeds", func() {
-			var policy []PolicyEntry
-			policy = []PolicyEntry{{Principal: "joe@coke.com", Roles: []string{"owner"}}}
+			var policy []*RoleBinding
+			policy = []*RoleBinding{{Role: "owner", Subjects: []string{"joe@photon.local"}}}
 			server.SetResponseJson(200, policy)
 			response, err := client.Images.GetIam("imageId")
 
 			GinkgoT().Log(err)
 			Expect(err).Should(BeNil())
-			Expect((*response)[0].Principal).Should(Equal(policy[0].Principal))
-			Expect((*response)[0].Roles).Should(Equal(policy[0].Roles))
+			Expect(response[0].Subjects).Should(Equal(policy[0].Subjects))
+			Expect(response[0].Role).Should(Equal(policy[0].Role))
 		})
 	})
 })

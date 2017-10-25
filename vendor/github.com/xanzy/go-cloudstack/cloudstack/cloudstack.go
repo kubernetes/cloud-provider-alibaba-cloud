@@ -1,5 +1,5 @@
 //
-// Copyright 2016, Sander van Harmelen
+// Copyright 2017, Sander van Harmelen
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -80,6 +80,7 @@ type CloudStackClient struct {
 	CloudIdentifier  *CloudIdentifierService
 	Cluster          *ClusterService
 	Configuration    *ConfigurationService
+	Custom           *CustomService
 	DiskOffering     *DiskOfferingService
 	Domain           *DomainService
 	Event            *EventService
@@ -161,6 +162,7 @@ func newClient(apiurl string, apikey string, secret string, async bool, verifyss
 	cs.CloudIdentifier = NewCloudIdentifierService(cs)
 	cs.Cluster = NewClusterService(cs)
 	cs.Configuration = NewConfigurationService(cs)
+	cs.Custom = NewCustomService(cs)
 	cs.DiskOffering = NewDiskOfferingService(cs)
 	cs.Domain = NewDomainService(cs)
 	cs.Event = NewEventService(cs)
@@ -533,6 +535,14 @@ type ConfigurationService struct {
 
 func NewConfigurationService(cs *CloudStackClient) *ConfigurationService {
 	return &ConfigurationService{cs: cs}
+}
+
+type CustomService struct {
+	cs *CloudStackClient
+}
+
+func NewCustomService(cs *CloudStackClient) *CustomService {
+	return &CustomService{cs: cs}
 }
 
 type DiskOfferingService struct {

@@ -247,6 +247,86 @@ var _ = Describe("OIDCClient", func() {
 		})
 	})
 
+	Describe("GetClientTokensPasswordGrant", func() {
+		Context("with fake server", func() {
+			BeforeEach(func() {
+				client, server = testSetupFakeServer()
+			})
+
+			Context("when server responds with valid data", func() {
+				var (
+					expected *OIDCTokenResponse
+				)
+
+				BeforeEach(func() {
+					expected = &OIDCTokenResponse{
+						AccessToken:  "fake_access_token",
+						ExpiresIn:    36000,
+						RefreshToken: "fake_refresh_token",
+						IdToken:      "fake_id_token",
+						TokenType:    "Bearer",
+					}
+					server.SetResponseJsonForPath(tokenPath, 200, expected)
+				})
+
+				It("retrieves tokens", func() {
+					resp, err := client.GetClientTokenByPasswordGrant("u", "p", "c")
+					Expect(err).To(BeNil())
+					Expect(resp).To(BeEquivalentTo(expected))
+				})
+			})
+
+			Context("when server responds with unsupported format", func() {
+				BeforeEach(func() {
+					server.SetResponseForPath(tokenPath, 200, "text")
+				})
+
+				It("returns an error", func() {
+					resp, err := client.GetClientTokenByPasswordGrant("u", "p", "c")
+					Expect(resp).To(BeNil())
+					Expect(err).ToNot(BeNil())
+					Expect(err).To(MatchError("invalid character 'e' in literal true (expecting 'r')"))
+				})
+			})
+
+			Context("when server responds with error", func() {
+				BeforeEach(func() {
+					server.SetResponseForPath(tokenPath, 400, "Error")
+				})
+
+				It("returns an error", func() {
+					resp, err := client.GetClientTokenByPasswordGrant("u", "p", "c")
+					Expect(resp).To(BeNil())
+					Expect(err).ToNot(BeNil())
+					Expect(err).To(MatchError("Status: 400 Bad Request, Body: Error\n [<nil>]"))
+				})
+			})
+		})
+
+		Context("with real server", func() {
+			BeforeEach(func() {
+				options := &OIDCClientOptions{
+					IgnoreCertificate: true,
+				}
+
+				client, _, _ = testSetupRealServer(options)
+				if client == nil {
+					Skip("LIGHTWAVE_ENDPOINT must be set for this test to run")
+				}
+			})
+
+			Context("when username/password is wrong", func() {
+				It("retrieves certificates", func() {
+					resp, err := client.GetClientTokenByPasswordGrant("u", "p", "c")
+					Expect(resp).To(BeNil())
+					Expect(err).ToNot(BeNil())
+					Expect(err.(OIDCError).Code).To(BeEquivalentTo("invalid_grant"))
+					Expect(err.(OIDCError).Message).ToNot(BeNil())
+				})
+			})
+		})
+	})
+
 	Describe("GetTokensFromWindowsLogInContext", func() {
 		Context("with fake server", func() {
 			BeforeEach(func() {
@@ -307,7 +387,7 @@ var _ = Describe("OIDCClient", func() {
 		})
 	})
 
-	Describe("GetTokensPasswordGrant", func() {
+	Describe("GetTokensRefreshTokenGrant", func() {
 		Context("with fake server", func() {
 			BeforeEach(func() {
 				client, server = testSetupFakeServer()
