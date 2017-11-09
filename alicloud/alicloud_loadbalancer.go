@@ -74,8 +74,8 @@ type SDKClientSLB struct {
 	c *slb.Client
 }
 
-func NewSDKClientSLB(key string, secret string) *SDKClientSLB {
-	client := slb.NewClient(key, secret)
+func NewSDKClientSLB(key string, secret string, region common.Region) *SDKClientSLB {
+	client := slb.NewSLBClient(key, secret, region)
 	client.SetUserAgent(KUBERNETES_ALICLOUD_IDENTITY)
 	return &SDKClientSLB{c: client}
 }
@@ -122,6 +122,7 @@ func (s *SDKClientSLB) EnsureLoadBalancer(service *v1.Service, nodes []*v1.Node,
 	}
 	opts.LoadBalancerName = lbn
 	if !exists {
+		glog.V(2).Infof("Alicloud, Create Load Balancer with OPTION: %+v\n",opts)
 		lbr, err := s.c.CreateLoadBalancer(opts)
 		if err != nil {
 			return nil, err
