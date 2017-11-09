@@ -80,6 +80,7 @@ func init() {
 				return nil, err
 			}
 			cfg.Global.AccessKeySecret = string(secret)
+			glog.V(2).Infof("Alicloud: Accesskey=%s, AccessKeySecrete=%s",cfg.Global.AccessKeyID,cfg.Global.AccessKeySecret)
 			return newAliCloud(&cfg)
 		})
 }
@@ -118,7 +119,7 @@ func newAliCloud(config *CloudConfig) (*Cloud, error) {
 		}
 	}
 	DEFAULT_REGION = c.region
-	c.slb = NewSDKClientSLB(config.Global.AccessKeyID, config.Global.AccessKeySecret)
+	c.slb = NewSDKClientSLB(config.Global.AccessKeyID, config.Global.AccessKeySecret, c.region)
 	c.ins = NewSDKClientINS(config.Global.AccessKeyID, config.Global.AccessKeySecret)
 	c.ins.CurrentNodeName = types.NodeName(curr)
 	r, err := NewSDKClientRoutes(config.Global.AccessKeyID, config.Global.AccessKeySecret)
