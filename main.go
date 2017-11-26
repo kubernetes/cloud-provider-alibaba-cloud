@@ -4,6 +4,9 @@ import (
 	"fmt"
 	"os"
 
+	_ "github.com/AliyunContainerService/alicloud-controller-manager/alicloud"
+	"github.com/golang/glog"
+	"github.com/spf13/pflag"
 	"k8s.io/apiserver/pkg/server/healthz"
 	"k8s.io/apiserver/pkg/util/flag"
 	"k8s.io/apiserver/pkg/util/logs"
@@ -13,9 +16,6 @@ import (
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	_ "k8s.io/kubernetes/pkg/version/prometheus"
 	"k8s.io/kubernetes/pkg/version/verflag"
-	_ "gitlab.alibaba-inc.com/acs/alicloud-controller-manager/alicloud"
-	"github.com/golang/glog"
-	"github.com/spf13/pflag"
 )
 
 func init() {
@@ -36,7 +36,6 @@ func main() {
 	cloud, err := cloudprovider.InitCloudProvider("alicloud", s.CloudConfigFile)
 	if err != nil {
 		glog.Fatalf("Alibaba cloud provider could not be initialized: %v", err)
-
 	}
 
 	if err := app.Run(s, cloud); err != nil {

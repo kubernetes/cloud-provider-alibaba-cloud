@@ -38,25 +38,21 @@
   version = "1.0.0"
 
 [[constraint]]
-  revision = "6c6dac0277229b9e9578c5ca3f74a4345d35cdc2"
+  branch = "release-1.8"
   name = "k8s.io/api"
 
 [[constraint]]
-  revision = "019ae5ada31de202164b118aee88ee2d14075c31"
+  branch = "release-1.8"
   name = "k8s.io/apimachinery"
 
 [[constraint]]
-  revision = "a35277792fddcf69f8cbbb8a9cb7727b23077409"
+  branch = "release-1.8"
   name = "k8s.io/apiserver"
 
 [[constraint]]
   name = "k8s.io/kubernetes"
-  revision = "f38e43b221d08850172a9a4ea785a86a3ffa3b3a"
-
-[[constraint]]
-  name = "github.com/docker/distribution"
-  branch = "master"
+  version = "v1.8.1"
 
 [[override]]
-  name = "github.com/docker/distribution"
+  name = "github.com/patrickmn/go-cache"
   branch = "master"
