@@ -19,7 +19,7 @@ endif
 ifeq ($(LOCAL),)
 	SOURCE=$(shell echo ${PWD})
 else
-    SOURCE=$(LOCAL)
+	SOURCE=$(LOCAL)
 endif
 GOARM=6
 KUBE_CROSS_TAG=v1.8.1-1
@@ -45,6 +45,9 @@ clean:
 	rm -f dist/*.docker
 	rm -f dist/*.tar.gz
 
+pre-requisite:
+	@echo "Warning: Tag your branch before make. or makefile can not autodetect image tag."
+
 ## Create a docker image on disk for a specific arch and tag
 cloud-controller-manager-$(TAG)-$(ARCH).docker: cloud-controller-manager-$(ARCH) dist/iptables-$(ARCH) dist/libpthread.so.0-$(ARCH)
 	docker build -f Dockerfile.$(ARCH) -t $(REGISTRY):$(TAG)-$(ARCH) .
@@ -54,10 +57,12 @@ cloud-controller-manager-$(TAG)-$(ARCH).docker: cloud-controller-manager-$(ARCH)
 ifeq ($(ARCH),amd64)
 	docker build -f Dockerfile -t $(REGISTRY):$(TAG) ./build/
 endif
-image:
-	docker build -f Dockerfile -t $(REGISTRY):$(TAG) .
-docker-push: cloud-controller-manager-$(TAG)-$(ARCH).docker
-	docker push $(REGISTRY):$(TAG)-$(ARCH)
+
+image: cloud-controller-manager-$(ARCH)
+	docker build -f build/Dockerfile -t $(REGISTRY):$(TAG) ./build/
+
+docker-push:
+	docker push $(REGISTRY):$(TAG)
 
 # amd64 gets an image with the suffix too (i.e. it's the default)
 ifeq ($(ARCH),amd64)
@@ -67,7 +72,7 @@ endif
 docker-build: cloud-controller-manager-$(ARCH)
 
 ## Build an architecture specific cloud-controller-manager binary
-cloud-controller-manager-$(ARCH):
+cloud-controller-manager-$(ARCH): pre-requisite
 	# Build for other platforms with ARCH=$$ARCH make build
 	# valid values for $$ARCH are [amd64 arm arm64 ppc64le]
 

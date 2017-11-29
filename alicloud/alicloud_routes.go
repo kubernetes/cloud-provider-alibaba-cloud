@@ -46,15 +46,14 @@ func (r *SDKClientRoutes) findRouter(region common.Region, vpcid string) (*ecs.V
 			VpcId:    vpcid,
 		})
 		if err != nil {
-			glog.V(2).Infof("Alicloud: Error ecs.DescribeVpcs(%s,%s), %s . \n", region, vpc, r.getErrorString(err))
+			glog.Errorf("Alicloud.findRouter(): error from ecs.DescribeVpcs(%s,%s). message=%s\n", region, vpc, r.getErrorString(err))
 			return nil, err
 		}
 		if len(vpc) <= 0 {
-			return nil, errors.New(fmt.Sprintf("Can not find vpc Meta by instance[region=%s][vpcid=%s], error: len = 0", region, vpc))
+			return nil, errors.New(fmt.Sprintf("can not find vpc metadata by instance. region=%s, vpcid=%s, error=[no vpc found by specified id]", region, vpc))
 		}
 		r.vpcs.Set(vpckey, &vpc[0], defaultCacheExpiration)
 		v = &vpc[0]
-		glog.V(2).Infof("call api: DescribeVpcs, %+v\n",vpc[0])
 	}
 	vpc := v.(*ecs.VpcSetType)
 	// lookup for VRouter
@@ -67,16 +66,14 @@ func (r *SDKClientRoutes) findRouter(region common.Region, vpcid string) (*ecs.V
 				RegionId:  region,
 			})
 		if err != nil {
-			glog.V(2).Infof("Alicloud: Error ecs.DescribeVRouters(%s,%s), %s .\n", vpc.VRouterId, region, r.getErrorString(err))
+			glog.Errorf("Alicloud.findRouter(): error ecs.DescribeVRouters(%s,%s). message=%s\n", vpc.VRouterId, region, r.getErrorString(err))
 			return nil, err
 		}
 		if len(vroute) <= 0 {
-			return nil, errors.New(fmt.Sprintf("Can not find VRouter Meta by instance[region=%s][vpcid=%s], error: len = 0", region, vpc))
+			return nil, errors.New(fmt.Sprintf("can not find VRouter metadata by instance. region=%s,vpcid=%s, error=[no VRouter found by specified id]", region, vpc))
 		}
 		r.routers.Set(routerkey, &vroute[0],defaultCacheExpiration)
 		route = &vroute[0]
-
-		glog.V(2).Infof("call api: DescribeVRouters, %+v\n",vroute[0])
 	}
 	rts := route.(*ecs.VRouterSetType)
 	return rts,nil
@@ -101,12 +98,12 @@ func (r *SDKClientRoutes) ListRoutes(region common.Region, vpcs []string) ([]*cl
 	for _, vpc := range vpcs {
 		tables, _ ,err := r.findRouteTables(region, vpc)
 		if err != nil {
-			glog.V(2).Infof("Alicloud: Error ecs.DescribeRouteTables() %s.\n", r.getErrorString(err))
+			glog.Errorf("Alicloud.ListRoutes(): error ecs.DescribeRouteTables() message=%s.\n", r.getErrorString(err))
 			return nil, err
 		}
 
 		if len(tables) <= 0 {
-			glog.V(2).Infof("Alicloud WARINING: SDKClientRoutes.SDKClientRoutes,vpc=%s\n", vpc)
+			glog.Warningf("Alicloud.ListRoutes(): error SDKClientRoutes.SDKClientRoutes. vpc=%s, message=[no route table found]\n", vpc)
 			continue
 		}
 
@@ -142,12 +139,12 @@ func (r *SDKClientRoutes) CreateRoute(route *cloudprovider.Route, region common.
 
 	tables, _, err := r.findRouteTables(region, vpcid)
 	if err != nil {
-		glog.V(2).Infof("Alicloud: Error ecs.DescribeRouteTables() %s.\n", err.Error())
+		glog.Errorf("Alicloud.CreateRoute(): error ecs.DescribeRouteTables(). message=%s.\n", err.Error())
 		return err
 	}
 	if len(tables) <= 0 {
-		glog.V(2).Infof("Alicloud WARINING: SDKClientRoutes.SDKClientRoutes,vRouteID=%s,rTableID=%s\n", tables[0].VRouterId, tables[0].RouteTableId)
-		return errors.New(fmt.Sprintf("SDKClientRoutes.CreateRoute(%s),Error: cant find route table [vRouteID=%s,rTableID=%s]", route.DestinationCIDR, tables[0].VRouterId, tables[0].RouteTableId))
+		glog.Errorf("Alicloud.CreateRoute(): SDKClientRoutes.SDKClientRoutes returned zero items. abort creating. vRouteID=%s,rTableID=%s\n", tables[0].VRouterId, tables[0].RouteTableId)
+		return errors.New(fmt.Sprintf("error: cant find route table for route. cidr=%s, vRouteID=%s, rTableID=%s", route.DestinationCIDR, tables[0].VRouterId, tables[0].RouteTableId))
 	}
 	if err := r.reCreateRoute(tables[0], &ecs.CreateRouteEntryArgs{
 		DestinationCidrBlock: route.DestinationCIDR,
@@ -191,13 +188,13 @@ func (r *SDKClientRoutes) reCreateRoute(table ecs.RouteTableSetType, route *ecs.
 			if e.DestinationCidrBlock == route.DestinationCidrBlock &&
 				e.Status == ecs.RouteEntryStatusAvailable {
 				exist = true
-				glog.V(2).Infof("Keep target entry: rtableid=%s, CIDR=%s, NextHop=%s \n", e.RouteTableId, e.DestinationCidrBlock, e.InstanceId)
+				glog.V(2).Infof("keep target entry: rtableid=%s, CIDR=%s, NextHop=%s \n", e.RouteTableId, e.DestinationCidrBlock, e.InstanceId)
 				continue
 			}
 
 			// 0.0.0.0/0 => ECS1 this kind of route is used for DNAT. so we keep it
 			if e.DestinationCidrBlock == "0.0.0.0/0" {
-				glog.V(2).Infof("Keep route entry: rtableid=%s, CIDR=%s, NextHop=%s For DNAT\n", e.RouteTableId, e.DestinationCidrBlock, e.InstanceId)
+				glog.V(2).Infof("keep route entry: rtableid=%s, CIDR=%s, NextHop=%s For DNAT\n", e.RouteTableId, e.DestinationCidrBlock, e.InstanceId)
 				continue
 			}
 			// Fix: here we delete all the route which targeted to us(instance) except the specified route.
@@ -211,11 +208,11 @@ func (r *SDKClientRoutes) reCreateRoute(table ecs.RouteTableSetType, route *ecs.
 				return err
 			}
 
-			glog.V(2).Infof("Remove old route entry: rtableid=%s, CIDR=%s, NextHop=%s \n", e.RouteTableId, e.DestinationCidrBlock, e.InstanceId)
+			glog.V(2).Infof("remove old route entry: rtableid=%s, CIDR=%s, NextHop=%s \n", e.RouteTableId, e.DestinationCidrBlock, e.InstanceId)
 			continue
 		}
 
-		glog.V(2).Infof("Keep route entry: rtableid=%s, CIDR=%s, NextHop=%s \n", e.RouteTableId, e.DestinationCidrBlock, e.InstanceId)
+		glog.V(2).Infof("keep route entry: rtableid=%s, CIDR=%s, NextHop=%s \n", e.RouteTableId, e.DestinationCidrBlock, e.InstanceId)
 	}
 	if !exist {
 		return r.client.CreateRouteEntry(route)

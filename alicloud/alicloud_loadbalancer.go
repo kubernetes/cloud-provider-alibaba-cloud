@@ -13,57 +13,26 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 )
 
-// ServiceAnnotationLoadBalancerSSLPorts is the annotation used on the service
-// to specify a comma-separated list of ports that will use SSL/HTTPS
-// listeners. Defaults to '*' (all).
-const ServiceAnnotationLoadBalancerProtocolPort = "service.beta.kubernetes.io/alicloud-loadbalancer-ProtocolPort"
-
-const ServiceAnnotationLoadBalancerAddressType = "service.beta.kubernetes.io/alicloud-loadbalancer-AddressType"
-
-const ServiceAnnotationLoadBalancerSLBNetworkType = "service.beta.kubernetes.io/alicloud-loadbalancer-SLBNetworkType"
-
-const ServiceAnnotationLoadBalancerChargeType = "service.beta.kubernetes.io/alicloud-loadbalancer-ChargeType"
-
-const ServiceAnnotationLoadBalancerRegion = "service.beta.kubernetes.io/alicloud-loadbalancer-Region"
-
-const ServiceAnnotationLoadBalancerBandwidth = "service.beta.kubernetes.io/alicloud-loadbalancer-Bandwidth"
-
-const ServiceAnnotationLoadBalancerCertID = "service.beta.kubernetes.io/alicloud-loadbalancer-CertID"
-
-const ServiceAnnotationLoadBalancerHealthCheckFlag = "service.beta.kubernetes.io/alicloud-loadbalancer-HealthCheckFlag"
-
-const ServiceAnnotationLoadBalancerHealthCheckType = "service.beta.kubernetes.io/alicloud-loadbalancer-HealthCheckType"
-
-const ServiceAnnotationLoadBalancerHealthCheckURI = "service.beta.kubernetes.io/alicloud-loadbalancer-HealthCheckURI"
-
-const ServiceAnnotationLoadBalancerHealthCheckConnectPort = "service.beta.kubernetes.io/alicloud-loadbalancer-HealthCheckConnectPort"
-
-const ServiceAnnotationLoadBalancerHealthCheckHealthyThreshold = "service.beta.kubernetes.io/alicloud-loadbalancer-HealthyThreshold"
-
-const ServiceAnnotationLoadBalancerHealthCheckUnhealthyThreshold = "service.beta.kubernetes.io/alicloud-loadbalancer-UnhealthyThreshold"
-
-const ServiceAnnotationLoadBalancerHealthCheckInterval = "service.beta.kubernetes.io/alicloud-loadbalancer-HealthCheckInterval"
-
-const ServiceAnnotationLoadBalancerHealthCheckConnectTimeout = "service.beta.kubernetes.io/alicloud-loadbalancer-HealthCheckConnectTimeout"
-
-const ServiceAnnotationLoadBalancerHealthCheckTimeout = "service.beta.kubernetes.io/alicloud-loadbalancer-HealthCheckTimeout"
 
 type AnnotationRequest struct {
-	SSLPorts    string
-	AddressType slb.AddressType
-	SLBNetworkType string
+	Loadbalancerid       	string
+	BackendLabel            string
 
-	ChargeType  slb.InternetChargeType
-	Region      common.Region
-	Bandwidth   int
-	CertID      string
+	SSLPorts    		string
+	AddressType 		slb.AddressType
+	SLBNetworkType 		string
 
-	HealthCheck            slb.FlagType
-	HealthCheckURI         string
-	HealthCheckConnectPort int
-	HealthyThreshold       int
-	UnhealthyThreshold     int
-	HealthCheckInterval    int
+	ChargeType  		slb.InternetChargeType
+	Region      		common.Region
+	Bandwidth  		int
+	CertID      		string
+
+	HealthCheck            	slb.FlagType
+	HealthCheckURI         	string
+	HealthCheckConnectPort 	int
+	HealthyThreshold       	int
+	UnhealthyThreshold     	int
+	HealthCheckInterval    	int
 
 	HealthCheckConnectTimeout int                 // for tcp
 	HealthCheckType           slb.HealthCheckType // for tcp, Type could be http tcp
@@ -79,50 +48,82 @@ func NewSDKClientSLB(key string, secret string, region common.Region) *SDKClient
 	client.SetUserAgent(KUBERNETES_ALICLOUD_IDENTITY)
 	return &SDKClientSLB{c: client}
 }
-func (s *SDKClientSLB) GetLoadBalancerByName(lbn string, service *v1.Service) (*slb.LoadBalancerType, bool, error) {
+
+func (s * SDKClientSLB) findLoadBalancer(service *v1.Service) (bool, *slb.LoadBalancerType, error) {
 	ar := ExtractAnnotationRequest(service)
+	if ar.Loadbalancerid != "" {
+		return s.findLoadBalancerByID(ar.Loadbalancerid,ar.Region)
+	}
+	return s.findLoadBalancerByName(cloudprovider.GetLoadBalancerName(service),ar.Region)
+}
+
+func (s *SDKClientSLB) findLoadBalancerByID(lbid string,region common.Region) (bool, *slb.LoadBalancerType, error) {
+
 	lbs, err := s.c.DescribeLoadBalancers(
 		&slb.DescribeLoadBalancersArgs{
-			RegionId:         ar.Region,
+			RegionId:         region,
+			LoadBalancerId:   lbid,
+		},
+	)
+
+	if err != nil {
+		return false, nil, err
+	}
+
+	if lbs == nil || len(lbs) == 0 {
+		return false,nil, nil
+	}
+	if len(lbs) > 1 {
+		glog.Warningf("Alicloud.GetLoadBalancerByID(): multiple loadbalancer returned with id=%s, " +
+			"using the first one with IP=%s", lbid, lbs[0].Address)
+	}
+	lb, err := s.c.DescribeLoadBalancerAttribute(lbs[0].LoadBalancerId)
+	return err == nil, lb, err
+}
+
+func (s *SDKClientSLB) findLoadBalancerByName(lbn string, region common.Region) (bool, *slb.LoadBalancerType, error) {
+
+	lbs, err := s.c.DescribeLoadBalancers(
+		&slb.DescribeLoadBalancersArgs{
+			RegionId:         region,
 			LoadBalancerName: lbn,
 		},
 	)
 
 	if err != nil {
-		return nil, false, err
+		return false, nil, err
 	}
 
 	if lbs == nil || len(lbs) == 0 {
-		return nil, false, nil
+		return false, nil, nil
 	}
 	if len(lbs) > 1 {
-		glog.Errorf("Warning: Mutil LoadBalancer returned with name=%s, Using the first one with IP=%s", lbn, lbs[0].Address)
+		glog.Warningf("Alicloud.GetLoadBalancerByName(): multiple loadbalancer returned with name=%s, " +
+			"using the first one with IP=%s", lbn, lbs[0].Address)
 	}
 	lb, err := s.c.DescribeLoadBalancerAttribute(lbs[0].LoadBalancerId)
-	if err != nil {
-		return nil, false, err
-	}
-	return lb, true, nil
+	return err == nil, lb, err
 }
 
 func (s *SDKClientSLB) EnsureLoadBalancer(service *v1.Service, nodes []*v1.Node, vswitchid string) (*slb.LoadBalancerType, error) {
-	lbn := cloudprovider.GetLoadBalancerName(service)
-	lb, exists, err := s.GetLoadBalancerByName(lbn, service)
+	exists, lb, err := s.findLoadBalancer(service)
 	if err != nil {
 		return nil, err
 	}
+	glog.V(2).Infof("Alicloud.EnsureLoadBalancer(): sync loadbalancer=%v\n", lb)
 	ar := ExtractAnnotationRequest(service)
 	opts := s.getLoadBalancerOpts(ar)
 	if strings.Compare(string(opts.AddressType) ,
 		string(slb.IntranetAddressType)) == 0 && ar.SLBNetworkType != "classic"{
 
-		glog.V(2).Infof("Create VPC intranet SLB, Alicloud.AddreesType:%s, " +
-			"slb: %s, switch: %s\n",opts.AddressType,slb.IntranetAddressType,vswitchid)
+		glog.Infof("Alicloud.EnsureLoadBalancer(): intranet VPC loadbalancer will be created. " +
+			"addressType=%s, switch=%s\n",opts.AddressType,vswitchid)
 		opts.VSwitchId = vswitchid
 	}
-	opts.LoadBalancerName = lbn
+	opts.LoadBalancerName = cloudprovider.GetLoadBalancerName(service)
 	if !exists {
-		glog.V(2).Infof("Alicloud, Create Load Balancer with OPTION: %+v\n",opts)
+		glog.V(2).Infof("Alicloud.EnsureLoadBalancer(): loadbalancer dose not exist, " +
+			"create new loadbalancer with option=%+v\n",opts)
 		lbr, err := s.c.CreateLoadBalancer(opts)
 		if err != nil {
 			return nil, err
@@ -132,10 +133,11 @@ func (s *SDKClientSLB) EnsureLoadBalancer(service *v1.Service, nodes []*v1.Node,
 			return nil, err
 		}
 	} else {
-		glog.V(2).Infof("Alicloud.EnsureLoadBalancer() compare: %+v, %+v", opts, lb)
 		// Todo: here we need to compare loadbalance
 		if opts.InternetChargeType != lb.InternetChargeType {
-			glog.Infof("Alicloud.EnsureLoadBalancer() InternetChargeType or Bandwidth Changed, update LoadBalancer:[%+v]\n", opts)
+			glog.Infof("Alicloud.EnsureLoadBalancer(): diff loadbalancer changes. " +
+				"[InternetChargeType] changed from [%s] to [%s] , need to update loadbalancer:[%+v]\n",
+				string(lb.InternetChargeType),string(opts.InternetChargeType), opts)
 			if err := s.c.ModifyLoadBalancerInternetSpec(
 				&slb.ModifyLoadBalancerInternetSpecArgs{
 					LoadBalancerId:     lb.LoadBalancerId,
@@ -146,9 +148,8 @@ func (s *SDKClientSLB) EnsureLoadBalancer(service *v1.Service, nodes []*v1.Node,
 			}
 		}
 		if opts.AddressType != lb.AddressType {
-			//fmt.Printf("Alicloud.EnsureLoadBalance(%s): AddressType changed[%s => %s] ,recreate loadbalance!",
-			//	lb.AddressType,opts.AddressType,opts.LoadBalancerName,)
-			glog.Infof("Alicloud.EnsureLoadBalance(%s): AddressType changed[%s => %s] ,recreate loadbalance!",
+			glog.Infof("Alicloud.EnsureLoadBalance(): diff loadbalancer changes. " +
+				"[AddressType] changed from [%s] to [%s]. need to recreate loadbalancer!",
 				lb.AddressType, opts.AddressType, opts.LoadBalancerName)
 			// Can not modify AddressType.  We can only recreate it.
 			if err := s.c.DeleteLoadBalancer(lb.LoadBalancerId); err != nil {
@@ -164,7 +165,6 @@ func (s *SDKClientSLB) EnsureLoadBalancer(service *v1.Service, nodes []*v1.Node,
 			}
 		}
 	}
-	glog.Infof("Alicloud.EnsureLoadBalancer() create LoadBalancer step 1:[%+v]\n", lb)
 
 	if _, err := s.EnsureLoadBalancerListener(service, lb); err != nil {
 
@@ -175,13 +175,13 @@ func (s *SDKClientSLB) EnsureLoadBalancer(service *v1.Service, nodes []*v1.Node,
 }
 
 func (s *SDKClientSLB) UpdateLoadBalancer(service *v1.Service, nodes []*v1.Node) error {
-	lbn := cloudprovider.GetLoadBalancerName(service)
-	lb, exists, err := s.GetLoadBalancerByName(lbn, service)
+
+	exists, lb, err := s.findLoadBalancer(service)
 	if err != nil {
 		return err
 	}
 	if !exists {
-		return errors.New(fmt.Sprintf("The loadbalance you specified by name [%s] does not exist!", lbn))
+		return errors.New(fmt.Sprintf("the loadbalance you specified by name [%s] does not exist!", service.Name))
 	}
 	_, err = s.EnsureBackendServer(service, nodes, lb)
 	return err
@@ -193,7 +193,7 @@ func (s *SDKClientSLB) EnsureLoadBalancerListener(service *v1.Service, lb *slb.L
 	if err != nil {
 		return nil, err
 	}
-	glog.Infof("Alicloud.EnsureLoadBalancerListener() Add additional LoadBalancerListerners:[%+v],  Delete removed LoadBalancerListerners[%+v]", additions, deletions)
+	glog.V(2).Infof("Alicloud.EnsureLoadBalancerListener(): add additional [LoadBalancerListerners]=%+v.  delete removed [LoadBalancerListerners]=%+v", additions, deletions)
 	if len(deletions) > 0 {
 		for _, p := range deletions {
 			// stop first
@@ -291,27 +291,27 @@ func (s *SDKClientSLB) diffListeners(service *v1.Service, lb *slb.LoadBalancerTy
 				update := false
 				if proto != v2.ListenerProtocol {
 					update = true
-					glog.Infof("Alicloud.diffListeners(%s): protocol changed [ %s => %s]", lb.LoadBalancerId, v2.ListenerProtocol, proto)
+					glog.V(2).Infof("Alicloud.diffListeners(): [%s], protocol changed from [%s] to [%s]\n", lb.LoadBalancerId, v2.ListenerProtocol, proto)
 				}
 				if int(v1.NodePort) != old.NodePort {
 					update = true
-					glog.Infof("Alicloud.diffListeners(%s): NodePort changed [ %d => %d]", lb.LoadBalancerId, old.NodePort, v1.NodePort)
+					glog.V(2).Infof("Alicloud.diffListeners(): [%s], nodeport changed from [%d] to [%d]\n", lb.LoadBalancerId, old.NodePort, v1.NodePort)
 				}
 
 				if old.Bandwidth != ar.Bandwidth {
 					update = true
-					glog.Infof("Alicloud.diffListeners(%s): bandwidth changed [ %d => %d]", lb.LoadBalancerId, old.Bandwidth, ar.Bandwidth)
+					glog.V(2).Infof("Alicloud.diffListeners(): [%s], bandwidth changed from [%d] to [%d]\n", lb.LoadBalancerId, old.Bandwidth, ar.Bandwidth)
 				}
 				if old.CertID != ar.CertID && proto == "https" {
 					update = true
-					glog.Infof("Alicloud.diffListeners(%s): CertID changed [ %s => %s]", lb.LoadBalancerId, old.CertID, ar.CertID)
+					glog.V(2).Infof("Alicloud.diffListeners(): [%s], certid changed  from [%s] to [%s]\n", lb.LoadBalancerId, old.CertID, ar.CertID)
 				}
 				if old.HealthCheck != ar.HealthCheck ||
 					old.HealthCheckType != ar.HealthCheckType ||
 					old.HealthCheckURI != ar.HealthCheckURI ||
 					old.HealthCheckConnectPort != ar.HealthCheckConnectPort {
 					update = true
-					glog.Infof("Alicloud.diffListeners(%s): HealthCheck changed ", lb.LoadBalancerId)
+					glog.V(2).Infof("Alicloud.diffListeners(): [%s] healthcheck changed \n", lb.LoadBalancerId)
 				}
 				if update {
 					deletions = append(deletions, old)
@@ -431,7 +431,7 @@ func (s *SDKClientSLB) findPortListener(lb *slb.LoadBalancerType, port int, prot
 func (s *SDKClientSLB) EnsureBackendServer(service *v1.Service, nodes []*v1.Node, lb *slb.LoadBalancerType) (*slb.LoadBalancerType, error) {
 
 	additions, deletions := s.diffServers(nodes, lb)
-	glog.Infof("Alicloud.EnsureBackendServer() Add additional BackendServers:[%+v],  Delete removed BackendServers[%+v]", additions, deletions)
+	glog.V(2).Infof("Alicloud.EnsureBackendServer(): add additional backend servers=[%+v],  delete removed backend servers=[%+v]", additions, deletions)
 	if len(additions) > 0 {
 		// deal with server add
 		if _, err := s.c.AddBackendServers(lb.LoadBalancerId, additions); err != nil {
@@ -453,10 +453,7 @@ func (s *SDKClientSLB) EnsureBackendServer(service *v1.Service, nodes []*v1.Node
 
 func (s *SDKClientSLB) EnsureLoadBalanceDeleted(service *v1.Service) error {
 
-	lb, exists, err := s.GetLoadBalancerByName(cloudprovider.GetLoadBalancerName(service), service)
-	if err != nil {
-		return err
-	}
+	exists, lb, err := s.findLoadBalancer(service)
 	if err != nil {
 		return err
 	}
@@ -589,7 +586,7 @@ func (s *SDKClientSLB) diffServers(nodes []*v1.Node, lb *slb.LoadBalancerType) (
 		_,id,err := nodeid(types.NodeName(n1.Spec.ExternalID))
 		for _, n2 := range lb.BackendServers.BackendServer {
 			if err != nil{
-				glog.Errorf("Alicloud.diffServers(): Spec.ExternalID=%s is not right.skip added",n1.Spec.ExternalID)
+				glog.Errorf("Alicloud.diffServers(): node externalid=%s is not in the correct form, expect regionid.instanceid. skip add op",n1.Spec.ExternalID)
 				continue
 			}
 			if string(id) == n2.ServerId {
@@ -606,7 +603,7 @@ func (s *SDKClientSLB) diffServers(nodes []*v1.Node, lb *slb.LoadBalancerType) (
 		for _, n2 := range nodes {
 			_,id,err := nodeid(types.NodeName(n2.Spec.ExternalID))
 			if err != nil{
-				glog.Errorf("Alicloud.diffServers(): Spec.ExternalID=%s is not right. skip deleted",n2.Spec.ExternalID)
+				glog.Errorf("Alicloud.diffServers(): node externalid=%s is not in the correct form, expect regionid.instanceid.. skip delete op",n2.Spec.ExternalID)
 				continue
 			}
 			if n1.ServerId == string(id) {
@@ -626,14 +623,14 @@ func transProtocol(annotation string, port *v1.ServicePort) (string, error) {
 		for _, v := range strings.Split(annotation, ",") {
 			pp := strings.Split(v, ":")
 			if len(pp) < 2 {
-				return "", errors.New(fmt.Sprintf("Port Protocol format must be like 'https:443' colon separated. pp=[%+v]", pp))
+				return "", errors.New(fmt.Sprintf("port and protocol format must be like 'https:443' with colon separated. got=[%+v]", pp))
 			}
 
 			if pp[0] != "http" &&
 				pp[0] != "tcp" &&
 				pp[0] != "https" &&
 				pp[0] != "udp" {
-				return "", errors.New(fmt.Sprintf("Port Protocol format must be either [http|https|tcp|udp], protocol not supported[%s]\n", pp[0]))
+				return "", errors.New(fmt.Sprintf("port protocol format must be either [http|https|tcp|udp], protocol not supported wit [%s]\n", pp[0]))
 			}
 
 			if pp[1] == fmt.Sprintf("%d", port.Port) {

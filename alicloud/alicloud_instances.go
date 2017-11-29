@@ -26,13 +26,68 @@ func NewSDKClientINS(access_key_id string, access_key_secret string) *SDKClientI
 	return ins
 }
 
+// filterOutByRegion Used for multi-region or multi-vpc. works for single region or vpc too.
+// SLB only support Backends within the same vpc in the same region. so we need to remove the other backends which not in
+// the same region vpc with teh SLB. Keep the most backends
+func (s *SDKClientINS) filterOutByRegion(nodes []*v1.Node, region common.Region) []*v1.Node {
+	result := []*v1.Node{}
+	mvpc := make(map[string]int)
+	for _, node := range nodes {
+		glog.V(2).Infof("Alicloud.filterOutByRegion(): for each node=%v\n", node.Name)
+		v, err := s.findInstanceByNode(types.NodeName(node.Name))
+		if err != nil {
+			glog.Errorf("Alicloud.filterOutByRegion(): error execute c.ins.doFindInstance(). message=[%s]\n", err.Error())
+			continue
+		}
+		if v != nil {
+			mvpc[v.VpcAttributes.VpcId] = mvpc[v.VpcAttributes.VpcId] + 1
+		}
+	}
+	max, key := 0, ""
+	for k, v := range mvpc {
+		if v > max {
+			max = v
+			key = k
+		}
+	}
+	for _, node := range nodes {
+		v, err := s.findInstanceByNode(types.NodeName(node.Name))
+		if err != nil {
+			glog.Errorf("Alicloud.filterOutByRegion(): error execute findInstanceByNode(). message=[%s]\n", err.Error())
+			continue
+		}
+		if v != nil && v.VpcAttributes.VpcId == key {
+			result = append(result, node)
+			glog.V(2).Infof("Alicloud.filterOutByRegion(): accept node=%v\n", node.Name)
+		}
+	}
+	return result
+}
+
+func (s *SDKClientINS) filterOutByLabel(nodes []*v1.Node, labels string) []*v1.Node {
+	result := []*v1.Node{}
+	lbl := strings.Split(labels, ",")
+	for _, node := range nodes{
+		found := true
+		for _,v := range lbl{
+			if _,exist := node.Labels[v]; !exist{
+				found = false
+				break
+			}
+		}
+		if found {
+			result = append(result, node)
+		}
+	}
+	return result
+}
 // we use '.' separated nodeid which looks like 'cn-hangzhou.i-v98dklsmnxkkgiiil7' to identify node
 // This is the format of "REGION.NODEID"
 func nodeid(nodename types.NodeName) (common.Region, types.NodeName, error) {
 	name := strings.Split(string(nodename), ".")
 	if len(name) < 2 {
-		glog.Warningf("Unexpected nodename: %s \n", nodename)
-		return "", "", errors.New(fmt.Sprintf("Alicloud: nodeid Unexpected, nodename=%s \n", nodename))
+		glog.Warningf("Alicloud: unable to split instanceid and region from nodename, error unexpected nodename=%s \n", nodename)
+		return "", "", errors.New(fmt.Sprintf("Alicloud: unable to split instanceid and region from nodename, error unexpected nodename=%s \n", nodename))
 	}
 	return common.Region(name[0]), types.NodeName(name[1]), nil
 }
@@ -42,7 +97,7 @@ func (s *SDKClientINS) findAddress(nodeName types.NodeName) ([]v1.NodeAddress, e
 
 	instance, err := s.findInstanceByNode(nodeName)
 	if err != nil {
-		glog.Errorf("Error getting instance by InstanceId '%s': %v", nodeName, err)
+		glog.Errorf("Alicloud: error getting instance by instanceid. instanceid='%s', message=[%s]\n", nodeName, err.Error())
 		return nil, err
 	}
 
@@ -80,7 +135,6 @@ func (s *SDKClientINS) findAddress(nodeName types.NodeName) ([]v1.NodeAddress, e
 // nodeName must be a ':' separated Region and ndoeid string which is the instance identity
 // Returns instance information
 func (s *SDKClientINS) findInstanceByNode(nodeName types.NodeName) (*ecs.InstanceAttributesType, error) {
-	glog.V(2).Infof("Alicloud.findInstanceByNode(\"%s\")", nodeName)
 	region, nodeid, err := nodeid(nodeName)
 	if err != nil {
 		return nil, err
@@ -100,19 +154,18 @@ func (s *SDKClientINS) refreshInstance(nodeName types.NodeName, region common.Re
 
 	instances, _, err := s.c.DescribeInstances(&args)
 	if err != nil {
-		glog.Errorf("refreshInstance: DescribeInstances error=%s, region=%s, instanceName=%s", err.Error(), args.RegionId, args.InstanceName)
-		//s.Set(fmt.Sprintf("%s/%s",nodeName,region),nil)
+		glog.Errorf("Alicloud: calling DescribeInstances error. region=%s, instancename=%s, message=[%s]\n", args.RegionId, args.InstanceName, err.Error())
 		return nil, err
 	}
 
 	if len(instances) == 0 {
-		glog.Infof("refreshInstance: InstanceNotFound, [%s.%s]", nodeName, region)
+		glog.Infof("Alicloud: InstanceNotFound, instanceid=[%s.%s]. It is likely to be deleted.", nodeName, region)
 		return nil, cloudprovider.InstanceNotFound
 	}
 	if len(instances) > 1 {
-		glog.Errorf("Warning: Multipul instance found by nodename [%s], the first one will be used. Instance: [%+v]", string(nodeName), instances)
+		glog.Warningf("Alicloud: multipul instance found by nodename=[%s], the first one will be used, instanceid=[%s]", string(nodeName), instances[0].InstanceId)
 	}
-	glog.V(2).Infof("Alicloud.refreshInstance(\"%s\") finished. [ %+v ]\n", string(nodeName), instances[0])
+
 	s.storeVpcid(&instances[0])
 	return &instances[0], nil
 }

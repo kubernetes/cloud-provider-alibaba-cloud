@@ -14,7 +14,6 @@ import (
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/version"
-	"strconv"
 	 b64 "encoding/base64"
 )
 
@@ -111,7 +110,7 @@ func newAliCloud(config *CloudConfig) (*Cloud, error) {
 		}
 		c.vpcID = v
 
-		glog.Infof("Using vpc region:[region: %s],[vpcid: %s]", r, c.vpcID)
+		glog.Infof("Using vpc region: region=%s, vpcid=%s", r, c.vpcID)
 
 		curr, err = c.meta.InstanceID()
 		if err != nil {
@@ -124,8 +123,8 @@ func newAliCloud(config *CloudConfig) (*Cloud, error) {
 	c.ins.CurrentNodeName = types.NodeName(curr)
 	r, err := NewSDKClientRoutes(config.Global.AccessKeyID, config.Global.AccessKeySecret)
 	if err != nil {
-		glog.V(2).Infof("Alicloud: error create routesdk, [%s]\n", err.Error())
-		return c, nil
+		glog.Errorf("Alicloud: error create routesdk. [%s]\n", err.Error())
+		return c, err
 	}
 	c.routes = r
 	return c, nil
@@ -141,16 +140,14 @@ func (c *Cloud) Initialize(clientBuilder controller.ControllerClientBuilder) {}
 // Parameter 'clusterName' is the name of the cluster as presented to kube-controller-manager
 func (c *Cloud) GetLoadBalancer(clusterName string, service *v1.Service) (status *v1.LoadBalancerStatus, exists bool, err error) {
 
-	lb, exists, err := c.slb.GetLoadBalancerByName(
-		cloudprovider.GetLoadBalancerName(service), service)
+	exists, lb, err := c.slb.findLoadBalancer(service)
 
 	if err != nil || !exists {
 		return nil, exists, err
 	}
 
 	return &v1.LoadBalancerStatus{
-		Ingress: []v1.LoadBalancerIngress{{IP: lb.Address}},
-	}, true, nil
+		Ingress: []v1.LoadBalancerIngress{{IP: lb.Address}}, }, true, nil
 }
 
 // EnsureLoadBalancer creates a new load balancer 'name', or updates the existing one. Returns the status of the balancer
@@ -158,19 +155,19 @@ func (c *Cloud) GetLoadBalancer(clusterName string, service *v1.Service) (status
 // parameters as read-only and not modify them.
 // Parameter 'clusterName' is the name of the cluster as presented to kube-controller-manager
 func (c *Cloud) EnsureLoadBalancer(clusterName string, service *v1.Service, nodes []*v1.Node) (*v1.LoadBalancerStatus, error) {
-	ns := c.filterOutByRegion(nodes, ExtractAnnotationRequest(service).Region)
+	ns := c.fileOutNode(nodes, service)
 	annotations := service.Annotations
-	glog.V(2).Infof("alicloud.EnsureLoadBalancer(%v, %v, %v, %v, %v, %v, %v, %v,%v)",
+	glog.V(2).Infof("Alicloud.EnsureLoadBalancer(%v, %v, %v, %v, %v, %v, %v, %v,%v)",
 		clusterName, service.Namespace, service.Name, c.region, service.Spec.LoadBalancerIP, service.Spec.Ports, nodes, annotations, ns)
 	if service.Spec.SessionAffinity != v1.ServiceAffinityNone {
 		// Does not support SessionAffinity
 		return nil, fmt.Errorf("unsupported load balancer affinity: %v", service.Spec.SessionAffinity)
 	}
 	if len(service.Spec.Ports) == 0 {
-		return nil, fmt.Errorf("requested load balancer with no ports")
+		return nil, fmt.Errorf("requested load balancer with no ports\n")
 	}
 	if service.Spec.LoadBalancerIP != "" {
-		return nil, fmt.Errorf("LoadBalancerIP cannot be specified for AWS ELB")
+		return nil, fmt.Errorf("LoadBalancerIP cannot be specified for Alicloud SLB\n")
 	}
 	vswitchid := ""
 	if len(ns) <= 0 {
@@ -179,7 +176,7 @@ func (c *Cloud) EnsureLoadBalancer(clusterName string, service *v1.Service, node
 		if err != nil {
 			return nil, err
 		}
-		glog.V(2).Infof("DEBUG: vswitchid = %s#",vswitchid)
+		glog.V(2).Infof("Alicloud: current vswitchid=%s\n",vswitchid)
 		if vswitchid == "" {
 			glog.Warningf("Alicloud.EnsureLoadBalancer: can not find vswitch id, this will prevent you " +
 				"from creating VPC intranet SLB. But classic LB is still avaliable.")
@@ -210,10 +207,10 @@ func (c *Cloud) EnsureLoadBalancer(clusterName string, service *v1.Service, node
 // parameters as read-only and not modify them.
 // Parameter 'clusterName' is the name of the cluster as presented to kube-controller-manager
 func (c *Cloud) UpdateLoadBalancer(clusterName string, service *v1.Service, nodes []*v1.Node) error {
-	glog.V(2).Infof("alicloud.UpdateLoadBalancer(%v, %v, %v, %v, %v, %v, %v)",
+	glog.V(2).Infof("Alicloud.UpdateLoadBalancer(%v, %v, %v, %v, %v, %v, %v)",
 		clusterName, service.Namespace, service.Name, c.region, service.Spec.LoadBalancerIP, service.Spec.Ports, nodes)
 
-	return c.slb.UpdateLoadBalancer(service, c.filterOutByRegion(nodes, ExtractAnnotationRequest(service).Region))
+	return c.slb.UpdateLoadBalancer(service, c.fileOutNode(nodes, service))
 }
 
 // EnsureLoadBalancerDeleted deletes the specified load balancer if it
@@ -225,7 +222,7 @@ func (c *Cloud) UpdateLoadBalancer(clusterName string, service *v1.Service, node
 // Implementations must treat the *v1.Service parameter as read-only and not modify it.
 // Parameter 'clusterName' is the name of the cluster as presented to kube-controller-manager
 func (c *Cloud) EnsureLoadBalancerDeleted(clusterName string, service *v1.Service) error {
-	glog.V(2).Infof("alicloud.EnsureLoadBalancerDeleted(%v, %v, %v, %v, %v, %v)",
+	glog.V(2).Infof("Alicloud.EnsureLoadBalancerDeleted(%v, %v, %v, %v, %v, %v)",
 		clusterName, service.Namespace, service.Name, c.region, service.Spec.LoadBalancerIP, service.Spec.Ports)
 	return c.slb.EnsureLoadBalanceDeleted(service)
 }
@@ -293,7 +290,7 @@ func (c *Cloud) InstanceType(name types.NodeName) (string, error) {
 // AddSSHKeyToAllInstances adds an SSH public key as a legal identity for all instances
 // expected format for the key is standard ssh-keygen format: <protocol> <blob>
 func (c *Cloud) AddSSHKeyToAllInstances(user string, keyData []byte) error {
-	return errors.New("Alicloud.AddSSHKeyToAllInstances not implemented")
+	return errors.New("Alicloud.AddSSHKeyToAllInstances() is not implemented")
 }
 
 // CurrentNodeName returns the name of the node we are currently running on
@@ -317,7 +314,7 @@ func (c *Cloud) InstanceExistsByProviderID(providerID string) (bool, error) {
 	_, err := c.ins.findInstanceByNode(types.NodeName(providerID))
 	if err == cloudprovider.InstanceNotFound {
 
-		glog.V(2).Infof("Alicloud.InstanceExistsByProviderID(\"%s\"), err=%s", providerID,err.Error())
+		glog.V(2).Infof("Alicloud.InstanceExistsByProviderID(\"%s\") message=[%s]", providerID,err.Error())
 		return false, err
 	}
 	return true, err
@@ -329,7 +326,7 @@ func (c *Cloud) ListRoutes(clusterName string) ([]*cloudprovider.Route, error) {
 	for k, v := range c.ins.Regions() {
 		r, err := c.routes.ListRoutes(common.Region(k), v)
 		if err != nil {
-			fmt.Errorf("Alicloud.ListRoutes : ERROR , %s\n", err.Error())
+			glog.Errorf("Alicloud.ListRoutes(): error list routes, message=[%s]\n", err.Error())
 			return nil, err
 		}
 		routes = append(routes, r...)
@@ -384,15 +381,15 @@ func (c *Cloud) DeleteRoute(clusterName string, route *cloudprovider.Route) erro
 func (c *Cloud) GetZone() (cloudprovider.Zone, error) {
 	host, err := c.meta.InstanceID()
 	if err != nil {
-		return cloudprovider.Zone{}, errors.New(fmt.Sprintf("Alicloud.GetZone(), error c.meta.InstanceID(): %s", err.Error()))
+		return cloudprovider.Zone{}, errors.New(fmt.Sprintf("Alicloud.GetZone(): error execute c.meta.InstanceID(). message=[%s]", err.Error()))
 	}
 	region, err := c.meta.Region()
 	if err != nil {
-		return cloudprovider.Zone{}, errors.New(fmt.Sprintf("Alicloud.GetZone(), error c.meta.Region(): %s", err.Error()))
+		return cloudprovider.Zone{}, errors.New(fmt.Sprintf("Alicloud.GetZone(): error execute c.meta.Region(). message=[%s]", err.Error()))
 	}
 	i, err := c.ins.findInstanceByNode(types.NodeName(fmt.Sprintf("%s.%s", region, host)))
 	if err != nil {
-		return cloudprovider.Zone{}, errors.New(fmt.Sprintf("Alicloud.GetZone(), error findInstanceByNodeID(): %s", err.Error()))
+		return cloudprovider.Zone{}, errors.New(fmt.Sprintf("Alicloud.GetZone(): error execute findInstanceByNodeID(). message=[%s]", err.Error()))
 	}
 	return cloudprovider.Zone{
 		Region:        string(c.region),
@@ -406,7 +403,7 @@ func (c *Cloud) GetZoneByNodeName(nodeName types.NodeName) (cloudprovider.Zone, 
 
 	i, err := c.ins.findInstanceByNode(nodeName)
 	if err != nil {
-		return cloudprovider.Zone{}, errors.New(fmt.Sprintf("Alicloud.GetZoneByNodeName(), error findInstanceByNode(): %s", err.Error()))
+		return cloudprovider.Zone{}, errors.New(fmt.Sprintf("Alicloud.GetZoneByNodeName(): error execute findInstanceByNode(). message=[%s]", err.Error()))
 	}
 	return cloudprovider.Zone{
 		Region:        string(c.region),
@@ -419,7 +416,7 @@ func (c *Cloud) GetZoneByNodeName(nodeName types.NodeName) (cloudprovider.Zone, 
 func (c *Cloud) GetZoneByProviderID(providerID string) (cloudprovider.Zone, error) {
 	i, err := c.ins.findInstanceByNode(types.NodeName(providerID))
 	if err != nil {
-		return cloudprovider.Zone{}, errors.New(fmt.Sprintf("Alicloud.GetZoneByProviderID(), error findInstanceByNode(): %s", err.Error()))
+		return cloudprovider.Zone{}, errors.New(fmt.Sprintf("Alicloud.GetZoneByProviderID(), error execute findInstanceByNode(). message=[%s]", err.Error()))
 	}
 	return cloudprovider.Zone{
 		Region:        string(c.region),
@@ -429,12 +426,12 @@ func (c *Cloud) GetZoneByProviderID(providerID string) (cloudprovider.Zone, erro
 
 // ListClusters lists the names of the available clusters.
 func (c *Cloud) ListClusters() ([]string, error) {
-	return nil, errors.New("Alicloud.ListClusters not implemented")
+	return nil, errors.New("Alicloud.ListClusters() is not implemented")
 }
 
 // Master gets back the address (either DNS name or IP address) of the master node for the cluster.
 func (c *Cloud) Master(clusterName string) (string, error) {
-	return "", errors.New("Alicloud.ListClusters not implemented")
+	return "", errors.New("Alicloud.ListClusters is not implemented")
 }
 
 // Clusters returns the list of clusters.
@@ -470,7 +467,7 @@ func (c *Cloud) Zones() (cloudprovider.Zones, bool) {
 // Routes returns an implementation of Routes for Alicloud Services.
 func (c *Cloud) Routes() (cloudprovider.Routes, bool) {
 	if c.vpcID != "" && c.routes != nil {
-		glog.V(2).Infof("Alicloud: Routes enabled!\n")
+		glog.V(2).Infof("Alicloud.Routes(): routes enabled!\n")
 		return c, true
 	}
 	return nil, false
@@ -481,147 +478,19 @@ func (c *Cloud) HasClusterID() bool{
 	return false
 }
 
-// filterOutByRegion Used for multi-region or multi-vpc. works for single region or vpc too.
-// SLB only support Backends within the same vpc in the same region. so we need to remove the other backends which not in
-// the same region vpc with teh SLB. Keep the most backends
-func (c *Cloud) filterOutByRegion(nodes []*v1.Node, region common.Region) []*v1.Node {
-	result := []*v1.Node{}
-	mvpc := make(map[string]int)
-	for _, node := range nodes {
-		glog.V(2).Infof("filterOutByRegion: for node => %v\n", node.Name)
-		v, err := c.ins.findInstanceByNode(types.NodeName(node.Name))
-		if err != nil {
-			glog.V(2).Infof("filterOutByRegion: c.ins.doFindInstance error => %s\n", err.Error())
-			continue
-		}
-		if v != nil {
 
-			mvpc[v.VpcAttributes.VpcId] = mvpc[v.VpcAttributes.VpcId] + 1
-			//result = append(result, node)
-			glog.V(2).Infof("filterOutByRegion: accept node => %v\n", node.Name)
-		}
-	}
-	max, key := 0, ""
-	for k, v := range mvpc {
-		if v > max {
-			max = v
-			key = k
-		}
-	}
-	for _, node := range nodes {
-		glog.V(2).Infof("filterOutByRegion: for node => %v\n", node.Name)
-		v, err := c.ins.findInstanceByNode(types.NodeName(node.Name))
-		if err != nil {
-			glog.V(2).Infof("filterOutByRegion: c.ins.doFindInstance error => %s\n", err.Error())
-			continue
-		}
-		if v != nil && v.VpcAttributes.VpcId == key {
-			result = append(result, node)
-			glog.V(2).Infof("filterOutByRegion: accept node => %v\n", node.Name)
-		}
-	}
-	return result
-}
+//
+func (c *Cloud) fileOutNode(nodes []*v1.Node, service *v1.Service) []*v1.Node{
 
-func ExtractAnnotationRequest(service *v1.Service) *AnnotationRequest {
-	ar := &AnnotationRequest{}
-	annotation := service.Annotations
-	i, err := strconv.Atoi(annotation[ServiceAnnotationLoadBalancerBandwidth])
-	if err != nil {
-		glog.V(2).Infof("Warining: Annotation bandwidth must be integer,got [%s],use default number 50.[%s]",
-			annotation[ServiceAnnotationLoadBalancerBandwidth], err.Error())
-		ar.Bandwidth = DEFAULT_BANDWIDTH
-	} else {
-		ar.Bandwidth = i
-	}
-	addtype := annotation[ServiceAnnotationLoadBalancerAddressType]
-	if addtype != "" {
-		ar.AddressType = slb.AddressType(addtype)
-	} else {
-		ar.AddressType = slb.InternetAddressType
-	}
-	ar.SLBNetworkType = annotation[ServiceAnnotationLoadBalancerSLBNetworkType]
+	ar := ExtractAnnotationRequest(service)
 
-	chargtype := annotation[ServiceAnnotationLoadBalancerChargeType]
-	if chargtype != "" {
-		ar.ChargeType = slb.InternetChargeType(chargtype)
-	} else {
-		ar.ChargeType = slb.PayByTraffic
+	targets := c.ins.filterOutByLabel(
+		c.ins.filterOutByRegion(nodes,ar.Region),
+		ar.BackendLabel,
+	)
+	// Add 20 nodes at most .
+	if len(targets) > MAX_LOADBALANCER_BACKEND{
+		return targets[0:MAX_LOADBALANCER_BACKEND]
 	}
-
-	region := annotation[ServiceAnnotationLoadBalancerRegion]
-	if region != "" {
-		ar.Region = common.Region(region)
-	} else {
-		ar.Region = DEFAULT_REGION
-	}
-
-	certid := annotation[ServiceAnnotationLoadBalancerCertID]
-	if certid != "" {
-		ar.CertID = certid
-	}
-
-	hcFlag := annotation[ServiceAnnotationLoadBalancerHealthCheckFlag]
-	if hcFlag != "" {
-		ar.HealthCheck = slb.FlagType(hcFlag)
-	} else {
-		ar.HealthCheck = slb.OffFlag
-	}
-
-	hcType := annotation[ServiceAnnotationLoadBalancerHealthCheckType]
-	if hcType != "" {
-		ar.HealthCheckType = slb.HealthCheckType(hcType)
-	} else {
-		ar.HealthCheckType = slb.TCPHealthCheckType
-	}
-
-	hcUri := annotation[ServiceAnnotationLoadBalancerHealthCheckURI]
-	if hcUri != "" {
-		ar.HealthCheckURI = hcUri
-	} else {
-		ar.HealthCheckURI = "/"
-	}
-
-	port, err := strconv.Atoi(annotation[ServiceAnnotationLoadBalancerHealthCheckConnectPort])
-	if err != nil {
-		ar.HealthCheckConnectPort = -520
-	} else {
-		ar.HealthCheckConnectPort = port
-	}
-
-	thresh, err := strconv.Atoi(annotation[ServiceAnnotationLoadBalancerHealthCheckHealthyThreshold])
-	if err != nil {
-		ar.HealthyThreshold = 3
-	} else {
-		ar.HealthyThreshold = thresh
-	}
-
-	unThresh, err := strconv.Atoi(annotation[ServiceAnnotationLoadBalancerHealthCheckUnhealthyThreshold])
-	if err != nil {
-		ar.UnhealthyThreshold = 3
-	} else {
-		ar.UnhealthyThreshold = unThresh
-	}
-
-	interval, err := strconv.Atoi(annotation[ServiceAnnotationLoadBalancerHealthCheckInterval])
-	if err != nil {
-		ar.HealthCheckInterval = 2
-	} else {
-		ar.HealthCheckInterval = interval
-	}
-
-	connout, err := strconv.Atoi(annotation[ServiceAnnotationLoadBalancerHealthCheckConnectTimeout])
-	if err != nil {
-		ar.HealthCheckConnectTimeout = 5
-	} else {
-		ar.HealthCheckConnectTimeout = connout
-	}
-
-	hout, err := strconv.Atoi(annotation[ServiceAnnotationLoadBalancerHealthCheckTimeout])
-	if err != nil {
-		ar.HealthCheckTimeout = 5
-	} else {
-		ar.HealthCheckConnectPort = hout
-	}
-	return ar
+	return targets
 }
