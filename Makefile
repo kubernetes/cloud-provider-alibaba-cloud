@@ -4,11 +4,10 @@
 .PHONY: test e2e-test cover gofmt gofmt-fix  clean
 
 # Registry used for publishing images
-REGISTRY?=registry.cn-hangzhou.aliyuncs.com/google-containers
+REGISTRY?=registry.cn-hangzhou.aliyuncs.com/google-containers/cloud-controller-manager
 
 # Default tag and architecture. Can be overridden
-TAG?=$(shell git describe --tags --dirty)
-COMMIT?=$(shell git rev-parse --short HEAD)
+TAG?=$(shell git describe --tags)
 ARCH?=amd64
 
 # Set the (cross) compiler to use for different architectures
@@ -28,7 +27,7 @@ IPTABLES_VERSION=1.4.21
 
 cloud-controller-manager: $(shell find . -type f  -name '*.go')
 	go build -o cloud-controller-manager \
-	  -ldflags "-X github.com/AliyunContainerService/alicloud-controller-manager/version.Version=$(TAG)-$(COMMIT)"
+	  -ldflags "-X github.com/AliyunContainerService/alicloud-controller-manager/version.Version=$(TAG)"
 
 # Throw an error if gofmt finds problems.
 # "read" will return a failure return code if there is no output. This is inverted wth the "!"
@@ -49,20 +48,15 @@ clean:
 pre-requisite:
 	@echo "Warning: Tag your branch before make. or makefile can not autodetect image tag."
 
-# amd64 gets an image with the suffix too (i.e. it's the default)
-ifeq ($(ARCH),amd64)
-	docker build -f Dockerfile -t $(REGISTRY):$(TAG) ./build/
-endif
-
 image: cloud-controller-manager-$(ARCH)
-	docker build -f build/Dockerfile -t $(REGISTRY):$(TAG)-$(COMMIT) ./build/
+	docker build -f build/Dockerfile -t $(REGISTRY):$(TAG) ./build/
 
 docker-push:
-	docker push $(REGISTRY):$(TAG)-$(COMMIT)
+	docker push $(REGISTRY):$(TAG)
 
 # amd64 gets an image with the suffix too (i.e. it's the default)
 ifeq ($(ARCH),amd64)
-	docker push $(REGISTRY):$(TAG)-$(COMMIT)
+	docker push $(REGISTRY):$(TAG)
 endif
 
 docker-build: cloud-controller-manager-$(ARCH)

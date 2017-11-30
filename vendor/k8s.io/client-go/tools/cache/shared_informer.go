@@ -357,7 +357,7 @@ func (s *sharedIndexInformer) HandleDeltas(obj interface{}) error {
 				s.processor.distribute(addNotification{newObj: d.Object}, isSync)
 			}
 		case Deleted:
-			if service , ok := d.Object.(v1.Service);ok{
+			if service , ok := d.Object.(*v1.Service);ok{
 				glog.V(4).Infof("alicloud: shared_informer service [deleted] event watched. [%+v]\n",service)
 			}
 			if err := s.indexer.Delete(d.Object); err != nil {
