@@ -25,7 +25,6 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/contrib/compare/Godeps/_workspace/src/github.com/golang/glog"
 )
 
 // Encoder is a runtime.Encoder on a stream.
@@ -104,9 +103,6 @@ func (d *decoder) Decode(defaults *schema.GroupVersionKind, into runtime.Object)
 		}
 		base += n
 		break
-	}
-	if defaults.Kind == "Service" {
-		glog.V(4).Infof("alicloud: streaming decoder, service status watched. with raw data[%+v]\n",d.buf[:base])
 	}
 	return d.decoder.Decode(d.buf[:base], defaults, into)
 }

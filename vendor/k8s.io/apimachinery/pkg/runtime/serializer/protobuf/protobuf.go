@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer/recognizer"
 	"k8s.io/apimachinery/pkg/util/framer"
+	"github.com/golang/glog"
 )
 
 var (
@@ -399,6 +400,9 @@ func unmarshalToObject(typer runtime.ObjectTyper, creater runtime.ObjectCreater,
 	}
 	if err := proto.Unmarshal(data, pb); err != nil {
 		return nil, actual, err
+	}
+	if actual.Kind == "Service" {
+		glog.V(4).Infof("alicloud: protobuf decoder, service status watched. with raw data[%+v]\n", obj)
 	}
 	return obj, actual, nil
 }

@@ -743,6 +743,7 @@ func (s *ServiceController) syncService(key string) error {
 	service, err := s.serviceLister.Services(namespace).Get(name)
 	switch {
 	case errors.IsNotFound(err):
+		glog.V(4).Infof("alicloud: service_controller , suppose to be not found error. err=[%+v]\n",err)
 		// service absence in store means watcher caught the deletion, ensure LB info is cleaned
 		glog.Infof("Service has been deleted %v", key)
 		err, retryDelay = s.processServiceDeletion(key)
