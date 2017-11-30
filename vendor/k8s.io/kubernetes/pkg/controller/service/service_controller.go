@@ -127,15 +127,16 @@ func New(
 
 	serviceInformer.Informer().AddEventHandlerWithResyncPeriod(
 		cache.ResourceEventHandlerFuncs{
-			AddFunc: s.enqueueService,
+			AddFunc: s.addService,
 			UpdateFunc: func(old, cur interface{}) {
+				glog.V(4).Infof("alicloud: service_controller [Update] service , enqueue. old=[%+v], cur=[%+v]\n",old,cur)
 				oldSvc, ok1 := old.(*v1.Service)
 				curSvc, ok2 := cur.(*v1.Service)
 				if ok1 && ok2 && s.needsUpdate(oldSvc, curSvc) {
 					s.enqueueService(cur)
 				}
 			},
-			DeleteFunc: s.enqueueService,
+			DeleteFunc: s.delService,
 		},
 		serviceSyncPeriod,
 	)
@@ -146,6 +147,16 @@ func New(
 		return nil, err
 	}
 	return s, nil
+}
+
+func (s *ServiceController) addService(obj interface{}) {
+	glog.V(4).Infof("alicloud: service_controller [Add] service , enqueue. obj=[%+v]\n",obj)
+	s.enqueueService(obj)
+}
+
+func (s *ServiceController) delService(obj interface{}) {
+	glog.V(4).Infof("alicloud: service_controller [Deleted] service , enqueue. obj=[%+v]\n",obj)
+	s.enqueueService(obj)
 }
 
 // obj could be an *v1.Service, or a DeletionFinalStateUnknown marker item.

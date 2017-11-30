@@ -111,6 +111,9 @@ func (sw *StreamWatcher) receive() {
 			}
 			return
 		}
+		if obj.GetObjectKind().GroupVersionKind().Kind == "Service" {
+			glog.V(4).Infof("alicloud: streamwatch watch of event type=[%s], obj=[%+v]\n",string(action),obj)
+		}
 		sw.result <- Event{
 			Type:   action,
 			Object: obj,
