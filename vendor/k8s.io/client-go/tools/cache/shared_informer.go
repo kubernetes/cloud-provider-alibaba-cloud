@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 
 	"github.com/golang/glog"
+	"k8s.io/api/core/v1"
 )
 
 // SharedInformer has a shared data cache and is capable of distributing notifications for changes
@@ -356,6 +357,9 @@ func (s *sharedIndexInformer) HandleDeltas(obj interface{}) error {
 				s.processor.distribute(addNotification{newObj: d.Object}, isSync)
 			}
 		case Deleted:
+			if service , ok := d.Object.(v1.Service);ok{
+				glog.V(4).Infof("alicloud: shared_informer service [deleted] event watched. [%+v]\n",service)
+			}
 			if err := s.indexer.Delete(d.Object); err != nil {
 				return err
 			}

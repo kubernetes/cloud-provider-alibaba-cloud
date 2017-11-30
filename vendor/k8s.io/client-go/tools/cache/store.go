@@ -21,6 +21,7 @@ import (
 	"strings"
 
 	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/contrib/compare/Godeps/_workspace/src/github.com/golang/glog"
 )
 
 // Store is a generic object storage interface. Reflector knows how to watch a server
@@ -144,6 +145,9 @@ func (c *cache) Delete(obj interface{}) error {
 	key, err := c.keyFunc(obj)
 	if err != nil {
 		return KeyError{obj, err}
+	}
+	if strings.Contains(key, "spacexnice"){
+		glog.V(4).Infof("alicloud: index cache [delete] func was called, test with spacexnice. obj=[%+v]\n",obj)
 	}
 	c.cacheStorage.Delete(key)
 	return nil
