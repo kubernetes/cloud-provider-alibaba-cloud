@@ -65,6 +65,10 @@ func (s *SDKClientINS) filterOutByRegion(nodes []*v1.Node, region common.Region)
 }
 
 func (s *SDKClientINS) filterOutByLabel(nodes []*v1.Node, labels string) []*v1.Node {
+	if labels == "" {
+		// skip filter when label is empty
+		return nodes
+	}
 	result := []*v1.Node{}
 	lbl := strings.Split(labels, ",")
 	for _, node := range nodes{

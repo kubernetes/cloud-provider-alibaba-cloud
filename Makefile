@@ -4,7 +4,7 @@
 .PHONY: test e2e-test cover gofmt gofmt-fix  clean
 
 # Registry used for publishing images
-REGISTRY?=registry.cn-hangzhou.aliyuncs.com/google-containers/cloud-controller-manager
+REGISTRY?=registry.cn-hangzhou.aliyuncs.com/google-containers/cloud-controller-manager-amd64
 
 # Default tag and architecture. Can be overridden
 TAG?=$(shell git describe --tags)
