@@ -1,14 +1,15 @@
 package alicloud
 
 import (
-	"github.com/denverdino/aliyungo/common"
-	"github.com/denverdino/aliyungo/slb"
-	"github.com/golang/glog"
-	"k8s.io/api/core/v1"
 	"strconv"
 	"strings"
 	"unicode"
 	"unicode/utf8"
+
+	"github.com/denverdino/aliyungo/common"
+	"github.com/denverdino/aliyungo/slb"
+	"github.com/golang/glog"
+	"k8s.io/api/core/v1"
 )
 
 const (
@@ -226,6 +227,15 @@ func splitCamel(src string) (entries []string) {
 		}
 	}
 	return
+}
+
+func serviceAnnotation(service *v1.Service, annotate string) string {
+	for k, v := range service.Annotations {
+		if annotate == replaceCamel(k) {
+			return v
+		}
+	}
+	return ""
 }
 
 func replaceCamel(str string) string {

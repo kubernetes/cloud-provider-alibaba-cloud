@@ -67,6 +67,7 @@ func (s *SDKClientINS) filterOutByRegion(nodes []*v1.Node, region common.Region)
 func (s *SDKClientINS) filterOutByLabel(nodes []*v1.Node, labels string) []*v1.Node {
 	if labels == "" {
 		// skip filter when label is empty
+		glog.V(2).Infof("alicloud: slb backend server label doesnot specified, skip filter nodes by label.")
 		return nodes
 	}
 	result := []*v1.Node{}
@@ -74,7 +75,12 @@ func (s *SDKClientINS) filterOutByLabel(nodes []*v1.Node, labels string) []*v1.N
 	for _, node := range nodes{
 		found := true
 		for _,v := range lbl{
-			if _,exist := node.Labels[v]; !exist{
+			l := strings.Split(v,"=")
+			if len(l) < 2 {
+				glog.Errorf("alicloud: error parse backend label with value [%s], must be key value like [k=v]\n",v)
+				return []*v1.Node{}
+			}
+			if nv,exist := node.Labels[l[0]]; !exist || nv != l[1]{
 				found = false
 				break
 			}
