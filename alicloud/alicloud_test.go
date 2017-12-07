@@ -373,7 +373,7 @@ func newCloud() (*Cloud, error) {
 			Region:          "cn-zhangjiakou",
 		},
 	}
-	return newAliCloud(cfg)
+	return newAliCloud(cfg.Global.AccessKeyID, cfg.Global.AccessKeySecret)
 }
 
 var vice string = `

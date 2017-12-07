@@ -39,17 +39,11 @@ type AnnotationRequest struct {
 	HealthCheckTimeout        int                 // for https and http
 }
 
-type SDKClientSLB struct {
+type LoadBalancerClient struct {
 	c *slb.Client
 }
 
-func NewSDKClientSLB(key string, secret string, region common.Region) *SDKClientSLB {
-	client := slb.NewSLBClient(key, secret, region)
-	client.SetUserAgent(KUBERNETES_ALICLOUD_IDENTITY)
-	return &SDKClientSLB{c: client}
-}
-
-func (s * SDKClientSLB) findLoadBalancer(service *v1.Service) (bool, *slb.LoadBalancerType, error) {
+func (s *LoadBalancerClient) findLoadBalancer(service *v1.Service) (bool, *slb.LoadBalancerType, error) {
 	ar := ExtractAnnotationRequest(service)
 	if ar.Loadbalancerid != "" {
 		return s.findLoadBalancerByID(ar.Loadbalancerid,ar.Region)
@@ -57,7 +51,7 @@ func (s * SDKClientSLB) findLoadBalancer(service *v1.Service) (bool, *slb.LoadBa
 	return s.findLoadBalancerByName(cloudprovider.GetLoadBalancerName(service),ar.Region)
 }
 
-func (s *SDKClientSLB) findLoadBalancerByID(lbid string,region common.Region) (bool, *slb.LoadBalancerType, error) {
+func (s *LoadBalancerClient) findLoadBalancerByID(lbid string,region common.Region) (bool, *slb.LoadBalancerType, error) {
 
 	lbs, err := s.c.DescribeLoadBalancers(
 		&slb.DescribeLoadBalancersArgs{
@@ -81,7 +75,7 @@ func (s *SDKClientSLB) findLoadBalancerByID(lbid string,region common.Region) (b
 	return err == nil, lb, err
 }
 
-func (s *SDKClientSLB) findLoadBalancerByName(lbn string, region common.Region) (bool, *slb.LoadBalancerType, error) {
+func (s *LoadBalancerClient) findLoadBalancerByName(lbn string, region common.Region) (bool, *slb.LoadBalancerType, error) {
 
 	lbs, err := s.c.DescribeLoadBalancers(
 		&slb.DescribeLoadBalancersArgs{
@@ -105,7 +99,7 @@ func (s *SDKClientSLB) findLoadBalancerByName(lbn string, region common.Region) 
 	return err == nil, lb, err
 }
 
-func (s *SDKClientSLB) EnsureLoadBalancer(service *v1.Service, nodes []*v1.Node, vswitchid string) (*slb.LoadBalancerType, error) {
+func (s *LoadBalancerClient) EnsureLoadBalancer(service *v1.Service, nodes []*v1.Node, vswitchid string) (*slb.LoadBalancerType, error) {
 	exists, lb, err := s.findLoadBalancer(service)
 	if err != nil {
 		return nil, err
@@ -174,7 +168,7 @@ func (s *SDKClientSLB) EnsureLoadBalancer(service *v1.Service, nodes []*v1.Node,
 	return s.EnsureBackendServer(service, nodes, lb)
 }
 
-func (s *SDKClientSLB) UpdateLoadBalancer(service *v1.Service, nodes []*v1.Node) error {
+func (s *LoadBalancerClient) UpdateLoadBalancer(service *v1.Service, nodes []*v1.Node) error {
 
 	exists, lb, err := s.findLoadBalancer(service)
 	if err != nil {
@@ -187,7 +181,7 @@ func (s *SDKClientSLB) UpdateLoadBalancer(service *v1.Service, nodes []*v1.Node)
 	return err
 }
 
-func (s *SDKClientSLB) EnsureLoadBalancerListener(service *v1.Service, lb *slb.LoadBalancerType) (*slb.LoadBalancerType, error) {
+func (s *LoadBalancerClient) EnsureLoadBalancerListener(service *v1.Service, lb *slb.LoadBalancerType) (*slb.LoadBalancerType, error) {
 	//ssl := service.Annotations["sec_ports"]
 	additions, deletions, err := s.diffListeners(service, lb)
 	if err != nil {
@@ -250,7 +244,7 @@ type PortListener struct {
 // 2. Modify NodePort would cause listener to be recreated
 // 3. Modify Protocol would cause listener to be recreated
 //
-func (s *SDKClientSLB) diffListeners(service *v1.Service, lb *slb.LoadBalancerType) (
+func (s *LoadBalancerClient) diffListeners(service *v1.Service, lb *slb.LoadBalancerType) (
 	[]PortListener, []PortListener, error) {
 	lp := lb.ListenerPortsAndProtocol.ListenerPortAndProtocol
 	additions, deletions := []PortListener{}, []PortListener{}
@@ -341,7 +335,7 @@ func (s *SDKClientSLB) diffListeners(service *v1.Service, lb *slb.LoadBalancerTy
 	return additions, deletions, nil
 }
 
-func (s *SDKClientSLB) findPortListener(lb *slb.LoadBalancerType, port int, proto string) (PortListener, error) {
+func (s *LoadBalancerClient) findPortListener(lb *slb.LoadBalancerType, port int, proto string) (PortListener, error) {
 	switch proto {
 	case "http":
 		p, err := s.c.DescribeLoadBalancerHTTPListenerAttribute(lb.LoadBalancerId, port)
@@ -428,7 +422,7 @@ func (s *SDKClientSLB) findPortListener(lb *slb.LoadBalancerType, port int, prot
 	return PortListener{}, errors.New(fmt.Sprintf("protocol not match: %s", proto))
 }
 
-func (s *SDKClientSLB) EnsureBackendServer(service *v1.Service, nodes []*v1.Node, lb *slb.LoadBalancerType) (*slb.LoadBalancerType, error) {
+func (s *LoadBalancerClient) EnsureBackendServer(service *v1.Service, nodes []*v1.Node, lb *slb.LoadBalancerType) (*slb.LoadBalancerType, error) {
 
 	additions, deletions := s.diffServers(nodes, lb)
 	glog.V(2).Infof("Alicloud.EnsureBackendServer(): add additional backend servers=[%+v],  delete removed backend servers=[%+v]", additions, deletions)
@@ -451,7 +445,7 @@ func (s *SDKClientSLB) EnsureBackendServer(service *v1.Service, nodes []*v1.Node
 	return lb, nil
 }
 
-func (s *SDKClientSLB) EnsureLoadBalanceDeleted(service *v1.Service) error {
+func (s *LoadBalancerClient) EnsureLoadBalanceDeleted(service *v1.Service) error {
 
 	exists, lb, err := s.findLoadBalancer(service)
 	if err != nil {
@@ -463,12 +457,12 @@ func (s *SDKClientSLB) EnsureLoadBalanceDeleted(service *v1.Service) error {
 	return s.c.DeleteLoadBalancer(lb.LoadBalancerId)
 }
 
-func (s *SDKClientSLB) EnsureHealthCheck(service *v1.Service, old *PortListener, new *PortListener) (*slb.LoadBalancerType, error) {
+func (s *LoadBalancerClient) EnsureHealthCheck(service *v1.Service, old *PortListener, new *PortListener) (*slb.LoadBalancerType, error) {
 
 	return nil, nil
 }
 
-func (s *SDKClientSLB) createListener(lb *slb.LoadBalancerType, pp PortListener) error {
+func (s *LoadBalancerClient) createListener(lb *slb.LoadBalancerType, pp PortListener) error {
 	protocol := pp.Protocol
 
 	if pp.HealthCheckConnectPort == MagicHealthCheckConnectPort {
@@ -567,7 +561,7 @@ func (s *SDKClientSLB) createListener(lb *slb.LoadBalancerType, pp PortListener)
 	return nil
 }
 
-func (s *SDKClientSLB) getLoadBalancerOpts(ar *AnnotationRequest) *slb.CreateLoadBalancerArgs {
+func (s *LoadBalancerClient) getLoadBalancerOpts(ar *AnnotationRequest) *slb.CreateLoadBalancerArgs {
 
 
 	return &slb.CreateLoadBalancerArgs{
@@ -580,7 +574,7 @@ func (s *SDKClientSLB) getLoadBalancerOpts(ar *AnnotationRequest) *slb.CreateLoa
 
 const DEFAULT_SERVER_WEIGHT = 100
 
-func (s *SDKClientSLB) diffServers(nodes []*v1.Node, lb *slb.LoadBalancerType) ([]slb.BackendServerType, []slb.BackendServerType) {
+func (s *LoadBalancerClient) diffServers(nodes []*v1.Node, lb *slb.LoadBalancerType) ([]slb.BackendServerType, []slb.BackendServerType) {
 	additions, deletions := []slb.BackendServerType{}, []slb.BackendServerType{}
 	for _, n1 := range nodes {
 		found := false

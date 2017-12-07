@@ -10,26 +10,24 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"strings"
+	"sync"
 )
 
-type SDKClientINS struct {
+type InstancerClient struct {
 	regions         map[string][]string
 	c               *ecs.Client
+	lock            sync.RWMutex
 	CurrentNodeName types.NodeName
 }
 
-func NewSDKClientINS(access_key_id string, access_key_secret string) *SDKClientINS {
-	ins := &SDKClientINS{
-		c: ecs.NewClient(access_key_id, access_key_secret),
-	}
-	ins.c.SetUserAgent(KUBERNETES_ALICLOUD_IDENTITY)
-	return ins
+func (s *InstancerClient) Update(client * ecs.Client) {
+
 }
 
 // filterOutByRegion Used for multi-region or multi-vpc. works for single region or vpc too.
 // SLB only support Backends within the same vpc in the same region. so we need to remove the other backends which not in
 // the same region vpc with teh SLB. Keep the most backends
-func (s *SDKClientINS) filterOutByRegion(nodes []*v1.Node, region common.Region) []*v1.Node {
+func (s *InstancerClient) filterOutByRegion(nodes []*v1.Node, region common.Region) []*v1.Node {
 	result := []*v1.Node{}
 	mvpc := make(map[string]int)
 	for _, node := range nodes {
@@ -64,7 +62,7 @@ func (s *SDKClientINS) filterOutByRegion(nodes []*v1.Node, region common.Region)
 	return result
 }
 
-func (s *SDKClientINS) filterOutByLabel(nodes []*v1.Node, labels string) []*v1.Node {
+func (s *InstancerClient) filterOutByLabel(nodes []*v1.Node, labels string) []*v1.Node {
 	if labels == "" {
 		// skip filter when label is empty
 		glog.V(2).Infof("alicloud: slb backend server label doesnot specified, skip filter nodes by label.")
@@ -103,7 +101,7 @@ func nodeid(nodename types.NodeName) (common.Region, types.NodeName, error) {
 }
 
 // getAddressesByName return an instance address slice by it's name.
-func (s *SDKClientINS) findAddress(nodeName types.NodeName) ([]v1.NodeAddress, error) {
+func (s *InstancerClient) findAddress(nodeName types.NodeName) ([]v1.NodeAddress, error) {
 
 	instance, err := s.findInstanceByNode(nodeName)
 	if err != nil {
@@ -144,7 +142,7 @@ func (s *SDKClientINS) findAddress(nodeName types.NodeName) ([]v1.NodeAddress, e
 
 // nodeName must be a ':' separated Region and ndoeid string which is the instance identity
 // Returns instance information
-func (s *SDKClientINS) findInstanceByNode(nodeName types.NodeName) (*ecs.InstanceAttributesType, error) {
+func (s *InstancerClient) findInstanceByNode(nodeName types.NodeName) (*ecs.InstanceAttributesType, error) {
 	region, nodeid, err := nodeid(nodeName)
 	if err != nil {
 		return nil, err
@@ -152,11 +150,11 @@ func (s *SDKClientINS) findInstanceByNode(nodeName types.NodeName) (*ecs.Instanc
 	return s.refreshInstance(types.NodeName(nodeid), common.Region(region))
 }
 
-func (s *SDKClientINS) Regions() map[string][]string {
+func (s *InstancerClient) Regions() map[string][]string {
 	return s.regions
 }
 
-func (s *SDKClientINS) refreshInstance(nodeName types.NodeName, region common.Region) (*ecs.InstanceAttributesType, error) {
+func (s *InstancerClient) refreshInstance(nodeName types.NodeName, region common.Region) (*ecs.InstanceAttributesType, error) {
 	args := ecs.DescribeInstancesArgs{
 		RegionId:    region,
 		InstanceIds: fmt.Sprintf("[\"%s\"]", string(nodeName)),
@@ -180,7 +178,7 @@ func (s *SDKClientINS) refreshInstance(nodeName types.NodeName, region common.Re
 	return &instances[0], nil
 }
 
-func (s *SDKClientINS) storeVpcid(i *ecs.InstanceAttributesType) {
+func (s *InstancerClient) storeVpcid(i *ecs.InstanceAttributesType) {
 	if s.regions == nil {
 		s.regions = make(map[string][]string)
 	}

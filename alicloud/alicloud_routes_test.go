@@ -2,9 +2,10 @@ package alicloud
 
 import (
 	"fmt"
-	"github.com/denverdino/aliyungo/common"
 	"testing"
 	"time"
+
+	"github.com/denverdino/aliyungo/common"
 )
 
 func TestRoute(t *testing.T) {

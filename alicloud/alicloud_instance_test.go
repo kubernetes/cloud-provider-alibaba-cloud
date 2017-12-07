@@ -7,9 +7,14 @@ import (
 )
 
 func TestInstanceRefeshInstance(t *testing.T) {
-	ins := NewSDKClientINS(keyid, keysecret)
-	_, err := ins.refreshInstance("xxxx", common.Zhangjiakou)
+	mgr,err := NewClientMgr("","")
 	if err != nil {
+		t.Errorf("create client manager fail. [%s]\n",err.Error())
+		t.Fatal()
+	}
+	fmt.Printf("Acloud: [%+v][%+v]\n", mgr,err)
+	_, e := mgr.Instances(DEFAULT_REGION).refreshInstance("xxxx", common.Zhangjiakou)
+	if e != nil {
 		t.Errorf("TestInstanceRefeshInstance error: %s\n", err.Error())
 	}
 }

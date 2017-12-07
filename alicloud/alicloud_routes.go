@@ -15,7 +15,7 @@ import (
 	"time"
 )
 
-type SDKClientRoutes struct {
+type RoutesClient struct {
 	client  *ecs.Client
 	lock    *sync.RWMutex
 	routers *cache.Cache
@@ -25,18 +25,7 @@ type SDKClientRoutes struct {
 
 var defaultCacheExpiration = time.Duration(10 * time.Minute)
 
-func NewSDKClientRoutes(access_key_id string, access_key_secret string) (*SDKClientRoutes, error) {
-	c := ecs.NewClient(access_key_id, access_key_secret)
-	c.SetUserAgent(KUBERNETES_ALICLOUD_IDENTITY)
-
-	return &SDKClientRoutes{
-		client: c,
-		routers: cache.New(defaultCacheExpiration, defaultCacheExpiration),
-		vpcs:    cache.New(defaultCacheExpiration, defaultCacheExpiration),
-	}, nil
-}
-
-func (r *SDKClientRoutes) findRouter(region common.Region, vpcid string) (*ecs.VRouterSetType,error) {
+func (r *RoutesClient) findRouter(region common.Region, vpcid string) (*ecs.VRouterSetType,error) {
 	// look up for vpc
 	vpckey := fmt.Sprintf("%s.%s",region,vpcid)
 	v,ok := r.vpcs.Get(vpckey);
@@ -79,7 +68,7 @@ func (r *SDKClientRoutes) findRouter(region common.Region, vpcid string) (*ecs.V
 	return rts,nil
 }
 
-func (r *SDKClientRoutes) findRouteTables(region common.Region, vpcid string) ([]ecs.RouteTableSetType, *common.PaginationResult, error) {
+func (r *RoutesClient) findRouteTables(region common.Region, vpcid string) ([]ecs.RouteTableSetType, *common.PaginationResult, error) {
 	route, err := r.findRouter(region,vpcid)
 	if err != nil {
 		return nil,nil,err
@@ -92,7 +81,7 @@ func (r *SDKClientRoutes) findRouteTables(region common.Region, vpcid string) ([
 }
 
 // ListRoutes lists all managed routes that belong to the specified clusterName
-func (r *SDKClientRoutes) ListRoutes(region common.Region, vpcs []string) ([]*cloudprovider.Route, error) {
+func (r *RoutesClient) ListRoutes(region common.Region, vpcs []string) ([]*cloudprovider.Route, error) {
 
 	routes := []*cloudprovider.Route{}
 	for _, vpc := range vpcs {
@@ -135,7 +124,7 @@ func (r *SDKClientRoutes) ListRoutes(region common.Region, vpcs []string) ([]*cl
 // CreateRoute creates the described managed route
 // route.Name will be ignored, although the cloud-provider may use nameHint
 // to create a more user-meaningful name.
-func (r *SDKClientRoutes) CreateRoute(route *cloudprovider.Route, region common.Region, vpcid string) error {
+func (r *RoutesClient) CreateRoute(route *cloudprovider.Route, region common.Region, vpcid string) error {
 
 	tables, _, err := r.findRouteTables(region, vpcid)
 	if err != nil {
@@ -161,7 +150,7 @@ func (r *SDKClientRoutes) CreateRoute(route *cloudprovider.Route, region common.
 
 // DeleteRoute deletes the specified managed route
 // Route should be as returned by ListRoutes
-func (r *SDKClientRoutes) DeleteRoute(route *cloudprovider.Route, region common.Region, vpcid string) error {
+func (r *RoutesClient) DeleteRoute(route *cloudprovider.Route, region common.Region, vpcid string) error {
 
 	tabels, _, err := r.findRouteTables(region,vpcid)
 	if err!= nil {
@@ -177,7 +166,7 @@ func (r *SDKClientRoutes) DeleteRoute(route *cloudprovider.Route, region common.
 	return r.client.WaitForAllRouteEntriesAvailable(tabels[0].VRouterId, tabels[0].RouteTableId, 60)
 }
 
-func (r *SDKClientRoutes) reCreateRoute(table ecs.RouteTableSetType, route *ecs.CreateRouteEntryArgs) error {
+func (r *RoutesClient) reCreateRoute(table ecs.RouteTableSetType, route *ecs.CreateRouteEntryArgs) error {
 
 	exist := false
 	for _, e := range table.RouteEntrys.RouteEntry {
@@ -220,7 +209,7 @@ func (r *SDKClientRoutes) reCreateRoute(table ecs.RouteTableSetType, route *ecs.
 	return nil
 }
 
-func (r *SDKClientRoutes) getErrorString(e error) string {
+func (r *RoutesClient) getErrorString(e error) string {
 	if e == nil {
 		return ""
 	}

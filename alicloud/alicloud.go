@@ -25,15 +25,11 @@ var KUBERNETES_ALICLOUD_IDENTITY = fmt.Sprintf("Kubernetes.Alicloud/%s", version
 
 // Cloud is an implementation of Interface, LoadBalancer and Instances for Alicloud Services.
 type Cloud struct {
-	meta *metadata.MetaData
-	slb  *SDKClientSLB
-	ins  *SDKClientINS
+	climgr 	* ClientMgr
 
-	routes *SDKClientRoutes
-
-	cfg    *CloudConfig
-	region common.Region
-	vpcID  string
+	cfg    	*CloudConfig
+	region 	common.Region
+	vpcID  	string
 }
 
 var (
@@ -60,7 +56,8 @@ func init() {
 	cloudprovider.RegisterCloudProvider(ProviderName,
 		func(config io.Reader) (cloudprovider.Interface, error) {
 			if config == nil {
-				return nil, errors.New("Alicloud: config must be provided!")
+				glog.Infof("Alicloud: config file is not provided, using vpc instance profile to access alicloud.")
+				return newAliCloud("", "")
 			}
 			var cfg CloudConfig
 			if err := json.NewDecoder(config).Decode(&cfg); err != nil {
@@ -80,54 +77,37 @@ func init() {
 			}
 			cfg.Global.AccessKeySecret = string(secret)
 			glog.V(2).Infof("Alicloud: Accesskey=%s, AccessKeySecrete=%s",cfg.Global.AccessKeyID,cfg.Global.AccessKeySecret)
-			return newAliCloud(&cfg)
+			return newAliCloud(cfg.Global.AccessKeyID, cfg.Global.AccessKeySecret)
 		})
 }
 
-func newAliCloud(config *CloudConfig) (*Cloud, error) {
-	c := &Cloud{
-		meta: metadata.NewMetaData(nil),
-	}
-	curr := "default"
-	if config.Global.Region != "" {
-		c.region = common.Region(config.Global.Region)
-	} else {
-		defer func() {
-			if err := recover(); err != nil {
-				fmt.Println(err)
-			}
-		}()
-		// if region not configed ,try to detect. return err if failed. this will work with vpc network
-		r, err := c.meta.Region()
-		if err != nil {
-			return nil, errors.New("Please provide region in Alicloud configuration file or make sure your ECS is under VPC network.")
-		}
-		c.region = common.Region(r)
+func newAliCloud(key, secret string) (*Cloud, error) {
 
-		v, err := c.meta.VpcID()
-		if err != nil {
-			return nil, errors.New(fmt.Sprintf("Alicloud: error get vpcid. %s\n", err.Error()))
+	m := metadata.NewMetaData(nil)
+	defer func() {
+		if err := recover(); err != nil {
+			fmt.Println(err)
 		}
-		c.vpcID = v
+	}()
 
-		glog.Infof("Using vpc region: region=%s, vpcid=%s", r, c.vpcID)
-
-		curr, err = c.meta.InstanceID()
-		if err != nil {
-			glog.Warningf("Error get instance id, %s", r, c.vpcID)
-		}
-	}
-	DEFAULT_REGION = c.region
-	c.slb = NewSDKClientSLB(config.Global.AccessKeyID, config.Global.AccessKeySecret, c.region)
-	c.ins = NewSDKClientINS(config.Global.AccessKeyID, config.Global.AccessKeySecret)
-	c.ins.CurrentNodeName = types.NodeName(curr)
-	r, err := NewSDKClientRoutes(config.Global.AccessKeyID, config.Global.AccessKeySecret)
+	region, err := m.Region()
 	if err != nil {
-		glog.Errorf("Alicloud: error create routesdk. [%s]\n", err.Error())
-		return c, err
+		return nil, errors.New("Please provide region in Alicloud configuration file or " +
+			"make sure your ECS is under VPC network.")
 	}
-	c.routes = r
-	return c, nil
+	DEFAULT_REGION = common.Region(region)
+
+	vpc, err := m.VpcID()
+	if err != nil {
+		return nil, errors.New(fmt.Sprintf("Alicloud: error get vpcid. %s\n", err.Error()))
+	}
+	glog.Infof("Using vpc region: region=%s, vpcid=%s", region, vpc)
+
+	mgr , err := NewClientMgr(key, secret)
+	if err != nil {
+		return nil, err
+	}
+	return &Cloud{ climgr: mgr, region: common.Region(region), vpcID: vpc }, nil
 }
 
 // Initialize passes a Kubernetes clientBuilder interface to the cloud provider
@@ -140,7 +120,7 @@ func (c *Cloud) Initialize(clientBuilder controller.ControllerClientBuilder) {}
 // Parameter 'clusterName' is the name of the cluster as presented to kube-controller-manager
 func (c *Cloud) GetLoadBalancer(clusterName string, service *v1.Service) (status *v1.LoadBalancerStatus, exists bool, err error) {
 
-	exists, lb, err := c.slb.findLoadBalancer(service)
+	exists, lb, err := c.climgr.LoadBalancers(DEFAULT_REGION).findLoadBalancer(service)
 
 	if err != nil || !exists {
 		return nil, exists, err
@@ -172,7 +152,7 @@ func (c *Cloud) EnsureLoadBalancer(clusterName string, service *v1.Service, node
 	vswitchid := ""
 	if len(ns) <= 0 {
 		var err error
-		vswitchid,err = c.meta.VswitchID()
+		vswitchid,err = c.climgr.MetaData().VswitchID()
 		if err != nil {
 			return nil, err
 		}
@@ -183,7 +163,7 @@ func (c *Cloud) EnsureLoadBalancer(clusterName string, service *v1.Service, node
 		}
 	}else {
 		for _, v := range ns {
-			i, err := c.ins.findInstanceByNode(types.NodeName(v.Name))
+			i, err := c.climgr.Instances(DEFAULT_REGION).findInstanceByNode(types.NodeName(v.Name))
 			if err != nil {
 				return nil, err
 			}
@@ -192,7 +172,7 @@ func (c *Cloud) EnsureLoadBalancer(clusterName string, service *v1.Service, node
 		}
 	}
 
-	lb, err := c.slb.EnsureLoadBalancer(service, ns, vswitchid)
+	lb, err := c.climgr.LoadBalancers(DEFAULT_REGION).EnsureLoadBalancer(service, ns, vswitchid)
 	if err != nil {
 		return nil, err
 	}
@@ -210,7 +190,7 @@ func (c *Cloud) UpdateLoadBalancer(clusterName string, service *v1.Service, node
 	glog.V(2).Infof("Alicloud.UpdateLoadBalancer(%v, %v, %v, %v, %v, %v, %v)",
 		clusterName, service.Namespace, service.Name, c.region, service.Spec.LoadBalancerIP, service.Spec.Ports, nodes)
 
-	return c.slb.UpdateLoadBalancer(service, c.fileOutNode(nodes, service))
+	return c.climgr.LoadBalancers(DEFAULT_REGION).UpdateLoadBalancer(service, c.fileOutNode(nodes, service))
 }
 
 // EnsureLoadBalancerDeleted deletes the specified load balancer if it
@@ -224,7 +204,7 @@ func (c *Cloud) UpdateLoadBalancer(clusterName string, service *v1.Service, node
 func (c *Cloud) EnsureLoadBalancerDeleted(clusterName string, service *v1.Service) error {
 	glog.V(2).Infof("Alicloud.EnsureLoadBalancerDeleted(%v, %v, %v, %v, %v, %v)",
 		clusterName, service.Namespace, service.Name, c.region, service.Spec.LoadBalancerIP, service.Spec.Ports)
-	return c.slb.EnsureLoadBalanceDeleted(service)
+	return c.climgr.LoadBalancers(DEFAULT_REGION).EnsureLoadBalanceDeleted(service)
 }
 
 // NodeAddresses returns the addresses of the specified instance.
@@ -233,7 +213,7 @@ func (c *Cloud) EnsureLoadBalancerDeleted(clusterName string, service *v1.Servic
 // make this clearer.
 func (c *Cloud) NodeAddresses(name types.NodeName) ([]v1.NodeAddress, error) {
 	glog.V(2).Infof("Alicloud.NodeAddresses(\"%s\")", string(name))
-	return c.ins.findAddress(name)
+	return c.climgr.Instances(DEFAULT_REGION).findAddress(name)
 }
 
 // InstanceTypeByProviderID returns the cloudprovider instance type of the node with the specified unique providerID
@@ -241,7 +221,7 @@ func (c *Cloud) NodeAddresses(name types.NodeName) ([]v1.NodeAddress, error) {
 // and other local methods cannot be used here
 func (c *Cloud) InstanceTypeByProviderID(providerID string) (string, error) {
 	glog.V(2).Infof("Alicloud.InstanceTypeByProviderID(\"%s\")", providerID)
-	ins, err := c.ins.findInstanceByNode(types.NodeName(providerID))
+	ins, err := c.climgr.Instances(DEFAULT_REGION).findInstanceByNode(types.NodeName(providerID))
 	if err == nil {
 		return ins.InstanceType, nil
 	}
@@ -253,14 +233,14 @@ func (c *Cloud) InstanceTypeByProviderID(providerID string) (string, error) {
 // and other local methods cannot be used here
 func (c *Cloud) NodeAddressesByProviderID(providerID string) ([]v1.NodeAddress, error) {
 	glog.V(2).Infof("Alicloud.NodeAddressesByProviderID(\"%s\")", providerID)
-	return c.ins.findAddress(types.NodeName(providerID))
+	return c.climgr.Instances(DEFAULT_REGION).findAddress(types.NodeName(providerID))
 }
 
 // ExternalID returns the cloud provider ID of the node with the specified NodeName.
 // Note that if the instance does not exist or is no longer running, we must return ("", cloudprovider.InstanceNotFound)
 func (c *Cloud) ExternalID(nodeName types.NodeName) (string, error) {
 	glog.V(2).Infof("Alicloud.ExternalID(\"%s\")", string(nodeName))
-	instance, err := c.ins.findInstanceByNode(nodeName)
+	instance, err := c.climgr.Instances(DEFAULT_REGION).findInstanceByNode(nodeName)
 	if err != nil {
 		return "", err
 	}
@@ -270,7 +250,7 @@ func (c *Cloud) ExternalID(nodeName types.NodeName) (string, error) {
 // InstanceID returns the cloud provider ID of the node with the specified NodeName.
 func (c *Cloud) InstanceID(nodeName types.NodeName) (string, error) {
 	glog.V(2).Infof("Alicloud.InstanceID(\"%s\")", string(nodeName))
-	instance, err := c.ins.findInstanceByNode(nodeName)
+	instance, err := c.climgr.Instances(DEFAULT_REGION).findInstanceByNode(nodeName)
 	if err != nil {
 		return "", err
 	}
@@ -280,7 +260,7 @@ func (c *Cloud) InstanceID(nodeName types.NodeName) (string, error) {
 // InstanceType returns the type of the specified instance.
 func (c *Cloud) InstanceType(name types.NodeName) (string, error) {
 	glog.V(2).Infof("Alicloud.InstanceType(\"%s\")", string(name))
-	instance, err := c.ins.findInstanceByNode(name)
+	instance, err := c.climgr.Instances(DEFAULT_REGION).findInstanceByNode(name)
 	if err != nil {
 		return "", err
 	}
@@ -296,11 +276,11 @@ func (c *Cloud) AddSSHKeyToAllInstances(user string, keyData []byte) error {
 // CurrentNodeName returns the name of the node we are currently running on
 // On most clouds (e.g. GCE) this is the hostname, so we provide the hostname
 func (c *Cloud) CurrentNodeName(hostname string) (types.NodeName, error) {
-	nodeName, err := c.meta.InstanceID()
+	nodeName, err := c.climgr.MetaData().InstanceID()
 	if err != nil {
 		return "", err
 	}
-	region, err := c.meta.Region()
+	region, err := c.climgr.MetaData().Region()
 	if err != nil {
 		return "", err
 	}
@@ -311,7 +291,7 @@ func (c *Cloud) CurrentNodeName(hostname string) (types.NodeName, error) {
 // InstanceExistsByProviderID returns true if the instance for the given provider id still is running.
 // If false is returned with no error, the instance will be immediately deleted by the cloud controller manager.
 func (c *Cloud) InstanceExistsByProviderID(providerID string) (bool, error) {
-	_, err := c.ins.findInstanceByNode(types.NodeName(providerID))
+	_, err := c.climgr.Instances(DEFAULT_REGION).findInstanceByNode(types.NodeName(providerID))
 	if err == cloudprovider.InstanceNotFound {
 
 		glog.V(2).Infof("Alicloud.InstanceExistsByProviderID(\"%s\") message=[%s]", providerID,err.Error())
@@ -323,8 +303,8 @@ func (c *Cloud) InstanceExistsByProviderID(providerID string) (bool, error) {
 // ListRoutes lists all managed routes that belong to the specified clusterName
 func (c *Cloud) ListRoutes(clusterName string) ([]*cloudprovider.Route, error) {
 	routes := []*cloudprovider.Route{}
-	for k, v := range c.ins.Regions() {
-		r, err := c.routes.ListRoutes(common.Region(k), v)
+	for k, v := range c.climgr.Instances(DEFAULT_REGION).Regions() {
+		r, err := c.climgr.Routes(DEFAULT_REGION).ListRoutes(common.Region(k), v)
 		if err != nil {
 			glog.Errorf("Alicloud.ListRoutes(): error list routes, message=[%s]\n", err.Error())
 			return nil, err
@@ -349,7 +329,7 @@ func (c *Cloud) ListRoutes(clusterName string) ([]*cloudprovider.Route, error) {
 // to create a more user-meaningful name.
 func (c *Cloud) CreateRoute(clusterName string, nameHint string, route *cloudprovider.Route) error {
 	glog.V(2).Infof("Alicloud.CreateRoute(\"%s, %+v\")", clusterName, route)
-	ins, err := c.ins.findInstanceByNode(types.NodeName(route.TargetNode))
+	ins, err := c.climgr.Instances(DEFAULT_REGION).findInstanceByNode(types.NodeName(route.TargetNode))
 	if err != nil {
 		return err
 	}
@@ -358,14 +338,14 @@ func (c *Cloud) CreateRoute(clusterName string, nameHint string, route *cloudpro
 		DestinationCIDR: route.DestinationCIDR,
 		TargetNode:      types.NodeName(ins.InstanceId),
 	}
-	return c.routes.CreateRoute(cRoute, ins.RegionId, ins.VpcAttributes.VpcId)
+	return c.climgr.Routes(DEFAULT_REGION).CreateRoute(cRoute, ins.RegionId, ins.VpcAttributes.VpcId)
 }
 
 // DeleteRoute deletes the specified managed route
 // Route should be as returned by ListRoutes
 func (c *Cloud) DeleteRoute(clusterName string, route *cloudprovider.Route) error {
 	glog.V(2).Infof("Alicloud.DeleteRoute(\"%s, %+v\")", clusterName, route)
-	ins, err := c.ins.findInstanceByNode(types.NodeName(route.TargetNode))
+	ins, err := c.climgr.Instances(DEFAULT_REGION).findInstanceByNode(types.NodeName(route.TargetNode))
 	if err != nil {
 		return err
 	}
@@ -374,20 +354,20 @@ func (c *Cloud) DeleteRoute(clusterName string, route *cloudprovider.Route) erro
 		DestinationCIDR: route.DestinationCIDR,
 		TargetNode:      types.NodeName(ins.InstanceId),
 	}
-	return c.routes.DeleteRoute(cRoute, ins.RegionId, ins.VpcAttributes.VpcId)
+	return c.climgr.Routes(DEFAULT_REGION).DeleteRoute(cRoute, ins.RegionId, ins.VpcAttributes.VpcId)
 }
 
 // GetZone returns the Zone containing the current failure zone and locality region that the program is running in
 func (c *Cloud) GetZone() (cloudprovider.Zone, error) {
-	host, err := c.meta.InstanceID()
+	host, err := c.climgr.MetaData().InstanceID()
 	if err != nil {
 		return cloudprovider.Zone{}, errors.New(fmt.Sprintf("Alicloud.GetZone(): error execute c.meta.InstanceID(). message=[%s]", err.Error()))
 	}
-	region, err := c.meta.Region()
+	region, err := c.climgr.MetaData().Region()
 	if err != nil {
 		return cloudprovider.Zone{}, errors.New(fmt.Sprintf("Alicloud.GetZone(): error execute c.meta.Region(). message=[%s]", err.Error()))
 	}
-	i, err := c.ins.findInstanceByNode(types.NodeName(fmt.Sprintf("%s.%s", region, host)))
+	i, err := c.climgr.Instances(DEFAULT_REGION).findInstanceByNode(types.NodeName(fmt.Sprintf("%s.%s", region, host)))
 	if err != nil {
 		return cloudprovider.Zone{}, errors.New(fmt.Sprintf("Alicloud.GetZone(): error execute findInstanceByNodeID(). message=[%s]", err.Error()))
 	}
@@ -401,7 +381,7 @@ func (c *Cloud) GetZone() (cloudprovider.Zone, error) {
 // outside the kubelets.
 func (c *Cloud) GetZoneByNodeName(nodeName types.NodeName) (cloudprovider.Zone, error){
 
-	i, err := c.ins.findInstanceByNode(nodeName)
+	i, err := c.climgr.Instances(DEFAULT_REGION).findInstanceByNode(nodeName)
 	if err != nil {
 		return cloudprovider.Zone{}, errors.New(fmt.Sprintf("Alicloud.GetZoneByNodeName(): error execute findInstanceByNode(). message=[%s]", err.Error()))
 	}
@@ -414,7 +394,7 @@ func (c *Cloud) GetZoneByNodeName(nodeName types.NodeName) (cloudprovider.Zone, 
 // This method is particularly used in the context of external cloud providers where node initialization must be down
 // outside the kubelets.
 func (c *Cloud) GetZoneByProviderID(providerID string) (cloudprovider.Zone, error) {
-	i, err := c.ins.findInstanceByNode(types.NodeName(providerID))
+	i, err := c.climgr.Instances(DEFAULT_REGION).findInstanceByNode(types.NodeName(providerID))
 	if err != nil {
 		return cloudprovider.Zone{}, errors.New(fmt.Sprintf("Alicloud.GetZoneByProviderID(), error execute findInstanceByNode(). message=[%s]", err.Error()))
 	}
@@ -466,7 +446,7 @@ func (c *Cloud) Zones() (cloudprovider.Zones, bool) {
 
 // Routes returns an implementation of Routes for Alicloud Services.
 func (c *Cloud) Routes() (cloudprovider.Routes, bool) {
-	if c.vpcID != "" && c.routes != nil {
+	if c.vpcID != "" {
 		glog.V(2).Infof("Alicloud.Routes(): routes enabled!\n")
 		return c, true
 	}
@@ -484,8 +464,8 @@ func (c *Cloud) fileOutNode(nodes []*v1.Node, service *v1.Service) []*v1.Node{
 
 	ar := ExtractAnnotationRequest(service)
 
-	targets := c.ins.filterOutByLabel(
-		c.ins.filterOutByRegion(nodes,ar.Region),
+	targets := c.climgr.Instances(DEFAULT_REGION).filterOutByLabel(
+		c.climgr.Instances(DEFAULT_REGION).filterOutByRegion(nodes,ar.Region),
 		ar.BackendLabel,
 	)
 	// Add 20 nodes at most .
