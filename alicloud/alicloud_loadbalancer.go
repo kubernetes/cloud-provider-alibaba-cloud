@@ -6,33 +6,32 @@ import (
 	"github.com/denverdino/aliyungo/common"
 	"github.com/denverdino/aliyungo/slb"
 	"github.com/golang/glog"
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"strings"
-	"k8s.io/apimachinery/pkg/types"
 )
 
-
 type AnnotationRequest struct {
-	Loadbalancerid       	string
-	BackendLabel            string
+	Loadbalancerid string
+	BackendLabel   string
 
-	SSLPorts    		string
-	AddressType 		slb.AddressType
-	SLBNetworkType 		string
+	SSLPorts       string
+	AddressType    slb.AddressType
+	SLBNetworkType string
 
-	ChargeType  		slb.InternetChargeType
-	Region      		common.Region
-	Bandwidth  		int
-	CertID      		string
+	ChargeType slb.InternetChargeType
+	Region     common.Region
+	Bandwidth  int
+	CertID     string
 
-	HealthCheck            	slb.FlagType
-	HealthCheckURI         	string
-	HealthCheckConnectPort 	int
-	HealthyThreshold       	int
-	UnhealthyThreshold     	int
-	HealthCheckInterval    	int
+	HealthCheck            slb.FlagType
+	HealthCheckURI         string
+	HealthCheckConnectPort int
+	HealthyThreshold       int
+	UnhealthyThreshold     int
+	HealthCheckInterval    int
 
 	HealthCheckConnectTimeout int                 // for tcp
 	HealthCheckType           slb.HealthCheckType // for tcp, Type could be http tcp
@@ -46,17 +45,17 @@ type LoadBalancerClient struct {
 func (s *LoadBalancerClient) findLoadBalancer(service *v1.Service) (bool, *slb.LoadBalancerType, error) {
 	ar := ExtractAnnotationRequest(service)
 	if ar.Loadbalancerid != "" {
-		return s.findLoadBalancerByID(ar.Loadbalancerid,ar.Region)
+		return s.findLoadBalancerByID(ar.Loadbalancerid, ar.Region)
 	}
-	return s.findLoadBalancerByName(cloudprovider.GetLoadBalancerName(service),ar.Region)
+	return s.findLoadBalancerByName(cloudprovider.GetLoadBalancerName(service), ar.Region)
 }
 
-func (s *LoadBalancerClient) findLoadBalancerByID(lbid string,region common.Region) (bool, *slb.LoadBalancerType, error) {
+func (s *LoadBalancerClient) findLoadBalancerByID(lbid string, region common.Region) (bool, *slb.LoadBalancerType, error) {
 
 	lbs, err := s.c.DescribeLoadBalancers(
 		&slb.DescribeLoadBalancersArgs{
-			RegionId:         region,
-			LoadBalancerId:   lbid,
+			RegionId:       region,
+			LoadBalancerId: lbid,
 		},
 	)
 
@@ -65,10 +64,10 @@ func (s *LoadBalancerClient) findLoadBalancerByID(lbid string,region common.Regi
 	}
 
 	if lbs == nil || len(lbs) == 0 {
-		return false,nil, nil
+		return false, nil, nil
 	}
 	if len(lbs) > 1 {
-		glog.Warningf("Alicloud.GetLoadBalancerByID(): multiple loadbalancer returned with id=%s, " +
+		glog.Warningf("Alicloud.GetLoadBalancerByID(): multiple loadbalancer returned with id=%s, "+
 			"using the first one with IP=%s", lbid, lbs[0].Address)
 	}
 	lb, err := s.c.DescribeLoadBalancerAttribute(lbs[0].LoadBalancerId)
@@ -92,7 +91,7 @@ func (s *LoadBalancerClient) findLoadBalancerByName(lbn string, region common.Re
 		return false, nil, nil
 	}
 	if len(lbs) > 1 {
-		glog.Warningf("Alicloud.GetLoadBalancerByName(): multiple loadbalancer returned with name=%s, " +
+		glog.Warningf("Alicloud.GetLoadBalancerByName(): multiple loadbalancer returned with name=%s, "+
 			"using the first one with IP=%s", lbn, lbs[0].Address)
 	}
 	lb, err := s.c.DescribeLoadBalancerAttribute(lbs[0].LoadBalancerId)
@@ -107,17 +106,17 @@ func (s *LoadBalancerClient) EnsureLoadBalancer(service *v1.Service, nodes []*v1
 	glog.V(2).Infof("Alicloud.EnsureLoadBalancer(): sync loadbalancer=%v\n", lb)
 	ar := ExtractAnnotationRequest(service)
 	opts := s.getLoadBalancerOpts(ar)
-	if strings.Compare(string(opts.AddressType) ,
-		string(slb.IntranetAddressType)) == 0 && ar.SLBNetworkType != "classic"{
+	if strings.Compare(string(opts.AddressType),
+		string(slb.IntranetAddressType)) == 0 && ar.SLBNetworkType != "classic" {
 
-		glog.Infof("Alicloud.EnsureLoadBalancer(): intranet VPC loadbalancer will be created. " +
-			"addressType=%s, switch=%s\n",opts.AddressType,vswitchid)
+		glog.Infof("Alicloud.EnsureLoadBalancer(): intranet VPC loadbalancer will be created. "+
+			"addressType=%s, switch=%s\n", opts.AddressType, vswitchid)
 		opts.VSwitchId = vswitchid
 	}
 	opts.LoadBalancerName = cloudprovider.GetLoadBalancerName(service)
 	if !exists {
-		glog.V(2).Infof("Alicloud.EnsureLoadBalancer(): loadbalancer dose not exist, " +
-			"create new loadbalancer with option=%+v\n",opts)
+		glog.V(2).Infof("Alicloud.EnsureLoadBalancer(): loadbalancer dose not exist, "+
+			"create new loadbalancer with option=%+v\n", opts)
 		lbr, err := s.c.CreateLoadBalancer(opts)
 		if err != nil {
 			return nil, err
@@ -129,9 +128,9 @@ func (s *LoadBalancerClient) EnsureLoadBalancer(service *v1.Service, nodes []*v1
 	} else {
 		// Todo: here we need to compare loadbalance
 		if opts.InternetChargeType != lb.InternetChargeType {
-			glog.Infof("Alicloud.EnsureLoadBalancer(): diff loadbalancer changes. " +
+			glog.Infof("Alicloud.EnsureLoadBalancer(): diff loadbalancer changes. "+
 				"[InternetChargeType] changed from [%s] to [%s] , need to update loadbalancer:[%+v]\n",
-				string(lb.InternetChargeType),string(opts.InternetChargeType), opts)
+				string(lb.InternetChargeType), string(opts.InternetChargeType), opts)
 			if err := s.c.ModifyLoadBalancerInternetSpec(
 				&slb.ModifyLoadBalancerInternetSpecArgs{
 					LoadBalancerId:     lb.LoadBalancerId,
@@ -142,7 +141,7 @@ func (s *LoadBalancerClient) EnsureLoadBalancer(service *v1.Service, nodes []*v1
 			}
 		}
 		if opts.AddressType != lb.AddressType {
-			glog.Infof("Alicloud.EnsureLoadBalance(): diff loadbalancer changes. " +
+			glog.Infof("Alicloud.EnsureLoadBalance(): diff loadbalancer changes. "+
 				"[AddressType] changed from [%s] to [%s]. need to recreate loadbalancer!",
 				lb.AddressType, opts.AddressType, opts.LoadBalancerName)
 			// Can not modify AddressType.  We can only recreate it.
@@ -563,7 +562,6 @@ func (s *LoadBalancerClient) createListener(lb *slb.LoadBalancerType, pp PortLis
 
 func (s *LoadBalancerClient) getLoadBalancerOpts(ar *AnnotationRequest) *slb.CreateLoadBalancerArgs {
 
-
 	return &slb.CreateLoadBalancerArgs{
 		AddressType:        ar.AddressType,
 		InternetChargeType: ar.ChargeType,
@@ -578,10 +576,10 @@ func (s *LoadBalancerClient) diffServers(nodes []*v1.Node, lb *slb.LoadBalancerT
 	additions, deletions := []slb.BackendServerType{}, []slb.BackendServerType{}
 	for _, n1 := range nodes {
 		found := false
-		_,id,err := nodeid(types.NodeName(n1.Spec.ExternalID))
+		_, id, err := nodeid(types.NodeName(n1.Spec.ExternalID))
 		for _, n2 := range lb.BackendServers.BackendServer {
-			if err != nil{
-				glog.Errorf("Alicloud.diffServers(): node externalid=%s is not in the correct form, expect regionid.instanceid. skip add op",n1.Spec.ExternalID)
+			if err != nil {
+				glog.Errorf("Alicloud.diffServers(): node externalid=%s is not in the correct form, expect regionid.instanceid. skip add op", n1.Spec.ExternalID)
 				continue
 			}
 			if string(id) == n2.ServerId {
@@ -596,9 +594,9 @@ func (s *LoadBalancerClient) diffServers(nodes []*v1.Node, lb *slb.LoadBalancerT
 	for _, n1 := range lb.BackendServers.BackendServer {
 		found := false
 		for _, n2 := range nodes {
-			_,id,err := nodeid(types.NodeName(n2.Spec.ExternalID))
-			if err != nil{
-				glog.Errorf("Alicloud.diffServers(): node externalid=%s is not in the correct form, expect regionid.instanceid.. skip delete op",n2.Spec.ExternalID)
+			_, id, err := nodeid(types.NodeName(n2.Spec.ExternalID))
+			if err != nil {
+				glog.Errorf("Alicloud.diffServers(): node externalid=%s is not in the correct form, expect regionid.instanceid.. skip delete op", n2.Spec.ExternalID)
 				continue
 			}
 			if n1.ServerId == string(id) {

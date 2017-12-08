@@ -8,10 +8,10 @@ import (
 	"github.com/denverdino/aliyungo/common"
 	"github.com/denverdino/aliyungo/ecs"
 	"github.com/golang/glog"
+	"github.com/patrickmn/go-cache"
 	"k8s.io/apimachinery/pkg/types"
 	"strings"
 	"sync"
-	"github.com/patrickmn/go-cache"
 	"time"
 )
 
@@ -20,33 +20,32 @@ type RoutesClient struct {
 	lock    *sync.RWMutex
 	routers *cache.Cache
 	vpcs    *cache.Cache
-
 }
 
 var defaultCacheExpiration = time.Duration(10 * time.Minute)
 
-func (r *RoutesClient) findRouter(region common.Region, vpcid string) (*ecs.VRouterSetType,error) {
+func (r *RoutesClient) findRouter(region common.Region, vpcid string) (*ecs.VRouterSetType, error) {
 	// look up for vpc
-	vpckey := fmt.Sprintf("%s.%s",region,vpcid)
-	v,ok := r.vpcs.Get(vpckey);
+	vpckey := fmt.Sprintf("%s.%s", region, vpcid)
+	v, ok := r.vpcs.Get(vpckey)
 	if !ok {
 		vpc, _, err := r.client.DescribeVpcs(&ecs.DescribeVpcsArgs{
 			RegionId: region,
 			VpcId:    vpcid,
 		})
 		if err != nil {
-			glog.Errorf("Alicloud.findRouter(): error from ecs.DescribeVpcs(%s,%s). message=%s\n", region, vpc, r.getErrorString(err))
+			glog.Errorf("Alicloud.findRouter(): error from ecs.DescribeVpcs(%s,%v). message=%s\n", region, vpc, r.getErrorString(err))
 			return nil, err
 		}
 		if len(vpc) <= 0 {
-			return nil, errors.New(fmt.Sprintf("can not find vpc metadata by instance. region=%s, vpcid=%s, error=[no vpc found by specified id]", region, vpc))
+			return nil, errors.New(fmt.Sprintf("can not find vpc metadata by instance. region=%s, vpc=%v, error=[no vpc found by specified id]", region, vpc))
 		}
 		r.vpcs.Set(vpckey, &vpc[0], defaultCacheExpiration)
 		v = &vpc[0]
 	}
 	vpc := v.(*ecs.VpcSetType)
 	// lookup for VRouter
-	routerkey := fmt.Sprintf("%s.%s",region,vpc.VRouterId)
+	routerkey := fmt.Sprintf("%s.%s", region, vpc.VRouterId)
 	route, ok := r.routers.Get(routerkey)
 	if !ok {
 		vroute, _, err := r.client.DescribeVRouters(
@@ -61,23 +60,23 @@ func (r *RoutesClient) findRouter(region common.Region, vpcid string) (*ecs.VRou
 		if len(vroute) <= 0 {
 			return nil, errors.New(fmt.Sprintf("can not find VRouter metadata by instance. region=%s,vpcid=%s, error=[no VRouter found by specified id]", region, vpc))
 		}
-		r.routers.Set(routerkey, &vroute[0],defaultCacheExpiration)
+		r.routers.Set(routerkey, &vroute[0], defaultCacheExpiration)
 		route = &vroute[0]
 	}
 	rts := route.(*ecs.VRouterSetType)
-	return rts,nil
+	return rts, nil
 }
 
 func (r *RoutesClient) findRouteTables(region common.Region, vpcid string) ([]ecs.RouteTableSetType, *common.PaginationResult, error) {
-	route, err := r.findRouter(region,vpcid)
+	route, err := r.findRouter(region, vpcid)
 	if err != nil {
-		return nil,nil,err
+		return nil, nil, err
 	}
 	return r.client.DescribeRouteTables(
 		&ecs.DescribeRouteTablesArgs{
 			VRouterId:    route.VRouterId,
 			RouteTableId: route.RouteTableIds.RouteTableId[0],
-	})
+		})
 }
 
 // ListRoutes lists all managed routes that belong to the specified clusterName
@@ -85,7 +84,7 @@ func (r *RoutesClient) ListRoutes(region common.Region, vpcs []string) ([]*cloud
 
 	routes := []*cloudprovider.Route{}
 	for _, vpc := range vpcs {
-		tables, _ ,err := r.findRouteTables(region, vpc)
+		tables, _, err := r.findRouteTables(region, vpc)
 		if err != nil {
 			glog.Errorf("Alicloud.ListRoutes(): error ecs.DescribeRouteTables() message=%s.\n", r.getErrorString(err))
 			return nil, err
@@ -152,8 +151,8 @@ func (r *RoutesClient) CreateRoute(route *cloudprovider.Route, region common.Reg
 // Route should be as returned by ListRoutes
 func (r *RoutesClient) DeleteRoute(route *cloudprovider.Route, region common.Region, vpcid string) error {
 
-	tabels, _, err := r.findRouteTables(region,vpcid)
-	if err!= nil {
+	tabels, _, err := r.findRouteTables(region, vpcid)
+	if err != nil {
 		return err
 	}
 	if err := r.client.DeleteRouteEntry(&ecs.DeleteRouteEntryArgs{

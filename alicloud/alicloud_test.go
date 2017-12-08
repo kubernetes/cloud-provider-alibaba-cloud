@@ -1,16 +1,16 @@
 package alicloud
 
 import (
+	b64 "encoding/base64"
 	"encoding/json"
 	"fmt"
 	"github.com/denverdino/aliyungo/slb"
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	"k8s.io/api/core/v1"
 	"strings"
 	"testing"
-	b64 "encoding/base64"
 )
 
 var keyid string = ""
@@ -35,7 +35,7 @@ var (
 
 func TestBase64(t *testing.T) {
 	data := "YWJjCg=="
-	key,err := b64.StdEncoding.DecodeString(data)
+	key, err := b64.StdEncoding.DecodeString(data)
 	if err != nil {
 		t.Fail()
 	}
@@ -355,9 +355,9 @@ func TestFindInstance(t *testing.T) {
 	nodeName := types.NodeName("c8330c59708d84f819a1ca0cd4c9bfd2b-node1")
 	id, err := c.InstanceID(nodeName)
 	if err != nil {
-		t.Fatal("Instance Error: %s\n", err.Error())
+		t.Errorf("Instance Error: %s\n", err.Error())
 	}
-	fmt.Printf("%+v\n", id)
+	t.Logf("%+v\n", id)
 }
 func newCloud() (*Cloud, error) {
 	cfg := &CloudConfig{

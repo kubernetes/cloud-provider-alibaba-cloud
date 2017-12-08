@@ -1,6 +1,7 @@
 package alicloud
 
 import (
+	b64 "encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -9,12 +10,11 @@ import (
 	"github.com/denverdino/aliyungo/slb"
 	"github.com/golang/glog"
 	"io"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/version"
-	 b64 "encoding/base64"
 )
 
 // ProviderName is the name of this cloud provider.
@@ -25,11 +25,11 @@ var KUBERNETES_ALICLOUD_IDENTITY = fmt.Sprintf("Kubernetes.Alicloud/%s", version
 
 // Cloud is an implementation of Interface, LoadBalancer and Instances for Alicloud Services.
 type Cloud struct {
-	climgr 	* ClientMgr
+	climgr *ClientMgr
 
-	cfg    	*CloudConfig
-	region 	common.Region
-	vpcID  	string
+	cfg    *CloudConfig
+	region common.Region
+	vpcID  string
 }
 
 var (
@@ -66,17 +66,17 @@ func init() {
 			if cfg.Global.AccessKeyID == "" || cfg.Global.AccessKeySecret == "" {
 				return nil, errors.New("Alicloud: Provider AccessKeyID and AccessKeySecret must be provided!")
 			}
-			key,err := b64.StdEncoding.DecodeString(cfg.Global.AccessKeyID)
+			key, err := b64.StdEncoding.DecodeString(cfg.Global.AccessKeyID)
 			if err != nil {
 				return nil, err
 			}
-			cfg.Global.AccessKeyID =  string(key)
-			secret,err := b64.StdEncoding.DecodeString(cfg.Global.AccessKeySecret)
+			cfg.Global.AccessKeyID = string(key)
+			secret, err := b64.StdEncoding.DecodeString(cfg.Global.AccessKeySecret)
 			if err != nil {
 				return nil, err
 			}
 			cfg.Global.AccessKeySecret = string(secret)
-			glog.V(2).Infof("Alicloud: Accesskey=%s, AccessKeySecrete=%s",cfg.Global.AccessKeyID,cfg.Global.AccessKeySecret)
+			glog.V(2).Infof("Alicloud: Accesskey=%s, AccessKeySecrete=%s", cfg.Global.AccessKeyID, cfg.Global.AccessKeySecret)
 			return newAliCloud(cfg.Global.AccessKeyID, cfg.Global.AccessKeySecret)
 		})
 }
@@ -103,11 +103,11 @@ func newAliCloud(key, secret string) (*Cloud, error) {
 	}
 	glog.Infof("Using vpc region: region=%s, vpcid=%s", region, vpc)
 
-	mgr , err := NewClientMgr(key, secret)
+	mgr, err := NewClientMgr(key, secret)
 	if err != nil {
 		return nil, err
 	}
-	return &Cloud{ climgr: mgr, region: common.Region(region), vpcID: vpc }, nil
+	return &Cloud{climgr: mgr, region: common.Region(region), vpcID: vpc}, nil
 }
 
 // Initialize passes a Kubernetes clientBuilder interface to the cloud provider
@@ -127,7 +127,7 @@ func (c *Cloud) GetLoadBalancer(clusterName string, service *v1.Service) (status
 	}
 
 	return &v1.LoadBalancerStatus{
-		Ingress: []v1.LoadBalancerIngress{{IP: lb.Address}}, }, true, nil
+		Ingress: []v1.LoadBalancerIngress{{IP: lb.Address}}}, true, nil
 }
 
 // EnsureLoadBalancer creates a new load balancer 'name', or updates the existing one. Returns the status of the balancer
@@ -152,16 +152,16 @@ func (c *Cloud) EnsureLoadBalancer(clusterName string, service *v1.Service, node
 	vswitchid := ""
 	if len(ns) <= 0 {
 		var err error
-		vswitchid,err = c.climgr.MetaData().VswitchID()
+		vswitchid, err = c.climgr.MetaData().VswitchID()
 		if err != nil {
 			return nil, err
 		}
-		glog.V(2).Infof("Alicloud: current vswitchid=%s\n",vswitchid)
+		glog.V(2).Infof("Alicloud: current vswitchid=%s\n", vswitchid)
 		if vswitchid == "" {
 			glog.Warningf("Alicloud.EnsureLoadBalancer: can not find vswitch id, this will prevent you " +
 				"from creating VPC intranet SLB. But classic LB is still avaliable.")
 		}
-	}else {
+	} else {
 		for _, v := range ns {
 			i, err := c.climgr.Instances(DEFAULT_REGION).findInstanceByNode(types.NodeName(v.Name))
 			if err != nil {
@@ -294,7 +294,7 @@ func (c *Cloud) InstanceExistsByProviderID(providerID string) (bool, error) {
 	_, err := c.climgr.Instances(DEFAULT_REGION).findInstanceByNode(types.NodeName(providerID))
 	if err == cloudprovider.InstanceNotFound {
 
-		glog.V(2).Infof("Alicloud.InstanceExistsByProviderID(\"%s\") message=[%s]", providerID,err.Error())
+		glog.V(2).Infof("Alicloud.InstanceExistsByProviderID(\"%s\") message=[%s]", providerID, err.Error())
 		return false, err
 	}
 	return true, err
@@ -376,10 +376,11 @@ func (c *Cloud) GetZone() (cloudprovider.Zone, error) {
 		FailureDomain: i.ZoneId,
 	}, nil
 }
+
 // GetZoneByNodeName returns the Zone containing the current zone and locality region of the node specified by node name
 // This method is particularly used in the context of external cloud providers where node initialization must be down
 // outside the kubelets.
-func (c *Cloud) GetZoneByNodeName(nodeName types.NodeName) (cloudprovider.Zone, error){
+func (c *Cloud) GetZoneByNodeName(nodeName types.NodeName) (cloudprovider.Zone, error) {
 
 	i, err := c.climgr.Instances(DEFAULT_REGION).findInstanceByNode(nodeName)
 	if err != nil {
@@ -390,6 +391,7 @@ func (c *Cloud) GetZoneByNodeName(nodeName types.NodeName) (cloudprovider.Zone, 
 		FailureDomain: i.ZoneId,
 	}, nil
 }
+
 // GetZoneByProviderID returns the Zone containing the current zone and locality region of the node specified by providerId
 // This method is particularly used in the context of external cloud providers where node initialization must be down
 // outside the kubelets.
@@ -454,22 +456,21 @@ func (c *Cloud) Routes() (cloudprovider.Routes, bool) {
 }
 
 // HasClusterID returns true if a ClusterID is required and set
-func (c *Cloud) HasClusterID() bool{
+func (c *Cloud) HasClusterID() bool {
 	return false
 }
 
-
 //
-func (c *Cloud) fileOutNode(nodes []*v1.Node, service *v1.Service) []*v1.Node{
+func (c *Cloud) fileOutNode(nodes []*v1.Node, service *v1.Service) []*v1.Node {
 
 	ar := ExtractAnnotationRequest(service)
 
 	targets := c.climgr.Instances(DEFAULT_REGION).filterOutByLabel(
-		c.climgr.Instances(DEFAULT_REGION).filterOutByRegion(nodes,ar.Region),
+		c.climgr.Instances(DEFAULT_REGION).filterOutByRegion(nodes, ar.Region),
 		ar.BackendLabel,
 	)
 	// Add 20 nodes at most .
-	if len(targets) > MAX_LOADBALANCER_BACKEND{
+	if len(targets) > MAX_LOADBALANCER_BACKEND {
 		return targets[0:MAX_LOADBALANCER_BACKEND]
 	}
 	return targets

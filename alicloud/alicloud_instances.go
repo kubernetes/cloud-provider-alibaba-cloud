@@ -6,8 +6,8 @@ import (
 	"github.com/denverdino/aliyungo/common"
 	"github.com/denverdino/aliyungo/ecs"
 	"github.com/golang/glog"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"strings"
 	"sync"
@@ -20,7 +20,7 @@ type InstancerClient struct {
 	CurrentNodeName types.NodeName
 }
 
-func (s *InstancerClient) Update(client * ecs.Client) {
+func (s *InstancerClient) Update(client *ecs.Client) {
 
 }
 
@@ -70,15 +70,15 @@ func (s *InstancerClient) filterOutByLabel(nodes []*v1.Node, labels string) []*v
 	}
 	result := []*v1.Node{}
 	lbl := strings.Split(labels, ",")
-	for _, node := range nodes{
+	for _, node := range nodes {
 		found := true
-		for _,v := range lbl{
-			l := strings.Split(v,"=")
+		for _, v := range lbl {
+			l := strings.Split(v, "=")
 			if len(l) < 2 {
-				glog.Errorf("alicloud: error parse backend label with value [%s], must be key value like [k=v]\n",v)
+				glog.Errorf("alicloud: error parse backend label with value [%s], must be key value like [k=v]\n", v)
 				return []*v1.Node{}
 			}
-			if nv,exist := node.Labels[l[0]]; !exist || nv != l[1]{
+			if nv, exist := node.Labels[l[0]]; !exist || nv != l[1] {
 				found = false
 				break
 			}
@@ -89,6 +89,7 @@ func (s *InstancerClient) filterOutByLabel(nodes []*v1.Node, labels string) []*v
 	}
 	return result
 }
+
 // we use '.' separated nodeid which looks like 'cn-hangzhou.i-v98dklsmnxkkgiiil7' to identify node
 // This is the format of "REGION.NODEID"
 func nodeid(nodename types.NodeName) (common.Region, types.NodeName, error) {
