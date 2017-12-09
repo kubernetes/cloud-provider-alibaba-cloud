@@ -253,7 +253,7 @@ func (s *LoadBalancerClient) diffListeners(service *v1.Service, lb *slb.LoadBala
 	// find additions
 	for _, v1 := range service.Spec.Ports {
 		found := false
-		proto, err := transProtocol(service.Annotations[ServiceAnnotationLoadBalancerProtocolPort], &v1)
+		proto, err := transProtocol(serviceAnnotation(service, ServiceAnnotationLoadBalancerProtocolPort), &v1)
 		if err != nil {
 			return nil, nil, err
 		}
