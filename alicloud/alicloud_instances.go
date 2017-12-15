@@ -141,7 +141,7 @@ func (s *InstancerClient) findAddress(nodeName types.NodeName) ([]v1.NodeAddress
 	return addrs, nil
 }
 
-// nodeName must be a ':' separated Region and ndoeid string which is the instance identity
+// nodeName must be a '.' separated Region and ndoeid string which is the instance identity
 // Returns instance information
 func (s *InstancerClient) findInstanceByNode(nodeName types.NodeName) (*ecs.InstanceAttributesType, error) {
 	region, nodeid, err := nodeid(nodeName)
@@ -168,7 +168,7 @@ func (s *InstancerClient) refreshInstance(nodeName types.NodeName, region common
 	}
 
 	if len(instances) == 0 {
-		glog.Infof("Alicloud: InstanceNotFound, instanceid=[%s.%s]. It is likely to be deleted.", nodeName, region)
+		glog.Infof("Alicloud: InstanceNotFound, instanceid=[%s.%s]. It is likely to be deleted.", region, nodeName)
 		return nil, cloudprovider.InstanceNotFound
 	}
 	if len(instances) > 1 {

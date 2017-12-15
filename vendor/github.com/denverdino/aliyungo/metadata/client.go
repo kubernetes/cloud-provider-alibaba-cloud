@@ -11,11 +11,10 @@ import (
 	"strings"
 	"time"
 
+	"encoding/json"
 	"github.com/denverdino/aliyungo/util"
 	"reflect"
-	"encoding/json"
 )
-
 
 const (
 	ENDPOINT = "http://100.100.100.200"
@@ -43,7 +42,7 @@ const (
 	VSWITCH_CIDR_BLOCK = "vswitch-cidr-block"
 	VSWITCH_ID         = "vswitch-id"
 	ZONE               = "zone-id"
-	RAM_SECURITY       = "Ram/security-credentials"
+	RAM_SECURITY       = "ram/security-credentials/"
 )
 
 type IMetaDataRequest interface {
@@ -51,15 +50,15 @@ type IMetaDataRequest interface {
 	ResourceType(rtype string) IMetaDataRequest
 	Resource(resource string) IMetaDataRequest
 	SubResource(sub string) IMetaDataRequest
-	Url() 				(string, error)
-	Do(api interface{}) 		(error)
+	Url() (string, error)
+	Do(api interface{}) error
 }
 
 type MetaData struct {
 	// mock for unit test.
-	mock    requestMock
+	mock requestMock
 
-	client 	*http.Client
+	client *http.Client
 }
 
 func NewMetaData(client *http.Client) *MetaData {
@@ -83,7 +82,7 @@ func NewMockMetaData(client *http.Client, sendRequest requestMock) *MetaData {
 
 func (m *MetaData) New() *MetaDataRequest {
 	return &MetaDataRequest{
-		client: m.client ,
+		client:      m.client,
 		sendRequest: m.mock,
 	}
 }
@@ -250,6 +249,15 @@ func (m *MetaData) Zone() (string, error) {
 	}
 	return zone.result[0], nil
 }
+func (m *MetaData) Role() (string, error) {
+	var role ResultList
+	err := m.New().Resource(RAM_SECURITY).Do(&role)
+	if err != nil {
+		return "", err
+	}
+	return role.result[0], nil
+}
+
 func (m *MetaData) RamRoleToken(role string) (RoleAuth, error) {
 	var roleauth RoleAuth
 	err := m.New().Resource(RAM_SECURITY).SubResource(role).Do(&roleauth)
@@ -269,7 +277,7 @@ type MetaDataRequest struct {
 	subResource  string
 	client       *http.Client
 
-	sendRequest  requestMock
+	sendRequest requestMock
 }
 
 func (vpc *MetaDataRequest) Version(version string) IMetaDataRequest {
@@ -312,15 +320,15 @@ func (vpc *MetaDataRequest) Url() (string, error) {
 	if vpc.subResource == "" {
 		return r, nil
 	}
-	return fmt.Sprintf("%s/%s",r,vpc.subResource), nil
+	return fmt.Sprintf("%s/%s", strings.TrimSuffix(r, "/"), vpc.subResource), nil
 }
 
-func (vpc *MetaDataRequest) Do(api interface{} ) ( err error) {
+func (vpc *MetaDataRequest) Do(api interface{}) (err error) {
 	var res = ""
 	for r := retry.Start(); r.Next(); {
 		if vpc.sendRequest != nil {
 			res, err = vpc.sendRequest(vpc.resource)
-		}else {
+		} else {
 			res, err = vpc.send()
 		}
 		if !shouldRetry(err) {
@@ -333,10 +341,10 @@ func (vpc *MetaDataRequest) Do(api interface{} ) ( err error) {
 	return vpc.Decode(res, api)
 }
 
-func (vpc *MetaDataRequest) Decode(data string, api interface{} ) (error) {
+func (vpc *MetaDataRequest) Decode(data string, api interface{}) error {
 	if data == "" {
 		url, _ := vpc.Url()
-		return errors.New(fmt.Sprintf("metadata: alivpc decode data must not be nil. url=[%s]\n",url))
+		return errors.New(fmt.Sprintf("metadata: alivpc decode data must not be nil. url=[%s]\n", url))
 	}
 	switch api.(type) {
 	case *ResultList:
@@ -345,10 +353,9 @@ func (vpc *MetaDataRequest) Decode(data string, api interface{} ) (error) {
 	case *RoleAuth:
 		return json.Unmarshal([]byte(data), api)
 	default:
-		return errors.New(fmt.Sprintf("metadata: unknow type to decode, type=%s\n",reflect.TypeOf(api)))
+		return errors.New(fmt.Sprintf("metadata: unknow type to decode, type=%s\n", reflect.TypeOf(api)))
 	}
 }
-
 
 func (vpc *MetaDataRequest) send() (string, error) {
 	url, err := vpc.Url()
@@ -365,15 +372,15 @@ func (vpc *MetaDataRequest) send() (string, error) {
 		return "", err
 	}
 	if resp.StatusCode != 200 {
-		return "", err
+		return "", fmt.Errorf("Aliyun Metadata API Error: Status Code: %d", resp.StatusCode)
 	}
 	defer resp.Body.Close()
 
 	data, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		return "",err
+		return "", err
 	}
-	return string(data),nil
+	return string(data), nil
 }
 
 type TimeoutError interface {
@@ -421,14 +428,14 @@ func shouldRetry(err error) bool {
 }
 
 type ResultList struct {
-	result  []string
+	result []string
 }
 
 type RoleAuth struct {
-	AccessKeyId       string
-	AccessKeySecret   string
-	Expiration        time.Time
-	SecurityToken     string
-	LastUpdated       time.Time
-	Code 		  string
+	AccessKeyId     string
+	AccessKeySecret string
+	Expiration      time.Time
+	SecurityToken   string
+	LastUpdated     time.Time
+	Code            string
 }

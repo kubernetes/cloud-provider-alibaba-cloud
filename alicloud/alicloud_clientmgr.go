@@ -12,7 +12,7 @@ import (
 	"time"
 )
 
-var ROLE_NAME = "CloudControllerManager"
+var ROLE_NAME = "KubernetesMasterRole"
 
 var TOKEN_RESYNC_PERIOD = 5 * time.Minute
 
@@ -53,12 +53,18 @@ func NewClientMgr(key, secret string) (*ClientMgr, error) {
 	m := metadata.NewMetaData(nil)
 
 	if key == "" || secret == "" {
-		role, err := m.RamRoleToken(ROLE_NAME)
-		if err != nil {
+		if rolename, err := m.Role(); err != nil {
 			return nil, err
+		}else {
+			ROLE_NAME = rolename
+			role, err := m.RamRoleToken(ROLE_NAME)
+			if err != nil {
+				return nil, err
+			}
+			glog.V(2).Infof("alicloud: clientmgr, using role=[%s] with initial token=[%+v]",ROLE_NAME, role)
+			token.auth = role
+			token.active = true
 		}
-		token.auth = role
-		token.active = true
 	}
 	keyid, sec, tok := token.authid()
 	ecsclient := ecs.NewClient(keyid, sec)
