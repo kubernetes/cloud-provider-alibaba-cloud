@@ -1,68 +1,58 @@
 package alicloud
 
 import (
+	"github.com/denverdino/aliyungo/common"
+	"github.com/denverdino/aliyungo/slb"
+	"github.com/golang/glog"
+	"k8s.io/api/core/v1"
 	"strconv"
 	"strings"
-	"k8s.io/api/core/v1"
-	"github.com/golang/glog"
-	"github.com/denverdino/aliyungo/slb"
-	"github.com/denverdino/aliyungo/common"
+	"unicode"
+	"unicode/utf8"
 )
 
-const ServiceAnnotationLoadBalancerProtocolPort 		= "service.beta.kubernetes.io/alicloud-loadbalancer-protocol-port"
+const (
+	ServiceAnnotationLoadBalancerPrefix                        = "service.beta.kubernetes.io/alicloud-loadbalancer-"
+	ServiceAnnotationLoadBalancerProtocolPort                  = ServiceAnnotationLoadBalancerPrefix + "protocol-port"
+	ServiceAnnotationLoadBalancerAddressType                   = ServiceAnnotationLoadBalancerPrefix + "address-type"
+	ServiceAnnotationLoadBalancerSLBNetworkType                = ServiceAnnotationLoadBalancerPrefix + "slb-network-type"
+	ServiceAnnotationLoadBalancerChargeType                    = ServiceAnnotationLoadBalancerPrefix + "charge-type"
+	ServiceAnnotationLoadBalancerId                            = ServiceAnnotationLoadBalancerPrefix + "id"
+	ServiceAnnotationLoadBalancerBackendLabel                  = ServiceAnnotationLoadBalancerPrefix + "backend-label"
+	ServiceAnnotationLoadBalancerRegion                        = ServiceAnnotationLoadBalancerPrefix + "region"
+	ServiceAnnotationLoadBalancerBandwidth                     = ServiceAnnotationLoadBalancerPrefix + "bandwidth"
+	ServiceAnnotationLoadBalancerCertID                        = ServiceAnnotationLoadBalancerPrefix + "cert-id"
+	ServiceAnnotationLoadBalancerHealthCheckFlag               = ServiceAnnotationLoadBalancerPrefix + "health-check-flag"
+	ServiceAnnotationLoadBalancerHealthCheckType               = ServiceAnnotationLoadBalancerPrefix + "health-check-type"
+	ServiceAnnotationLoadBalancerHealthCheckURI                = ServiceAnnotationLoadBalancerPrefix + "health-check-uri"
+	ServiceAnnotationLoadBalancerHealthCheckConnectPort        = ServiceAnnotationLoadBalancerPrefix + "health-check-connect-port"
+	ServiceAnnotationLoadBalancerHealthCheckHealthyThreshold   = ServiceAnnotationLoadBalancerPrefix + "healthy-threshold"
+	ServiceAnnotationLoadBalancerHealthCheckUnhealthyThreshold = ServiceAnnotationLoadBalancerPrefix + "unhealthy-threshold"
+	ServiceAnnotationLoadBalancerHealthCheckInterval           = ServiceAnnotationLoadBalancerPrefix + "health-check-interval"
+	ServiceAnnotationLoadBalancerHealthCheckConnectTimeout     = ServiceAnnotationLoadBalancerPrefix + "health-check-connect-timeout"
+	ServiceAnnotationLoadBalancerHealthCheckTimeout            = ServiceAnnotationLoadBalancerPrefix + "health-check-timeout"
 
-const ServiceAnnotationLoadBalancerAddressType 			= "service.beta.kubernetes.io/alicloud-loadbalancer-address-type"
+	MagicHealthCheckConnectPort = -520
 
-const ServiceAnnotationLoadBalancerSLBNetworkType 		= "service.beta.kubernetes.io/alicloud-loadbalancer-slb-network-type"
-
-const ServiceAnnotationLoadBalancerChargeType 			= "service.beta.kubernetes.io/alicloud-loadbalancer-charge-type"
-
-const ServiceAnnotationLoadBalancerId 				= "service.beta.kubernetes.io/alicloud-loadbalancer-id"
-
-const ServiceAnnotationLoadBalancerBackendLabel 		= "service.beta.kubernetes.io/alicloud-loadbalancer-backend-label"
-
-const ServiceAnnotationLoadBalancerRegion 			= "service.beta.kubernetes.io/alicloud-loadbalancer-region"
-
-const ServiceAnnotationLoadBalancerBandwidth 			= "service.beta.kubernetes.io/alicloud-loadbalancer-bandwidth"
-
-const ServiceAnnotationLoadBalancerCertID 			= "service.beta.kubernetes.io/alicloud-loadbalancer-cert-id"
-
-const ServiceAnnotationLoadBalancerHealthCheckFlag 		= "service.beta.kubernetes.io/alicloud-loadbalancer-health-check-flag"
-
-const ServiceAnnotationLoadBalancerHealthCheckType 		= "service.beta.kubernetes.io/alicloud-loadbalancer-health-check-type"
-
-const ServiceAnnotationLoadBalancerHealthCheckURI 		= "service.beta.kubernetes.io/alicloud-loadbalancer-health-check-uri"
-
-const ServiceAnnotationLoadBalancerHealthCheckConnectPort 	= "service.beta.kubernetes.io/alicloud-loadbalancer-health-check-connect-port"
-
-const ServiceAnnotationLoadBalancerHealthCheckHealthyThreshold 	= "service.beta.kubernetes.io/alicloud-loadbalancer-healthy-threshold"
-
-const ServiceAnnotationLoadBalancerHealthCheckUnhealthyThreshold = "service.beta.kubernetes.io/alicloud-loadbalancer-unhealthy-threshold"
-
-const ServiceAnnotationLoadBalancerHealthCheckInterval 		= "service.beta.kubernetes.io/alicloud-loadbalancer-health-check-interval"
-
-const ServiceAnnotationLoadBalancerHealthCheckConnectTimeout 	= "service.beta.kubernetes.io/alicloud-loadbalancer-health-check-connect-timeout"
-
-const ServiceAnnotationLoadBalancerHealthCheckTimeout 		= "service.beta.kubernetes.io/alicloud-loadbalancer-health-check-timeout"
-
-const MAX_LOADBALANCER_BACKEND=20
+	MAX_LOADBALANCER_BACKEND = 20
+)
 
 func ExtractAnnotationRequest(service *v1.Service) *AnnotationRequest {
 	ar := &AnnotationRequest{}
 	annotation := make(map[string]string)
-	for k,v := range service.Annotations{
+	for k, v := range service.Annotations {
 		annotation[replaceCamel(k)] = v
 	}
 	bandwith := annotation[ServiceAnnotationLoadBalancerBandwidth]
 	if bandwith != "" {
-		if i, err := strconv.Atoi(bandwith);err == nil {
+		if i, err := strconv.Atoi(bandwith); err == nil {
 			ar.Bandwidth = i
 		} else {
-			glog.Warningf("annotation bandwidth must be integer, but got [%s], use default number 50. message=[%s]\n",
-				annotation[ServiceAnnotationLoadBalancerBandwidth], err.Error())
+			glog.Warningf("annotation service.beta.kubernetes.io/alicloud-loadbalancer-bandwidth must be integer, but got [%s], use default number 50. message=[%s]\n",
+				bandwith, err.Error())
 			ar.Bandwidth = DEFAULT_BANDWIDTH
 		}
-	}else {
+	} else {
 		ar.Bandwidth = DEFAULT_BANDWIDTH
 	}
 
@@ -90,7 +80,7 @@ func ExtractAnnotationRequest(service *v1.Service) *AnnotationRequest {
 
 	ar.Loadbalancerid = annotation[ServiceAnnotationLoadBalancerId]
 
-	ar.BackendLabel   = annotation[ServiceAnnotationLoadBalancerBackendLabel]
+	ar.BackendLabel = annotation[ServiceAnnotationLoadBalancerBackendLabel]
 
 	certid := annotation[ServiceAnnotationLoadBalancerCertID]
 	if certid != "" {
@@ -118,73 +108,133 @@ func ExtractAnnotationRequest(service *v1.Service) *AnnotationRequest {
 		ar.HealthCheckURI = "/"
 	}
 
-	port, err := strconv.Atoi(annotation[ServiceAnnotationLoadBalancerHealthCheckConnectPort])
-	if err != nil {
-		ar.HealthCheckConnectPort = -520
-	} else {
-		ar.HealthCheckConnectPort = port
+	healthCheckConnectPort := annotation[ServiceAnnotationLoadBalancerHealthCheckConnectPort]
+	if healthCheckConnectPort != "" {
+		port, err := strconv.Atoi(healthCheckConnectPort)
+		if err != nil {
+			glog.Warningf("annotation service.beta.kubernetes.io/alicloud-loadbalancer-health-check-connect-port must be integer, but got [%s]. message=[%s]\n",
+				healthCheckConnectPort, err.Error())
+			ar.HealthCheckConnectPort = MagicHealthCheckConnectPort
+		} else {
+			ar.HealthCheckConnectPort = port
+		}
 	}
 
-	thresh, err := strconv.Atoi(annotation[ServiceAnnotationLoadBalancerHealthCheckHealthyThreshold])
-	if err != nil {
-		ar.HealthyThreshold = 3
-	} else {
-		ar.HealthyThreshold = thresh
+	healthCheckHealthyThreshold := annotation[ServiceAnnotationLoadBalancerHealthCheckHealthyThreshold]
+	if healthCheckHealthyThreshold != "" {
+		thresh, err := strconv.Atoi(healthCheckHealthyThreshold)
+		if err != nil {
+			glog.Warningf("annotation service.beta.kubernetes.io/alicloud-loadbalancer-health-check-healthy-threshold must be integer, but got [%s], use default number 3. message=[%s]\n",
+				healthCheckHealthyThreshold, err.Error())
+			ar.HealthyThreshold = 3
+		} else {
+			ar.HealthyThreshold = thresh
+		}
 	}
 
-	unThresh, err := strconv.Atoi(annotation[ServiceAnnotationLoadBalancerHealthCheckUnhealthyThreshold])
-	if err != nil {
-		ar.UnhealthyThreshold = 3
-	} else {
-		ar.UnhealthyThreshold = unThresh
+	healthCheckUnhealthyThreshold := annotation[ServiceAnnotationLoadBalancerHealthCheckUnhealthyThreshold]
+	if healthCheckUnhealthyThreshold != "" {
+		unThresh, err := strconv.Atoi(healthCheckUnhealthyThreshold)
+		if err != nil {
+			glog.Warningf("annotation service.beta.kubernetes.io/alicloud-loadbalancer-health-check-unhealthy-threshold must be integer, but got [%s], use default number 3. message=[%s]\n",
+				healthCheckUnhealthyThreshold, err.Error())
+			ar.UnhealthyThreshold = 3
+		} else {
+			ar.UnhealthyThreshold = unThresh
+		}
 	}
 
-	interval, err := strconv.Atoi(annotation[ServiceAnnotationLoadBalancerHealthCheckInterval])
-	if err != nil {
-		ar.HealthCheckInterval = 2
-	} else {
-		ar.HealthCheckInterval = interval
+	healthCheckInterval := annotation[ServiceAnnotationLoadBalancerHealthCheckInterval]
+	if healthCheckInterval != "" {
+		interval, err := strconv.Atoi(healthCheckInterval)
+		if err != nil {
+			glog.Warningf("annotation service.beta.kubernetes.io/alicloud-loadbalancer-health-check-interval must be integer, but got [%s], use default number 2. message=[%s]\n",
+				healthCheckInterval, err.Error())
+			ar.HealthCheckInterval = 2
+		} else {
+			ar.HealthCheckInterval = interval
+		}
 	}
 
-	connout, err := strconv.Atoi(annotation[ServiceAnnotationLoadBalancerHealthCheckConnectTimeout])
-	if err != nil {
-		ar.HealthCheckConnectTimeout = 5
-	} else {
-		ar.HealthCheckConnectTimeout = connout
+	healthCheckConnectTimeout := annotation[ServiceAnnotationLoadBalancerHealthCheckConnectTimeout]
+	if healthCheckConnectTimeout != "" {
+		connout, err := strconv.Atoi(healthCheckConnectTimeout)
+		if err != nil {
+			glog.Warningf("annotation service.beta.kubernetes.io/alicloud-loadbalancer-health-check-connect-timeout must be integer, but got [%s], use default number 5. message=[%s]\n",
+				healthCheckConnectTimeout, err.Error())
+			ar.HealthCheckConnectTimeout = 5
+		} else {
+			ar.HealthCheckConnectTimeout = connout
+		}
 	}
 
-	hout, err := strconv.Atoi(annotation[ServiceAnnotationLoadBalancerHealthCheckTimeout])
-	if err != nil {
-		ar.HealthCheckTimeout = 5
-	} else {
-		ar.HealthCheckConnectPort = hout
+	healthCheckTimeout := annotation[ServiceAnnotationLoadBalancerHealthCheckTimeout]
+	if healthCheckTimeout != "" {
+		hout, err := strconv.Atoi(annotation[healthCheckTimeout])
+		if err != nil {
+			glog.Warningf("annotation service.beta.kubernetes.io/alicloud-loadbalancer-health-check-timeout must be integer, but got [%s], use default number 5. message=[%s]\n",
+				healthCheckConnectTimeout, err.Error())
+			ar.HealthCheckTimeout = 5
+		} else {
+			ar.HealthCheckTimeout = hout
+		}
 	}
+
 	return ar
 }
 
-func replaceCamel(str string) string{
-
-	if !strings.Contains(str,"alicloud-loadbalancer") {
-		// If it is not `alicloud-loadbalancer` , just skip.
-		return str
+func splitCamel(src string) (entries []string) {
+	// don't split invalid utf8
+	if !utf8.ValidString(src) {
+		return []string{src}
 	}
-	dot := strings.Split(str, "-")
-	target := dot[len(dot) - 1]
-	res := []byte{}
-	for i,v := range []byte(target){
-		if v <= 90 {
-			if i>0 && target[i - 1] <=90 {
-				// deal with all upper letter case, eg. URL -> url
-				res = append(res,v+32)
-			}else {
-				// eg. A to -a
-				res = append(res, 45, v + 32)
-			}
-			continue
+	entries = []string{}
+	var runes [][]rune
+	lastClass := 0
+	class := 0
+	// split into fields based on class of unicode character
+	for _, r := range src {
+		switch true {
+		case unicode.IsLower(r):
+			class = 1
+		case unicode.IsUpper(r):
+			class = 2
+		case unicode.IsDigit(r):
+			class = 3
+		default:
+			class = 4
 		}
-		res = append(res,v)
+		if class == lastClass {
+			runes[len(runes)-1] = append(runes[len(runes)-1], r)
+		} else {
+			runes = append(runes, []rune{r})
+		}
+		lastClass = class
 	}
-
-	return strings.Join(dot[0:len(dot)-1],"-") + string(res)
+	// handle upper case -> lower case sequences, e.g.
+	// "SLBN", "etwork" -> "SLB", "Network"
+	for i := 0; i < len(runes)-1; i++ {
+		if unicode.IsUpper(runes[i][0]) && unicode.IsLower(runes[i+1][0]) {
+			runes[i+1] = append([]rune{runes[i][len(runes[i])-1]}, runes[i+1]...)
+			runes[i] = runes[i][:len(runes[i])-1]
+		}
+	}
+	// construct []string from results
+	for _, s := range runes {
+		if len(s) > 0 {
+			entries = append(entries, strings.ToLower(string(s)))
+		}
+	}
+	return
 }
 
+func replaceCamel(str string) string {
+	if !strings.HasPrefix(str, ServiceAnnotationLoadBalancerPrefix) {
+		// If it is not start with ServiceAnnotationLoadBalancerPrefix, just skip.
+		return str
+	}
+	target := str[len(ServiceAnnotationLoadBalancerPrefix):]
+	res := splitCamel(target)
+
+	return ServiceAnnotationLoadBalancerPrefix + strings.Join(res, "-")
+}

@@ -470,6 +470,11 @@ func (s *SDKClientSLB) EnsureHealthCheck(service *v1.Service, old *PortListener,
 
 func (s *SDKClientSLB) createListener(lb *slb.LoadBalancerType, pp PortListener) error {
 	protocol := pp.Protocol
+
+	if pp.HealthCheckConnectPort == MagicHealthCheckConnectPort {
+		pp.HealthCheckConnectPort = 0
+	}
+
 	if protocol == "https" {
 		lis := slb.CreateLoadBalancerHTTPSListenerArgs(
 			slb.HTTPSListenerType{
@@ -521,10 +526,6 @@ func (s *SDKClientSLB) createListener(lb *slb.LoadBalancerType, pp PortListener)
 		}
 	}
 	if protocol == strings.ToLower(string(api.ProtocolTCP)) {
-
-		if pp.HealthCheckConnectPort == -520 {
-			pp.HealthCheckConnectPort = 0
-		}
 		if err := s.c.CreateLoadBalancerTCPListener(
 			&slb.CreateLoadBalancerTCPListenerArgs{
 				LoadBalancerId:    lb.LoadBalancerId,
