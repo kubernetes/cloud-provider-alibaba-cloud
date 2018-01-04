@@ -186,8 +186,10 @@ func (s *LoadBalancerClient) EnsureLoadBalancerListener(service *v1.Service, lb 
 	if err != nil {
 		return nil, err
 	}
-	glog.V(2).Infof("Alicloud.EnsureLoadBalancerListener(): add additional [LoadBalancerListerners]=%+v.  delete removed [LoadBalancerListerners]=%+v", additions, deletions)
+	glog.V(2).Infof("Alicloud.EnsureLoadBalancerListener(): verify addition [LoadBalancerListerners]=%+v.  deletion [LoadBalancerListerners]=%+v", additions, deletions)
 	if len(deletions) > 0 {
+
+		glog.Infof("Alicloud.EnsureLoadBalancerListener(): adding additional [LoadBalancerListerners]=%+v.", additions)
 		for _, p := range deletions {
 			// stop first
 			// todo: here should retry for none runing status
@@ -201,6 +203,8 @@ func (s *LoadBalancerClient) EnsureLoadBalancerListener(service *v1.Service, lb 
 		}
 	}
 	if len(additions) > 0 {
+
+		glog.Infof("Alicloud.EnsureLoadBalancerListener(): deleting [LoadBalancerListerners]=%+v", deletions)
 		// deal with port add
 		for _, p := range additions {
 			if err := s.createListener(lb, p); err != nil {
@@ -299,13 +303,13 @@ func (s *LoadBalancerClient) diffListeners(service *v1.Service, lb *slb.LoadBala
 					update = true
 					glog.V(2).Infof("Alicloud.diffListeners(): [%s], certid changed  from [%s] to [%s]\n", lb.LoadBalancerId, old.CertID, ar.CertID)
 				}
-				if old.HealthCheck != ar.HealthCheck ||
-					old.HealthCheckType != ar.HealthCheckType ||
-					old.HealthCheckURI != ar.HealthCheckURI ||
-					old.HealthCheckConnectPort != ar.HealthCheckConnectPort {
-					update = true
-					glog.V(2).Infof("Alicloud.diffListeners(): [%s] healthcheck changed \n", lb.LoadBalancerId)
-				}
+				//if old.HealthCheck != ar.HealthCheck ||
+				//	old.HealthCheckType != ar.HealthCheckType ||
+				//	old.HealthCheckURI != ar.HealthCheckURI ||
+				//	old.HealthCheckConnectPort != ar.HealthCheckConnectPort {
+				//	update = true
+				//	glog.V(2).Infof("Alicloud.diffListeners(): [%s] healthcheck changed \n", lb.LoadBalancerId)
+				//}
 				if update {
 					deletions = append(deletions, old)
 					additions = append(additions, new)
@@ -424,8 +428,9 @@ func (s *LoadBalancerClient) findPortListener(lb *slb.LoadBalancerType, port int
 func (s *LoadBalancerClient) EnsureBackendServer(service *v1.Service, nodes []*v1.Node, lb *slb.LoadBalancerType) (*slb.LoadBalancerType, error) {
 
 	additions, deletions := s.diffServers(nodes, lb)
-	glog.V(2).Infof("Alicloud.EnsureBackendServer(): add additional backend servers=[%+v],  delete removed backend servers=[%+v]", additions, deletions)
+	glog.V(2).Infof("Alicloud.EnsureBackendServer(): verify additional-backend-servers=[%+v],   removing-backend-servers=[%+v]", additions, deletions)
 	if len(additions) > 0 {
+		glog.Infof("Alicloud.EnsureBackendServer(): adding additional backend servers=[%+v]", additions)
 		// deal with server add
 		if _, err := s.c.AddBackendServers(lb.LoadBalancerId, additions); err != nil {
 
@@ -433,6 +438,7 @@ func (s *LoadBalancerClient) EnsureBackendServer(service *v1.Service, nodes []*v
 		}
 	}
 	if len(deletions) > 0 {
+		glog.Infof("Alicloud.EnsureBackendServer():  deleting removed backend servers=[%+v]", deletions)
 		servers := []string{}
 		for _, v := range deletions {
 			servers = append(servers, v.ServerId)

@@ -41,7 +41,7 @@ var (
 	DEFAULT_REGION = common.Hangzhou
 )
 
-// CloudConfig wraps the settings for the AWS cloud provider.
+// CloudConfig wraps the settings for the Alicloud provider.
 type CloudConfig struct {
 	Global struct {
 		KubernetesClusterTag string
