@@ -245,7 +245,7 @@ type InstanceAttributesType struct {
 	SerialNumber       string
 	Status             InstanceStatus
 	OperationLocks     OperationLocksType
-	SecurityGroupIds struct {
+	SecurityGroupIds   struct {
 		SecurityGroupId []string
 	}
 	PublicIpAddress         IpAddressSetType
@@ -260,7 +260,7 @@ type InstanceAttributesType struct {
 	IoOptimized             StringOrBool
 	InstanceChargeType      common.InstanceChargeType
 	ExpiredTime             util.ISO6801Time
-	Tags struct {
+	Tags                    struct {
 		Tag []TagItemType
 	}
 	SpotStrategy   SpotStrategyType
@@ -440,6 +440,28 @@ func (client *Client) DescribeInstancesWithRaw(args *DescribeInstancesArgs) (res
 	return response, nil
 }
 
+type ModifyInstanceAutoReleaseTimeArgs struct {
+	InstanceId      string
+	AutoReleaseTime string
+}
+
+type ModifyInstanceAutoReleaseTimeResponse struct {
+	common.Response
+}
+
+// 对给定的实例设定自动释放时间。
+//
+// You can read doc at https://help.aliyun.com/document_detail/47576.html
+func (client *Client) ModifyInstanceAutoReleaseTime(instanceId, time string) error {
+	args := ModifyInstanceAutoReleaseTimeArgs{
+		InstanceId:      instanceId,
+		AutoReleaseTime: time,
+	}
+	response := ModifyInstanceAutoReleaseTimeResponse{}
+	err := client.Invoke("ModifyInstanceAutoReleaseTime", &args, &response)
+	return err
+}
+
 type DeleteInstanceArgs struct {
 	InstanceId string
 }
@@ -512,34 +534,42 @@ var (
 	IoOptimizedOptimized = IoOptimized("optimized")
 )
 
+type SecurityEnhancementStrategy string
+
+var (
+	InactiveSecurityEnhancementStrategy = SecurityEnhancementStrategy("Active")
+	DeactiveSecurityEnhancementStrategy = SecurityEnhancementStrategy("Deactive")
+)
+
 type CreateInstanceArgs struct {
-	RegionId                common.Region
-	ZoneId                  string
-	ImageId                 string
-	InstanceType            string
-	SecurityGroupId         string
-	InstanceName            string
-	Description             string
-	InternetChargeType      common.InternetChargeType
-	InternetMaxBandwidthIn  int
-	InternetMaxBandwidthOut int
-	HostName                string
-	Password                string
-	IoOptimized             IoOptimized
-	SystemDisk              SystemDiskType
-	DataDisk                []DataDiskType
-	VSwitchId               string
-	PrivateIpAddress        string
-	ClientToken             string
-	InstanceChargeType      common.InstanceChargeType
-	Period                  int
-	UserData                string
-	AutoRenew               bool
-	AutoRenewPeriod         int
-	SpotStrategy            SpotStrategyType
-	SpotPriceLimit          float64
-	KeyPairName             string
-	RamRoleName             string
+	RegionId                    common.Region
+	ZoneId                      string
+	ImageId                     string
+	InstanceType                string
+	SecurityGroupId             string
+	InstanceName                string
+	Description                 string
+	InternetChargeType          common.InternetChargeType
+	InternetMaxBandwidthIn      int
+	InternetMaxBandwidthOut     int
+	HostName                    string
+	Password                    string
+	IoOptimized                 IoOptimized
+	SystemDisk                  SystemDiskType
+	DataDisk                    []DataDiskType
+	VSwitchId                   string
+	PrivateIpAddress            string
+	ClientToken                 string
+	InstanceChargeType          common.InstanceChargeType
+	Period                      int
+	UserData                    string
+	AutoRenew                   bool
+	AutoRenewPeriod             int
+	SpotStrategy                SpotStrategyType
+	SpotPriceLimit              float64
+	KeyPairName                 string
+	RamRoleName                 string
+	SecurityEnhancementStrategy SecurityEnhancementStrategy
 }
 
 type CreateInstanceResponse struct {
@@ -678,6 +708,74 @@ func (client *Client) DescribeInstanceRamRole(args *AttachInstancesArgs) (resp *
 	response := &DescribeInstanceRamRoleResponse{}
 	err = client.Invoke("DescribeInstanceRamRole", args, response)
 	if err != nil {
+		return response, err
+	}
+	return response, nil
+}
+
+type ModifyInstanceSpecArgs struct {
+	InstanceId              string
+	InstanceType            string
+	InternetMaxBandwidthOut *int
+	InternetMaxBandwidthIn  *int
+	ClientToken             string
+}
+
+type ModifyInstanceSpecResponse struct {
+	common.Response
+}
+
+//ModifyInstanceSpec  modify instance specification
+//
+// Notice: 1. An instance that was successfully modified once cannot be modified again within 5 minutes.
+// 	   2. The API only can be used Pay-As-You-Go (PostPaid) instance
+//
+// You can read doc at https://www.alibabacloud.com/help/doc-detail/57633.htm
+func (client *Client) ModifyInstanceSpec(args *ModifyInstanceSpecArgs) error {
+	response := ModifyInstanceSpecResponse{}
+	return client.Invoke("ModifyInstanceSpec", args, &response)
+}
+
+type ModifyInstanceVpcAttributeArgs struct {
+	InstanceId       string
+	VSwitchId        string
+	PrivateIpAddress string
+}
+
+type ModifyInstanceVpcAttributeResponse struct {
+	common.Response
+}
+
+//ModifyInstanceVpcAttribute  modify instance vswitchID and private ip address
+//
+// You can read doc at https://www.alibabacloud.com/help/doc-detail/25504.htm
+func (client *Client) ModifyInstanceVpcAttribute(args *ModifyInstanceVpcAttributeArgs) error {
+	response := ModifyInstanceVpcAttributeResponse{}
+	return client.Invoke("ModifyInstanceVpcAttribute", args, &response)
+}
+
+type ModifyInstanceChargeTypeArgs struct {
+	InstanceIds      string
+	RegionId         common.Region
+	Period           int
+	PeriodUnit       common.TimeType
+	IncludeDataDisks bool
+	DryRun           bool
+	AutoPay          bool
+	ClientToken      string
+}
+
+type ModifyInstanceChargeTypeResponse struct {
+	common.Response
+	Order string
+}
+
+//ModifyInstanceChargeType  modify instance charge type
+//
+// You can read doc at https://www.alibabacloud.com/help/doc-detail/25504.htm
+func (client *Client) ModifyInstanceChargeType(args *ModifyInstanceChargeTypeArgs) (*ModifyInstanceChargeTypeResponse, error) {
+	response := &ModifyInstanceChargeTypeResponse{}
+	if err := client.Invoke("ModifyInstanceChargeType", args, response); err != nil {
 		return response, err
 	}
 	return response, nil

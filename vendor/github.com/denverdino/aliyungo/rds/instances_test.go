@@ -1,10 +1,11 @@
 package rds
 
 import (
-	"github.com/denverdino/aliyungo/common"
 	"strconv"
 	"strings"
 	"testing"
+
+	"github.com/denverdino/aliyungo/common"
 )
 
 func TestDBPostpaidClassicInstanceCreationAndDeletion(t *testing.T) {
@@ -17,7 +18,7 @@ func TestDBPostpaidClassicInstanceCreationAndDeletion(t *testing.T) {
 	client := NewTestClient()
 
 	args := CreateOrderArgs{
-		RegionId:          RegionId,
+		RegionId:          TestRegionID,
 		CommodityCode:     Bards,
 		Engine:            MySQL,
 		EngineVersion:     EngineVersion,
@@ -65,7 +66,7 @@ func TestDBPrepaidInstanceCreation(t *testing.T) {
 	client := NewTestClient()
 
 	args := CreateOrderArgs{
-		RegionId:          RegionId,
+		RegionId:          TestRegionID,
 		CommodityCode:     Rds,
 		Engine:            MySQL,
 		EngineVersion:     EngineVersion,
@@ -111,7 +112,7 @@ func TestDBPostpaidVpcInstanceCreationAndDeletion(t *testing.T) {
 	client := NewTestClient()
 
 	args := CreateOrderArgs{
-		RegionId:            RegionId,
+		RegionId:            TestRegionID,
 		ZoneId:              ZoneId,
 		CommodityCode:       Bards,
 		Engine:              MySQL,
@@ -167,7 +168,7 @@ func TestGetZonesByRegionId(t *testing.T) {
 
 	zoneIds := []string{}
 	for _, r := range regions {
-		if strings.Contains(r.RegionId, RegionId) {
+		if strings.Contains(r.RegionId, string(TestRegionID)) {
 			zoneIds = append(zoneIds, r.ZoneId)
 		}
 	}
@@ -289,12 +290,11 @@ func TestModifyBackupPolicy(t *testing.T) {
 func TestModifySecurityIps(t *testing.T) {
 	client := NewTestClient()
 
-	sargs := DBInstanceIPArray{
-		SecurityIps: "127.0.0.1",
-	}
+	securityIps := "127.0.0.1"
+
 	args := ModifySecurityIpsArgs{
-		DBInstanceId:      DBInstanceId,
-		DBInstanceIPArray: sargs,
+		DBInstanceId: DBInstanceId,
+		SecurityIps:  securityIps,
 	}
 
 	_, err := client.ModifySecurityIps(&args)
@@ -335,4 +335,16 @@ func TestModifyDBInstanceSpec(t *testing.T) {
 	}
 
 	t.Logf("Modify db instance spec successfully.")
+}
+
+func TestClient_DescribeRegions(t *testing.T) {
+	client := NewTestClientForDebug()
+	client.SetSecurityToken(TestSecurityToken)
+
+	regions, err := client.DescribeRegions()
+	if err != nil {
+		t.Fatalf("Error %++v", err)
+	} else {
+		t.Logf("Result = %++v", regions)
+	}
 }

@@ -1,10 +1,10 @@
 package metadata
 
 import (
-	"fmt"
-	"testing"
-	"strings"
 	"errors"
+	"fmt"
+	"strings"
+	"testing"
 )
 
 func init() {
@@ -12,7 +12,7 @@ func init() {
 }
 
 func send(resource string) (string, error) {
-	
+
 	if strings.Contains(resource, HOSTNAME) {
 		return "hostname-test", nil
 	}
@@ -87,10 +87,10 @@ func send(resource string) (string, error) {
 	if strings.Contains(resource, RAM_SECURITY) {
 		role := `
 		{
-  "AccessKeyId" : "STS.CYjyYm5fqsXdmXXnqmbiYiA7a",
-  "AccessKeySecret" : "7iUyLB6wtrLgUMRdvWWGwGXUeX3RrW5VCxhk9FoK77JR",
+  "AccessKeyId" : "",
+  "AccessKeySecret" : "",
   "Expiration" : "2017-12-05T13:30:01Z",
-  "SecurityToken" : "CAISmwJ1q6Ft5B2yfSjIoprfMuPZ2LlQxJqPb37pinE4buZ1hoScgzz2IHFFenNpAu8XtvUxnmxT7fYSlrRtTtpfTEmBbI569s1c+Bioe4fM5s+89uIYipz1FDASiI8lNouADd/iRfbxJ92PCTmd5AIRrJL+cTK9JS/HVbSClZ9gaPkOQwC8dkAoLdxKJwxk2qR4XDmrQpTLCBPxhXfKB0dFoxd1jXgFiZ6y2cqB8BHT/jaYo603392ufsX5M5Y9YMomCIvvhLNMG/CfgHIK2X9j77xriaFIwzDDs+yGDkNZixf8aLuFrIc2d1AoPvlkQfIf96isj4pxvu3CioL6wA1MOOhaXiXaXIe63MfJFuq0MsojcrL2K8YFBx0/gyyfGoABAc0pO6BQL3uh7S8LFVxWwYitgulmRybgjkNKEGRGggUZ946S80+bdbLjL3LPRjwzhvjaKmsu3eaK2asrUC3XI/CBw4t3CTq5pJbTxxhAyq5pwBOeh+FGn348N0vxpAlXXgiJgrHwbL/wzaudtYmhMTzJDaOnC6ZvgzAbX2dDwB0=",
+  "SecurityToken" : "",
   "LastUpdated" : "2017-12-05T07:30:01Z",
   "Code" : "Success"
 }
@@ -100,11 +100,9 @@ func send(resource string) (string, error) {
 	return "", errors.New("unknow resource error.")
 }
 
-
 func TestOK(t *testing.T) {
 	fmt.Println("ok")
 }
-
 
 func TestHostname(t *testing.T) {
 	meta := NewMockMetaData(nil, send)
