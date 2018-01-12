@@ -12,6 +12,7 @@ const (
 	Shenzhen    = Region("cn-shenzhen")
 	Shanghai    = Region("cn-shanghai")
 	Zhangjiakou = Region("cn-zhangjiakou")
+	Huhehaote   = Region("cn-huhehaote")
 
 	APSouthEast1 = Region("ap-southeast-1")
 	APNorthEast1 = Region("ap-northeast-1")
@@ -24,12 +25,16 @@ const (
 	MEEast1 = Region("me-east-1")
 
 	EUCentral1 = Region("eu-central-1")
+
+	ShenZhenFinance = Region("cn-shenzhen-finance-1")
+	ShanghaiFinance = Region("cn-shanghai-finance-1")
 )
 
 var ValidRegions = []Region{
-	Hangzhou, Qingdao, Beijing, Shenzhen, Hongkong, Shanghai, Zhangjiakou,
+	Hangzhou, Qingdao, Beijing, Shenzhen, Hongkong, Shanghai, Zhangjiakou, Huhehaote,
 	USWest1, USEast1,
 	APNorthEast1, APSouthEast1, APSouthEast2, APSouthEast3,
 	MEEast1,
 	EUCentral1,
+	ShenZhenFinance, ShanghaiFinance,
 }

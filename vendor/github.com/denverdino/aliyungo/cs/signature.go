@@ -1,7 +1,7 @@
 package cs
 
 import (
-	"log"
+	"fmt"
 	"net/http"
 	"sort"
 	"strings"
@@ -23,7 +23,7 @@ func (client *Client) signRequest(request *http.Request) {
 
 	stringToSign := request.Method + "\n" + accept + "\n" + contentMd5 + "\n" + contentType + "\n" + date + "\n" + canonicalizedHeader + canonicalizedResource
 
-	log.Println("stringToSign: ", stringToSign)
+	fmt.Printf("stringToSign = %s: ", stringToSign)
 	signature := util.CreateSignature(stringToSign, client.AccessKeySecret)
 	headers.Set("Authorization", "acs "+client.AccessKeyId+":"+signature)
 }
@@ -49,7 +49,11 @@ func canonicalizeHeader(headers http.Header) (newHeaders http.Header, result str
 	var canonicalizedHeader string
 
 	for _, k := range canonicalizedHeaders {
-		canonicalizedHeader += k + ":" + headers.Get(k) + "\n"
+		v := ""
+		if len(headers[k]) > 0 {
+			v = headers[k][0]
+		}
+		canonicalizedHeader += k + ":" + v + "\n"
 	}
 
 	return newHeaders, canonicalizedHeader

@@ -29,7 +29,7 @@
   branch = "master"
   name = "github.com/denverdino/aliyungo"
   packages = ["common","ecs","metadata","slb","util"]
-  revision = "199fa376135951b938a53634048bb32e5dc823c1"
+  revision = "4321f40169319af5be81746c2d22535b4ba30f57"
 
 [[projects]]
   name = "github.com/dgrijalva/jwt-go"

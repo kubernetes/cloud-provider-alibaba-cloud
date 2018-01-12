@@ -1,6 +1,9 @@
 package alicloud
 
 import (
+	"sync"
+	"time"
+
 	"github.com/denverdino/aliyungo/common"
 	"github.com/denverdino/aliyungo/ecs"
 	"github.com/denverdino/aliyungo/metadata"
@@ -8,8 +11,6 @@ import (
 	"github.com/golang/glog"
 	"github.com/patrickmn/go-cache"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"sync"
-	"time"
 )
 
 var ROLE_NAME = "KubernetesMasterRole"
@@ -53,29 +54,24 @@ func NewClientMgr(key, secret string) (*ClientMgr, error) {
 	m := metadata.NewMetaData(nil)
 
 	if key == "" || secret == "" {
-		if rolename, err := m.Role(); err != nil {
+		if rolename, err := m.RoleName(); err != nil {
 			return nil, err
-		}else {
+		} else {
 			ROLE_NAME = rolename
 			role, err := m.RamRoleToken(ROLE_NAME)
 			if err != nil {
 				return nil, err
 			}
-			glog.V(2).Infof("alicloud: clientmgr, using role=[%s] with initial token=[%+v]",ROLE_NAME, role)
+			glog.V(2).Infof("alicloud: clientmgr, using role=[%s] with initial token=[%+v]", ROLE_NAME, role)
 			token.auth = role
 			token.active = true
 		}
 	}
 	keyid, sec, tok := token.authid()
-	ecsclient := ecs.NewClient(keyid, sec)
-	ecsclient.SetSecurityToken(tok)
+	ecsclient := ecs.NewECSClientWithSecurityToken(keyid, sec, tok, DEFAULT_REGION)
 	ecsclient.SetUserAgent(KUBERNETES_ALICLOUD_IDENTITY)
-	ecsclient.SetRegionID(DEFAULT_REGION)
-
-	slbclient := slb.NewClient(keyid, sec)
-	slbclient.SetSecurityToken(tok)
+	slbclient := slb.NewSLBClientWithSecurityToken(keyid, sec, tok, DEFAULT_REGION)
 	slbclient.SetUserAgent(KUBERNETES_ALICLOUD_IDENTITY)
-	slbclient.SetRegionID(DEFAULT_REGION)
 
 	mgr := &ClientMgr{
 		stop:  make(<-chan struct{}, 1),
