@@ -131,8 +131,10 @@ func (r *RoutesClient) CreateRoute(route *cloudprovider.Route, region common.Reg
 		return err
 	}
 	if len(tables) <= 0 {
-		glog.Errorf("Alicloud.CreateRoute(): SDKClientRoutes.SDKClientRoutes returned zero items. abort creating. vRouteID=%s,rTableID=%s\n", tables[0].VRouterId, tables[0].RouteTableId)
-		return errors.New(fmt.Sprintf("error: cant find route table for route. cidr=%s, vRouteID=%s, rTableID=%s", route.DestinationCIDR, tables[0].VRouterId, tables[0].RouteTableId))
+		//glog.Errorf("Alicloud.CreateRoute(): SDKClientRoutes.SDKClientRoutes returned zero items. abort creating. vRouteID=%s,rTableID=%s\n", tables[0].VRouterId, tables[0].RouteTableId)
+		//return errors.New(fmt.Sprintf("error: cant find route table for route. cidr=%s, vRouteID=%s, rTableID=%s", route.DestinationCIDR, tables[0].VRouterId, tables[0].RouteTableId))
+		glog.Errorf("Alicloud.CreateRoute(): SDKClientRoutes.SDKClientRoutes returned zero items. abort creating. \n")
+		return errors.New(fmt.Sprintf("error: cant find route table for route. cidr=%s", route.DestinationCIDR))
 	}
 	if err := r.reCreateRoute(tables[0], &ecs.CreateRouteEntryArgs{
 		DestinationCidrBlock: route.DestinationCIDR,
