@@ -3,6 +3,8 @@ package alicloud
 import (
 	"errors"
 	"fmt"
+	"strings"
+
 	"github.com/denverdino/aliyungo/common"
 	"github.com/denverdino/aliyungo/slb"
 	"github.com/golang/glog"
@@ -10,7 +12,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/cloudprovider"
-	"strings"
 )
 
 type AnnotationRequest struct {
@@ -103,7 +104,12 @@ func (s *LoadBalancerClient) EnsureLoadBalancer(service *v1.Service, nodes []*v1
 	if err != nil {
 		return nil, err
 	}
-	glog.V(2).Infof("Alicloud.EnsureLoadBalancer(): sync loadbalancer=%v\n", lb)
+	glog.V(2).Infof("Alicloud.EnsureLoadBalancer(): sync loadbalancer=%v, exist=%v\n", lb, exists)
+	if !exists && checkIfSLBExistInService(service) {
+		glog.V(2).Infof("Not able to find SLB named %s in aliyun openapi, but it's defined in service.loaderbalancer.ingress.\n", service.Name)
+		return nil, fmt.Errorf("Not able to find SLB named %s in aliyun openapi, but it's defined in service.loaderbalancer.ingress.\n", service.Name)
+	}
+
 	ar := ExtractAnnotationRequest(service)
 	opts := s.getLoadBalancerOpts(ar)
 	if strings.Compare(string(opts.AddressType),
@@ -640,4 +646,19 @@ func transProtocol(annotation string, port *v1.ServicePort) (string, error) {
 	}
 
 	return strings.ToLower(string(port.Protocol)), nil
+}
+
+// check if the service exists in service definition
+func checkIfSLBExistInService(service *v1.Service) (exists bool) {
+	if service == nil ||
+		len(service.Status.LoadBalancer.Ingress) == 0 {
+		glog.V(2).Infof("checkIfSLBExistInService(): service %s doesn't have ingresses\n", service.Name)
+		exists = false
+	} else {
+		glog.V(2).Infof("checkIfSLBExistInService(): service %s has ingresses=%v\n", service.Name, service.Status.LoadBalancer.Ingress)
+		exists = true
+	}
+
+	return exists
+
 }
