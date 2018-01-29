@@ -22,12 +22,12 @@ To deploy cloud-controller-manager in kubernetes cluster, we need to a few thing
 
 ### Get an `cloud-controller-manager` image
 
-You can either get an image from official release by image name `registry.cn-hangzhou.aliyuncs.com/google-containers/cloud-controller-manager:<RELEASE_VERSION>`
+You can either get an image from official release by image name `registry.cn-hangzhou.aliyuncs.com/acs/cloud-controller-manager:<RELEASE_VERSION>`
 
 Or build it from source which require docker has been installed:
 
     ```bash
-    # for example. export REGISTRY=registry.cn-hangzhou.aliyuncs.com/google-containers
+    # for example. export REGISTRY=registry.cn-hangzhou.aliyuncs.com/acs
     $ export REGISTRY=<YOUR_REGISTRY_NAME>
     # This will build cloud-controller-manager from source code and build an docker image from binary and push to your specified registry.
     # You can also use `make binary && make build` if you don't want push this image to your registry.
@@ -93,7 +93,7 @@ spec:
           value: "true"
           effect: "NoSchedule"
       containers:
-      - image: registry.cn-hangzhou.aliyuncs.com/google-containers/cloud-controller-manager:v1.8.1
+      - image: registry.cn-hangzhou.aliyuncs.com/acs/cloud-controller-manager:v1.8.4-14-gca3c1da
         name: cloud-controller-manager
         command:
           - /cloud-controller-manager
