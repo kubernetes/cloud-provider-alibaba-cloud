@@ -3,6 +3,8 @@ package alicloud
 import (
 	"errors"
 	"fmt"
+	"os"
+	"strconv"
 	"strings"
 
 	"github.com/denverdino/aliyungo/common"
@@ -41,6 +43,8 @@ type AnnotationRequest struct {
 
 type LoadBalancerClient struct {
 	c *slb.Client
+	// known service resource version
+	knownSVCResourceVersionMap map[string]uint64
 }
 
 func (s *LoadBalancerClient) findLoadBalancer(service *v1.Service) (bool, *slb.LoadBalancerType, error) {
@@ -52,14 +56,14 @@ func (s *LoadBalancerClient) findLoadBalancer(service *v1.Service) (bool, *slb.L
 }
 
 func (s *LoadBalancerClient) findLoadBalancerByID(lbid string, region common.Region) (bool, *slb.LoadBalancerType, error) {
-
+	glog.V(2).Infof("Alicloud.findLoadBalancerByID(): lbid=%+v", lbid)
 	lbs, err := s.c.DescribeLoadBalancers(
 		&slb.DescribeLoadBalancersArgs{
 			RegionId:       region,
 			LoadBalancerId: lbid,
 		},
 	)
-
+	glog.V(2).Infof("Alicloud.findLoadBalancerByID(): lbs=%+v, check err=%v", lbs, err)
 	if err != nil {
 		return false, nil, err
 	}
@@ -72,18 +76,19 @@ func (s *LoadBalancerClient) findLoadBalancerByID(lbid string, region common.Reg
 			"using the first one with IP=%s", lbid, lbs[0].Address)
 	}
 	lb, err := s.c.DescribeLoadBalancerAttribute(lbs[0].LoadBalancerId)
+	glog.V(2).Infof("Alicloud.findLoadBalancerByID(): lb=%+v, check err=%v", lb, err)
 	return err == nil, lb, err
 }
 
 func (s *LoadBalancerClient) findLoadBalancerByName(lbn string, region common.Region) (bool, *slb.LoadBalancerType, error) {
-
+	glog.V(2).Infof("Alicloud.findLoadBalancerByName(): lbn=%s, region=%v", lbn, region)
 	lbs, err := s.c.DescribeLoadBalancers(
 		&slb.DescribeLoadBalancersArgs{
 			RegionId:         region,
 			LoadBalancerName: lbn,
 		},
 	)
-
+	glog.V(2).Infof("Alicloud.findLoadBalancerByName(): lbs=%+v, check err=%v", lbs, err)
 	if err != nil {
 		return false, nil, err
 	}
@@ -96,10 +101,13 @@ func (s *LoadBalancerClient) findLoadBalancerByName(lbn string, region common.Re
 			"using the first one with IP=%s", lbn, lbs[0].Address)
 	}
 	lb, err := s.c.DescribeLoadBalancerAttribute(lbs[0].LoadBalancerId)
+	glog.V(2).Infof("Alicloud.findLoadBalancerByName(): lb=%+v, check err=%v", lb, err)
 	return err == nil, lb, err
 }
 
 func (s *LoadBalancerClient) EnsureLoadBalancer(service *v1.Service, nodes []*v1.Node, vswitchid string) (*slb.LoadBalancerType, error) {
+	glog.V(2).Infof("Alicloud.EnsureLoadBalancer(): service details=%+v", service)
+
 	exists, lb, err := s.findLoadBalancer(service)
 	if err != nil {
 		return nil, err
@@ -108,6 +116,15 @@ func (s *LoadBalancerClient) EnsureLoadBalancer(service *v1.Service, nodes []*v1
 	if !exists && checkIfSLBExistInService(service) {
 		glog.V(2).Infof("Not able to find SLB named %s in aliyun openapi, but it's defined in service.loaderbalancer.ingress.\n", service.Name)
 		return nil, fmt.Errorf("Not able to find SLB named %s in aliyun openapi, but it's defined in service.loaderbalancer.ingress.\n", service.Name)
+	}
+
+	// If need created, double check the resource version
+	if !exists {
+		err = s.EnsureSVCResourceVersion(service)
+		if err != nil {
+			glog.V(2).Infof("Alicloud.EnsureLoadBalancer(): EnsureSVCResourceVersion func can't work properly due to %+v, exit", err)
+			os.Exit(1)
+		}
 	}
 
 	ar := ExtractAnnotationRequest(service)
@@ -168,6 +185,11 @@ func (s *LoadBalancerClient) EnsureLoadBalancer(service *v1.Service, nodes []*v1
 	if _, err := s.EnsureLoadBalancerListener(service, lb); err != nil {
 
 		return nil, err
+	}
+
+	if !exists {
+		err = s.KeepSVCResourceVersion(service)
+		glog.V(2).Infof("Failed to KeepSVCResourceVersion service %s due to %v ", service.Name, err)
 	}
 
 	return s.EnsureBackendServer(service, nodes, lb)
@@ -465,6 +487,8 @@ func (s *LoadBalancerClient) EnsureLoadBalanceDeleted(service *v1.Service) error
 	if !exists {
 		return nil
 	}
+	err = s.KeepSVCResourceVersion(service)
+	glog.V(2).Infof("Failed to KeepSVCResourceVersion service %s due to %v ", service.Name, err)
 	return s.c.DeleteLoadBalancer(lb.LoadBalancerId)
 }
 
@@ -661,4 +685,63 @@ func checkIfSLBExistInService(service *v1.Service) (exists bool) {
 
 	return exists
 
+}
+
+// ensure service resource version properly and update last known resource version to the largest one, for now only keep create and delete behavior
+func (s *LoadBalancerClient) EnsureSVCResourceVersion(service *v1.Service) error {
+	if service == nil {
+		return fmt.Errorf("EnsureSVCResourceVersion:service is nil")
+	}
+	if s.knownSVCResourceVersionMap == nil {
+		s.knownSVCResourceVersionMap = map[string]uint64{}
+	}
+
+	serviceUID := string(service.GetUID())
+	currentVersion, err := strconv.ParseUint(service.ResourceVersion, 10, 64)
+	if err != nil {
+		glog.V(2).Infof("EnsureSVCResourceVersion(): service %s's ResourceVersion %v has been parsed failed due to %v", service.Name, service.ResourceVersion, err)
+		return err
+	}
+
+	if lastKnownVersion, ok := s.knownSVCResourceVersionMap[serviceUID]; ok {
+		if currentVersion > lastKnownVersion {
+			glog.V(2).Infof("EnsureSVCResourceVersion(): service %s's uid %v and ResourceVersion %v > lastKnownResourceVersion %v, as expected.\n", service.Name,
+				serviceUID,
+				service.ResourceVersion,
+				lastKnownVersion)
+		} else {
+			glog.V(2).Infof("EnsureSVCResourceVersion(): service %s's uid %v and ResourceVersion %v < lastKnownResourceVersion %v, it means the resourceVersion has been processed, not as expected.\n", service.Name,
+				serviceUID,
+				service.ResourceVersion,
+				lastKnownVersion)
+			return fmt.Errorf("EnsureSVCResourceVersion(): service %s's uid %v and ResourceVersion %v < lastKnownResourceVersion %v, it means the resourceVersion has been processed, not as expected.\n", service.Name,
+				serviceUID,
+				service.ResourceVersion,
+				lastKnownVersion)
+		}
+	} else {
+		glog.V(2).Infof("EnsureSVCResourceVersion(): service %s's uid %v is not kept, first time to process, as expected.\n", service.Name, serviceUID)
+	}
+
+	return nil
+}
+
+func (s *LoadBalancerClient) KeepSVCResourceVersion(service *v1.Service) error {
+	if service == nil {
+		return fmt.Errorf("KeepSVCResourceVersion:service is nil")
+	}
+	if s.knownSVCResourceVersionMap == nil {
+		s.knownSVCResourceVersionMap = map[string]uint64{}
+	}
+
+	serviceUID := string(service.GetUID())
+	currentVersion, err := strconv.ParseUint(service.ResourceVersion, 10, 64)
+	if err != nil {
+		glog.V(2).Infof("KeepSVCResourceVersion(): service %s's ResourceVersion %v has been parsed failed due to %v", service.Name, service.ResourceVersion, err)
+		return err
+	}
+
+	glog.V(2).Infof("KeepSVCResourceVersion(): service %s's uid %s and ResourceVersion %v has been kept.", service.Name, serviceUID, service.ResourceVersion)
+	s.knownSVCResourceVersionMap[serviceUID] = currentVersion
+	return nil
 }
