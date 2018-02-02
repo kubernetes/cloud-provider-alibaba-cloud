@@ -44,7 +44,6 @@ type AnnotationRequest struct {
 type LoadBalancerClient struct {
 	c *slb.Client
 	// known service resource version
-	knownSVCResourceVersionMap map[string]uint64
 }
 
 func (s *LoadBalancerClient) findLoadBalancer(service *v1.Service) (bool, *slb.LoadBalancerType, error) {
@@ -189,7 +188,9 @@ func (s *LoadBalancerClient) EnsureLoadBalancer(service *v1.Service, nodes []*v1
 
 	if !exists {
 		err = s.KeepSVCResourceVersion(service)
-		glog.V(2).Infof("Failed to KeepSVCResourceVersion service %s due to %v ", service.Name, err)
+		if err != nil {
+			glog.V(2).Infof("Failed to KeepSVCResourceVersion service %s due to %v ", service.Name, err)
+		}
 	}
 
 	return s.EnsureBackendServer(service, nodes, lb)
@@ -701,9 +702,10 @@ func (s *LoadBalancerClient) EnsureSVCResourceVersion(service *v1.Service) error
 	if service == nil {
 		return fmt.Errorf("EnsureSVCResourceVersion:service is nil")
 	}
-	if s.knownSVCResourceVersionMap == nil {
-		s.knownSVCResourceVersionMap = map[string]uint64{}
-	}
+
+	keeper := GetSvcResourceVersionKeeper()
+	keeper.versionMapLock.RLock()
+	defer keeper.versionMapLock.RUnlock()
 
 	serviceUID := string(service.GetUID())
 	currentVersion, err := strconv.ParseUint(service.ResourceVersion, 10, 64)
@@ -712,7 +714,7 @@ func (s *LoadBalancerClient) EnsureSVCResourceVersion(service *v1.Service) error
 		return err
 	}
 
-	if lastKnownVersion, ok := s.knownSVCResourceVersionMap[serviceUID]; ok {
+	if lastKnownVersion, ok := keeper.knownSVCResourceVersionMap[serviceUID]; ok {
 		if currentVersion > lastKnownVersion {
 			glog.V(2).Infof("EnsureSVCResourceVersion(): service %s's uid %v and ResourceVersion %v > lastKnownResourceVersion %v, as expected.\n", service.Name,
 				serviceUID,
@@ -739,9 +741,6 @@ func (s *LoadBalancerClient) KeepSVCResourceVersion(service *v1.Service) error {
 	if service == nil {
 		return fmt.Errorf("KeepSVCResourceVersion:service is nil")
 	}
-	if s.knownSVCResourceVersionMap == nil {
-		s.knownSVCResourceVersionMap = map[string]uint64{}
-	}
 
 	serviceUID := string(service.GetUID())
 	currentVersion, err := strconv.ParseUint(service.ResourceVersion, 10, 64)
@@ -751,6 +750,12 @@ func (s *LoadBalancerClient) KeepSVCResourceVersion(service *v1.Service) error {
 	}
 
 	glog.V(2).Infof("KeepSVCResourceVersion(): service %s's uid %s and ResourceVersion %v has been kept.", service.Name, serviceUID, service.ResourceVersion)
-	s.knownSVCResourceVersionMap[serviceUID] = currentVersion
+
+	keeper := GetSvcResourceVersionKeeper()
+	keeper.versionMapLock.Lock()
+	// s.versionMapLock.Lock()
+	defer keeper.versionMapLock.Unlock()
+	keeper.knownSVCResourceVersionMap[serviceUID] = currentVersion
+
 	return nil
 }
