@@ -703,10 +703,6 @@ func (s *LoadBalancerClient) EnsureSVCResourceVersion(service *v1.Service) error
 		return fmt.Errorf("EnsureSVCResourceVersion:service is nil")
 	}
 
-	keeper := GetSvcResourceVersionKeeper()
-	keeper.versionMapLock.RLock()
-	defer keeper.versionMapLock.RUnlock()
-
 	serviceUID := string(service.GetUID())
 	currentVersion, err := strconv.ParseUint(service.ResourceVersion, 10, 64)
 	if err != nil {
@@ -714,7 +710,9 @@ func (s *LoadBalancerClient) EnsureSVCResourceVersion(service *v1.Service) error
 		return err
 	}
 
-	if lastKnownVersion, ok := keeper.maxSVCResourceVersionMap[serviceUID]; ok {
+	keeper := GetSvcResourceVersionKeeper()
+	lastKnownVersion, found := keeper.get(serviceUID)
+	if found {
 		if currentVersion > lastKnownVersion {
 			glog.V(2).Infof("EnsureSVCResourceVersion(): service %s's uid %v and ResourceVersion %v > lastKnownResourceVersion %v, as expected.\n", service.Name,
 				serviceUID,
@@ -752,10 +750,7 @@ func (s *LoadBalancerClient) KeepSVCResourceVersion(service *v1.Service) error {
 	glog.V(2).Infof("KeepSVCResourceVersion(): service %s's uid %s and ResourceVersion %v has been kept.", service.Name, serviceUID, service.ResourceVersion)
 
 	keeper := GetSvcResourceVersionKeeper()
-	keeper.versionMapLock.Lock()
-	// s.versionMapLock.Lock()
-	defer keeper.versionMapLock.Unlock()
-	keeper.maxSVCResourceVersionMap[serviceUID] = currentVersion
+	keeper.set(serviceUID, currentVersion)
 
 	return nil
 }

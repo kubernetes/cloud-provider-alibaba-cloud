@@ -19,3 +19,17 @@ func GetSvcResourceVersionKeeper() *svcResourceVersionKeeper {
 	})
 	return svcRVKeeper
 }
+
+func (s *svcResourceVersionKeeper) set(serviceUID string, resourceVersion uint64) {
+	s.versionMapLock.Lock()
+	// s.versionMapLock.Lock()
+	defer s.versionMapLock.Unlock()
+	s.maxSVCResourceVersionMap[serviceUID] = resourceVersion
+}
+
+func (s *svcResourceVersionKeeper) get(serviceUID string) (resourceVersion uint64, found bool) {
+	s.versionMapLock.RLock()
+	defer s.versionMapLock.RUnlock()
+	resourceVersion, found = s.maxSVCResourceVersionMap[serviceUID]
+	return
+}
