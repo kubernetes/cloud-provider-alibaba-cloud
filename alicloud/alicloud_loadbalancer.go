@@ -69,7 +69,7 @@ func (s *LoadBalancerClient) findLoadBalancerByID(lbid string, region common.Reg
 	}
 
 	if lbs == nil || len(lbs) == 0 {
-		return false, nil, nil
+		return false, nil, fmt.Errorf("The specified Load Balancer ID %s can't be found", lbid)
 	}
 	if len(lbs) > 1 {
 		glog.Warningf("Alicloud.GetLoadBalancerByID(): multiple loadbalancer returned with id=%s, "+
@@ -479,6 +479,15 @@ func (s *LoadBalancerClient) EnsureBackendServer(service *v1.Service, nodes []*v
 }
 
 func (s *LoadBalancerClient) EnsureLoadBalanceDeleted(service *v1.Service) error {
+	ar := ExtractAnnotationRequest(service)
+	if ar.Loadbalancerid != "" {
+		glog.V(2).Infof("It will not delete slb %s's load balancer id %s, because it's created by the user.", service.Name, ar.Loadbalancerid)
+		err := s.KeepSVCResourceVersion(service)
+		if err != nil {
+			glog.V(2).Infof("Failed to KeepSVCResourceVersion service %s due to %v ", service.Name, err)
+		}
+		return nil
+	}
 
 	exists, lb, err := s.findLoadBalancer(service)
 	if err != nil {
