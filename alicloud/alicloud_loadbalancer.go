@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"strconv"
 	"strings"
 
 	"github.com/denverdino/aliyungo/common"
@@ -112,18 +111,19 @@ func (s *LoadBalancerClient) EnsureLoadBalancer(service *v1.Service, nodes []*v1
 		return nil, err
 	}
 	glog.V(2).Infof("Alicloud.EnsureLoadBalancer(): sync loadbalancer=%v, exist=%v\n", lb, exists)
+
+	if !exists {
+		// If need created, double check if the resource id has been deleted
+		err = s.EnsureSVCNotDeleted(service)
+		if err != nil {
+			glog.V(2).Infof("Alicloud.EnsureLoadBalancer(): EnsureSVCNotDeleted func can't work properly due to %+v, exit", err)
+			os.Exit(1)
+		}
+	}
+
 	if !exists && checkIfSLBExistInService(service) {
 		glog.V(2).Infof("Not able to find SLB named %s in aliyun openapi, but it's defined in service.loaderbalancer.ingress.\n", service.Name)
 		return nil, fmt.Errorf("Not able to find SLB named %s in aliyun openapi, but it's defined in service.loaderbalancer.ingress.\n", service.Name)
-	}
-
-	// If need created, double check the resource version
-	if !exists {
-		err = s.EnsureSVCResourceVersion(service)
-		if err != nil {
-			glog.V(2).Infof("Alicloud.EnsureLoadBalancer(): EnsureSVCResourceVersion func can't work properly due to %+v, exit", err)
-			os.Exit(1)
-		}
 	}
 
 	ar := ExtractAnnotationRequest(service)
@@ -184,13 +184,6 @@ func (s *LoadBalancerClient) EnsureLoadBalancer(service *v1.Service, nodes []*v1
 	if _, err := s.EnsureLoadBalancerListener(service, lb); err != nil {
 
 		return nil, err
-	}
-
-	if !exists {
-		err = s.KeepSVCResourceVersion(service)
-		if err != nil {
-			glog.V(2).Infof("Failed to KeepSVCResourceVersion service %s due to %v ", service.Name, err)
-		}
 	}
 
 	return s.EnsureBackendServer(service, nodes, lb)
@@ -480,12 +473,18 @@ func (s *LoadBalancerClient) EnsureBackendServer(service *v1.Service, nodes []*v
 }
 
 func (s *LoadBalancerClient) EnsureLoadBalanceDeleted(service *v1.Service) error {
+
+	// need to save the resource version when deleted event
+	err := s.SaveDeletedSVCResourceVersion(service)
+	if err != nil {
+		glog.V(2).Infof("Failed to SaveDeletedSVCResourceVersion service %s due to %v ", service.Name, err)
+	}
 	ar := ExtractAnnotationRequest(service)
 	if ar.Loadbalancerid != "" {
 		glog.V(2).Infof("It will not delete slb %s's load balancer id %s, because it's created by the user.", service.Name, ar.Loadbalancerid)
-		err := s.KeepSVCResourceVersion(service)
+		err := s.SaveDeletedSVCResourceVersion(service)
 		if err != nil {
-			glog.V(2).Infof("Failed to KeepSVCResourceVersion service %s due to %v ", service.Name, err)
+			glog.V(2).Infof("Failed to SaveDeletedSVCResourceVersion service %s due to %v ", service.Name, err)
 		}
 		return nil
 	}
@@ -497,8 +496,6 @@ func (s *LoadBalancerClient) EnsureLoadBalanceDeleted(service *v1.Service) error
 	if !exists {
 		return nil
 	}
-	err = s.KeepSVCResourceVersion(service)
-	glog.V(2).Infof("Failed to KeepSVCResourceVersion service %s due to %v ", service.Name, err)
 	return s.c.DeleteLoadBalancer(lb.LoadBalancerId)
 }
 
@@ -698,59 +695,43 @@ func checkIfSLBExistInService(service *v1.Service) (exists bool) {
 }
 
 // ensure service resource version properly and update last known resource version to the largest one, for now only keep create and delete behavior
-func (s *LoadBalancerClient) EnsureSVCResourceVersion(service *v1.Service) error {
+func (s *LoadBalancerClient) EnsureSVCNotDeleted(service *v1.Service) error {
 	if service == nil {
-		return fmt.Errorf("EnsureSVCResourceVersion:service is nil")
+		return fmt.Errorf("EnsureSVCNotDeleted:service is nil")
 	}
 
 	serviceUID := string(service.GetUID())
-	currentVersion, err := strconv.ParseUint(service.ResourceVersion, 10, 64)
-	if err != nil {
-		glog.V(2).Infof("EnsureSVCResourceVersion(): service %s's ResourceVersion %v has been parsed failed due to %v", service.Name, service.ResourceVersion, err)
-		return err
-	}
-
-	keeper := GetSvcResourceVersionKeeper()
-	lastKnownVersion, found := keeper.get(serviceUID)
-	if found {
-		if currentVersion > lastKnownVersion {
-			glog.V(2).Infof("EnsureSVCResourceVersion(): service %s's uid %v and ResourceVersion %v > lastKnownResourceVersion %v, as expected.\n", service.Name,
-				serviceUID,
-				service.ResourceVersion,
-				lastKnownVersion)
-		} else {
-			glog.V(2).Infof("EnsureSVCResourceVersion(): service %s's uid %v and ResourceVersion %v < lastKnownResourceVersion %v, it means the resourceVersion has been processed, not as expected.\n", service.Name,
-				serviceUID,
-				service.ResourceVersion,
-				lastKnownVersion)
-			return fmt.Errorf("EnsureSVCResourceVersion(): service %s's uid %v and ResourceVersion %v < lastKnownResourceVersion %v, it means the resourceVersion has been processed, not as expected.\n", service.Name,
-				serviceUID,
-				service.ResourceVersion,
-				lastKnownVersion)
-		}
+	keeper := GetDeletedSvcKeeper()
+	deleted := keeper.get(serviceUID)
+	if deleted {
+		glog.V(2).Infof("EnsureSVCNotDeleted(): service %s's uid %v has been deleted, shouldn't be created again.\n", service.Name,
+			serviceUID)
+		return fmt.Errorf("EnsureSVCNotDeleted(): service %s's uid %v has been deleted, shouldn't be created again.\n", service.Name,
+			serviceUID)
 	} else {
-		glog.V(2).Infof("EnsureSVCResourceVersion(): service %s's uid %v is not kept, first time to process, as expected.\n", service.Name, serviceUID)
+		glog.V(2).Infof("EnsureSVCNotDeleted(): service %s's uid %v hasn't been deleted, first time to process, as expected.\n", service.Name, serviceUID)
 	}
 
 	return nil
 }
 
-func (s *LoadBalancerClient) KeepSVCResourceVersion(service *v1.Service) error {
+// save the deleted service's uid
+func (s *LoadBalancerClient) SaveDeletedSVCResourceVersion(service *v1.Service) error {
 	if service == nil {
-		return fmt.Errorf("KeepSVCResourceVersion:service is nil")
+		return fmt.Errorf("SaveDeletedSVCResourceVersion:service is nil")
 	}
 
 	serviceUID := string(service.GetUID())
-	currentVersion, err := strconv.ParseUint(service.ResourceVersion, 10, 64)
-	if err != nil {
-		glog.V(2).Infof("KeepSVCResourceVersion(): service %s's ResourceVersion %v has been parsed failed due to %v", service.Name, service.ResourceVersion, err)
-		return err
+	keeper := GetDeletedSvcKeeper()
+	if !keeper.get(serviceUID) {
+		keeper.set(serviceUID)
+		glog.V(2).Infof("SaveDeletedSVCResourceVersion(): service %s's uid %v is kept in the DeletedSvcKeeper.\n", service.Name,
+			serviceUID)
+	} else {
+		glog.V(2).Infof("SaveDeletedSVCResourceVersion(): service %s's uid %v has been kept in the DeletedSvcKeeper, no need to update.\n", service.Name,
+			serviceUID)
 	}
-
-	glog.V(2).Infof("KeepSVCResourceVersion(): service %s's uid %s and ResourceVersion %v has been kept.", service.Name, serviceUID, service.ResourceVersion)
-
-	keeper := GetSvcResourceVersionKeeper()
-	keeper.set(serviceUID, currentVersion)
+	// keeper.set(serviceUID, currentVersion)
 
 	return nil
 }
