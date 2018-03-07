@@ -3,41 +3,26 @@ package alicloud
 import (
 	"fmt"
 	"testing"
-	"time"
+	//"time"
 
 	"github.com/denverdino/aliyungo/common"
 )
 
 func TestRoute(t *testing.T) {
-	rsdk, err := NewSDKClientRoutes("", "")
+	cmgr, err := NewClientMgr("", "")
 	if err != nil {
+		t.Log("failed to create client manager")
 		t.Fail()
 	}
 
-	route, err := rsdk.ListRoutes(common.Hangzhou, []string{"", ""})
+	route, err := cmgr.routes.ListRoutes(common.Hangzhou, []string{"", ""})
 	if err != nil {
+		t.Log("failed to list routes")
 		t.Fail()
 	}
 	for _, r := range route {
 		t.Log(fmt.Sprintf("%+v\n", r))
 	}
-}
-
-func TestRouteExpire(t *testing.T) {
-	rsdk, err := NewSDKClientRoutes("", "")
-	if err != nil {
-		t.Fail()
-	}
-
-	for i := 0; i < 20; i++ {
-		_, err := rsdk.ListRoutes(common.Hangzhou, []string{""})
-		if err != nil {
-			t.Fail()
-		}
-		time.Sleep(time.Duration(3 * time.Second))
-		fmt.Printf("Log 1 second: %d", i)
-	}
-
 }
 
 func testCamel(t *testing.T, original, expected string) {
@@ -66,6 +51,23 @@ func TestSep(t *testing.T) {
 	testCamel(t, "service.beta.kubernetes.io/alicloud-loadbalancer-HealthCheckInterval", ServiceAnnotationLoadBalancerHealthCheckInterval)
 	testCamel(t, "service.beta.kubernetes.io/alicloud-loadbalancer-HealthCheckConnectTimeout", ServiceAnnotationLoadBalancerHealthCheckConnectTimeout)
 	testCamel(t, "service.beta.kubernetes.io/alicloud-loadbalancer-HealthCheckTimeout", ServiceAnnotationLoadBalancerHealthCheckTimeout)
+
+	testCamel(t, ServiceAnnotationLoadBalancerProtocolPort, ServiceAnnotationLoadBalancerProtocolPort)
+	testCamel(t, ServiceAnnotationLoadBalancerAddressType, ServiceAnnotationLoadBalancerAddressType)
+	testCamel(t, ServiceAnnotationLoadBalancerSLBNetworkType, ServiceAnnotationLoadBalancerSLBNetworkType)
+	testCamel(t, ServiceAnnotationLoadBalancerChargeType, ServiceAnnotationLoadBalancerChargeType)
+	testCamel(t, ServiceAnnotationLoadBalancerRegion, ServiceAnnotationLoadBalancerRegion)
+	testCamel(t, ServiceAnnotationLoadBalancerBandwidth, ServiceAnnotationLoadBalancerBandwidth)
+	testCamel(t, ServiceAnnotationLoadBalancerCertID, ServiceAnnotationLoadBalancerCertID)
+	testCamel(t, ServiceAnnotationLoadBalancerHealthCheckFlag, ServiceAnnotationLoadBalancerHealthCheckFlag)
+	testCamel(t, ServiceAnnotationLoadBalancerHealthCheckType, ServiceAnnotationLoadBalancerHealthCheckType)
+	testCamel(t, ServiceAnnotationLoadBalancerHealthCheckURI, ServiceAnnotationLoadBalancerHealthCheckURI)
+	testCamel(t, ServiceAnnotationLoadBalancerHealthCheckConnectPort, ServiceAnnotationLoadBalancerHealthCheckConnectPort)
+	testCamel(t, ServiceAnnotationLoadBalancerHealthCheckHealthyThreshold, ServiceAnnotationLoadBalancerHealthCheckHealthyThreshold)
+	testCamel(t, ServiceAnnotationLoadBalancerHealthCheckUnhealthyThreshold, ServiceAnnotationLoadBalancerHealthCheckUnhealthyThreshold)
+	testCamel(t, ServiceAnnotationLoadBalancerHealthCheckInterval, ServiceAnnotationLoadBalancerHealthCheckInterval)
+	testCamel(t, ServiceAnnotationLoadBalancerHealthCheckConnectTimeout, ServiceAnnotationLoadBalancerHealthCheckConnectTimeout)
+	testCamel(t, ServiceAnnotationLoadBalancerHealthCheckTimeout, ServiceAnnotationLoadBalancerHealthCheckTimeout)
 
 	// Ignore the unsupported annotation
 	testCamel(t, "alicloud-loadbalancer-HealthCheckTimeout", "alicloud-loadbalancer-HealthCheckTimeout")

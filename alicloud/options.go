@@ -208,9 +208,12 @@ func splitCamel(src string) (entries []string) {
 		if class == lastClass {
 			runes[len(runes)-1] = append(runes[len(runes)-1], r)
 		} else {
+			lastClass = class
+			if r == '-' {
+				continue
+			}
 			runes = append(runes, []rune{r})
 		}
-		lastClass = class
 	}
 	// handle upper case -> lower case sequences, e.g.
 	// "SLBN", "etwork" -> "SLB", "Network"
