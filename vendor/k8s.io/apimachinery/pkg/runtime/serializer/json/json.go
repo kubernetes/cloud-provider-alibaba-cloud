@@ -111,9 +111,6 @@ func (s *Serializer) Decode(originalData []byte, gvk *schema.GroupVersionKind, i
 		if err != nil {
 			return nil, actual, err
 		}
-		if actual.Kind == "Service" {
-			glog.V(4).Infof("alicloud: json decoder, versioned service status watched. with raw data[%+v]\n",obj)
-		}
 		versioned.Objects = []runtime.Object{obj}
 		return versioned, actual, nil
 	}

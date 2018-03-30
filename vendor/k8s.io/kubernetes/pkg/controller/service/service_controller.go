@@ -127,16 +127,15 @@ func New(
 
 	serviceInformer.Informer().AddEventHandlerWithResyncPeriod(
 		cache.ResourceEventHandlerFuncs{
-			AddFunc: s.addService,
+			AddFunc: s.enqueueService,
 			UpdateFunc: func(old, cur interface{}) {
-				glog.V(4).Infof("alicloud: service_controller [Update] service , enqueue. old=[%+v], cur=[%+v]\n",old,cur)
 				oldSvc, ok1 := old.(*v1.Service)
 				curSvc, ok2 := cur.(*v1.Service)
 				if ok1 && ok2 && s.needsUpdate(oldSvc, curSvc) {
 					s.enqueueService(cur)
 				}
 			},
-			DeleteFunc: s.delService,
+			DeleteFunc: s.enqueueService,
 		},
 		serviceSyncPeriod,
 	)
@@ -147,16 +146,6 @@ func New(
 		return nil, err
 	}
 	return s, nil
-}
-
-func (s *ServiceController) addService(obj interface{}) {
-	glog.V(4).Infof("alicloud: service_controller [Add] service , enqueue. obj=[%+v]\n",obj)
-	s.enqueueService(obj)
-}
-
-func (s *ServiceController) delService(obj interface{}) {
-	glog.V(4).Infof("alicloud: service_controller [Deleted] service , enqueue. obj=[%+v]\n",obj)
-	s.enqueueService(obj)
 }
 
 // obj could be an *v1.Service, or a DeletionFinalStateUnknown marker item.
@@ -257,6 +246,7 @@ func (s *ServiceController) processServiceUpdate(cachedService *cachedService, s
 
 		return err, cachedService.nextRetryDelay()
 	}
+	cachedService.state = service
 	// Always update the cache upon success.
 	// NOTE: Since we update the cached service if and only if we successfully
 	// processed it, a cached service being nil implies that it hasn't yet
@@ -743,7 +733,6 @@ func (s *ServiceController) syncService(key string) error {
 	service, err := s.serviceLister.Services(namespace).Get(name)
 	switch {
 	case errors.IsNotFound(err):
-		glog.V(4).Infof("alicloud: service_controller , suppose to be not found error. err=[%+v]\n",err)
 		// service absence in store means watcher caught the deletion, ensure LB info is cleaned
 		glog.Infof("Service has been deleted %v", key)
 		err, retryDelay = s.processServiceDeletion(key)

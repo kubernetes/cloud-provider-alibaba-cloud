@@ -67,30 +67,33 @@ type LoadBalancerClient struct {
 }
 
 func (s *LoadBalancerClient) findLoadBalancer(service *v1.Service) (bool, *slb.LoadBalancerType, error) {
-	ar := ExtractAnnotationRequest(service)
+	def,_ := ExtractAnnotationRequest(service)
 
 	loadbalancer := service.Status.LoadBalancer
+	glog.V(2).Infof("alicloud: find loadbalancer, [%v]\n [%v]\n",loadbalancer,def)
 	if len(loadbalancer.Ingress) > 0 {
-		lbid := loadbalancer.Ingress[0].Hostname
-		if lbid != "" {
-			if ar.Loadbalancerid != "" && ar.Loadbalancerid != lbid {
-				glog.Warningf(fmt.Sprintf("alicloud: changing loadbalancer id was not allowed after loadbalancer"+
-					" was already created ! please remove service annotation: [%s]\n", ServiceAnnotationLoadBalancerId))
+		glog.V(2).Infof(fromLoadBalancerStatus(service))
+		if lbid := fromLoadBalancerStatus(service); lbid != "" {
+			if def.Loadbalancerid != "" && def.Loadbalancerid != lbid {
+				glog.Errorf("alicloud: changing loadbalancer id was not allowed after loadbalancer"+
+					" was already created ! please remove service annotation: [%s]\n", ServiceAnnotationLoadBalancerId)
+				return false, nil, errors.New(fmt.Sprintf("alicloud: change loadbalancer id after service " +
+					"has been created is not supported. remove service annotation[%s] and retry!", ServiceAnnotationLoadBalancerId))
 			}
 			// found loadbalancer id in service ingress status.
 			// this id was set previously when loadbalancer was created.
-			return s.findLoadBalancerByID(lbid, ar.Region)
+			return s.findLoadBalancerByID(lbid, def.Region)
 		}
 	}
 	// if service ingress status was not initialized with loadbalancer, then
 	// we check annotation to see if user had assigned a loadbalancer manually.
 	// if so , we use user defined loadbalancer
-	if ar.Loadbalancerid != "" {
-		return s.findLoadBalancerByID(ar.Loadbalancerid, ar.Region)
+	if def.Loadbalancerid != "" {
+		return s.findLoadBalancerByID(def.Loadbalancerid, def.Region)
 	}
 
 	// finally , fallback to find by name to compatible with old version
-	return s.findLoadBalancerByName(cloudprovider.GetLoadBalancerName(service), ar.Region)
+	return s.findLoadBalancerByName(cloudprovider.GetLoadBalancerName(service), def.Region)
 }
 
 func (s *LoadBalancerClient) findLoadBalancerByID(lbid string, region common.Region) (bool, *slb.LoadBalancerType, error) {
@@ -107,7 +110,7 @@ func (s *LoadBalancerClient) findLoadBalancerByID(lbid string, region common.Reg
 	}
 
 	if lbs == nil || len(lbs) == 0 {
-		return false, nil, fmt.Errorf(" alicloud: can't find the specified loadbalancer id [%s]", lbid)
+		return false, nil, nil
 	}
 	if len(lbs) > 1 {
 		glog.Warningf("alicloud: "+
@@ -124,7 +127,7 @@ func (s *LoadBalancerClient) findLoadBalancerByName(lbn string, region common.Re
 			LoadBalancerName: lbn,
 		},
 	)
-	glog.V(2).Infof("alicloud: fallback to find loadbalancer by name [%s]\n", lbs)
+	glog.V(2).Infof("alicloud: fallback to find loadbalancer by name [%s]\n", lbn)
 	if err != nil {
 		return false, nil, err
 	}
@@ -143,11 +146,11 @@ func (s *LoadBalancerClient) findLoadBalancerByName(lbn string, region common.Re
 func (s *LoadBalancerClient) EnsureLoadBalancer(service *v1.Service, nodes []*v1.Node, vswitchid string) (*slb.LoadBalancerType, error) {
 	glog.V(4).Infof("alicloud: ensure loadbalancer with service details, %+v", service)
 
-	exists, lb, err := s.findLoadBalancer(service)
+	exists, origined, err := s.findLoadBalancer(service)
 	if err != nil {
 		return nil, err
 	}
-	glog.V(2).Infof("alicloud: find loadbalancer with result, exist=%v, %+v\n", exists, lb)
+	glog.V(2).Infof("alicloud: find loadbalancer with result, exist=%v, %+v\n", exists, origined)
 
 	// this is a workaround for issue: https://github.com/kubernetes/kubernetes/issues/59084
 	if !exists {
@@ -160,26 +163,60 @@ func (s *LoadBalancerClient) EnsureLoadBalancer(service *v1.Service, nodes []*v1
 	}
 
 	if !exists && checkIfSLBExistInService(service) {
-		return nil, fmt.Errorf("alicloud: not able to find loadbalancer "+
-			"named [%s] in openapi, but it's defined in service.loaderbalancer.ingress.\n", service.Name)
+		return nil, errors.New(fmt.Sprintf("alicloud: not able to find loadbalancer "+
+			"named [%s] in openapi, but it's defined in service.loaderbalancer.ingress.\n", service.Name))
+	}
+
+	_,request := ExtractAnnotationRequest(service)
+
+	if !exists && request.Loadbalancerid != "" {
+		return nil, errors.New(fmt.Sprintf("alicloud: user specified " +
+			"loadbalancer[%s] does not exist. pls check!", request.Loadbalancerid))
 	}
 
 	opts := s.getLoadBalancerOpts(service, vswitchid)
 
 	if !exists {
-		lb, err = s.create(opts)
+		lbr, err := s.c.CreateLoadBalancer(opts)
+		if err != nil {
+			return nil, err
+		}
+		origined, err = s.c.DescribeLoadBalancerAttribute(lbr.LoadBalancerId)
 	} else {
-		lb, err = s.update(lb, opts)
-	}
-	if err != nil {
-		return nil, err
-	}
-	err = NewListenerManager(s.c, service, lb).ApplyUpdate()
-	if err != nil {
-		return nil, err
-	}
+		if request.ChargeType != "" && request.ChargeType != origined.InternetChargeType {
+		// Todo: here we need to compare loadbalance
+			glog.Infof("alicloud: internet charge type changed. [%s] -> [%s], update loadbalancer [%s]\n",
+				string(origined.InternetChargeType), string(request.ChargeType), opts.LoadBalancerName)
 
-	return lb, s.UpdateBackendServers(nodes, lb)
+			if err := s.c.ModifyLoadBalancerInternetSpec(
+				&slb.ModifyLoadBalancerInternetSpecArgs{
+					LoadBalancerId:     origined.LoadBalancerId,
+					InternetChargeType: request.ChargeType,
+					//Bandwidth:          opts.Bandwidth,
+				}); err != nil {
+				return nil, err
+			}
+		}
+		if request.AddressType != "" && request.AddressType != origined.AddressType {
+			glog.Errorf("alicloud: warning! can not change "+
+				"loadbalancer address type after it has been created! please "+
+				"recreate the service.[%s]->[%s],[%s]\n", origined.AddressType, request.AddressType, opts.LoadBalancerName)
+			return nil, errors.New("alicloud: change loadbalancer address type after service has been created is not supported. delete and retry")
+		}
+		origined, err = s.c.DescribeLoadBalancerAttribute(origined.LoadBalancerId)
+	}
+	if err != nil {
+		glog.Errorf("alicloud: can not get loadbalancer attribute. ")
+		return nil, err
+	}
+	// we should apply listener update only if user does not assign loadbalancer id by themselves.
+	if ! isUserDefinedLoadBalancer(service) {
+		err = NewListenerManager(s.c, service, origined).ApplyUpdate()
+		if err != nil {
+			return nil, err
+		}
+	}
+	return origined, s.UpdateBackendServers(nodes, origined)
 }
 
 func (s *LoadBalancerClient) UpdateLoadBalancer(service *v1.Service, nodes []*v1.Node) error {
@@ -234,16 +271,14 @@ func (s *LoadBalancerClient) EnsureLoadBalanceDeleted(service *v1.Service) error
 	// need to save the resource version when deleted event
 	err := s.SaveDeletedSVCResourceVersion(service)
 	if err != nil {
-		glog.V(2).Infof("alicloud: "+
-			"failed to save deleted service resourceVersion, [%s] due to [%s] ", service.Name, err.Error())
+		glog.Warningf("alicloud: failed to save " +
+			"deleted service resourceVersion, [%s] due to [%s] ", service.Name, err.Error())
 	}
-	ar := ExtractAnnotationRequest(service)
-	if ar.Loadbalancerid != "" {
-		glog.V(2).Infof("alicloud: user created loadbalancer[%s] will not be deleted by cloudprovider. service [%s]", ar.Loadbalancerid, service.Name)
-		err := s.SaveDeletedSVCResourceVersion(service)
-		if err != nil {
-			glog.V(2).Infof("Failed to SaveDeletedSVCResourceVersion service %s due to %v ", service.Name, err)
-		}
+
+	// skip delete user defined loadbalancer
+	if isUserDefinedLoadBalancer(service) {
+		glog.V(2).Infof("alicloud: user created loadbalancer " +
+			"will not be deleted by cloudprovider. service [%s]", service.Name)
 		return nil
 	}
 
@@ -258,7 +293,7 @@ func (s *LoadBalancerClient) EnsureLoadBalanceDeleted(service *v1.Service) error
 }
 
 func (s *LoadBalancerClient) getLoadBalancerOpts(service *v1.Service, vswitchid string) (args *slb.CreateLoadBalancerArgs) {
-	ar := ExtractAnnotationRequest(service)
+	ar,_ := ExtractAnnotationRequest(service)
 	args = &slb.CreateLoadBalancerArgs{
 		AddressType:        ar.AddressType,
 		InternetChargeType: ar.ChargeType,
@@ -272,7 +307,7 @@ func (s *LoadBalancerClient) getLoadBalancerOpts(service *v1.Service, vswitchid 
 			"loadbalancer will be created. address type=%s, switchid=%s\n", ar.AddressType, vswitchid)
 		args.VSwitchId = vswitchid
 	}
-	args.LoadBalancerName = fmt.Sprintf("kubernetes-%s", cloudprovider.GetLoadBalancerName(service))[0:16]
+	args.LoadBalancerName = cloudprovider.GetLoadBalancerName(service)
 	return
 }
 
@@ -326,8 +361,78 @@ func (s *LoadBalancerClient) UpdateBackendServers(nodes []*v1.Node, lb *slb.Load
 			deletions = append(deletions, n1.ServerId)
 		}
 	}
-	_, err := s.c.RemoveBackendServers(lb.LoadBalancerId, deletions)
-	return err
+	if len(deletions) > 0 {
+		if _, err := s.c.RemoveBackendServers(lb.LoadBalancerId, deletions); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// domain retrun slb hostname.
+// this is intended to keep track of user define slb.
+// user defined slb has the hostname format of ${serviceName}.${slbid}.${regionid}.alicontainer.com
+// auto generated slb has the hostname format of ${slbid}.${regionid}.alicontainer.com
+func domain(service *v1.Service, lb *slb.LoadBalancerType) (string) {
+	_, request := ExtractAnnotationRequest(service)
+
+	if service.Status.LoadBalancer.Ingress == nil ||
+		len(service.Status.LoadBalancer.Ingress) == 0 {
+
+		if request.Loadbalancerid != "" {
+			return loadBalancerDomain(service.Name,lb.LoadBalancerId, string(DEFAULT_REGION))
+		}
+		return loadBalancerDomain("",lb.LoadBalancerId, string(DEFAULT_REGION))
+	}
+	return service.Status.LoadBalancer.Ingress[0].Hostname
+
+}
+
+func loadBalancerDomain(name, id, region string) string {
+	domain := []string{
+		id,
+		region,
+		"alicontainer",
+		"com",
+	}
+	if name != "" {
+		domain = append([]string{name}, domain...)
+	}
+	return strings.Join(domain, ".")
+}
+
+func isUserDefinedLoadBalancer(service *v1.Service) bool {
+	ing := service.Status.LoadBalancer.Ingress
+	if ing == nil || len(ing) <= 0 {
+		return false
+	}
+	domain := ing[0].Hostname
+	if domain == "" {
+		return false
+	}
+	if len(strings.Split(domain, ".")) != 5 {
+		return false
+	}
+	return true
+}
+
+// fromLoadBalancerStatus split loadbalancer id from service`s loadbalancer status.
+// see func domain() for format information
+func fromLoadBalancerStatus(service *v1.Service) string {
+	ing := service.Status.LoadBalancer.Ingress
+	if ing == nil || len(ing) <= 0 {
+		return ""
+	}
+	domain := ing[0].Hostname
+	if domain == "" {
+		return ""
+	}
+	secs := strings.Split(domain, ".")
+	if len(secs) < 4 {
+		glog.Warningf("alicloud: can not split loadbalancer hostname domain. [%s]\n",domain)
+		return ""
+	}
+	return secs[len(secs) - 4]
 }
 
 // check if the service exists in service definition

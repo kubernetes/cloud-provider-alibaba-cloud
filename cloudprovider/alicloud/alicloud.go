@@ -128,7 +128,7 @@ func (c *Cloud) GetLoadBalancer(clusterName string, service *v1.Service) (status
 	}
 
 	return &v1.LoadBalancerStatus{
-		Ingress: []v1.LoadBalancerIngress{{IP: lb.Address, Hostname: lb.LoadBalancerId}}}, true, nil
+		Ingress: []v1.LoadBalancerIngress{{IP: lb.Address, Hostname: domain(service, lb)}}}, true, nil
 }
 
 // EnsureLoadBalancer creates a new load balancer 'name', or updates the existing one. Returns the status of the balancer
@@ -139,7 +139,7 @@ func (c *Cloud) EnsureLoadBalancer(clusterName string, service *v1.Service, node
 	ns := c.fileOutNode(nodes, service)
 	annotations := service.Annotations
 	glog.V(2).Infof("Alicloud.EnsureLoadBalancer(%v, %v, %v, %v, %v, %v, %v, %v,%v)",
-		clusterName, service.Namespace, service.Name, c.region, service.Spec.LoadBalancerIP, service.Spec.Ports, nodes, annotations, ns)
+		clusterName, service.Namespace, service.Name, c.region, service.Spec.LoadBalancerIP, service.Spec.Ports, NodeList(nodes), annotations, NodeList(ns))
 	if service.Spec.SessionAffinity != v1.ServiceAffinityNone {
 		// Does not support SessionAffinity
 		return nil, fmt.Errorf("unsupported load balancer affinity: %v", service.Spec.SessionAffinity)
@@ -177,12 +177,11 @@ func (c *Cloud) EnsureLoadBalancer(clusterName string, service *v1.Service, node
 	if err != nil {
 		return nil, err
 	}
-
 	return &v1.LoadBalancerStatus{
 		Ingress: []v1.LoadBalancerIngress{
 			{
 				IP:       lb.Address,
-				Hostname: lb.LoadBalancerId,
+				Hostname: domain(service, lb),
 			},
 		},
 	}, nil
@@ -194,7 +193,7 @@ func (c *Cloud) EnsureLoadBalancer(clusterName string, service *v1.Service, node
 // Parameter 'clusterName' is the name of the cluster as presented to kube-controller-manager
 func (c *Cloud) UpdateLoadBalancer(clusterName string, service *v1.Service, nodes []*v1.Node) error {
 	glog.V(2).Infof("Alicloud.UpdateLoadBalancer(%v, %v, %v, %v, %v, %v, %v)",
-		clusterName, service.Namespace, service.Name, c.region, service.Spec.LoadBalancerIP, service.Spec.Ports, nodes)
+		clusterName, service.Namespace, service.Name, c.region, service.Spec.LoadBalancerIP, service.Spec.Ports, NodeList(nodes))
 
 	return c.climgr.LoadBalancers().UpdateLoadBalancer(service, c.fileOutNode(nodes, service))
 }
@@ -210,6 +209,7 @@ func (c *Cloud) UpdateLoadBalancer(clusterName string, service *v1.Service, node
 func (c *Cloud) EnsureLoadBalancerDeleted(clusterName string, service *v1.Service) error {
 	glog.V(2).Infof("Alicloud.EnsureLoadBalancerDeleted(%v, %v, %v, %v, %v, %v)",
 		clusterName, service.Namespace, service.Name, c.region, service.Spec.LoadBalancerIP, service.Spec.Ports)
+	glog.V(4).Infof("SERVICE: %+v\n",service)
 	return c.climgr.LoadBalancers().EnsureLoadBalanceDeleted(service)
 }
 
@@ -308,26 +308,16 @@ func (c *Cloud) InstanceExistsByProviderID(providerID string) (bool, error) {
 
 // ListRoutes lists all managed routes that belong to the specified clusterName
 func (c *Cloud) ListRoutes(clusterName string) ([]*cloudprovider.Route, error) {
-	routes := []*cloudprovider.Route{}
-	for k, v := range c.climgr.Instances().Regions() {
-		r, err := c.climgr.Routes().ListRoutes(common.Region(k), v)
-		if err != nil {
-			glog.Errorf("Alicloud.ListRoutes(): error list routes, message=[%s]\n", err.Error())
-			return nil, err
-		}
-		routes = append(routes, r...)
+	glog.V(2).Infof("alicloud: ListRoutes \n")
+	vpcid,err := c.climgr.MetaData().VpcID()
+	if err != nil {
+		return nil, errors.New("alicloud: can not determin vpcid while list routes")
 	}
-	//for k,v := range routes{
-	//	ins, err := c.ins.findInstanceByNode(types.NodeName(v.Name))
-	//	if err != nil {
-	//		glog.Warningf("Alicloud.ListRoutes(%s): cant find instanceid [%s].\n",v.Name,err.Error())
-	//		continue
-	//	}
-	//	// Fix route name
-	//	routes[k].TargetNode=types.NodeName(strings.ToLower(ins.InstanceId))
-	//	glog.V(2).Infof("Alicloud.ListRoutes(): route[%d]=> %v",k,v)
-	//}
-	return routes, nil
+	region, err := c.climgr.MetaData().Region()
+	if err != nil {
+		return nil, errors.New("alicloud: can not determin region id while list routes")
+	}
+	return c.climgr.Routes().ListRoutes(common.Region(region), []string{vpcid})
 }
 
 // CreateRoute creates the described managed route
@@ -469,7 +459,7 @@ func (c *Cloud) HasClusterID() bool {
 //
 func (c *Cloud) fileOutNode(nodes []*v1.Node, service *v1.Service) []*v1.Node {
 
-	ar := ExtractAnnotationRequest(service)
+	ar, _ := ExtractAnnotationRequest(service)
 
 	targets := c.climgr.Instances().filterOutByLabel(
 		c.climgr.Instances().filterOutByRegion(nodes, ar.Region),

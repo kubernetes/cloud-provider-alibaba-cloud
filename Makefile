@@ -48,6 +48,9 @@ clean:
 pre-requisite:
 	@echo "Warning: Tag your branch before make. or makefile can not autodetect image tag."
 
+test:
+	go test -v github.com/AliyunContainerService/alicloud-controller-manager/cloudprovider/alicloud
+
 image: cloud-controller-manager-$(ARCH)
 	docker build -f build/Dockerfile -t $(REGISTRY):$(TAG) ./build/
 

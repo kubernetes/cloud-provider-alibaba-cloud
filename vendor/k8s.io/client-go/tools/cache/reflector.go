@@ -43,7 +43,6 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
-	"k8s.io/api/core/v1"
 )
 
 // Reflector watches a specified resource and causes all changes to be reflected in the given store.
@@ -399,9 +398,6 @@ loop:
 				}
 			case watch.Deleted:
 
-				if service, ok := event.Object.(*v1.Service); ok{
-					glog.V(4).Infof("alicloud: reflector watch of service [%+v] deleted event.\n",service)
-				}
 				// TODO: Will any consumers need access to the "last known
 				// state", which is passed in event.Object? If so, may need
 				// to change this.

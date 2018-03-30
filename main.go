@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	_ "github.com/AliyunContainerService/alicloud-controller-manager/alicloud"
+	_ "github.com/AliyunContainerService/alicloud-controller-manager/cloudprovider/alicloud"
 	"github.com/golang/glog"
 	"github.com/spf13/pflag"
 	"k8s.io/apiserver/pkg/server/healthz"

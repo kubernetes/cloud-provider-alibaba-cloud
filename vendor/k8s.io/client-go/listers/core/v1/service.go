@@ -19,11 +19,10 @@ limitations under the License.
 package v1
 
 import (
-	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/tools/cache"
-	"github.com/golang/glog"
+	"k8s.io/api/core/v1"
 )
 
 // ServiceLister helps list Services.
@@ -89,11 +88,6 @@ func (s serviceNamespaceLister) Get(name string) (*v1.Service, error) {
 		return nil, err
 	}
 	if !exists {
-		glog.V(4).Infof("alicloud: service [%s/%s] not found. dump index store\n",s.namespace,name)
-		ret, _ := s.List(labels.Everything())
-		for _, service := range ret{
-			glog.V(4).Infof("alicloud: [%+v]",*service)
-		}
 		return nil, errors.NewNotFound(v1.Resource("service"), name)
 	}
 	return obj.(*v1.Service), nil

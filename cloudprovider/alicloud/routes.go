@@ -214,13 +214,14 @@ func (r *RoutesClient) reCreateRoute(table ecs.RouteTableSetType, route *ecs.Cre
 				"CIDR=%s, NextHop=%s \n", e.RouteTableId, e.DestinationCidrBlock, e.InstanceId)
 			continue
 		}
-
-		glog.V(2).Infof("keep route entry: rtableid=%s, " +
-			"CIDR=%s, NextHop=%s \n", e.RouteTableId, e.DestinationCidrBlock, e.InstanceId)
 	}
 	if !exist {
+		glog.V(2).Infof("create route entry: rtableid=%s, " +
+			"CIDR=%s, NextHop=%s \n", route.RouteTableId, route.DestinationCidrBlock, route.NextHopId)
 		return r.client.CreateRouteEntry(route)
 	}
+	glog.V(2).Infof("route keeped unchanged: rtableid=%s, " +
+		"CIDR=%s, NextHop=%s \n", route.RouteTableId, route.DestinationCidrBlock, route.NextHopId)
 	return nil
 }
 

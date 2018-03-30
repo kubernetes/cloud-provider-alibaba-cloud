@@ -540,7 +540,6 @@ func (f *DeltaFIFO) Resync() error {
 	defer f.lock.Unlock()
 
 	keys := f.knownObjects.ListKeys()
-	glog.V(4).Infof("alicloud: fifo resync, keys=%+v\n",keys)
 	for _, k := range keys {
 		if err := f.syncKeyLocked(k); err != nil {
 			return err

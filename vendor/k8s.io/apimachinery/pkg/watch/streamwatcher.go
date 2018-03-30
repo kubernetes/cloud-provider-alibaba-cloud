@@ -24,8 +24,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/net"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	"strings"
-	"fmt"
 )
 
 // Decoder allows StreamWatcher to watch any stream for which a Decoder can be written.
@@ -114,9 +112,6 @@ func (sw *StreamWatcher) receive() {
 			return
 		}
 
-		if strings.Contains(fmt.Sprintf("%+v",obj),"Service{ObjectMeta"){
-			glog.V(4).Infof("alicloud: streamwatch watch of event type=[%s], obj=[%+v]\n",string(action),obj)
-		}
 		sw.result <- Event{
 			Type:   action,
 			Object: obj,

@@ -156,3 +156,7 @@ $ kubectl get svc
 NAME            CLUSTER-IP        EXTERNAL-IP     PORT(S)        AGE
 nginx-example   192.168.250.19    106.xx.xx.xxx   80:31205/TCP   5s
 ```
+
+## develop
+
+Test project with command ```make test```

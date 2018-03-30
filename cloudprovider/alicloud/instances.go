@@ -14,7 +14,6 @@ import (
 )
 
 type InstanceClient struct {
-	regions         map[string][]string
 	c               ClientInstanceSDK
 	lock            sync.RWMutex
 	CurrentNodeName types.NodeName
@@ -156,10 +155,6 @@ func (s *InstanceClient) findInstanceByNode(nodeName types.NodeName) (*ecs.Insta
 	return s.refreshInstance(types.NodeName(nodeid), common.Region(region))
 }
 
-func (s *InstanceClient) Regions() map[string][]string {
-	return s.regions
-}
-
 func (s *InstanceClient) refreshInstance(nodeName types.NodeName, region common.Region) (*ecs.InstanceAttributesType, error) {
 	args := ecs.DescribeInstancesArgs{
 		RegionId:    region,
@@ -179,28 +174,5 @@ func (s *InstanceClient) refreshInstance(nodeName types.NodeName, region common.
 	if len(instances) > 1 {
 		glog.Warningf("alicloud: multipul instance found by nodename=[%s], the first one will be used, instanceid=[%s]", string(nodeName), instances[0].InstanceId)
 	}
-
-	s.storeVpcid(&instances[0])
 	return &instances[0], nil
-}
-
-func (s *InstanceClient) storeVpcid(i *ecs.InstanceAttributesType) {
-	if s.regions == nil {
-		s.regions = make(map[string][]string)
-	}
-	if v, e := s.regions[string(i.RegionId)]; !e {
-		s.regions[string(i.RegionId)] = []string{i.VpcAttributes.VpcId}
-	} else {
-		found := false
-		for _, n := range v {
-			if n == i.VpcAttributes.VpcId {
-				found = true
-				break
-			}
-		}
-		if !found {
-			vpcs := s.regions[string(i.RegionId)]
-			s.regions[string(i.RegionId)] = append(vpcs, i.VpcAttributes.VpcId)
-		}
-	}
 }
