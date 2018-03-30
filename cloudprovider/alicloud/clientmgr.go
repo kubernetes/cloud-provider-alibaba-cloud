@@ -4,7 +4,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/denverdino/aliyungo/common"
 	"github.com/denverdino/aliyungo/ecs"
 	"github.com/denverdino/aliyungo/metadata"
 	"github.com/denverdino/aliyungo/slb"
@@ -40,7 +39,7 @@ type ClientMgr struct {
 	meta         *metadata.MetaData
 	routes       *RoutesClient
 	loadbalancer *LoadBalancerClient
-	instance     *InstancerClient
+	instance     *InstanceClient
 }
 
 func NewClientMgr(key, secret string) (*ClientMgr, error) {
@@ -77,7 +76,7 @@ func NewClientMgr(key, secret string) (*ClientMgr, error) {
 		stop:  make(<-chan struct{}, 1),
 		token: token,
 		meta:  m,
-		instance: &InstancerClient{
+		instance: &InstanceClient{
 			c: ecsclient,
 		},
 		loadbalancer: &LoadBalancerClient{
@@ -115,15 +114,15 @@ func NewClientMgr(key, secret string) (*ClientMgr, error) {
 	return mgr, nil
 }
 
-func (c *ClientMgr) Instances(region common.Region) *InstancerClient {
+func (c *ClientMgr) Instances() *InstanceClient {
 	return c.instance
 }
 
-func (c *ClientMgr) Routes(region common.Region) *RoutesClient {
+func (c *ClientMgr) Routes() *RoutesClient {
 	return c.routes
 }
 
-func (c *ClientMgr) LoadBalancers(region common.Region) *LoadBalancerClient {
+func (c *ClientMgr) LoadBalancers() *LoadBalancerClient {
 	return c.loadbalancer
 }
 

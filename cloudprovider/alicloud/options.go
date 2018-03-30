@@ -6,6 +6,10 @@ import (
 	"unicode"
 	"unicode/utf8"
 
+	"bytes"
+	"encoding/json"
+	"errors"
+	"fmt"
 	"github.com/denverdino/aliyungo/common"
 	"github.com/denverdino/aliyungo/slb"
 	"github.com/golang/glog"
@@ -232,6 +236,33 @@ func splitCamel(src string) (entries []string) {
 	return
 }
 
+func getProtocol(annotation string, port v1.ServicePort) (string, error) {
+
+	if annotation == "" {
+		return strings.ToLower(string(port.Protocol)), nil
+	}
+	for _, v := range strings.Split(annotation, ",") {
+		pp := strings.Split(v, ":")
+		if len(pp) < 2 {
+			return "", errors.New(fmt.Sprintf("port and "+
+				"protocol format must be like 'https:443' with colon separated. got=[%+v]", pp))
+		}
+
+		if pp[0] != "http" &&
+			pp[0] != "tcp" &&
+			pp[0] != "https" &&
+			pp[0] != "udp" {
+			return "", errors.New(fmt.Sprintf("port protocol"+
+				" format must be either [http|https|tcp|udp], protocol not supported wit [%s]\n", pp[0]))
+		}
+
+		if pp[1] == fmt.Sprintf("%d", port.Port) {
+			return pp[0], nil
+		}
+	}
+	return strings.ToLower(string(port.Protocol)), nil
+}
+
 func serviceAnnotation(service *v1.Service, annotate string) string {
 	for k, v := range service.Annotations {
 		if annotate == replaceCamel(k) {
@@ -250,4 +281,20 @@ func replaceCamel(str string) string {
 	res := splitCamel(target)
 
 	return ServiceAnnotationLoadBalancerPrefix + strings.Join(res, "-")
+}
+
+func PrettyJson(obj interface{}) string {
+	pretty := bytes.Buffer{}
+	data, err := json.Marshal(obj)
+	if err != nil {
+		glog.Errorf("PrettyJson, mashal error: %s\n", err.Error())
+		return ""
+	}
+	err = json.Indent(&pretty, data, "", "    ")
+
+	if err != nil {
+		glog.Errorf("PrettyJson, indent error: %s\n", err.Error())
+		return ""
+	}
+	return pretty.String()
 }
