@@ -261,6 +261,7 @@ func (s *ServiceController) processServiceUpdate(cachedService *cachedService, s
 		s.eventRecorder.Event(service, v1.EventTypeWarning, "CreatingLoadBalancerFailed", message)
 		return err, retryToReturn
 	}
+	cachedService.state = service
 	// Always update the cache upon success.
 	// NOTE: Since we update the cached service if and only if we successfully
 	// processed it, a cached service being nil implies that it hasn't yet
