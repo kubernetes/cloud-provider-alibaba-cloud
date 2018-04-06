@@ -77,7 +77,7 @@ func (err ErrManifestUnknownRevision) Error() string {
 type ErrManifestUnverified struct{}
 
 func (ErrManifestUnverified) Error() string {
-	return "unverified manifest"
+	return fmt.Sprintf("unverified manifest")
 }
 
 // ErrManifestVerification provides a type to collect errors encountered

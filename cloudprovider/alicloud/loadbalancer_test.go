@@ -118,7 +118,7 @@ func TestFindLoadBalancer(t *testing.T) {
 	delete(service.Annotations, ServiceAnnotationLoadBalancerId)
 	ingress := v1.LoadBalancerIngress{
 		IP:       LOADBALANCER_ADDRESS,
-		Hostname: LOADBALANCER_ID + "-ingress",
+		Hostname: loadBalancerDomain("my-service",LOADBALANCER_ID+"-ingress",string(DEFAULT_REGION)),
 	}
 	service.Status.LoadBalancer.Ingress = append(service.Status.LoadBalancer.Ingress, ingress)
 	exist, lb, err = mgr.loadbalancer.findLoadBalancer(service)

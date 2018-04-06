@@ -30,7 +30,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer/recognizer"
 	"k8s.io/apimachinery/pkg/util/framer"
 	utilyaml "k8s.io/apimachinery/pkg/util/yaml"
-	"github.com/golang/glog"
 )
 
 // NewSerializer creates a JSON serializer that handles encoding versioned objects into the proper JSON form. If typer
@@ -151,9 +150,10 @@ func (s *Serializer) Decode(originalData []byte, gvk *schema.GroupVersionKind, i
 	}
 
 	if into != nil {
+		_, isUnstructured := into.(runtime.Unstructured)
 		types, _, err := s.typer.ObjectKinds(into)
 		switch {
-		case runtime.IsNotRegisteredError(err):
+		case runtime.IsNotRegisteredError(err), isUnstructured:
 			if err := jsoniter.ConfigFastest.Unmarshal(data, into); err != nil {
 				return nil, actual, err
 			}
@@ -190,9 +190,6 @@ func (s *Serializer) Decode(originalData []byte, gvk *schema.GroupVersionKind, i
 
 	if err := jsoniter.ConfigFastest.Unmarshal(data, obj); err != nil {
 		return nil, actual, err
-	}
-	if actual.Kind == "Service" {
-		glog.V(4).Infof("alicloud: json decoder, service status watched. with raw data[%+v]\n",obj)
 	}
 	return obj, actual, nil
 }

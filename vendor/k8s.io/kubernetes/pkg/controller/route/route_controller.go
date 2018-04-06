@@ -66,8 +66,8 @@ type RouteController struct {
 }
 
 func New(routes cloudprovider.Routes, kubeClient clientset.Interface, nodeInformer coreinformers.NodeInformer, clusterName string, clusterCIDR *net.IPNet) *RouteController {
-	if kubeClient != nil && kubeClient.Core().RESTClient().GetRateLimiter() != nil {
-		metrics.RegisterMetricAndTrackRateLimiterUsage("route_controller", kubeClient.Core().RESTClient().GetRateLimiter())
+	if kubeClient != nil && kubeClient.CoreV1().RESTClient().GetRateLimiter() != nil {
+		metrics.RegisterMetricAndTrackRateLimiterUsage("route_controller", kubeClient.CoreV1().RESTClient().GetRateLimiter())
 	}
 
 	if clusterCIDR == nil {
@@ -75,6 +75,7 @@ func New(routes cloudprovider.Routes, kubeClient clientset.Interface, nodeInform
 	}
 
 	eventBroadcaster := record.NewBroadcaster()
+	eventBroadcaster.StartLogging(glog.Infof)
 	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "route_controller"})
 
 	rc := &RouteController{
@@ -102,7 +103,7 @@ func (rc *RouteController) Run(stopCh <-chan struct{}, syncPeriod time.Duration)
 	}
 
 	if rc.broadcaster != nil {
-		rc.broadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: v1core.New(rc.kubeClient.Core().RESTClient()).Events("")})
+		rc.broadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: v1core.New(rc.kubeClient.CoreV1().RESTClient()).Events("")})
 	}
 
 	// TODO: If we do just the full Resync every 5 minutes (default value)
@@ -114,7 +115,7 @@ func (rc *RouteController) Run(stopCh <-chan struct{}, syncPeriod time.Duration)
 		if err := rc.reconcileNodeRoutes(); err != nil {
 			glog.Errorf("Couldn't reconcile node routes: %v", err)
 		}
-	}, syncPeriod, wait.NeverStop)
+	}, syncPeriod, stopCh)
 
 	<-stopCh
 }
@@ -163,13 +164,7 @@ func (rc *RouteController) reconcile(nodes []*v1.Node, routes []*cloudprovider.R
 			wg.Add(1)
 			go func(nodeName types.NodeName, nameHint string, route *cloudprovider.Route) {
 				defer wg.Done()
-				backoff := wait.Backoff{
-					Duration: 1 * time.Second,
-					Factor:   2,
-					Jitter:   0,
-					Steps:    4,
-				}
-				wait.ExponentialBackoff(backoff, func() (bool, error) {
+				for i := 0; i < maxRetries; i++ {
 					startTime := time.Now()
 					// Ensure that we don't have more than maxConcurrentRouteCreations
 					// CreateRoute calls in flight.
@@ -194,10 +189,9 @@ func (rc *RouteController) reconcile(nodes []*v1.Node, routes []*cloudprovider.R
 
 					} else {
 						glog.Infof("Created route for node %s %s with hint %s after %v", nodeName, route.DestinationCIDR, nameHint, time.Now().Sub(startTime))
-						return true, nil
+						return
 					}
-					return false, err
-				})
+				}
 			}(nodeName, nameHint, route)
 		} else {
 			// Update condition only if it doesn't reflect the current state.
@@ -261,7 +255,7 @@ func (rc *RouteController) updateNetworkingCondition(nodeName types.NodeName, ro
 			glog.Errorf("Error updating node %s: %v", nodeName, err)
 			return err
 		}
-		glog.Errorf("Error updating node %s, retrying: %v", nodeName, err)
+		glog.V(4).Infof("Error updating node %s, retrying: %v", nodeName, err)
 	}
 	glog.Errorf("Error updating node %s: %v", nodeName, err)
 	return err

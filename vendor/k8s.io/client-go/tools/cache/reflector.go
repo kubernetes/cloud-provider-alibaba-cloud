@@ -109,7 +109,7 @@ func NewNamedReflector(name string, lw ListerWatcher, expectedType interface{}, 
 	r := &Reflector{
 		name: name,
 		// we need this to be unique per process (some names are still the same)but obvious who it belongs to
-		metrics:       newReflectorMetrics(makeValidPromethusMetricName(fmt.Sprintf("reflector_"+name+"_%d", reflectorSuffix))),
+		metrics:       newReflectorMetrics(makeValidPromethusMetricLabel(fmt.Sprintf("reflector_"+name+"_%d", reflectorSuffix))),
 		listerWatcher: lw,
 		store:         store,
 		expectedType:  reflect.TypeOf(expectedType),
@@ -120,9 +120,9 @@ func NewNamedReflector(name string, lw ListerWatcher, expectedType interface{}, 
 	return r
 }
 
-func makeValidPromethusMetricName(in string) string {
+func makeValidPromethusMetricLabel(in string) string {
 	// this isn't perfect, but it removes our common characters
-	return strings.NewReplacer("/", "_", ".", "_", "-", "_").Replace(in)
+	return strings.NewReplacer("/", "_", ".", "_", "-", "_", ":", "_").Replace(in)
 }
 
 // internalPackages are packages that ignored when creating a default reflector name. These packages are in the common
@@ -295,6 +295,13 @@ func (r *Reflector) ListAndWatch(stopCh <-chan struct{}) error {
 	}()
 
 	for {
+		// give the stopCh a chance to stop the loop, even in case of continue statements further down on errors
+		select {
+		case <-stopCh:
+			return nil
+		default:
+		}
+
 		timemoutseconds := int64(minWatchTimeout.Seconds() * (rand.Float64() + 1.0))
 		options = metav1.ListOptions{
 			ResourceVersion: resourceVersion,
@@ -397,7 +404,6 @@ loop:
 					utilruntime.HandleError(fmt.Errorf("%s: unable to update watch event object (%#v) to store: %v", r.name, event.Object, err))
 				}
 			case watch.Deleted:
-
 				// TODO: Will any consumers need access to the "last known
 				// state", which is passed in event.Object? If so, may need
 				// to change this.

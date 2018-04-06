@@ -111,7 +111,6 @@ func (sw *StreamWatcher) receive() {
 			}
 			return
 		}
-
 		sw.result <- Event{
 			Type:   action,
 			Object: obj,

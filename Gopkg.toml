@@ -20,11 +20,6 @@
 #  name = "github.com/x/y"
 #  version = "2.4.0"
 
-
-[[constraint]]
-  branch = "master"
-  name = "github.com/AliyunContainerService/alicloud-controller-manager"
-
 [[constraint]]
   branch = "master"
   name = "github.com/denverdino/aliyungo"
@@ -38,21 +33,37 @@
   version = "1.0.0"
 
 [[constraint]]
-  branch = "release-1.8"
+  branch = "release-1.9"
   name = "k8s.io/api"
 
+#[[constraint]]
+#  branch = "release-1.9"
+#  name = "k8s.io/apiextensions-apiserver"
+
 [[constraint]]
-  branch = "release-1.8"
+  branch = "release-1.9"
   name = "k8s.io/apimachinery"
 
 [[constraint]]
-  branch = "release-1.8"
+  branch = "release-1.9"
   name = "k8s.io/apiserver"
 
 [[constraint]]
   name = "k8s.io/kubernetes"
-  version = "v1.8.1"
+  branch = "release-1.9"
 
 [[override]]
   name = "github.com/patrickmn/go-cache"
   branch = "master"
+
+[[override]]
+  branch = "release-6.0"
+  name = "k8s.io/client-go"
+
+[[override]]
+  revision = "545102ea07aa9796f189d82f606b7c27d7aa3ed3"
+  name = "github.com/docker/distribution"
+
+[prune]
+  unused-packages = true
+  go-tests = true
