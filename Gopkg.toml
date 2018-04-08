@@ -64,6 +64,3 @@
   revision = "545102ea07aa9796f189d82f606b7c27d7aa3ed3"
   name = "github.com/docker/distribution"
 
-[prune]
-  unused-packages = true
-  go-tests = true
