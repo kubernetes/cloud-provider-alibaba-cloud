@@ -312,7 +312,7 @@
     "idna",
     "lex/httplex"
   ]
-  revision = "b3c676e531a6dc479fa1b35ac961c13f5e2b4d2e"
+  revision = "61147c48b25b599e5b561d2e9c4f3e1ef489ca41"
 
 [[projects]]
   branch = "master"
@@ -321,7 +321,7 @@
     "unix",
     "windows"
   ]
-  revision = "1d206c9fa8975fb4cf00df1dc8bf3283dc24ba0e"
+  revision = "3b87a42e500a6dc65dae1a55d0b641295971163e"
 
 [[projects]]
   name = "golang.org/x/text"
@@ -396,7 +396,7 @@
   branch = "master"
   name = "k8s.io/apiextensions-apiserver"
   packages = ["pkg/features"]
-  revision = "76b8134f2082ae81f4989c709be17587745ef0c0"
+  revision = "e83de7d4f1e07494ca918e150a1325bae7db0c54"
 
 [[projects]]
   branch = "release-1.9"
@@ -656,7 +656,7 @@
     "plugin/pkg/scheduler/schedulercache",
     "plugin/pkg/scheduler/util"
   ]
-  revision = "d498b2753217b3655ec58b614d3bf63e7bf12aac"
+  revision = "a24e4610c57f69125ff7c07c8ed4087b0876a5b0"
 
 [solve-meta]
   analyzer-name = "dep"

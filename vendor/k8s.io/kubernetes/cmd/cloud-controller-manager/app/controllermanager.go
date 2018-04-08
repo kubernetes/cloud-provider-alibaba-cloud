@@ -225,6 +225,7 @@ func StartControllers(s *options.CloudControllerManagerServer, kubeconfig *restc
 		client("service-controller"),
 		sharedInformers.Core().V1().Services(),
 		sharedInformers.Core().V1().Nodes(),
+		sharedInformers.Core().V1().Endpoints(),
 		s.ClusterName,
 	)
 	if err != nil {
