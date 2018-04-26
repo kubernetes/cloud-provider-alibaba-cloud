@@ -41,7 +41,8 @@ const (
 
 	MAX_LOADBALANCER_BACKEND = 20
 )
-
+// defaulted is the parameters which set by programe.
+// request represent user defined parameters.
 func ExtractAnnotationRequest(service *v1.Service) (*AnnotationRequest, *AnnotationRequest ) {
 	defaulted, request := &AnnotationRequest{}, &AnnotationRequest{}
 	annotation := make(map[string]string)

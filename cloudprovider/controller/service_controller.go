@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package controller
+package service
 
 
 import (
@@ -165,7 +165,7 @@ clusterName string,
 			UpdateFunc: func(obja,objb interface{}){
 				node1,ok1 := obja.(*v1.Node)
 				node2,ok2 := objb.(*v1.Node)
-				if ok1 && ok2 && !nodeLabelsEqual(node1, node2) {
+				if ok1 && ok2 && !nodeLabelsEqual([]*v1.Node{node1}, []*v1.Node{node2}) {
 					s.syncNodes(node1)
 				}
 			},
@@ -175,7 +175,14 @@ clusterName string,
 	)
 	serviceInformer.Informer().AddEventHandlerWithResyncPeriod(
 		cache.ResourceEventHandlerFuncs{
-			AddFunc: s.enqueueService,
+			AddFunc: func(cur interface{}) {
+				if !needLoadBalancer(cur.(*v1.Service)) {
+					key, _ := controller.KeyFunc(cur)
+					glog.Infof("do not need loadbalancer ,skip. %s\n",key)
+					return
+				}
+				s.enqueueService(cur)
+			},
 			UpdateFunc: func(old, cur interface{}) {
 				oldSvc, ok1 := old.(*v1.Service)
 				curSvc, ok2 := cur.(*v1.Service)
@@ -197,8 +204,10 @@ clusterName string,
 }
 
 func (s *ServiceController) syncNodes(obj interface{}) {
+	glog.V(2).Infof("syncNodes: enqueue nodes\n")
 	errs := s.cache.lockedEach(
 		func(svc *cachedService) error {
+			glog.V(2).Infof("syncNodes: process cachedService, %+v\n",svc)
 			if ! needLoadBalancer(svc.state) {
 				glog.V(6).Infof("syncNodes: service [%s] does not need loadbalancer , skip.\n",svc.state.Name)
 				return nil
@@ -207,7 +216,7 @@ func (s *ServiceController) syncNodes(obj interface{}) {
 			return nil
 		},
 	)
-	if errs != nil {
+	if len(errs) > 0 {
 		glog.Errorf("sync nodes queue error, %d service backend queued. %s\n" ,len(s.cache.serviceMap)-len(errs), errorutils.NewAggregate(errs).Error())
 	}
 }
@@ -222,7 +231,14 @@ func (s *ServiceController) syncEnpoints(obj interface{}) {
 	if err != nil || !exist {
 		return
 	}
-	s.enqueueServiceForNodes(svc.(*cachedService).state)
+	service := svc.(*cachedService).state
+	if ! needLoadBalancer(service) {
+		// we are safe here to skip process syncEnpoint.
+		glog.V(6).Infof("syncNodes: service [%s] does not need loadbalancer , skip.\n",service.Name)
+		return
+	}
+	glog.V(2).Infof("syncEndpoint: enqueue svc %+v\n",svc)
+	s.enqueueServiceForNodes(service)
 }
 
 // obj could be an *v1.Service, or a DeletionFinalStateUnknown marker item.
@@ -232,6 +248,7 @@ func (s *ServiceController) enqueueService(obj interface{}) {
 		glog.Errorf("Couldn't get key for object %#v: %v", obj, err)
 		return
 	}
+	glog.Infof("working queue add service %s\n",key)
 	s.workingQueue.Add(key)
 }
 
@@ -264,10 +281,9 @@ func (s *ServiceController) Run(stopCh <-chan struct{}, workers int) {
 	glog.Info("Starting service controller")
 	defer glog.Info("Shutting down service controller")
 
-	if !controller.WaitForCacheSync("service", stopCh, s.serviceListerSynced, s.nodeListerSynced,s.epListerSynced) {
+	if !controller.WaitForCacheSync("service", stopCh, s.serviceListerSynced, s.nodeListerSynced) {
 		return
 	}
-
 	for i := 0; i < workers; i++ {
 		go wait.Until(s.worker, time.Second, stopCh)
 		go wait.Until(s.nodesWorker, time.Second, stopCh)
@@ -308,7 +324,8 @@ func (s *ServiceController) nodesWorker() {
 				return
 			}
 			cached := obj.(*cachedService)
-			err := s.syncBackend(cached)
+			err = s.syncBackend(cached)
+
 			if err != nil {
 				glog.Errorf("Error syncing backend: %v", err)
 			}
@@ -344,7 +361,7 @@ func (s *ServiceController) processServiceUpdate(cachedService *cachedService, s
 	}
 	// cache the service, we need the info for service deletion
 	cachedService.state = service
-	err, retry := s.createLoadBalancerIfNeeded(key, service)
+	err, retry := s.createLoadBalancerIfNeeded(key, service,cachedService)
 	if err != nil {
 		message := "Error creating load balancer"
 		var retryToReturn time.Duration
@@ -357,10 +374,9 @@ func (s *ServiceController) processServiceUpdate(cachedService *cachedService, s
 		}
 		message += err.Error()
 		s.eventRecorder.Event(service, v1.EventTypeWarning, "CreatingLoadBalancerFailed", message)
+		glog.V(5).Infof("next retry delay is %d\n",retryToReturn)
 		return err, retryToReturn
 	}
-	// reset state in case to persist service change by createLoadBalancerIfNeeded.
-	cachedService.state = service
 	// Always update the cache upon success.
 	// NOTE: Since we update the cached service if and only if we successfully
 	// processed it, a cached service being nil implies that it hasn't yet
@@ -373,7 +389,7 @@ func (s *ServiceController) processServiceUpdate(cachedService *cachedService, s
 
 // Returns whatever error occurred along with a boolean indicator of whether it
 // should be retried.
-func (s *ServiceController) createLoadBalancerIfNeeded(key string, service *v1.Service) (error, bool) {
+func (s *ServiceController) createLoadBalancerIfNeeded(key string, service *v1.Service,cachedService *cachedService) (error, bool) {
 	// Note: It is safe to just call EnsureLoadBalancer.  But, on some clouds that requires a delete & create,
 	// which may involve service interruption.  Also, we would like user-friendly events.
 
@@ -403,7 +419,7 @@ func (s *ServiceController) createLoadBalancerIfNeeded(key string, service *v1.S
 		// TODO: We could do a dry-run here if wanted to avoid the spurious cloud-calls & events when we restart
 
 		s.eventRecorder.Event(service, v1.EventTypeNormal, "EnsuringLoadBalancer", "Ensuring load balancer")
-		newState, err = s.ensureLoadBalancer(service)
+		newState, err = s.ensureLoadBalancer(service, cachedService)
 		if err != nil {
 			return fmt.Errorf("failed to ensure load balancer for service %s: %v", key, err), retryable
 		}
@@ -422,6 +438,8 @@ func (s *ServiceController) createLoadBalancerIfNeeded(key string, service *v1.S
 		if err := s.persistUpdate(service); err != nil {
 			return fmt.Errorf("failed to persist updated status to apiserver, even after retries. Giving up: %v", err), notRetryable
 		}
+		// reset state in case to persist service change by createLoadBalancerIfNeeded.
+		cachedService.state = service
 	} else {
 		glog.V(2).Infof("Not persisting unchanged LoadBalancerStatus for service %s to registry.", key)
 	}
@@ -457,7 +475,7 @@ func (s *ServiceController) persistUpdate(service *v1.Service) error {
 	return err
 }
 
-func (s *ServiceController) ensureLoadBalancer(service *v1.Service) (*v1.LoadBalancerStatus, error) {
+func (s *ServiceController) ensureLoadBalancer(service *v1.Service,cachedService *cachedService) (*v1.LoadBalancerStatus, error) {
 	predicate, err := s.getNodeConditionPredicate(service)
 	if err != nil {
 		return nil, err
@@ -475,11 +493,20 @@ func (s *ServiceController) ensureLoadBalancer(service *v1.Service) (*v1.LoadBal
 	// - Only one protocol supported per service
 	// - Not all cloud providers support all protocols and the next step is expected to return
 	//   an error for unsupported protocols
-	return s.balancer.EnsureLoadBalancer(s.clusterName, service, nodes)
+	status, err := s.balancer.EnsureLoadBalancer(s.clusterName, service, nodes)
+	if err != nil {
+		return nil, err
+	}
+	cachedService.backend = nodes
+	return status, nil
 }
 
 func (s *ServiceController) syncBackend(service *cachedService) (error) {
-
+	key, err := controller.KeyFunc(service.state)
+	if err != nil {
+		glog.Warningf("can not obtain service key ,%s\n",service.state.Name)
+	}
+	glog.V(4).Infof("start sync backend for service [%s].\n",key)
 	predicate, err := s.getNodeConditionPredicate(service.state)
 	if err != nil {
 		return err
@@ -488,14 +515,17 @@ func (s *ServiceController) syncBackend(service *cachedService) (error) {
 	if err != nil {
 		return err
 	}
-
 	// If there are no available nodes for LoadBalancer service, make a EventTypeWarning event for it.
 	if len(nodes) == 0 {
-		s.eventRecorder.Eventf(service.state, v1.EventTypeWarning, "UnAvailableLoadBalancer", "There are no available nodes for LoadBalancer service %s/%s", service.Namespace, service.Name)
+		s.eventRecorder.Eventf(service.state, v1.EventTypeWarning, "UnAvailableLoadBalancer", "There are no available nodes for LoadBalancer service %s/%s", service.state.Namespace, service.state.Name)
 	}
-	if !needUpdateBackend(service.backend, nodes) {
-		return nil
-	}
+
+	// here we should not check for the neediness of updating loadbalancer.
+	// Because, the provider may need to filter by label again.
+	//if !needUpdateBackend(service.backend, nodes) {
+	//	return nil
+	//}
+
 	// - Only one protocol supported per service
 	// - Not all cloud providers support all protocols and the next step is expected to return
 	//   an error for unsupported protocols
@@ -503,6 +533,7 @@ func (s *ServiceController) syncBackend(service *cachedService) (error) {
 		err != nil{
 		return err
 	}
+	glog.Infof("finish sync backend for service [%s]\n\n",key)
 	service.backend = nodes
 	return nil
 }
@@ -576,7 +607,8 @@ func (s *serviceCache) lockedEach(do func(service *cachedService) error) []error
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	errs := []error{}
-	for _, svc := range s.serviceMap {
+	for k, svc := range s.serviceMap {
+		glog.V(2).Infof("service map: k=v, %+v, %+v\n",k,svc)
 		err := do(svc)
 		if err != nil {
 			errs = append(errs, err)
@@ -815,7 +847,7 @@ func (s *ServiceController) getNodeConditionPredicate(service *v1.Service) (core
 		for _, sub := range ep.Subsets {
 			for _, add := range sub.Addresses {
 				nodes[*add.NodeName] = *add.NodeName
-				glog.V(4).Infof("alicloud: node condition predicate, should accept node [%s]\n",add.NodeName)
+				glog.V(4).Infof("alicloud: node condition predicate, external traffic policy should accept node [%s]\n",*add.NodeName)
 			}
 		}
 		return nodes, nil
@@ -957,6 +989,11 @@ func needLoadBalancer(service *v1.Service) bool {
 	return service.Spec.Type == v1.ServiceTypeLoadBalancer
 }
 
+func needLocalBackend(service *v1.Service) bool {
+	return service.Spec.ExternalTrafficPolicy ==
+		v1.ServiceExternalTrafficPolicyTypeLocal
+}
+
 func loadBalancerIPsAreEqual(oldService, newService *v1.Service) bool {
 	return oldService.Spec.LoadBalancerIP == newService.Spec.LoadBalancerIP
 }
@@ -987,7 +1024,7 @@ func (s *ServiceController) syncService(key string) error {
 	var cachedService *cachedService
 	var retryDelay time.Duration
 	defer func() {
-		glog.V(4).Infof("Finished syncing service %q (%v)", key, time.Now().Sub(startTime))
+		glog.V(4).Infof("Finished syncing service %q (%v)\n\n", key, time.Now().Sub(startTime))
 	}()
 
 	namespace, name, err := cache.SplitMetaNamespaceKey(key)
@@ -1001,20 +1038,15 @@ func (s *ServiceController) syncService(key string) error {
 	case errors.IsNotFound(err):
 		// service absence in store means watcher caught the deletion, ensure LB info is cleaned
 		glog.Infof("Service has been deleted %v", key)
-		s.cache.locked(func() error{
-			err, retryDelay = s.processServiceDeletion(key)
-			return err
-		})
+		err, retryDelay = s.processServiceDeletion(key)
+		return err
 	case err != nil:
 		glog.Infof("Unable to retrieve service %v from store: %v", key, err)
 		s.workingQueue.Add(key)
 		return err
 	default:
-		s.cache.locked(func() error{
-			cachedService = s.cache.getOrCreate(key)
-			err, retryDelay = s.processServiceUpdate(cachedService, service, key)
-			return err
-		})
+		cachedService = s.cache.getOrCreate(key)
+		err, retryDelay = s.processServiceUpdate(cachedService, service, key)
 	}
 
 	if retryDelay != 0 {

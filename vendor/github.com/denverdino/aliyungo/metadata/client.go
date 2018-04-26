@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"io/ioutil"
 	"net"
 	"net/http"
@@ -318,7 +319,11 @@ func (vpc *MetaDataRequest) Url() (string, error) {
 	if vpc.resource == "" {
 		return "", errors.New("the resource you want to visit must not be nil!")
 	}
-	r := fmt.Sprintf("%s/%s/%s/%s", ENDPOINT, vpc.version, vpc.resourceType, vpc.resource)
+	endpoint := os.Getenv("METADATA_ENDPOINT")
+	if endpoint == "" {
+		endpoint = ENDPOINT
+	}
+ 	r := fmt.Sprintf("%s/%s/%s/%s", endpoint, vpc.version, vpc.resourceType, vpc.resource)
 	if vpc.subResource == "" {
 		return r, nil
 	}

@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	f "flag"
 
 	_ "github.com/AliyunContainerService/alicloud-controller-manager/cloudprovider/alicloud"
 	"github.com/spf13/pflag"
@@ -22,13 +23,14 @@ func init() {
 }
 
 func main() {
+	f.CommandLine.Parse([]string{})
+
 	s := options.NewCloudControllerManagerServer()
 	s.AddFlags(pflag.CommandLine)
 
 	flag.InitFlags()
 	logs.InitLogs()
 	defer logs.FlushLogs()
-
 	verflag.PrintAndExitIfRequested()
 
 	//cloud, err := cloudprovider.InitCloudProvider("alicloud", s.CloudConfigFile)
@@ -39,6 +41,5 @@ func main() {
 	if err := app.Run(s); err != nil {
 		fmt.Fprintf(os.Stderr, "%v\n", err)
 		os.Exit(1)
-
 	}
 }

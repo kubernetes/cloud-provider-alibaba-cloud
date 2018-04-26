@@ -70,9 +70,8 @@ func (s *LoadBalancerClient) findLoadBalancer(service *v1.Service) (bool, *slb.L
 	def,_ := ExtractAnnotationRequest(service)
 
 	loadbalancer := service.Status.LoadBalancer
-	glog.V(2).Infof("alicloud: find loadbalancer, [%v]\n [%v]\n",loadbalancer,def)
+	glog.V(4).Infof("alicloud: find loadbalancer [%v] with user defined annotations [%v]\n",loadbalancer,def)
 	if len(loadbalancer.Ingress) > 0 {
-		glog.V(2).Infof(fromLoadBalancerStatus(service))
 		if lbid := fromLoadBalancerStatus(service); lbid != "" {
 			if def.Loadbalancerid != "" && def.Loadbalancerid != lbid {
 				glog.Errorf("alicloud: changing loadbalancer id was not allowed after loadbalancer"+
@@ -104,7 +103,7 @@ func (s *LoadBalancerClient) findLoadBalancerByID(lbid string, region common.Reg
 			LoadBalancerId: lbid,
 		},
 	)
-	glog.V(4).Infof("alicloud: find loadbalancer with id [%s], %+v", lbid, lbs)
+	glog.V(4).Infof("alicloud: find loadbalancer with id [%s], %d found.", lbid, len(lbs))
 	if err != nil {
 		return false, nil, err
 	}
@@ -144,13 +143,13 @@ func (s *LoadBalancerClient) findLoadBalancerByName(lbn string, region common.Re
 }
 
 func (s *LoadBalancerClient) EnsureLoadBalancer(service *v1.Service, nodes []*v1.Node, vswitchid string) (*slb.LoadBalancerType, error) {
-	glog.V(4).Infof("alicloud: ensure loadbalancer with service details, %+v", service)
+	glog.V(4).Infof("alicloud: ensure loadbalancer with service details, \n%+v", PrettyJson(service))
 
 	exists, origined, err := s.findLoadBalancer(service)
 	if err != nil {
 		return nil, err
 	}
-	glog.V(2).Infof("alicloud: find loadbalancer with result, exist=%v, %+v\n", exists, origined)
+	glog.V(4).Infof("alicloud: find loadbalancer with result, exist=%v\n %s\n", exists, PrettyJson(origined))
 
 	// this is a workaround for issue: https://github.com/kubernetes/kubernetes/issues/59084
 	if !exists {
@@ -210,7 +209,8 @@ func (s *LoadBalancerClient) EnsureLoadBalancer(service *v1.Service, nodes []*v1
 		return nil, err
 	}
 	// we should apply listener update only if user does not assign loadbalancer id by themselves.
-	if ! isUserDefinedLoadBalancer(service) {
+	if ! isUserDefinedLoadBalancer(service, request) {
+		glog.V(5).Infof("alicloud: not user defined loadbalancer, start to apply listener.")
 		err = NewListenerManager(s.c, service, origined).ApplyUpdate()
 		if err != nil {
 			return nil, err
@@ -274,9 +274,9 @@ func (s *LoadBalancerClient) EnsureLoadBalanceDeleted(service *v1.Service) error
 		glog.Warningf("alicloud: failed to save " +
 			"deleted service resourceVersion, [%s] due to [%s] ", service.Name, err.Error())
 	}
-
+	_, request := ExtractAnnotationRequest(service)
 	// skip delete user defined loadbalancer
-	if isUserDefinedLoadBalancer(service) {
+	if isUserDefinedLoadBalancer(service,request) {
 		glog.V(2).Infof("alicloud: user created loadbalancer " +
 			"will not be deleted by cloudprovider. service [%s]", service.Name)
 		return nil
@@ -336,6 +336,7 @@ func (s *LoadBalancerClient) UpdateBackendServers(nodes []*v1.Node, lb *slb.Load
 		}
 	}
 	if len(additions) > 0 {
+		glog.V(5).Infof("alicloud: add loadbalancer backend for [%s] \n %s\n",lb.LoadBalancerId, PrettyJson(additions))
 		_, err := s.c.AddBackendServers(lb.LoadBalancerId, additions)
 		if err != nil {
 			return err
@@ -362,6 +363,7 @@ func (s *LoadBalancerClient) UpdateBackendServers(nodes []*v1.Node, lb *slb.Load
 		}
 	}
 	if len(deletions) > 0 {
+		glog.V(5).Infof("alicloud: delete loadbalancer backend for [%s] %v\n",lb.LoadBalancerId, deletions)
 		if _, err := s.c.RemoveBackendServers(lb.LoadBalancerId, deletions); err != nil {
 			return err
 		}
@@ -376,13 +378,26 @@ func (s *LoadBalancerClient) UpdateBackendServers(nodes []*v1.Node, lb *slb.Load
 func domain(service *v1.Service, lb *slb.LoadBalancerType) (string) {
 	_, request := ExtractAnnotationRequest(service)
 
-	if service.Status.LoadBalancer.Ingress == nil ||
-		len(service.Status.LoadBalancer.Ingress) == 0 {
-
+	hostname := func ()string {
 		if request.Loadbalancerid != "" {
 			return loadBalancerDomain(service.Name,lb.LoadBalancerId, string(DEFAULT_REGION))
 		}
 		return loadBalancerDomain("",lb.LoadBalancerId, string(DEFAULT_REGION))
+	}
+	if service.Status.LoadBalancer.Ingress == nil ||
+		len(service.Status.LoadBalancer.Ingress) == 0 {
+
+		return hostname()
+	}else {
+		ingress := service.Status.LoadBalancer.Ingress[0]
+		if ingress.IP == "" {
+			// This is not expected scenario. we just keep ingress status unchanged.
+			return ingress.Hostname
+		}
+		if ingress.Hostname == "" {
+			// That is the case we should fix. Just to ensure hostname is eventually set.
+			return hostname()
+		}
 	}
 	return service.Status.LoadBalancer.Ingress[0].Hostname
 
@@ -400,15 +415,18 @@ func loadBalancerDomain(name, id, region string) string {
 	}
 	return strings.Join(domain, ".")
 }
+// isUserDefinedLoadBalancer
+// 1. has ingress hostname length equal to 5.
+// 2. with id annotation
+func isUserDefinedLoadBalancer(service *v1.Service, request * AnnotationRequest) bool {
 
-func isUserDefinedLoadBalancer(service *v1.Service) bool {
 	ing := service.Status.LoadBalancer.Ingress
 	if ing == nil || len(ing) <= 0 {
-		return false
+		return request.Loadbalancerid != ""
 	}
 	domain := ing[0].Hostname
 	if domain == "" {
-		return false
+		return request.Loadbalancerid != ""
 	}
 	if len(strings.Split(domain, ".")) != 5 {
 		return false

@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 
 	"github.com/denverdino/aliyungo/common"
 	"github.com/denverdino/aliyungo/slb"
@@ -78,6 +79,11 @@ func init() {
 				}
 				keysecret = string(secret)
 				glog.V(2).Infof("Alicloud: Accesskey=%s, AccessKeySecrete=%s", cfg.Global.AccessKeyID, cfg.Global.AccessKeySecret)
+			}
+			if keyid == "" || keysecret == "" {
+				glog.V(2).Infof("cloud config does not have keyid and keysecret . try enviroment ACCESS_KEY_ID ACCESS_KEY_SECRET")
+				keyid     = os.Getenv("ACCESS_KEY_ID")
+				keysecret = os.Getenv("ACCESS_KEY_SECRET")
 			}
 			mgr, err := NewClientMgr(keyid, keysecret)
 			if err != nil {
@@ -226,7 +232,7 @@ func (c *Cloud) NodeAddresses(name types.NodeName) ([]v1.NodeAddress, error) {
 // This method will not be called from the node that is requesting this ID. i.e. metadata service
 // and other local methods cannot be used here
 func (c *Cloud) InstanceTypeByProviderID(providerID string) (string, error) {
-	glog.V(2).Infof("Alicloud.InstanceTypeByProviderID(\"%s\")", providerID)
+	glog.V(5).Infof("Alicloud.InstanceTypeByProviderID(\"%s\")", providerID)
 	ins, err := c.climgr.Instances().findInstanceByNode(types.NodeName(providerID))
 	if err == nil {
 		return ins.InstanceType, nil
@@ -238,14 +244,14 @@ func (c *Cloud) InstanceTypeByProviderID(providerID string) (string, error) {
 // This method will not be called from the node that is requesting this ID. i.e. metadata service
 // and other local methods cannot be used here
 func (c *Cloud) NodeAddressesByProviderID(providerID string) ([]v1.NodeAddress, error) {
-	glog.V(2).Infof("Alicloud.NodeAddressesByProviderID(\"%s\")", providerID)
+	glog.V(5).Infof("Alicloud.NodeAddressesByProviderID(\"%s\")", providerID)
 	return c.climgr.Instances().findAddress(types.NodeName(providerID))
 }
 
 // ExternalID returns the cloud provider ID of the node with the specified NodeName.
 // Note that if the instance does not exist or is no longer running, we must return ("", cloudprovider.InstanceNotFound)
 func (c *Cloud) ExternalID(nodeName types.NodeName) (string, error) {
-	glog.V(2).Infof("Alicloud.ExternalID(\"%s\")", string(nodeName))
+	glog.V(5).Infof("Alicloud.ExternalID(\"%s\")", string(nodeName))
 	instance, err := c.climgr.Instances().findInstanceByNode(nodeName)
 	if err != nil {
 		return "", err
@@ -255,7 +261,7 @@ func (c *Cloud) ExternalID(nodeName types.NodeName) (string, error) {
 
 // InstanceID returns the cloud provider ID of the node with the specified NodeName.
 func (c *Cloud) InstanceID(nodeName types.NodeName) (string, error) {
-	glog.V(2).Infof("Alicloud.InstanceID(\"%s\")", string(nodeName))
+	glog.V(5).Infof("Alicloud.InstanceID(\"%s\")", string(nodeName))
 	instance, err := c.climgr.Instances().findInstanceByNode(nodeName)
 	if err != nil {
 		return "", err
@@ -265,7 +271,7 @@ func (c *Cloud) InstanceID(nodeName types.NodeName) (string, error) {
 
 // InstanceType returns the type of the specified instance.
 func (c *Cloud) InstanceType(name types.NodeName) (string, error) {
-	glog.V(2).Infof("Alicloud.InstanceType(\"%s\")", string(name))
+	glog.V(5).Infof("Alicloud.InstanceType(\"%s\")", string(name))
 	instance, err := c.climgr.Instances().findInstanceByNode(name)
 	if err != nil {
 		return "", err
@@ -308,7 +314,7 @@ func (c *Cloud) InstanceExistsByProviderID(providerID string) (bool, error) {
 
 // ListRoutes lists all managed routes that belong to the specified clusterName
 func (c *Cloud) ListRoutes(clusterName string) ([]*cloudprovider.Route, error) {
-	glog.V(2).Infof("alicloud: ListRoutes \n")
+	glog.V(5).Infof("alicloud: ListRoutes \n")
 	vpcid,err := c.climgr.MetaData().VpcID()
 	if err != nil {
 		return nil, errors.New("alicloud: can not determin vpcid while list routes")

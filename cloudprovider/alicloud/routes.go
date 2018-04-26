@@ -80,6 +80,7 @@ func (r *RoutesClient) findRouter(region common.Region, vpcid string) (*ecs.VRou
 }
 
 func (r *RoutesClient) findRouteTables(region common.Region, vpcid string) ([]ecs.RouteTableSetType, *common.PaginationResult, error) {
+
 	route, err := r.findRouter(region, vpcid)
 	if err != nil {
 		return nil, nil, err
