@@ -26,14 +26,13 @@ type ClientInstanceSDK interface {
 // filterOutByRegion Used for multi-region or multi-vpc. works for single region or vpc too.
 // SLB only support Backends within the same vpc in the same region. so we need to remove the other backends which not in
 // the same region vpc with teh SLB. Keep the most backends
-func (s *InstanceClient) filterOutByRegion(nodes []*v1.Node, region common.Region) []*v1.Node {
+func (s *InstanceClient) filterOutByRegion(nodes []*v1.Node, region common.Region) ([]*v1.Node,error) {
 	result := []*v1.Node{}
 	mvpc := make(map[string]int)
 	for _, node := range nodes {
 		v, err := s.findInstanceByNode(types.NodeName(node.Name))
 		if err != nil {
-			glog.Errorf("alicloud: error execute c.ins.doFindInstance(). message=[%s]\n", err.Error())
-			continue
+			return []*v1.Node{}, err
 		}
 		if v != nil {
 			mvpc[v.VpcAttributes.VpcId] = mvpc[v.VpcAttributes.VpcId] + 1
@@ -46,35 +45,39 @@ func (s *InstanceClient) filterOutByRegion(nodes []*v1.Node, region common.Regio
 			key = k
 		}
 	}
+	records := []string{}
 	for _, node := range nodes {
 		v, err := s.findInstanceByNode(types.NodeName(node.Name))
 		if err != nil {
-			glog.Errorf("alicloud: error execute findInstanceByNode(). message=[%s]\n", err.Error())
-			continue
+			glog.Errorf("alicloud: error find instance by node, retrieve nodes [%s]\n", err.Error())
+			return []*v1.Node{}, err
 		}
 		if v != nil && v.VpcAttributes.VpcId == key {
 			result = append(result, node)
-			glog.V(2).Infof("alicloud: accept node=%v\n", node.Name)
+			records = append(records, node.Name)
 		}
 	}
-	return result
+	glog.V(4).Infof("alicloud: accept nodes by region id=[%v], records=%v\n",region, records)
+	return result,nil
 }
 
-func (s *InstanceClient) filterOutByLabel(nodes []*v1.Node, labels string) []*v1.Node {
+func (s *InstanceClient) filterOutByLabel(nodes []*v1.Node, labels string) ([]*v1.Node, error) {
 	if labels == "" {
 		// skip filter when label is empty
-		glog.V(2).Infof("alicloud: slb backend server label doesnot specified, skip filter nodes by label.")
-		return nodes
+		glog.V(2).Infof("alicloud: slb backend server label does not specified, skip filter nodes by label.")
+		return nodes, nil
 	}
-	result := []*v1.Node{}
-	lbl := strings.Split(labels, ",")
+	result  := []*v1.Node{}
+	lbl     := strings.Split(labels, ",")
+	records := []string{}
 	for _, node := range nodes {
 		found := true
 		for _, v := range lbl {
 			l := strings.Split(v, "=")
 			if len(l) < 2 {
-				glog.Errorf("alicloud: error parse backend label with value [%s], must be key value like [k=v]\n", v)
-				return []*v1.Node{}
+				msg := fmt.Sprintf("alicloud: error parse backend label with value [%s], must be key value like [k1=v1,k2=v2]\n", v)
+				glog.Errorf(msg)
+				return []*v1.Node{},errors.New(msg)
 			}
 			if nv, exist := node.Labels[l[0]]; !exist || nv != l[1] {
 				found = false
@@ -83,9 +86,11 @@ func (s *InstanceClient) filterOutByLabel(nodes []*v1.Node, labels string) []*v1
 		}
 		if found {
 			result = append(result, node)
+			records = append(records, node.Name)
 		}
 	}
-	return result
+	glog.V(4).Infof("alicloud: accept nodes by service backend labels[%s], %v\n",labels, records)
+	return result,nil
 }
 
 // we use '.' separated nodeid which looks like 'cn-hangzhou.i-v98dklsmnxkkgiiil7' to identify node

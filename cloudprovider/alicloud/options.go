@@ -8,8 +8,6 @@ import (
 
 	"bytes"
 	"encoding/json"
-	"errors"
-	"fmt"
 	"github.com/denverdino/aliyungo/common"
 	"github.com/denverdino/aliyungo/slb"
 	"github.com/golang/glog"
@@ -36,10 +34,17 @@ const (
 	ServiceAnnotationLoadBalancerHealthCheckInterval           = ServiceAnnotationLoadBalancerPrefix + "health-check-interval"
 	ServiceAnnotationLoadBalancerHealthCheckConnectTimeout     = ServiceAnnotationLoadBalancerPrefix + "health-check-connect-timeout"
 	ServiceAnnotationLoadBalancerHealthCheckTimeout            = ServiceAnnotationLoadBalancerPrefix + "health-check-timeout"
+	ServiceAnnotationLoadBalancerHealthCheckDomain             = ServiceAnnotationLoadBalancerPrefix + "health-check-domain"
 
+	ServiceAnnotationLoadBalancerSpec		           = ServiceAnnotationLoadBalancerPrefix + "spec"
+	ServiceAnnotationLoadBalancerSessionStick            	   = ServiceAnnotationLoadBalancerPrefix + "sticky-session"
+	ServiceAnnotationLoadBalancerSessionStickType		   = ServiceAnnotationLoadBalancerPrefix + "sticky-session-type"
+	ServiceAnnotationLoadBalancerCookieTimeout		   = ServiceAnnotationLoadBalancerPrefix + "cookie-timeout"
+	ServiceAnnotationLoadBalancerCookie			   = ServiceAnnotationLoadBalancerPrefix + "cookie"
+	ServiceAnnotationLoadBalancerPersistenceTimeout		   = ServiceAnnotationLoadBalancerPrefix + "persistence-timeout"
 	MagicHealthCheckConnectPort = -520
 
-	MAX_LOADBALANCER_BACKEND = 20
+	MAX_LOADBALANCER_BACKEND    = 20
 )
 // defaulted is the parameters which set by programe.
 // request represent user defined parameters.
@@ -49,157 +54,224 @@ func ExtractAnnotationRequest(service *v1.Service) (*AnnotationRequest, *Annotat
 	for k, v := range service.Annotations {
 		annotation[replaceCamel(k)] = v
 	}
-	bandwith := annotation[ServiceAnnotationLoadBalancerBandwidth]
-	if bandwith != "" {
+	bandwith,ok := annotation[ServiceAnnotationLoadBalancerBandwidth]
+	if ok {
 		if i, err := strconv.Atoi(bandwith); err == nil {
 			request.Bandwidth = i
 			defaulted.Bandwidth = i
 		} else {
-			glog.Warningf("annotation service.beta.kubernetes.io/alicloud-loadbalancer-bandwidth must be integer, but got [%s], use default number 50. message=[%s]\n",
+			glog.Warningf("annotation service.beta.kubernetes.io/alicloud-loadbalancer-bandwidth must be integer, but got [%s], default with no limit. message=[%s]\n",
 				bandwith, err.Error())
-			defaulted.Bandwidth = DEFAULT_BANDWIDTH
+			defaulted.Bandwidth = -1
 		}
-	} else {
-		defaulted.Bandwidth = DEFAULT_BANDWIDTH
+	}else {
+		defaulted.Bandwidth = -1
 	}
 
-	addtype := annotation[ServiceAnnotationLoadBalancerAddressType]
-	if addtype != "" {
-		defaulted.AddressType 	   = slb.AddressType(addtype)
-		request.AddressType = defaulted.AddressType
+	addtype,ok := annotation[ServiceAnnotationLoadBalancerAddressType]
+	if ok {
+		defaulted.AddressType = slb.AddressType(addtype)
+		request.AddressType   = defaulted.AddressType
 	} else {
 		defaulted.AddressType = slb.InternetAddressType
 	}
-	defaulted.SLBNetworkType 	= annotation[ServiceAnnotationLoadBalancerSLBNetworkType]
-	request.SLBNetworkType 	= defaulted.SLBNetworkType
 
-	chargtype := annotation[ServiceAnnotationLoadBalancerChargeType]
-	if chargtype != "" {
+	networkType,ok := annotation[ServiceAnnotationLoadBalancerSLBNetworkType]
+	if ok {
+		defaulted.SLBNetworkType = networkType
+		request.SLBNetworkType   = defaulted.SLBNetworkType
+	}
+
+	chargtype,ok := annotation[ServiceAnnotationLoadBalancerChargeType]
+	if ok {
 		defaulted.ChargeType = slb.InternetChargeType(chargtype)
 		request.ChargeType = defaulted.ChargeType
 	} else {
 		defaulted.ChargeType = slb.PayByTraffic
 	}
 
-	region := annotation[ServiceAnnotationLoadBalancerRegion]
-	if region != "" {
+	region,ok := annotation[ServiceAnnotationLoadBalancerRegion]
+	if ok {
 		defaulted.Region = common.Region(region)
 		request.Region = defaulted.Region
-	} else {
-		defaulted.Region = DEFAULT_REGION
 	}
 
-	defaulted.Loadbalancerid 	= annotation[ServiceAnnotationLoadBalancerId]
-	request.Loadbalancerid 	= defaulted.Loadbalancerid
+	lbid,ok := annotation[ServiceAnnotationLoadBalancerId]
+	if ok {
+		defaulted.Loadbalancerid = lbid
+		request.Loadbalancerid = defaulted.Loadbalancerid
+	}
 
-	defaulted.BackendLabel 	= annotation[ServiceAnnotationLoadBalancerBackendLabel]
-	request.BackendLabel 	= defaulted.BackendLabel
+	blabel,ok := annotation[ServiceAnnotationLoadBalancerBackendLabel]
+	if ok {
+		defaulted.BackendLabel = blabel
+		request.BackendLabel = defaulted.BackendLabel
+	}
 
-	defaulted.CertID 	= annotation[ServiceAnnotationLoadBalancerCertID]
-	request.CertID 	= defaulted.CertID
+	certid,ok := annotation[ServiceAnnotationLoadBalancerCertID]
+	if ok {
+		defaulted.CertID = certid
+		request.CertID = defaulted.CertID
+	}
 
-	hcFlag := annotation[ServiceAnnotationLoadBalancerHealthCheckFlag]
-	if hcFlag != "" {
+
+	hcFlag,ok := annotation[ServiceAnnotationLoadBalancerHealthCheckFlag]
+	if ok {
 		defaulted.HealthCheck = slb.FlagType(hcFlag)
 		request.HealthCheck = defaulted.HealthCheck
 	} else {
 		defaulted.HealthCheck = slb.OffFlag
 	}
 
-	hcType := annotation[ServiceAnnotationLoadBalancerHealthCheckType]
-	if hcType != "" {
+	hcType,ok := annotation[ServiceAnnotationLoadBalancerHealthCheckType]
+	if ok {
 		defaulted.HealthCheckType = slb.HealthCheckType(hcType)
 		request.HealthCheckType = defaulted.HealthCheckType
 	} else {
 		defaulted.HealthCheckType = slb.TCPHealthCheckType
 	}
 
-	hcUri := annotation[ServiceAnnotationLoadBalancerHealthCheckURI]
-	if hcUri != "" {
+	hcUri,ok := annotation[ServiceAnnotationLoadBalancerHealthCheckURI]
+	if ok {
 		defaulted.HealthCheckURI = hcUri
 		request.HealthCheckURI = defaulted.HealthCheckURI
-	} else {
-		defaulted.HealthCheckURI = "/"
 	}
 
-	healthCheckConnectPort := annotation[ServiceAnnotationLoadBalancerHealthCheckConnectPort]
-	if healthCheckConnectPort != "" {
+	healthCheckConnectPort,ok := annotation[ServiceAnnotationLoadBalancerHealthCheckConnectPort]
+	if ok {
 		port, err := strconv.Atoi(healthCheckConnectPort)
 		if err != nil {
 			glog.Warningf("annotation service.beta.kubernetes.io/alicloud-loadbalancer-health-check-connect-port must be integer, but got [%s]. message=[%s]\n",
 				healthCheckConnectPort, err.Error())
-			defaulted.HealthCheckConnectPort = MagicHealthCheckConnectPort
+			//defaulted.HealthCheckConnectPort = MagicHealthCheckConnectPort
 		} else {
 			defaulted.HealthCheckConnectPort = port
 			request.HealthCheckConnectPort = defaulted.HealthCheckConnectPort
 		}
 	}
 
-	healthCheckHealthyThreshold := annotation[ServiceAnnotationLoadBalancerHealthCheckHealthyThreshold]
-	if healthCheckHealthyThreshold != "" {
+	healthCheckHealthyThreshold,ok := annotation[ServiceAnnotationLoadBalancerHealthCheckHealthyThreshold]
+	if ok {
 		thresh, err := strconv.Atoi(healthCheckHealthyThreshold)
 		if err != nil {
 			glog.Warningf("annotation service.beta.kubernetes.io/alicloud-loadbalancer-health-check-healthy-threshold must be integer, but got [%s], use default number 3. message=[%s]\n",
 				healthCheckHealthyThreshold, err.Error())
-			defaulted.HealthyThreshold = 3
+			//defaulted.HealthyThreshold = 3
 		} else {
 			defaulted.HealthyThreshold = thresh
 			request.HealthyThreshold = defaulted.UnhealthyThreshold
 		}
 	}
 
-	healthCheckUnhealthyThreshold := annotation[ServiceAnnotationLoadBalancerHealthCheckUnhealthyThreshold]
-	if healthCheckUnhealthyThreshold != "" {
+	healthCheckUnhealthyThreshold,ok := annotation[ServiceAnnotationLoadBalancerHealthCheckUnhealthyThreshold]
+	if ok {
 		unThresh, err := strconv.Atoi(healthCheckUnhealthyThreshold)
 		if err != nil {
 			glog.Warningf("annotation service.beta.kubernetes.io/alicloud-loadbalancer-health-check-unhealthy-threshold must be integer, but got [%s], use default number 3. message=[%s]\n",
 				healthCheckUnhealthyThreshold, err.Error())
-			defaulted.UnhealthyThreshold = 3
+			//defaulted.UnhealthyThreshold = 3
 		} else {
 			defaulted.UnhealthyThreshold = unThresh
 			request.UnhealthyThreshold = defaulted.UnhealthyThreshold
 		}
 	}
 
-	healthCheckInterval := annotation[ServiceAnnotationLoadBalancerHealthCheckInterval]
-	if healthCheckInterval != "" {
+	healthCheckInterval,ok := annotation[ServiceAnnotationLoadBalancerHealthCheckInterval]
+	if ok {
 		interval, err := strconv.Atoi(healthCheckInterval)
 		if err != nil {
 			glog.Warningf("annotation service.beta.kubernetes.io/alicloud-loadbalancer-health-check-interval must be integer, but got [%s], use default number 2. message=[%s]\n",
 				healthCheckInterval, err.Error())
-			defaulted.HealthCheckInterval = 2
+			//defaulted.HealthCheckInterval = 2
 		} else {
 			defaulted.HealthCheckInterval = interval
 			request.HealthCheckInterval = defaulted.HealthCheckInterval
 		}
 	}
 
-	healthCheckConnectTimeout := annotation[ServiceAnnotationLoadBalancerHealthCheckConnectTimeout]
-	if healthCheckConnectTimeout != "" {
+	healthCheckConnectTimeout,ok := annotation[ServiceAnnotationLoadBalancerHealthCheckConnectTimeout]
+	if ok {
 		connout, err := strconv.Atoi(healthCheckConnectTimeout)
 		if err != nil {
 			glog.Warningf("annotation service.beta.kubernetes.io/alicloud-loadbalancer-health-check-connect-timeout must be integer, but got [%s], use default number 5. message=[%s]\n",
 				healthCheckConnectTimeout, err.Error())
-			defaulted.HealthCheckConnectTimeout = 5
+			//defaulted.HealthCheckConnectTimeout = 5
 		} else {
 			defaulted.HealthCheckConnectTimeout = connout
 			request.HealthCheckConnectTimeout = defaulted.HealthCheckConnectTimeout
 		}
 	}
 
-	healthCheckTimeout := annotation[ServiceAnnotationLoadBalancerHealthCheckTimeout]
-	if healthCheckTimeout != "" {
+	healthCheckTimeout,ok := annotation[ServiceAnnotationLoadBalancerHealthCheckTimeout]
+	if ok {
 		hout, err := strconv.Atoi(annotation[healthCheckTimeout])
 		if err != nil {
 			glog.Warningf("annotation service.beta.kubernetes.io/alicloud-loadbalancer-health-check-timeout must be integer, but got [%s], use default number 5. message=[%s]\n",
 				healthCheckConnectTimeout, err.Error())
-			defaulted.HealthCheckTimeout = 5
+			//defaulted.HealthCheckTimeout = 5
 		} else {
 			defaulted.HealthCheckTimeout = hout
 			request.HealthCheckTimeout = defaulted.HealthCheckTimeout
 		}
 	}
 
+	hcDomain,ok := annotation[ServiceAnnotationLoadBalancerHealthCheckDomain]
+	if ok {
+		defaulted.HealthCheckDomain = hcDomain
+		request.HealthCheckDomain = defaulted.HealthCheckDomain
+	}
+
+	loadbalancerSpec,ok := annotation[ServiceAnnotationLoadBalancerSpec]
+	if ok {
+		defaulted.LoadBalancerSpec = slb.LoadBalancerSpecType(loadbalancerSpec)
+		request.LoadBalancerSpec   = defaulted.LoadBalancerSpec
+	}
+
+	// stick session
+	stickSession,ok  := annotation[ServiceAnnotationLoadBalancerSessionStick]
+	if ok {
+		request.StickySession   = slb.FlagType(stickSession)
+		defaulted.StickySession = request.StickySession
+	}
+
+	// stick session type
+	stickSessionType,ok  := annotation[ServiceAnnotationLoadBalancerSessionStickType]
+	if ok {
+		defaulted.StickySessionType = slb.StickySessionType(stickSessionType)
+		request.StickySessionType   = defaulted.StickySessionType
+	}
+
+	persistenceTimeout,ok := annotation[ServiceAnnotationLoadBalancerPersistenceTimeout]
+
+	if ok {
+		timeout, err := strconv.Atoi(persistenceTimeout)
+		if err != nil {
+			glog.Warningf("annotation persistence timeout must be integer, but got [%s]. message=[%s]\n",
+				persistenceTimeout, err.Error())
+			//defaulted.PersistenceTimeout = 0
+		} else {
+			defaulted.PersistenceTimeout = timeout
+			request.PersistenceTimeout = defaulted.PersistenceTimeout
+		}
+	}
+	cookieTimeout,ok := annotation[ServiceAnnotationLoadBalancerCookieTimeout]
+	if ok {
+		timeout, err := strconv.Atoi(cookieTimeout)
+		if err != nil {
+			glog.Warningf("annotation persistence timeout must be integer, but got [%s]. message=[%s]\n",
+				cookieTimeout, err.Error())
+			//defaulted.CookieTimeout = 0
+		} else {
+			defaulted.CookieTimeout = timeout
+			request.CookieTimeout = defaulted.CookieTimeout
+		}
+	}
+
+	cookie, ok := annotation[ServiceAnnotationLoadBalancerCookie]
+	if ok {
+		request.Cookie   = cookie
+		defaulted.Cookie = request.Cookie
+	}
 	return defaulted, request
 }
 
@@ -249,33 +321,6 @@ func splitCamel(src string) (entries []string) {
 		}
 	}
 	return
-}
-
-func getProtocol(annotation string, port v1.ServicePort) (string, error) {
-
-	if annotation == "" {
-		return strings.ToLower(string(port.Protocol)), nil
-	}
-	for _, v := range strings.Split(annotation, ",") {
-		pp := strings.Split(v, ":")
-		if len(pp) < 2 {
-			return "", errors.New(fmt.Sprintf("port and "+
-				"protocol format must be like 'https:443' with colon separated. got=[%+v]", pp))
-		}
-
-		if pp[0] != "http" &&
-			pp[0] != "tcp" &&
-			pp[0] != "https" &&
-			pp[0] != "udp" {
-			return "", errors.New(fmt.Sprintf("port protocol"+
-				" format must be either [http|https|tcp|udp], protocol not supported wit [%s]\n", pp[0]))
-		}
-
-		if pp[1] == fmt.Sprintf("%d", port.Port) {
-			return pp[0], nil
-		}
-	}
-	return strings.ToLower(string(port.Protocol)), nil
 }
 
 func serviceAnnotation(service *v1.Service, annotate string) string {

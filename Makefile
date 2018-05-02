@@ -76,4 +76,4 @@ cloud-controller-manager-$(ARCH): pre-requisite
 		cd /go/src/github.com/AliyunContainerService/alicloud-controller-manager && \
 		CGO_ENABLED=1 make -e cloud-controller-manager && \
 		mv cloud-controller-manager build/cloud-controller-manager-$(ARCH) && \
-		file cloud-controller-manager-$(ARCH)'
+		file build/cloud-controller-manager-$(ARCH)'

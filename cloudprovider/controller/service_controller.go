@@ -81,6 +81,7 @@ type cachedService struct {
 	state 		*v1.Service
 	// Controls error back-off
 	lastRetryDelay 	time.Duration
+	lock 		sync.Mutex
 }
 
 type serviceCache struct {
@@ -147,29 +148,53 @@ clusterName string,
 	}
 	endpointsInformer.Informer().AddEventHandlerWithResyncPeriod(
 		cache.ResourceEventHandlerFuncs{
-			AddFunc: s.syncEnpoints,
+			AddFunc: func(cur interface{}) {
+				endpoint := cur.(*v1.Endpoints)
+				glog.V(5).Infof("controller: Add event, enpoints [%s/%s]\n", endpoint.Namespace, endpoint.Name)
+				s.syncEnpoints(cur)
+			},
 			UpdateFunc: func(obja,objb interface{}){
 				ep1,ok1 := obja.(*v1.Endpoints)
 				ep2,ok2 := objb.(*v1.Endpoints)
 				if ok1 && ok2 && !reflect.DeepEqual(ep1.Subsets, ep2.Subsets) {
+					glog.V(5).Infof("controller: Update event, endpoints [%s/%s]\n",ep1.Namespace, ep1.Name)
 					s.syncEnpoints(ep1)
 				}
 			},
-			DeleteFunc: s.syncEnpoints,
+			DeleteFunc: func(cur interface{}) {
+				endpoint := cur.(*v1.Endpoints)
+				glog.V(5).Infof("controller: Delete event, endpoints [%s/%s]\n", endpoint.Namespace, endpoint.Name)
+				s.syncEnpoints(cur)
+			},
 		},
 		serviceSyncPeriod,
 	)
 	nodeInformer.Informer().AddEventHandlerWithResyncPeriod(
 		cache.ResourceEventHandlerFuncs{
-			AddFunc: s.syncNodes,
+			AddFunc: func(cur interface{}) {
+				node := cur.(*v1.Node)
+				glog.V(5).Infof("controller: Add event, nodes [%s/%s]\n",node.Namespace, node.Name)
+				s.syncNodes(cur)
+			},
 			UpdateFunc: func(obja,objb interface{}){
+
 				node1,ok1 := obja.(*v1.Node)
 				node2,ok2 := objb.(*v1.Node)
-				if ok1 && ok2 && !nodeLabelsEqual([]*v1.Node{node1}, []*v1.Node{node2}) {
+				if ok1 &&ok2 &&
+					(!nodeLabelsEqual([]*v1.Node{node1}, []*v1.Node{node2}) ||
+						node1.Spec.Unschedulable != node2.Spec.Unschedulable ||
+						!nodeConditionEqual(node1.Status.Conditions, node2.Status.Conditions)){
+					// label and schedulable changed .
+					// status healthy should be considered
+					glog.V(5).Infof("controller: Update event, nodes [%s/%s]\n",node1.Namespace, node1.Name)
 					s.syncNodes(node1)
 				}
 			},
-			DeleteFunc: s.syncNodes,
+			DeleteFunc: func(cur interface{}) {
+				node := cur.(*v1.Node)
+				glog.V(5).Infof("controller: Delete event, nodes [%s/%s]\n",node.Namespace, node.Name)
+				s.syncNodes(cur)
+			},
 		},
 		serviceSyncPeriod,
 	)
@@ -178,19 +203,26 @@ clusterName string,
 			AddFunc: func(cur interface{}) {
 				if !needLoadBalancer(cur.(*v1.Service)) {
 					key, _ := controller.KeyFunc(cur)
-					glog.Infof("do not need loadbalancer ,skip. %s\n",key)
+					glog.Infof("controller: do not need loadbalancer ,skip. %s\n",key)
 					return
 				}
+				svc := cur.(*v1.Service)
+				glog.V(5).Infof("controller: Add event, service [%s/%s]\n",svc.Namespace, svc.Name)
 				s.enqueueService(cur)
 			},
 			UpdateFunc: func(old, cur interface{}) {
 				oldSvc, ok1 := old.(*v1.Service)
 				curSvc, ok2 := cur.(*v1.Service)
 				if ok1 && ok2 && s.needsUpdate(oldSvc, curSvc) {
+					glog.V(5).Infof("controller: Update event, service [%s/%s]\n",oldSvc.Namespace, oldSvc.Name)
 					s.enqueueService(cur)
 				}
 			},
-			DeleteFunc: s.enqueueService,
+			DeleteFunc: func(cur interface{}) {
+				svc := cur.(*v1.Service)
+				glog.V(5).Infof("controller: Delete event, service [%s/%s]\n",svc.Namespace, svc.Name)
+				s.enqueueService(cur)
+			},
 		},
 		serviceSyncPeriod,
 	)
@@ -204,14 +236,15 @@ clusterName string,
 }
 
 func (s *ServiceController) syncNodes(obj interface{}) {
-	glog.V(2).Infof("syncNodes: enqueue nodes\n")
+
+	//glog.V(5).Infof("controller: syncNodes, enqueue node [%s]\n",obj.(*v1.Node).Name)
 	errs := s.cache.lockedEach(
 		func(svc *cachedService) error {
-			glog.V(2).Infof("syncNodes: process cachedService, %+v\n",svc)
 			if ! needLoadBalancer(svc.state) {
 				glog.V(6).Infof("syncNodes: service [%s] does not need loadbalancer , skip.\n",svc.state.Name)
 				return nil
 			}
+			glog.V(5).Infof("controller: syncNodes, enqueue service[%s/%s]\n",svc.state.Namespace,svc.state.Name)
 			s.enqueueServiceForNodes(svc.state)
 			return nil
 		},
@@ -229,15 +262,16 @@ func (s *ServiceController) syncEnpoints(obj interface{}) {
 	}
 	svc,exist, err := s.cache.GetByKey(fmt.Sprintf("%s/%s",ep.Namespace,ep.Name))
 	if err != nil || !exist {
+		glog.Infof("controller: can not get cached service for endpoints[%s/%s], skip sync endpoint.\n",ep.Namespace,ep.Name)
 		return
 	}
 	service := svc.(*cachedService).state
 	if ! needLoadBalancer(service) {
 		// we are safe here to skip process syncEnpoint.
-		glog.V(6).Infof("syncNodes: service [%s] does not need loadbalancer , skip.\n",service.Name)
+		glog.V(5).Infof("syncNodes: service [%s] does not need loadbalancer , skip.\n",service.Name)
 		return
 	}
-	glog.V(2).Infof("syncEndpoint: enqueue svc %+v\n",svc)
+	glog.V(5).Infof("controller: syncEndpoint, enqueue service [%s/%s]\n",service.Namespace,service.Name)
 	s.enqueueServiceForNodes(service)
 }
 
@@ -321,13 +355,15 @@ func (s *ServiceController) nodesWorker() {
 			defer s.nodesQueue.Done(key)
 			obj,exist, err := s.cache.GetByKey(key.(string))
 			if err != nil || !exist {
+				glog.V(4).Infof("controller: can not get cached service[%s], might been deleted concurrently or [%v]\n",key,err)
 				return
 			}
+			glog.V(5).Infof("controller: node worker sync for [%s]",key)
 			cached := obj.(*cachedService)
 			err = s.syncBackend(cached)
 
 			if err != nil {
-				glog.Errorf("Error syncing backend: %v", err)
+				glog.Errorf("controller: error syncing backend, %v", err)
 			}
 		}()
 	}
@@ -345,6 +381,26 @@ func (s *ServiceController) init() error {
 	s.balancer = balancer
 
 	return nil
+}
+
+func nodeConditionEqual(a,b []v1.NodeCondition) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for _, cona := range a {
+		found := false
+		for _, conb := range b {
+			if string(cona.Type) == string(conb.Type) &&
+				string(cona.Status) == string(conb.Status){
+				found = true
+				break
+			}
+		}
+		if !found {
+			return false
+		}
+	}
+	return true
 }
 
 // Returns an error if processing the service update failed, along with a time.Duration
@@ -502,11 +558,14 @@ func (s *ServiceController) ensureLoadBalancer(service *v1.Service,cachedService
 }
 
 func (s *ServiceController) syncBackend(service *cachedService) (error) {
+
 	key, err := controller.KeyFunc(service.state)
 	if err != nil {
 		glog.Warningf("can not obtain service key ,%s\n",service.state.Name)
 	}
 	glog.V(4).Infof("start sync backend for service [%s].\n",key)
+	service.lock.Lock()
+	defer service.lock.Unlock()
 	predicate, err := s.getNodeConditionPredicate(service.state)
 	if err != nil {
 		return err
@@ -522,9 +581,11 @@ func (s *ServiceController) syncBackend(service *cachedService) (error) {
 
 	// here we should not check for the neediness of updating loadbalancer.
 	// Because, the provider may need to filter by label again.
-	//if !needUpdateBackend(service.backend, nodes) {
-	//	return nil
-	//}
+	/*
+	if !needUpdateBackend(service.backend, nodes) {
+		return nil
+	}
+	*/
 
 	// - Only one protocol supported per service
 	// - Not all cloud providers support all protocols and the next step is expected to return
@@ -607,8 +668,11 @@ func (s *serviceCache) lockedEach(do func(service *cachedService) error) []error
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	errs := []error{}
-	for k, svc := range s.serviceMap {
-		glog.V(2).Infof("service map: k=v, %+v, %+v\n",k,svc)
+	if len(s.serviceMap) == 0 {
+		glog.Infof("service cache: empty service cache , skip func call. ")
+		return errs
+	}
+	for _, svc := range s.serviceMap {
 		err := do(svc)
 		if err != nil {
 			errs = append(errs, err)
@@ -844,12 +908,14 @@ func (s *ServiceController) getNodeConditionPredicate(service *v1.Service) (core
 			glog.Errorf("alicloud: find endpoints for service [%s/%s] with error [%s]",service.Namespace,service.Name,err.Error())
 			return nil, err
 		}
+		records := []string{}
 		for _, sub := range ep.Subsets {
 			for _, add := range sub.Addresses {
 				nodes[*add.NodeName] = *add.NodeName
-				glog.V(4).Infof("alicloud: node condition predicate, external traffic policy should accept node [%s]\n",*add.NodeName)
+				records = append(records, *add.NodeName)
 			}
 		}
+		glog.V(4).Infof("controller: node condition predicate, external traffic policy should accept node %v\n",records)
 		return nodes, nil
 	}()
 	if err != nil {
@@ -1021,7 +1087,11 @@ func (s *cachedService) resetRetryDelay() {
 // invoked concurrently with the same key.
 func (s *ServiceController) syncService(key string) error {
 	startTime := time.Now()
-	var cachedService *cachedService
+	//var cachedService *cachedService
+
+	cachedService := s.cache.getOrCreate(key)
+	cachedService.lock.Lock()
+	defer cachedService.lock.Unlock()
 	var retryDelay time.Duration
 	defer func() {
 		glog.V(4).Infof("Finished syncing service %q (%v)\n\n", key, time.Now().Sub(startTime))
@@ -1045,7 +1115,6 @@ func (s *ServiceController) syncService(key string) error {
 		s.workingQueue.Add(key)
 		return err
 	default:
-		cachedService = s.cache.getOrCreate(key)
 		err, retryDelay = s.processServiceUpdate(cachedService, service, key)
 	}
 

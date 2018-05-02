@@ -3,94 +3,23 @@ package alicloud
 import (
 	"errors"
 	"strings"
+	"fmt"
 	"github.com/denverdino/aliyungo/slb"
 	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
 )
 
-type Listener interface {
-	AttemptAdd(client ClientSLBSDK, targetPort v1.ServicePort, transformProtocol string) error
-	AttemptRemove(client ClientSLBSDK, targetPort int, transformProtocol string) error
-	AttemptUpdate(client ClientSLBSDK, targetPort v1.ServicePort, transformProtocol string) error
+type ListenerInterface interface {
+	Add(port v1.ServicePort) 	error
+	Remove(port v1.ServicePort) 	error
+	Update(port v1.ServicePort) 	error
 }
 
 type BaseListener struct {
-	doAdd        func(client ClientSLBSDK, port v1.ServicePort) error
-	doUpdate     func(client ClientSLBSDK, port v1.ServicePort) error
-	loadbalancer *slb.LoadBalancerType
-	service      *v1.Service
-}
-
-func (l *BaseListener) AttemptRemove(client ClientSLBSDK, targetPort int, backProtocol string) error {
-	found := false
-	protocol := serviceAnnotation(l.service, ServiceAnnotationLoadBalancerProtocolPort)
-	for _, port := range l.service.Spec.Ports {
-		proto, err := getProtocol(protocol, port)
-		if err != nil {
-			return err
-		}
-		if port.Port == int32(targetPort) &&
-			strings.ToUpper(proto) == strings.ToUpper(backProtocol){
-			found = true
-			break
-		}
-	}
-	if !found {
-		glog.V(4).Infof("alicloud: attempt to [remove] listener, [%d]\n", targetPort)
-		err := client.StopLoadBalancerListener(l.loadbalancer.LoadBalancerId, targetPort)
-		if err != nil {
-			return err
-		}
-		return client.DeleteLoadBalancerListener(l.loadbalancer.LoadBalancerId, targetPort)
-	}
-	return nil
-}
-func (l *BaseListener) AttemptAdd(client ClientSLBSDK, targetPort v1.ServicePort, transformProtocol string) error {
-	found := false
-	ports := l.loadbalancer.ListenerPortsAndProtocol
-	for _, port := range ports.ListenerPortAndProtocol {
-		if port.ListenerPort == int(targetPort.Port) &&
-			strings.ToUpper(port.ListenerProtocol) == strings.ToUpper(transformProtocol) {
-			found = true
-			break
-		}
-	}
-	if !found {
-		glog.V(4).Infof("alicloud: attempt to [add] listener, port=[%d], nodeport=[%d]\n", targetPort.Port,targetPort.NodePort)
-		if l.doAdd == nil {
-			return errors.New("AttemptAdd needs doAdd implementation.\n")
-		}
-		err := l.doAdd(client, targetPort)
-		if err != nil {
-			return err
-		}
-		// todo : here should retry
-		return client.StartLoadBalancerListener(l.loadbalancer.LoadBalancerId, int(targetPort.Port))
-	}
-	return nil
-}
-func (l *BaseListener) AttemptUpdate(client ClientSLBSDK, targetPort v1.ServicePort, transformProtocol string) error {
-	found := false
-	backports := l.loadbalancer.ListenerPortsAndProtocol
-	for _, backport := range backports.ListenerPortAndProtocol {
-		if backport.ListenerPort == int(targetPort.Port)&&
-			strings.ToUpper(backport.ListenerProtocol) == strings.ToUpper(transformProtocol) {
-			found = true
-			break
-		}
-	}
-	if !found {
-		// no update needed, just return
-		return nil
-	}
-	if l.doUpdate == nil {
-		return errors.New("AttemptUpdate need doUpdate implementation.\n")
-	}
-	glog.V(4).Infof("alicloud: attempt to [update] listener, port=[%d], nodeport=[%d]\n", targetPort.Port, targetPort.NodePort)
-	if err := l.doUpdate(client, targetPort); err != nil {
-		return err
-	}
-	return client.StartLoadBalancerListener(l.loadbalancer.LoadBalancerId, int(targetPort.Port))
+	doAdd        	func(port v1.ServicePort) error
+	doUpdate     	func(port v1.ServicePort) error
+	doRemove     	func(port v1.ServicePort) error
+	manager 	*ListenerManager
 }
 
 //####################################################################################
@@ -102,17 +31,43 @@ type CommonListener struct {
 	BaseListener
 }
 
-func NewTCP(service *v1.Service, loadbalancer *slb.LoadBalancerType) Listener {
+func (com *CommonListener) Add(port v1.ServicePort) error{
+	if com.doAdd != nil {
+		return com.doAdd(port)
+	}
+	return errors.New("unimplemented Add()")
+}
 
-	def, request := ExtractAnnotationRequest(service)
-	doAdd := func(client ClientSLBSDK, targetPort v1.ServicePort) error {
-		return client.CreateLoadBalancerTCPListener(
+func (com *CommonListener) Update(port v1.ServicePort) error{
+	if com.doAdd != nil {
+		return com.doUpdate(port)
+	}
+	return errors.New("unimplemented Update()")
+}
+
+func (com *CommonListener) Remove(port v1.ServicePort) error{
+	if com.doRemove != nil {
+		return com.doRemove(port)
+	}
+	err := com.manager.client.StopLoadBalancerListener(com.manager.loadbalancer.LoadBalancerId, int(port.Port))
+	if err != nil {
+		return err
+	}
+	return com.manager.client.DeleteLoadBalancerListener(com.manager.loadbalancer.LoadBalancerId, int(port.Port))
+}
+
+func (f *ListenerManager) NewTCP() ListenerInterface {
+
+	def, request := ExtractAnnotationRequest(f.service)
+	doAdd := func(targetPort v1.ServicePort) error {
+		return f.client.CreateLoadBalancerTCPListener(
 			&slb.CreateLoadBalancerTCPListenerArgs{
-				LoadBalancerId:    loadbalancer.LoadBalancerId,
+				LoadBalancerId:    f.loadbalancer.LoadBalancerId,
 				ListenerPort:      int(targetPort.Port),
 				BackendServerPort: int(targetPort.NodePort),
 				//Health Check
-				Bandwidth: def.Bandwidth,
+				Bandwidth: 		   def.Bandwidth,
+				PersistenceTimeout: 	   def.PersistenceTimeout,
 
 				HealthCheckType:           def.HealthCheckType,
 				HealthCheckURI:            def.HealthCheckURI,
@@ -121,21 +76,23 @@ func NewTCP(service *v1.Service, loadbalancer *slb.LoadBalancerType) Listener {
 				UnhealthyThreshold:        def.UnhealthyThreshold,
 				HealthCheckConnectTimeout: def.HealthCheckConnectTimeout,
 				HealthCheckInterval:       def.HealthCheckInterval,
+				HealthCheck:               def.HealthCheck,
 			},
 		)
 	}
-	doUpdate := func(client ClientSLBSDK, port v1.ServicePort) error {
+	doUpdate := func(port v1.ServicePort) error {
 
-		response, err := client.DescribeLoadBalancerTCPListenerAttribute(loadbalancer.LoadBalancerId, int(port.Port))
+		response, err := f.client.DescribeLoadBalancerTCPListenerAttribute(f.loadbalancer.LoadBalancerId, int(port.Port))
 		if err != nil {
 			return err
 		}
-		config := &slb.CreateLoadBalancerTCPListenerArgs{
-			LoadBalancerId:    loadbalancer.LoadBalancerId,
+		config := &slb.SetLoadBalancerTCPListenerAttributeArgs{
+			LoadBalancerId:    f.loadbalancer.LoadBalancerId,
 			ListenerPort:      int(port.Port),
 			BackendServerPort: int(port.NodePort),
 			//Health Check
-			Bandwidth: response.Bandwidth,
+			Bandwidth: 		   response.Bandwidth,
+			PersistenceTimeout: 	   response.PersistenceTimeout,
 
 			HealthCheckType:           response.HealthCheckType,
 			HealthCheckURI:            response.HealthCheckURI,
@@ -144,78 +101,76 @@ func NewTCP(service *v1.Service, loadbalancer *slb.LoadBalancerType) Listener {
 			UnhealthyThreshold:        response.UnhealthyThreshold,
 			HealthCheckConnectTimeout: response.HealthCheckConnectTimeout,
 			HealthCheckInterval:       response.HealthCheckInterval,
+			HealthCheck: 		   response.HealthCheck,
 		}
-		recreate := false
+		needUpdate := false
 		if def.Bandwidth != response.Bandwidth {
-			recreate = true
+			needUpdate = true
 			config.Bandwidth = def.Bandwidth
 			glog.V(2).Infof("TCP listener checker [bandwidth] changed, request=%d. response=%d", def.Bandwidth, response.Bandwidth)
 		}
 
 		// backend server port has changed.
 		if int(port.NodePort) != response.BackendServerPort {
-			recreate = true
+			needUpdate = true
 			config.BackendServerPort = int(port.NodePort)
 			glog.V(2).Infof("TCP listener checker [BackendServerPort] changed, request=%d. response=%d", port.NodePort, response.BackendServerPort)
 		}
 		// todo: perform healthcheck update.
 		if def.HealthCheckType != response.HealthCheckType {
-			recreate = true
+			needUpdate = true
 			config.HealthCheckType = def.HealthCheckType
 		}
 		if request.HealthCheckURI != "" &&
 			def.HealthCheckURI != response.HealthCheckURI {
-			recreate = true
+			needUpdate = true
 			config.HealthCheckURI = def.HealthCheckURI
 		}
 		if request.HealthCheckConnectPort != 0 &&
 			def.HealthCheckConnectPort != response.HealthCheckConnectPort {
-			recreate = true
+			needUpdate = true
 			config.HealthCheckConnectPort = def.HealthCheckConnectPort
 		}
 		if request.HealthyThreshold != 0 &&
 			def.HealthyThreshold != response.HealthyThreshold {
-			recreate = true
+			needUpdate = true
 			config.HealthyThreshold = def.HealthyThreshold
 		}
 		if request.UnhealthyThreshold != 0 &&
 			def.UnhealthyThreshold != response.UnhealthyThreshold {
-			recreate = true
+			needUpdate = true
 			config.UnhealthyThreshold = def.UnhealthyThreshold
 		}
 		if request.HealthCheckConnectTimeout != 0 &&
 			def.HealthCheckConnectTimeout != response.HealthCheckConnectTimeout {
-			recreate = true
+			needUpdate = true
 			config.HealthCheckConnectTimeout = def.HealthCheckConnectTimeout
 		}
 		if request.HealthCheckInterval != 0 &&
 			def.HealthCheckInterval != response.HealthCheckInterval {
-			recreate = true
+			needUpdate = true
 			config.HealthCheckInterval = def.HealthCheckInterval
 		}
-
-		// because backendserverport update is not supported, so we use recreate instead.
-		if !recreate {
+		if def.PersistenceTimeout != response.PersistenceTimeout {
+			needUpdate = true
+			config.PersistenceTimeout = def.PersistenceTimeout
+		}
+		if !needUpdate {
 			glog.V(2).Infof("alicloud: tcp listener did not change, skip [update], port=[%d], nodeport=[%d]\n",port.Port, port.NodePort)
 			// no recreate needed.  skip
 			return nil
 		}
-		glog.V(2).Infof("TCP listener checker changed, request recreate [%s]\n",loadbalancer.LoadBalancerId)
+		glog.V(2).Infof("TCP listener checker changed, request recreate [%s]\n",f.loadbalancer.LoadBalancerId)
 		glog.V(5).Infof(PrettyJson(def))
 		glog.V(5).Infof(PrettyJson(response))
-		if err := client.DeleteLoadBalancerListener(
-			loadbalancer.LoadBalancerId, int(port.Port)); err != nil {
 
-			return err
-		}
-		return client.CreateLoadBalancerTCPListener(config)
+		return f.client.SetLoadBalancerTCPListenerAttribute(config)
 	}
 	return &CommonListener{
 		BaseListener{
-			loadbalancer: loadbalancer,
-			service:      service,
-			doAdd:        doAdd,
-			doUpdate:     doUpdate,
+			manager:	f,
+			doAdd:        	doAdd,
+			doUpdate:     	doUpdate,
 		},
 	}
 }
@@ -226,20 +181,20 @@ func NewTCP(service *v1.Service, loadbalancer *slb.LoadBalancerType) Listener {
 //# @desc: LoadBalancer UDP listener implementation.
 //####################################################################################
 
-func NewUDP(service *v1.Service, loadbalancer *slb.LoadBalancerType) Listener {
-	doUpdate := func(client ClientSLBSDK, port v1.ServicePort) error {
-		request,_ := ExtractAnnotationRequest(service)
-		response, err := client.DescribeLoadBalancerUDPListenerAttribute(loadbalancer.LoadBalancerId, int(port.Port))
+func (f *ListenerManager) NewUDP() ListenerInterface {
+	def, request := ExtractAnnotationRequest(f.service)
+	doUpdate := func(port v1.ServicePort) error {
+		response, err := f.client.DescribeLoadBalancerUDPListenerAttribute(f.loadbalancer.LoadBalancerId, int(port.Port))
 		if err != nil {
 			return err
 		}
-		config := &slb.CreateLoadBalancerUDPListenerArgs{
-			LoadBalancerId:    loadbalancer.LoadBalancerId,
+		config := &slb.SetLoadBalancerUDPListenerAttributeArgs{
+			LoadBalancerId:    f.loadbalancer.LoadBalancerId,
 			ListenerPort:      int(port.Port),
 			BackendServerPort: int(port.NodePort),
 			//Health Check
-			Bandwidth: response.Bandwidth,
-
+			Bandwidth: 		   response.Bandwidth,
+			PersistenceTimeout:        response.PersistenceTimeout,
 			//HealthCheckType:           response.HealthCheckType,
 			//HealthCheckURI:            response.HealthCheckURI,
 			HealthCheckConnectPort:    response.HealthCheckConnectPort,
@@ -247,61 +202,89 @@ func NewUDP(service *v1.Service, loadbalancer *slb.LoadBalancerType) Listener {
 			UnhealthyThreshold:        response.UnhealthyThreshold,
 			HealthCheckConnectTimeout: response.HealthCheckConnectTimeout,
 			HealthCheckInterval:       response.HealthCheckInterval,
+			HealthCheck: 		   response.HealthCheck,
 		}
-		recreate := false
+		needUpdate := false
 		if request.Bandwidth != response.Bandwidth {
-			recreate = true
+			needUpdate = true
 			config.Bandwidth = request.Bandwidth
 			glog.V(2).Infof("UDP listener checker [bandwidth] changed, request=%d. response=%d", request.Bandwidth, response.Bandwidth)
 		}
 		// backend server port has changed.
 		if int(port.NodePort) != response.BackendServerPort {
-			recreate = true
+			needUpdate = true
 			config.BackendServerPort = int(port.NodePort)
 			glog.V(2).Infof("UDP listener checker [BackendServerPort] changed, request=%d. response=%d", port.NodePort, response.BackendServerPort)
 		}
 
 		// todo: perform healthcheck update.
-		// because backendserverport update is not supported, so we use recreate instead.
-		if !recreate {
+		if def.HealthCheck != response.HealthCheck {
+			needUpdate = true
+			config.HealthCheck = def.HealthCheck
+		}
+		if request.HealthCheckConnectPort != 0 &&
+			def.HealthCheckConnectPort != response.HealthCheckConnectPort {
+			needUpdate = true
+			config.HealthCheckConnectPort = def.HealthCheckConnectPort
+		}
+		if request.HealthyThreshold != 0 &&
+			def.HealthyThreshold != response.HealthyThreshold {
+			needUpdate = true
+			config.HealthyThreshold = def.HealthyThreshold
+		}
+		if request.UnhealthyThreshold != 0 &&
+			def.UnhealthyThreshold != response.UnhealthyThreshold {
+			needUpdate = true
+			config.UnhealthyThreshold = def.UnhealthyThreshold
+		}
+		if request.HealthCheckConnectTimeout != 0 &&
+			def.HealthCheckConnectTimeout != response.HealthCheckConnectTimeout {
+			needUpdate = true
+			config.HealthCheckConnectTimeout = def.HealthCheckConnectTimeout
+		}
+		if request.HealthCheckInterval != 0 &&
+			def.HealthCheckInterval != response.HealthCheckInterval {
+			needUpdate = true
+			config.HealthCheckInterval = def.HealthCheckInterval
+		}
+		if def.PersistenceTimeout != response.PersistenceTimeout {
+			needUpdate = true
+			config.PersistenceTimeout = def.PersistenceTimeout
+		}
+		if !needUpdate {
 			glog.V(2).Infof("alicloud: udp listener did not change, skip [update], port=[%d], nodeport=[%d]\n",port.Port, port.NodePort)
 			// no recreate needed.  skip
 			return nil
 		}
-		glog.V(2).Infof("UDP listener checker changed, request recreate [%s]\n",loadbalancer.LoadBalancerId)
+		glog.V(2).Infof("UDP listener checker changed, request recreate [%s]\n",f.loadbalancer.LoadBalancerId)
 		glog.V(5).Infof(PrettyJson(request))
 		glog.V(5).Infof(PrettyJson(response))
-		if err := client.DeleteLoadBalancerListener(
-			loadbalancer.LoadBalancerId, int(port.Port)); err != nil {
-
-			return err
-		}
-		return client.CreateLoadBalancerUDPListener(config)
+		return f.client.SetLoadBalancerUDPListenerAttribute(config)
 	}
-	doAdd := func(client ClientSLBSDK, targetPort v1.ServicePort) error {
-		request,_ := ExtractAnnotationRequest(service)
-		return client.CreateLoadBalancerUDPListener(
+	doAdd := func(targetPort v1.ServicePort) error {
+		return f.client.CreateLoadBalancerUDPListener(
 			&slb.CreateLoadBalancerUDPListenerArgs{
-				LoadBalancerId:    loadbalancer.LoadBalancerId,
+				LoadBalancerId:    f.loadbalancer.LoadBalancerId,
 				ListenerPort:      int(targetPort.Port),
 				BackendServerPort: int(targetPort.NodePort),
 				//Health Check
-				Bandwidth: request.Bandwidth,
+				Bandwidth: 		   def.Bandwidth,
+				PersistenceTimeout:        def.PersistenceTimeout,
 
 				//HealthCheckType:           request.HealthCheckType,
 				//HealthCheckURI:            request.HealthCheckURI,
-				HealthCheckConnectPort:    request.HealthCheckConnectPort,
-				HealthyThreshold:          request.HealthyThreshold,
-				UnhealthyThreshold:        request.UnhealthyThreshold,
-				HealthCheckConnectTimeout: request.HealthCheckConnectTimeout,
-				HealthCheckInterval:       request.HealthCheckInterval,
+				HealthCheckConnectPort:    def.HealthCheckConnectPort,
+				HealthyThreshold:          def.HealthyThreshold,
+				UnhealthyThreshold:        def.UnhealthyThreshold,
+				HealthCheckConnectTimeout: def.HealthCheckConnectTimeout,
+				HealthCheckInterval:       def.HealthCheckInterval,
+				HealthCheck:		   def.HealthCheck,
 			},
 		)
 	}
 	return &CommonListener{
 		BaseListener{
-			loadbalancer: loadbalancer,
-			service:      service,
+			manager: 	f,
 			doUpdate:     doUpdate,
 			doAdd:        doAdd,
 		},
@@ -314,67 +297,124 @@ func NewUDP(service *v1.Service, loadbalancer *slb.LoadBalancerType) Listener {
 //# @desc: LoadBalancer HTTP listener implementation.
 //####################################################################################
 
-func NewHTTP(service *v1.Service, loadbalancer *slb.LoadBalancerType) Listener {
-	doUpdate := func(client ClientSLBSDK, port v1.ServicePort) error {
-		request,_ := ExtractAnnotationRequest(service)
-		response, err := client.DescribeLoadBalancerHTTPListenerAttribute(loadbalancer.LoadBalancerId, int(port.Port))
+func (f *ListenerManager) NewHTTP() ListenerInterface {
+	def, request := ExtractAnnotationRequest(f.service)
+	doUpdate := func(port v1.ServicePort) error {
+		response, err := f.client.DescribeLoadBalancerHTTPListenerAttribute(f.loadbalancer.LoadBalancerId, int(port.Port))
 		if err != nil {
 			return err
 		}
-		config := &slb.CreateLoadBalancerHTTPListenerArgs{
-			LoadBalancerId:    loadbalancer.LoadBalancerId,
+		config := &slb.SetLoadBalancerHTTPListenerAttributeArgs{
+			LoadBalancerId:    f.loadbalancer.LoadBalancerId,
 			ListenerPort:      int(port.Port),
 			BackendServerPort: int(port.NodePort),
 			//Health Check
-			Bandwidth: response.Bandwidth,
+			Bandwidth: 		response.Bandwidth,
+			StickySession: 		response.StickySession,
+			StickySessionType:      response.StickySessionType,
+			CookieTimeout: 		response.CookieTimeout,
+			Cookie:                 response.Cookie,
 
-			//HealthCheckType:           response.HealthCheckType,
+			HealthCheck:            response.HealthCheck,
 			HealthCheckURI:         response.HealthCheckURI,
 			HealthCheckConnectPort: response.HealthCheckConnectPort,
 			HealthyThreshold:       response.HealthyThreshold,
 			UnhealthyThreshold:     response.UnhealthyThreshold,
-			//HealthCheckConnectTimeout: response.HealthCheckConnectTimeout,
-			HealthCheckInterval: response.HealthCheckInterval,
+			HealthCheckTimeout:	response.HealthCheckTimeout,
+			HealthCheckDomain:      response.HealthCheckDomain,
+			HealthCheckHttpCode:    response.HealthCheckHttpCode,
+			HealthCheckInterval: 	response.HealthCheckInterval,
 		}
-		recreate := false
+		needUpdate := false
 		if request.Bandwidth != response.Bandwidth {
-			recreate = true
+			needUpdate = true
 			config.Bandwidth = request.Bandwidth
 			glog.V(2).Infof("HTTP listener checker [bandwidth] changed, request=%d. response=%d", request.Bandwidth, response.Bandwidth)
 		}
 		// backend server port has changed.
 		if int(port.NodePort) != response.BackendServerPort {
-			recreate = true
+			needUpdate = true
 			config.BackendServerPort = int(port.NodePort)
 			glog.V(2).Infof("HTTP listener checker [BackendServerPort] changed, request=%d. response=%d", port.NodePort, response.BackendServerPort)
 		}
-
 		// todo: perform healthcheck update.
-		// because backendserverport update is not supported, so we use recreate instead.
-		if !recreate {
+		if def.HealthCheck != response.HealthCheck {
+			needUpdate = true
+			config.HealthCheck = def.HealthCheck
+		}
+		if request.HealthCheckURI != "" &&
+			def.HealthCheckURI != response.HealthCheckURI {
+			needUpdate = true
+			config.HealthCheckURI = def.HealthCheckURI
+		}
+		if request.HealthCheckConnectPort != 0 &&
+			def.HealthCheckConnectPort != response.HealthCheckConnectPort {
+			needUpdate = true
+			config.HealthCheckConnectPort = def.HealthCheckConnectPort
+		}
+		if request.HealthyThreshold != 0 &&
+			def.HealthyThreshold != response.HealthyThreshold {
+			needUpdate = true
+			config.HealthyThreshold = def.HealthyThreshold
+		}
+		if request.UnhealthyThreshold != 0 &&
+			def.UnhealthyThreshold != response.UnhealthyThreshold {
+			needUpdate = true
+			config.UnhealthyThreshold = def.UnhealthyThreshold
+		}
+		if request.HealthCheckTimeout != 0 &&
+			def.HealthCheckTimeout != response.HealthCheckTimeout {
+			needUpdate = true
+			config.HealthCheckTimeout = def.HealthCheckTimeout
+		}
+		if request.HealthCheckInterval != 0 &&
+			def.HealthCheckInterval != response.HealthCheckInterval {
+			needUpdate = true
+			config.HealthCheckInterval = def.HealthCheckInterval
+		}
+		if string(request.StickySession) != "" &&
+			def.StickySession != response.StickySession {
+			needUpdate = true
+			config.StickySession = def.StickySession
+		}
+		if string(request.StickySessionType) != "" &&
+			def.StickySessionType != response.StickySessionType {
+			needUpdate = true
+			config.StickySessionType = def.StickySessionType
+		}
+		if request.Cookie != "" &&
+			def.Cookie != response.Cookie {
+			needUpdate = true
+			config.Cookie = def.Cookie
+		}
+		if request.CookieTimeout != 0 &&
+			def.CookieTimeout != response.CookieTimeout {
+			needUpdate = true
+			config.CookieTimeout = def.CookieTimeout
+		}
+
+		if !needUpdate {
 			glog.V(2).Infof("alicloud: http listener did not change, skip [update], port=[%d], nodeport=[%d]\n",port.Port, port.NodePort)
 			// no recreate needed.  skip
 			return nil
 		}
-		glog.V(2).Infof("HTTP listener checker changed, request recreate [%s]\n",loadbalancer.LoadBalancerId)
+		glog.V(2).Infof("HTTP listener checker changed, request recreate [%s]\n",f.loadbalancer.LoadBalancerId)
 		glog.V(5).Infof(PrettyJson(request))
 		glog.V(5).Infof(PrettyJson(response))
-		if err := client.DeleteLoadBalancerListener(
-			loadbalancer.LoadBalancerId, int(port.Port)); err != nil {
-
-			return err
-		}
-		return client.CreateLoadBalancerHTTPListener(config)
+		return f.client.SetLoadBalancerHTTPListenerAttribute(config)
 	}
-	doAdd := func(client ClientSLBSDK, targetPort v1.ServicePort) error {
-		request,_ := ExtractAnnotationRequest(service)
-		return client.CreateLoadBalancerHTTPListener(
+	doAdd := func(targetPort v1.ServicePort) error {
+		return f.client.CreateLoadBalancerHTTPListener(
 			&slb.CreateLoadBalancerHTTPListenerArgs{
-				LoadBalancerId:    loadbalancer.LoadBalancerId,
+				LoadBalancerId:    f.loadbalancer.LoadBalancerId,
 				ListenerPort:      int(targetPort.Port),
 				BackendServerPort: int(targetPort.NodePort),
 				//Health Check
-				Bandwidth: request.Bandwidth,
+				Bandwidth: 		request.Bandwidth,
+				StickySession: 		def.StickySession,
+				StickySessionType: 	def.StickySessionType,
+				CookieTimeout: 		def.CookieTimeout,
+				Cookie:			def.Cookie,
 
 				//HealthCheckType:           request.HealthCheckType,
 				HealthCheckURI:         request.HealthCheckURI,
@@ -383,15 +423,16 @@ func NewHTTP(service *v1.Service, loadbalancer *slb.LoadBalancerType) Listener {
 				UnhealthyThreshold:     request.UnhealthyThreshold,
 				//HealthCheckConnectTimeout: request.HealthCheckConnectTimeout,
 				HealthCheckInterval: request.HealthCheckInterval,
+				HealthCheckDomain:	def.HealthCheckDomain,
+				HealthCheck: 		def.HealthCheck,
 			},
 		)
 	}
 	return &CommonListener{
 		BaseListener{
-			loadbalancer: loadbalancer,
-			service:      service,
-			doUpdate:     doUpdate,
-			doAdd:        doAdd,
+			manager:   f,
+			doUpdate:  doUpdate,
+			doAdd:     doAdd,
 		},
 	}
 }
@@ -402,22 +443,25 @@ func NewHTTP(service *v1.Service, loadbalancer *slb.LoadBalancerType) Listener {
 //# @desc: LoadBalancer HTTPS listener implementation.
 //####################################################################################
 
-func NewHTTPS(service *v1.Service, loadbalancer *slb.LoadBalancerType) Listener {
-	doUpdate := func(client ClientSLBSDK, port v1.ServicePort) error {
-		request,_ := ExtractAnnotationRequest(service)
-		response, err := client.DescribeLoadBalancerHTTPSListenerAttribute(loadbalancer.LoadBalancerId, int(port.Port))
+func (f *ListenerManager) NewHTTPS() ListenerInterface {
+	def, request := ExtractAnnotationRequest(f.service)
+	doUpdate := func(port v1.ServicePort) error {
+		response, err := f.client.DescribeLoadBalancerHTTPSListenerAttribute(f.loadbalancer.LoadBalancerId, int(port.Port))
 		if err != nil {
 			return err
 		}
-		config := &slb.CreateLoadBalancerHTTPSListenerArgs{
+		config := &slb.SetLoadBalancerHTTPSListenerAttributeArgs{
 			HTTPListenerType: slb.HTTPListenerType{
-				LoadBalancerId:    response.LoadBalancerId,
+				LoadBalancerId:    f.loadbalancer.LoadBalancerId,
 				ListenerPort:      response.ListenerPort,
 				BackendServerPort: response.BackendServerPort,
 				//Health Check
 				HealthCheck:   response.HealthCheck,
 				Bandwidth:     response.Bandwidth,
 				StickySession: response.StickySession,
+				StickySessionType: response.StickySessionType,
+				CookieTimeout:     response.CookieTimeout,
+				Cookie:            response.Cookie,
 
 				HealthCheckURI:         response.HealthCheckURI,
 				HealthCheckConnectPort: response.HealthCheckConnectPort,
@@ -425,59 +469,113 @@ func NewHTTPS(service *v1.Service, loadbalancer *slb.LoadBalancerType) Listener 
 				UnhealthyThreshold:     response.UnhealthyThreshold,
 				HealthCheckTimeout:     response.HealthCheckTimeout,
 				HealthCheckInterval:    response.HealthCheckInterval,
+				HealthCheckHttpCode:    response.HealthCheckHttpCode,
+				HealthCheckDomain:      response.HealthCheckDomain,
 			},
 			ServerCertificateId: response.ServerCertificateId,
 		}
 
-		recreate := false
+		needUpdate := false
 		if request.Bandwidth != response.Bandwidth {
-			recreate = true
+			needUpdate = true
 			config.Bandwidth = request.Bandwidth
 			glog.V(2).Infof("HTTPS listener checker [bandwidth] changed, request=%d. response=%d", request.Bandwidth, response.Bandwidth)
 		}
 		// backend server port has changed.
 		if int(port.NodePort) != response.BackendServerPort {
-			recreate = true
+			needUpdate = true
 			config.BackendServerPort = int(port.NodePort)
 			glog.V(2).Infof("HTTPS listener checker [BackendServerPort] changed, request=%d. response=%d", port.NodePort, response.BackendServerPort)
 		}
 
 		// todo: perform healthcheck update.
-		// because backendserverport update is not supported, so we use recreate instead.
-		if !recreate {
+		if def.HealthCheck != response.HealthCheck {
+			needUpdate = true
+			config.HealthCheck = def.HealthCheck
+		}
+		if request.HealthCheckURI != "" &&
+			def.HealthCheckURI != response.HealthCheckURI {
+			needUpdate = true
+			config.HealthCheckURI = def.HealthCheckURI
+		}
+		if request.HealthCheckConnectPort != 0 &&
+			def.HealthCheckConnectPort != response.HealthCheckConnectPort {
+			needUpdate = true
+			config.HealthCheckConnectPort = def.HealthCheckConnectPort
+		}
+		if request.HealthyThreshold != 0 &&
+			def.HealthyThreshold != response.HealthyThreshold {
+			needUpdate = true
+			config.HealthyThreshold = def.HealthyThreshold
+		}
+		if request.UnhealthyThreshold != 0 &&
+			def.UnhealthyThreshold != response.UnhealthyThreshold {
+			needUpdate = true
+			config.UnhealthyThreshold = def.UnhealthyThreshold
+		}
+		if request.HealthCheckTimeout != 0 &&
+			def.HealthCheckTimeout != response.HealthCheckTimeout {
+			needUpdate = true
+			config.HealthCheckTimeout = def.HealthCheckTimeout
+		}
+		if request.HealthCheckInterval != 0 &&
+			def.HealthCheckInterval != response.HealthCheckInterval {
+			needUpdate = true
+			config.HealthCheckInterval = def.HealthCheckInterval
+		}
+
+		if string(request.StickySession) != "" &&
+			def.StickySession != response.StickySession {
+			needUpdate = true
+			config.StickySession = def.StickySession
+		}
+		if string(request.StickySessionType) != "" &&
+			def.StickySessionType != response.StickySessionType {
+			needUpdate = true
+			config.StickySessionType = def.StickySessionType
+		}
+		if request.Cookie != "" &&
+			def.Cookie != response.Cookie {
+			needUpdate = true
+			config.Cookie = def.Cookie
+		}
+		if request.CookieTimeout != 0 &&
+			def.CookieTimeout != response.CookieTimeout {
+			needUpdate = true
+			config.CookieTimeout = def.CookieTimeout
+		}
+		if !needUpdate {
 			glog.V(2).Infof("alicloud: https listener did not change, skip [update], port=[%d], nodeport=[%d]\n",port.Port, port.NodePort)
 			// no recreate needed.  skip
 			return nil
 		}
-		glog.V(2).Infof("HTTPS listener checker changed, request recreate [%s]\n",loadbalancer.LoadBalancerId)
+		glog.V(2).Infof("HTTPS listener checker changed, request recreate [%s]\n",f.loadbalancer.LoadBalancerId)
 		glog.V(5).Infof(PrettyJson(request))
 		glog.V(5).Infof(PrettyJson(response))
-		if err := client.DeleteLoadBalancerListener(
-			loadbalancer.LoadBalancerId, int(port.Port)); err != nil {
-
-			return err
-		}
-		return client.CreateLoadBalancerHTTPSListener(config)
+		return f.client.SetLoadBalancerHTTPSListenerAttribute(config)
 	}
-	doAdd := func(client ClientSLBSDK, targetPort v1.ServicePort) error {
-		request,_ := ExtractAnnotationRequest(service)
-		return client.CreateLoadBalancerHTTPSListener(
+	doAdd := func(targetPort v1.ServicePort) error {
+		return f.client.CreateLoadBalancerHTTPSListener(
 			&slb.CreateLoadBalancerHTTPSListenerArgs{
 				HTTPListenerType: slb.HTTPListenerType{
-					LoadBalancerId:    loadbalancer.LoadBalancerId,
+					LoadBalancerId:    f.loadbalancer.LoadBalancerId,
 					ListenerPort:      int(targetPort.Port),
 					BackendServerPort: int(targetPort.NodePort),
 					//Health Check
-					HealthCheck: request.HealthCheck,
-					Bandwidth:   request.Bandwidth,
-					StickySession: slb.OffFlag,
+					HealthCheck: 		def.HealthCheck,
+					Bandwidth:   		def.Bandwidth,
+					StickySession: 		def.StickySession,
+					StickySessionType: 	def.StickySessionType,
+					Cookie: 		def.Cookie,
+					CookieTimeout:  	def.CookieTimeout,
 
-					HealthCheckURI:         request.HealthCheckURI,
-					HealthCheckConnectPort: request.HealthCheckConnectPort,
-					HealthyThreshold:       request.HealthyThreshold,
-					UnhealthyThreshold:     request.UnhealthyThreshold,
-					HealthCheckTimeout:     request.HealthCheckTimeout,
-					HealthCheckInterval:    request.HealthCheckInterval,
+					HealthCheckURI:         def.HealthCheckURI,
+					HealthCheckConnectPort: def.HealthCheckConnectPort,
+					HealthyThreshold:       def.HealthyThreshold,
+					UnhealthyThreshold:     def.UnhealthyThreshold,
+					HealthCheckTimeout:     def.HealthCheckTimeout,
+					HealthCheckInterval:    def.HealthCheckInterval,
+					HealthCheckDomain:      def.HealthCheckDomain,
 				},
 				ServerCertificateId: request.CertID,
 			},
@@ -485,70 +583,148 @@ func NewHTTPS(service *v1.Service, loadbalancer *slb.LoadBalancerType) Listener 
 	}
 	return &CommonListener{
 		BaseListener{
-			loadbalancer: loadbalancer,
-			service:      service,
-			doUpdate:     doUpdate,
-			doAdd:        doAdd,
+			manager: 	f,
+			doUpdate:     	doUpdate,
+			doAdd:        	doAdd,
 		},
 	}
 }
 
-type factory struct {
+type ListenerManager struct {
 	client       ClientSLBSDK
 	service      *v1.Service
 	loadbalancer *slb.LoadBalancerType
 }
 
 func NewListenerManager(client ClientSLBSDK,
-	servcie *v1.Service, loadbalancer *slb.LoadBalancerType) *factory {
-	return &factory{
+	servcie *v1.Service, loadbalancer *slb.LoadBalancerType) *ListenerManager {
+	return &ListenerManager{
 		client:       client,
 		service:      servcie,
 		loadbalancer: loadbalancer,
 	}
 }
 
-func (f *factory) newListener(proto string) Listener {
+func (f *ListenerManager) Build(proto string) ListenerInterface {
 
 	switch proto {
 	case "tcp":
-		return NewTCP(f.service, f.loadbalancer)
+		return f.NewTCP()
 	case "udp":
-		return NewUDP(f.service, f.loadbalancer)
+		return f.NewUDP()
 	case "http":
-		return NewHTTP(f.service, f.loadbalancer)
+		return f.NewHTTP()
 	case "https":
-		return NewHTTPS(f.service, f.loadbalancer)
+		return f.NewHTTPS()
 	default:
 		glog.Warningf("alicloud: unknown protocol specified. fallback to tcp.")
-		return NewTCP(f.service, f.loadbalancer)
+		return f.NewTCP()
 	}
 }
 
-//ApplyUpdate try to update current loadbalancer`s listeners based on the given service
-func (f *factory) ApplyUpdate() error {
-	protocol := serviceAnnotation(f.service, ServiceAnnotationLoadBalancerProtocolPort)
-	// remove listeners which was no longer exist.
-	port := f.loadbalancer.ListenerPortsAndProtocol.ListenerPortAndProtocol
-	glog.V(4).Infof("alicloud: loadbalancer backend listener and protocol. [%v]\n",port )
-	for _, port := range port {
-		listener := f.newListener("tcp")
-		if err := listener.AttemptRemove(f.client, port.ListenerPort, port.ListenerProtocol); err != nil {
-			return err
+func Protocol(annotation string, port v1.ServicePort) (string, error) {
+
+	if annotation == "" {
+		return strings.ToLower(string(port.Protocol)), nil
+	}
+	for _, v := range strings.Split(annotation, ",") {
+		pp := strings.Split(v, ":")
+		if len(pp) < 2 {
+			return "", errors.New(fmt.Sprintf("port and "+
+				"protocol format must be like 'https:443' with colon separated. got=[%+v]", pp))
+		}
+
+		if pp[0] != "http" &&
+			pp[0] != "tcp" &&
+			pp[0] != "https" &&
+			pp[0] != "udp" {
+			return "", errors.New(fmt.Sprintf("port protocol"+
+				" format must be either [http|https|tcp|udp], protocol not supported wit [%s]\n", pp[0]))
+		}
+
+		if pp[1] == fmt.Sprintf("%d", port.Port) {
+			return pp[0], nil
 		}
 	}
-	// attempt to add and update new or existing listeners
-	for _, port := range f.service.Spec.Ports {
-		proto, err := getProtocol(protocol, port)
+	return strings.ToLower(string(port.Protocol)), nil
+}
+
+//ApplyUpdate try to update current loadbalancer`s listeners based on the given service
+func (f *ListenerManager) Apply() error {
+	if err := f.Deletions();
+		err != nil {
+		return err
+	}
+	return f.Updations()
+}
+
+func (f *ListenerManager) Updations() error {
+	anno := serviceAnnotation(f.service, ServiceAnnotationLoadBalancerProtocolPort)
+	for _, spec := range f.service.Spec.Ports {
+		found := false
+		realProtocol,err := Protocol(anno, spec)
 		if err != nil {
 			return err
 		}
-		listener := f.newListener(proto)
-		if err := listener.AttemptAdd(f.client, port,proto); err != nil {
-			return err
+		pprot := f.loadbalancer.ListenerPortsAndProtocol
+		for _, back := range pprot.ListenerPortAndProtocol{
+			if int(spec.Port) == back.ListenerPort &&
+				strings.ToUpper(back.ListenerProtocol) == strings.ToUpper(realProtocol){
+				found = true
+				break
+			}
 		}
-		if err := listener.AttemptUpdate(f.client, port,proto); err != nil {
-			return err
+		listener := f.Build(realProtocol)
+		if !found {
+			// Add listener
+			glog.V(4).Infof("alicloud: attempt to [add] listener, port=[%d]," +
+				" nodeport=[%d],[%s]\n", spec.Port,spec.NodePort,f.loadbalancer.LoadBalancerId)
+			err := listener.Add(spec)
+			if err != nil {
+				return err
+			}
+		}else {
+			glog.V(4).Infof("alicloud: attempt to [update] listener, port=[%d]," +
+				" nodeport=[%d],[%s]\n", spec.Port,spec.NodePort,f.loadbalancer.LoadBalancerId)
+			if err := listener.Update(spec);
+				err != nil {
+				return err
+			}
+		}
+		// todo : here should retry
+		return f.client.StartLoadBalancerListener(f.loadbalancer.LoadBalancerId, int(spec.Port))
+	}
+	return nil
+}
+func (f *ListenerManager) Deletions() error {
+	anno  := serviceAnnotation(f.service, ServiceAnnotationLoadBalancerProtocolPort)
+	pprot := f.loadbalancer.ListenerPortsAndProtocol
+	for _, back := range pprot.ListenerPortAndProtocol{
+		found := false
+		for _, spec := range f.service.Spec.Ports{
+			if int(spec.Port) == back.ListenerPort{
+				realProtocol,err := Protocol(anno, spec)
+				if err != nil {
+					return err
+				}
+				if strings.ToUpper(back.ListenerProtocol) == strings.ToUpper(realProtocol){
+					found = true
+					break
+				}
+			}
+		}
+		if !found {
+			// Add listener
+			glog.V(4).Infof("alicloud: attempt to [delete] " +
+				"listener, port=[%d],[%s]\n", back.ListenerPort,f.loadbalancer.LoadBalancerId)
+
+			if err := f.Build("tcp").Remove(
+				v1.ServicePort{
+					Port:int32(back.ListenerPort),
+				});
+				err != nil {
+				return err
+			}
 		}
 	}
 	return nil

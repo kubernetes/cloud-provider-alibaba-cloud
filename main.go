@@ -33,11 +33,6 @@ func main() {
 	defer logs.FlushLogs()
 	verflag.PrintAndExitIfRequested()
 
-	//cloud, err := cloudprovider.InitCloudProvider("alicloud", s.CloudConfigFile)
-	//if err != nil {
-	//	glog.Fatalf("Alibaba cloud provider could not be initialized: %v", err)
-	//}
-
 	if err := app.Run(s); err != nil {
 		fmt.Fprintf(os.Stderr, "%v\n", err)
 		os.Exit(1)

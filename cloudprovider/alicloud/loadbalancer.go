@@ -33,10 +33,19 @@ type AnnotationRequest struct {
 	HealthyThreshold       	int
 	UnhealthyThreshold     	int
 	HealthCheckInterval    	int
+	HealthCheckDomain       string
 
 	HealthCheckConnectTimeout int                 // for tcp
 	HealthCheckType           slb.HealthCheckType // for tcp, Type could be http tcp
 	HealthCheckTimeout        int                 // for https and http
+
+	LoadBalancerSpec	slb.LoadBalancerSpecType
+
+	StickySession 		slb.FlagType
+	StickySessionType 	slb.StickySessionType
+	Cookie 			string
+	CookieTimeout		int
+	PersistenceTimeout      int
 }
 
 type ClientSLBSDK interface {
@@ -59,6 +68,11 @@ type ClientSLBSDK interface {
 	DescribeLoadBalancerTCPListenerAttribute(loadBalancerId string, port int) (response *slb.DescribeLoadBalancerTCPListenerAttributeResponse, err error)
 	DescribeLoadBalancerUDPListenerAttribute(loadBalancerId string, port int) (response *slb.DescribeLoadBalancerUDPListenerAttributeResponse, err error)
 	DescribeLoadBalancerHTTPListenerAttribute(loadBalancerId string, port int) (response *slb.DescribeLoadBalancerHTTPListenerAttributeResponse, err error)
+
+	SetLoadBalancerHTTPListenerAttribute(args *slb.SetLoadBalancerHTTPListenerAttributeArgs) (err error)
+	SetLoadBalancerHTTPSListenerAttribute(args *slb.SetLoadBalancerHTTPSListenerAttributeArgs) (err error)
+	SetLoadBalancerTCPListenerAttribute(args *slb.SetLoadBalancerTCPListenerAttributeArgs) (err error)
+	SetLoadBalancerUDPListenerAttribute(args *slb.SetLoadBalancerUDPListenerAttributeArgs) (err error)
 }
 
 type LoadBalancerClient struct {
@@ -176,12 +190,14 @@ func (s *LoadBalancerClient) EnsureLoadBalancer(service *v1.Service, nodes []*v1
 	opts := s.getLoadBalancerOpts(service, vswitchid)
 
 	if !exists {
+		glog.V(5).Infof("alicloud: can not find a loadbalancer with service name [%s/%s], creating a new one\n",service.Namespace,service.Name)
 		lbr, err := s.c.CreateLoadBalancer(opts)
 		if err != nil {
 			return nil, err
 		}
 		origined, err = s.c.DescribeLoadBalancerAttribute(lbr.LoadBalancerId)
 	} else {
+		glog.V(5).Infof("alicloud: found an exist loadbalancer[%s], check to see whether update is needed.", origined.LoadBalancerId)
 		if request.ChargeType != "" && request.ChargeType != origined.InternetChargeType {
 		// Todo: here we need to compare loadbalance
 			glog.Infof("alicloud: internet charge type changed. [%s] -> [%s], update loadbalancer [%s]\n",
@@ -205,13 +221,13 @@ func (s *LoadBalancerClient) EnsureLoadBalancer(service *v1.Service, nodes []*v1
 		origined, err = s.c.DescribeLoadBalancerAttribute(origined.LoadBalancerId)
 	}
 	if err != nil {
-		glog.Errorf("alicloud: can not get loadbalancer attribute. ")
+		glog.Errorf("alicloud: can not get loadbalancer[%s] attribute. ",origined.LoadBalancerId)
 		return nil, err
 	}
 	// we should apply listener update only if user does not assign loadbalancer id by themselves.
 	if ! isUserDefinedLoadBalancer(service, request) {
-		glog.V(5).Infof("alicloud: not user defined loadbalancer, start to apply listener.")
-		err = NewListenerManager(s.c, service, origined).ApplyUpdate()
+		glog.V(5).Infof("alicloud: not user defined loadbalancer[%s], start to apply listener.\n",origined.LoadBalancerId)
+		err = NewListenerManager(s.c, service, origined).Apply()
 		if err != nil {
 			return nil, err
 		}
@@ -297,8 +313,9 @@ func (s *LoadBalancerClient) getLoadBalancerOpts(service *v1.Service, vswitchid 
 	args = &slb.CreateLoadBalancerArgs{
 		AddressType:        ar.AddressType,
 		InternetChargeType: ar.ChargeType,
-		Bandwidth:          ar.Bandwidth,
+		//Bandwidth:          ar.Bandwidth,
 		RegionId:           ar.Region,
+		LoadBalancerSpec:   ar.LoadBalancerSpec,
 	}
 	if ar.SLBNetworkType != "classic" &&
 		strings.Compare(string(ar.AddressType), string(slb.IntranetAddressType)) == 0 {
@@ -315,7 +332,7 @@ const DEFAULT_SERVER_WEIGHT = 100
 
 func (s *LoadBalancerClient) UpdateBackendServers(nodes []*v1.Node, lb *slb.LoadBalancerType) error {
 	additions, deletions := []slb.BackendServerType{}, []string{}
-
+	glog.V(5).Infof("alicloud: try to update loadbalancer backend servers. [%s]\n",lb.LoadBalancerId)
 	// checkout for newly added servers
 	for _, n1 := range nodes {
 		found := false
@@ -368,6 +385,11 @@ func (s *LoadBalancerClient) UpdateBackendServers(nodes []*v1.Node, lb *slb.Load
 			return err
 		}
 	}
+	if len(additions) <=0 && len(deletions) <=0 {
+		glog.V(5).Infof("alicloud: no backend servers need to be updated.[%s]\n",lb.LoadBalancerId)
+		return nil
+	}
+	glog.V(5).Infof("alicloud: update loadbalancer`s backend servers finished! [%s]\n",lb.LoadBalancerId)
 	return nil
 }
 
@@ -450,6 +472,7 @@ func fromLoadBalancerStatus(service *v1.Service) string {
 		glog.Warningf("alicloud: can not split loadbalancer hostname domain. [%s]\n",domain)
 		return ""
 	}
+	glog.V(4).Infof("alicloud: extract loadbalancer id from service.Spec.LoadBalancerStatus[%s]",secs[len(secs) - 4])
 	return secs[len(secs) - 4]
 }
 

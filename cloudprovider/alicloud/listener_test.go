@@ -145,7 +145,7 @@ func TestUpdateListenerPorts(t *testing.T) {
 		},
 	})
 
-	err := NewListenerManager(mgr.loadbalancer.c, service, detail).ApplyUpdate()
+	err := NewListenerManager(mgr.loadbalancer.c, service, detail).Apply()
 
 	if err != nil {
 		t.Fatal("listener update error! ")
@@ -296,7 +296,7 @@ func TestUpdateListenerBackendPorts(t *testing.T) {
 		},
 	})
 
-	err := NewListenerManager(mgr.loadbalancer.c, service, detail).ApplyUpdate()
+	err := NewListenerManager(mgr.loadbalancer.c, service, detail).Apply()
 
 	if err != nil {
 		t.Fatal("listener update error! ")

@@ -35,7 +35,7 @@ type Cloud struct {
 
 var (
 	DEFAULT_CHARGE_TYPE  = common.PayByTraffic
-	DEFAULT_BANDWIDTH    = 50
+	DEFAULT_BANDWIDTH    = -1
 	DEFAULT_ADDRESS_TYPE = slb.InternetAddressType
 
 	// DEFAULT_REGION should be override in cloud initialize.
@@ -142,10 +142,14 @@ func (c *Cloud) GetLoadBalancer(clusterName string, service *v1.Service) (status
 // parameters as read-only and not modify them.
 // Parameter 'clusterName' is the name of the cluster as presented to kube-controller-manager
 func (c *Cloud) EnsureLoadBalancer(clusterName string, service *v1.Service, nodes []*v1.Node) (*v1.LoadBalancerStatus, error) {
-	ns := c.fileOutNode(nodes, service)
-	annotations := service.Annotations
-	glog.V(2).Infof("Alicloud.EnsureLoadBalancer(%v, %v, %v, %v, %v, %v, %v, %v,%v)",
-		clusterName, service.Namespace, service.Name, c.region, service.Spec.LoadBalancerIP, service.Spec.Ports, NodeList(nodes), annotations, NodeList(ns))
+
+	glog.V(2).Infof("Alicloud.EnsureLoadBalancer(%v, %s/%s, %v, %v)",
+		clusterName, service.Namespace, service.Name, c.region, NodeList(nodes))
+	ns, err := c.fileOutNode(nodes, service)
+	if err != nil {
+		return nil, err
+	}
+	glog.V(5).Infof("alicloud: ensure loadbalancer with final nodes list , %v\n", NodeList(ns))
 	if service.Spec.SessionAffinity != v1.ServiceAffinityNone {
 		// Does not support SessionAffinity
 		return nil, fmt.Errorf("unsupported load balancer affinity: %v", service.Spec.SessionAffinity)
@@ -200,8 +204,11 @@ func (c *Cloud) EnsureLoadBalancer(clusterName string, service *v1.Service, node
 func (c *Cloud) UpdateLoadBalancer(clusterName string, service *v1.Service, nodes []*v1.Node) error {
 	glog.V(2).Infof("Alicloud.UpdateLoadBalancer(%v, %v, %v, %v, %v, %v, %v)",
 		clusterName, service.Namespace, service.Name, c.region, service.Spec.LoadBalancerIP, service.Spec.Ports, NodeList(nodes))
-
-	return c.climgr.LoadBalancers().UpdateLoadBalancer(service, c.fileOutNode(nodes, service))
+	ns,err := c.fileOutNode(nodes, service)
+	if err != nil {
+		return err
+	}
+	return c.climgr.LoadBalancers().UpdateLoadBalancer(service, ns)
 }
 
 // EnsureLoadBalancerDeleted deletes the specified load balancer if it
@@ -463,17 +470,20 @@ func (c *Cloud) HasClusterID() bool {
 }
 
 //
-func (c *Cloud) fileOutNode(nodes []*v1.Node, service *v1.Service) []*v1.Node {
+func (c *Cloud) fileOutNode(nodes []*v1.Node, service *v1.Service) ([]*v1.Node,error) {
 
 	ar, _ := ExtractAnnotationRequest(service)
-
-	targets := c.climgr.Instances().filterOutByLabel(
-		c.climgr.Instances().filterOutByRegion(nodes, ar.Region),
-		ar.BackendLabel,
-	)
+	ns, err := c.climgr.Instances().filterOutByRegion(nodes, ar.Region)
+	if err != nil {
+		return []*v1.Node{}, err
+	}
+	targets, err := c.climgr.Instances().filterOutByLabel(ns, ar.BackendLabel)
+	if err != nil {
+		return []*v1.Node{}, err
+	}
 	// Add 20 nodes at most .
 	if len(targets) > MAX_LOADBALANCER_BACKEND {
-		return targets[0:MAX_LOADBALANCER_BACKEND]
+		return targets[0:MAX_LOADBALANCER_BACKEND], nil
 	}
-	return targets
+	return targets, nil
 }
