@@ -5,7 +5,7 @@ import (
 	"os"
 	f "flag"
 
-	_ "github.com/AliyunContainerService/alicloud-controller-manager/cloudprovider/alicloud"
+	_ "k8s.io/cloud-provider-alicloud/cloudprovider/alicloud"
 	"github.com/spf13/pflag"
 	"k8s.io/apiserver/pkg/server/healthz"
 	"k8s.io/apiserver/pkg/util/flag"

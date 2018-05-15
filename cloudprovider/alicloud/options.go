@@ -8,7 +8,6 @@ import (
 
 	"bytes"
 	"encoding/json"
-	"github.com/denverdino/aliyungo/common"
 	"github.com/denverdino/aliyungo/slb"
 	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
@@ -90,11 +89,11 @@ func ExtractAnnotationRequest(service *v1.Service) (*AnnotationRequest, *Annotat
 		defaulted.ChargeType = slb.PayByTraffic
 	}
 
-	region,ok := annotation[ServiceAnnotationLoadBalancerRegion]
-	if ok {
-		defaulted.Region = common.Region(region)
-		request.Region = defaulted.Region
-	}
+	//region,ok := annotation[ServiceAnnotationLoadBalancerRegion]
+	//if ok {
+	//	defaulted.Region = common.Region(region)
+	//	request.Region = defaulted.Region
+	//}
 
 	lbid,ok := annotation[ServiceAnnotationLoadBalancerId]
 	if ok {
@@ -159,7 +158,7 @@ func ExtractAnnotationRequest(service *v1.Service) (*AnnotationRequest, *Annotat
 			//defaulted.HealthyThreshold = 3
 		} else {
 			defaulted.HealthyThreshold = thresh
-			request.HealthyThreshold = defaulted.UnhealthyThreshold
+			request.HealthyThreshold = defaulted.HealthyThreshold
 		}
 	}
 

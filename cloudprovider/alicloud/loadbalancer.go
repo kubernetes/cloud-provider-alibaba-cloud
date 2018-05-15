@@ -6,7 +6,6 @@ import (
 	"os"
 	"strings"
 
-	"github.com/denverdino/aliyungo/common"
 	"github.com/denverdino/aliyungo/slb"
 	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
@@ -23,7 +22,7 @@ type AnnotationRequest struct {
 	SLBNetworkType 		string
 
 	ChargeType 		slb.InternetChargeType
-	Region     		common.Region
+	//Region     		common.Region
 	Bandwidth  		int
 	CertID     		string
 
@@ -95,25 +94,25 @@ func (s *LoadBalancerClient) findLoadBalancer(service *v1.Service) (bool, *slb.L
 			}
 			// found loadbalancer id in service ingress status.
 			// this id was set previously when loadbalancer was created.
-			return s.findLoadBalancerByID(lbid, def.Region)
+			return s.findLoadBalancerByID(lbid)
 		}
 	}
 	// if service ingress status was not initialized with loadbalancer, then
 	// we check annotation to see if user had assigned a loadbalancer manually.
 	// if so , we use user defined loadbalancer
 	if def.Loadbalancerid != "" {
-		return s.findLoadBalancerByID(def.Loadbalancerid, def.Region)
+		return s.findLoadBalancerByID(def.Loadbalancerid)
 	}
 
 	// finally , fallback to find by name to compatible with old version
-	return s.findLoadBalancerByName(cloudprovider.GetLoadBalancerName(service), def.Region)
+	return s.findLoadBalancerByName(cloudprovider.GetLoadBalancerName(service))
 }
 
-func (s *LoadBalancerClient) findLoadBalancerByID(lbid string, region common.Region) (bool, *slb.LoadBalancerType, error) {
+func (s *LoadBalancerClient) findLoadBalancerByID(lbid string) (bool, *slb.LoadBalancerType, error) {
 
 	lbs, err := s.c.DescribeLoadBalancers(
 		&slb.DescribeLoadBalancersArgs{
-			RegionId:       region,
+			RegionId:       DEFAULT_REGION,
 			LoadBalancerId: lbid,
 		},
 	)
@@ -133,10 +132,10 @@ func (s *LoadBalancerClient) findLoadBalancerByID(lbid string, region common.Reg
 	return err == nil, lb, err
 }
 
-func (s *LoadBalancerClient) findLoadBalancerByName(lbn string, region common.Region) (bool, *slb.LoadBalancerType, error) {
+func (s *LoadBalancerClient) findLoadBalancerByName(lbn string) (bool, *slb.LoadBalancerType, error) {
 	lbs, err := s.c.DescribeLoadBalancers(
 		&slb.DescribeLoadBalancersArgs{
-			RegionId:         region,
+			RegionId:         DEFAULT_REGION,
 			LoadBalancerName: lbn,
 		},
 	)
@@ -314,7 +313,7 @@ func (s *LoadBalancerClient) getLoadBalancerOpts(service *v1.Service, vswitchid 
 		AddressType:        ar.AddressType,
 		InternetChargeType: ar.ChargeType,
 		//Bandwidth:          ar.Bandwidth,
-		RegionId:           ar.Region,
+		RegionId:           DEFAULT_REGION,
 		LoadBalancerSpec:   ar.LoadBalancerSpec,
 	}
 	if ar.SLBNetworkType != "classic" &&

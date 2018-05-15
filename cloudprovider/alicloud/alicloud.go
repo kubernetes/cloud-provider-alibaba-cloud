@@ -473,11 +473,11 @@ func (c *Cloud) HasClusterID() bool {
 func (c *Cloud) fileOutNode(nodes []*v1.Node, service *v1.Service) ([]*v1.Node,error) {
 
 	ar, _ := ExtractAnnotationRequest(service)
-	ns, err := c.climgr.Instances().filterOutByRegion(nodes, ar.Region)
-	if err != nil {
-		return []*v1.Node{}, err
-	}
-	targets, err := c.climgr.Instances().filterOutByLabel(ns, ar.BackendLabel)
+	//ns, err := c.climgr.Instances().filterOutByRegion(nodes, ar.Region)
+	//if err != nil {
+	//	return []*v1.Node{}, err
+	//}
+	targets, err := c.climgr.Instances().filterOutByLabel(nodes, ar.BackendLabel)
 	if err != nil {
 		return []*v1.Node{}, err
 	}
