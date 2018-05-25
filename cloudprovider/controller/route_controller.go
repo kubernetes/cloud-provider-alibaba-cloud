@@ -145,7 +145,26 @@ func (rc *RouteController) reconcile(nodes []*v1.Node, routes []*cloudprovider.R
 
 	wg := sync.WaitGroup{}
 	rateLimiter := make(chan struct{}, maxConcurrentRouteCreations)
+	for _, route := range routes {
+		if rc.isResponsibleForRoute(route) {
+			// Check if this route is a blackhole, or applies to a node we know about & has an incorrect CIDR.
+			if route.Blackhole || (cidrForNode(nodes,string(route.TargetNode)) != route.DestinationCIDR) {
+				wg.Add(1)
+				// Delete the route.
+				go func(route *cloudprovider.Route, startTime time.Time) {
+					glog.Infof("Deleting route %s %s", route.Name, route.DestinationCIDR)
+					if err := rc.routes.DeleteRoute(rc.clusterName, route); err != nil {
+						glog.Errorf("Could not delete route %s %s after %v: %v", route.Name, route.DestinationCIDR, time.Now().Sub(startTime), err)
+					} else {
+						glog.Infof("Deleted route %s %s after %v", route.Name, route.DestinationCIDR, time.Now().Sub(startTime))
+					}
+					wg.Done()
 
+				}(route, time.Now())
+			}
+		}
+	}
+	wg.Wait()
 	for _, node := range nodes {
 		// Skip if the node hasn't been assigned a CIDR yet.
 		if node.Spec.PodCIDR == "" {
@@ -209,27 +228,17 @@ func (rc *RouteController) reconcile(nodes []*v1.Node, routes []*cloudprovider.R
 		}
 		nodeCIDRs[nodeName] = node.Spec.PodCIDR
 	}
-	for _, route := range routes {
-		if rc.isResponsibleForRoute(route) {
-			// Check if this route is a blackhole, or applies to a node we know about & has an incorrect CIDR.
-			if route.Blackhole || (nodeCIDRs[route.TargetNode] != route.DestinationCIDR) {
-				wg.Add(1)
-				// Delete the route.
-				go func(route *cloudprovider.Route, startTime time.Time) {
-					glog.Infof("Deleting route %s %s", route.Name, route.DestinationCIDR)
-					if err := rc.routes.DeleteRoute(rc.clusterName, route); err != nil {
-						glog.Errorf("Could not delete route %s %s after %v: %v", route.Name, route.DestinationCIDR, time.Now().Sub(startTime), err)
-					} else {
-						glog.Infof("Deleted route %s %s after %v", route.Name, route.DestinationCIDR, time.Now().Sub(startTime))
-					}
-					wg.Done()
-
-				}(route, time.Now())
-			}
-		}
-	}
 	wg.Wait()
 	return nil
+}
+
+func cidrForNode(nodes []*v1.Node, name string) string {
+	for _, node := range nodes {
+		if node.Name == name {
+			return node.Spec.PodCIDR
+		}
+	}
+	return ""
 }
 
 func (rc *RouteController) updateNetworkingCondition(nodeName types.NodeName, routeCreated bool) error {
