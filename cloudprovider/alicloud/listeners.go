@@ -428,6 +428,7 @@ func (f *ListenerManager) NewHTTP() ListenerInterface {
 				HealthCheckInterval: request.HealthCheckInterval,
 				HealthCheckDomain:	def.HealthCheckDomain,
 				HealthCheck: 		def.HealthCheck,
+				HealthCheckTimeout:     def.HealthCheckTimeout,
 			},
 		)
 	}

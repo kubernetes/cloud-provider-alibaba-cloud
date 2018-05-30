@@ -46,10 +46,13 @@ var (
 type CloudConfig struct {
 	Global struct {
 		KubernetesClusterTag string
+		VpcID 		string `json:"vpcid"`
+		Region 		string `json:"region"`
+		ZoneID          string `json:"zoneid"`
+
 
 		AccessKeyID     string `json:"accessKeyID"`
 		AccessKeySecret string `json:"accessKeySecret"`
-		Region          string `json:"region"`
 	}
 }
 

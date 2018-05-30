@@ -203,7 +203,7 @@ func ExtractAnnotationRequest(service *v1.Service) (*AnnotationRequest, *Annotat
 
 	healthCheckTimeout,ok := annotation[ServiceAnnotationLoadBalancerHealthCheckTimeout]
 	if ok {
-		hout, err := strconv.Atoi(annotation[healthCheckTimeout])
+		hout, err := strconv.Atoi(healthCheckTimeout)
 		if err != nil {
 			glog.Warningf("annotation service.beta.kubernetes.io/alicloud-loadbalancer-health-check-timeout must be integer, but got [%s], use default number 5. message=[%s]\n",
 				healthCheckConnectTimeout, err.Error())
@@ -231,6 +231,9 @@ func ExtractAnnotationRequest(service *v1.Service) (*AnnotationRequest, *Annotat
 	if ok {
 		request.StickySession   = slb.FlagType(stickSession)
 		defaulted.StickySession = request.StickySession
+	}else{
+		request.StickySession   = slb.FlagType(stickSession)
+		defaulted.StickySession = slb.OffFlag
 	}
 
 	// stick session type
