@@ -1,3 +1,19 @@
+/*
+Copyright 2018 The Kubernetes Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
 package alicloud
 
 import (
@@ -665,6 +681,7 @@ func (f *ListenerManager) Apply() error {
 
 func (f *ListenerManager) Updations() error {
 	anno := serviceAnnotation(f.service, ServiceAnnotationLoadBalancerProtocolPort)
+
 	for _, spec := range f.service.Spec.Ports {
 		found := false
 		realProtocol,err := Protocol(anno, spec)
@@ -697,7 +714,11 @@ func (f *ListenerManager) Updations() error {
 			}
 		}
 		// todo : here should retry
-		return f.client.StartLoadBalancerListener(f.loadbalancer.LoadBalancerId, int(spec.Port))
+		if err := f.client.StartLoadBalancerListener(
+			f.loadbalancer.LoadBalancerId, int(spec.Port));
+			err != nil {
+			return err
+		}
 	}
 	return nil
 }

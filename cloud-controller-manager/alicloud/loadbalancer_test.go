@@ -1,3 +1,19 @@
+/*
+Copyright 2018 The Kubernetes Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
 package alicloud
 
 import (
@@ -181,6 +197,11 @@ type mockClientSLB struct {
 	describeLoadBalancerTCPListenerAttribute   func(loadBalancerId string, port int) (response *slb.DescribeLoadBalancerTCPListenerAttributeResponse, err error)
 	describeLoadBalancerUDPListenerAttribute   func(loadBalancerId string, port int) (response *slb.DescribeLoadBalancerUDPListenerAttributeResponse, err error)
 	describeLoadBalancerHTTPListenerAttribute  func(loadBalancerId string, port int) (response *slb.DescribeLoadBalancerHTTPListenerAttributeResponse, err error)
+
+	setLoadBalancerHTTPListenerAttribute 	   func(args *slb.SetLoadBalancerHTTPListenerAttributeArgs) (err error)
+	setLoadBalancerHTTPSListenerAttribute      func(args *slb.SetLoadBalancerHTTPSListenerAttributeArgs) (err error)
+	setLoadBalancerTCPListenerAttribute        func(args *slb.SetLoadBalancerTCPListenerAttributeArgs) (err error)
+	setLoadBalancerUDPListenerAttribute        func(args *slb.SetLoadBalancerUDPListenerAttributeArgs) (err error)
 }
 
 var (
@@ -326,4 +347,32 @@ func (c *mockClientSLB) DescribeLoadBalancerHTTPListenerAttribute(loadBalancerId
 		return c.describeLoadBalancerHTTPListenerAttribute(loadBalancerId, port)
 	}
 	return nil, nil
+}
+
+func (c *mockClientSLB) SetLoadBalancerHTTPListenerAttribute(args *slb.SetLoadBalancerHTTPListenerAttributeArgs) (err error) {
+	if c.setLoadBalancerHTTPListenerAttribute != nil {
+		return c.setLoadBalancerHTTPListenerAttribute(args)
+	}
+	return nil
+}
+
+func (c *mockClientSLB) SetLoadBalancerHTTPSListenerAttribute(args *slb.SetLoadBalancerHTTPSListenerAttributeArgs) (err error){
+	if c.setLoadBalancerHTTPSListenerAttribute != nil {
+		return c.setLoadBalancerHTTPSListenerAttribute(args)
+	}
+	return nil
+}
+
+func (c *mockClientSLB) SetLoadBalancerTCPListenerAttribute(args *slb.SetLoadBalancerTCPListenerAttributeArgs) (err error){
+	if c.setLoadBalancerTCPListenerAttribute != nil {
+		return c.setLoadBalancerTCPListenerAttribute(args)
+	}
+	return nil
+}
+
+func (c *mockClientSLB) SetLoadBalancerUDPListenerAttribute(args *slb.SetLoadBalancerUDPListenerAttributeArgs) (err error){
+	if c.setLoadBalancerUDPListenerAttribute != nil {
+		return c.setLoadBalancerUDPListenerAttribute(args)
+	}
+	return nil
 }
