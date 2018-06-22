@@ -52,7 +52,7 @@ If you are not sure how to find your ECS instance's ID and region id, try to run
 
 1. Prepare `cloud-controller-manager` daemonset yaml
 
-Mare sure container image, `--cluster-cidr` field match what your needs.
+Mare sure container image, `--cluster-cidr` field match what your needs. replace image with your version.
 
 ```
 apiVersion: extensions/v1beta1

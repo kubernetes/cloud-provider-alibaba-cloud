@@ -31,6 +31,7 @@ import (
 	"errors"
 	"github.com/denverdino/aliyungo/ecs"
 	"github.com/denverdino/aliyungo/common"
+	"k8s.io/kubernetes/pkg/cloudprovider"
 )
 
 var keyid 	string
@@ -51,54 +52,6 @@ var (
 	serviceUID        = "UID-1234567890-0987654321-1234556"
 	nodeName          = "iZuf694l8lw6xvdx6gh7tkZ"
 )
-
-func TestLoadBalancerDomain(t *testing.T) {
-	domain := loadBalancerDomain("", "idd",string(DEFAULT_REGION))
-	t.Log(domain)
-	if domain != "idd.cn-hangzhou.alicontainer.com" {
-		t.Fatal("TestLoadBalancerDomain fail")
-	}
-	domain = loadBalancerDomain("user", "idd",string(DEFAULT_REGION))
-	t.Log(domain)
-	if domain != "user.idd.cn-hangzhou.alicontainer.com" {
-		t.Fatal("TestLoadBalancerDomain with user fail")
-	}
-}
-
-func TestFromLoadBalancerDomain(t *testing.T) {
-	service := &v1.Service{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "my-service",
-			UID:  types.UID(serviceUID),
-		},
-		Spec: v1.ServiceSpec{
-			Type:            v1.ServiceTypeLoadBalancer,
-			SessionAffinity: v1.ServiceAffinityNone,
-		},
-		Status: v1.ServiceStatus{
-			LoadBalancer: v1.LoadBalancerStatus{
-				Ingress: []v1.LoadBalancerIngress{
-					{
-						IP: 		"1.1.1.1",
-						// indicate user defined loadbalancer
-						Hostname: 	loadBalancerDomain("my-service","lbid",string(DEFAULT_REGION)),
-					},
-				},
-			},
-		},
-	}
-
-	lbid := fromLoadBalancerStatus(service)
-	if lbid != "lbid" {
-		t.Fatal("must equal to lbid")
-	}
-	t.Log(lbid)
-	service.Status.LoadBalancer.Ingress[0].Hostname = loadBalancerDomain("","lbid",string(DEFAULT_REGION))
-	t.Log(lbid)
-	if lbid != "lbid" {
-		t.Fatal("short must equal to lbid")
-	}
-}
 
 func TestBase64(t *testing.T) {
 	data := "YWJjCg=="
@@ -188,7 +141,10 @@ func TestEnsureLoadBalancerBasic(t *testing.T) {
 			if args.LoadBalancerName != "" {
 				base[0].LoadBalancerName = args.LoadBalancerName
 				return base, nil
-			} else {
+			}
+			if len(args.Tags)>0{
+				base[0].LoadBalancerName = cloudprovider.GetLoadBalancerName(service)
+			}else {
 				return nil, errors.New("loadbalancerid or loadbanancername must be specified.\n")
 			}
 			return base, nil
@@ -371,7 +327,10 @@ func TestEnsureLoadBalancerHTTPS(t *testing.T) {
 			if args.LoadBalancerName != "" {
 				base[0].LoadBalancerName = args.LoadBalancerName
 				return base, nil
-			} else {
+			}
+			if len(args.Tags)>0{
+				base[0].LoadBalancerName = cloudprovider.GetLoadBalancerName(service)
+			}else {
 				return nil, errors.New("loadbalancerid or loadbanancername must be specified.\n")
 			}
 			return base, nil
@@ -552,7 +511,10 @@ func TestEnsureLoadBalancerWithPortChange(t *testing.T) {
 			if args.LoadBalancerName != "" {
 				base[0].LoadBalancerName = args.LoadBalancerName
 				return base, nil
-			} else {
+			}
+			if len(args.Tags)>0{
+				base[0].LoadBalancerName = cloudprovider.GetLoadBalancerName(service)
+			}else {
 				return nil, errors.New("loadbalancerid or loadbanancername must be specified.\n")
 			}
 			return base, nil
@@ -761,7 +723,10 @@ func TestEnsureLoadbalancerDeleted(t *testing.T) {
 			if args.LoadBalancerName != "" {
 				base[0].LoadBalancerName = args.LoadBalancerName
 				return base, nil
-			} else {
+			}
+			if len(args.Tags)>0{
+				base[0].LoadBalancerName = cloudprovider.GetLoadBalancerName(service)
+			}else {
 				return nil, errors.New("loadbalancerid or loadbanancername must be specified.\n")
 			}
 			return base, nil
@@ -832,6 +797,9 @@ func TestEnsureLoadBalancerDeleteWithUserDefined(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "my-service",
 			UID:  types.UID(serviceUID),
+			Annotations: map[string]string{
+				//ServiceAnnotationLoadBalancerId: "idbllll",
+			},
 		},
 		Spec: v1.ServiceSpec{
 			Ports: []v1.ServicePort{
@@ -845,8 +813,6 @@ func TestEnsureLoadBalancerDeleteWithUserDefined(t *testing.T) {
 				Ingress: []v1.LoadBalancerIngress{
 					{
 						IP: 		"1.1.1.1",
-						// indicate user defined loadbalancer
-						Hostname: 	loadBalancerDomain("my-service",base[0].LoadBalancerId,string(DEFAULT_REGION)),
 					},
 				},
 			},
@@ -864,7 +830,10 @@ func TestEnsureLoadBalancerDeleteWithUserDefined(t *testing.T) {
 			if args.LoadBalancerName != "" {
 				base[0].LoadBalancerName = args.LoadBalancerName
 				return base, nil
-			} else {
+			}
+			if len(args.Tags)>0{
+				base[0].LoadBalancerName = cloudprovider.GetLoadBalancerName(service)
+			}else {
 				return nil, errors.New("loadbalancerid or loadbanancername must be specified.\n")
 			}
 			return base, nil
@@ -873,7 +842,7 @@ func TestEnsureLoadBalancerDeleteWithUserDefined(t *testing.T) {
 			t.Logf("findloadbalancer, [%s]", loadBalancerId)
 			return loadbalancerAttrib(&base[0]), nil
 		},
-		deleteLoadBalancer:             func(loadBalancerId string) (err error) {
+		deleteLoadBalancer:  func(loadBalancerId string) (err error) {
 			base = []slb.LoadBalancerType{}
 			return nil
 		},
@@ -889,15 +858,8 @@ func TestEnsureLoadBalancerDeleteWithUserDefined(t *testing.T) {
 		t.Errorf("TestEnsureLoadBalancerDeleteWithUserDefined error: %s\n", e.Error())
 	}
 	t.Log(PrettyJson(base))
-	if len(base) != 1 {
-		t.Fatal("TestEnsureLoadBalancerDeleteWithUserDefined error, expected not to be deleted")
-	}
-
-	base = newBaseLoadbalancer()
-	service.Status.LoadBalancer.Ingress[0].Hostname = loadBalancerDomain("",base[0].LoadBalancerId,string(DEFAULT_REGION))
-	e = cloud.EnsureLoadBalancerDeleted(clusterName, service)
 	if len(base) != 0 {
-		t.Fatal("TestEnsureLoadBalancerDeleteWithUserDefined error, expected to be deleted")
+		t.Fatal("TestEnsureLoadBalancerDeleteWithUserDefined error, expected not to be deleted")
 	}
 }
 

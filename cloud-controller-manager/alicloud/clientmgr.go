@@ -26,6 +26,8 @@ import (
 	"github.com/golang/glog"
 	"github.com/patrickmn/go-cache"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"fmt"
+	"strings"
 )
 
 var ROLE_NAME = "KubernetesMasterRole"
@@ -52,7 +54,7 @@ type ClientMgr struct {
 
 	token *TokenAuth
 
-	meta         *metadata.MetaData
+	meta         IMetaData
 	routes       *RoutesClient
 	loadbalancer *LoadBalancerClient
 	instance     *InstanceClient
@@ -66,7 +68,7 @@ func NewClientMgr(key, secret string) (*ClientMgr, error) {
 		},
 		active: false,
 	}
-	m := metadata.NewMetaData(nil)
+	m := NewMetaData()
 
 	if key == "" || secret == "" {
 		if rolename, err := m.RoleName(); err != nil {
@@ -142,7 +144,169 @@ func (c *ClientMgr) LoadBalancers() *LoadBalancerClient {
 	return c.loadbalancer
 }
 
-func (c *ClientMgr) MetaData() *metadata.MetaData {
+func (c *ClientMgr) MetaData() IMetaData {
 
 	return c.meta
 }
+
+type IMetaData interface {
+	HostName()(string, error)
+	ImageID() (string, error)
+	InstanceID() (string, error)
+	Mac() (string, error)
+	NetworkType() (string, error)
+	OwnerAccountID() (string, error)
+	PrivateIPv4() (string, error)
+	Region() (string, error)
+	SerialNumber() (string, error)
+	SourceAddress() (string, error)
+	VpcCIDRBlock() (string, error)
+	VpcID() (string, error)
+	VswitchCIDRBlock() (string, error)
+	Zone() (string, error)
+	NTPConfigServers() ([]string, error)
+	RoleName() (string, error)
+	RamRoleToken(role string) (metadata.RoleAuth, error)
+	VswitchID() (string, error)
+}
+
+func NewMetaData() IMetaData{
+	if cfg.Global.Region != "" &&
+		cfg.Global.VpcID != "" &&
+		cfg.Global.VswitchID != "" &&
+		cfg.Global.ZoneID != "" {
+		glog.V(2).Infof("use mocked metadata server.")
+		return &fakeMetaData{base: metadata.NewMetaData(nil)}
+	}
+	return metadata.NewMetaData(nil)
+}
+
+type fakeMetaData struct {
+	base 	IMetaData
+}
+
+func (m *fakeMetaData) HostName() (string, error) {
+
+	return "",fmt.Errorf("unimplemented")
+}
+
+func (m *fakeMetaData) ImageID() (string, error) {
+
+	return "",fmt.Errorf("unimplemented")
+}
+
+func (m *fakeMetaData) InstanceID() (string, error) {
+
+	return "fakedInstanceid",nil
+}
+
+func (m *fakeMetaData) Mac() (string, error) {
+
+	return "",fmt.Errorf("unimplemented")
+}
+
+func (m *fakeMetaData) NetworkType() (string, error) {
+
+	return "",fmt.Errorf("unimplemented")
+}
+
+func (m *fakeMetaData) OwnerAccountID() (string, error) {
+
+	return "",fmt.Errorf("unimplemented")
+}
+
+func (m *fakeMetaData) PrivateIPv4() (string, error) {
+
+	return "",fmt.Errorf("unimplemented")
+}
+
+func (m *fakeMetaData) Region() (string, error) {
+	if cfg.Global.Region != "" {
+		return cfg.Global.Region, nil
+	}
+	return m.base.Region()
+}
+
+func (m *fakeMetaData) SerialNumber() (string, error) {
+
+	return "",fmt.Errorf("unimplemented")
+}
+
+func (m *fakeMetaData) SourceAddress() (string, error) {
+
+	return "",fmt.Errorf("unimplemented")
+
+}
+
+func (m *fakeMetaData) VpcCIDRBlock() (string, error) {
+
+	return "",fmt.Errorf("unimplemented")
+}
+
+func (m *fakeMetaData) VpcID() (string, error) {
+
+	return cfg.Global.VpcID,nil
+}
+
+func (m *fakeMetaData) VswitchCIDRBlock() (string, error) {
+
+	return "",fmt.Errorf("unimplemented")
+}
+
+// zone1:vswitchid1,zone2:vswitch2
+func (m *fakeMetaData) VswitchID() (string, error) {
+
+	zlist := strings.Split(cfg.Global.VswitchID,",")
+	if len(zlist) == 1 {
+		glog.Infof("simple vswitchid mode, %s",cfg.Global.VswitchID)
+		return cfg.Global.VswitchID,nil
+	}
+	zone, err := m.Zone()
+	if err != nil {
+		return "",fmt.Errorf("retrieve vswitchid error for %s",err.Error())
+	}
+	for _, zone := range zlist {
+		vs := strings.Split(zone,":")
+		if len(vs) != 2 {
+			return "", fmt.Errorf("cloud-config vswitch format error: %s",cfg.Global.VswitchID)
+		}
+		if vs[0] == zone {
+			return vs[1], nil
+		}
+	}
+	glog.Infof("zone[%s] match failed, fallback with simple vswitch id mode, [%s]",zone,cfg.Global.VswitchID)
+	return cfg.Global.VswitchID, nil
+}
+
+func (m *fakeMetaData) EIPv4() (string, error) {
+
+	return "",fmt.Errorf("unimplemented")
+}
+
+func (m *fakeMetaData) DNSNameServers() ([]string, error) {
+
+	return []string{""},fmt.Errorf("unimplemented")
+}
+
+func (m *fakeMetaData) NTPConfigServers() ([]string, error) {
+
+	return []string{""},fmt.Errorf("unimplemented")
+}
+
+func (m *fakeMetaData) Zone() (string, error) {
+	if cfg.Global.ZoneID != "" {
+		return cfg.Global.ZoneID, nil
+	}
+	return m.base.Zone()
+}
+
+func (m *fakeMetaData) RoleName() (string, error) {
+
+	return "",fmt.Errorf("unimplemented")
+}
+
+func (m *fakeMetaData) RamRoleToken(role string) (metadata.RoleAuth, error) {
+
+	return metadata.RoleAuth{},fmt.Errorf("unimplemented")
+}
+

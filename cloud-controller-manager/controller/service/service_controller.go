@@ -201,11 +201,11 @@ clusterName string,
 	serviceInformer.Informer().AddEventHandlerWithResyncPeriod(
 		cache.ResourceEventHandlerFuncs{
 			AddFunc: func(cur interface{}) {
-				if !needLoadBalancer(cur.(*v1.Service)) {
-					key, _ := controller.KeyFunc(cur)
-					glog.Infof("controller: do not need loadbalancer ,skip. %s\n",key)
-					return
-				}
+				//if !needLoadBalancer(cur.(*v1.Service)) {
+				//	key, _ := controller.KeyFunc(cur)
+				//	glog.Infof("controller: do not need loadbalancer ,skip. %s\n",key)
+				//	return
+				//}
 				svc := cur.(*v1.Service)
 				glog.V(5).Infof("controller: Add event, service [%s/%s]\n",svc.Namespace, svc.Name)
 				s.enqueueService(cur)
@@ -578,7 +578,12 @@ func (s *ServiceController) syncBackend(service *cachedService) (error) {
 	if len(nodes) == 0 {
 		s.eventRecorder.Eventf(service.state, v1.EventTypeWarning, "UnAvailableLoadBalancer", "There are no available nodes for LoadBalancer service %s/%s", service.state.Namespace, service.state.Name)
 	}
-
+	// service holds the latest service info from apiserver
+	_, err = s.serviceLister.Services(service.state.Namespace).Get(service.state.Name)
+	if errors.IsNotFound(err) {
+		glog.Infof("SyncBackend: Service has been deleted %v", key)
+		return nil
+	}
 	// here we should not check for the neediness of updating loadbalancer.
 	// Because, the provider may need to filter by label again.
 	/*

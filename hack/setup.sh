@@ -1,5 +1,5 @@
 #!/bin/bash
-set -e
+set -e -x
 if [ -z $APISERVER_IP ];then
 	APISERVER_IP=47.97.236.85
 fi

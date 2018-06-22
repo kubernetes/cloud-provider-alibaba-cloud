@@ -93,7 +93,10 @@ func TestFindLoadBalancer(t *testing.T) {
 			if args.LoadBalancerName != "" {
 				base[0].LoadBalancerName = args.LoadBalancerName
 				return base, nil
-			} else {
+			}
+			if len(args.Tags)>0{
+				base[0].LoadBalancerName = cloudprovider.GetLoadBalancerName(service)
+			}else {
 				return nil, errors.New("loadbalancerid or loadbanancername must be specified.\n")
 			}
 			return base, nil
@@ -126,23 +129,6 @@ func TestFindLoadBalancer(t *testing.T) {
 		t.Fatal("Test findLoadBalancer fail.")
 	}
 	if lb.LoadBalancerId != LOADBALANCER_ID+"-new" {
-		t.Fatal("find loadbalancer fail. suppose to find by exist loadbalancerid.")
-	}
-
-	// 3.
-	// user has already create a loadbalancer. use ingress status`s id instead.
-	delete(service.Annotations, ServiceAnnotationLoadBalancerId)
-	ingress := v1.LoadBalancerIngress{
-		IP:       LOADBALANCER_ADDRESS,
-		Hostname: loadBalancerDomain("my-service",LOADBALANCER_ID+"-ingress",string(DEFAULT_REGION)),
-	}
-	service.Status.LoadBalancer.Ingress = append(service.Status.LoadBalancer.Ingress, ingress)
-	exist, lb, err = mgr.loadbalancer.findLoadBalancer(service)
-	if err != nil || !exist {
-		t.Logf("3.user has already create a loadbalancer. use ingress status`s id instead")
-		t.Fatal("Test findLoadBalancer fail.")
-	}
-	if lb.LoadBalancerId != LOADBALANCER_ID+"-ingress" {
 		t.Fatal("find loadbalancer fail. suppose to find by exist loadbalancerid.")
 	}
 }
@@ -202,6 +188,9 @@ type mockClientSLB struct {
 	setLoadBalancerHTTPSListenerAttribute      func(args *slb.SetLoadBalancerHTTPSListenerAttributeArgs) (err error)
 	setLoadBalancerTCPListenerAttribute        func(args *slb.SetLoadBalancerTCPListenerAttributeArgs) (err error)
 	setLoadBalancerUDPListenerAttribute        func(args *slb.SetLoadBalancerUDPListenerAttributeArgs) (err error)
+	removeTags 				   func(args *slb.RemoveTagsArgs) error
+	describeTags 				   func(args *slb.DescribeTagsArgs) (tags []slb.TagItemType, pagination *common.PaginationResult, err error)
+	addTags 				   func(args *slb.AddTagsArgs) error
 }
 
 var (
@@ -373,6 +362,25 @@ func (c *mockClientSLB) SetLoadBalancerTCPListenerAttribute(args *slb.SetLoadBal
 func (c *mockClientSLB) SetLoadBalancerUDPListenerAttribute(args *slb.SetLoadBalancerUDPListenerAttributeArgs) (err error){
 	if c.setLoadBalancerUDPListenerAttribute != nil {
 		return c.setLoadBalancerUDPListenerAttribute(args)
+	}
+	return nil
+}
+
+func (c *mockClientSLB) RemoveTags(args *slb.RemoveTagsArgs) error {
+	if c.removeTags != nil {
+		return c.removeTags(args)
+	}
+	return nil
+}
+func (c *mockClientSLB) DescribeTags(args *slb.DescribeTagsArgs) (tags []slb.TagItemType, pagination *common.PaginationResult, err error){
+	if c.describeTags != nil {
+		return c.describeTags(args)
+	}
+	return []slb.TagItemType{}, nil, nil
+}
+func (c *mockClientSLB) AddTags(args *slb.AddTagsArgs) error{
+	if c.addTags != nil {
+		return c.addTags(args)
 	}
 	return nil
 }

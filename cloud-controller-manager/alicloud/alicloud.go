@@ -65,12 +65,14 @@ type CloudConfig struct {
 		VpcID 		string `json:"vpcid"`
 		Region 		string `json:"region"`
 		ZoneID          string `json:"zoneid"`
-
+		VswitchID 	string `json:"vswitchid"`
 
 		AccessKeyID     string `json:"accessKeyID"`
 		AccessKeySecret string `json:"accessKeySecret"`
 	}
 }
+
+var cfg CloudConfig
 
 func init() {
 	cloudprovider.RegisterCloudProvider(ProviderName,
@@ -80,7 +82,6 @@ func init() {
 				keysecret = ""
 			)
 			if config != nil {
-				var cfg CloudConfig
 				if err := json.NewDecoder(config).Decode(&cfg); err != nil {
 					return nil, err
 				}
@@ -153,7 +154,7 @@ func (c *Cloud) GetLoadBalancer(clusterName string, service *v1.Service) (status
 	}
 
 	return &v1.LoadBalancerStatus{
-		Ingress: []v1.LoadBalancerIngress{{IP: lb.Address, Hostname: domain(service, lb)}}}, true, nil
+		Ingress: []v1.LoadBalancerIngress{{IP: lb.Address}}}, true, nil
 }
 
 // EnsureLoadBalancer creates a new load balancer 'name', or updates the existing one. Returns the status of the balancer
@@ -210,7 +211,6 @@ func (c *Cloud) EnsureLoadBalancer(clusterName string, service *v1.Service, node
 		Ingress: []v1.LoadBalancerIngress{
 			{
 				IP:       lb.Address,
-				Hostname: domain(service, lb),
 			},
 		},
 	}, nil
@@ -241,7 +241,6 @@ func (c *Cloud) UpdateLoadBalancer(clusterName string, service *v1.Service, node
 func (c *Cloud) EnsureLoadBalancerDeleted(clusterName string, service *v1.Service) error {
 	glog.V(2).Infof("Alicloud.EnsureLoadBalancerDeleted(%v, %v, %v, %v, %v, %v)",
 		clusterName, service.Namespace, service.Name, c.region, service.Spec.LoadBalancerIP, service.Spec.Ports)
-	glog.V(4).Infof("SERVICE: %+v\n",service)
 	return c.climgr.LoadBalancers().EnsureLoadBalanceDeleted(service)
 }
 
@@ -387,6 +386,12 @@ func (c *Cloud) DeleteRoute(clusterName string, route *cloudprovider.Route) erro
 
 // GetZone returns the Zone containing the current failure zone and locality region that the program is running in
 func (c *Cloud) GetZone() (cloudprovider.Zone, error) {
+	if cfg.Global.ZoneID != "" && cfg.Global.Region != "" {
+		return cloudprovider.Zone{
+			Region:        cfg.Global.Region,
+			FailureDomain: cfg.Global.ZoneID,
+		}, nil
+	}
 	host, err := c.climgr.MetaData().InstanceID()
 	if err != nil {
 		return cloudprovider.Zone{}, errors.New(fmt.Sprintf("Alicloud.GetZone(): error execute c.meta.InstanceID(). message=[%s]", err.Error()))
