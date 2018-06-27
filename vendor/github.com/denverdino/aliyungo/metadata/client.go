@@ -446,3 +446,4 @@ type RoleAuth struct {
 	LastUpdated     time.Time
 	Code            string
 }
+

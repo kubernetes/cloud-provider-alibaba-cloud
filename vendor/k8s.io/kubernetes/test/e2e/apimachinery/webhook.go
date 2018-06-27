@@ -46,28 +46,29 @@ import (
 )
 
 const (
-	secretName                   = "sample-webhook-secret"
-	deploymentName               = "sample-webhook-deployment"
-	serviceName                  = "e2e-test-webhook"
-	roleBindingName              = "webhook-auth-reader"
-	webhookConfigName            = "e2e-test-webhook-config"
-	mutatingWebhookConfigName    = "e2e-test-mutating-webhook-config"
-	skipNamespaceLabelKey        = "skip-webhook-admission"
-	skipNamespaceLabelValue      = "yes"
-	skippedNamespaceName         = "exempted-namesapce"
-	disallowedPodName            = "disallowed-pod"
-	disallowedConfigMapName      = "disallowed-configmap"
-	allowedConfigMapName         = "allowed-configmap"
-	crdName                      = "e2e-test-webhook-crd"
-	crdKind                      = "E2e-test-webhook-crd"
-	crdWebhookConfigName         = "e2e-test-webhook-config-crd"
-	crdMutatingWebhookConfigName = "e2e-test-mutating-webhook-config-crd"
-	crdAPIGroup                  = "webhook-crd-test.k8s.io"
-	crdAPIVersion                = "v1"
-	webhookFailClosedConfigName  = "e2e-test-webhook-fail-closed"
-	failNamespaceLabelKey        = "fail-closed-webhook"
-	failNamespaceLabelValue      = "yes"
-	failNamespaceName            = "fail-closed-namesapce"
+	secretName                  = "sample-webhook-secret"
+	deploymentName              = "sample-webhook-deployment"
+	serviceName                 = "e2e-test-webhook"
+	roleBindingName             = "webhook-auth-reader"
+	webhookConfigName           = "e2e-test-webhook-config"
+	mutatingWebhookConfigName   = "e2e-test-mutating-webhook-config"
+	skipNamespaceLabelKey       = "skip-webhook-admission"
+	skipNamespaceLabelValue     = "yes"
+	skippedNamespaceName        = "exempted-namesapce"
+	disallowedPodName           = "disallowed-pod"
+	disallowedConfigMapName     = "disallowed-configmap"
+	allowedConfigMapName        = "allowed-configmap"
+	crdName                     = "e2e-test-webhook-crd"
+	crdKind                     = "E2e-test-webhook-crd"
+	crWebhookConfigName         = "e2e-test-webhook-config-cr"
+	crdWebhookConfigName        = "e2e-test-webhook-config-crd"
+	crMutatingWebhookConfigName = "e2e-test-mutating-webhook-config-cr"
+	crdAPIGroup                 = "webhook-crd-test.k8s.io"
+	crdAPIVersion               = "v1"
+	webhookFailClosedConfigName = "e2e-test-webhook-fail-closed"
+	failNamespaceLabelKey       = "fail-closed-webhook"
+	failNamespaceLabelValue     = "yes"
+	failNamespaceName           = "fail-closed-namesapce"
 )
 
 var serverWebhookVersion = utilversion.MustParseSemantic("v1.8.0")
@@ -99,7 +100,7 @@ var _ = SIGDescribe("AdmissionWebhook", func() {
 		// Note that in 1.9 we will have backwards incompatible change to
 		// admission webhooks, so the image will be updated to 1.9 sometime in
 		// the development 1.9 cycle.
-		deployWebhookAndService(f, "gcr.io/kubernetes-e2e-test-images/k8s-sample-admission-webhook-amd64:1.9v1", context)
+		deployWebhookAndService(f, "gcr.io/kubernetes-e2e-test-images/k8s-sample-admission-webhook-amd64:1.10v2", context)
 	})
 	AfterEach(func() {
 		cleanWebhookTest(client, namespaceName)
@@ -114,9 +115,9 @@ var _ = SIGDescribe("AdmissionWebhook", func() {
 	It("Should be able to deny custom resource creation", func() {
 		crdCleanup, dynamicClient := createCRD(f)
 		defer crdCleanup()
-		registerWebhookForCRD(f, context)
-		defer client.AdmissionregistrationV1beta1().ValidatingWebhookConfigurations().Delete(crdWebhookConfigName, nil)
-		testCRDWebhook(f, dynamicClient)
+		registerWebhookForCustomResource(f, context)
+		defer client.AdmissionregistrationV1beta1().ValidatingWebhookConfigurations().Delete(crWebhookConfigName, nil)
+		testCustomResourceWebhook(f, dynamicClient)
 	})
 
 	It("Should unconditionally reject operations on fail closed webhook", func() {
@@ -137,12 +138,19 @@ var _ = SIGDescribe("AdmissionWebhook", func() {
 		testMutatingPodWebhook(f)
 	})
 
-	It("Should mutate crd", func() {
+	It("Should mutate custom resource", func() {
 		crdCleanup, dynamicClient := createCRD(f)
 		defer crdCleanup()
-		registerMutatingWebhookForCRD(f, context)
-		defer client.AdmissionregistrationV1beta1().MutatingWebhookConfigurations().Delete(crdMutatingWebhookConfigName, nil)
-		testMutatingCRDWebhook(f, dynamicClient)
+		registerMutatingWebhookForCustomResource(f, context)
+		defer client.AdmissionregistrationV1beta1().MutatingWebhookConfigurations().Delete(crMutatingWebhookConfigName, nil)
+		testMutatingCustomResourceWebhook(f, dynamicClient)
+	})
+
+	It("Should deny crd creation", func() {
+		crdWebhookCleanup := registerValidatingWebhookForCRD(f, context)
+		defer crdWebhookCleanup()
+
+		testCRDDenyWebhook(f)
 	})
 
 	// TODO: add more e2e tests for mutating webhooks
@@ -814,18 +822,19 @@ func createCRD(f *framework.Framework) (func(), dynamic.ResourceInterface) {
 	}, resourceClient
 }
 
-func registerWebhookForCRD(f *framework.Framework, context *certContext) {
+func registerWebhookForCustomResource(f *framework.Framework, context *certContext) {
 	client := f.ClientSet
-	By("Registering the crd webhook via the AdmissionRegistration API")
+	By("Registering the custom resource webhook via the AdmissionRegistration API")
 
 	namespace := f.Namespace.Name
+	configName := crWebhookConfigName
 	_, err := client.AdmissionregistrationV1beta1().ValidatingWebhookConfigurations().Create(&v1beta1.ValidatingWebhookConfiguration{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: crdWebhookConfigName,
+			Name: configName,
 		},
 		Webhooks: []v1beta1.Webhook{
 			{
-				Name: "deny-unwanted-crd-data.k8s.io",
+				Name: "deny-unwanted-custom-resource-data.k8s.io",
 				Rules: []v1beta1.RuleWithOperations{{
 					Operations: []v1beta1.OperationType{v1beta1.Create},
 					Rule: v1beta1.Rule{
@@ -838,31 +847,32 @@ func registerWebhookForCRD(f *framework.Framework, context *certContext) {
 					Service: &v1beta1.ServiceReference{
 						Namespace: namespace,
 						Name:      serviceName,
-						Path:      strPtr("/crd"),
+						Path:      strPtr("/custom-resource"),
 					},
 					CABundle: context.signingCert,
 				},
 			},
 		},
 	})
-	framework.ExpectNoError(err, "registering crd webhook config %s with namespace %s", webhookConfigName, namespace)
+	framework.ExpectNoError(err, "registering custom resource webhook config %s with namespace %s", configName, namespace)
 
 	// The webhook configuration is honored in 1s.
 	time.Sleep(10 * time.Second)
 }
 
-func registerMutatingWebhookForCRD(f *framework.Framework, context *certContext) {
+func registerMutatingWebhookForCustomResource(f *framework.Framework, context *certContext) {
 	client := f.ClientSet
-	By("Registering the mutating webhook for crd via the AdmissionRegistration API")
+	By("Registering the mutating webhook for a custom resource via the AdmissionRegistration API")
 
 	namespace := f.Namespace.Name
+	configName := crMutatingWebhookConfigName
 	_, err := client.AdmissionregistrationV1beta1().MutatingWebhookConfigurations().Create(&v1beta1.MutatingWebhookConfiguration{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: crdMutatingWebhookConfigName,
+			Name: configName,
 		},
 		Webhooks: []v1beta1.Webhook{
 			{
-				Name: "mutate-crd-data-stage-1.k8s.io",
+				Name: "mutate-custom-resource-data-stage-1.k8s.io",
 				Rules: []v1beta1.RuleWithOperations{{
 					Operations: []v1beta1.OperationType{v1beta1.Create},
 					Rule: v1beta1.Rule{
@@ -875,13 +885,13 @@ func registerMutatingWebhookForCRD(f *framework.Framework, context *certContext)
 					Service: &v1beta1.ServiceReference{
 						Namespace: namespace,
 						Name:      serviceName,
-						Path:      strPtr("/mutating-crd"),
+						Path:      strPtr("/mutating-custom-resource"),
 					},
 					CABundle: context.signingCert,
 				},
 			},
 			{
-				Name: "mutate-crd-data-stage-2.k8s.io",
+				Name: "mutate-custom-resource-data-stage-2.k8s.io",
 				Rules: []v1beta1.RuleWithOperations{{
 					Operations: []v1beta1.OperationType{v1beta1.Create},
 					Rule: v1beta1.Rule{
@@ -894,20 +904,20 @@ func registerMutatingWebhookForCRD(f *framework.Framework, context *certContext)
 					Service: &v1beta1.ServiceReference{
 						Namespace: namespace,
 						Name:      serviceName,
-						Path:      strPtr("/mutating-crd"),
+						Path:      strPtr("/mutating-custom-resource"),
 					},
 					CABundle: context.signingCert,
 				},
 			},
 		},
 	})
-	framework.ExpectNoError(err, "registering crd webhook config %s with namespace %s", crdMutatingWebhookConfigName, namespace)
+	framework.ExpectNoError(err, "registering custom resource webhook config %s with namespace %s", configName, namespace)
 
 	// The webhook configuration is honored in 1s.
 	time.Sleep(10 * time.Second)
 }
 
-func testCRDWebhook(f *framework.Framework, crdClient dynamic.ResourceInterface) {
+func testCustomResourceWebhook(f *framework.Framework, customResourceClient dynamic.ResourceInterface) {
 	By("Creating a custom resource that should be denied by the webhook")
 	crd := newCRDForAdmissionWebhookTest()
 	crInstance := &unstructured.Unstructured{
@@ -923,7 +933,7 @@ func testCRDWebhook(f *framework.Framework, crdClient dynamic.ResourceInterface)
 			},
 		},
 	}
-	_, err := crdClient.Create(crInstance)
+	_, err := customResourceClient.Create(crInstance)
 	Expect(err).NotTo(BeNil())
 	expectedErrMsg := "the custom resource contains unwanted data"
 	if !strings.Contains(err.Error(), expectedErrMsg) {
@@ -931,7 +941,7 @@ func testCRDWebhook(f *framework.Framework, crdClient dynamic.ResourceInterface)
 	}
 }
 
-func testMutatingCRDWebhook(f *framework.Framework, crdClient dynamic.ResourceInterface) {
+func testMutatingCustomResourceWebhook(f *framework.Framework, customResourceClient dynamic.ResourceInterface) {
 	By("Creating a custom resource that should be mutated by the webhook")
 	crd := newCRDForAdmissionWebhookTest()
 	cr := &unstructured.Unstructured{
@@ -947,7 +957,7 @@ func testMutatingCRDWebhook(f *framework.Framework, crdClient dynamic.ResourceIn
 			},
 		},
 	}
-	mutatedCR, err := crdClient.Create(cr)
+	mutatedCR, err := customResourceClient.Create(cr)
 	Expect(err).To(BeNil())
 	expectedCRData := map[string]interface{}{
 		"mutation-start":   "yes",
@@ -956,5 +966,98 @@ func testMutatingCRDWebhook(f *framework.Framework, crdClient dynamic.ResourceIn
 	}
 	if !reflect.DeepEqual(expectedCRData, mutatedCR.Object["data"]) {
 		framework.Failf("\nexpected %#v\n, got %#v\n", expectedCRData, mutatedCR.Object["data"])
+	}
+}
+
+func registerValidatingWebhookForCRD(f *framework.Framework, context *certContext) func() {
+	client := f.ClientSet
+	By("Registering the crd webhook via the AdmissionRegistration API")
+
+	namespace := f.Namespace.Name
+	configName := crdWebhookConfigName
+
+	// This webhook will deny the creation of CustomResourceDefinitions which have the
+	// label "webhook-e2e-test":"webhook-disallow"
+	// NOTE: Because tests are run in parallel and in an unpredictable order, it is critical
+	// that no other test attempts to create CRD with that label.
+	_, err := client.AdmissionregistrationV1beta1().ValidatingWebhookConfigurations().Create(&v1beta1.ValidatingWebhookConfiguration{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: configName,
+		},
+		Webhooks: []v1beta1.Webhook{
+			{
+				Name: "deny-crd-with-unwanted-label.k8s.io",
+				Rules: []v1beta1.RuleWithOperations{{
+					Operations: []v1beta1.OperationType{v1beta1.Create},
+					Rule: v1beta1.Rule{
+						APIGroups:   []string{"apiextensions.k8s.io"},
+						APIVersions: []string{"*"},
+						Resources:   []string{"customresourcedefinitions"},
+					},
+				}},
+				ClientConfig: v1beta1.WebhookClientConfig{
+					Service: &v1beta1.ServiceReference{
+						Namespace: namespace,
+						Name:      serviceName,
+						Path:      strPtr("/crd"),
+					},
+					CABundle: context.signingCert,
+				},
+			},
+		},
+	})
+	framework.ExpectNoError(err, "registering crd webhook config %s with namespace %s", configName, namespace)
+
+	// The webhook configuration is honored in 10s.
+	time.Sleep(10 * time.Second)
+	return func() {
+		client.AdmissionregistrationV1beta1().ValidatingWebhookConfigurations().Delete(configName, nil)
+	}
+}
+
+func testCRDDenyWebhook(f *framework.Framework) {
+	By("Creating a custom resource definition that should be denied by the webhook")
+	name := fmt.Sprintf("e2e-test-%s-%s-crd", f.BaseName, "deny")
+	kind := fmt.Sprintf("E2e-test-%s-%s-crd", f.BaseName, "deny")
+	group := fmt.Sprintf("%s-crd-test.k8s.io", f.BaseName)
+	apiVersion := "v1"
+
+	// Creating a custom resource definition for use by assorted tests.
+	config, err := framework.LoadConfig()
+	if err != nil {
+		framework.Failf("failed to load config: %v", err)
+		return
+	}
+	apiExtensionClient, err := crdclientset.NewForConfig(config)
+	if err != nil {
+		framework.Failf("failed to initialize apiExtensionClient: %v", err)
+		return
+	}
+	crd := &apiextensionsv1beta1.CustomResourceDefinition{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name + "s." + group,
+			Labels: map[string]string{
+				"webhook-e2e-test": "webhook-disallow",
+			},
+		},
+		Spec: apiextensionsv1beta1.CustomResourceDefinitionSpec{
+			Group:   group,
+			Version: apiVersion,
+			Names: apiextensionsv1beta1.CustomResourceDefinitionNames{
+				Plural:   name + "s",
+				Singular: name,
+				Kind:     kind,
+				ListKind: name + "List",
+			},
+			Scope: apiextensionsv1beta1.NamespaceScoped,
+		},
+	}
+
+	// create CRD
+	_, err = apiExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Create(crd)
+	Expect(err).NotTo(BeNil())
+	expectedErrMsg := "the crd contains unwanted label"
+	if !strings.Contains(err.Error(), expectedErrMsg) {
+		framework.Failf("expect error contains %q, got %q", expectedErrMsg, err.Error())
 	}
 }

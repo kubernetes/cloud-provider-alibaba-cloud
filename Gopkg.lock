@@ -26,16 +26,18 @@
   version = "v1.1.0"
 
 [[projects]]
-  branch = "master"
+  branch = "feature/bazaar"
   name = "github.com/denverdino/aliyungo"
   packages = [
     "common",
     "ecs",
     "metadata",
     "slb",
+    "sts",
     "util"
   ]
-  revision = "39745192ce9045d198ca2003b493ea29b3f7d9d3"
+  revision = "80e436a9b54baf43c29571b8cfd745b523126533"
+  source = "git@gitlab.alibaba-inc.com:cos/aliyungo.git"
 
 [[projects]]
   name = "github.com/dgrijalva/jwt-go"
@@ -57,8 +59,8 @@
     ".",
     "log"
   ]
-  revision = "26b41036311f2da8242db402557a0dbd09dc83da"
-  version = "v2.6.0"
+  revision = "3658237ded108b4134956c1b3050349d93e7b895"
+  version = "v2.7.1"
 
 [[projects]]
   name = "github.com/ghodss/yaml"
@@ -82,7 +84,7 @@
   branch = "master"
   name = "github.com/go-openapi/spec"
   packages = ["."]
-  revision = "370d9e047557906322be8396e77cb0376be6cb96"
+  revision = "bcff419492eeeb01f76e77d2ebc714dc97b607f5"
 
 [[projects]]
   branch = "master"
@@ -109,7 +111,7 @@
   branch = "master"
   name = "github.com/golang/groupcache"
   packages = ["lru"]
-  revision = "66deaeb636dff1ac7d938ce666d090556056a4b0"
+  revision = "24b0969c4cb722950103eed87108c8d291a8df00"
 
 [[projects]]
   name = "github.com/golang/protobuf"
@@ -120,8 +122,8 @@
     "ptypes/duration",
     "ptypes/timestamp"
   ]
-  revision = "925541529c1fa6821df4e44ce2723319eb2be768"
-  version = "v1.0.0"
+  revision = "b4deda0973fb4c70b50d226b1af49f3da59f5265"
+  version = "v1.1.0"
 
 [[projects]]
   branch = "master"
@@ -142,8 +144,8 @@
     "compiler",
     "extensions"
   ]
-  revision = "ee43cbb60db7bd22502942cccbc39059117352ab"
-  version = "v0.1.0"
+  revision = "7c663266750e7d82587642f65e60bc4083f1f84e"
+  version = "v0.2.0"
 
 [[projects]]
   branch = "master"
@@ -172,8 +174,8 @@
 [[projects]]
   name = "github.com/imdario/mergo"
   packages = ["."]
-  revision = "9d5f1277e9a8ed20c3684bda8fde67c05628518c"
-  version = "v0.3.4"
+  revision = "9316a62528ac99aaecb4e47eadd6dc8aa6533d58"
+  version = "v0.3.5"
 
 [[projects]]
   name = "github.com/inconshreveable/mousetrap"
@@ -201,13 +203,13 @@
     "jlexer",
     "jwriter"
   ]
-  revision = "8b799c424f57fa123fc63a99d6383bc6e4c02578"
+  revision = "3fdea8d05856a0c8df22ed4bc71b3219245e4485"
 
 [[projects]]
   name = "github.com/matttproud/golang_protobuf_extensions"
   packages = ["pbutil"]
-  revision = "3247c84500bff8d9fb6d579d800f20b3e091582c"
-  version = "v1.0.0"
+  revision = "c12348ce28de40eed0136aa2b644d0ee0650e56c"
+  version = "v1.0.1"
 
 [[projects]]
   name = "github.com/modern-go/concurrent"
@@ -228,10 +230,10 @@
   version = "v1.0.0-rc1"
 
 [[projects]]
+  branch = "master"
   name = "github.com/patrickmn/go-cache"
   packages = ["."]
-  revision = "a3647f8e31d79543b2d0f0ae2fe5c379d72cedc0"
-  version = "v2.1.0"
+  revision = "9f6ff22cfff829561052f5886ec80a2ac148b4eb"
 
 [[projects]]
   branch = "master"
@@ -271,7 +273,7 @@
     "internal/bitbucket.org/ww/goautoneg",
     "model"
   ]
-  revision = "38c53a9f4bfcd932d1b00bfc65e256a7fba6b37a"
+  revision = "7600349dcfe1abd18d72d3a1770870d9800a7801"
 
 [[projects]]
   branch = "master"
@@ -282,37 +284,37 @@
     "nfs",
     "xfs"
   ]
-  revision = "780932d4fbbe0e69b84c34c20f5c8d0981e109ea"
+  revision = "7d6f385de8bea29190f15ba9931442a0eaef9af7"
 
 [[projects]]
   name = "github.com/spf13/cobra"
   packages = ["."]
-  revision = "a1f051bc3eba734da4772d60e2d677f47cf93ef4"
-  version = "v0.0.2"
+  revision = "ef82de70bb3f60c65fb8eebacbb2d122ef517385"
+  version = "v0.0.3"
 
 [[projects]]
   name = "github.com/spf13/pflag"
   packages = ["."]
-  revision = "e57e3eeb33f795204c1ca35f56c44f83227c6e66"
-  version = "v1.0.0"
+  revision = "583c0c0531f06d5278b7d917446061adc344b5cd"
+  version = "v1.0.1"
 
 [[projects]]
   branch = "master"
   name = "golang.org/x/crypto"
   packages = ["ssh/terminal"]
-  revision = "b2aa35443fbc700ab74c586ae79b81c171851023"
+  revision = "a49355c7e3f8fe157a85be2f77e6e269a0f89602"
 
 [[projects]]
   branch = "master"
   name = "golang.org/x/net"
   packages = [
     "context",
+    "http/httpguts",
     "http2",
     "http2/hpack",
-    "idna",
-    "lex/httplex"
+    "idna"
   ]
-  revision = "61147c48b25b599e5b561d2e9c4f3e1ef489ca41"
+  revision = "afe8f62b1d6bbd81f31868121a50b06d8188e1f9"
 
 [[projects]]
   branch = "master"
@@ -321,7 +323,7 @@
     "unix",
     "windows"
   ]
-  revision = "3b87a42e500a6dc65dae1a55d0b641295971163e"
+  revision = "c4afb3effaa53fd9a06ca61262dc7ce8df4c081b"
 
 [[projects]]
   name = "golang.org/x/text"
@@ -390,13 +392,13 @@
     "storage/v1alpha1",
     "storage/v1beta1"
   ]
-  revision = "c6c40fa5f71e46739e69d43b8ce08fad9720bab9"
+  revision = "9273ee02527c608cecc74969b3e489f5dba686da"
 
 [[projects]]
   branch = "master"
   name = "k8s.io/apiextensions-apiserver"
   packages = ["pkg/features"]
-  revision = "e83de7d4f1e07494ca918e150a1325bae7db0c54"
+  revision = "779cefed6876a153122db9d5c37871a39631ba2e"
 
 [[projects]]
   branch = "release-1.9"
@@ -450,7 +452,7 @@
     "third_party/forked/golang/json",
     "third_party/forked/golang/reflect"
   ]
-  revision = "cb88e003047fb517f284ff8af294451b20f0b403"
+  revision = "21efb2924c7cf1920f76af05b1fd6a325bf46dfc"
 
 [[projects]]
   branch = "release-1.9"
@@ -465,7 +467,7 @@
     "pkg/util/flag",
     "pkg/util/logs"
   ]
-  revision = "1aadb24971a7156fe20eb831ea805c60c61158de"
+  revision = "5c57f79d2dc483fe547eb6a5a4efc35a88f46a86"
 
 [[projects]]
   branch = "release-6.0"
@@ -590,7 +592,7 @@
     "util/retry",
     "util/workqueue"
   ]
-  revision = "90539b4e75a8daaf7f67c3874c6180bfb1a63936"
+  revision = "1692bdde78a61f6316cfb6988015bd460067b238"
 
 [[projects]]
   branch = "master"
@@ -599,14 +601,12 @@
     "pkg/common",
     "pkg/util/proto"
   ]
-  revision = "cd0308977f05a0de033c0e8ce1860b317e360dca"
+  revision = "4cac20de16b951c103aa40c4bafbc8cefdd18a12"
 
 [[projects]]
   branch = "release-1.9"
   name = "k8s.io/kubernetes"
   packages = [
-    "cmd/cloud-controller-manager/app",
-    "cmd/cloud-controller-manager/app/options",
     "pkg/api/legacyscheme",
     "pkg/api/service",
     "pkg/api/v1/node",
@@ -629,8 +629,6 @@
     "pkg/cloudprovider",
     "pkg/controller",
     "pkg/controller/cloud",
-    "pkg/controller/route",
-    "pkg/controller/service",
     "pkg/features",
     "pkg/fieldpath",
     "pkg/kubelet/apis",
@@ -656,11 +654,11 @@
     "plugin/pkg/scheduler/schedulercache",
     "plugin/pkg/scheduler/util"
   ]
-  revision = "a24e4610c57f69125ff7c07c8ed4087b0876a5b0"
+  revision = "f4cf484c2cb6056e28fb9759a3c913be3eed990a"
 
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "0d334ab57cba96e1b831346270f97f7ccc5e4ae490f8703e66784e1c5560925c"
+  inputs-digest = "47788cfa4915d7d5c469d2de9f35886dd45a4037f5fd8cf38f063f3592d3ec13"
   solver-name = "gps-cdcl"
   solver-version = 1

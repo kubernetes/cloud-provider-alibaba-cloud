@@ -57,9 +57,8 @@ func newController() (*ServiceController, *fakecloud.FakeCloud, *fake.Clientset)
 	informerFactory := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
 	serviceInformer := informerFactory.Core().V1().Services()
 	nodeInformer := informerFactory.Core().V1().Nodes()
-	endpointsInformer := informerFactory.Core().V1().Endpoints()
 
-	controller, _ := New(cloud, client, serviceInformer, nodeInformer,endpointsInformer, "test-cluster")
+	controller, _ := New(cloud, client, serviceInformer, nodeInformer, "test-cluster")
 	controller.nodeListerSynced = alwaysReady
 	controller.serviceListerSynced = alwaysReady
 	controller.eventRecorder = record.NewFakeRecorder(100)
@@ -261,49 +260,49 @@ func TestUpdateNodesInExternalLoadBalancer(t *testing.T) {
 	}
 }
 
-//func TestGetNodeConditionPredicate(t *testing.T) {
-//	tests := []struct {
-//		node         v1.Node
-//		expectAccept bool
-//		name         string
-//	}{
-//		{
-//			node:         v1.Node{},
-//			expectAccept: false,
-//			name:         "empty",
-//		},
-//		{
-//			node: v1.Node{
-//				Status: v1.NodeStatus{
-//					Conditions: []v1.NodeCondition{
-//						{Type: v1.NodeReady, Status: v1.ConditionTrue},
-//					},
-//				},
-//			},
-//			expectAccept: true,
-//			name:         "basic",
-//		},
-//		{
-//			node: v1.Node{
-//				Spec: v1.NodeSpec{Unschedulable: true},
-//				Status: v1.NodeStatus{
-//					Conditions: []v1.NodeCondition{
-//						{Type: v1.NodeReady, Status: v1.ConditionTrue},
-//					},
-//				},
-//			},
-//			expectAccept: false,
-//			name:         "unschedulable",
-//		},
-//	}
-//	pred := getNodeConditionPredicate()
-//	for _, test := range tests {
-//		accept := pred(&test.node)
-//		if accept != test.expectAccept {
-//			t.Errorf("Test failed for %s, expected %v, saw %v", test.name, test.expectAccept, accept)
-//		}
-//	}
-//}
+func TestGetNodeConditionPredicate(t *testing.T) {
+	tests := []struct {
+		node         v1.Node
+		expectAccept bool
+		name         string
+	}{
+		{
+			node:         v1.Node{},
+			expectAccept: false,
+			name:         "empty",
+		},
+		{
+			node: v1.Node{
+				Status: v1.NodeStatus{
+					Conditions: []v1.NodeCondition{
+						{Type: v1.NodeReady, Status: v1.ConditionTrue},
+					},
+				},
+			},
+			expectAccept: true,
+			name:         "basic",
+		},
+		{
+			node: v1.Node{
+				Spec: v1.NodeSpec{Unschedulable: true},
+				Status: v1.NodeStatus{
+					Conditions: []v1.NodeCondition{
+						{Type: v1.NodeReady, Status: v1.ConditionTrue},
+					},
+				},
+			},
+			expectAccept: false,
+			name:         "unschedulable",
+		},
+	}
+	pred := getNodeConditionPredicate()
+	for _, test := range tests {
+		accept := pred(&test.node)
+		if accept != test.expectAccept {
+			t.Errorf("Test failed for %s, expected %v, saw %v", test.name, test.expectAccept, accept)
+		}
+	}
+}
 
 // TODO(a-robinson): Add tests for update/sync/delete.
 
@@ -790,7 +789,7 @@ func TestServiceCache(t *testing.T) {
 			setCacheFn: nil, //Nothing to set
 			checkCacheFn: func() error {
 				//It should return two elements
-				svcArray := sc.ListAll()
+				svcArray := sc.allServices()
 				if len(svcArray) != 2 {
 					return fmt.Errorf("Expected(2) Obtained(%v)", len(svcArray))
 				}
@@ -809,16 +808,16 @@ func TestServiceCache(t *testing.T) {
 	}
 }
 
-////Test a utility functions as its not easy to unit test nodeSyncLoop directly
-//func TestNodeSlicesEqualForLB(t *testing.T) {
-//	numNodes := 10
-//	nArray := make([]*v1.Node, 10)
-//
-//	for i := 0; i < numNodes; i++ {
-//		nArray[i] = &v1.Node{}
-//		nArray[i].Name = fmt.Sprintf("node1")
-//	}
-//	if !nodeSlicesEqualForLB(nArray, nArray) {
-//		t.Errorf("nodeSlicesEqualForLB() Expected=true Obtained=false")
-//	}
-//}
+//Test a utility functions as its not easy to unit test nodeSyncLoop directly
+func TestNodeSlicesEqualForLB(t *testing.T) {
+	numNodes := 10
+	nArray := make([]*v1.Node, 10)
+
+	for i := 0; i < numNodes; i++ {
+		nArray[i] = &v1.Node{}
+		nArray[i].Name = fmt.Sprintf("node1")
+	}
+	if !nodeSlicesEqualForLB(nArray, nArray) {
+		t.Errorf("nodeSlicesEqualForLB() Expected=true Obtained=false")
+	}
+}

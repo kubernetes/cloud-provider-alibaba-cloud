@@ -60,10 +60,32 @@ type DescribeNetworkInterfacesResponse struct {
 	PageNumber int
 	PageSize   int
 }
+
 type AttachNetworkInterfaceArgs struct {
 	RegionId           common.Region
 	NetworkInterfaceId string
 	InstanceId         string
+}
+
+type CreateNetworkInterfacePermissionArgs struct {
+	RegionId           common.Region
+	NetworkInterfaceId string
+	InstanceId         string
+	AccountId          int
+	Permission         string //InstanceAttach
+}
+
+type NetworkInterfacePermission struct {
+	AccountId                    int
+	ServiceName                  string
+	NetworkInterfaceId           string
+	NetworkInterfacePermissionId string
+	Permission                   string
+	PermissionState              string
+}
+
+type CreateNetworkInterfacePermissionResp struct {
+	NetworkInterfacePermission NetworkInterfacePermission
 }
 
 type AttachNetworkInterfaceResponse common.Response
@@ -114,6 +136,12 @@ func (client *Client) DetachNetworkInterface(args *DetachNetworkInterfaceArgs) (
 func (client *Client) ModifyNetworkInterfaceAttribute(args *ModifyNetworkInterfaceAttributeArgs) (resp *ModifyNetworkInterfaceAttributeResponse, err error) {
 	resp = &ModifyNetworkInterfaceAttributeResponse{}
 	err = client.Invoke("ModifyNetworkInterfaceAttribute", args, resp)
+	return resp, err
+}
+
+func (client *Client) CreateNetworkInterfacePermission(args *CreateNetworkInterfacePermissionArgs) (resp *CreateNetworkInterfacePermissionResp, err error) {
+	resp = &CreateNetworkInterfacePermissionResp{}
+	err = client.Invoke("CreateNetworkInterfacePermission", args, resp)
 	return resp, err
 }
 

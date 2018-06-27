@@ -28,9 +28,12 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"fmt"
 	"strings"
+	"github.com/denverdino/aliyungo/sts"
 )
 
 var ROLE_NAME = "KubernetesMasterRole"
+
+var ASSUME_ROLE_NAME = "AliyunCSManagedKubernetesRole"
 
 var TOKEN_RESYNC_PERIOD = 5 * time.Minute
 
@@ -106,27 +109,49 @@ func NewClientMgr(key, secret string) (*ClientMgr, error) {
 			vpcs:    cache.New(defaultCacheExpiration, defaultCacheExpiration),
 		},
 	}
-	if !token.active {
+	if !token.active && cfg.Global.UID == ""{
 		// use key and secret
-		glog.Infof("alicloud: clientmgr, use accesskeyid and accesskeysecret mode to authenticate user. without token")
+		glog.Infof("alicloud: clientmgr, use accesskeyid and accesskeysecret mode to authenticate user. without token and role assume")
 		return mgr, nil
 	}
 	go wait.Until(func() {
 		// refresh client token periodically
 		token.lock.Lock()
 		defer token.lock.Unlock()
-		role, err := mgr.meta.RamRoleToken(ROLE_NAME)
-		if err != nil {
-			glog.Errorf("alicloud: clientmgr, error get ram role token [%s]\n", err.Error())
-			return
+		var rkey, rsecret, rtok string
+		if token.active{
+			// use instance ram file way.
+			role, err := mgr.meta.RamRoleToken(ROLE_NAME)
+			if err != nil {
+				glog.Errorf("alicloud: clientmgr, error get ram role token [%s]\n", err.Error())
+				return
+			}
+			rkey    = role.AccessKeyId
+			rsecret = role.AccessKeySecret
+			rtok    = role.SecurityToken
+		}else {
+			// use Assume role way.
+			c := sts.NewClient(keyid,sec)
+			assumeRoleRequest := sts.AssumeRoleWithServiceIdentityRequest{
+				RoleArn:         fmt.Sprintf("acs:ram::%s:role/%s", cfg.Global.UID, ASSUME_ROLE_NAME),
+				RoleSessionName: fmt.Sprintf("terway-provision-role-%d", time.Now().Unix()),
+				DurationSeconds: 7200,
+				AssumeRoleFor:   cfg.Global.UID,
+			}
+			resp, err := c.AssumeRoleWithServiceIdentity(assumeRoleRequest)
+			if err != nil {
+				return
+			}
+			rkey = resp.Credentials.AccessKeyId
+			rsecret = resp.Credentials.AccessKeySecret
+			rtok = resp.Credentials.SecurityToken
 		}
-		token.auth = role
-		ecsclient.WithSecurityToken(role.SecurityToken).
-			WithAccessKeyId(role.AccessKeyId).
-			WithAccessKeySecret(role.AccessKeySecret)
-		slbclient.WithSecurityToken(role.SecurityToken).
-			WithAccessKeyId(role.AccessKeyId).
-			WithAccessKeySecret(role.AccessKeySecret)
+		ecsclient.WithSecurityToken(rtok).
+			WithAccessKeyId(rkey).
+			WithAccessKeySecret(rsecret)
+		slbclient.WithSecurityToken(rtok).
+			WithAccessKeyId(rkey).
+			WithAccessKeySecret(rsecret)
 	}, time.Duration(TOKEN_RESYNC_PERIOD), mgr.stop)
 
 	return mgr, nil
@@ -171,10 +196,8 @@ type IMetaData interface {
 }
 
 func NewMetaData() IMetaData{
-	if cfg.Global.Region != "" &&
-		cfg.Global.VpcID != "" &&
-		cfg.Global.VswitchID != "" &&
-		cfg.Global.ZoneID != "" {
+	if cfg.Global.VpcID != "" &&
+		cfg.Global.VswitchID != "" {
 		glog.V(2).Infof("use mocked metadata server.")
 		return &fakeMetaData{base: metadata.NewMetaData(nil)}
 	}
@@ -244,8 +267,10 @@ func (m *fakeMetaData) VpcCIDRBlock() (string, error) {
 }
 
 func (m *fakeMetaData) VpcID() (string, error) {
-
-	return cfg.Global.VpcID,nil
+	if cfg.Global.VpcID != "" {
+		return cfg.Global.VpcID, nil
+	}
+	return m.base.VpcID()
 }
 
 func (m *fakeMetaData) VswitchCIDRBlock() (string, error) {
@@ -256,6 +281,10 @@ func (m *fakeMetaData) VswitchCIDRBlock() (string, error) {
 // zone1:vswitchid1,zone2:vswitch2
 func (m *fakeMetaData) VswitchID() (string, error) {
 
+	if cfg.Global.VswitchID == "" {
+		// get vswitch id from meta server
+		return m.base.VswitchID()
+	}
 	zlist := strings.Split(cfg.Global.VswitchID,",")
 	if len(zlist) == 1 {
 		glog.Infof("simple vswitchid mode, %s",cfg.Global.VswitchID)
@@ -302,11 +331,11 @@ func (m *fakeMetaData) Zone() (string, error) {
 
 func (m *fakeMetaData) RoleName() (string, error) {
 
-	return "",fmt.Errorf("unimplemented")
+	return m.base.RoleName()
 }
 
 func (m *fakeMetaData) RamRoleToken(role string) (metadata.RoleAuth, error) {
 
-	return metadata.RoleAuth{},fmt.Errorf("unimplemented")
+	return m.base.RamRoleToken(role)
 }
 

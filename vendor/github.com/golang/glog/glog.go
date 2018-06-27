@@ -580,17 +580,9 @@ func (l *loggingT) formatHeader(s severity, file string, line int) *buffer {
 	buf.WriteString(file)
 	buf.tmp[0] = ':'
 	n := buf.someDigits(1, line)
-	if n < 3 {
-		buf.tmp[n+1] = ' '
-		n = n+1
-	}
 	buf.tmp[n+1] = ']'
-	i := 0
-	for i = 0 ; i < 17-len(file);i++ {
-		buf.tmp[n+2+i] = ' '
-	}
-	//buf.tmp[n+2] = ' '
-	buf.Write(buf.tmp[:n+2+i])
+	buf.tmp[n+2] = ' '
+	buf.Write(buf.tmp[:n+3])
 	return buf
 }
 

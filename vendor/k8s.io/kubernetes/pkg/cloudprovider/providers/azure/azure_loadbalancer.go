@@ -183,7 +183,8 @@ func (az *Cloud) getServiceLoadBalancer(service *v1.Service, clusterName string,
 
 	// check if the service already has a load balancer
 	if existingLBs != nil {
-		for _, existingLB := range existingLBs {
+		for i := range existingLBs {
+			existingLB := existingLBs[i]
 			if strings.EqualFold(*existingLB.Name, defaultLBName) {
 				defaultLB = &existingLB
 			}
@@ -884,8 +885,8 @@ func (az *Cloud) reconcileSecurityGroup(clusterName string, service *v1.Service,
 	// update security rules
 	dirtySg := false
 	var updatedRules []network.SecurityRule
-	if sg.SecurityRules != nil {
-		updatedRules = *sg.SecurityRules
+	if sg.SecurityGroupPropertiesFormat != nil && sg.SecurityGroupPropertiesFormat.SecurityRules != nil {
+		updatedRules = *sg.SecurityGroupPropertiesFormat.SecurityRules
 	}
 
 	for _, r := range updatedRules {

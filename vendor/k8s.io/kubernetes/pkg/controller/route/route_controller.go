@@ -145,26 +145,7 @@ func (rc *RouteController) reconcile(nodes []*v1.Node, routes []*cloudprovider.R
 
 	wg := sync.WaitGroup{}
 	rateLimiter := make(chan struct{}, maxConcurrentRouteCreations)
-	for _, route := range routes {
-		if rc.isResponsibleForRoute(route) {
-			// Check if this route is a blackhole, or applies to a node we know about & has an incorrect CIDR.
-			if route.Blackhole || (cidrForNode(nodes,string(route.TargetNode)) != route.DestinationCIDR) {
-				wg.Add(1)
-				// Delete the route.
-				go func(route *cloudprovider.Route, startTime time.Time) {
-					glog.Infof("Deleting route %s %s", route.Name, route.DestinationCIDR)
-					if err := rc.routes.DeleteRoute(rc.clusterName, route); err != nil {
-						glog.Errorf("Could not delete route %s %s after %v: %v", route.Name, route.DestinationCIDR, time.Now().Sub(startTime), err)
-					} else {
-						glog.Infof("Deleted route %s %s after %v", route.Name, route.DestinationCIDR, time.Now().Sub(startTime))
-					}
-					wg.Done()
 
-				}(route, time.Now())
-			}
-		}
-	}
-	wg.Wait()
 	for _, node := range nodes {
 		// Skip if the node hasn't been assigned a CIDR yet.
 		if node.Spec.PodCIDR == "" {
@@ -183,13 +164,7 @@ func (rc *RouteController) reconcile(nodes []*v1.Node, routes []*cloudprovider.R
 			wg.Add(1)
 			go func(nodeName types.NodeName, nameHint string, route *cloudprovider.Route) {
 				defer wg.Done()
-				backoff := wait.Backoff{
-					Duration: 1 * time.Second,
-					Factor:   2,
-					Jitter:   0,
-					Steps:    4,
-				}
-				wait.ExponentialBackoff(backoff, func() (bool, error) {
+				for i := 0; i < maxRetries; i++ {
 					startTime := time.Now()
 					// Ensure that we don't have more than maxConcurrentRouteCreations
 					// CreateRoute calls in flight.
@@ -214,10 +189,9 @@ func (rc *RouteController) reconcile(nodes []*v1.Node, routes []*cloudprovider.R
 
 					} else {
 						glog.Infof("Created route for node %s %s with hint %s after %v", nodeName, route.DestinationCIDR, nameHint, time.Now().Sub(startTime))
-						return true, nil
+						return
 					}
-					return false, err
-				})
+				}
 			}(nodeName, nameHint, route)
 		} else {
 			// Update condition only if it doesn't reflect the current state.
@@ -228,17 +202,27 @@ func (rc *RouteController) reconcile(nodes []*v1.Node, routes []*cloudprovider.R
 		}
 		nodeCIDRs[nodeName] = node.Spec.PodCIDR
 	}
-	wg.Wait()
-	return nil
-}
+	for _, route := range routes {
+		if rc.isResponsibleForRoute(route) {
+			// Check if this route is a blackhole, or applies to a node we know about & has an incorrect CIDR.
+			if route.Blackhole || (nodeCIDRs[route.TargetNode] != route.DestinationCIDR) {
+				wg.Add(1)
+				// Delete the route.
+				go func(route *cloudprovider.Route, startTime time.Time) {
+					glog.Infof("Deleting route %s %s", route.Name, route.DestinationCIDR)
+					if err := rc.routes.DeleteRoute(rc.clusterName, route); err != nil {
+						glog.Errorf("Could not delete route %s %s after %v: %v", route.Name, route.DestinationCIDR, time.Now().Sub(startTime), err)
+					} else {
+						glog.Infof("Deleted route %s %s after %v", route.Name, route.DestinationCIDR, time.Now().Sub(startTime))
+					}
+					wg.Done()
 
-func cidrForNode(nodes []*v1.Node, name string) string {
-	for _, node := range nodes {
-		if node.Name == name {
-			return node.Spec.PodCIDR
+				}(route, time.Now())
+			}
 		}
 	}
-	return ""
+	wg.Wait()
+	return nil
 }
 
 func (rc *RouteController) updateNetworkingCondition(nodeName types.NodeName, routeCreated bool) error {

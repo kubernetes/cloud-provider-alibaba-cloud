@@ -47,6 +47,7 @@ func DefaultServerConfig() (*extensionsapiserver.Config, error) {
 	options.RecommendedOptions.Authentication = nil // disable
 	options.RecommendedOptions.Authorization = nil  // disable
 	options.RecommendedOptions.Admission = nil      // disable
+	options.RecommendedOptions.CoreAPI = nil        // disable
 	options.RecommendedOptions.SecureServing.BindAddress = net.ParseIP("127.0.0.1")
 	options.RecommendedOptions.SecureServing.Listener = listener
 	etcdURL, ok := os.LookupEnv("KUBE_INTEGRATION_ETCD_URL")
@@ -64,7 +65,7 @@ func DefaultServerConfig() (*extensionsapiserver.Config, error) {
 	if err := options.RecommendedOptions.ApplyTo(genericConfig, nil); err != nil {
 		return nil, err
 	}
-	if err := options.APIEnablement.ApplyTo(&genericConfig.Config, extensionsapiserver.DefaultAPIResourceConfigSource(), extensionsapiserver.Registry); err != nil {
+	if err := options.APIEnablement.ApplyTo(&genericConfig.Config, extensionsapiserver.DefaultAPIResourceConfigSource(), extensionsapiserver.Scheme); err != nil {
 		return nil, err
 	}
 
@@ -139,7 +140,7 @@ func StartDefaultServer() (chan struct{}, *rest.Config, error) {
 	return StartServer(config)
 }
 
-func StartDefaultServerWithClients() (chan struct{}, clientset.Interface, dynamic.ClientPool, error) {
+func StartDefaultServerWithClients() (chan struct{}, clientset.Interface, dynamic.Interface, error) {
 	stopCh, config, err := StartDefaultServer()
 	if err != nil {
 		return nil, nil, nil, err
@@ -151,5 +152,11 @@ func StartDefaultServerWithClients() (chan struct{}, clientset.Interface, dynami
 		return nil, nil, nil, err
 	}
 
-	return stopCh, apiExtensionsClient, dynamic.NewDynamicClientPool(config), nil
+	dynamicClient, err := dynamic.NewForConfig(config)
+	if err != nil {
+		close(stopCh)
+		return nil, nil, nil, err
+	}
+
+	return stopCh, apiExtensionsClient, dynamicClient, nil
 }
