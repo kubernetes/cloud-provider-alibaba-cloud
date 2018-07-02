@@ -150,7 +150,9 @@ func (client *LocationClient) DescribeOpenAPIEndpoint(region Region, serviceCode
 	}
 
 	endpoint, err := client.DescribeEndpoints(args)
+	fmt.Printf("RequestID: %s\n",endpoint.RequestId)
 	if err != nil || len(endpoint.Endpoints.Endpoint) <= 0 {
+		fmt.Println("endpoint count le 0\n")
 		return ""
 	}
 
@@ -162,7 +164,7 @@ func (client *LocationClient) DescribeOpenAPIEndpoint(region Region, serviceCode
 	}
 
 	ep := fmt.Sprintf("%s://%s", defaultProtocols, endpoint.Endpoints.Endpoint[0].Endpoint)
-
+	fmt.Printf("real endpoint: %s\n",ep)
 	//setProductRegionEndpoint(region, serviceCode, ep)
 	return ep
 }

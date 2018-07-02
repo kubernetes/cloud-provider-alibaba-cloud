@@ -101,11 +101,13 @@ func (client *Client) setEndpointByLocation(region Region, serviceCode, accessKe
 	ep := locationClient.DescribeOpenAPIEndpoint(region, serviceCode)
 	if ep == "" {
 		ep = loadEndpointFromFile(region, serviceCode)
+		fmt.Printf("can not get endpoint from location service, [%s], use [%s]\n",ep)
 	}
 
 	if ep != "" {
 		client.endpoint = ep
 	}
+	fmt.Printf("aliyungo client: use endpoint ep=[%s], endpoint=[%s]\n",ep,client.endpoint)
 }
 
 // Ensure all necessary properties are valid
