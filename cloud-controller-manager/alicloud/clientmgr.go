@@ -29,6 +29,7 @@ import (
 	"fmt"
 	"strings"
 	"github.com/denverdino/aliyungo/sts"
+	"github.com/denverdino/aliyungo/common"
 )
 
 var ROLE_NAME = "KubernetesMasterRole"
@@ -88,9 +89,13 @@ func NewClientMgr(key, secret string) (*ClientMgr, error) {
 		}
 	}
 	keyid, sec, tok := token.authid()
-	ecsclient := ecs.NewECSClientWithSecurityToken(keyid, sec, tok, DEFAULT_REGION)
+	region, err := m.Region()
+	if err != nil {
+		return nil, err
+	}
+	ecsclient := ecs.NewECSClientWithSecurityToken(keyid, sec, tok, common.Region(region))
 	ecsclient.SetUserAgent(KUBERNETES_ALICLOUD_IDENTITY)
-	slbclient := slb.NewSLBClientWithSecurityToken(keyid, sec, tok, DEFAULT_REGION)
+	slbclient := slb.NewSLBClientWithSecurityToken(keyid, sec, tok, common.Region(region))
 	slbclient.SetUserAgent(KUBERNETES_ALICLOUD_IDENTITY)
 
 	mgr := &ClientMgr{

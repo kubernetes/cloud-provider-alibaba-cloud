@@ -107,7 +107,7 @@ func (client *Client) setEndpointByLocation(region Region, serviceCode, accessKe
 	if ep != "" {
 		client.endpoint = ep
 	}
-	fmt.Printf("aliyungo client: use endpoint ep=[%s], endpoint=[%s]\n",ep,client.endpoint)
+	fmt.Printf("aliyungo client: use endpoint ep=[%s], endpoint=[%s] in region [%s]\n",ep,client.endpoint,region)
 }
 
 // Ensure all necessary properties are valid
