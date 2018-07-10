@@ -59,12 +59,12 @@ func (r *RoutesClient) findRouter(region common.Region, vpcid string) (*ecs.VRou
 			VpcId:    vpcid,
 		})
 		if err != nil {
-			glog.Errorf("alicloud: error from ecs.DescribeVpcs(%s,%v). message=%s\n", region, vpc, r.getErrorString(err))
+			glog.Errorf("alicloud: error from ecs.DescribeVpcs(%s,%s,%v). message=%s\n", vpcid, region, vpc, r.getErrorString(err))
 			return nil, err
 		}
 		if len(vpc) <= 0 {
 			return nil, errors.New(fmt.Sprintf("can not find vpc metadata by " +
-				"instance. region=%s, vpc=%v, error=[no vpc found by specified id]", region, vpc))
+				"instance. region=%s, vpcid=%s, error=[no vpc found by specified id (%v)]", region, vpcid,vpc))
 		}
 		r.vpcs.Set(vpckey, &vpc[0], defaultCacheExpiration)
 		v = &vpc[0]

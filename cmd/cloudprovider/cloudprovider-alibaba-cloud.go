@@ -21,7 +21,7 @@ import (
 	"os"
 	f "flag"
 
-	_ "k8s.io/cloud-provider-alibaba-cloud/cloud-controller-manager/alicloud"
+	_ "k8s.io/cloud-provider-alibaba-cloud/cloud-controller-manager"
 	"github.com/spf13/pflag"
 	"k8s.io/apiserver/pkg/server/healthz"
 	"k8s.io/apiserver/pkg/util/flag"

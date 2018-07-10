@@ -127,12 +127,6 @@ func (f *ListenerManager) NewTCP() ListenerInterface {
 			glog.V(2).Infof("TCP listener checker [bandwidth] changed, request=%d. response=%d", def.Bandwidth, response.Bandwidth)
 		}
 
-		// backend server port has changed.
-		if int(port.NodePort) != response.BackendServerPort {
-			needUpdate = true
-			config.BackendServerPort = int(port.NodePort)
-			glog.V(2).Infof("TCP listener checker [BackendServerPort] changed, request=%d. response=%d", port.NodePort, response.BackendServerPort)
-		}
 		// todo: perform healthcheck update.
 		if def.HealthCheckType != response.HealthCheckType {
 			needUpdate = true
@@ -172,6 +166,16 @@ func (f *ListenerManager) NewTCP() ListenerInterface {
 			needUpdate = true
 			config.PersistenceTimeout = def.PersistenceTimeout
 		}
+		// backend server port has changed.
+		if int(port.NodePort) != response.BackendServerPort {
+			config.BackendServerPort = int(port.NodePort)
+			glog.V(2).Infof("tcp listener [BackendServerPort] changed, request=%d. response=%d, recreate.", port.NodePort, response.BackendServerPort)
+			err := f.client.DeleteLoadBalancerListener(f.loadbalancer.LoadBalancerId, int(port.Port))
+			if err != nil {
+				return err
+			}
+			return f.client.CreateLoadBalancerTCPListener((*slb.CreateLoadBalancerTCPListenerArgs)(config))
+		}
 		if !needUpdate {
 			glog.V(2).Infof("alicloud: tcp listener did not change, skip [update], port=[%d], nodeport=[%d]\n",port.Port, port.NodePort)
 			// no recreate needed.  skip
@@ -180,7 +184,6 @@ func (f *ListenerManager) NewTCP() ListenerInterface {
 		glog.V(2).Infof("TCP listener checker changed, request recreate [%s]\n",f.loadbalancer.LoadBalancerId)
 		glog.V(5).Infof(PrettyJson(def))
 		glog.V(5).Infof(PrettyJson(response))
-
 		return f.client.SetLoadBalancerTCPListenerAttribute(config)
 	}
 	return &CommonListener{
@@ -228,18 +231,8 @@ func (f *ListenerManager) NewUDP() ListenerInterface {
 			config.Bandwidth = request.Bandwidth
 			glog.V(2).Infof("UDP listener checker [bandwidth] changed, request=%d. response=%d", request.Bandwidth, response.Bandwidth)
 		}
-		// backend server port has changed.
-		if int(port.NodePort) != response.BackendServerPort {
-			needUpdate = true
-			config.BackendServerPort = int(port.NodePort)
-			glog.V(2).Infof("UDP listener checker [BackendServerPort] changed, request=%d. response=%d", port.NodePort, response.BackendServerPort)
-		}
 
 		// todo: perform healthcheck update.
-		if def.HealthCheck != response.HealthCheck {
-			needUpdate = true
-			config.HealthCheck = def.HealthCheck
-		}
 		if request.HealthCheckConnectPort != 0 &&
 			def.HealthCheckConnectPort != response.HealthCheckConnectPort {
 			needUpdate = true
@@ -269,6 +262,17 @@ func (f *ListenerManager) NewUDP() ListenerInterface {
 			needUpdate = true
 			config.PersistenceTimeout = def.PersistenceTimeout
 		}
+		// backend server port has changed.
+		if int(port.NodePort) != response.BackendServerPort {
+			config.BackendServerPort = int(port.NodePort)
+			glog.V(2).Infof("UDP listener checker [BackendServerPort] changed, request=%d. response=%d", port.NodePort, response.BackendServerPort)
+			err := f.client.DeleteLoadBalancerListener(f.loadbalancer.LoadBalancerId, int(port.Port))
+			if err != nil {
+				return err
+			}
+			return f.client.CreateLoadBalancerUDPListener((*slb.CreateLoadBalancerUDPListenerArgs)(config))
+		}
+
 		if !needUpdate {
 			glog.V(2).Infof("alicloud: udp listener did not change, skip [update], port=[%d], nodeport=[%d]\n",port.Port, port.NodePort)
 			// no recreate needed.  skip
@@ -350,12 +354,7 @@ func (f *ListenerManager) NewHTTP() ListenerInterface {
 			config.Bandwidth = request.Bandwidth
 			glog.V(2).Infof("HTTP listener checker [bandwidth] changed, request=%d. response=%d", request.Bandwidth, response.Bandwidth)
 		}
-		// backend server port has changed.
-		if int(port.NodePort) != response.BackendServerPort {
-			needUpdate = true
-			config.BackendServerPort = int(port.NodePort)
-			glog.V(2).Infof("HTTP listener checker [BackendServerPort] changed, request=%d. response=%d", port.NodePort, response.BackendServerPort)
-		}
+
 		// todo: perform healthcheck update.
 		if def.HealthCheck != response.HealthCheck {
 			needUpdate = true
@@ -410,6 +409,16 @@ func (f *ListenerManager) NewHTTP() ListenerInterface {
 			def.CookieTimeout != response.CookieTimeout {
 			needUpdate = true
 			config.CookieTimeout = def.CookieTimeout
+		}
+		// backend server port has changed.
+		if int(port.NodePort) != response.BackendServerPort {
+			config.BackendServerPort = int(port.NodePort)
+			glog.V(2).Infof("HTTP listener checker [BackendServerPort] changed, request=%d. response=%d", port.NodePort, response.BackendServerPort)
+			err := f.client.DeleteLoadBalancerListener(f.loadbalancer.LoadBalancerId, int(port.Port))
+			if err != nil {
+				return err
+			}
+			return f.client.CreateLoadBalancerHTTPListener((*slb.CreateLoadBalancerHTTPListenerArgs)(config))
 		}
 
 		if !needUpdate {
@@ -502,12 +511,6 @@ func (f *ListenerManager) NewHTTPS() ListenerInterface {
 			config.Bandwidth = request.Bandwidth
 			glog.V(2).Infof("HTTPS listener checker [bandwidth] changed, request=%d. response=%d", request.Bandwidth, response.Bandwidth)
 		}
-		// backend server port has changed.
-		if int(port.NodePort) != response.BackendServerPort {
-			needUpdate = true
-			config.BackendServerPort = int(port.NodePort)
-			glog.V(2).Infof("HTTPS listener checker [BackendServerPort] changed, request=%d. response=%d", port.NodePort, response.BackendServerPort)
-		}
 
 		// todo: perform healthcheck update.
 		if def.HealthCheck != response.HealthCheck {
@@ -565,6 +568,18 @@ func (f *ListenerManager) NewHTTPS() ListenerInterface {
 			needUpdate = true
 			config.CookieTimeout = def.CookieTimeout
 		}
+		// backend server port has changed.
+		if int(port.NodePort) != response.BackendServerPort {
+			needUpdate = true
+			config.BackendServerPort = int(port.NodePort)
+			glog.V(2).Infof("HTTPS listener checker [BackendServerPort] changed, request=%d. response=%d", port.NodePort, response.BackendServerPort)
+			err := f.client.DeleteLoadBalancerListener(f.loadbalancer.LoadBalancerId, int(port.Port))
+			if err != nil {
+				return err
+			}
+			return f.client.CreateLoadBalancerHTTPSListener((*slb.CreateLoadBalancerHTTPSListenerArgs)(config))
+		}
+
 		if !needUpdate {
 			glog.V(2).Infof("alicloud: https listener did not change, skip [update], port=[%d], nodeport=[%d]\n",port.Port, port.NodePort)
 			// no recreate needed.  skip

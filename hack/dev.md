@@ -36,7 +36,7 @@ run ```bash hack/setup.sh```
 replaced with your own apiserver public loadbalancer ip.
 ```
 ### replaced with your own apiserver public loadbalancer ip.
-sudo ssh -v -N -L 127.0.0.1:80:127.0.0.1:30977 root@$APISERVER_IP
+sudo ssh -v -N -L 127.0.0.1:80:127.0.0.1:31977 root@$APISERVER_IP
 
 ```
 
