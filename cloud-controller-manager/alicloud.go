@@ -502,13 +502,13 @@ func (c *Cloud) fileOutNode(nodes []*v1.Node, service *v1.Service) ([]*v1.Node,e
 	//if err != nil {
 	//	return []*v1.Node{}, err
 	//}
-	targets, err := c.climgr.Instances().filterOutByLabel(nodes, ar.BackendLabel)
-	if err != nil {
-		return []*v1.Node{}, err
-	}
-	// Add 20 nodes at most .
-	if len(targets) > MAX_LOADBALANCER_BACKEND {
-		return targets[0:MAX_LOADBALANCER_BACKEND], nil
-	}
-	return targets, nil
+	//targets, err := c.climgr.Instances().filterOutByLabel(nodes, ar.BackendLabel)
+	//if err != nil {
+	//	return []*v1.Node{}, err
+	//}
+	//// Add 20 nodes at most .
+	//if len(targets) > MAX_LOADBALANCER_BACKEND {
+	//	return targets[0:MAX_LOADBALANCER_BACKEND], nil
+	//}
+	return c.climgr.Instances().filterOutByLabel(nodes, ar.BackendLabel)
 }

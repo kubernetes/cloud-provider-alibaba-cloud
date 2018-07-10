@@ -51,6 +51,7 @@ type AnnotationRequest struct {
 	UnhealthyThreshold     	int
 	HealthCheckInterval    	int
 	HealthCheckDomain       string
+	HealthCheckHttpCode     slb.HealthCheckHttpCodeType
 
 	HealthCheckConnectTimeout int                 // for tcp
 	HealthCheckType           slb.HealthCheckType // for tcp, Type could be http tcp
@@ -427,9 +428,22 @@ func (s *LoadBalancerClient) UpdateBackendServers(nodes []*v1.Node, lb *slb.Load
 	}
 	if len(additions) > 0 {
 		glog.V(5).Infof("alicloud: add loadbalancer backend for [%s] \n %s\n",lb.LoadBalancerId, PrettyJson(additions))
-		_, err := s.c.AddBackendServers(lb.LoadBalancerId, additions)
-		if err != nil {
-			return err
+		// only 20 backend servers is accepted per delete.
+		for len(additions) > 0{
+			target := []slb.BackendServerType{}
+			if len(additions) > MAX_LOADBALANCER_BACKEND {
+				target = additions[0:MAX_LOADBALANCER_BACKEND]
+				additions = additions[MAX_LOADBALANCER_BACKEND:]
+				glog.V(5).Infof("alicloud: batch add backend servers, %s",target)
+			}else {
+				target = additions
+				additions = []slb.BackendServerType{}
+				glog.V(5).Infof("alicloud: batch add backend servers, else %s",target)
+			}
+			if _, err := s.c.AddBackendServers(lb.LoadBalancerId, target);
+				err != nil {
+				return err
+			}
 		}
 	}
 
@@ -454,8 +468,22 @@ func (s *LoadBalancerClient) UpdateBackendServers(nodes []*v1.Node, lb *slb.Load
 	}
 	if len(deletions) > 0 {
 		glog.V(5).Infof("alicloud: delete loadbalancer backend for [%s] %v\n",lb.LoadBalancerId, deletions)
-		if _, err := s.c.RemoveBackendServers(lb.LoadBalancerId, deletions); err != nil {
-			return err
+		// only 20 backend servers is accepted per delete.
+		for len(deletions) > 0{
+			target := []string{}
+			if len(deletions) > MAX_LOADBALANCER_BACKEND {
+				target = deletions[0:MAX_LOADBALANCER_BACKEND]
+				deletions = deletions[MAX_LOADBALANCER_BACKEND:]
+				glog.V(5).Infof("alicloud: batch delete backend servers, %s",target)
+			}else {
+				target = deletions
+				deletions = []string{}
+				glog.V(5).Infof("alicloud: batch delete backend servers else, %s",target)
+			}
+			if _, err := s.c.RemoveBackendServers(lb.LoadBalancerId, target);
+				err != nil {
+				return err
+			}
 		}
 	}
 	if len(additions) <=0 && len(deletions) <=0 {
@@ -522,6 +550,5 @@ func keepResourceVesion(service *v1.Service) error {
 			"already been kept in the DeletedSvcKeeper, no need to update.\n", service.Name, serviceUID)
 	}
 	// keeper.set(serviceUID, currentVersion)
-
 	return nil
 }

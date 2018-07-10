@@ -50,6 +50,7 @@ const (
 	ServiceAnnotationLoadBalancerHealthCheckConnectTimeout     = ServiceAnnotationLoadBalancerPrefix + "health-check-connect-timeout"
 	ServiceAnnotationLoadBalancerHealthCheckTimeout            = ServiceAnnotationLoadBalancerPrefix + "health-check-timeout"
 	ServiceAnnotationLoadBalancerHealthCheckDomain             = ServiceAnnotationLoadBalancerPrefix + "health-check-domain"
+	ServiceAnnotationLoadBalancerHealthCheckHTTPCode           = ServiceAnnotationLoadBalancerPrefix + "health-check-httpcode"
 
 	ServiceAnnotationLoadBalancerSpec		           = ServiceAnnotationLoadBalancerPrefix + "spec"
 	ServiceAnnotationLoadBalancerSessionStick            	   = ServiceAnnotationLoadBalancerPrefix + "sticky-session"
@@ -59,7 +60,7 @@ const (
 	ServiceAnnotationLoadBalancerPersistenceTimeout		   = ServiceAnnotationLoadBalancerPrefix + "persistence-timeout"
 	MagicHealthCheckConnectPort = -520
 
-	MAX_LOADBALANCER_BACKEND    = 20
+	MAX_LOADBALANCER_BACKEND    = 18
 )
 // defaulted is the parameters which set by programe.
 // request represent user defined parameters.
@@ -234,6 +235,12 @@ func ExtractAnnotationRequest(service *v1.Service) (*AnnotationRequest, *Annotat
 	if ok {
 		defaulted.HealthCheckDomain = hcDomain
 		request.HealthCheckDomain = defaulted.HealthCheckDomain
+	}
+
+	httpCode,ok := annotation[ServiceAnnotationLoadBalancerHealthCheckHTTPCode]
+	if ok {
+		defaulted.HealthCheckHttpCode = slb.HealthCheckHttpCodeType(httpCode)
+		request.HealthCheckHttpCode = defaulted.HealthCheckHttpCode
 	}
 
 	loadbalancerSpec,ok := annotation[ServiceAnnotationLoadBalancerSpec]

@@ -93,6 +93,8 @@ func (f *ListenerManager) NewTCP() ListenerInterface {
 				HealthCheckConnectTimeout: def.HealthCheckConnectTimeout,
 				HealthCheckInterval:       def.HealthCheckInterval,
 				HealthCheck:               def.HealthCheck,
+				HealthCheckDomain:         def.HealthCheckDomain,
+				HealthCheckHttpCode:       def.HealthCheckHttpCode,
 			},
 		)
 	}
@@ -118,6 +120,8 @@ func (f *ListenerManager) NewTCP() ListenerInterface {
 			HealthCheckConnectTimeout: response.HealthCheckConnectTimeout,
 			HealthCheckInterval:       response.HealthCheckInterval,
 			HealthCheck: 		   response.HealthCheck,
+			HealthCheckHttpCode:       response.HealthCheckHttpCode,
+			HealthCheckDomain:         response.HealthCheckDomain,
 		}
 		needUpdate := false
 		if request.Bandwidth != 0 &&
@@ -165,6 +169,16 @@ func (f *ListenerManager) NewTCP() ListenerInterface {
 		if def.PersistenceTimeout != response.PersistenceTimeout {
 			needUpdate = true
 			config.PersistenceTimeout = def.PersistenceTimeout
+		}
+		if request.HealthCheckHttpCode != "" &&
+			def.HealthCheckHttpCode != response.HealthCheckHttpCode {
+			needUpdate = true
+			config.HealthCheckHttpCode = def.HealthCheckHttpCode
+		}
+		if request.HealthCheckDomain != "" &&
+			def.HealthCheckDomain != response.HealthCheckDomain {
+			needUpdate = true
+			config.HealthCheckDomain = def.HealthCheckDomain
 		}
 		// backend server port has changed.
 		if int(port.NodePort) != response.BackendServerPort {
@@ -410,6 +424,16 @@ func (f *ListenerManager) NewHTTP() ListenerInterface {
 			needUpdate = true
 			config.CookieTimeout = def.CookieTimeout
 		}
+		if request.HealthCheckHttpCode != "" &&
+			def.HealthCheckHttpCode != response.HealthCheckHttpCode {
+			needUpdate = true
+			config.HealthCheckHttpCode = def.HealthCheckHttpCode
+		}
+		if request.HealthCheckDomain != "" &&
+			def.HealthCheckDomain != response.HealthCheckDomain {
+			needUpdate = true
+			config.HealthCheckDomain = def.HealthCheckDomain
+		}
 		// backend server port has changed.
 		if int(port.NodePort) != response.BackendServerPort {
 			config.BackendServerPort = int(port.NodePort)
@@ -454,6 +478,7 @@ func (f *ListenerManager) NewHTTP() ListenerInterface {
 				HealthCheckDomain:	def.HealthCheckDomain,
 				HealthCheck: 		def.HealthCheck,
 				HealthCheckTimeout:     def.HealthCheckTimeout,
+				HealthCheckHttpCode:    def.HealthCheckHttpCode,
 			},
 		)
 	}
@@ -568,6 +593,16 @@ func (f *ListenerManager) NewHTTPS() ListenerInterface {
 			needUpdate = true
 			config.CookieTimeout = def.CookieTimeout
 		}
+		if request.HealthCheckHttpCode != "" &&
+			def.HealthCheckHttpCode != response.HealthCheckHttpCode {
+			needUpdate = true
+			config.HealthCheckHttpCode = def.HealthCheckHttpCode
+		}
+		if request.HealthCheckDomain != "" &&
+			def.HealthCheckDomain != response.HealthCheckDomain {
+			needUpdate = true
+			config.HealthCheckDomain = def.HealthCheckDomain
+		}
 		// backend server port has changed.
 		if int(port.NodePort) != response.BackendServerPort {
 			needUpdate = true
@@ -612,6 +647,7 @@ func (f *ListenerManager) NewHTTPS() ListenerInterface {
 					HealthCheckTimeout:     def.HealthCheckTimeout,
 					HealthCheckInterval:    def.HealthCheckInterval,
 					HealthCheckDomain:      def.HealthCheckDomain,
+					HealthCheckHttpCode:    def.HealthCheckHttpCode,
 				},
 				ServerCertificateId: request.CertID,
 			},
