@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"os"
 	"strings"
+	"time"
 )
 
 const (
@@ -140,7 +141,6 @@ func (client *LocationClient) DescribeOpenAPIEndpoint(region Region, serviceCode
 	if endpoint := getProductRegionEndpoint(region, serviceCode); endpoint != "" {
 		return endpoint
 	}
-
 	defaultProtocols := HTTP_PROTOCOL
 
 	args := &DescribeEndpointsArgs{
@@ -149,9 +149,17 @@ func (client *LocationClient) DescribeOpenAPIEndpoint(region Region, serviceCode
 		Type:        "openAPI",
 	}
 
-	endpoint, err := client.DescribeEndpoints(args)
-	if err != nil || len(endpoint.Endpoints.Endpoint) <= 0 {
-		fmt.Println("endpoint count le 0\n")
+	var endpoint *DescribeEndpointsResponse
+	var err error
+	for index := 0; index < 5; index++ {
+		endpoint, err = client.DescribeEndpoints(args)
+		if err == nil && endpoint != nil && len(endpoint.Endpoints.Endpoint) > 0 {
+			break
+		}
+		time.Sleep(500 * time.Millisecond)
+	}
+
+	if err != nil || endpoint == nil || len(endpoint.Endpoints.Endpoint) <= 0 {
 		return ""
 	}
 
@@ -163,11 +171,8 @@ func (client *LocationClient) DescribeOpenAPIEndpoint(region Region, serviceCode
 	}
 
 	ep := fmt.Sprintf("%s://%s", defaultProtocols, endpoint.Endpoints.Endpoint[0].Endpoint)
-	////fmt.Printf("real endpoint: %s\n",ep)
-	//if ep == "https://slb-pop.aliyuncs.com" {
-	//	return "https://slb.ap-southeast-5.aliyuncs.com"
-	//}
-	//setProductRegionEndpoint(region, serviceCode, ep)
+
+	setProductRegionEndpoint(region, serviceCode, ep)
 	return ep
 }
 

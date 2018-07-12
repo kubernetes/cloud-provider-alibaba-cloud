@@ -63,8 +63,8 @@ func (r *RoutesClient) findRouter(region common.Region, vpcid string) (*ecs.VRou
 			return nil, err
 		}
 		if len(vpc) <= 0 {
-			return nil, errors.New(fmt.Sprintf("can not find vpc metadata by " +
-				"instance. region=%s, vpcid=%s, error=[no vpc found by specified id (%v)]", region, vpcid,vpc))
+			return nil, errors.New(fmt.Sprintf("can not find vpc metadata by "+
+				"instance. region=%s, vpcid=%s, error=[no vpc found by specified id (%v)]", region, vpcid, vpc))
 		}
 		r.vpcs.Set(vpckey, &vpc[0], defaultCacheExpiration)
 		v = &vpc[0]
@@ -80,12 +80,12 @@ func (r *RoutesClient) findRouter(region common.Region, vpcid string) (*ecs.VRou
 				RegionId:  region,
 			})
 		if err != nil {
-			glog.Errorf("alicloud: error ecs.DescribeVRouters(%s,%s). " +
+			glog.Errorf("alicloud: error ecs.DescribeVRouters(%s,%s). "+
 				"message=%s\n", vpc.VRouterId, region, r.getErrorString(err))
 			return nil, err
 		}
 		if len(vroute) <= 0 {
-			return nil, errors.New(fmt.Sprintf("can not find VRouter metadata " +
+			return nil, errors.New(fmt.Sprintf("can not find VRouter metadata "+
 				"by instance. region=%s,vpcid=%s, error=[no VRouter found by specified id]", region, vpc))
 		}
 		r.routers.Set(routerkey, &vroute[0], defaultCacheExpiration)
@@ -205,14 +205,14 @@ func (r *RoutesClient) reCreateRoute(table ecs.RouteTableSetType, route *ecs.Cre
 			if e.DestinationCidrBlock == route.DestinationCidrBlock &&
 				e.Status == ecs.RouteEntryStatusAvailable {
 				exist = true
-				glog.V(2).Infof("keep target entry: rtableid=%s, " +
+				glog.V(2).Infof("keep target entry: rtableid=%s, "+
 					"CIDR=%s, NextHop=%s \n", e.RouteTableId, e.DestinationCidrBlock, e.InstanceId)
 				continue
 			}
 
 			// 0.0.0.0/0 => ECS1 this kind of route is used for DNAT. so we keep it
 			if e.DestinationCidrBlock == "0.0.0.0/0" {
-				glog.V(2).Infof("keep route entry: rtableid=%s, CIDR=%s, " +
+				glog.V(2).Infof("keep route entry: rtableid=%s, CIDR=%s, "+
 					"NextHop=%s For DNAT\n", e.RouteTableId, e.DestinationCidrBlock, e.InstanceId)
 				continue
 			}
@@ -227,17 +227,17 @@ func (r *RoutesClient) reCreateRoute(table ecs.RouteTableSetType, route *ecs.Cre
 				return err
 			}
 
-			glog.V(2).Infof("remove old route entry: rtableid=%s, " +
+			glog.V(2).Infof("remove old route entry: rtableid=%s, "+
 				"CIDR=%s, NextHop=%s \n", e.RouteTableId, e.DestinationCidrBlock, e.InstanceId)
 			continue
 		}
 	}
 	if !exist {
-		glog.V(2).Infof("create route entry: rtableid=%s, " +
+		glog.V(2).Infof("create route entry: rtableid=%s, "+
 			"CIDR=%s, NextHop=%s \n", route.RouteTableId, route.DestinationCidrBlock, route.NextHopId)
 		return r.client.CreateRouteEntry(route)
 	}
-	glog.V(2).Infof("route keeped unchanged: rtableid=%s, " +
+	glog.V(2).Infof("route keeped unchanged: rtableid=%s, "+
 		"CIDR=%s, NextHop=%s \n", route.RouteTableId, route.DestinationCidrBlock, route.NextHopId)
 	return nil
 }

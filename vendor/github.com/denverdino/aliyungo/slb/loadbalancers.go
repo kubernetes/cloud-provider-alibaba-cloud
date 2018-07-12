@@ -44,7 +44,6 @@ type CreateLoadBalancerArgs struct {
 	MasterZoneId       string
 	SlaveZoneId        string
 	LoadBalancerSpec   LoadBalancerSpecType
-	Tags               string
 }
 
 type CreateLoadBalancerResponse struct {
@@ -188,7 +187,7 @@ type DescribeLoadBalancersArgs struct {
 	Address            string
 	InternetChargeType InternetChargeType
 	ServerId           string
-	Tags 		   string
+	Tags               string
 }
 
 type ListenerPortAndProtocolType struct {

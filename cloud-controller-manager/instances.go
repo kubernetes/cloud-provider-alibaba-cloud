@@ -42,7 +42,7 @@ type ClientInstanceSDK interface {
 // filterOutByRegion Used for multi-region or multi-vpc. works for single region or vpc too.
 // SLB only support Backends within the same vpc in the same region. so we need to remove the other backends which not in
 // the same region vpc with teh SLB. Keep the most backends
-func (s *InstanceClient) filterOutByRegion(nodes []*v1.Node, region common.Region) ([]*v1.Node,error) {
+func (s *InstanceClient) filterOutByRegion(nodes []*v1.Node, region common.Region) ([]*v1.Node, error) {
 	result := []*v1.Node{}
 	mvpc := make(map[string]int)
 	for _, node := range nodes {
@@ -73,8 +73,8 @@ func (s *InstanceClient) filterOutByRegion(nodes []*v1.Node, region common.Regio
 			records = append(records, node.Name)
 		}
 	}
-	glog.V(4).Infof("alicloud: accept nodes by region id=[%v], records=%v\n",region, records)
-	return result,nil
+	glog.V(4).Infof("alicloud: accept nodes by region id=[%v], records=%v\n", region, records)
+	return result, nil
 }
 
 func (s *InstanceClient) filterOutByLabel(nodes []*v1.Node, labels string) ([]*v1.Node, error) {
@@ -83,8 +83,8 @@ func (s *InstanceClient) filterOutByLabel(nodes []*v1.Node, labels string) ([]*v
 		glog.V(2).Infof("alicloud: slb backend server label does not specified, skip filter nodes by label.")
 		return nodes, nil
 	}
-	result  := []*v1.Node{}
-	lbl     := strings.Split(labels, ",")
+	result := []*v1.Node{}
+	lbl := strings.Split(labels, ",")
 	records := []string{}
 	for _, node := range nodes {
 		found := true
@@ -93,7 +93,7 @@ func (s *InstanceClient) filterOutByLabel(nodes []*v1.Node, labels string) ([]*v
 			if len(l) < 2 {
 				msg := fmt.Sprintf("alicloud: error parse backend label with value [%s], must be key value like [k1=v1,k2=v2]\n", v)
 				glog.Errorf(msg)
-				return []*v1.Node{},errors.New(msg)
+				return []*v1.Node{}, errors.New(msg)
 			}
 			if nv, exist := node.Labels[l[0]]; !exist || nv != l[1] {
 				found = false
@@ -105,8 +105,8 @@ func (s *InstanceClient) filterOutByLabel(nodes []*v1.Node, labels string) ([]*v
 			records = append(records, node.Name)
 		}
 	}
-	glog.V(4).Infof("alicloud: accept nodes by service backend labels[%s], %v\n",labels, records)
-	return result,nil
+	glog.V(4).Infof("alicloud: accept nodes by service backend labels[%s], %v\n", labels, records)
+	return result, nil
 }
 
 // we use '.' separated nodeid which looks like 'cn-hangzhou.i-v98dklsmnxkkgiiil7' to identify node
@@ -123,7 +123,7 @@ func nodeinfo(nodename types.NodeName) (common.Region, types.NodeName, error) {
 // we use '.' separated nodeid which looks like 'cn-hangzhou.i-v98dklsmnxkkgiiil7' to identify node
 // This is the format of "REGION.NODEID"
 func nodeid(region, nodename string) string {
-	return fmt.Sprintf("%s.%s",region,nodename)
+	return fmt.Sprintf("%s.%s", region, nodename)
 }
 
 // getAddressesByName return an instance address slice by it's name.

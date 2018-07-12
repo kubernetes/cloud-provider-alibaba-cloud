@@ -8,6 +8,8 @@ import (
 	"strconv"
 	"time"
 
+	"fmt"
+
 	"github.com/denverdino/aliyungo/common"
 	"github.com/denverdino/aliyungo/ecs"
 	"github.com/denverdino/aliyungo/util"
@@ -178,6 +180,15 @@ func (client *Client) GetClusterCerts(id string) (certs ClusterCerts, err error)
 	return
 }
 
+type ClusterConfig struct {
+	Config string `json:"config"`
+}
+
+func (client *Client) GetClusterConfig(id string) (config ClusterConfig, err error) {
+	err = client.Invoke("", http.MethodGet, "/k8s/"+id+"/user_config", nil, nil, &config)
+	return
+}
+
 type KubernetesNodeType struct {
 	InstanceType       string   `json:"instance_type"`
 	IpAddress          []string `json:"ip_address"`
@@ -199,7 +210,7 @@ type GetKubernetesClusterNodesResponse struct {
 
 func (client *Client) GetKubernetesClusterNodes(id string, pagination common.Pagination) (nodes []KubernetesNodeType, paginationResult *PaginationResult, err error) {
 	response := &GetKubernetesClusterNodesResponse{}
-	err = client.Invoke("", http.MethodGet, "/clusters/"+id+"/nodes?pageNumber="+strconv.Itoa(pagination.PageNumber)+"pageSize="+strconv.Itoa(pagination.PageSize), nil, nil, &response)
+	err = client.Invoke("", http.MethodGet, "/clusters/"+id+"/nodes?pageNumber="+strconv.Itoa(pagination.PageNumber)+"&pageSize="+strconv.Itoa(pagination.PageSize), nil, nil, &response)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -232,6 +243,8 @@ func (client *Client) WaitForClusterAsyn(clusterId string, status ClusterState, 
 		cluster, err := client.DescribeCluster(clusterId)
 		if err != nil {
 			return err
+		} else if cluster.State == Failed {
+			return fmt.Errorf("Waitting for cluster %s %s failed. Looking the specified reason in the web console.", clusterId, status)
 		} else if cluster.State == status {
 			//TODO
 			break

@@ -50,6 +50,22 @@ If you are not sure how to find your ECS instance's ID and region id, try to run
 
 ### Prepare and deploy `cloud-controller-manager`
 
+1. Prepare AliCloud access key id and secret
+
+```
+apiVersion: v1
+kind: Secret
+metadata:
+  name: cloud-config
+  namespace: kube-system
+data:
+  # insert your base64 encoded AliCloud access id and key here, ensure there's no trailing newline:
+  # to base64 encode your token run:
+  #      echo -n "abc123abc123doaccesstoken" | base64
+  access-key-id: "<ACCESS_KEY_ID>"
+  access-key-secret: "<ACCESS_KEY_SECRET>"
+```
+
 1. Prepare `cloud-controller-manager` daemonset yaml
 
 Mare sure container image, `--cluster-cidr` field match what your needs. replace image with your version.
@@ -84,11 +100,23 @@ spec:
         - --leader-elect=true
         - --cloud-provider=alicloud
         - --allocate-node-cidrs=true
+        - --allow-untagged-cloud=true
         # set this to what you set to controller-manager or kube-proxy
         - --cluster-cidr=172.20.0.0/16
         - --use-service-account-credentials=true
         - --route-reconciliation-period=30s
         - --v=5
+        env:
+          - name: ACCESS_KEY_ID
+            valueFrom:
+              secretKeyRef:
+                name: cloud-config
+                key: access-key-id
+          - name: ACCESS_KEY_SECRET
+            valueFrom:
+              secretKeyRef:
+                name: cloud-config
+                key: access-key-secret
         image: registry-vpc.cn-hangzhou.aliyuncs.com/acs/cloud-controller-manager-amd64:v1.9.3
         imagePullPolicy: IfNotPresent
         livenessProbe:

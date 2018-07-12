@@ -19,26 +19,26 @@ package alicloud
 import (
 	b64 "encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"github.com/denverdino/aliyungo/common"
+	"github.com/denverdino/aliyungo/ecs"
+	"github.com/denverdino/aliyungo/metadata"
 	"github.com/denverdino/aliyungo/slb"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/kubernetes/pkg/cloudprovider"
 	"strings"
 	"testing"
-	"github.com/denverdino/aliyungo/metadata"
-	"errors"
-	"github.com/denverdino/aliyungo/ecs"
-	"github.com/denverdino/aliyungo/common"
-	"k8s.io/kubernetes/pkg/cloudprovider"
 )
 
-var keyid 	string
-var keysecret   string
+var keyid string
+var keysecret string
 
 var (
-	vswitchid 	  = "vsw-2zeclpmxy66zzxj4cg4ls"
+	vswitchid         = "vsw-2zeclpmxy66zzxj4cg4ls"
 	listenPort2 int32 = 90
 	targetPort1       = intstr.FromInt(8080)
 	targetPort2       = intstr.FromInt(9090)
@@ -73,7 +73,7 @@ func TestCloudConfigInit(t *testing.T) {
 	}
 }
 
-func newMockCloud(slb ClientSLBSDK, route RouteSDK, ins ClientInstanceSDK, meta *metadata.MetaData) (*Cloud, error)  {
+func newMockCloud(slb ClientSLBSDK, route RouteSDK, ins ClientInstanceSDK, meta *metadata.MetaData) (*Cloud, error) {
 	if meta == nil {
 		meta = metadata.NewMockMetaData(nil, func(resource string) (string, error) {
 			if strings.Contains(resource, metadata.REGION) {
@@ -86,8 +86,8 @@ func newMockCloud(slb ClientSLBSDK, route RouteSDK, ins ClientInstanceSDK, meta 
 		})
 	}
 	mgr := &ClientMgr{
-		stop:  make(<-chan struct{}, 1),
-		meta:  meta,
+		stop: make(<-chan struct{}, 1),
+		meta: meta,
 		loadbalancer: &LoadBalancerClient{
 			c: slb,
 		},
@@ -103,8 +103,8 @@ func newMockCloud(slb ClientSLBSDK, route RouteSDK, ins ClientInstanceSDK, meta 
 }
 
 func TestEnsureLoadBalancerBasic(t *testing.T) {
-	instanceid 	:= "i-2zecarjjmtkx3oru4233"
-	listenPort1 	:= int32(80)
+	instanceid := "i-2zecarjjmtkx3oru4233"
+	listenPort1 := int32(80)
 	service := &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "my-service",
@@ -120,15 +120,15 @@ func TestEnsureLoadBalancerBasic(t *testing.T) {
 	}
 	nodes := []*v1.Node{
 		{
-			ObjectMeta: metav1.ObjectMeta{Name: nodeid("cn-beijing",instanceid)},
+			ObjectMeta: metav1.ObjectMeta{Name: nodeid("cn-beijing", instanceid)},
 			Spec: v1.NodeSpec{
-				ProviderID: nodeid("cn-beijing",instanceid),
+				ProviderID: nodeid("cn-beijing", instanceid),
 			},
 		},
 	}
 
-	base 	:= newBaseLoadbalancer()
-	detail 	:= loadbalancerAttrib(&base[0])
+	base := newBaseLoadbalancer()
+	detail := loadbalancerAttrib(&base[0])
 	t.Log(PrettyJson(detail))
 	// New Mock cloud to test
 	cloud, err := newMockCloud(&mockClientSLB{
@@ -142,9 +142,9 @@ func TestEnsureLoadBalancerBasic(t *testing.T) {
 				base[0].LoadBalancerName = args.LoadBalancerName
 				return base, nil
 			}
-			if len(args.Tags)>0{
+			if len(args.Tags) > 0 {
 				base[0].LoadBalancerName = cloudprovider.GetLoadBalancerName(service)
-			}else {
+			} else {
 				return nil, errors.New("loadbalancerid or loadbanancername must be specified.\n")
 			}
 			return base, nil
@@ -204,7 +204,7 @@ func TestEnsureLoadBalancerBasic(t *testing.T) {
 			}
 			return nil, errors.New("not found")
 		},
-		removeBackendServers:  func(loadBalancerId string, backendServers []string) (result []slb.BackendServerType, err error){
+		removeBackendServers: func(loadBalancerId string, backendServers []string) (result []slb.BackendServerType, err error) {
 			servers := detail.BackendServers.BackendServer
 			target := []slb.BackendServerType{}
 			for _, server := range servers {
@@ -218,31 +218,30 @@ func TestEnsureLoadBalancerBasic(t *testing.T) {
 					target = append(target, server)
 				}
 			}
-			detail.BackendServers.BackendServer=target
+			detail.BackendServers.BackendServer = target
 			return target, nil
 		},
-		addBackendServers:     func(loadBalancerId string, backendServers []slb.BackendServerType) (result []slb.BackendServerType, err error){
+		addBackendServers: func(loadBalancerId string, backendServers []slb.BackendServerType) (result []slb.BackendServerType, err error) {
 			detail.BackendServers.BackendServer = append(detail.BackendServers.BackendServer, backendServers...)
 			return detail.BackendServers.BackendServer, nil
 		},
-
 	}, nil, &mockClientInstanceSDK{
-		describeInstances: func(args *ecs.DescribeInstancesArgs) (instances []ecs.InstanceAttributesType, pagination *common.PaginationResult, err error){
+		describeInstances: func(args *ecs.DescribeInstancesArgs) (instances []ecs.InstanceAttributesType, pagination *common.PaginationResult, err error) {
 			if !strings.Contains(args.InstanceIds, instanceid) {
-				return nil,nil, errors.New("not found")
+				return nil, nil, errors.New("not found")
 			}
 			instances = []ecs.InstanceAttributesType{
 				{
-					InstanceId: instanceid,
-					ImageId:    "centos_7_04_64_20G_alibase_201701015.vhd",
-					RegionId:   "cn-beijing",
-					ZoneId:     "cn-beijing-f",
-					InstanceType: "ecs.sn1ne.large",
-					InstanceTypeFamily: "ecs.sn1ne",
-					Status:     "running",
+					InstanceId:          instanceid,
+					ImageId:             "centos_7_04_64_20G_alibase_201701015.vhd",
+					RegionId:            "cn-beijing",
+					ZoneId:              "cn-beijing-f",
+					InstanceType:        "ecs.sn1ne.large",
+					InstanceTypeFamily:  "ecs.sn1ne",
+					Status:              "running",
 					InstanceNetworkType: "vpc",
 					VpcAttributes: ecs.VpcAttributesType{
-						VpcId: "vpc-2zeaybwqmvn6qgabfd3pe",
+						VpcId:     "vpc-2zeaybwqmvn6qgabfd3pe",
 						VSwitchId: "vsw-2zeclpmxy66zzxj4cg4ls",
 						PrivateIpAddress: ecs.IpAddressSetType{
 							IpAddress: []string{"192.168.211.130"},
@@ -252,10 +251,9 @@ func TestEnsureLoadBalancerBasic(t *testing.T) {
 				},
 			}
 
-			return instances, nil,nil
+			return instances, nil, nil
 		},
 	}, nil)
-
 
 	if err != nil {
 		t.Fatal(fmt.Sprintf("TestEnsureLoadBalancer error newCloud: %s\n", err.Error()))
@@ -271,7 +269,7 @@ func TestEnsureLoadBalancerBasic(t *testing.T) {
 		t.Fatal("TestEnsureLoadBalancer error, expected only 1 backend left")
 	}
 	if detail.BackendServers.BackendServer[0].ServerId != instanceid {
-		t.Fatal(fmt.Sprintf("TestEnsureLoadBalancer error, expected to be instance [%s]",instanceid))
+		t.Fatal(fmt.Sprintf("TestEnsureLoadBalancer error, expected to be instance [%s]", instanceid))
 	}
 	if len(detail.ListenerPorts.ListenerPort) != 1 {
 		t.Fatal("TestEnsureLoadBalancer error, expected only 1 listener port left")
@@ -281,12 +279,11 @@ func TestEnsureLoadBalancerBasic(t *testing.T) {
 	}
 }
 
-
 // EnsureLoadBalancer and HTTPS with UpdateLoadBalancer.
 func TestEnsureLoadBalancerHTTPS(t *testing.T) {
-	instanceid 	:= "i-2zecarjjmtkx3oru4233"
-	listenPort1 	:= int32(80)
-	certID          := "1745547945134207_157f665c830"
+	instanceid := "i-2zecarjjmtkx3oru4233"
+	listenPort1 := int32(80)
+	certID := "1745547945134207_157f665c830"
 
 	service := &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
@@ -307,14 +304,14 @@ func TestEnsureLoadBalancerHTTPS(t *testing.T) {
 	}
 	nodes := []*v1.Node{
 		{
-			ObjectMeta: metav1.ObjectMeta{Name: nodeid("cn-beijing",instanceid)},
+			ObjectMeta: metav1.ObjectMeta{Name: nodeid("cn-beijing", instanceid)},
 			Spec: v1.NodeSpec{
-				ProviderID: nodeid("cn-beijing",instanceid),
+				ProviderID: nodeid("cn-beijing", instanceid),
 			},
 		},
 	}
-	base 	:= newBaseLoadbalancer()
-	detail 	:= loadbalancerAttrib(&base[0])
+	base := newBaseLoadbalancer()
+	detail := loadbalancerAttrib(&base[0])
 	t.Log(PrettyJson(detail))
 	// New Mock cloud to test
 	cloud, err := newMockCloud(&mockClientSLB{
@@ -328,9 +325,9 @@ func TestEnsureLoadBalancerHTTPS(t *testing.T) {
 				base[0].LoadBalancerName = args.LoadBalancerName
 				return base, nil
 			}
-			if len(args.Tags)>0{
+			if len(args.Tags) > 0 {
 				base[0].LoadBalancerName = cloudprovider.GetLoadBalancerName(service)
-			}else {
+			} else {
 				return nil, errors.New("loadbalancerid or loadbanancername must be specified.\n")
 			}
 			return base, nil
@@ -342,7 +339,7 @@ func TestEnsureLoadBalancerHTTPS(t *testing.T) {
 		createLoadBalancerHTTPSListener: func(args *slb.CreateLoadBalancerHTTPSListenerArgs) (err error) {
 			// check certid
 			if args.ServerCertificateId != certID {
-				return errors.New(fmt.Sprintf("server cert must be provided and equals to [%s]",certID ))
+				return errors.New(fmt.Sprintf("server cert must be provided and equals to [%s]", certID))
 			}
 			li := slb.ListenerPortAndProtocolType{
 				ListenerPort:     args.ListenerPort,
@@ -397,7 +394,7 @@ func TestEnsureLoadBalancerHTTPS(t *testing.T) {
 			}
 			return nil, errors.New("not found")
 		},
-		removeBackendServers:  func(loadBalancerId string, backendServers []string) (result []slb.BackendServerType, err error){
+		removeBackendServers: func(loadBalancerId string, backendServers []string) (result []slb.BackendServerType, err error) {
 			servers := detail.BackendServers.BackendServer
 			target := []slb.BackendServerType{}
 			for _, server := range servers {
@@ -411,31 +408,30 @@ func TestEnsureLoadBalancerHTTPS(t *testing.T) {
 					target = append(target, server)
 				}
 			}
-			detail.BackendServers.BackendServer=target
+			detail.BackendServers.BackendServer = target
 			return target, nil
 		},
-		addBackendServers:     func(loadBalancerId string, backendServers []slb.BackendServerType) (result []slb.BackendServerType, err error){
+		addBackendServers: func(loadBalancerId string, backendServers []slb.BackendServerType) (result []slb.BackendServerType, err error) {
 			detail.BackendServers.BackendServer = append(detail.BackendServers.BackendServer, backendServers...)
 			return detail.BackendServers.BackendServer, nil
 		},
-
 	}, nil, &mockClientInstanceSDK{
-		describeInstances: func(args *ecs.DescribeInstancesArgs) (instances []ecs.InstanceAttributesType, pagination *common.PaginationResult, err error){
+		describeInstances: func(args *ecs.DescribeInstancesArgs) (instances []ecs.InstanceAttributesType, pagination *common.PaginationResult, err error) {
 			if !strings.Contains(args.InstanceIds, instanceid) {
-				return nil,nil, errors.New("not found")
+				return nil, nil, errors.New("not found")
 			}
 			instances = []ecs.InstanceAttributesType{
 				{
-					InstanceId: instanceid,
-					ImageId:    "centos_7_04_64_20G_alibase_201701015.vhd",
-					RegionId:   "cn-beijing",
-					ZoneId:     "cn-beijing-f",
-					InstanceType: "ecs.sn1ne.large",
-					InstanceTypeFamily: "ecs.sn1ne",
-					Status:     "running",
+					InstanceId:          instanceid,
+					ImageId:             "centos_7_04_64_20G_alibase_201701015.vhd",
+					RegionId:            "cn-beijing",
+					ZoneId:              "cn-beijing-f",
+					InstanceType:        "ecs.sn1ne.large",
+					InstanceTypeFamily:  "ecs.sn1ne",
+					Status:              "running",
 					InstanceNetworkType: "vpc",
 					VpcAttributes: ecs.VpcAttributesType{
-						VpcId: "vpc-2zeaybwqmvn6qgabfd3pe",
+						VpcId:     "vpc-2zeaybwqmvn6qgabfd3pe",
 						VSwitchId: "vsw-2zeclpmxy66zzxj4cg4ls",
 						PrivateIpAddress: ecs.IpAddressSetType{
 							IpAddress: []string{"192.168.211.130"},
@@ -445,10 +441,9 @@ func TestEnsureLoadBalancerHTTPS(t *testing.T) {
 				},
 			}
 
-			return instances, nil,nil
+			return instances, nil, nil
 		},
 	}, nil)
-
 
 	if err != nil {
 		t.Fatal(fmt.Sprintf("TestEnsureLoadBalancer error newCloud: %s\n", err.Error()))
@@ -467,10 +462,9 @@ func TestEnsureLoadBalancerHTTPS(t *testing.T) {
 	}
 }
 
-
 func TestEnsureLoadBalancerWithPortChange(t *testing.T) {
-	instanceid 	:= "i-2zecarjjmtkx3oru4233"
-	listenPort1 	:= int32(80)
+	instanceid := "i-2zecarjjmtkx3oru4233"
+	listenPort1 := int32(80)
 	service := &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "my-service",
@@ -480,7 +474,7 @@ func TestEnsureLoadBalancerWithPortChange(t *testing.T) {
 			Ports: []v1.ServicePort{
 				{
 					Port: listenPort1, TargetPort: targetPort1, Protocol: v1.ProtocolTCP, NodePort: nodePort1,
-				},{
+				}, {
 					Port: 443, TargetPort: intstr.FromInt(443), Protocol: v1.ProtocolTCP, NodePort: 30443,
 				},
 			},
@@ -490,15 +484,15 @@ func TestEnsureLoadBalancerWithPortChange(t *testing.T) {
 	}
 	nodes := []*v1.Node{
 		{
-			ObjectMeta: metav1.ObjectMeta{Name: nodeid("cn-beijing",instanceid)},
+			ObjectMeta: metav1.ObjectMeta{Name: nodeid("cn-beijing", instanceid)},
 			Spec: v1.NodeSpec{
-				ProviderID: nodeid("cn-beijing",instanceid),
+				ProviderID: nodeid("cn-beijing", instanceid),
 			},
 		},
 	}
 
-	base 	:= newBaseLoadbalancer()
-	detail 	:= loadbalancerAttrib(&base[0])
+	base := newBaseLoadbalancer()
+	detail := loadbalancerAttrib(&base[0])
 	t.Log(PrettyJson(detail))
 	// New Mock cloud to test
 	cloud, err := newMockCloud(&mockClientSLB{
@@ -512,9 +506,9 @@ func TestEnsureLoadBalancerWithPortChange(t *testing.T) {
 				base[0].LoadBalancerName = args.LoadBalancerName
 				return base, nil
 			}
-			if len(args.Tags)>0{
+			if len(args.Tags) > 0 {
 				base[0].LoadBalancerName = cloudprovider.GetLoadBalancerName(service)
-			}else {
+			} else {
 				return nil, errors.New("loadbalancerid or loadbanancername must be specified.\n")
 			}
 			return base, nil
@@ -574,7 +568,7 @@ func TestEnsureLoadBalancerWithPortChange(t *testing.T) {
 			}
 			return nil, errors.New("not found")
 		},
-		removeBackendServers:  func(loadBalancerId string, backendServers []string) (result []slb.BackendServerType, err error){
+		removeBackendServers: func(loadBalancerId string, backendServers []string) (result []slb.BackendServerType, err error) {
 			servers := detail.BackendServers.BackendServer
 			target := []slb.BackendServerType{}
 			for _, server := range servers {
@@ -588,31 +582,30 @@ func TestEnsureLoadBalancerWithPortChange(t *testing.T) {
 					target = append(target, server)
 				}
 			}
-			detail.BackendServers.BackendServer=target
+			detail.BackendServers.BackendServer = target
 			return target, nil
 		},
-		addBackendServers:     func(loadBalancerId string, backendServers []slb.BackendServerType) (result []slb.BackendServerType, err error){
+		addBackendServers: func(loadBalancerId string, backendServers []slb.BackendServerType) (result []slb.BackendServerType, err error) {
 			detail.BackendServers.BackendServer = append(detail.BackendServers.BackendServer, backendServers...)
 			return detail.BackendServers.BackendServer, nil
 		},
-
 	}, nil, &mockClientInstanceSDK{
-		describeInstances: func(args *ecs.DescribeInstancesArgs) (instances []ecs.InstanceAttributesType, pagination *common.PaginationResult, err error){
+		describeInstances: func(args *ecs.DescribeInstancesArgs) (instances []ecs.InstanceAttributesType, pagination *common.PaginationResult, err error) {
 			if !strings.Contains(args.InstanceIds, instanceid) {
-				return nil,nil, errors.New("not found")
+				return nil, nil, errors.New("not found")
 			}
 			instances = []ecs.InstanceAttributesType{
 				{
-					InstanceId: instanceid,
-					ImageId:    "centos_7_04_64_20G_alibase_201701015.vhd",
-					RegionId:   "cn-beijing",
-					ZoneId:     "cn-beijing-f",
-					InstanceType: "ecs.sn1ne.large",
-					InstanceTypeFamily: "ecs.sn1ne",
-					Status:     "running",
+					InstanceId:          instanceid,
+					ImageId:             "centos_7_04_64_20G_alibase_201701015.vhd",
+					RegionId:            "cn-beijing",
+					ZoneId:              "cn-beijing-f",
+					InstanceType:        "ecs.sn1ne.large",
+					InstanceTypeFamily:  "ecs.sn1ne",
+					Status:              "running",
 					InstanceNetworkType: "vpc",
 					VpcAttributes: ecs.VpcAttributesType{
-						VpcId: "vpc-2zeaybwqmvn6qgabfd3pe",
+						VpcId:     "vpc-2zeaybwqmvn6qgabfd3pe",
 						VSwitchId: "vsw-2zeclpmxy66zzxj4cg4ls",
 						PrivateIpAddress: ecs.IpAddressSetType{
 							IpAddress: []string{"192.168.211.130"},
@@ -622,10 +615,9 @@ func TestEnsureLoadBalancerWithPortChange(t *testing.T) {
 				},
 			}
 
-			return instances, nil,nil
+			return instances, nil, nil
 		},
 	}, nil)
-
 
 	if err != nil {
 		t.Fatal(fmt.Sprintf("TestEnsureLoadBalancer error newCloud: %s\n", err.Error()))
@@ -641,7 +633,7 @@ func TestEnsureLoadBalancerWithPortChange(t *testing.T) {
 		t.Fatal("TestEnsureLoadBalancerWithPortChange error, expected only 1 backend left")
 	}
 	if detail.BackendServers.BackendServer[0].ServerId != instanceid {
-		t.Fatal(fmt.Sprintf("TestEnsureLoadBalancerWithPortChange error, expected to be instance [%s]",instanceid))
+		t.Fatal(fmt.Sprintf("TestEnsureLoadBalancerWithPortChange error, expected to be instance [%s]", instanceid))
 	}
 	if len(detail.ListenerPorts.ListenerPort) != 2 {
 		t.Fatal("TestEnsureLoadBalancerWithPortChange error, expected only 1 listener port left")
@@ -695,7 +687,7 @@ func TestEnsureLoadBalancerWithPortChange(t *testing.T) {
 //
 
 func TestEnsureLoadbalancerDeleted(t *testing.T) {
-	instanceid 	:= "i-2zecarjjmtkx3oru4233"
+	instanceid := "i-2zecarjjmtkx3oru4233"
 
 	service := &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
@@ -724,9 +716,9 @@ func TestEnsureLoadbalancerDeleted(t *testing.T) {
 				base[0].LoadBalancerName = args.LoadBalancerName
 				return base, nil
 			}
-			if len(args.Tags)>0{
+			if len(args.Tags) > 0 {
 				base[0].LoadBalancerName = cloudprovider.GetLoadBalancerName(service)
-			}else {
+			} else {
 				return nil, errors.New("loadbalancerid or loadbanancername must be specified.\n")
 			}
 			return base, nil
@@ -743,22 +735,22 @@ func TestEnsureLoadbalancerDeleted(t *testing.T) {
 			return nil
 		},
 	}, nil, &mockClientInstanceSDK{
-		describeInstances: func(args *ecs.DescribeInstancesArgs) (instances []ecs.InstanceAttributesType, pagination *common.PaginationResult, err error){
+		describeInstances: func(args *ecs.DescribeInstancesArgs) (instances []ecs.InstanceAttributesType, pagination *common.PaginationResult, err error) {
 			if !strings.Contains(args.InstanceIds, instanceid) {
-				return nil,nil, errors.New("not found")
+				return nil, nil, errors.New("not found")
 			}
 			instances = []ecs.InstanceAttributesType{
 				{
-					InstanceId: instanceid,
-					ImageId:    "centos_7_04_64_20G_alibase_201701015.vhd",
-					RegionId:   "cn-beijing",
-					ZoneId:     "cn-beijing-f",
-					InstanceType: "ecs.sn1ne.large",
-					InstanceTypeFamily: "ecs.sn1ne",
-					Status:     "running",
+					InstanceId:          instanceid,
+					ImageId:             "centos_7_04_64_20G_alibase_201701015.vhd",
+					RegionId:            "cn-beijing",
+					ZoneId:              "cn-beijing-f",
+					InstanceType:        "ecs.sn1ne.large",
+					InstanceTypeFamily:  "ecs.sn1ne",
+					Status:              "running",
 					InstanceNetworkType: "vpc",
 					VpcAttributes: ecs.VpcAttributesType{
-						VpcId: "vpc-2zeaybwqmvn6qgabfd3pe",
+						VpcId:     "vpc-2zeaybwqmvn6qgabfd3pe",
 						VSwitchId: "vsw-2zeclpmxy66zzxj4cg4ls",
 						PrivateIpAddress: ecs.IpAddressSetType{
 							IpAddress: []string{"192.168.211.130"},
@@ -768,14 +760,13 @@ func TestEnsureLoadbalancerDeleted(t *testing.T) {
 				},
 			}
 
-			return instances, nil,nil
+			return instances, nil, nil
 		},
 	}, nil)
 
 	if err != nil {
 		t.Errorf("TestEnsureLoadbalancerDeleted error newCloud: %s\n", err.Error())
 	}
-
 
 	e := cloud.EnsureLoadBalancerDeleted(clusterName, service)
 	if e != nil {
@@ -789,16 +780,15 @@ func TestEnsureLoadbalancerDeleted(t *testing.T) {
 	}
 }
 
-
 func TestEnsureLoadBalancerDeleteWithUserDefined(t *testing.T) {
-	listenPort1 	:= int32(80)
-	base 	:= newBaseLoadbalancer()
+	listenPort1 := int32(80)
+	base := newBaseLoadbalancer()
 	service := &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "my-service",
-			UID:  types.UID(serviceUID),
+			Name:        "my-service",
+			UID:         types.UID(serviceUID),
 			Annotations: map[string]string{
-				//ServiceAnnotationLoadBalancerId: "idbllll",
+			//ServiceAnnotationLoadBalancerId: "idbllll",
 			},
 		},
 		Spec: v1.ServiceSpec{
@@ -812,7 +802,7 @@ func TestEnsureLoadBalancerDeleteWithUserDefined(t *testing.T) {
 			LoadBalancer: v1.LoadBalancerStatus{
 				Ingress: []v1.LoadBalancerIngress{
 					{
-						IP: 		"1.1.1.1",
+						IP: "1.1.1.1",
 					},
 				},
 			},
@@ -831,9 +821,9 @@ func TestEnsureLoadBalancerDeleteWithUserDefined(t *testing.T) {
 				base[0].LoadBalancerName = args.LoadBalancerName
 				return base, nil
 			}
-			if len(args.Tags)>0{
+			if len(args.Tags) > 0 {
 				base[0].LoadBalancerName = cloudprovider.GetLoadBalancerName(service)
-			}else {
+			} else {
 				return nil, errors.New("loadbalancerid or loadbanancername must be specified.\n")
 			}
 			return base, nil
@@ -842,12 +832,11 @@ func TestEnsureLoadBalancerDeleteWithUserDefined(t *testing.T) {
 			t.Logf("findloadbalancer, [%s]", loadBalancerId)
 			return loadbalancerAttrib(&base[0]), nil
 		},
-		deleteLoadBalancer:  func(loadBalancerId string) (err error) {
+		deleteLoadBalancer: func(loadBalancerId string) (err error) {
 			base = []slb.LoadBalancerType{}
 			return nil
 		},
 	}, nil, nil, nil)
-
 
 	if err != nil {
 		t.Fatal(fmt.Sprintf("TestEnsureLoadBalancerDeleteWithUserDefined error newCloud: %s\n", err.Error()))
@@ -863,27 +852,26 @@ func TestEnsureLoadBalancerDeleteWithUserDefined(t *testing.T) {
 	}
 }
 
-
 func TestNodeAddressAndInstanceID(t *testing.T) {
-	instanceid 	:= "i-2zecarjjmtkx3oru4233"
+	instanceid := "i-2zecarjjmtkx3oru4233"
 	// New Mock cloud to test
 	cloud, err := newMockCloud(nil, nil, &mockClientInstanceSDK{
-		describeInstances: func(args *ecs.DescribeInstancesArgs) (instances []ecs.InstanceAttributesType, pagination *common.PaginationResult, err error){
+		describeInstances: func(args *ecs.DescribeInstancesArgs) (instances []ecs.InstanceAttributesType, pagination *common.PaginationResult, err error) {
 			if !strings.Contains(args.InstanceIds, instanceid) {
-				return nil,nil, errors.New("not found")
+				return nil, nil, errors.New("not found")
 			}
 			instances = []ecs.InstanceAttributesType{
 				{
-					InstanceId: instanceid,
-					ImageId:    "centos_7_04_64_20G_alibase_201701015.vhd",
-					RegionId:   "cn-beijing",
-					ZoneId:     "cn-beijing-f",
-					InstanceType: "ecs.sn1ne.large",
-					InstanceTypeFamily: "ecs.sn1ne",
-					Status:     "running",
+					InstanceId:          instanceid,
+					ImageId:             "centos_7_04_64_20G_alibase_201701015.vhd",
+					RegionId:            "cn-beijing",
+					ZoneId:              "cn-beijing-f",
+					InstanceType:        "ecs.sn1ne.large",
+					InstanceTypeFamily:  "ecs.sn1ne",
+					Status:              "running",
 					InstanceNetworkType: "vpc",
 					VpcAttributes: ecs.VpcAttributesType{
-						VpcId: "vpc-2zeaybwqmvn6qgabfd3pe",
+						VpcId:     "vpc-2zeaybwqmvn6qgabfd3pe",
 						VSwitchId: "vsw-2zeclpmxy66zzxj4cg4ls",
 						PrivateIpAddress: ecs.IpAddressSetType{
 							IpAddress: []string{"192.168.211.130"},
@@ -893,10 +881,9 @@ func TestNodeAddressAndInstanceID(t *testing.T) {
 				},
 			}
 
-			return instances, nil,nil
+			return instances, nil, nil
 		},
 	}, nil)
-
 
 	if err != nil {
 		t.Errorf("TestNodeAddressAndInstanceID error: newcloud %s\n", err.Error())
@@ -908,7 +895,7 @@ func TestNodeAddressAndInstanceID(t *testing.T) {
 	}
 	t.Log(PrettyJson(n))
 
-	if len(n) != 1{
+	if len(n) != 1 {
 		t.Fatal("TestNodeAddressAndInstanceID error: node address returned must equal to 1")
 	}
 	if n[0].Type != "InternalIP" || n[0].Address != "192.168.211.130" {
@@ -923,7 +910,6 @@ func TestNodeAddressAndInstanceID(t *testing.T) {
 		t.Fatal("TestNodeAddressAndInstanceID error: instance id must equal to i-2zecarjjmtkx3oru4233")
 	}
 }
-
 
 var con string = `
 {

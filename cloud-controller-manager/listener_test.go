@@ -113,7 +113,7 @@ func TestUpdateListenerPorts(t *testing.T) {
 				ListenerPort:     args.ListenerPort,
 				ListenerProtocol: "tcp",
 			}
-			t.Log("PPPP: %v\n",li)
+			t.Log("PPPP: %v\n", li)
 			detail.ListenerPorts.ListenerPort = append(detail.ListenerPorts.ListenerPort, args.ListenerPort)
 			detail.ListenerPortsAndProtocol.ListenerPortAndProtocol = append(detail.ListenerPortsAndProtocol.ListenerPortAndProtocol, li)
 			return nil

@@ -18,8 +18,8 @@ package alicloud
 
 import (
 	"fmt"
-	"testing"
 	"strings"
+	"testing"
 	//"time"
 	"errors"
 	"github.com/denverdino/aliyungo/common"
@@ -30,7 +30,7 @@ import (
 func NewMockRouteMgr(client RouteSDK) (*ClientMgr, error) {
 	mgr := &ClientMgr{
 		routes: &RoutesClient{
-			client:	client,
+			client:  client,
 			routers: cache.New(defaultCacheExpiration, defaultCacheExpiration),
 			vpcs:    cache.New(defaultCacheExpiration, defaultCacheExpiration),
 		},
@@ -39,69 +39,69 @@ func NewMockRouteMgr(client RouteSDK) (*ClientMgr, error) {
 }
 
 func TestListRoutes(t *testing.T) {
-	vpcid 		:= "vpc-2zeaybwqmvn6qgabfd3pe"
-	vrouterid 	:= "vrt-2zegcm0ty46mq243fmxoj"
-	vswitchid 	:= "vsw-2zeclpmxy66zzxj4cg4ls"
-	routetableid 	:= "vtb-2zedne8cr43rp5oqsr9xg"
+	vpcid := "vpc-2zeaybwqmvn6qgabfd3pe"
+	vrouterid := "vrt-2zegcm0ty46mq243fmxoj"
+	vswitchid := "vsw-2zeclpmxy66zzxj4cg4ls"
+	routetableid := "vtb-2zedne8cr43rp5oqsr9xg"
 
 	entries := []ecs.RouteEntrySetType{
 		{
-			RouteTableId: routetableid,
+			RouteTableId:         routetableid,
 			DestinationCidrBlock: "172.16.3.0/24",
-			Type: ecs.RouteTableCustom,
-			NextHopType: "Instance",
-			InstanceId: "i-2zee0h6bdcgrocv2n9jb",
-			Status: ecs.RouteEntryStatusAvailable,
+			Type:                 ecs.RouteTableCustom,
+			NextHopType:          "Instance",
+			InstanceId:           "i-2zee0h6bdcgrocv2n9jb",
+			Status:               ecs.RouteEntryStatusAvailable,
 		},
 		{
-			RouteTableId: routetableid,
+			RouteTableId:         routetableid,
 			DestinationCidrBlock: "172.16.2.0/24",
-			Type: ecs.RouteTableCustom,
-			NextHopType: "Instance",
-			InstanceId: "i-2zecarjjmtkx3oru4233",
-			Status: ecs.RouteEntryStatusAvailable,
+			Type:                 ecs.RouteTableCustom,
+			NextHopType:          "Instance",
+			InstanceId:           "i-2zecarjjmtkx3oru4233",
+			Status:               ecs.RouteEntryStatusAvailable,
 		},
 		{
-			RouteTableId: routetableid,
+			RouteTableId:         routetableid,
 			DestinationCidrBlock: "172.16.0.0/24",
-			Type: ecs.RouteTableCustom,
-			NextHopType: "Instance",
-			InstanceId: "i-2ze7q4vl8cosjsd56j0h",
-			Status: ecs.RouteEntryStatusAvailable,
+			Type:                 ecs.RouteTableCustom,
+			NextHopType:          "Instance",
+			InstanceId:           "i-2ze7q4vl8cosjsd56j0h",
+			Status:               ecs.RouteEntryStatusAvailable,
 		},
 		{
-			RouteTableId: routetableid,
+			RouteTableId:         routetableid,
 			DestinationCidrBlock: "0.0.0.0/0",
-			Type: ecs.RouteTableCustom,
-			NextHopType: "NatGateway",
-			InstanceId: "ngw-2zetlvdtq0zt9ubez3zz3",
-			Status: ecs.RouteEntryStatusAvailable,
+			Type:                 ecs.RouteTableCustom,
+			NextHopType:          "NatGateway",
+			InstanceId:           "ngw-2zetlvdtq0zt9ubez3zz3",
+			Status:               ecs.RouteEntryStatusAvailable,
 		},
 		{
-			RouteTableId: routetableid,
+			RouteTableId:         routetableid,
 			DestinationCidrBlock: "192.168.0.0/16",
-			Type: ecs.RouteTableSystem,
-			NextHopType: "local",
-			Status: ecs.RouteEntryStatusAvailable,
+			Type:                 ecs.RouteTableSystem,
+			NextHopType:          "local",
+			Status:               ecs.RouteEntryStatusAvailable,
 		},
 		{
-			RouteTableId: routetableid,
+			RouteTableId:         routetableid,
 			DestinationCidrBlock: "100.64.0.0/10",
-			Type: ecs.RouteTableSystem,
-			NextHopType: "service",
-			Status: ecs.RouteEntryStatusAvailable,
+			Type:                 ecs.RouteTableSystem,
+			NextHopType:          "service",
+			Status:               ecs.RouteEntryStatusAvailable,
 		},
 	}
 	cmgr, err := NewMockRouteMgr(&mockRouteSDK{
-		describeVpcs: func(args *ecs.DescribeVpcsArgs) (vpcs []ecs.VpcSetType, pagination *common.PaginationResult, err error){
-			if args.RegionId != common.Beijing{
-				return nil,nil, errors.New("pls specify the right region")
+		describeVpcs: func(args *ecs.DescribeVpcsArgs) (vpcs []ecs.VpcSetType, pagination *common.PaginationResult, err error) {
+			if args.RegionId != common.Beijing {
+				return nil, nil, errors.New("pls specify the right region")
 			}
 			vpcs = []ecs.VpcSetType{
 				{
-					VpcId: 	vpcid,
+					VpcId:    vpcid,
 					RegionId: common.Beijing,
-					VSwitchIds:struct {
+					VSwitchIds: struct {
 						VSwitchId []string
 					}{
 						VSwitchId: []string{vswitchid},
@@ -112,15 +112,15 @@ func TestListRoutes(t *testing.T) {
 			}
 			return vpcs, nil, nil
 		},
-		describeVRouters: func(args *ecs.DescribeVRoutersArgs) (vrouters []ecs.VRouterSetType, pagination *common.PaginationResult, err error){
-			if args.RegionId != common.Beijing{
-				return nil,nil, errors.New("pls specify the right region")
+		describeVRouters: func(args *ecs.DescribeVRoutersArgs) (vrouters []ecs.VRouterSetType, pagination *common.PaginationResult, err error) {
+			if args.RegionId != common.Beijing {
+				return nil, nil, errors.New("pls specify the right region")
 			}
 			vrouters = []ecs.VRouterSetType{
 				{
 					VRouterId: vrouterid,
-					RegionId: common.Beijing,
-					VpcId: vpcid,
+					RegionId:  common.Beijing,
+					VpcId:     vpcid,
 					RouteTableIds: struct {
 						RouteTableId []string
 					}{
@@ -128,15 +128,15 @@ func TestListRoutes(t *testing.T) {
 					},
 				},
 			}
-			return vrouters,nil,nil
+			return vrouters, nil, nil
 		},
-		describeRouteTables: func(args *ecs.DescribeRouteTablesArgs) (routeTables []ecs.RouteTableSetType, pagination *common.PaginationResult, err error){
-			if args.RouteTableId != routetableid{
-				return nil,nil, errors.New("pls specify the right route table id")
+		describeRouteTables: func(args *ecs.DescribeRouteTablesArgs) (routeTables []ecs.RouteTableSetType, pagination *common.PaginationResult, err error) {
+			if args.RouteTableId != routetableid {
+				return nil, nil, errors.New("pls specify the right route table id")
 			}
-			routeTables = []ecs.RouteTableSetType {
+			routeTables = []ecs.RouteTableSetType{
 				{
-					VRouterId: vrouterid,
+					VRouterId:    vrouterid,
 					RouteTableId: routetableid,
 					RouteEntrys: struct {
 						RouteEntry []ecs.RouteEntrySetType
@@ -146,7 +146,7 @@ func TestListRoutes(t *testing.T) {
 					RouteTableType: "System",
 				},
 			}
-			return routeTables,nil, nil
+			return routeTables, nil, nil
 		},
 	})
 	if err != nil {
@@ -162,7 +162,7 @@ func TestListRoutes(t *testing.T) {
 		t.Log(PrettyJson(r))
 		for _, entry := range entries {
 			if entry.DestinationCidrBlock == r.DestinationCIDR &&
-			string(r.TargetNode) == strings.Join([]string{"cn-beijing",entry.InstanceId}, ".") {
+				string(r.TargetNode) == strings.Join([]string{"cn-beijing", entry.InstanceId}, ".") {
 				if entry.Type != "Custom" {
 					t.Fatal("should not return none cutomized routes")
 				}
@@ -177,53 +177,52 @@ func TestListRoutes(t *testing.T) {
 }
 
 type mockRouteSDK struct {
-	describeVpcs func(args *ecs.DescribeVpcsArgs) (vpcs []ecs.VpcSetType, pagination *common.PaginationResult, err error)
-	describeVRouters func(args *ecs.DescribeVRoutersArgs) (vrouters []ecs.VRouterSetType, pagination *common.PaginationResult, err error)
-	describeRouteTables func(args *ecs.DescribeRouteTablesArgs) (routeTables []ecs.RouteTableSetType, pagination *common.PaginationResult, err error)
-	deleteRouteEntry func(args *ecs.DeleteRouteEntryArgs) error
-	createRouteEntry func(args *ecs.CreateRouteEntryArgs) error
+	describeVpcs                    func(args *ecs.DescribeVpcsArgs) (vpcs []ecs.VpcSetType, pagination *common.PaginationResult, err error)
+	describeVRouters                func(args *ecs.DescribeVRoutersArgs) (vrouters []ecs.VRouterSetType, pagination *common.PaginationResult, err error)
+	describeRouteTables             func(args *ecs.DescribeRouteTablesArgs) (routeTables []ecs.RouteTableSetType, pagination *common.PaginationResult, err error)
+	deleteRouteEntry                func(args *ecs.DeleteRouteEntryArgs) error
+	createRouteEntry                func(args *ecs.CreateRouteEntryArgs) error
 	waitForAllRouteEntriesAvailable func(vrouterId string, routeTableId string, timeout int) error
 }
 
-func (m *mockRouteSDK) DescribeVpcs(args *ecs.DescribeVpcsArgs) (vpcs []ecs.VpcSetType, pagination *common.PaginationResult, err error){
+func (m *mockRouteSDK) DescribeVpcs(args *ecs.DescribeVpcsArgs) (vpcs []ecs.VpcSetType, pagination *common.PaginationResult, err error) {
 	if m.describeVpcs != nil {
 		return m.describeVpcs(args)
 	}
 	return nil, nil, errors.New("not implemented")
 }
 
-func (m *mockRouteSDK) DescribeVRouters(args *ecs.DescribeVRoutersArgs) (vrouters []ecs.VRouterSetType, pagination *common.PaginationResult, err error){
+func (m *mockRouteSDK) DescribeVRouters(args *ecs.DescribeVRoutersArgs) (vrouters []ecs.VRouterSetType, pagination *common.PaginationResult, err error) {
 	if m.describeVRouters != nil {
 		return m.describeVRouters(args)
 	}
 	return nil, nil, errors.New("not implemented")
 }
 
-func (m *mockRouteSDK) DescribeRouteTables(args *ecs.DescribeRouteTablesArgs) (routeTables []ecs.RouteTableSetType, pagination *common.PaginationResult, err error){
+func (m *mockRouteSDK) DescribeRouteTables(args *ecs.DescribeRouteTablesArgs) (routeTables []ecs.RouteTableSetType, pagination *common.PaginationResult, err error) {
 	if m.describeRouteTables != nil {
 		return m.describeRouteTables(args)
 	}
 	return nil, nil, errors.New("not implemented")
 }
-func (m *mockRouteSDK) DeleteRouteEntry(args *ecs.DeleteRouteEntryArgs) error{
+func (m *mockRouteSDK) DeleteRouteEntry(args *ecs.DeleteRouteEntryArgs) error {
 	if m.deleteRouteEntry != nil {
 		return m.deleteRouteEntry(args)
 	}
 	return errors.New("not implemented")
 }
-func (m *mockRouteSDK) CreateRouteEntry(args *ecs.CreateRouteEntryArgs) error{
+func (m *mockRouteSDK) CreateRouteEntry(args *ecs.CreateRouteEntryArgs) error {
 	if m.createRouteEntry != nil {
 		return m.createRouteEntry(args)
 	}
 	return errors.New("not implemented")
 }
-func (m *mockRouteSDK) WaitForAllRouteEntriesAvailable(vrouterId string, routeTableId string, timeout int) error{
+func (m *mockRouteSDK) WaitForAllRouteEntriesAvailable(vrouterId string, routeTableId string, timeout int) error {
 	if m.waitForAllRouteEntriesAvailable != nil {
 		return m.waitForAllRouteEntriesAvailable(vrouterId, routeTableId, timeout)
 	}
 	return errors.New("not implemented")
 }
-
 
 func testCamel(t *testing.T, original, expected string) {
 	converted := replaceCamel(original)
@@ -274,18 +273,18 @@ func TestSep(t *testing.T) {
 }
 
 func TestRealClient(t *testing.T) {
-	realRouteClient(keyid,keysecret)
+	realRouteClient(keyid, keysecret)
 }
 
-func realRouteClient(keyid,keysec string) {
+func realRouteClient(keyid, keysec string) {
 	if keyid == "" || keysec == "" {
 		return
 	}
 	cs := ecs.NewClient(keyid, keysec)
 
-	vpc,_,_ := cs.DescribeRouteTables(&ecs.DescribeRouteTablesArgs{
-		RouteTableId:   "vtb-2zedne8cr43rp5oqsr9xg",
-		VRouterId: 	"vrt-2zegcm0ty46mq243fmxoj",
+	vpc, _, _ := cs.DescribeRouteTables(&ecs.DescribeRouteTablesArgs{
+		RouteTableId: "vtb-2zedne8cr43rp5oqsr9xg",
+		VRouterId:    "vrt-2zegcm0ty46mq243fmxoj",
 	})
 
 	fmt.Printf(PrettyJson(vpc))

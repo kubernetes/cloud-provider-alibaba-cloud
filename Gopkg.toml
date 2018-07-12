@@ -20,9 +20,9 @@
 #  name = "github.com/x/y"
 #  version = "2.4.0"
 
-#[[constraint]]
-#  branch = "master"
-#  name = "github.com/denverdino/aliyungo"
+[[constraint]]
+  branch = "master"
+  name = "github.com/denverdino/aliyungo"
 
 [[constraint]]
   branch = "master"
@@ -64,7 +64,3 @@
   revision = "545102ea07aa9796f189d82f606b7c27d7aa3ed3"
   name = "github.com/docker/distribution"
 
-[[constraint]]
-  branch = "feature/bazaar"
-  name = "github.com/denverdino/aliyungo"
-  source = "git@gitlab.alibaba-inc.com:cos/aliyungo.git"

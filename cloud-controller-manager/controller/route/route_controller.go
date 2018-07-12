@@ -148,7 +148,7 @@ func (rc *RouteController) reconcile(nodes []*v1.Node, routes []*cloudprovider.R
 	for _, route := range routes {
 		if rc.isResponsibleForRoute(route) {
 			// Check if this route is a blackhole, or applies to a node we know about & has an incorrect CIDR.
-			if route.Blackhole || (cidrForNode(nodes,string(route.TargetNode)) != route.DestinationCIDR) {
+			if route.Blackhole || (cidrForNode(nodes, string(route.TargetNode)) != route.DestinationCIDR) {
 				wg.Add(1)
 				// Delete the route.
 				go func(route *cloudprovider.Route, startTime time.Time) {

@@ -17,20 +17,20 @@ limitations under the License.
 package main
 
 import (
+	f "flag"
 	"fmt"
 	"os"
-	f "flag"
 
-	_ "k8s.io/cloud-provider-alibaba-cloud/cloud-controller-manager"
 	"github.com/spf13/pflag"
 	"k8s.io/apiserver/pkg/server/healthz"
 	"k8s.io/apiserver/pkg/util/flag"
 	"k8s.io/apiserver/pkg/util/logs"
+	_ "k8s.io/cloud-provider-alibaba-cloud/cloud-controller-manager"
+	"k8s.io/cloud-provider-alibaba-cloud/cmd/cloudprovider/app"
+	"k8s.io/cloud-provider-alibaba-cloud/cmd/cloudprovider/app/options"
 	_ "k8s.io/kubernetes/pkg/client/metrics/prometheus"
 	_ "k8s.io/kubernetes/pkg/version/prometheus"
 	"k8s.io/kubernetes/pkg/version/verflag"
-	"k8s.io/cloud-provider-alibaba-cloud/cmd/cloudprovider/app/options"
-	"k8s.io/cloud-provider-alibaba-cloud/cmd/cloudprovider/app"
 )
 
 func init() {

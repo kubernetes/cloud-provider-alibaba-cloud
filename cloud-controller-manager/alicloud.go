@@ -62,11 +62,11 @@ var (
 type CloudConfig struct {
 	Global struct {
 		KubernetesClusterTag string
-		UID		string `json:"uid"`
-		VpcID 		string `json:"vpcid"`
-		Region 		string `json:"region"`
-		ZoneID          string `json:"zoneid"`
-		VswitchID 	string `json:"vswitchid"`
+		UID                  string `json:"uid"`
+		VpcID                string `json:"vpcid"`
+		Region               string `json:"region"`
+		ZoneID               string `json:"zoneid"`
+		VswitchID            string `json:"vswitchid"`
 
 		AccessKeyID     string `json:"accessKeyID"`
 		AccessKeySecret string `json:"accessKeySecret"`
@@ -79,7 +79,7 @@ func init() {
 	cloudprovider.RegisterCloudProvider(ProviderName,
 		func(config io.Reader) (cloudprovider.Interface, error) {
 			var (
-				keyid = ""
+				keyid     = ""
 				keysecret = ""
 			)
 			if config != nil {
@@ -103,7 +103,7 @@ func init() {
 			}
 			if keyid == "" || keysecret == "" {
 				glog.V(2).Infof("cloud config does not have keyid and keysecret . try enviroment ACCESS_KEY_ID ACCESS_KEY_SECRET")
-				keyid     = os.Getenv("ACCESS_KEY_ID")
+				keyid = os.Getenv("ACCESS_KEY_ID")
 				keysecret = os.Getenv("ACCESS_KEY_SECRET")
 			}
 			mgr, err := NewClientMgr(keyid, keysecret)
@@ -211,7 +211,7 @@ func (c *Cloud) EnsureLoadBalancer(clusterName string, service *v1.Service, node
 	return &v1.LoadBalancerStatus{
 		Ingress: []v1.LoadBalancerIngress{
 			{
-				IP:       lb.Address,
+				IP: lb.Address,
 			},
 		},
 	}, nil
@@ -224,7 +224,7 @@ func (c *Cloud) EnsureLoadBalancer(clusterName string, service *v1.Service, node
 func (c *Cloud) UpdateLoadBalancer(clusterName string, service *v1.Service, nodes []*v1.Node) error {
 	glog.V(2).Infof("Alicloud.UpdateLoadBalancer(%v, %v, %v, %v, %v, %v, %v)",
 		clusterName, service.Namespace, service.Name, c.region, service.Spec.LoadBalancerIP, service.Spec.Ports, NodeList(nodes))
-	ns,err := c.fileOutNode(nodes, service)
+	ns, err := c.fileOutNode(nodes, service)
 	if err != nil {
 		return err
 	}
@@ -341,7 +341,7 @@ func (c *Cloud) InstanceExistsByProviderID(providerID string) (bool, error) {
 // ListRoutes lists all managed routes that belong to the specified clusterName
 func (c *Cloud) ListRoutes(clusterName string) ([]*cloudprovider.Route, error) {
 	glog.V(5).Infof("alicloud: ListRoutes \n")
-	vpcid,err := c.climgr.MetaData().VpcID()
+	vpcid, err := c.climgr.MetaData().VpcID()
 	if err != nil {
 		return nil, errors.New("alicloud: can not determin vpcid while list routes")
 	}
@@ -495,7 +495,7 @@ func (c *Cloud) HasClusterID() bool {
 }
 
 //
-func (c *Cloud) fileOutNode(nodes []*v1.Node, service *v1.Service) ([]*v1.Node,error) {
+func (c *Cloud) fileOutNode(nodes []*v1.Node, service *v1.Service) ([]*v1.Node, error) {
 
 	ar, _ := ExtractAnnotationRequest(service)
 	//ns, err := c.climgr.Instances().filterOutByRegion(nodes, ar.Region)

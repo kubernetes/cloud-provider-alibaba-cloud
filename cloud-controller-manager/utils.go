@@ -17,15 +17,15 @@ limitations under the License.
 package alicloud
 
 import (
-	"sync"
 	"k8s.io/api/core/v1"
+	"sync"
 )
 
 // localService is a local cache try to record the max resource version of each service.
 // this is a workaround of BUG #https://github.com/kubernetes/kubernetes/issues/59084
 var (
-	versionCache        *localService
-	once 	sync.Once
+	versionCache *localService
+	once         sync.Once
 )
 
 type localService struct {

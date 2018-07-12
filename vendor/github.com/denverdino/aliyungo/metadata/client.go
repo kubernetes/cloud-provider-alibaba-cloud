@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"os"
 	"io/ioutil"
 	"net"
 	"net/http"
@@ -16,6 +15,7 @@ import (
 	"reflect"
 
 	"github.com/denverdino/aliyungo/util"
+	"os"
 )
 
 const (
@@ -323,7 +323,7 @@ func (vpc *MetaDataRequest) Url() (string, error) {
 	if endpoint == "" {
 		endpoint = ENDPOINT
 	}
- 	r := fmt.Sprintf("%s/%s/%s/%s", endpoint, vpc.version, vpc.resourceType, vpc.resource)
+	r := fmt.Sprintf("%s/%s/%s/%s", endpoint, vpc.version, vpc.resourceType, vpc.resource)
 	if vpc.subResource == "" {
 		return r, nil
 	}
@@ -446,4 +446,3 @@ type RoleAuth struct {
 	LastUpdated     time.Time
 	Code            string
 }
-

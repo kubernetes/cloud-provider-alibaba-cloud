@@ -52,25 +52,26 @@ const (
 	ServiceAnnotationLoadBalancerHealthCheckDomain             = ServiceAnnotationLoadBalancerPrefix + "health-check-domain"
 	ServiceAnnotationLoadBalancerHealthCheckHTTPCode           = ServiceAnnotationLoadBalancerPrefix + "health-check-httpcode"
 
-	ServiceAnnotationLoadBalancerSpec		           = ServiceAnnotationLoadBalancerPrefix + "spec"
-	ServiceAnnotationLoadBalancerSessionStick            	   = ServiceAnnotationLoadBalancerPrefix + "sticky-session"
-	ServiceAnnotationLoadBalancerSessionStickType		   = ServiceAnnotationLoadBalancerPrefix + "sticky-session-type"
-	ServiceAnnotationLoadBalancerCookieTimeout		   = ServiceAnnotationLoadBalancerPrefix + "cookie-timeout"
-	ServiceAnnotationLoadBalancerCookie			   = ServiceAnnotationLoadBalancerPrefix + "cookie"
-	ServiceAnnotationLoadBalancerPersistenceTimeout		   = ServiceAnnotationLoadBalancerPrefix + "persistence-timeout"
-	MagicHealthCheckConnectPort = -520
+	ServiceAnnotationLoadBalancerSpec               = ServiceAnnotationLoadBalancerPrefix + "spec"
+	ServiceAnnotationLoadBalancerSessionStick       = ServiceAnnotationLoadBalancerPrefix + "sticky-session"
+	ServiceAnnotationLoadBalancerSessionStickType   = ServiceAnnotationLoadBalancerPrefix + "sticky-session-type"
+	ServiceAnnotationLoadBalancerCookieTimeout      = ServiceAnnotationLoadBalancerPrefix + "cookie-timeout"
+	ServiceAnnotationLoadBalancerCookie             = ServiceAnnotationLoadBalancerPrefix + "cookie"
+	ServiceAnnotationLoadBalancerPersistenceTimeout = ServiceAnnotationLoadBalancerPrefix + "persistence-timeout"
+	MagicHealthCheckConnectPort                     = -520
 
-	MAX_LOADBALANCER_BACKEND    = 18
+	MAX_LOADBALANCER_BACKEND = 18
 )
+
 // defaulted is the parameters which set by programe.
 // request represent user defined parameters.
-func ExtractAnnotationRequest(service *v1.Service) (*AnnotationRequest, *AnnotationRequest ) {
+func ExtractAnnotationRequest(service *v1.Service) (*AnnotationRequest, *AnnotationRequest) {
 	defaulted, request := &AnnotationRequest{}, &AnnotationRequest{}
 	annotation := make(map[string]string)
 	for k, v := range service.Annotations {
 		annotation[replaceCamel(k)] = v
 	}
-	bandwith,ok := annotation[ServiceAnnotationLoadBalancerBandwidth]
+	bandwith, ok := annotation[ServiceAnnotationLoadBalancerBandwidth]
 	if ok {
 		if i, err := strconv.Atoi(bandwith); err == nil {
 			request.Bandwidth = i
@@ -80,25 +81,25 @@ func ExtractAnnotationRequest(service *v1.Service) (*AnnotationRequest, *Annotat
 				bandwith, err.Error())
 			defaulted.Bandwidth = -1
 		}
-	}else {
+	} else {
 		defaulted.Bandwidth = -1
 	}
 
-	addtype,ok := annotation[ServiceAnnotationLoadBalancerAddressType]
+	addtype, ok := annotation[ServiceAnnotationLoadBalancerAddressType]
 	if ok {
 		defaulted.AddressType = slb.AddressType(addtype)
-		request.AddressType   = defaulted.AddressType
+		request.AddressType = defaulted.AddressType
 	} else {
 		defaulted.AddressType = slb.InternetAddressType
 	}
 
-	networkType,ok := annotation[ServiceAnnotationLoadBalancerSLBNetworkType]
+	networkType, ok := annotation[ServiceAnnotationLoadBalancerSLBNetworkType]
 	if ok {
 		defaulted.SLBNetworkType = networkType
-		request.SLBNetworkType   = defaulted.SLBNetworkType
+		request.SLBNetworkType = defaulted.SLBNetworkType
 	}
 
-	chargtype,ok := annotation[ServiceAnnotationLoadBalancerChargeType]
+	chargtype, ok := annotation[ServiceAnnotationLoadBalancerChargeType]
 	if ok {
 		defaulted.ChargeType = slb.InternetChargeType(chargtype)
 		request.ChargeType = defaulted.ChargeType
@@ -112,26 +113,25 @@ func ExtractAnnotationRequest(service *v1.Service) (*AnnotationRequest, *Annotat
 	//	request.Region = defaulted.Region
 	//}
 
-	lbid,ok := annotation[ServiceAnnotationLoadBalancerId]
+	lbid, ok := annotation[ServiceAnnotationLoadBalancerId]
 	if ok {
 		defaulted.Loadbalancerid = lbid
 		request.Loadbalancerid = defaulted.Loadbalancerid
 	}
 
-	blabel,ok := annotation[ServiceAnnotationLoadBalancerBackendLabel]
+	blabel, ok := annotation[ServiceAnnotationLoadBalancerBackendLabel]
 	if ok {
 		defaulted.BackendLabel = blabel
 		request.BackendLabel = defaulted.BackendLabel
 	}
 
-	certid,ok := annotation[ServiceAnnotationLoadBalancerCertID]
+	certid, ok := annotation[ServiceAnnotationLoadBalancerCertID]
 	if ok {
 		defaulted.CertID = certid
 		request.CertID = defaulted.CertID
 	}
 
-
-	hcFlag,ok := annotation[ServiceAnnotationLoadBalancerHealthCheckFlag]
+	hcFlag, ok := annotation[ServiceAnnotationLoadBalancerHealthCheckFlag]
 	if ok {
 		defaulted.HealthCheck = slb.FlagType(hcFlag)
 		request.HealthCheck = defaulted.HealthCheck
@@ -139,7 +139,7 @@ func ExtractAnnotationRequest(service *v1.Service) (*AnnotationRequest, *Annotat
 		defaulted.HealthCheck = slb.OffFlag
 	}
 
-	hcType,ok := annotation[ServiceAnnotationLoadBalancerHealthCheckType]
+	hcType, ok := annotation[ServiceAnnotationLoadBalancerHealthCheckType]
 	if ok {
 		defaulted.HealthCheckType = slb.HealthCheckType(hcType)
 		request.HealthCheckType = defaulted.HealthCheckType
@@ -147,13 +147,13 @@ func ExtractAnnotationRequest(service *v1.Service) (*AnnotationRequest, *Annotat
 		defaulted.HealthCheckType = slb.TCPHealthCheckType
 	}
 
-	hcUri,ok := annotation[ServiceAnnotationLoadBalancerHealthCheckURI]
+	hcUri, ok := annotation[ServiceAnnotationLoadBalancerHealthCheckURI]
 	if ok {
 		defaulted.HealthCheckURI = hcUri
 		request.HealthCheckURI = defaulted.HealthCheckURI
 	}
 
-	healthCheckConnectPort,ok := annotation[ServiceAnnotationLoadBalancerHealthCheckConnectPort]
+	healthCheckConnectPort, ok := annotation[ServiceAnnotationLoadBalancerHealthCheckConnectPort]
 	if ok {
 		port, err := strconv.Atoi(healthCheckConnectPort)
 		if err != nil {
@@ -166,7 +166,7 @@ func ExtractAnnotationRequest(service *v1.Service) (*AnnotationRequest, *Annotat
 		}
 	}
 
-	healthCheckHealthyThreshold,ok := annotation[ServiceAnnotationLoadBalancerHealthCheckHealthyThreshold]
+	healthCheckHealthyThreshold, ok := annotation[ServiceAnnotationLoadBalancerHealthCheckHealthyThreshold]
 	if ok {
 		thresh, err := strconv.Atoi(healthCheckHealthyThreshold)
 		if err != nil {
@@ -179,7 +179,7 @@ func ExtractAnnotationRequest(service *v1.Service) (*AnnotationRequest, *Annotat
 		}
 	}
 
-	healthCheckUnhealthyThreshold,ok := annotation[ServiceAnnotationLoadBalancerHealthCheckUnhealthyThreshold]
+	healthCheckUnhealthyThreshold, ok := annotation[ServiceAnnotationLoadBalancerHealthCheckUnhealthyThreshold]
 	if ok {
 		unThresh, err := strconv.Atoi(healthCheckUnhealthyThreshold)
 		if err != nil {
@@ -192,7 +192,7 @@ func ExtractAnnotationRequest(service *v1.Service) (*AnnotationRequest, *Annotat
 		}
 	}
 
-	healthCheckInterval,ok := annotation[ServiceAnnotationLoadBalancerHealthCheckInterval]
+	healthCheckInterval, ok := annotation[ServiceAnnotationLoadBalancerHealthCheckInterval]
 	if ok {
 		interval, err := strconv.Atoi(healthCheckInterval)
 		if err != nil {
@@ -205,7 +205,7 @@ func ExtractAnnotationRequest(service *v1.Service) (*AnnotationRequest, *Annotat
 		}
 	}
 
-	healthCheckConnectTimeout,ok := annotation[ServiceAnnotationLoadBalancerHealthCheckConnectTimeout]
+	healthCheckConnectTimeout, ok := annotation[ServiceAnnotationLoadBalancerHealthCheckConnectTimeout]
 	if ok {
 		connout, err := strconv.Atoi(healthCheckConnectTimeout)
 		if err != nil {
@@ -218,7 +218,7 @@ func ExtractAnnotationRequest(service *v1.Service) (*AnnotationRequest, *Annotat
 		}
 	}
 
-	healthCheckTimeout,ok := annotation[ServiceAnnotationLoadBalancerHealthCheckTimeout]
+	healthCheckTimeout, ok := annotation[ServiceAnnotationLoadBalancerHealthCheckTimeout]
 	if ok {
 		hout, err := strconv.Atoi(healthCheckTimeout)
 		if err != nil {
@@ -231,42 +231,42 @@ func ExtractAnnotationRequest(service *v1.Service) (*AnnotationRequest, *Annotat
 		}
 	}
 
-	hcDomain,ok := annotation[ServiceAnnotationLoadBalancerHealthCheckDomain]
+	hcDomain, ok := annotation[ServiceAnnotationLoadBalancerHealthCheckDomain]
 	if ok {
 		defaulted.HealthCheckDomain = hcDomain
 		request.HealthCheckDomain = defaulted.HealthCheckDomain
 	}
 
-	httpCode,ok := annotation[ServiceAnnotationLoadBalancerHealthCheckHTTPCode]
+	httpCode, ok := annotation[ServiceAnnotationLoadBalancerHealthCheckHTTPCode]
 	if ok {
 		defaulted.HealthCheckHttpCode = slb.HealthCheckHttpCodeType(httpCode)
 		request.HealthCheckHttpCode = defaulted.HealthCheckHttpCode
 	}
 
-	loadbalancerSpec,ok := annotation[ServiceAnnotationLoadBalancerSpec]
+	loadbalancerSpec, ok := annotation[ServiceAnnotationLoadBalancerSpec]
 	if ok {
 		defaulted.LoadBalancerSpec = slb.LoadBalancerSpecType(loadbalancerSpec)
-		request.LoadBalancerSpec   = defaulted.LoadBalancerSpec
+		request.LoadBalancerSpec = defaulted.LoadBalancerSpec
 	}
 
 	// stick session
-	stickSession,ok  := annotation[ServiceAnnotationLoadBalancerSessionStick]
+	stickSession, ok := annotation[ServiceAnnotationLoadBalancerSessionStick]
 	if ok {
-		request.StickySession   = slb.FlagType(stickSession)
+		request.StickySession = slb.FlagType(stickSession)
 		defaulted.StickySession = request.StickySession
-	}else{
-		request.StickySession   = slb.FlagType(stickSession)
+	} else {
+		request.StickySession = slb.FlagType(stickSession)
 		defaulted.StickySession = slb.OffFlag
 	}
 
 	// stick session type
-	stickSessionType,ok  := annotation[ServiceAnnotationLoadBalancerSessionStickType]
+	stickSessionType, ok := annotation[ServiceAnnotationLoadBalancerSessionStickType]
 	if ok {
 		defaulted.StickySessionType = slb.StickySessionType(stickSessionType)
-		request.StickySessionType   = defaulted.StickySessionType
+		request.StickySessionType = defaulted.StickySessionType
 	}
 
-	persistenceTimeout,ok := annotation[ServiceAnnotationLoadBalancerPersistenceTimeout]
+	persistenceTimeout, ok := annotation[ServiceAnnotationLoadBalancerPersistenceTimeout]
 
 	if ok {
 		timeout, err := strconv.Atoi(persistenceTimeout)
@@ -279,7 +279,7 @@ func ExtractAnnotationRequest(service *v1.Service) (*AnnotationRequest, *Annotat
 			request.PersistenceTimeout = defaulted.PersistenceTimeout
 		}
 	}
-	cookieTimeout,ok := annotation[ServiceAnnotationLoadBalancerCookieTimeout]
+	cookieTimeout, ok := annotation[ServiceAnnotationLoadBalancerCookieTimeout]
 	if ok {
 		timeout, err := strconv.Atoi(cookieTimeout)
 		if err != nil {
@@ -294,7 +294,7 @@ func ExtractAnnotationRequest(service *v1.Service) (*AnnotationRequest, *Annotat
 
 	cookie, ok := annotation[ServiceAnnotationLoadBalancerCookie]
 	if ok {
-		request.Cookie   = cookie
+		request.Cookie = cookie
 		defaulted.Cookie = request.Cookie
 	}
 	return defaulted, request

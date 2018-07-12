@@ -17,15 +17,14 @@ limitations under the License.
 package alicloud
 
 import (
-	"github.com/denverdino/aliyungo/common"
-	"testing"
-	"strings"
 	"errors"
 	"fmt"
+	"github.com/denverdino/aliyungo/common"
 	"github.com/denverdino/aliyungo/ecs"
 	"k8s.io/apimachinery/pkg/types"
+	"strings"
+	"testing"
 )
-
 
 func NewMockClientInstanceMgr(client ClientInstanceSDK) (*ClientMgr, error) {
 
@@ -40,22 +39,22 @@ func NewMockClientInstanceMgr(client ClientInstanceSDK) (*ClientMgr, error) {
 func TestInstanceRefeshInstance(t *testing.T) {
 	instanceid := "i-2zecarjjmtkx3oru4233"
 	mgr, err := NewMockClientInstanceMgr(&mockClientInstanceSDK{
-		describeInstances: func(args *ecs.DescribeInstancesArgs) (instances []ecs.InstanceAttributesType, pagination *common.PaginationResult, err error){
+		describeInstances: func(args *ecs.DescribeInstancesArgs) (instances []ecs.InstanceAttributesType, pagination *common.PaginationResult, err error) {
 			if !strings.Contains(args.InstanceIds, instanceid) {
-				return nil,nil, errors.New("not found")
+				return nil, nil, errors.New("not found")
 			}
 			instances = []ecs.InstanceAttributesType{
 				{
-					InstanceId: instanceid,
-					ImageId:    "centos_7_04_64_20G_alibase_201701015.vhd",
-					RegionId:   "cn-beijing",
-					ZoneId:     "cn-beijing-f",
-					InstanceType: "ecs.sn1ne.large",
-					InstanceTypeFamily: "ecs.sn1ne",
-					Status:     "running",
+					InstanceId:          instanceid,
+					ImageId:             "centos_7_04_64_20G_alibase_201701015.vhd",
+					RegionId:            "cn-beijing",
+					ZoneId:              "cn-beijing-f",
+					InstanceType:        "ecs.sn1ne.large",
+					InstanceTypeFamily:  "ecs.sn1ne",
+					Status:              "running",
 					InstanceNetworkType: "vpc",
 					VpcAttributes: ecs.VpcAttributesType{
-						VpcId: "vpc-2zeaybwqmvn6qgabfd3pe",
+						VpcId:     "vpc-2zeaybwqmvn6qgabfd3pe",
 						VSwitchId: "vsw-2zeclpmxy66zzxj4cg4ls",
 						PrivateIpAddress: ecs.IpAddressSetType{
 							IpAddress: []string{"192.168.211.130"},
@@ -65,7 +64,7 @@ func TestInstanceRefeshInstance(t *testing.T) {
 				},
 			}
 
-			return instances, nil,nil
+			return instances, nil, nil
 		},
 	})
 	id := "cn-hangzhou.i-2zecarjjmtkx3oru4233"
@@ -88,28 +87,27 @@ func TestInstanceRefeshInstance(t *testing.T) {
 	}
 }
 
-
 type mockClientInstanceSDK struct {
 	describeInstances func(args *ecs.DescribeInstancesArgs) (instances []ecs.InstanceAttributesType, pagination *common.PaginationResult, err error)
 }
 
-func (m *mockClientInstanceSDK) DescribeInstances(args *ecs.DescribeInstancesArgs) (instances []ecs.InstanceAttributesType, pagination *common.PaginationResult, err error){
+func (m *mockClientInstanceSDK) DescribeInstances(args *ecs.DescribeInstancesArgs) (instances []ecs.InstanceAttributesType, pagination *common.PaginationResult, err error) {
 	if m.describeInstances != nil {
 		return m.describeInstances(args)
 	}
-	return nil,nil,errors.New("not implemented")
+	return nil, nil, errors.New("not implemented")
 }
 
 func TestNewMgr(t *testing.T) {
 	_, err := NewMockClientInstanceMgr(&mockClientInstanceSDK{
-		describeInstances: func(args *ecs.DescribeInstancesArgs) (instances []ecs.InstanceAttributesType, pagination *common.PaginationResult, err error){
-			return nil,nil,errors.New("not implemented")
+		describeInstances: func(args *ecs.DescribeInstancesArgs) (instances []ecs.InstanceAttributesType, pagination *common.PaginationResult, err error) {
+			return nil, nil, errors.New("not implemented")
 		},
 	})
 	if err != nil {
 		t.Fatal("error create new instance client")
 	}
-	realInsClient(keyid,keysecret)
+	realInsClient(keyid, keysecret)
 }
 
 func realInsClient(keyid, keysec string) {
@@ -119,7 +117,7 @@ func realInsClient(keyid, keysec string) {
 	nodeName := "i-2zecarjjmtkx3oru4233"
 	cs := ecs.NewClient(keyid, keysec)
 	cs.SetUserAgent(KUBERNETES_ALICLOUD_IDENTITY)
-	ins,_, _ := cs.DescribeInstances(&ecs.DescribeInstancesArgs{
+	ins, _, _ := cs.DescribeInstances(&ecs.DescribeInstancesArgs{
 		RegionId:    "cn-beijing",
 		InstanceIds: fmt.Sprintf("[\"%s\"]", string(nodeName)),
 	})

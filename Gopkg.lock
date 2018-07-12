@@ -26,18 +26,16 @@
   version = "v1.1.0"
 
 [[projects]]
-  branch = "feature/bazaar"
+  branch = "master"
   name = "github.com/denverdino/aliyungo"
   packages = [
     "common",
     "ecs",
     "metadata",
     "slb",
-    "sts",
     "util"
   ]
-  revision = "80e436a9b54baf43c29571b8cfd745b523126533"
-  source = "git@gitlab.alibaba-inc.com:cos/aliyungo.git"
+  revision = "82830dbc7c38fb69f936ea20dc529583a13f6eca"
 
 [[projects]]
   name = "github.com/dgrijalva/jwt-go"
@@ -59,8 +57,8 @@
     ".",
     "log"
   ]
-  revision = "3658237ded108b4134956c1b3050349d93e7b895"
-  version = "v2.7.1"
+  revision = "3eb9738c1697594ea6e71a7156a9bb32ed216cf0"
+  version = "v2.8.0"
 
 [[projects]]
   name = "github.com/ghodss/yaml"
@@ -84,13 +82,13 @@
   branch = "master"
   name = "github.com/go-openapi/spec"
   packages = ["."]
-  revision = "bcff419492eeeb01f76e77d2ebc714dc97b607f5"
+  revision = "bce47c9386f9ecd6b86f450478a80103c3fe1402"
 
 [[projects]]
   branch = "master"
   name = "github.com/go-openapi/swag"
   packages = ["."]
-  revision = "811b1089cde9dad18d4d0c2d09fbdbf28dbd27a5"
+  revision = "2b0bd4f193d011c203529df626a65d63cb8a79e8"
 
 [[projects]]
   name = "github.com/gogo/protobuf"
@@ -186,8 +184,8 @@
 [[projects]]
   name = "github.com/json-iterator/go"
   packages = ["."]
-  revision = "ca39e5af3ece67bbcda3d0f4f56a8e24d9f2dad4"
-  version = "1.1.3"
+  revision = "ab8a2e0c74be9d3be70b3184d9acc634935ded82"
+  version = "1.1.4"
 
 [[projects]]
   name = "github.com/juju/ratelimit"
@@ -220,8 +218,8 @@
 [[projects]]
   name = "github.com/modern-go/reflect2"
   packages = ["."]
-  revision = "1df9eeb2bb81f327b96228865c5687bc2194af3f"
-  version = "1.0.0"
+  revision = "4b7aa43c6742a2c18fdef89dd197aaae7dac7ccd"
+  version = "1.0.1"
 
 [[projects]]
   name = "github.com/opencontainers/go-digest"
@@ -284,7 +282,7 @@
     "nfs",
     "xfs"
   ]
-  revision = "7d6f385de8bea29190f15ba9931442a0eaef9af7"
+  revision = "ae68e2d4c00fed4943b5f6698d504a5fe083da8a"
 
 [[projects]]
   name = "github.com/spf13/cobra"
@@ -314,7 +312,7 @@
     "http2/hpack",
     "idna"
   ]
-  revision = "afe8f62b1d6bbd81f31868121a50b06d8188e1f9"
+  revision = "039a4258aec0ad3c79b905677cceeab13b296a77"
 
 [[projects]]
   branch = "master"
@@ -323,7 +321,7 @@
     "unix",
     "windows"
   ]
-  revision = "c4afb3effaa53fd9a06ca61262dc7ce8df4c081b"
+  revision = "1b2967e3c290b7c545b3db0deeda16e9be4f98a2"
 
 [[projects]]
   name = "golang.org/x/text"
@@ -398,7 +396,7 @@
   branch = "master"
   name = "k8s.io/apiextensions-apiserver"
   packages = ["pkg/features"]
-  revision = "779cefed6876a153122db9d5c37871a39631ba2e"
+  revision = "29a2b5e2b48eeaba42bba7d57afe9414f1e9e40a"
 
 [[projects]]
   branch = "release-1.9"
@@ -452,7 +450,7 @@
     "third_party/forked/golang/json",
     "third_party/forked/golang/reflect"
   ]
-  revision = "21efb2924c7cf1920f76af05b1fd6a325bf46dfc"
+  revision = "fb40df2b502912cbe3a93aa61c2b2487f39cb42f"
 
 [[projects]]
   branch = "release-1.9"
@@ -467,7 +465,7 @@
     "pkg/util/flag",
     "pkg/util/logs"
   ]
-  revision = "5c57f79d2dc483fe547eb6a5a4efc35a88f46a86"
+  revision = "0c27ac7eec3e47fa7637c9dba4ecf70494bbc28a"
 
 [[projects]]
   branch = "release-6.0"
@@ -592,7 +590,7 @@
     "util/retry",
     "util/workqueue"
   ]
-  revision = "1692bdde78a61f6316cfb6988015bd460067b238"
+  revision = "e2680bfa771859c129bc5c8413fdb565af2b3dcd"
 
 [[projects]]
   branch = "master"
@@ -601,7 +599,7 @@
     "pkg/common",
     "pkg/util/proto"
   ]
-  revision = "4cac20de16b951c103aa40c4bafbc8cefdd18a12"
+  revision = "0cf8f7e6ed1d2e3d47d02e3b6e559369af24d803"
 
 [[projects]]
   branch = "release-1.9"
@@ -654,11 +652,11 @@
     "plugin/pkg/scheduler/schedulercache",
     "plugin/pkg/scheduler/util"
   ]
-  revision = "f4cf484c2cb6056e28fb9759a3c913be3eed990a"
+  revision = "3b33517c1ea2657e5b6be64b87725790a8f29a43"
 
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "47788cfa4915d7d5c469d2de9f35886dd45a4037f5fd8cf38f063f3592d3ec13"
+  inputs-digest = "591cf23af8967858b18f445d0a6d9acae47c5a36e8d6c35be4f159c42bbbc5a5"
   solver-name = "gps-cdcl"
   solver-version = 1

@@ -20,16 +20,15 @@ import (
 	"sync"
 	"time"
 
+	"fmt"
+	"github.com/denverdino/aliyungo/common"
 	"github.com/denverdino/aliyungo/ecs"
 	"github.com/denverdino/aliyungo/metadata"
 	"github.com/denverdino/aliyungo/slb"
 	"github.com/golang/glog"
 	"github.com/patrickmn/go-cache"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"fmt"
 	"strings"
-	"github.com/denverdino/aliyungo/sts"
-	"github.com/denverdino/aliyungo/common"
 )
 
 var ROLE_NAME = "KubernetesMasterRole"
@@ -114,7 +113,7 @@ func NewClientMgr(key, secret string) (*ClientMgr, error) {
 			vpcs:    cache.New(defaultCacheExpiration, defaultCacheExpiration),
 		},
 	}
-	if !token.active && cfg.Global.UID == ""{
+	if !token.active && cfg.Global.UID == "" {
 		// use key and secret
 		glog.Infof("alicloud: clientmgr, use accesskeyid and accesskeysecret mode to authenticate user. without token and role assume")
 		return mgr, nil
@@ -124,32 +123,16 @@ func NewClientMgr(key, secret string) (*ClientMgr, error) {
 		token.lock.Lock()
 		defer token.lock.Unlock()
 		var rkey, rsecret, rtok string
-		if token.active{
+		if token.active {
 			// use instance ram file way.
 			role, err := mgr.meta.RamRoleToken(ROLE_NAME)
 			if err != nil {
 				glog.Errorf("alicloud: clientmgr, error get ram role token [%s]\n", err.Error())
 				return
 			}
-			rkey    = role.AccessKeyId
+			rkey = role.AccessKeyId
 			rsecret = role.AccessKeySecret
-			rtok    = role.SecurityToken
-		}else {
-			// use Assume role way.
-			c := sts.NewClient(keyid,sec)
-			assumeRoleRequest := sts.AssumeRoleWithServiceIdentityRequest{
-				RoleArn:         fmt.Sprintf("acs:ram::%s:role/%s", cfg.Global.UID, ASSUME_ROLE_NAME),
-				RoleSessionName: fmt.Sprintf("terway-provision-role-%d", time.Now().Unix()),
-				DurationSeconds: 7200,
-				AssumeRoleFor:   cfg.Global.UID,
-			}
-			resp, err := c.AssumeRoleWithServiceIdentity(assumeRoleRequest)
-			if err != nil {
-				return
-			}
-			rkey = resp.Credentials.AccessKeyId
-			rsecret = resp.Credentials.AccessKeySecret
-			rtok = resp.Credentials.SecurityToken
+			rtok = role.SecurityToken
 		}
 		ecsclient.WithSecurityToken(rtok).
 			WithAccessKeyId(rkey).
@@ -180,7 +163,7 @@ func (c *ClientMgr) MetaData() IMetaData {
 }
 
 type IMetaData interface {
-	HostName()(string, error)
+	HostName() (string, error)
 	ImageID() (string, error)
 	InstanceID() (string, error)
 	Mac() (string, error)
@@ -200,7 +183,7 @@ type IMetaData interface {
 	VswitchID() (string, error)
 }
 
-func NewMetaData() IMetaData{
+func NewMetaData() IMetaData {
 	if cfg.Global.VpcID != "" &&
 		cfg.Global.VswitchID != "" {
 		glog.V(2).Infof("use mocked metadata server.")
@@ -210,42 +193,42 @@ func NewMetaData() IMetaData{
 }
 
 type fakeMetaData struct {
-	base 	IMetaData
+	base IMetaData
 }
 
 func (m *fakeMetaData) HostName() (string, error) {
 
-	return "",fmt.Errorf("unimplemented")
+	return "", fmt.Errorf("unimplemented")
 }
 
 func (m *fakeMetaData) ImageID() (string, error) {
 
-	return "",fmt.Errorf("unimplemented")
+	return "", fmt.Errorf("unimplemented")
 }
 
 func (m *fakeMetaData) InstanceID() (string, error) {
 
-	return "fakedInstanceid",nil
+	return "fakedInstanceid", nil
 }
 
 func (m *fakeMetaData) Mac() (string, error) {
 
-	return "",fmt.Errorf("unimplemented")
+	return "", fmt.Errorf("unimplemented")
 }
 
 func (m *fakeMetaData) NetworkType() (string, error) {
 
-	return "",fmt.Errorf("unimplemented")
+	return "", fmt.Errorf("unimplemented")
 }
 
 func (m *fakeMetaData) OwnerAccountID() (string, error) {
 
-	return "",fmt.Errorf("unimplemented")
+	return "", fmt.Errorf("unimplemented")
 }
 
 func (m *fakeMetaData) PrivateIPv4() (string, error) {
 
-	return "",fmt.Errorf("unimplemented")
+	return "", fmt.Errorf("unimplemented")
 }
 
 func (m *fakeMetaData) Region() (string, error) {
@@ -257,18 +240,18 @@ func (m *fakeMetaData) Region() (string, error) {
 
 func (m *fakeMetaData) SerialNumber() (string, error) {
 
-	return "",fmt.Errorf("unimplemented")
+	return "", fmt.Errorf("unimplemented")
 }
 
 func (m *fakeMetaData) SourceAddress() (string, error) {
 
-	return "",fmt.Errorf("unimplemented")
+	return "", fmt.Errorf("unimplemented")
 
 }
 
 func (m *fakeMetaData) VpcCIDRBlock() (string, error) {
 
-	return "",fmt.Errorf("unimplemented")
+	return "", fmt.Errorf("unimplemented")
 }
 
 func (m *fakeMetaData) VpcID() (string, error) {
@@ -280,7 +263,7 @@ func (m *fakeMetaData) VpcID() (string, error) {
 
 func (m *fakeMetaData) VswitchCIDRBlock() (string, error) {
 
-	return "",fmt.Errorf("unimplemented")
+	return "", fmt.Errorf("unimplemented")
 }
 
 // zone1:vswitchid1,zone2:vswitch2
@@ -290,41 +273,41 @@ func (m *fakeMetaData) VswitchID() (string, error) {
 		// get vswitch id from meta server
 		return m.base.VswitchID()
 	}
-	zlist := strings.Split(cfg.Global.VswitchID,",")
+	zlist := strings.Split(cfg.Global.VswitchID, ",")
 	if len(zlist) == 1 {
-		glog.Infof("simple vswitchid mode, %s",cfg.Global.VswitchID)
-		return cfg.Global.VswitchID,nil
+		glog.Infof("simple vswitchid mode, %s", cfg.Global.VswitchID)
+		return cfg.Global.VswitchID, nil
 	}
 	zone, err := m.Zone()
 	if err != nil {
-		return "",fmt.Errorf("retrieve vswitchid error for %s",err.Error())
+		return "", fmt.Errorf("retrieve vswitchid error for %s", err.Error())
 	}
 	for _, zone := range zlist {
-		vs := strings.Split(zone,":")
+		vs := strings.Split(zone, ":")
 		if len(vs) != 2 {
-			return "", fmt.Errorf("cloud-config vswitch format error: %s",cfg.Global.VswitchID)
+			return "", fmt.Errorf("cloud-config vswitch format error: %s", cfg.Global.VswitchID)
 		}
 		if vs[0] == zone {
 			return vs[1], nil
 		}
 	}
-	glog.Infof("zone[%s] match failed, fallback with simple vswitch id mode, [%s]",zone,cfg.Global.VswitchID)
+	glog.Infof("zone[%s] match failed, fallback with simple vswitch id mode, [%s]", zone, cfg.Global.VswitchID)
 	return cfg.Global.VswitchID, nil
 }
 
 func (m *fakeMetaData) EIPv4() (string, error) {
 
-	return "",fmt.Errorf("unimplemented")
+	return "", fmt.Errorf("unimplemented")
 }
 
 func (m *fakeMetaData) DNSNameServers() ([]string, error) {
 
-	return []string{""},fmt.Errorf("unimplemented")
+	return []string{""}, fmt.Errorf("unimplemented")
 }
 
 func (m *fakeMetaData) NTPConfigServers() ([]string, error) {
 
-	return []string{""},fmt.Errorf("unimplemented")
+	return []string{""}, fmt.Errorf("unimplemented")
 }
 
 func (m *fakeMetaData) Zone() (string, error) {
@@ -343,4 +326,3 @@ func (m *fakeMetaData) RamRoleToken(role string) (metadata.RoleAuth, error) {
 
 	return m.base.RamRoleToken(role)
 }
-

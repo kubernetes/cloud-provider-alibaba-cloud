@@ -94,9 +94,9 @@ func TestFindLoadBalancer(t *testing.T) {
 				base[0].LoadBalancerName = args.LoadBalancerName
 				return base, nil
 			}
-			if len(args.Tags)>0{
+			if len(args.Tags) > 0 {
 				base[0].LoadBalancerName = cloudprovider.GetLoadBalancerName(service)
-			}else {
+			} else {
 				return nil, errors.New("loadbalancerid or loadbanancername must be specified.\n")
 			}
 			return base, nil
@@ -184,13 +184,13 @@ type mockClientSLB struct {
 	describeLoadBalancerUDPListenerAttribute   func(loadBalancerId string, port int) (response *slb.DescribeLoadBalancerUDPListenerAttributeResponse, err error)
 	describeLoadBalancerHTTPListenerAttribute  func(loadBalancerId string, port int) (response *slb.DescribeLoadBalancerHTTPListenerAttributeResponse, err error)
 
-	setLoadBalancerHTTPListenerAttribute 	   func(args *slb.SetLoadBalancerHTTPListenerAttributeArgs) (err error)
-	setLoadBalancerHTTPSListenerAttribute      func(args *slb.SetLoadBalancerHTTPSListenerAttributeArgs) (err error)
-	setLoadBalancerTCPListenerAttribute        func(args *slb.SetLoadBalancerTCPListenerAttributeArgs) (err error)
-	setLoadBalancerUDPListenerAttribute        func(args *slb.SetLoadBalancerUDPListenerAttributeArgs) (err error)
-	removeTags 				   func(args *slb.RemoveTagsArgs) error
-	describeTags 				   func(args *slb.DescribeTagsArgs) (tags []slb.TagItemType, pagination *common.PaginationResult, err error)
-	addTags 				   func(args *slb.AddTagsArgs) error
+	setLoadBalancerHTTPListenerAttribute  func(args *slb.SetLoadBalancerHTTPListenerAttributeArgs) (err error)
+	setLoadBalancerHTTPSListenerAttribute func(args *slb.SetLoadBalancerHTTPSListenerAttributeArgs) (err error)
+	setLoadBalancerTCPListenerAttribute   func(args *slb.SetLoadBalancerTCPListenerAttributeArgs) (err error)
+	setLoadBalancerUDPListenerAttribute   func(args *slb.SetLoadBalancerUDPListenerAttributeArgs) (err error)
+	removeTags                            func(args *slb.RemoveTagsArgs) error
+	describeTags                          func(args *slb.DescribeTagsArgs) (tags []slb.TagItemType, pagination *common.PaginationResult, err error)
+	addTags                               func(args *slb.AddTagsArgs) error
 }
 
 var (
@@ -345,21 +345,21 @@ func (c *mockClientSLB) SetLoadBalancerHTTPListenerAttribute(args *slb.SetLoadBa
 	return nil
 }
 
-func (c *mockClientSLB) SetLoadBalancerHTTPSListenerAttribute(args *slb.SetLoadBalancerHTTPSListenerAttributeArgs) (err error){
+func (c *mockClientSLB) SetLoadBalancerHTTPSListenerAttribute(args *slb.SetLoadBalancerHTTPSListenerAttributeArgs) (err error) {
 	if c.setLoadBalancerHTTPSListenerAttribute != nil {
 		return c.setLoadBalancerHTTPSListenerAttribute(args)
 	}
 	return nil
 }
 
-func (c *mockClientSLB) SetLoadBalancerTCPListenerAttribute(args *slb.SetLoadBalancerTCPListenerAttributeArgs) (err error){
+func (c *mockClientSLB) SetLoadBalancerTCPListenerAttribute(args *slb.SetLoadBalancerTCPListenerAttributeArgs) (err error) {
 	if c.setLoadBalancerTCPListenerAttribute != nil {
 		return c.setLoadBalancerTCPListenerAttribute(args)
 	}
 	return nil
 }
 
-func (c *mockClientSLB) SetLoadBalancerUDPListenerAttribute(args *slb.SetLoadBalancerUDPListenerAttributeArgs) (err error){
+func (c *mockClientSLB) SetLoadBalancerUDPListenerAttribute(args *slb.SetLoadBalancerUDPListenerAttributeArgs) (err error) {
 	if c.setLoadBalancerUDPListenerAttribute != nil {
 		return c.setLoadBalancerUDPListenerAttribute(args)
 	}
@@ -372,13 +372,13 @@ func (c *mockClientSLB) RemoveTags(args *slb.RemoveTagsArgs) error {
 	}
 	return nil
 }
-func (c *mockClientSLB) DescribeTags(args *slb.DescribeTagsArgs) (tags []slb.TagItemType, pagination *common.PaginationResult, err error){
+func (c *mockClientSLB) DescribeTags(args *slb.DescribeTagsArgs) (tags []slb.TagItemType, pagination *common.PaginationResult, err error) {
 	if c.describeTags != nil {
 		return c.describeTags(args)
 	}
 	return []slb.TagItemType{}, nil, nil
 }
-func (c *mockClientSLB) AddTags(args *slb.AddTagsArgs) error{
+func (c *mockClientSLB) AddTags(args *slb.AddTagsArgs) error {
 	if c.addTags != nil {
 		return c.addTags(args)
 	}
