@@ -702,16 +702,16 @@ func Protocol(annotation string, port v1.ServicePort) (string, error) {
 	for _, v := range strings.Split(annotation, ",") {
 		pp := strings.Split(v, ":")
 		if len(pp) < 2 {
-			return "", errors.New(fmt.Sprintf("port and "+
-				"protocol format must be like 'https:443' with colon separated. got=[%+v]", pp))
+			return "", fmt.Errorf("port and "+
+				"protocol format must be like 'https:443' with colon separated. got=[%+v]", pp)
 		}
 
 		if pp[0] != "http" &&
 			pp[0] != "tcp" &&
 			pp[0] != "https" &&
 			pp[0] != "udp" {
-			return "", errors.New(fmt.Sprintf("port protocol"+
-				" format must be either [http|https|tcp|udp], protocol not supported wit [%s]\n", pp[0]))
+			return "", fmt.Errorf("port protocol"+
+				" format must be either [http|https|tcp|udp], protocol not supported wit [%s]\n", pp[0])
 		}
 
 		if pp[1] == fmt.Sprintf("%d", port.Port) {

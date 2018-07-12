@@ -71,14 +71,14 @@ func ExtractAnnotationRequest(service *v1.Service) (*AnnotationRequest, *Annotat
 	for k, v := range service.Annotations {
 		annotation[replaceCamel(k)] = v
 	}
-	bandwith, ok := annotation[ServiceAnnotationLoadBalancerBandwidth]
+	bandwidth, ok := annotation[ServiceAnnotationLoadBalancerBandwidth]
 	if ok {
-		if i, err := strconv.Atoi(bandwith); err == nil {
+		if i, err := strconv.Atoi(bandwidth); err == nil {
 			request.Bandwidth = i
 			defaulted.Bandwidth = i
 		} else {
 			glog.Warningf("annotation service.beta.kubernetes.io/alicloud-loadbalancer-bandwidth must be integer, but got [%s], default with no limit. message=[%s]\n",
-				bandwith, err.Error())
+				bandwidth, err.Error())
 			defaulted.Bandwidth = -1
 		}
 	} else {

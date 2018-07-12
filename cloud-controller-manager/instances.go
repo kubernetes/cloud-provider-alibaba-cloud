@@ -41,7 +41,7 @@ type ClientInstanceSDK interface {
 
 // filterOutByRegion Used for multi-region or multi-vpc. works for single region or vpc too.
 // SLB only support Backends within the same vpc in the same region. so we need to remove the other backends which not in
-// the same region vpc with teh SLB. Keep the most backends
+// the same region vpc with the SLB. Keep the most backends
 func (s *InstanceClient) filterOutByRegion(nodes []*v1.Node, region common.Region) ([]*v1.Node, error) {
 	result := []*v1.Node{}
 	mvpc := make(map[string]int)
@@ -115,7 +115,7 @@ func nodeinfo(nodename types.NodeName) (common.Region, types.NodeName, error) {
 	name := strings.Split(string(nodename), ".")
 	if len(name) < 2 {
 		glog.Warningf("alicloud: unable to split instanceid and region from nodename, error unexpected nodename=%s \n", nodename)
-		return "", "", errors.New(fmt.Sprintf("alicloud: unable to split instanceid and region from nodename, error unexpected nodename=%s \n", nodename))
+		return "", "", fmt.Errorf("alicloud: unable to split instanceid and region from nodename, error unexpected nodename=%s \n", nodename)
 	}
 	return common.Region(name[0]), types.NodeName(name[1]), nil
 }

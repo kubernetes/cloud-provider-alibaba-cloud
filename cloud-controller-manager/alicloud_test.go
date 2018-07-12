@@ -339,7 +339,7 @@ func TestEnsureLoadBalancerHTTPS(t *testing.T) {
 		createLoadBalancerHTTPSListener: func(args *slb.CreateLoadBalancerHTTPSListenerArgs) (err error) {
 			// check certid
 			if args.ServerCertificateId != certID {
-				return errors.New(fmt.Sprintf("server cert must be provided and equals to [%s]", certID))
+				return fmt.Errorf("server cert must be provided and equals to [%s]", certID)
 			}
 			li := slb.ListenerPortAndProtocolType{
 				ListenerPort:     args.ListenerPort,

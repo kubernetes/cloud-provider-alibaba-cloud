@@ -114,8 +114,8 @@ func (s *LoadBalancerClient) findLoadBalancer(service *v1.Service) (bool, *slb.L
 	//		if def.Loadbalancerid != "" && def.Loadbalancerid != lbid {
 	//			glog.Errorf("alicloud: changing loadbalancer id was not allowed after loadbalancer"+
 	//				" was already created ! please remove service annotation: [%s]\n", ServiceAnnotationLoadBalancerId)
-	//			return false, nil, errors.New(fmt.Sprintf("alicloud: change loadbalancer id after service " +
-	//				"has been created is not supported. remove service annotation[%s] and retry!", ServiceAnnotationLoadBalancerId))
+	//			return false, nil, fmt.Errorf("alicloud: change loadbalancer id after service " +
+	//				"has been created is not supported. remove service annotation[%s] and retry!", ServiceAnnotationLoadBalancerId)
 	//		}
 	//		// found loadbalancer id in service ingress status.
 	//		// this id was set previously when loadbalancer was created.
@@ -234,13 +234,13 @@ func (s *LoadBalancerClient) EnsureLoadBalancer(service *v1.Service, nodes []*v1
 			os.Exit(1)
 		}
 		if isLoadbalancerOwnIngress(service) {
-			return nil, errors.New(fmt.Sprintf("alicloud: not able to find loadbalancer "+
+			return nil, fmt.Errorf("alicloud: not able to find loadbalancer "+
 				"named [%s] in openapi, but it's defined in service.loaderbalancer.ingress. "+
-				"this may happend when you removed loadbalancerid annotation.\n", service.Name))
+				"this may happen when you removed loadbalancerid annotation.\n", service.Name)
 		}
 		if request.Loadbalancerid != "" {
-			return nil, errors.New(fmt.Sprintf("alicloud: user specified "+
-				"loadbalancer[%s] does not exist. pls check!", request.Loadbalancerid))
+			return nil, fmt.Errorf("alicloud: user specified "+
+				"loadbalancer[%s] does not exist. pls check!", request.Loadbalancerid)
 		}
 
 		// From here, we need to create a new loadbalancer
@@ -317,7 +317,7 @@ func (s *LoadBalancerClient) UpdateLoadBalancer(service *v1.Service, nodes []*v1
 		return err
 	}
 	if !exists {
-		return errors.New(fmt.Sprintf("the loadbalance you specified by name [%s] does not exist!", service.Name))
+		return fmt.Errorf("the loadbalance you specified by name [%s] does not exist!", service.Name)
 	}
 
 	return s.UpdateBackendServers(nodes, lb)

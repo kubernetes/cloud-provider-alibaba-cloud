@@ -102,7 +102,7 @@ func init() {
 				glog.V(2).Infof("Alicloud: Accesskey=%s, AccessKeySecrete=%s", cfg.Global.AccessKeyID, cfg.Global.AccessKeySecret)
 			}
 			if keyid == "" || keysecret == "" {
-				glog.V(2).Infof("cloud config does not have keyid and keysecret . try enviroment ACCESS_KEY_ID ACCESS_KEY_SECRET")
+				glog.V(2).Infof("cloud config does not have keyid and keysecret . try environment ACCESS_KEY_ID ACCESS_KEY_SECRET")
 				keyid = os.Getenv("ACCESS_KEY_ID")
 				keysecret = os.Getenv("ACCESS_KEY_SECRET")
 			}
@@ -131,7 +131,7 @@ func newAliCloud(mgr *ClientMgr) (*Cloud, error) {
 
 	vpc, err := mgr.MetaData().VpcID()
 	if err != nil {
-		return nil, errors.New(fmt.Sprintf("Alicloud: error get vpcid. %s\n", err.Error()))
+		return nil, fmt.Errorf("Alicloud: error get vpcid. %s\n", err.Error())
 	}
 	glog.Infof("Using vpc region: region=%s, vpcid=%s", region, vpc)
 
@@ -191,7 +191,7 @@ func (c *Cloud) EnsureLoadBalancer(clusterName string, service *v1.Service, node
 		glog.V(2).Infof("alicloud: current vswitchid=%s\n", vswitchid)
 		if vswitchid == "" {
 			glog.Warningf("alicloud: can not find vswitch id, this will prevent you " +
-				"from creating VPC intranet SLB. But classic LB is still avaliable.")
+				"from creating VPC intranet SLB. But classic LB is still available.")
 		}
 	} else {
 		for _, v := range ns {
@@ -395,15 +395,15 @@ func (c *Cloud) GetZone() (cloudprovider.Zone, error) {
 	}
 	host, err := c.climgr.MetaData().InstanceID()
 	if err != nil {
-		return cloudprovider.Zone{}, errors.New(fmt.Sprintf("Alicloud.GetZone(): error execute c.meta.InstanceID(). message=[%s]", err.Error()))
+		return cloudprovider.Zone{}, fmt.Errorf("Alicloud.GetZone(): error execute c.meta.InstanceID(). message=[%s]", err.Error())
 	}
 	region, err := c.climgr.MetaData().Region()
 	if err != nil {
-		return cloudprovider.Zone{}, errors.New(fmt.Sprintf("Alicloud.GetZone(): error execute c.meta.Region(). message=[%s]", err.Error()))
+		return cloudprovider.Zone{}, fmt.Errorf("Alicloud.GetZone(): error execute c.meta.Region(). message=[%s]", err.Error())
 	}
 	i, err := c.climgr.Instances().findInstanceByNode(types.NodeName(fmt.Sprintf("%s.%s", region, host)))
 	if err != nil {
-		return cloudprovider.Zone{}, errors.New(fmt.Sprintf("Alicloud.GetZone(): error execute findInstanceByNodeID(). message=[%s]", err.Error()))
+		return cloudprovider.Zone{}, fmt.Errorf("Alicloud.GetZone(): error execute findInstanceByNodeID(). message=[%s]", err.Error())
 	}
 	return cloudprovider.Zone{
 		Region:        string(c.region),
@@ -418,7 +418,7 @@ func (c *Cloud) GetZoneByNodeName(nodeName types.NodeName) (cloudprovider.Zone, 
 
 	i, err := c.climgr.Instances().findInstanceByNode(nodeName)
 	if err != nil {
-		return cloudprovider.Zone{}, errors.New(fmt.Sprintf("Alicloud.GetZoneByNodeName(): error execute findInstanceByNode(). message=[%s]", err.Error()))
+		return cloudprovider.Zone{}, fmt.Errorf("Alicloud.GetZoneByNodeName(): error execute findInstanceByNode(). message=[%s]", err.Error())
 	}
 	return cloudprovider.Zone{
 		Region:        string(c.region),
@@ -432,7 +432,7 @@ func (c *Cloud) GetZoneByNodeName(nodeName types.NodeName) (cloudprovider.Zone, 
 func (c *Cloud) GetZoneByProviderID(providerID string) (cloudprovider.Zone, error) {
 	i, err := c.climgr.Instances().findInstanceByNode(types.NodeName(providerID))
 	if err != nil {
-		return cloudprovider.Zone{}, errors.New(fmt.Sprintf("Alicloud.GetZoneByProviderID(), error execute findInstanceByNode(). message=[%s]", err.Error()))
+		return cloudprovider.Zone{}, fmt.Errorf("Alicloud.GetZoneByProviderID(), error execute findInstanceByNode(). message=[%s]", err.Error())
 	}
 	return cloudprovider.Zone{
 		Region:        string(c.region),

@@ -19,7 +19,6 @@ package alicloud
 import (
 	"k8s.io/kubernetes/pkg/cloudprovider"
 
-	"errors"
 	"fmt"
 	"github.com/denverdino/aliyungo/common"
 	"github.com/denverdino/aliyungo/ecs"
@@ -63,8 +62,8 @@ func (r *RoutesClient) findRouter(region common.Region, vpcid string) (*ecs.VRou
 			return nil, err
 		}
 		if len(vpc) <= 0 {
-			return nil, errors.New(fmt.Sprintf("can not find vpc metadata by "+
-				"instance. region=%s, vpcid=%s, error=[no vpc found by specified id (%v)]", region, vpcid, vpc))
+			return nil, fmt.Errorf("can not find vpc metadata by "+
+				"instance. region=%s, vpcid=%s, error=[no vpc found by specified id (%v)]", region, vpcid, vpc)
 		}
 		r.vpcs.Set(vpckey, &vpc[0], defaultCacheExpiration)
 		v = &vpc[0]
@@ -85,8 +84,8 @@ func (r *RoutesClient) findRouter(region common.Region, vpcid string) (*ecs.VRou
 			return nil, err
 		}
 		if len(vroute) <= 0 {
-			return nil, errors.New(fmt.Sprintf("can not find VRouter metadata "+
-				"by instance. region=%s,vpcid=%s, error=[no VRouter found by specified id]", region, vpc))
+			return nil, fmt.Errorf("can not find VRouter metadata "+
+				"by instance. region=%s,vpcid=%s, error=[no VRouter found by specified id]", region, vpc)
 		}
 		r.routers.Set(routerkey, &vroute[0], defaultCacheExpiration)
 		route = &vroute[0]
@@ -161,7 +160,7 @@ func (r *RoutesClient) CreateRoute(route *cloudprovider.Route, region common.Reg
 	}
 	if len(tables) <= 0 {
 		glog.Errorf("alicloud: returned zero items. abort creating. \n")
-		return errors.New(fmt.Sprintf("error: cant find route table for route. cidr=%s", route.DestinationCIDR))
+		return fmt.Errorf("error: cant find route table for route. cidr=%s", route.DestinationCIDR)
 	}
 	if err := r.reCreateRoute(tables[0], &ecs.CreateRouteEntryArgs{
 		DestinationCidrBlock: route.DestinationCIDR,
