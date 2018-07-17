@@ -216,7 +216,7 @@ func (rc *RouteController) reconcile(nodes []*v1.Node, routes []*cloudprovider.R
 						glog.Infof("Created route for node %s %s with hint %s after %v", nodeName, route.DestinationCIDR, nameHint, time.Now().Sub(startTime))
 						return true, nil
 					}
-					return false, err
+					return false, nil
 				})
 			}(nodeName, nameHint, route)
 		} else {
