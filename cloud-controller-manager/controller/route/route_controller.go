@@ -138,6 +138,7 @@ func (rc *RouteController) reconcile(nodes []*v1.Node, routes []*cloudprovider.R
 	// routeMap maps routeTargetNode->route
 	routeMap := make(map[types.NodeName]*cloudprovider.Route)
 	for _, route := range routes {
+		glog.Infof("ListRoutes: reconcile %+v",route)
 		if route.TargetNode != "" {
 			routeMap[route.TargetNode] = route
 		}
@@ -149,6 +150,7 @@ func (rc *RouteController) reconcile(nodes []*v1.Node, routes []*cloudprovider.R
 		if rc.isResponsibleForRoute(route) {
 			// Check if this route is a blackhole, or applies to a node we know about & has an incorrect CIDR.
 			if route.Blackhole || (cidrForNode(nodes, string(route.TargetNode)) != route.DestinationCIDR) {
+				glog.Infof("responsible for: %t, %t,%t",route.Blackhole,cidrForNode(nodes, string(route.TargetNode)) != route.DestinationCIDR,route.Blackhole || (cidrForNode(nodes, string(route.TargetNode)) != route.DestinationCIDR))
 				wg.Add(1)
 				// Delete the route.
 				go func(route *cloudprovider.Route, startTime time.Time) {
@@ -173,6 +175,7 @@ func (rc *RouteController) reconcile(nodes []*v1.Node, routes []*cloudprovider.R
 		nodeName := types.NodeName(node.Name)
 		// Check if we have a route for this node w/ the correct CIDR.
 		r := routeMap[nodeName]
+		glog.Infof("Node: %s, r=%+v, node.Spec.PodCIDR=%s",node.Name,r, node.Spec.PodCIDR)
 		if r == nil || r.DestinationCIDR != node.Spec.PodCIDR {
 			// If not, create the route.
 			route := &cloudprovider.Route{
