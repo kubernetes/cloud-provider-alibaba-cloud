@@ -52,6 +52,8 @@ const (
 	ServiceAnnotationLoadBalancerHealthCheckDomain             = ServiceAnnotationLoadBalancerPrefix + "health-check-domain"
 	ServiceAnnotationLoadBalancerHealthCheckHTTPCode           = ServiceAnnotationLoadBalancerPrefix + "health-check-httpcode"
 
+	ServiceAnnotationLoadBalancerOverrideListener              = ServiceAnnotationLoadBalancerPrefix + "force-override-listeners"
+
 	ServiceAnnotationLoadBalancerSpec               = ServiceAnnotationLoadBalancerPrefix + "spec"
 	ServiceAnnotationLoadBalancerSessionStick       = ServiceAnnotationLoadBalancerPrefix + "sticky-session"
 	ServiceAnnotationLoadBalancerSessionStickType   = ServiceAnnotationLoadBalancerPrefix + "sticky-session-type"
@@ -145,6 +147,14 @@ func ExtractAnnotationRequest(service *v1.Service) (*AnnotationRequest, *Annotat
 		request.HealthCheckType = defaulted.HealthCheckType
 	} else {
 		defaulted.HealthCheckType = slb.TCPHealthCheckType
+	}
+
+	override, ok := annotation[ServiceAnnotationLoadBalancerOverrideListener]
+	if ok {
+		defaulted.OverrideListeners = override
+		request.HealthCheckType = defaulted.HealthCheckType
+	} else {
+		defaulted.HealthCheckType = "false"
 	}
 
 	hcUri, ok := annotation[ServiceAnnotationLoadBalancerHealthCheckURI]

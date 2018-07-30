@@ -171,10 +171,10 @@ func (c *Cloud) EnsureLoadBalancer(clusterName string, service *v1.Service, node
 		return nil, err
 	}
 	glog.V(5).Infof("alicloud: ensure loadbalancer with final nodes list , %v\n", NodeList(ns))
-	if service.Spec.SessionAffinity != v1.ServiceAffinityNone {
-		// Does not support SessionAffinity
-		return nil, fmt.Errorf("unsupported load balancer affinity: %v", service.Spec.SessionAffinity)
-	}
+	//if service.Spec.SessionAffinity != v1.ServiceAffinityNone {
+	//	// Does not support SessionAffinity
+	//	return nil, fmt.Errorf("unsupported load balancer affinity: %v", service.Spec.SessionAffinity)
+	//}
 	if len(service.Spec.Ports) == 0 {
 		return nil, fmt.Errorf("requested load balancer with no ports\n")
 	}

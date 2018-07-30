@@ -64,6 +64,8 @@ type AnnotationRequest struct {
 	Cookie             string
 	CookieTimeout      int
 	PersistenceTimeout int
+
+	OverrideListeners  string
 }
 
 const TAGKEY = "kubernetes.do.not.delete"
@@ -300,7 +302,8 @@ func (s *LoadBalancerClient) EnsureLoadBalancer(service *v1.Service, nodes []*v1
 		return nil, err
 	}
 	// we should apply listener update only if user does not assign loadbalancer id by themselves.
-	if !isUserDefinedLoadBalancer(request) {
+	if !isUserDefinedLoadBalancer(request) ||
+		(isUserDefinedLoadBalancer(request) && isOverrideListeners(request)) {
 		glog.V(5).Infof("alicloud: not user defined loadbalancer[%s], start to apply listener.\n", origined.LoadBalancerId)
 		err = NewListenerManager(s.c, service, origined).Apply()
 		if err != nil {
@@ -497,6 +500,11 @@ func (s *LoadBalancerClient) UpdateBackendServers(nodes []*v1.Node, lb *slb.Load
 func isUserDefinedLoadBalancer(request *AnnotationRequest) bool {
 
 	return request.Loadbalancerid != ""
+}
+
+func isOverrideListeners(request *AnnotationRequest) bool {
+
+	return strings.ToLower(request.OverrideListeners) != "true"
 }
 
 // check if the service exists in service definition

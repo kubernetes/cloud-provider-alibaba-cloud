@@ -50,7 +50,13 @@ pre-requisite:
 	@echo "Warning: Tag your branch before make. or makefile can not autodetect image tag."
 
 test:
-	go test -v k8s.io/cloud-provider-alibaba-cloud/cloud-controller-manager/alicloud
+	#go test -v k8s.io/cloud-provider-alibaba-cloud/cloud-controller-manager/alicloud
+	docker run -e CC=$(CC) -e GOARM=$(GOARM) -e GOARCH=$(ARCH) \
+		-v $(SOURCE):/go/src/k8s.io/cloud-provider-alibaba-cloud \
+		-v $(SOURCE)/build:/go/src/k8s.io/cloud-provider-alibaba-cloud/build \
+		registry.cn-hangzhou.aliyuncs.com/google-containers/kube-cross:$(KUBE_CROSS_TAG) /bin/bash -c '\
+		cd /go/src/k8s.io/cloud-provider-alibaba-cloud && \
+		CGO_ENABLED=1 go test -v k8s.io/cloud-provider-alibaba-cloud/cloud-controller-manager/alicloud'
 
 image: cloud-controller-manager-$(ARCH)
 	docker build -f build/Dockerfile -t $(REGISTRY):$(TAG) ./build/
