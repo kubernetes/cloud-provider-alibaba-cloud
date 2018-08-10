@@ -274,17 +274,30 @@ func (s *LoadBalancerClient) EnsureLoadBalancer(service *v1.Service, nodes []*v1
 		}
 		origined, err = s.c.DescribeLoadBalancerAttribute(lbr.LoadBalancerId)
 	} else {
+		needUpdate,charge,bandwidth := false,origined.InternetChargeType,origined.Bandwidth
 		glog.V(5).Infof("alicloud: found an exist loadbalancer[%s], check to see whether update is needed.", origined.LoadBalancerId)
 		if request.ChargeType != "" && request.ChargeType != origined.InternetChargeType {
+			needUpdate = true
+			charge = request.ChargeType
 			// Todo: here we need to compare loadbalance
-			glog.Infof("alicloud: internet charge type changed. [%s] -> [%s], update loadbalancer [%s]\n",
+			glog.Infof("alicloud: internet charge type([%s] -> [%s]), update loadbalancer [%s]\n",
 				string(origined.InternetChargeType), string(request.ChargeType), origined.LoadBalancerName)
+		}
+		if request.ChargeType == slb.PayByBandwidth &&
+			request.Bandwidth != DEFAULT_BANDWIDTH &&
+			request.Bandwidth != origined.Bandwidth {
 
+			needUpdate = true
+			bandwidth = request.Bandwidth
+			glog.Infof("alicloud: bandwidth([%d] -> [%d]) changed, update loadbalancer [%s]\n",
+				origined.Bandwidth, request.Bandwidth, origined.LoadBalancerName)
+		}
+		if needUpdate{
 			if err := s.c.ModifyLoadBalancerInternetSpec(
 				&slb.ModifyLoadBalancerInternetSpecArgs{
 					LoadBalancerId:     origined.LoadBalancerId,
-					InternetChargeType: request.ChargeType,
-					//Bandwidth:          opts.Bandwidth,
+					InternetChargeType: charge,
+					Bandwidth:          bandwidth,
 				}); err != nil {
 				return nil, err
 			}
@@ -301,8 +314,10 @@ func (s *LoadBalancerClient) EnsureLoadBalancer(service *v1.Service, nodes []*v1
 		glog.Errorf("alicloud: can not get loadbalancer[%s] attribute. ", origined.LoadBalancerId)
 		return nil, err
 	}
-	// we should apply listener update only if user does not assign loadbalancer id by themselves.
-	if !isUserDefinedLoadBalancer(request) ||
+	// Apply listener when
+	//   1. user does not assign loadbalancer id by themselves.
+	//   2. force-override-listener annotation is set.
+	if (!isUserDefinedLoadBalancer(request)) ||
 		(isUserDefinedLoadBalancer(request) && isOverrideListeners(request)) {
 		glog.V(5).Infof("alicloud: not user defined loadbalancer[%s], start to apply listener.\n", origined.LoadBalancerId)
 		err = NewListenerManager(s.c, service, origined).Apply()
@@ -325,40 +340,6 @@ func (s *LoadBalancerClient) UpdateLoadBalancer(service *v1.Service, nodes []*v1
 
 	return s.UpdateBackendServers(nodes, lb)
 }
-
-////create , play actual create.
-//func (s *LoadBalancerClient) create(loadbalancer *slb.CreateLoadBalancerArgs) (*slb.LoadBalancerType, error) {
-//	lbr, err := s.c.CreateLoadBalancer(loadbalancer)
-//	if err != nil {
-//		return nil, err
-//	}
-//	return s.c.DescribeLoadBalancerAttribute(lbr.LoadBalancerId)
-//}
-
-//update, play loadbalancer update
-//func (s *LoadBalancerClient) update(old *slb.LoadBalancerType, new *slb.CreateLoadBalancerArgs) (*slb.LoadBalancerType, error) {
-//	// Todo: here we need to compare loadbalance
-//	if new.InternetChargeType != old.InternetChargeType {
-//		glog.Infof("alicloud: internet charge type changed. [%s] -> [%s], update loadbalancer [%s]\n",
-//			string(old.InternetChargeType), string(new.InternetChargeType), new.LoadBalancerName)
-//
-//		if err := s.c.ModifyLoadBalancerInternetSpec(
-//			&slb.ModifyLoadBalancerInternetSpecArgs{
-//				LoadBalancerId:     old.LoadBalancerId,
-//				InternetChargeType: new.InternetChargeType,
-//				//Bandwidth:          opts.Bandwidth,
-//			}); err != nil {
-//			return nil, err
-//		}
-//	}
-//	if new.AddressType != old.AddressType {
-//		glog.Errorf("alicloud: warning! can not change "+
-//			"loadbalancer address type after it has been created! please "+
-//			"recreate the service.[%s]->[%s],[%s]\n", old.AddressType, new.AddressType, new.LoadBalancerName)
-//		return nil, errors.New("alicloud: change loadbalancer address type after created is not support.")
-//	}
-//	return s.c.DescribeLoadBalancerAttribute(old.LoadBalancerId)
-//}
 
 func (s *LoadBalancerClient) EnsureLoadBalanceDeleted(service *v1.Service) error {
 
@@ -387,13 +368,18 @@ func (s *LoadBalancerClient) EnsureLoadBalanceDeleted(service *v1.Service) error
 }
 
 func (s *LoadBalancerClient) getLoadBalancerOpts(service *v1.Service, vswitchid string) (args *slb.CreateLoadBalancerArgs) {
-	ar, _ := ExtractAnnotationRequest(service)
+	ar, req := ExtractAnnotationRequest(service)
 	args = &slb.CreateLoadBalancerArgs{
 		AddressType:        ar.AddressType,
 		InternetChargeType: ar.ChargeType,
-		//Bandwidth:          ar.Bandwidth,
 		RegionId:         DEFAULT_REGION,
 		LoadBalancerSpec: ar.LoadBalancerSpec,
+	}
+	// paybybandwidth need a default bandwidth args, while paybytraffic doesnt.
+	if ar.ChargeType == slb.PayByBandwidth ||
+		(ar.ChargeType == slb.PayByTraffic && req.Bandwidth != 0){
+		glog.V(5).Infof("alicloud: %s, set bandwidth to %d",ar.ChargeType, ar.Bandwidth)
+		args.Bandwidth = ar.Bandwidth
 	}
 	if ar.SLBNetworkType != "classic" &&
 		strings.Compare(string(ar.AddressType), string(slb.IntranetAddressType)) == 0 {
@@ -504,7 +490,7 @@ func isUserDefinedLoadBalancer(request *AnnotationRequest) bool {
 
 func isOverrideListeners(request *AnnotationRequest) bool {
 
-	return strings.ToLower(request.OverrideListeners) != "true"
+	return strings.ToLower(request.OverrideListeners) == "true"
 }
 
 // check if the service exists in service definition

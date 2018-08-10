@@ -1,7 +1,7 @@
 
 ##############################################################################################################
 
-.PHONY: test e2e-test cover gofmt gofmt-fix  clean
+.PHONY: test e2e-test cover gofmt gofmt-fix  clean cloud-controller-manager
 
 # Registry used for publishing images
 REGISTRY?=registry.cn-hangzhou.aliyuncs.com/google-containers/cloud-controller-manager-amd64
@@ -22,7 +22,7 @@ else
 	SOURCE=$(LOCAL)
 endif
 GOARM=6
-KUBE_CROSS_TAG=v1.8.1-1
+KUBE_CROSS_TAG=v1.9.3-1
 IPTABLES_VERSION=1.4.21
 
 cloud-controller-manager: $(shell find . -type f  -name '*.go')

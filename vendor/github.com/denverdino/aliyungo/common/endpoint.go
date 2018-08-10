@@ -7,6 +7,7 @@ import (
 	"os"
 	"strings"
 	"time"
+	"log"
 )
 
 const (
@@ -139,6 +140,7 @@ func setProductRegionEndpoint(region Region, serviceCode string, endpoint string
 
 func (client *LocationClient) DescribeOpenAPIEndpoint(region Region, serviceCode string) string {
 	if endpoint := getProductRegionEndpoint(region, serviceCode); endpoint != "" {
+		fmt.Printf("debug: find endpoint from local cache: %s\n",endpoint)
 		return endpoint
 	}
 	defaultProtocols := HTTP_PROTOCOL
@@ -160,6 +162,7 @@ func (client *LocationClient) DescribeOpenAPIEndpoint(region Region, serviceCode
 	}
 
 	if err != nil || endpoint == nil || len(endpoint.Endpoints.Endpoint) <= 0 {
+		log.Printf("aliyungo: can not get endpoint from service, use default. endpoint=[%s], error=[%v]\n",endpoint, err)
 		return ""
 	}
 

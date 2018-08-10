@@ -25,6 +25,8 @@ import (
 	"strings"
 )
 
+var DEFAULT_LISTENER_BANDWIDTH = -1
+
 type ListenerInterface interface {
 	Add(port v1.ServicePort) error
 	Remove(port v1.ServicePort) error
@@ -82,7 +84,7 @@ func (f *ListenerManager) NewTCP() ListenerInterface {
 				ListenerPort:      int(targetPort.Port),
 				BackendServerPort: int(targetPort.NodePort),
 				//Health Check
-				Bandwidth:          def.Bandwidth,
+				Bandwidth:          DEFAULT_LISTENER_BANDWIDTH,
 				PersistenceTimeout: def.PersistenceTimeout,
 
 				HealthCheckType:           def.HealthCheckType,
@@ -109,7 +111,7 @@ func (f *ListenerManager) NewTCP() ListenerInterface {
 			ListenerPort:      int(port.Port),
 			BackendServerPort: int(port.NodePort),
 			//Health Check
-			Bandwidth:          response.Bandwidth,
+			Bandwidth:          DEFAULT_LISTENER_BANDWIDTH,
 			PersistenceTimeout: response.PersistenceTimeout,
 
 			HealthCheckType:           response.HealthCheckType,
@@ -124,12 +126,14 @@ func (f *ListenerManager) NewTCP() ListenerInterface {
 			HealthCheckDomain:         response.HealthCheckDomain,
 		}
 		needUpdate := false
+		/*
 		if request.Bandwidth != 0 &&
 			def.Bandwidth != response.Bandwidth {
 			needUpdate = true
 			config.Bandwidth = def.Bandwidth
 			glog.V(2).Infof("TCP listener checker [bandwidth] changed, request=%d. response=%d", def.Bandwidth, response.Bandwidth)
 		}
+		*/
 
 		// todo: perform healthcheck update.
 		if def.HealthCheckType != response.HealthCheckType {
@@ -195,7 +199,7 @@ func (f *ListenerManager) NewTCP() ListenerInterface {
 			// no recreate needed.  skip
 			return nil
 		}
-		glog.V(2).Infof("TCP listener checker changed, request recreate [%s]\n", f.loadbalancer.LoadBalancerId)
+		glog.V(2).Infof("TCP listener checker changed, request update listener attribute [%s]\n", f.loadbalancer.LoadBalancerId)
 		glog.V(5).Infof(PrettyJson(def))
 		glog.V(5).Infof(PrettyJson(response))
 		return f.client.SetLoadBalancerTCPListenerAttribute(config)
@@ -227,7 +231,7 @@ func (f *ListenerManager) NewUDP() ListenerInterface {
 			ListenerPort:      int(port.Port),
 			BackendServerPort: int(port.NodePort),
 			//Health Check
-			Bandwidth:          response.Bandwidth,
+			Bandwidth:          DEFAULT_LISTENER_BANDWIDTH,
 			PersistenceTimeout: response.PersistenceTimeout,
 			//HealthCheckType:           response.HealthCheckType,
 			//HealthCheckURI:            response.HealthCheckURI,
@@ -239,12 +243,14 @@ func (f *ListenerManager) NewUDP() ListenerInterface {
 			HealthCheck:               response.HealthCheck,
 		}
 		needUpdate := false
+		/*
 		if request.Bandwidth != 0 &&
 			request.Bandwidth != response.Bandwidth {
 			needUpdate = true
 			config.Bandwidth = request.Bandwidth
 			glog.V(2).Infof("UDP listener checker [bandwidth] changed, request=%d. response=%d", request.Bandwidth, response.Bandwidth)
 		}
+		*/
 
 		// todo: perform healthcheck update.
 		if request.HealthCheckConnectPort != 0 &&
@@ -304,7 +310,7 @@ func (f *ListenerManager) NewUDP() ListenerInterface {
 				ListenerPort:      int(targetPort.Port),
 				BackendServerPort: int(targetPort.NodePort),
 				//Health Check
-				Bandwidth:          def.Bandwidth,
+				Bandwidth:          DEFAULT_LISTENER_BANDWIDTH,
 				PersistenceTimeout: def.PersistenceTimeout,
 
 				//HealthCheckType:           request.HealthCheckType,
@@ -345,7 +351,7 @@ func (f *ListenerManager) NewHTTP() ListenerInterface {
 			ListenerPort:      int(port.Port),
 			BackendServerPort: int(port.NodePort),
 			//Health Check
-			Bandwidth:         response.Bandwidth,
+			Bandwidth:         DEFAULT_LISTENER_BANDWIDTH,
 			StickySession:     response.StickySession,
 			StickySessionType: response.StickySessionType,
 			CookieTimeout:     response.CookieTimeout,
@@ -362,12 +368,14 @@ func (f *ListenerManager) NewHTTP() ListenerInterface {
 			HealthCheckInterval:    response.HealthCheckInterval,
 		}
 		needUpdate := false
+		/*
 		if request.Bandwidth != 0 &&
 			request.Bandwidth != response.Bandwidth {
 			needUpdate = true
 			config.Bandwidth = request.Bandwidth
 			glog.V(2).Infof("HTTP listener checker [bandwidth] changed, request=%d. response=%d", request.Bandwidth, response.Bandwidth)
 		}
+		*/
 
 		// todo: perform healthcheck update.
 		if def.HealthCheck != response.HealthCheck {
@@ -462,7 +470,7 @@ func (f *ListenerManager) NewHTTP() ListenerInterface {
 				ListenerPort:      int(targetPort.Port),
 				BackendServerPort: int(targetPort.NodePort),
 				//Health Check
-				Bandwidth:         request.Bandwidth,
+				Bandwidth:         DEFAULT_LISTENER_BANDWIDTH,
 				StickySession:     def.StickySession,
 				StickySessionType: def.StickySessionType,
 				CookieTimeout:     def.CookieTimeout,
@@ -511,7 +519,7 @@ func (f *ListenerManager) NewHTTPS() ListenerInterface {
 				BackendServerPort: response.BackendServerPort,
 				//Health Check
 				HealthCheck:       response.HealthCheck,
-				Bandwidth:         response.Bandwidth,
+				Bandwidth:         DEFAULT_LISTENER_BANDWIDTH,
 				StickySession:     response.StickySession,
 				StickySessionType: response.StickySessionType,
 				CookieTimeout:     response.CookieTimeout,
@@ -530,13 +538,14 @@ func (f *ListenerManager) NewHTTPS() ListenerInterface {
 		}
 
 		needUpdate := false
+		/*
 		if request.Bandwidth != 0 &&
 			request.Bandwidth != response.Bandwidth {
 			needUpdate = true
 			config.Bandwidth = request.Bandwidth
 			glog.V(2).Infof("HTTPS listener checker [bandwidth] changed, request=%d. response=%d", request.Bandwidth, response.Bandwidth)
 		}
-
+		*/
 		// todo: perform healthcheck update.
 		if def.HealthCheck != response.HealthCheck {
 			needUpdate = true
@@ -634,7 +643,7 @@ func (f *ListenerManager) NewHTTPS() ListenerInterface {
 					BackendServerPort: int(targetPort.NodePort),
 					//Health Check
 					HealthCheck:       def.HealthCheck,
-					Bandwidth:         def.Bandwidth,
+					Bandwidth:         DEFAULT_LISTENER_BANDWIDTH,
 					StickySession:     def.StickySession,
 					StickySessionType: def.StickySessionType,
 					Cookie:            def.Cookie,

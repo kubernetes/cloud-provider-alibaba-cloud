@@ -51,7 +51,7 @@ type Cloud struct {
 
 var (
 	DEFAULT_CHARGE_TYPE  = common.PayByTraffic
-	DEFAULT_BANDWIDTH    = -1
+	DEFAULT_BANDWIDTH    = 100
 	DEFAULT_ADDRESS_TYPE = slb.InternetAddressType
 
 	// DEFAULT_REGION should be override in cloud initialize.
