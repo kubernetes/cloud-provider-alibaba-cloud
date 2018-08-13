@@ -39,7 +39,7 @@ How and where to set this flag depends on how you deploy your cluster, we will g
 
 #### hostname and provider id
 
-By default, the kubelet will name nodes based on the node's hostname. But in `cloud-controller-manager`, we use `<REGION_ID>.<ECS_ID>` format to build a unique node id to identity one node. In order to elimite these difference, we need to set extra flags `--hostname_override` and `--provider-id` with format `<REGION_ID>.<ECS_ID>` on kubelet.
+By default, the kubelet will name nodes based on the node's hostname. But in `cloud-controller-manager`, we use `<REGION_ID>.<ECS_ID>` format to build a unique node id to identity one node. In order to elimite these difference, we need to set extra flags `--hostname-override` and `--provider-id` with format `<REGION_ID>.<ECS_ID>` on kubelet.
 
 If you are not sure how to find your ECS instance's ID and region id, try to run these command in your ECS instance:
 
