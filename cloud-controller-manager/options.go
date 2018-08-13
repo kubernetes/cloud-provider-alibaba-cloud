@@ -38,6 +38,8 @@ const (
 	ServiceAnnotationLoadBalancerId                            = ServiceAnnotationLoadBalancerPrefix + "id"
 	ServiceAnnotationLoadBalancerBackendLabel                  = ServiceAnnotationLoadBalancerPrefix + "backend-label"
 	ServiceAnnotationLoadBalancerRegion                        = ServiceAnnotationLoadBalancerPrefix + "region"
+	ServiceAnnotationLoadBalancerMasterZoneID                  = ServiceAnnotationLoadBalancerPrefix + "master-zoneid"
+	ServiceAnnotationLoadBalancerSlaveZoneID                   = ServiceAnnotationLoadBalancerPrefix + "slave-zoneid"
 	ServiceAnnotationLoadBalancerBandwidth                     = ServiceAnnotationLoadBalancerPrefix + "bandwidth"
 	ServiceAnnotationLoadBalancerCertID                        = ServiceAnnotationLoadBalancerPrefix + "cert-id"
 	ServiceAnnotationLoadBalancerHealthCheckFlag               = ServiceAnnotationLoadBalancerPrefix + "health-check-flag"
@@ -110,11 +112,17 @@ func ExtractAnnotationRequest(service *v1.Service) (*AnnotationRequest, *Annotat
 		defaulted.ChargeType = slb.PayByTraffic
 	}
 
-	//region,ok := annotation[ServiceAnnotationLoadBalancerRegion]
-	//if ok {
-	//	defaulted.Region = common.Region(region)
-	//	request.Region = defaulted.Region
-	//}
+	mzoneid,ok := annotation[ServiceAnnotationLoadBalancerMasterZoneID]
+	if ok && mzoneid != "" {
+		defaulted.MasterZoneID = mzoneid
+		request.MasterZoneID   = mzoneid
+	}
+
+	szoneid,ok := annotation[ServiceAnnotationLoadBalancerSlaveZoneID]
+	if ok && szoneid != "" {
+		defaulted.SlaveZoneID = szoneid
+		request.SlaveZoneID   = szoneid
+	}
 
 	lbid, ok := annotation[ServiceAnnotationLoadBalancerId]
 	if ok {

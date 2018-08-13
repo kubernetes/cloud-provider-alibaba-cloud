@@ -213,6 +213,9 @@ type LoadBalancerType struct {
 	VpcId              string
 	NetworkType        string
 	Bandwidth          int
+	MasterZoneId       string
+	SlaveZoneId        string
+
 	InternetChargeType InternetChargeType
 	CreateTime         string //Why not ISO 6801
 	CreateTimeStamp    util.ISO6801Time

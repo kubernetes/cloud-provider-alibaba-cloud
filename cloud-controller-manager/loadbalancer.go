@@ -44,6 +44,9 @@ type AnnotationRequest struct {
 	Bandwidth int
 	CertID    string
 
+	MasterZoneID 	string
+	SlaveZoneID 	string
+
 	HealthCheck            slb.FlagType
 	HealthCheckURI         string
 	HealthCheckConnectPort int
@@ -276,6 +279,12 @@ func (s *LoadBalancerClient) EnsureLoadBalancer(service *v1.Service, nodes []*v1
 	} else {
 		needUpdate,charge,bandwidth := false,origined.InternetChargeType,origined.Bandwidth
 		glog.V(5).Infof("alicloud: found an exist loadbalancer[%s], check to see whether update is needed.", origined.LoadBalancerId)
+		if request.MasterZoneID != "" && request.MasterZoneID != origined.MasterZoneId {
+			return nil, fmt.Errorf("alicloud: can not change LoadBalancer master zone id once created.")
+		}
+		if request.SlaveZoneID != "" && request.SlaveZoneID != origined.SlaveZoneId {
+			return nil, fmt.Errorf("alicloud: can not change LoadBalancer slave zone id once created.")
+		}
 		if request.ChargeType != "" && request.ChargeType != origined.InternetChargeType {
 			needUpdate = true
 			charge = request.ChargeType
@@ -374,6 +383,8 @@ func (s *LoadBalancerClient) getLoadBalancerOpts(service *v1.Service, vswitchid 
 		InternetChargeType: ar.ChargeType,
 		RegionId:         DEFAULT_REGION,
 		LoadBalancerSpec: ar.LoadBalancerSpec,
+		MasterZoneId: ar.MasterZoneID,
+		SlaveZoneId:  ar.SlaveZoneID,
 	}
 	// paybybandwidth need a default bandwidth args, while paybytraffic doesnt.
 	if ar.ChargeType == slb.PayByBandwidth ||
