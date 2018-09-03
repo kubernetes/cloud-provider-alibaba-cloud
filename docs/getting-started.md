@@ -1,191 +1,83 @@
-## Requirements
 
-### Version
-Kubernetes version 1.7.2 or higher is required to get a stable running.
+## Pre-Requirement
+- Version: kubernetes version great than v1.7.2 is required.
+- CloudNetwork: Only Alibaba Cloud VPC network is supported.
 
-### AliCloud ECS
-Only VPC network is supported.
 
-## Getting started
-To deploy cloud-controller-manager in kubernetes cluster, we need to do a few things:
+## Deploy out-of-tree CloudProvider in Alibaba Cloud.
 
-- Get an `cloud-controller-manager` image.
-- Prepare your kubernetes cluster with some requirements.
-- Prepare and deploy `cloud-controller-manager`.
-- Try it!
+### Bring up a latest supported Kubernetes Cluster of version v1.10 with Kubeadm.
+Kubeadm is an official installation tool for kubernetes. You could bring up a single master kubernetes cluster by following the instruction in this [page](https://kubernetes.io/docs/setup/independent/create-cluster-kubeadm/).
 
-### Get an `cloud-controller-manager` image
+Be advise that kubeadm accept a serious of certain parameters to customize your cluster with kubeadm.conf file. If you want to use your own secure ETCD cluster or image repository, you may find the template [kubeadm.conf](examples/kubeadm.conf) is useful. 
 
-You can either get an image from official release by image name `registry.cn-hangzhou.aliyuncs.com/acs/cloud-controller-manager:<RELEASE_VERSION>`
+Run the command below to initialize a kubernetes cluster.
+```$bash
+kubeadm init --config kubeadm.conf
+```
 
-Or build it from source which require docker has been installed:
-
-    ```bash
-    # for example. export REGISTRY=registry.cn-hangzhou.aliyuncs.com/acs
-    $ export REGISTRY=<YOUR_REGISTRY_NAME>
-    # This will build cloud-controller-manager from source code and build an docker image from binary and push to your specified registry.
-    # You can also use `make binary && make build` if you don't want push this image to your registry.
-    $ make image
-    $ docker images |grep cloud-controller-manager
-    ```
-
-### Prepare your kubernetes cluster with some requirements
-
-#### --cloud-provider=external
-
-In order to external cloud provider feature, we need to deploy or reconfigure `kube-apiserver`/`kube-controller-manager`/`kubelet` component with extra flag `--cloud-provider=external`, which means cloud provider functionality will hand to out of tree external cloud provider, here we use `cloud-controller-manager`.
-
-How and where to set this flag depends on how you deploy your cluster, we will give a detail `kubeadm` way to deploy cluster with `cloud-controller-manager` later.
-
-#### hostname and provider id
-
-By default, the kubelet will name nodes based on the node's hostname. But in `cloud-controller-manager`, we use `<REGION_ID>.<ECS_ID>` format to build a unique node id to identity one node. In order to elimite these difference, we need to set extra flags `--hostname-override` and `--provider-id` with format `<REGION_ID>.<ECS_ID>` on kubelet.
+>> Note:
+1. ```cloudProvider: external``` is required to set in kubeadm.conf file for you to deploy alibaba out-of-tree cloudprovider.
+2. Set ```imageRepository: registry-vpc.${region}.aliyuncs.com/acs``` is a best practice to enable you the ability to pull image faster in China. 
+3. You should provide ```--hostname-override=${REGION_ID}.${INSTANCE_ID} --provider-id=${REGION_ID}.${INSTANCE_ID}``` arguments in all of your kubelet unit file. The format is ```${REGION_ID}.${INSTANCE_ID}```. See [kubelet.service](examples/kubelet.service) for more details.
 
 If you are not sure how to find your ECS instance's ID and region id, try to run these command in your ECS instance:
 
-    ```bash
-    $ META_EP=http://100.100.100.200/latest/meta-data
-    $ echo `curl -s $META_EP/region-id`.`curl -s $META_EP/instance-id`
-    ```
-
-### Prepare and deploy `cloud-controller-manager`
-
-1. Prepare AliCloud access key id and secret
-
-```
-apiVersion: v1
-kind: Secret
-metadata:
-  name: cloud-config
-  namespace: kube-system
-data:
-  # insert your base64 encoded AliCloud access id and key here, ensure there's no trailing newline:
-  # to base64 encode your token run:
-  #      echo -n "abc123abc123doaccesstoken" | base64
-  access-key-id: "<ACCESS_KEY_ID>"
-  access-key-secret: "<ACCESS_KEY_SECRET>"
-```
-
-1. Prepare `cloud-controller-manager` daemonset yaml
-
-Mare sure container image, `--cluster-cidr` field match what your needs. replace image with your version.
-
-```
-apiVersion: extensions/v1beta1
-kind: DaemonSet
-metadata:
-  labels:
-    app: cloud-controller-manager
-    tier: control-plane
-  name: cloud-controller-manager
-  namespace: kube-system
-spec:
-  revisionHistoryLimit: 10
-  selector:
-    matchLabels:
-      app: cloud-controller-manager
-      tier: control-plane
-  template:
-    metadata:
-      creationTimestamp: null
-      labels:
-        app: cloud-controller-manager
-        tier: control-plane
-    spec:
-      containers:
-      - command:
-        - /cloud-controller-manager
-        - --kubeconfig=/etc/kubernetes/cloud-controller-manager.conf
-        - --address=127.0.0.1
-        - --leader-elect=true
-        - --cloud-provider=alicloud
-        - --allocate-node-cidrs=true
-        - --allow-untagged-cloud=true
-        # set this to what you set to controller-manager or kube-proxy
-        - --cluster-cidr=172.20.0.0/16
-        - --use-service-account-credentials=true
-        - --route-reconciliation-period=30s
-        - --v=5
-        env:
-          - name: ACCESS_KEY_ID
-            valueFrom:
-              secretKeyRef:
-                name: cloud-config
-                key: access-key-id
-          - name: ACCESS_KEY_SECRET
-            valueFrom:
-              secretKeyRef:
-                name: cloud-config
-                key: access-key-secret
-        image: registry-vpc.cn-hangzhou.aliyuncs.com/acs/cloud-controller-manager-amd64:v1.9.3
-        imagePullPolicy: IfNotPresent
-        livenessProbe:
-          failureThreshold: 8
-          httpGet:
-            host: 127.0.0.1
-            path: /healthz
-            port: 10252
-            scheme: HTTP
-          initialDelaySeconds: 15
-          periodSeconds: 10
-          successThreshold: 1
-          timeoutSeconds: 15
-        name: cloud-controller-manager
-        resources:
-          requests:
-            cpu: 200m
-        terminationMessagePath: /dev/termination-log
-        terminationMessagePolicy: File
-        volumeMounts:
-        - mountPath: /etc/kubernetes/
-          name: k8s
-          readOnly: true
-        - mountPath: /etc/ssl/certs
-          name: certs
-        - mountPath: /etc/pki
-          name: pki
-      dnsPolicy: ClusterFirst
-      hostNetwork: true
-      nodeSelector:
-        node-role.kubernetes.io/master: ""
-      restartPolicy: Always
-      schedulerName: default-scheduler
-      securityContext: {}
-      serviceAccount: cloud-controller-manager
-      serviceAccountName: cloud-controller-manager
-      terminationGracePeriodSeconds: 30
-      tolerations:
-      - effect: NoSchedule
-        key: node-role.kubernetes.io/master
-        operator: Exists
-      - effect: NoSchedule
-        key: node.cloudprovider.kubernetes.io/uninitialized
-        operator: Exists
-      volumes:
-      - hostPath:
-          path: /etc/kubernetes
-          type: ""
-        name: k8s
-      - hostPath:
-          path: /etc/ssl/certs
-          type: ""
-        name: certs
-      - hostPath:
-          path: /etc/pki
-          type: ""
-        name: pki
-  updateStrategy:
-    rollingUpdate:
-      maxUnavailable: 1
-    type: RollingUpdate
-
-```
-3. Deploy `cloud-controller-manager`
 ```bash
-$ kubectl create -f cloud-controller-manager.yaml
+$ META_EP=http://100.100.100.200/latest/meta-data
+$ echo `curl -s $META_EP/region-id`.`curl -s $META_EP/instance-id`
+```
+For now, you should have a running kubernetes cluster. Try some example command like ```kubectl get no ```
+
+### Install Alibaba CloudProvider support.
+
+**AccessKeyID & AccessKeySecret**
+
+CloudProvider needs certain permissions to access Alibaba Cloud. Here we use Alibaba AccessKeyID&Secret to authorize the CloudProvider. Please make sure that the AccessKeyID has the listed permissions in [permissions.policy](examples/permissions.policy)
+
+[How to get AccessKey?](https://usercenter.console.aliyun.com/#/manage/ak)
+
+Then, create ```cloud-config``` configmap in the cluster.
+
+```bash
+$ kubectl -n kube-system create configmap cloud-config \
+        --from-literal=special.keyid="$ACCESS_KEY_ID" \
+        --from-literal=special.keysecret="$ACCESS_KEY_SECRET"
 ```
 
-### Try it!
+**ServiceAccount system:cloud-controller-manager**
+
+CloudProvider use system:cloud-controller-manager service account to authorize Kubernetes cluster with RBAC enabled. So:
+1. Certain RBAC roles and bindings must be created. See [cloud-controller-manager.yml](examples/cloud-controller-manager.yml) for details.
+
+2. kubeconfig file must be provider. Save the file below to ```/etc/kubernetes/cloud-controller-manager.conf```. And replace ```$CA_DATA``` with the output of command ```cat /etc/kubernetes/pki/ca.crt|base64 -w 0```. And replace servers with your own apiserver address.
+
+```
+kind: Config
+contexts:
+- context:
+    cluster: kubernetes
+    user: system:cloud-controller-manager
+  name: system:cloud-controller-manager@kubernetes
+current-context: system:cloud-controller-manager@kubernetes
+users:
+- name: system:cloud-controller-manager
+  user:
+    tokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
+apiVersion: v1
+clusters:
+- cluster:
+    certificate-authority-data: $CA_DATA
+    server: https://192.168.1.76:6443
+  name: kubernetes
+``` 
+
+**Apply CloudProvider daemonset**
+
+An available cloudprovider daemonset yaml file is being prepared in [cloud-controller-manager.yml](examples/cloud-controller-manager.yml). The only thing you need to do is to replace the ${CLUSTER_CIDR} with your own real cluster cidr. 
+And then ``` kubectl apply -f examples/cloud-controller-manager.yml``` to finish the installation. 
+
+## Try With Simple Example
 Once `cloud-controller-manager` is up and running, run a sample nginx deployment:
 ```bash
 $ cat <<EOF >nginx.yaml
