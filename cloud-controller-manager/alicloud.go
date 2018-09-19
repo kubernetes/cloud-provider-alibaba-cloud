@@ -99,7 +99,7 @@ func init() {
 					return nil, err
 				}
 				keysecret = string(secret)
-				glog.V(2).Infof("Alicloud: Accesskey=%s, AccessKeySecrete=%s", cfg.Global.AccessKeyID, cfg.Global.AccessKeySecret)
+				glog.V(2).Infof("Alicloud: Try Accesskey and AccessKeySecret from config file.")
 			}
 			if keyid == "" || keysecret == "" {
 				glog.V(2).Infof("cloud config does not have keyid and keysecret . try environment ACCESS_KEY_ID ACCESS_KEY_SECRET")
