@@ -42,6 +42,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/util/metrics"
 	nodeutil "k8s.io/kubernetes/pkg/util/node"
+	"strings"
 )
 
 const (
@@ -187,10 +188,10 @@ func (rc *RouteController) reconcile(nodes []*v1.Node, routes []*cloudprovider.R
 			go func(nodeName types.NodeName, nameHint string, route *cloudprovider.Route) {
 				defer wg.Done()
 				backoff := wait.Backoff{
-					Duration: 1 * time.Second,
+					Duration: 4 * time.Second,
 					Factor:   2,
-					Jitter:   0,
-					Steps:    4,
+					Jitter:   1,
+					Steps:    8,
 				}
 				wait.ExponentialBackoff(backoff, func() (bool, error) {
 					startTime := time.Now()
@@ -199,6 +200,11 @@ func (rc *RouteController) reconcile(nodes []*v1.Node, routes []*cloudprovider.R
 					rateLimiter <- struct{}{}
 					glog.Infof("Creating route for node %s %s with hint %s, throttled %v", nodeName, route.DestinationCIDR, nameHint, time.Now().Sub(startTime))
 					err := rc.routes.CreateRoute(rc.clusterName, nameHint, route)
+					if err != nil && strings.Contains(err.Error(),"please wait a moment and try again") {
+						// Throttled, wait a second.
+						glog.Infof("alicloud: throttle triggered. sleep for 10s before proceeding.")
+						time.Sleep(10 * time.Second)
+					}
 					<-rateLimiter
 
 					rc.updateNetworkingCondition(nodeName, err == nil)
