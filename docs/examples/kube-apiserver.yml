@@ -1,0 +1,94 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  annotations:
+    scheduler.alpha.kubernetes.io/critical-pod: ""
+  creationTimestamp: null
+  labels:
+    component: kube-apiserver
+    tier: control-plane
+  name: kube-apiserver
+  namespace: kube-system
+spec:
+  containers:
+  - command:
+    - kube-apiserver
+    - --apiserver-count=500
+    - --endpoint-reconciler-type=lease
+    - --runtime-config=admissionregistration.k8s.io/v1alpha1
+    - --requestheader-username-headers=X-Remote-User
+    - --requestheader-allowed-names=front-proxy-client
+    - --client-ca-file=/etc/kubernetes/pki/apiserver-ca.crt
+    - --tls-cert-file=/etc/kubernetes/pki/apiserver.crt
+    - --admission-control=NamespaceLifecycle,LimitRanger,ServiceAccount,DefaultStorageClass,DefaultTolerationSeconds,NodeRestriction,MutatingAdmissionWebhook,ValidatingAdmissionWebhook,ResourceQuota
+    - --requestheader-extra-headers-prefix=X-Remote-Extra-
+    #- --advertise-address=192.168.1.76
+    - --advertise-address=${IP}
+    - --enable-bootstrap-token-auth=true
+    - --allow-privileged=true
+    - --kubelet-preferred-address-types=InternalIP,ExternalIP,Hostname
+    - --kubelet-client-certificate=/etc/kubernetes/pki/apiserver-kubelet-client.crt
+    - --kubelet-client-key=/etc/kubernetes/pki/apiserver-kubelet-client.key
+    - --requestheader-client-ca-file=/etc/kubernetes/pki/front-proxy-ca.crt
+    - --proxy-client-key-file=/etc/kubernetes/pki/front-proxy-client.key
+    - --insecure-port=0
+    - --requestheader-group-headers=X-Remote-Group
+    #- --service-cluster-ip-range=172.19.0.0/20
+    - --service-cluster-ip-range=${SERVICE_CIDR}
+    - --service-account-key-file=/etc/kubernetes/pki/sa.pub
+    - --tls-private-key-file=/etc/kubernetes/pki/apiserver.key
+    - --secure-port=6443
+    - --proxy-client-cert-file=/etc/kubernetes/pki/front-proxy-client.crt
+    - --authorization-mode=Node,RBAC
+    #- --etcd-servers=https://192.168.1.74:2379,https://192.168.1.75:2379,https://192.168.1.76:2379
+    - --etcd-servers=${ETCD_SERVER_LIST}
+    - --etcd-cafile=/etc/kubernetes/pki/etcd/ca.pem
+    - --etcd-certfile=/etc/kubernetes/pki/etcd/etcd-client.pem
+    - --etcd-keyfile=/etc/kubernetes/pki/etcd/etcd-client-key.pem
+    - --cloud-provider=external
+    image: registry-vpc.cn-hangzhou.aliyuncs.com/acs/kube-apiserver-amd64:v1.10.4
+    imagePullPolicy: IfNotPresent
+    livenessProbe:
+      failureThreshold: 8
+      httpGet:
+        host: ${IP}
+        path: /healthz
+        port: 6443
+        scheme: HTTPS
+      initialDelaySeconds: 15
+      timeoutSeconds: 15
+    name: kube-apiserver
+    resources:
+      requests:
+        cpu: 250m
+    volumeMounts:
+    - mountPath: /etc/kubernetes/pki
+      name: k8s-certs
+      readOnly: true
+    - mountPath: /etc/ssl/certs
+      name: ca-certs
+      readOnly: true
+    - mountPath: /etc/pki
+      name: ca-certs-etc-pki
+      readOnly: true
+    - mountPath: /etc/localtime
+      name: localtime
+      readOnly: true
+  hostNetwork: true
+  volumes:
+  - hostPath:
+      path: /etc/ssl/certs
+      type: DirectoryOrCreate
+    name: ca-certs
+  - hostPath:
+      path: /etc/pki
+      type: DirectoryOrCreate
+    name: ca-certs-etc-pki
+  - hostPath:
+      path: /etc/localtime
+      type: ""
+    name: localtime
+  - hostPath:
+      path: /etc/kubernetes/pki
+      type: DirectoryOrCreate
+    name: k8s-certs
