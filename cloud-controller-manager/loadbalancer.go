@@ -44,8 +44,8 @@ type AnnotationRequest struct {
 	Bandwidth int
 	CertID    string
 
-	MasterZoneID 	string
-	SlaveZoneID 	string
+	MasterZoneID string
+	SlaveZoneID  string
 
 	HealthCheck            slb.FlagType
 	HealthCheckURI         string
@@ -68,7 +68,7 @@ type AnnotationRequest struct {
 	CookieTimeout      int
 	PersistenceTimeout int
 
-	OverrideListeners  string
+	OverrideListeners string
 }
 
 const TAGKEY = "kubernetes.do.not.delete"
@@ -277,7 +277,7 @@ func (s *LoadBalancerClient) EnsureLoadBalancer(service *v1.Service, nodes []*v1
 		}
 		origined, err = s.c.DescribeLoadBalancerAttribute(lbr.LoadBalancerId)
 	} else {
-		needUpdate,charge,bandwidth := false,origined.InternetChargeType,origined.Bandwidth
+		needUpdate, charge, bandwidth := false, origined.InternetChargeType, origined.Bandwidth
 		glog.V(5).Infof("alicloud: found an exist loadbalancer[%s], check to see whether update is needed.", origined.LoadBalancerId)
 		if request.MasterZoneID != "" && request.MasterZoneID != origined.MasterZoneId {
 			return nil, fmt.Errorf("alicloud: can not change LoadBalancer master zone id once created.")
@@ -301,7 +301,7 @@ func (s *LoadBalancerClient) EnsureLoadBalancer(service *v1.Service, nodes []*v1
 			glog.Infof("alicloud: bandwidth([%d] -> [%d]) changed, update loadbalancer [%s]\n",
 				origined.Bandwidth, request.Bandwidth, origined.LoadBalancerName)
 		}
-		if needUpdate{
+		if needUpdate {
 			if err := s.c.ModifyLoadBalancerInternetSpec(
 				&slb.ModifyLoadBalancerInternetSpecArgs{
 					LoadBalancerId:     origined.LoadBalancerId,
@@ -381,15 +381,15 @@ func (s *LoadBalancerClient) getLoadBalancerOpts(service *v1.Service, vswitchid 
 	args = &slb.CreateLoadBalancerArgs{
 		AddressType:        ar.AddressType,
 		InternetChargeType: ar.ChargeType,
-		RegionId:         DEFAULT_REGION,
-		LoadBalancerSpec: ar.LoadBalancerSpec,
-		MasterZoneId: ar.MasterZoneID,
-		SlaveZoneId:  ar.SlaveZoneID,
+		RegionId:           DEFAULT_REGION,
+		LoadBalancerSpec:   ar.LoadBalancerSpec,
+		MasterZoneId:       ar.MasterZoneID,
+		SlaveZoneId:        ar.SlaveZoneID,
 	}
 	// paybybandwidth need a default bandwidth args, while paybytraffic doesnt.
 	if ar.ChargeType == slb.PayByBandwidth ||
-		(ar.ChargeType == slb.PayByTraffic && req.Bandwidth != 0){
-		glog.V(5).Infof("alicloud: %s, set bandwidth to %d",ar.ChargeType, ar.Bandwidth)
+		(ar.ChargeType == slb.PayByTraffic && req.Bandwidth != 0) {
+		glog.V(5).Infof("alicloud: %s, set bandwidth to %d", ar.ChargeType, ar.Bandwidth)
 		args.Bandwidth = ar.Bandwidth
 	}
 	if ar.SLBNetworkType != "classic" &&
