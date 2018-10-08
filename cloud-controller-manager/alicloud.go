@@ -343,11 +343,11 @@ func (c *Cloud) ListRoutes(clusterName string) ([]*cloudprovider.Route, error) {
 	glog.V(5).Infof("alicloud: ListRoutes \n")
 	vpcid, err := c.climgr.MetaData().VpcID()
 	if err != nil {
-		return nil, fmt.Errorf("alicloud: can not determin vpcid while list routes. %s",err.Error())
+		return nil, fmt.Errorf("alicloud: can not determin vpcid while list routes. %s", err.Error())
 	}
 	region, err := c.climgr.MetaData().Region()
 	if err != nil {
-		return nil, fmt.Errorf("alicloud: can not determin region id while list routes, %s",err.Error())
+		return nil, fmt.Errorf("alicloud: can not determin region id while list routes, %s", err.Error())
 	}
 	return c.climgr.Routes().ListRoutes(common.Region(region), []string{vpcid})
 }
