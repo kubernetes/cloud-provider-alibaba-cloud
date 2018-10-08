@@ -127,12 +127,12 @@ func (f *ListenerManager) NewTCP() ListenerInterface {
 		}
 		needUpdate := false
 		/*
-		if request.Bandwidth != 0 &&
-			def.Bandwidth != response.Bandwidth {
-			needUpdate = true
-			config.Bandwidth = def.Bandwidth
-			glog.V(2).Infof("TCP listener checker [bandwidth] changed, request=%d. response=%d", def.Bandwidth, response.Bandwidth)
-		}
+			if request.Bandwidth != 0 &&
+				def.Bandwidth != response.Bandwidth {
+				needUpdate = true
+				config.Bandwidth = def.Bandwidth
+				glog.V(2).Infof("TCP listener checker [bandwidth] changed, request=%d. response=%d", def.Bandwidth, response.Bandwidth)
+			}
 		*/
 
 		// todo: perform healthcheck update.
@@ -244,12 +244,12 @@ func (f *ListenerManager) NewUDP() ListenerInterface {
 		}
 		needUpdate := false
 		/*
-		if request.Bandwidth != 0 &&
-			request.Bandwidth != response.Bandwidth {
-			needUpdate = true
-			config.Bandwidth = request.Bandwidth
-			glog.V(2).Infof("UDP listener checker [bandwidth] changed, request=%d. response=%d", request.Bandwidth, response.Bandwidth)
-		}
+			if request.Bandwidth != 0 &&
+				request.Bandwidth != response.Bandwidth {
+				needUpdate = true
+				config.Bandwidth = request.Bandwidth
+				glog.V(2).Infof("UDP listener checker [bandwidth] changed, request=%d. response=%d", request.Bandwidth, response.Bandwidth)
+			}
 		*/
 
 		// todo: perform healthcheck update.
@@ -369,12 +369,12 @@ func (f *ListenerManager) NewHTTP() ListenerInterface {
 		}
 		needUpdate := false
 		/*
-		if request.Bandwidth != 0 &&
-			request.Bandwidth != response.Bandwidth {
-			needUpdate = true
-			config.Bandwidth = request.Bandwidth
-			glog.V(2).Infof("HTTP listener checker [bandwidth] changed, request=%d. response=%d", request.Bandwidth, response.Bandwidth)
-		}
+			if request.Bandwidth != 0 &&
+				request.Bandwidth != response.Bandwidth {
+				needUpdate = true
+				config.Bandwidth = request.Bandwidth
+				glog.V(2).Infof("HTTP listener checker [bandwidth] changed, request=%d. response=%d", request.Bandwidth, response.Bandwidth)
+			}
 		*/
 
 		// todo: perform healthcheck update.
@@ -539,12 +539,12 @@ func (f *ListenerManager) NewHTTPS() ListenerInterface {
 
 		needUpdate := false
 		/*
-		if request.Bandwidth != 0 &&
-			request.Bandwidth != response.Bandwidth {
-			needUpdate = true
-			config.Bandwidth = request.Bandwidth
-			glog.V(2).Infof("HTTPS listener checker [bandwidth] changed, request=%d. response=%d", request.Bandwidth, response.Bandwidth)
-		}
+			if request.Bandwidth != 0 &&
+				request.Bandwidth != response.Bandwidth {
+				needUpdate = true
+				config.Bandwidth = request.Bandwidth
+				glog.V(2).Infof("HTTPS listener checker [bandwidth] changed, request=%d. response=%d", request.Bandwidth, response.Bandwidth)
+			}
 		*/
 		// todo: perform healthcheck update.
 		if def.HealthCheck != response.HealthCheck {

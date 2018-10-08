@@ -74,7 +74,7 @@ func TestFindLoadBalancer(t *testing.T) {
 			Name:        "service-test",
 			UID:         "abcdefghigklmnopqrstu",
 			Annotations: map[string]string{
-			//ServiceAnnotationLoadBalancerId: LOADBALANCER_ID,
+				//ServiceAnnotationLoadBalancerId: LOADBALANCER_ID,
 			},
 		},
 		Spec: v1.ServiceSpec{

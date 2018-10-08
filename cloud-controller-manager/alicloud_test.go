@@ -788,7 +788,7 @@ func TestEnsureLoadBalancerDeleteWithUserDefined(t *testing.T) {
 			Name:        "my-service",
 			UID:         types.UID(serviceUID),
 			Annotations: map[string]string{
-			//ServiceAnnotationLoadBalancerId: "idbllll",
+				//ServiceAnnotationLoadBalancerId: "idbllll",
 			},
 		},
 		Spec: v1.ServiceSpec{
