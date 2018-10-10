@@ -246,7 +246,7 @@ spec:
 
 \>> **Note** 
 
-- Seperate multiple labels with comma。 "k1:v1,k2:v2"
+- Separate multiple labels with comma。 "k1:v1,k2:v2"
 - And is used in multiple label。
 
 #### 10. Config SessionSticky for TCP LoadBalancer.
@@ -356,7 +356,7 @@ spec:
 \>> **Note** 
 
 - master/slave zone is not supported in every zone，ap-southeast-5 for example does not support master/slave zone.
-- modify master/slave availabe zone is not supported once LoadBalancer has been created.
+- modify master/slave available zone is not supported once LoadBalancer has been created.
 
 #### 13. Create Local traffic LoadBalancer
 
