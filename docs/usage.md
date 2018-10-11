@@ -28,9 +28,9 @@ spec:
 
 \>> **Note：**    
 
-- CloudProvider would not deal with your LoadBalancer(which was provided by user) listener by default if your cloud-controller-manager version is great equal then v1.9.3. User need to config their listener by themselves or useing ```service.beta.kubernetes.io/alicloud-loadbalancer-force-override-listeners: "true"``` to force overwrite listeners. 
+- CloudProvider would not deal with your LoadBalancer(which was provided by user) listener by default if your cloud-controller-manager version is great equal then v1.9.3. User need to config their listener by themselves or using ```service.beta.kubernetes.io/alicloud-loadbalancer-force-override-listeners: "true"``` to force overwrite listeners. 
 
-Useing the following command to find the version of your cloud-controller-manager 
+Using the following command to find the version of your cloud-controller-manager 
 
 ```
 root@master # kubectl get po -n kube-system -o yaml|grep image:|grep cloud-con|uniq
@@ -133,7 +133,7 @@ spec:
 
 \>> **Note：** 
 
-- You need an certificate ID to create a https LoadBalancer. Please heading to the Aliyun Console to create one.
+- You need a certificate ID to create an https LoadBalancer. Please heading to the Aliyun Console to create one.
 
 #### 5. Restrict the bandwidth of the LoadBalancer
 
@@ -332,7 +332,7 @@ spec:
 - SessionSticky type is `server` Cookie.
 - SessionStichy is applied to all the HTTP&HTTPS listeners by default
 
-#### 13. Create LoadBalancer with specified master zoneid and slave zone id
+#### 13. Create LoadBalancer with specified master zoneid and slave zoneid
 
 ```
 apiVersion: v1
