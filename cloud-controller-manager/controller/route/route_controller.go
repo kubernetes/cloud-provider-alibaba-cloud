@@ -22,6 +22,8 @@ import (
 	"sync"
 	"time"
 
+	"strings"
+
 	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -42,7 +44,6 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/util/metrics"
 	nodeutil "k8s.io/kubernetes/pkg/util/node"
-	"strings"
 )
 
 const (
@@ -173,19 +174,22 @@ func (rc *RouteController) reconcile(nodes []*v1.Node, routes []*cloudprovider.R
 		if node.Spec.PodCIDR == "" {
 			continue
 		}
-		nodeName := types.NodeName(node.Name)
+		if node.Spec.ProviderID == "" {
+			glog.Errorf("Node %s has no Provider ID, skip it", node.Name)
+		}
+		providerID := types.NodeName(node.Spec.ProviderID)
 		// Check if we have a route for this node w/ the correct CIDR.
-		r := routeMap[nodeName]
+		r := routeMap[providerID]
 		glog.Infof("Node: %s, r=%+v, node.Spec.PodCIDR=%s", node.Name, r, node.Spec.PodCIDR)
 		if r == nil || r.DestinationCIDR != node.Spec.PodCIDR {
 			// If not, create the route.
 			route := &cloudprovider.Route{
-				TargetNode:      nodeName,
+				TargetNode:      providerID,
 				DestinationCIDR: node.Spec.PodCIDR,
 			}
-			nameHint := string(node.UID)
+
 			wg.Add(1)
-			go func(nodeName types.NodeName, nameHint string, route *cloudprovider.Route) {
+			go func(node *v1.Node, route *cloudprovider.Route) {
 				defer wg.Done()
 				backoff := wait.Backoff{
 					Duration: 4 * time.Second,
@@ -195,10 +199,11 @@ func (rc *RouteController) reconcile(nodes []*v1.Node, routes []*cloudprovider.R
 				}
 				wait.ExponentialBackoff(backoff, func() (bool, error) {
 					startTime := time.Now()
+					nameHint := node.Name
 					// Ensure that we don't have more than maxConcurrentRouteCreations
 					// CreateRoute calls in flight.
 					rateLimiter <- struct{}{}
-					glog.Infof("Creating route for node %s %s with hint %s, throttled %v", nodeName, route.DestinationCIDR, nameHint, time.Now().Sub(startTime))
+					glog.Infof("Creating route for node %s %s with hint %s, throttled %v", node.Name, route.DestinationCIDR, nameHint, time.Now().Sub(startTime))
 					err := rc.routes.CreateRoute(rc.clusterName, nameHint, route)
 					if err != nil && strings.Contains(err.Error(), "please wait a moment and try again") {
 						// Throttled, wait a second.
@@ -207,27 +212,27 @@ func (rc *RouteController) reconcile(nodes []*v1.Node, routes []*cloudprovider.R
 					}
 					<-rateLimiter
 
-					rc.updateNetworkingCondition(nodeName, err == nil)
+					rc.updateNetworkingCondition(types.NodeName(node.Name), err == nil)
 					if err != nil {
-						msg := fmt.Sprintf("Could not create route %s %s for node %s after %v: %v", nameHint, route.DestinationCIDR, nodeName, time.Now().Sub(startTime), err)
+						msg := fmt.Sprintf("Could not create route %s %s for node %s after %v: %v", nameHint, route.DestinationCIDR, node.Name, time.Now().Sub(startTime), err)
 						if rc.recorder != nil {
 							rc.recorder.Eventf(
 								&v1.ObjectReference{
 									Kind:      "Node",
-									Name:      string(nodeName),
-									UID:       types.UID(nodeName),
+									Name:      node.Name,
+									UID:       node.UID,
 									Namespace: "",
 								}, v1.EventTypeWarning, "FailedToCreateRoute", msg)
 						}
 						glog.Error(msg)
 
 					} else {
-						glog.Infof("Created route for node %s %s with hint %s after %v", nodeName, route.DestinationCIDR, nameHint, time.Now().Sub(startTime))
+						glog.Infof("Created route for node %s %s with hint %s after %v", node.Name, route.DestinationCIDR, nameHint, time.Now().Sub(startTime))
 						return true, nil
 					}
 					return false, nil
 				})
-			}(nodeName, nameHint, route)
+			}(node, route)
 		} else {
 			// Update condition only if it doesn't reflect the current state.
 			_, condition := v1node.GetNodeCondition(&node.Status, v1.NodeNetworkUnavailable)
@@ -235,21 +240,22 @@ func (rc *RouteController) reconcile(nodes []*v1.Node, routes []*cloudprovider.R
 				rc.updateNetworkingCondition(types.NodeName(node.Name), true)
 			}
 		}
-		nodeCIDRs[nodeName] = node.Spec.PodCIDR
+		nodeCIDRs[providerID] = node.Spec.PodCIDR
 	}
 	wg.Wait()
 	return nil
 }
 
-func cidrForNode(nodes []*v1.Node, name string) string {
+func cidrForNode(nodes []*v1.Node, providerID string) string {
 	for _, node := range nodes {
-		if node.Name == name {
+		if node.Spec.ProviderID == providerID {
 			return node.Spec.PodCIDR
 		}
 	}
 	return ""
 }
 
+// Update network condition of node in K8S
 func (rc *RouteController) updateNetworkingCondition(nodeName types.NodeName, routeCreated bool) error {
 	var err error
 	for i := 0; i < updateNodeStatusMaxRetries; i++ {

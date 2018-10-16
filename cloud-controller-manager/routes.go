@@ -20,14 +20,15 @@ import (
 	"k8s.io/kubernetes/pkg/cloudprovider"
 
 	"fmt"
+	"strings"
+	"sync"
+	"time"
+
 	"github.com/denverdino/aliyungo/common"
 	"github.com/denverdino/aliyungo/ecs"
 	"github.com/golang/glog"
 	"github.com/patrickmn/go-cache"
 	"k8s.io/apimachinery/pkg/types"
-	"strings"
-	"sync"
-	"time"
 )
 
 type RoutesClient struct {
@@ -84,8 +85,7 @@ func (r *RoutesClient) findRouter(region common.Region, vpcid string) (*ecs.VRou
 			return nil, err
 		}
 		if len(vroute) <= 0 {
-			return nil, fmt.Errorf("can not find VRouter metadata "+
-				"by instance. region=%s,vpcid=%v, error=[no VRouter found by specified id]", region, vpc)
+			return nil, fmt.Errorf("can not find VRouter metadata by instance. region=%s,vpcid=%s, error=[no VRouter found by specified id]", region, vpc.VpcId)
 		}
 		r.routers.Set(routerkey, &vroute[0], defaultCacheExpiration)
 		route = &vroute[0]
