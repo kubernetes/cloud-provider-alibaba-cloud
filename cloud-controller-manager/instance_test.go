@@ -19,11 +19,11 @@ package alicloud
 import (
 	"errors"
 	"fmt"
-	"github.com/denverdino/aliyungo/common"
-	"github.com/denverdino/aliyungo/ecs"
-	"k8s.io/apimachinery/pkg/types"
 	"strings"
 	"testing"
+
+	"github.com/denverdino/aliyungo/common"
+	"github.com/denverdino/aliyungo/ecs"
 )
 
 func NewMockClientInstanceMgr(client ClientInstanceSDK) (*ClientMgr, error) {
@@ -71,14 +71,14 @@ func TestInstanceRefeshInstance(t *testing.T) {
 	if err != nil {
 		t.Fatal(fmt.Sprintf("create client manager fail. [%s]\n", err.Error()))
 	}
-	ins, err := mgr.Instances().refreshInstance(types.NodeName(id), common.Beijing)
+	ins, err := mgr.Instances().refreshInstance(instanceid, common.Beijing)
 	if err != nil {
 		t.Errorf("TestInstanceRefeshInstance error: %s\n", err.Error())
 	}
 	if ins.InstanceId != instanceid {
 		t.Fatal("refresh instance error.")
 	}
-	ins, err = mgr.Instances().findInstanceByNode(types.NodeName(id))
+	ins, err = mgr.Instances().findInstanceByProviderID(id)
 	if err != nil {
 		t.Fatal(fmt.Sprintf("findInstanceByNode error: %s\n", err.Error()))
 	}
