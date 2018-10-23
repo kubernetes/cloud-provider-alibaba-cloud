@@ -149,7 +149,7 @@ func New(
 		cache.ResourceEventHandlerFuncs{
 			AddFunc: func(cur interface{}) {
 				endpoint := cur.(*v1.Endpoints)
-				glog.V(5).Infof("controller: Add event, enpoints [%s/%s]\n", endpoint.Namespace, endpoint.Name)
+				glog.V(5).Infof("controller: Add event, endpoints [%s/%s]\n", endpoint.Namespace, endpoint.Name)
 				s.syncEnpoints(cur)
 			},
 			UpdateFunc: func(obja, objb interface{}) {
@@ -256,7 +256,7 @@ func (s *ServiceController) syncNodes(obj interface{}) {
 func (s *ServiceController) syncEnpoints(obj interface{}) {
 	ep, ok := obj.(*v1.Endpoints)
 	if !ok {
-		glog.Errorf("enpoint controller: wrong type [%s], expect v1.Endpoints\n", reflect.TypeOf(obj).String())
+		glog.Errorf("endpoint controller: wrong type [%s], expect v1.Endpoints\n", reflect.TypeOf(obj).String())
 		return
 	}
 	svc, exist, err := s.cache.GetByKey(fmt.Sprintf("%s/%s", ep.Namespace, ep.Name))
