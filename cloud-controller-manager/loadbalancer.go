@@ -530,10 +530,9 @@ func isServiceDeleted(service *v1.Service) bool {
 		glog.V(2).Infof("alicloud: service "+
 			"%s's uid %v has been deleted, shouldn't be created again.\n", service.Name, serviceUID)
 		return true
-	} else {
-		glog.V(2).Infof("alicloud: service %s's uid %v "+
-			"hasn't been deleted, first time to process, as expected.\n", service.Name, serviceUID)
 	}
+	glog.V(2).Infof("alicloud: service %s's uid %v "+
+		"hasn't been deleted, first time to process, as expected.\n", service.Name, serviceUID)
 	return false
 }
 
