@@ -37,7 +37,7 @@ import (
 // ProviderName is the name of this cloud provider.
 const ProviderName = "alicloud"
 
-// This is for statistic purpose.
+// KUBERNETES_ALICLOUD_IDENTITY is for statistic purpose.
 var KUBERNETES_ALICLOUD_IDENTITY = fmt.Sprintf("Kubernetes.Alicloud/%s", version.Get().String())
 
 // Cloud is an implementation of Interface, LoadBalancer and Instances for Alicloud Services.
