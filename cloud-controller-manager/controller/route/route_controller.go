@@ -147,7 +147,9 @@ func (rc *RouteController) reconcile(nodes []*v1.Node, routes []*cloudprovider.R
 	}
 
 	wg := sync.WaitGroup{}
-	rateLimiter := make(chan struct{}, maxConcurrentRouteCreations)
+
+	// Aoxn: Alibaba Cloud does not support concurrent route operation
+	rateLimiter := make(chan struct{}, 1)
 	for _, route := range routes {
 		if rc.isResponsibleForRoute(route) {
 			// Check if this route is a blackhole, or applies to a node we know about & has an incorrect CIDR.
@@ -155,16 +157,18 @@ func (rc *RouteController) reconcile(nodes []*v1.Node, routes []*cloudprovider.R
 				glog.Infof("responsible for: %t, %t,%t", route.Blackhole, cidrForNode(nodes, string(route.TargetNode)) != route.DestinationCIDR, route.Blackhole || (cidrForNode(nodes, string(route.TargetNode)) != route.DestinationCIDR))
 				wg.Add(1)
 				// Delete the route.
-				go func(route *cloudprovider.Route, startTime time.Time) {
-					glog.Infof("Deleting route %s %s", route.Name, route.DestinationCIDR)
-					if err := rc.routes.DeleteRoute(rc.clusterName, route); err != nil {
-						glog.Errorf("Could not delete route %s %s after %v: %v", route.Name, route.DestinationCIDR, time.Now().Sub(startTime), err)
-					} else {
-						glog.Infof("Deleted route %s %s after %v", route.Name, route.DestinationCIDR, time.Now().Sub(startTime))
-					}
-					wg.Done()
+				startTime := time.Now()
+				// Aoxn: Alibaba Cloud does not support concurrent route operation
+				//go func(route *cloudprovider.Route, startTime time.Time) {
+				glog.Infof("Deleting route %s %s", route.Name, route.DestinationCIDR)
+				if err := rc.routes.DeleteRoute(rc.clusterName, route); err != nil {
+					glog.Errorf("Could not delete route %s %s after %v: %v", route.Name, route.DestinationCIDR, time.Now().Sub(startTime), err)
+				} else {
+					glog.Infof("Deleted route %s %s after %v", route.Name, route.DestinationCIDR, time.Now().Sub(startTime))
+				}
+				wg.Done()
 
-				}(route, time.Now())
+				//}(route, time.Now())
 			}
 		}
 	}
@@ -172,6 +176,8 @@ func (rc *RouteController) reconcile(nodes []*v1.Node, routes []*cloudprovider.R
 	for _, node := range nodes {
 		// Skip if the node hasn't been assigned a CIDR yet.
 		if node.Spec.PodCIDR == "" {
+			// UpdateNetworkUnavailable When PodCIDR is not allocated.
+			rc.updateNetworkingCondition(types.NodeName(node.Name), true)
 			continue
 		}
 		if node.Spec.ProviderID == "" {
@@ -208,7 +214,7 @@ func (rc *RouteController) reconcile(nodes []*v1.Node, routes []*cloudprovider.R
 					if err != nil && strings.Contains(err.Error(), "please wait a moment and try again") {
 						// Throttled, wait a second.
 						glog.Infof("alicloud: throttle triggered. sleep for 10s before proceeding.")
-						time.Sleep(10 * time.Second)
+						time.Sleep(5 * time.Second)
 					}
 					<-rateLimiter
 

@@ -60,6 +60,8 @@ type CloudNodeController struct {
 	nodeMonitorPeriod time.Duration
 
 	nodeStatusUpdateFrequency time.Duration
+
+	ConfigRoutes 		bool
 }
 
 const (
@@ -76,7 +78,8 @@ func NewCloudNodeController(
 	kubeClient clientset.Interface,
 	cloud cloudprovider.Interface,
 	nodeMonitorPeriod time.Duration,
-	nodeStatusUpdateFrequency time.Duration) *CloudNodeController {
+	nodeStatusUpdateFrequency time.Duration,
+	configRoutes bool) *CloudNodeController {
 
 	eventBroadcaster := record.NewBroadcaster()
 	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "cloud-node-controller"})
@@ -95,6 +98,7 @@ func NewCloudNodeController(
 		cloud:                     cloud,
 		nodeMonitorPeriod:         nodeMonitorPeriod,
 		nodeStatusUpdateFrequency: nodeStatusUpdateFrequency,
+		ConfigRoutes: 			   configRoutes,
 	}
 
 	nodeInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
@@ -336,7 +340,8 @@ func (cnc *CloudNodeController) AddCloudNode(obj interface{}) {
 		// TODO(wlan0): Move this logic to the route controller using the node taint instead of condition
 		// Since there are node taints, do we still need this?
 		// This condition marks the node as unusable until routes are initialized in the cloud provider
-		if cnc.cloud.ProviderName() == "gce" {
+		// Aoxn: Hack for alibaba cloud
+		if cnc.cloud.ProviderName() == "gce" || (cnc.ConfigRoutes && cnc.cloud.ProviderName() == "alicloud") {
 			curNode.Status.Conditions = append(node.Status.Conditions, v1.NodeCondition{
 				Type:               v1.NodeNetworkUnavailable,
 				Status:             v1.ConditionTrue,
