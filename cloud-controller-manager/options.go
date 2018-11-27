@@ -66,8 +66,8 @@ const (
 	ServiceAnnotationLoadBalancerCookie             = ServiceAnnotationLoadBalancerPrefix + "cookie"
 	ServiceAnnotationLoadBalancerPersistenceTimeout = ServiceAnnotationLoadBalancerPrefix + "persistence-timeout"
 	MagicHealthCheckConnectPort                     = -520
-
-	MAX_LOADBALANCER_BACKEND = 18
+	ServiceAnnotationLoadBalancerIPVersion          = ServiceAnnotationLoadBalancerPrefix + "ip-version"
+	MAX_LOADBALANCER_BACKEND                        = 18
 )
 
 //compatible to old camel annotation
@@ -331,6 +331,12 @@ func ExtractAnnotationRequest(service *v1.Service) (*AnnotationRequest, *Annotat
 		request.Cookie = cookie
 		defaulted.Cookie = request.Cookie
 	}
+
+	ipVersion, ok := annotation[ServiceAnnotationLoadBalancerIPVersion]
+	if ok {
+		request.AddressIPVersion = slb.AddressIPVersionType(ipVersion)
+	}
+
 	return defaulted, request
 }
 

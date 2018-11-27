@@ -208,7 +208,7 @@ func StartControllers(s *options.CloudControllerManagerServer, kubeconfig *restc
 		sharedInformers.Core().V1().Nodes(),
 		client("cloud-node-controller"), cloud,
 		s.NodeMonitorPeriod.Duration,
-		s.NodeStatusUpdateFrequency.Duration,s.ConfigureCloudRoutes)
+		s.NodeStatusUpdateFrequency.Duration, s.ConfigureCloudRoutes)
 
 	nodeController.Run()
 	time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
