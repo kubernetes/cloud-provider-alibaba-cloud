@@ -67,6 +67,7 @@ type AnnotationRequest struct {
 	Cookie             string
 	CookieTimeout      int
 	PersistenceTimeout int
+	AddressIPVersion   slb.AddressIPVersionType
 
 	OverrideListeners string
 }
@@ -249,6 +250,17 @@ func getLoadBalancerAdditionalTags(annotations map[string]string) map[string]str
 	return additionalTags
 }
 
+func equalsAddressIPVersion(request, origined slb.AddressIPVersionType) bool {
+	if request == "" {
+		request = slb.IPv4
+	}
+
+	if origined == "" {
+		origined = slb.IPv4
+	}
+	return request == origined
+}
+
 func (s *LoadBalancerClient) EnsureLoadBalancer(service *v1.Service, nodes []*v1.Node, vswitchid string) (*slb.LoadBalancerType, error) {
 	glog.V(4).Infof("alicloud: ensure loadbalancer with service details, \n%+v", PrettyJson(service))
 
@@ -319,6 +331,9 @@ func (s *LoadBalancerClient) EnsureLoadBalancer(service *v1.Service, nodes []*v1
 		}
 		if request.SlaveZoneID != "" && request.SlaveZoneID != origined.SlaveZoneId {
 			return nil, fmt.Errorf("alicloud: can not change LoadBalancer slave zone id once created.")
+		}
+		if equalsAddressIPVersion(request.AddressIPVersion, origined.AddressIPVersion) {
+			return nil, fmt.Errorf("alicloud: can not change LoadBalancer AddressIPVersion once created.")
 		}
 		if request.ChargeType != "" && request.ChargeType != origined.InternetChargeType {
 			needUpdate = true
@@ -420,6 +435,7 @@ func (s *LoadBalancerClient) getLoadBalancerOpts(service *v1.Service, vswitchid 
 		LoadBalancerSpec:   ar.LoadBalancerSpec,
 		MasterZoneId:       ar.MasterZoneID,
 		SlaveZoneId:        ar.SlaveZoneID,
+		AddressIPVersion:   ar.AddressIPVersion,
 	}
 	// paybybandwidth need a default bandwidth args, while paybytraffic doesnt.
 	if ar.ChargeType == slb.PayByBandwidth ||
