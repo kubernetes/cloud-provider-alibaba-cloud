@@ -199,7 +199,7 @@ func (n *Listener) Instance() IListener {
 }
 
 func (n *Listener) Apply() error {
-	glog.Infof("apply: check listener for %s, name:[%s]",n.Action,n.NamedKey.Key())
+	glog.Infof("apply: check listener for %s, name:[%s]",n.Action,n.Name)
 	switch n.Action {
 	case ACTION_UPDATE:
 		err := n.Instance().Update();
@@ -442,6 +442,7 @@ func buildListenersFromService(service *v1.Service,
 			VGroups:         vgrps,
 			LoadBalancerID:  lb.LoadBalancerId,
 		}
+		n.Name    = n.NamedKey.Key()
 		listeners = append(listeners, &n)
 	}
 	return listeners, nil

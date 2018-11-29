@@ -177,7 +177,7 @@ func (rc *RouteController) reconcile(nodes []*v1.Node, routes []*cloudprovider.R
 		// Skip if the node hasn't been assigned a CIDR yet.
 		if node.Spec.PodCIDR == "" {
 			// UpdateNetworkUnavailable When PodCIDR is not allocated.
-			rc.updateNetworkingCondition(types.NodeName(node.Name), true)
+			rc.updateNetworkingCondition(types.NodeName(node.Name), false)
 			continue
 		}
 		if node.Spec.ProviderID == "" {
