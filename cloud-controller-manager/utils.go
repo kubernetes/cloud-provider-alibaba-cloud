@@ -62,3 +62,12 @@ func NodeList(nodes []*v1.Node) []string {
 	}
 	return ns
 }
+
+func Contains(list []int, x int) bool {
+	for _, item := range list {
+		if item == x {
+			return true
+		}
+	}
+	return false
+}

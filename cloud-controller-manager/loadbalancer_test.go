@@ -191,6 +191,12 @@ type mockClientSLB struct {
 	removeTags                            func(args *slb.RemoveTagsArgs) error
 	describeTags                          func(args *slb.DescribeTagsArgs) (tags []slb.TagItemType, pagination *common.PaginationResult, err error)
 	addTags                               func(args *slb.AddTagsArgs) error
+
+
+	createVServerGroup 				func(args *slb.CreateVServerGroupArgs) (response *slb.CreateVServerGroupResponse, err error)
+	describeVServerGroups 			func(args *slb.DescribeVServerGroupsArgs) (response *slb.DescribeVServerGroupsResponse, err error)
+	deleteVServerGroup 				func(args *slb.DeleteVServerGroupArgs) (response *slb.DeleteVServerGroupResponse, err error)
+	setVServerGroupAttribute 		func(args *slb.SetVServerGroupAttributeArgs) (response *slb.SetVServerGroupAttributeResponse, err error)
 }
 
 var (
@@ -384,6 +390,33 @@ func (c *mockClientSLB) AddTags(args *slb.AddTagsArgs) error {
 	}
 	return nil
 }
+
+func (c *mockClientSLB) CreateVServerGroup(args *slb.CreateVServerGroupArgs) (response *slb.CreateVServerGroupResponse, err error) {
+	if c.createVServerGroup != nil {
+		return c.createVServerGroup(args)
+	}
+	return nil,nil
+}
+func (c *mockClientSLB) DescribeVServerGroups(args *slb.DescribeVServerGroupsArgs) (response *slb.DescribeVServerGroupsResponse, err error) {
+
+	if c.describeVServerGroups != nil {
+		return c.describeVServerGroups(args)
+	}
+	return nil, nil
+}
+func (c *mockClientSLB) DeleteVServerGroup(args *slb.DeleteVServerGroupArgs) (response *slb.DeleteVServerGroupResponse, err error) {
+	if c.deleteVServerGroup != nil {
+		return c.deleteVServerGroup(args)
+	}
+	return nil, nil
+}
+func (c *mockClientSLB) SetVServerGroupAttribute(args *slb.SetVServerGroupAttributeArgs) (response *slb.SetVServerGroupAttributeResponse, err error) {
+	if c.setVServerGroupAttribute != nil {
+		return c.setVServerGroupAttribute(args)
+	}
+	return nil, nil
+}
+
 
 
 func TestGetLoadBalancerAdditionalTags(t *testing.T) {

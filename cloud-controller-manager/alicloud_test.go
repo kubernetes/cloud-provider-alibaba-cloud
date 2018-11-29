@@ -230,6 +230,14 @@ func newMockClientInstanceSDK(instanceid string) ClientInstanceSDK {
 
 }
 func newMockClientSLB(service *v1.Service, nodes []*v1.Node, base *[]slb.LoadBalancerType, detail *slb.LoadBalancerType) *mockClientSLB {
+	grp := vgroups{
+		{
+			NamedKey: &NamedKey{CID:CLUSTER_ID, ServiceName: service.Name, Namespace: service.Namespace, Port: listenPort1},
+			LoadBalancerId: detail.LoadBalancerId,
+			RegionId:  detail.RegionId,
+			VGroupId: "v-idvgroup",
+		},
+	}
 	return &mockClientSLB{
 		describeLoadBalancers: func(args *slb.DescribeLoadBalancersArgs) (loadBalancers []slb.LoadBalancerType, err error) {
 
@@ -359,6 +367,20 @@ func newMockClientSLB(service *v1.Service, nodes []*v1.Node, base *[]slb.LoadBal
 			detail.BackendServers.BackendServer = append(detail.BackendServers.BackendServer, backendServers...)
 			return detail.BackendServers.BackendServer, nil
 		},
+		describeVServerGroups: func (args *slb.DescribeVServerGroupsArgs) (response *slb.DescribeVServerGroupsResponse, err error) {
+			return &slb.DescribeVServerGroupsResponse{
+				VServerGroups: []slb.VServerGroup{{
+					VServerGroupId: grp[0].VGroupId,
+					VServerGroupName: grp[0].NamedKey.Key(),
+				},},
+			},nil
+		},
+		createVServerGroup: func (args *slb.CreateVServerGroupArgs) (response *slb.CreateVServerGroupResponse, err error) {
+			return &slb.CreateVServerGroupResponse{
+				VServerGroupName: args.VServerGroupName,
+				VServerGroupId:   grp[0].VGroupId,
+			},nil
+		},
 		deleteLoadBalancer: func(loadBalancerId string) (err error) {
 			*base = []slb.LoadBalancerType{}
 			return nil
@@ -450,22 +472,20 @@ func TestEnsureLoadBalancerWithPortChange(t *testing.T) {
 	if e != nil {
 		t.Errorf("TestEnsureLoadBalancer error: %s\n", e.Error())
 	}
+	t.Log("--------------------- Status ---------------------")
 	t.Log(PrettyJson(status))
+
+	t.Log("+++++++++++++++++++++ Detail +++++++++++++++++++++++")
 	t.Log(PrettyJson(detail))
-	if len(detail.BackendServers.BackendServer) != 1 {
-		t.Fatal("TestEnsureLoadBalancerWithPortChange error, expected only 1 backend left")
-	}
-	if detail.BackendServers.BackendServer[0].ServerId != node1 {
-		t.Fatal(fmt.Sprintf("TestEnsureLoadBalancerWithPortChange error, expected to be instance [%s]", node1))
-	}
+
 	if len(detail.ListenerPorts.ListenerPort) != 2 {
 		t.Fatal("TestEnsureLoadBalancerWithPortChange error, expected only 1 listener port left")
 	}
-	if detail.ListenerPorts.ListenerPort[0] != 80 {
+	if !Contains(detail.ListenerPorts.ListenerPort, 80) {
 		t.Fatal("TestEnsureLoadBalancerWithPortChange error, expected to be port 80")
 	}
-	if detail.ListenerPorts.ListenerPort[1] != 443 {
-		t.Fatal("TestEnsureLoadBalancerWithPortChange error, expected to be port 80")
+	if !Contains(detail.ListenerPorts.ListenerPort , 443) {
+		t.Fatal("TestEnsureLoadBalancerWithPortChange error, expected to be port 443")
 	}
 }
 
@@ -476,7 +496,7 @@ func TestEnsureLoadBalancerWithPortChange(t *testing.T) {
 //		t.Errorf("TestEnsureLoadBalancerHTTPSHealthCheck error newCloud: %s\n", err.Error())
 //	}
 //
-//	service := &v1.Service{
+//	service := &v1.ServiceName{
 //		ObjectMeta: metav1.ObjectMeta{
 //			Name: "my-service",
 //			UID:  types.UID(serviceUID),
