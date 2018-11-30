@@ -104,7 +104,7 @@ func Run(s *options.CloudControllerManagerServer) error {
 	if c, err := configz.New("componentconfig"); err == nil {
 		c.Set(s.KubeControllerManagerConfiguration)
 	} else {
-		glog.Errorf("unable to register configz: %s", err)
+		glog.Errorf("unable to register configz: %v", err)
 	}
 	kubeconfig, err := clientcmd.BuildConfigFromFlags(s.Master, s.Kubeconfig)
 	if err != nil {
