@@ -354,7 +354,7 @@ func (s *LoadBalancerClient) EnsureLoadBalancer(service *v1.Service, nodes []*v1
 		if request.SlaveZoneID != "" && request.SlaveZoneID != origined.SlaveZoneId {
 			return nil, fmt.Errorf("alicloud: can not change LoadBalancer slave zone id once created.")
 		}
-		if equalsAddressIPVersion(request.AddressIPVersion, origined.AddressIPVersion) {
+		if ! equalsAddressIPVersion(request.AddressIPVersion, origined.AddressIPVersion) {
 			return nil, fmt.Errorf("alicloud: can not change LoadBalancer AddressIPVersion once created.")
 		}
 		if request.ChargeType != "" && request.ChargeType != origined.InternetChargeType {

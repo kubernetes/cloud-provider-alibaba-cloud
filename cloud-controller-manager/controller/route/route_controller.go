@@ -140,7 +140,7 @@ func (rc *RouteController) reconcile(nodes []*v1.Node, routes []*cloudprovider.R
 	// routeMap maps routeTargetNode->route
 	routeMap := make(map[types.NodeName]*cloudprovider.Route)
 	for _, route := range routes {
-		glog.Infof("ListRoutes: reconcile %+v", route)
+		glog.V(5).Infof("ListRoutes: reconcile %+v", route)
 		if route.TargetNode != "" {
 			routeMap[route.TargetNode] = route
 		}
@@ -186,7 +186,7 @@ func (rc *RouteController) reconcile(nodes []*v1.Node, routes []*cloudprovider.R
 		providerID := types.NodeName(node.Spec.ProviderID)
 		// Check if we have a route for this node w/ the correct CIDR.
 		r := routeMap[providerID]
-		glog.Infof("Node: %s, r=%+v, node.Spec.PodCIDR=%s", node.Name, r, node.Spec.PodCIDR)
+		glog.V(5).Infof("Node: %s, r=%+v, node.Spec.PodCIDR=%s", node.Name, r, node.Spec.PodCIDR)
 		if r == nil || r.DestinationCIDR != node.Spec.PodCIDR {
 			// If not, create the route.
 			route := &cloudprovider.Route{

@@ -1109,7 +1109,6 @@ func (s *ServiceController) syncService(key string) error {
 		// service absence in store means watcher caught the deletion, ensure LB info is cleaned
 		glog.Infof("ServiceName has been deleted %v", key)
 		err, retryDelay = s.processServiceDeletion(key)
-		return err
 	case err != nil:
 		glog.Infof("Unable to retrieve service %v from store: %v", key, err)
 		s.workingQueue.Add(key)
@@ -1140,6 +1139,9 @@ func (s *ServiceController) processServiceDeletion(key string) (error, time.Dura
 	cachedService, ok := s.cache.get(key)
 	if !ok {
 		return fmt.Errorf("service %s not in cache even though the watcher thought it was. Ignoring the deletion", key), doNotRetry
+	}
+	if cachedService.state == nil {
+		return fmt.Errorf("cached service not ready, obtain delete event before update. this might result in undeleted loadbalancer"),doNotRetry
 	}
 	return s.processLoadBalancerDelete(cachedService, key)
 }
