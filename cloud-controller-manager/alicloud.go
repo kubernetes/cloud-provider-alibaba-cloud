@@ -49,6 +49,7 @@ type Cloud struct {
 	cfg    *CloudConfig
 	region common.Region
 	vpcID  string
+	cid    string
 }
 
 var (
@@ -69,6 +70,7 @@ type CloudConfig struct {
 		Region               string `json:"region"`
 		ZoneID               string `json:"zoneid"`
 		VswitchID            string `json:"vswitchid"`
+		ClusterID 			 string `json:"clusterID"`
 
 		AccessKeyID     string `json:"accessKeyID"`
 		AccessKeySecret string `json:"accessKeySecret"`
@@ -88,20 +90,23 @@ func init() {
 				if err := json.NewDecoder(config).Decode(&cfg); err != nil {
 					return nil, err
 				}
-				if cfg.Global.AccessKeyID == "" || cfg.Global.AccessKeySecret == "" {
-					return nil, errors.New("Alicloud: Provider AccessKeyID and AccessKeySecret must be provided!")
+				if cfg.Global.AccessKeyID != "" && cfg.Global.AccessKeySecret != "" {
+					key, err := b64.StdEncoding.DecodeString(cfg.Global.AccessKeyID)
+					if err != nil {
+						return nil, err
+					}
+					keyid = string(key)
+					secret, err := b64.StdEncoding.DecodeString(cfg.Global.AccessKeySecret)
+					if err != nil {
+						return nil, err
+					}
+					keysecret = string(secret)
+					glog.V(2).Infof("Alicloud: Try Accesskey and AccessKeySecret from config file.")
 				}
-				key, err := b64.StdEncoding.DecodeString(cfg.Global.AccessKeyID)
-				if err != nil {
-					return nil, err
+				if cfg.Global.ClusterID != "" {
+					CLUSTER_ID = cfg.Global.ClusterID
+					glog.Infof("use clusterid %s",CLUSTER_ID)
 				}
-				keyid = string(key)
-				secret, err := b64.StdEncoding.DecodeString(cfg.Global.AccessKeySecret)
-				if err != nil {
-					return nil, err
-				}
-				keysecret = string(secret)
-				glog.V(2).Infof("Alicloud: Try Accesskey and AccessKeySecret from config file.")
 			}
 			if keyid == "" || keysecret == "" {
 				glog.V(2).Infof("cloud config does not have keyid and keysecret . try environment ACCESS_KEY_ID ACCESS_KEY_SECRET")
@@ -493,7 +498,7 @@ func (c *Cloud) Routes() (cloudprovider.Routes, bool) {
 
 // HasClusterID returns true if a ClusterID is required and set
 func (c *Cloud) HasClusterID() bool {
-	return false
+	return CLUSTER_ID != "clusterid"
 }
 
 //
