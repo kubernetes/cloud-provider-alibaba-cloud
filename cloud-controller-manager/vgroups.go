@@ -90,26 +90,76 @@ func (v *vgroup) Update() 	error{
 			return v.Add()
 		}
 	}
-	backends, err := json.Marshal(v.BackendServers)
-	if err != nil {
-		return fmt.Errorf("error marshal backends: %s, %v",err.Error(),v.BackendServers)
-	}
-	glog.Infof("update: vgroupid [%s]",v.VGroupId)
-	vgp := slb.SetVServerGroupAttributeArgs{
-		LoadBalancerId: v.LoadBalancerId,
-		RegionId:       v.RegionId,
+
+	glog.Infof("update: backend vgroupid [%s]",v.VGroupId)
+	dsc := &slb.DescribeVServerGroupAttributeArgs{
 		VServerGroupId: v.VGroupId,
-		BackendServers: string(backends),
-		VServerGroupName: v.NamedKey.Key(),
+		RegionId: 		v.RegionId,
 	}
-	glog.Infof("update: try to update vserver group[%s]",v.NamedKey.Key())
-	_, err = v.Client.SetVServerGroupAttribute(&vgp)
+	att, err := v.Client.DescribeVServerGroupAttribute(dsc)
+	if err != nil {
+		return fmt.Errorf("update: describe vserver group attribute error. %s",err.Error())
+	}
+	glog.Infof("update: apis[%v], node[%v]",att.BackendServers.BackendServer, v.BackendServers)
+	add, del := v.diff(att.BackendServers.BackendServer, v.BackendServers)
+	if len(add) == 0 && len(del) == 0 {
+		glog.Infof("update: no backend need to be added for vgroupid [%s]",v.VGroupId)
+		return nil
+	}
+	additions, err := json.Marshal(add)
+	if err != nil {
+		return fmt.Errorf("error marshal backends: %s, %v",err.Error(),add)
+	}
+	deletions, err := json.Marshal(del)
+	if err != nil {
+		return fmt.Errorf("error marshal backends: %s, %v",err.Error(),del)
+	}
+
+	vgp := slb.ModifyVServerGroupBackendServersArgs{
+		VServerGroupId: 		v.VGroupId,
+		OldBackendServers:      string(deletions),
+		NewBackendServers:      string(additions),
+	}
+	glog.Infof("update: try to update vserver group[%s]," +
+		" backend new[%s], old[%s]",v.NamedKey.Key(),string(additions),string(deletions))
+	_, err = v.Client.ModifyVServerGroupBackendServers(&vgp)
 	return err
+}
+
+func (v *vgroup) diff(apis, nodes []slb.VBackendServerType) (
+										[]slb.VBackendServerType, []slb.VBackendServerType) {
+
+	addition, deletions := []slb.VBackendServerType{},[]slb.VBackendServerType{}
+	for _, api := range apis {
+		found := false
+		for _, node := range nodes {
+			if api.ServerId == node.ServerId {
+				found = true
+				break
+			}
+		}
+		if !found {
+			deletions = append(deletions, api)
+		}
+	}
+	for _, node := range nodes {
+		found := false
+		for _, api := range apis {
+			if api.ServerId == node.ServerId {
+				found = true
+				break
+			}
+		}
+		if !found {
+			addition = append(addition, node)
+		}
+	}
+	return addition, deletions
 }
 
 func (v *vgroup) Ensure(nodes []*v1.Node) error {
 
-	backend := []slb.VBackendServerType{}
+	var backend []slb.VBackendServerType
 	for _, node := range nodes {
 		_, id,err := nodeinfo(types.NodeName(node.Spec.ProviderID))
 		if err != nil {
@@ -129,7 +179,7 @@ func (v *vgroup) Ensure(nodes []*v1.Node) error {
 type vgroups []*vgroup
 
 func (vgrps *vgroups) EnsureVGroup(nodes []*v1.Node) error {
-	glog.Infof("ensure vserver group: len=%d",len(*vgrps))
+	glog.Infof("ensure vserver group: %d vgroup need to be processed.",len(*vgrps))
 	for _,v := range *vgrps {
 		if v == nil {
 			return fmt.Errorf("unexpected nil vgroup ")

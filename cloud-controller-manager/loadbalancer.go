@@ -108,6 +108,8 @@ type ClientSLBSDK interface {
 	DescribeVServerGroups(args *slb.DescribeVServerGroupsArgs) (response *slb.DescribeVServerGroupsResponse, err error)
 	DeleteVServerGroup(args *slb.DeleteVServerGroupArgs) (response *slb.DeleteVServerGroupResponse, err error)
 	SetVServerGroupAttribute(args *slb.SetVServerGroupAttributeArgs) (response *slb.SetVServerGroupAttributeResponse, err error)
+	DescribeVServerGroupAttribute(args *slb.DescribeVServerGroupAttributeArgs) (response *slb.DescribeVServerGroupAttributeResponse, err error)
+	ModifyVServerGroupBackendServers(args *slb.ModifyVServerGroupBackendServersArgs) (response *slb.ModifyVServerGroupBackendServersResponse, err error)
 }
 
 type LoadBalancerClient struct {
@@ -406,7 +408,7 @@ func (s *LoadBalancerClient) EnsureLoadBalancer(service *v1.Service, nodes []*v1
 	//   2. force-override-listener annotation is set.
 	if (!isUserDefinedLoadBalancer(request)) ||
 		(isUserDefinedLoadBalancer(request) && isOverrideListeners(request.OverrideListeners)) {
-		glog.V(5).Infof("alicloud: not user defined loadbalancer[%s], start to apply listener.\n", origined.LoadBalancerId)
+		glog.V(2).Infof("alicloud: not user defined loadbalancer[%s], start to apply listener.\n", origined.LoadBalancerId)
 		// If listener update is needed. Switch to vserver group immediately.
 		// No longer update default backend servers.
 
@@ -438,11 +440,9 @@ func (s *LoadBalancerClient) UpdateLoadBalancer(service *v1.Service, nodes []*v1
 
 func (s *LoadBalancerClient) UpdateBackendServers(service *v1.Service,lb *slb.LoadBalancerType, vgs *vgroups, nodes []*v1.Node) error{
 
-	if err := vgs.EnsureVGroup(nodes);err != nil {
-		return fmt.Errorf("ensure vserver group: %s",err.Error())
-	}
-	// Set vserver group and default backends both.
-	return s.UpdateDefaultServerGroup(nodes, lb)
+	// Set default backends is not allowed when vserver group is enabled.
+	//return s.UpdateDefaultServerGroup(nodes, lb)
+	return vgs.EnsureVGroup(nodes)
 }
 
 
