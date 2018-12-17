@@ -110,6 +110,8 @@ type ClientSLBSDK interface {
 	SetVServerGroupAttribute(args *slb.SetVServerGroupAttributeArgs) (response *slb.SetVServerGroupAttributeResponse, err error)
 	DescribeVServerGroupAttribute(args *slb.DescribeVServerGroupAttributeArgs) (response *slb.DescribeVServerGroupAttributeResponse, err error)
 	ModifyVServerGroupBackendServers(args *slb.ModifyVServerGroupBackendServersArgs) (response *slb.ModifyVServerGroupBackendServersResponse, err error)
+	AddVServerGroupBackendServers(args *slb.AddVServerGroupBackendServersArgs) (response *slb.AddVServerGroupBackendServersResponse, err error)
+	RemoveVServerGroupBackendServers(args *slb.RemoveVServerGroupBackendServersArgs) (response *slb.RemoveVServerGroupBackendServersResponse, err error)
 }
 
 type LoadBalancerClient struct {
@@ -441,8 +443,12 @@ func (s *LoadBalancerClient) UpdateLoadBalancer(service *v1.Service, nodes []*v1
 func (s *LoadBalancerClient) UpdateBackendServers(service *v1.Service,lb *slb.LoadBalancerType, vgs *vgroups, nodes []*v1.Node) error{
 
 	// Set default backends is not allowed when vserver group is enabled.
-	//return s.UpdateDefaultServerGroup(nodes, lb)
+	// Because different service may have different default backend under SLB reusing case.
 	return vgs.EnsureVGroup(nodes)
+	//if err := vgs.EnsureVGroup(nodes);err != nil {
+	//	return fmt.Errorf("update backend servers: error %s",err.Error())
+	//}
+	//return s.UpdateDefaultServerGroup(nodes, lb)
 }
 
 
@@ -523,7 +529,7 @@ func (s *LoadBalancerClient) UpdateDefaultServerGroup(nodes []*v1.Node, lb *slb.
 			}
 		}
 		if !found {
-			additions = append(additions, slb.BackendServerType{ServerId: string(id), Weight: DEFAULT_SERVER_WEIGHT})
+			additions = append(additions, slb.BackendServerType{ServerId: string(id), Weight: DEFAULT_SERVER_WEIGHT,Type:"ecs"})
 		}
 	}
 	if len(additions) > 0 {

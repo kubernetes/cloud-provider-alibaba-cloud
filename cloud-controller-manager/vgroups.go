@@ -106,24 +106,40 @@ func (v *vgroup) Update() 	error{
 		glog.Infof("update: no backend need to be added for vgroupid [%s]",v.VGroupId)
 		return nil
 	}
-	additions, err := json.Marshal(add)
-	if err != nil {
-		return fmt.Errorf("error marshal backends: %s, %v",err.Error(),add)
-	}
-	deletions, err := json.Marshal(del)
-	if err != nil {
-		return fmt.Errorf("error marshal backends: %s, %v",err.Error(),del)
-	}
 
-	vgp := slb.ModifyVServerGroupBackendServersArgs{
-		VServerGroupId: 		v.VGroupId,
-		OldBackendServers:      string(deletions),
-		NewBackendServers:      string(additions),
+	if len(add) > 0 {
+		additions, err := json.Marshal(add)
+		if err != nil {
+			return fmt.Errorf("error marshal backends: %s, %v",err.Error(),add)
+		}
+		glog.Infof("update: try to update vserver group[%s]," +
+			" backend add[%s]",v.NamedKey.Key(),string(additions))
+		_, err = v.Client.AddVServerGroupBackendServers(
+			&slb.AddVServerGroupBackendServersArgs{
+				VServerGroupId: v.VGroupId,
+				RegionId:       v.RegionId,
+				BackendServers: string(additions),
+			})
+		if err != nil {
+			return err
+		}
 	}
-	glog.Infof("update: try to update vserver group[%s]," +
-		" backend new[%s], old[%s]",v.NamedKey.Key(),string(additions),string(deletions))
-	_, err = v.Client.ModifyVServerGroupBackendServers(&vgp)
-	return err
+	if len(del) > 0 {
+		deletions, err := json.Marshal(del)
+		if err != nil {
+			return fmt.Errorf("error marshal backends: %s, %v",err.Error(),del)
+		}
+		glog.Infof("update: try to update vserver group[%s]," +
+			" backend del[%s]",v.NamedKey.Key(),string(deletions))
+		_, err = v.Client.RemoveVServerGroupBackendServers(
+			&slb.RemoveVServerGroupBackendServersArgs{
+				VServerGroupId:  v.VGroupId,
+				RegionId:        v.RegionId,
+				BackendServers:  string(deletions),
+			})
+		return err
+	}
+	return nil
 }
 
 func (v *vgroup) diff(apis, nodes []slb.VBackendServerType) (
