@@ -908,14 +908,17 @@ func (s *ServiceController) getNodeConditionPredicate(service *v1.Service) (core
 			glog.Errorf("alicloud: find endpoints for service [%s/%s] with error [%s]", service.Namespace, service.Name, err.Error())
 			return nil, err
 		}
+		glog.V(5).Infof("[%s/%s]endpoint has [%d] subsets. [%v]",service.Namespace,service.Name,len(ep.Subsets),ep.Subsets)
 		records := []string{}
 		for _, sub := range ep.Subsets {
 			for _, add := range sub.Addresses {
+				glog.Infof("[%s/%s]prepare to add node [%s]",service.Namespace,service.Name,*add.NodeName)
 				nodes[*add.NodeName] = *add.NodeName
 				records = append(records, *add.NodeName)
 			}
 		}
-		glog.V(4).Infof("controller: node condition predicate, external traffic policy should accept node %v\n", records)
+		glog.V(4).Infof("controller: node condition predicate, " +
+			"external traffic policy should accept node %v for service[%s/%s]\n", records,service.Namespace,service.Name)
 		return nodes, nil
 	}()
 	if err != nil {
