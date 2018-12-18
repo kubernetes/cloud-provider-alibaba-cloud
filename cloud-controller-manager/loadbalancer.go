@@ -401,9 +401,10 @@ func (s *LoadBalancerClient) EnsureLoadBalancer(service *v1.Service, nodes []*v1
 		return nil, err
 	}
 	vgs := buildVGroupFromService(service,origined,s.c,origined.RegionId)
-	err = s.UpdateBackendServers(service,origined,vgs, nodes)
-	if err != nil {
-		return origined, err
+
+	// Make sure virtual server backend group has been updated.
+	if err := vgs.EnsureVGroup(nodes);err != nil {
+		return origined,fmt.Errorf("update backend servers: error %s",err.Error())
 	}
 	// Apply listener when
 	//   1. user does not assign loadbalancer id by themselves.
@@ -413,10 +414,13 @@ func (s *LoadBalancerClient) EnsureLoadBalancer(service *v1.Service, nodes []*v1
 		glog.V(2).Infof("alicloud: not user defined loadbalancer[%s], start to apply listener.\n", origined.LoadBalancerId)
 		// If listener update is needed. Switch to vserver group immediately.
 		// No longer update default backend servers.
+		if err := EnsureListeners(s.c,service,origined, vgs);
+			err != nil {
 
-		return origined, EnsureListeners(s.c,service,origined, vgs)
+				return origined, fmt.Errorf("ensure listener error: %s",err.Error())
+		}
 	}
-	return origined, nil
+	return origined, s.UpdateLoadBalancer(service,nodes,false)
 }
 
 func isLoadBalancerCreatedByKubernetes(tags []slb.TagItemType) bool {
@@ -427,7 +431,8 @@ func isLoadBalancerCreatedByKubernetes(tags []slb.TagItemType) bool {
 	}
 	return false
 }
-func (s *LoadBalancerClient) UpdateLoadBalancer(service *v1.Service, nodes []*v1.Node) error {
+
+func (s *LoadBalancerClient) UpdateLoadBalancer(service *v1.Service, nodes []*v1.Node, withVgroup bool) error {
 
 	exists, lb, err := s.findLoadBalancer(service)
 	if err != nil {
@@ -436,21 +441,48 @@ func (s *LoadBalancerClient) UpdateLoadBalancer(service *v1.Service, nodes []*v1
 	if !exists {
 		return fmt.Errorf("the loadbalance you specified by name [%s] does not exist", service.Name)
 	}
-	return s.UpdateBackendServers(service,lb,
-				buildVGroupFromService(service,lb,s.c,lb.RegionId), nodes)
+	if withVgroup {
+		vgs := buildVGroupFromService(service,lb,s.c,lb.RegionId)
+		if err := vgs.EnsureVGroup(nodes);err != nil {
+			return fmt.Errorf("update backend servers: error %s",err.Error())
+		}
+	}
+	if !needUpdateDefaultBackend(service,lb){
+		return nil
+	}
+	glog.Infof("update default backend server group, %s/%s",service.Namespace,service.Name)
+	return s.UpdateDefaultServerGroup(nodes, lb)
 }
 
-func (s *LoadBalancerClient) UpdateBackendServers(service *v1.Service,lb *slb.LoadBalancerType, vgs *vgroups, nodes []*v1.Node) error{
+// needUpdateDefaultBackend when listeners have legacy listener.
+// which means legacy listener
+// we do not update default backend server group when listener enables virtual server group mode.
+func needUpdateDefaultBackend(svc *v1.Service,lb *slb.LoadBalancerType) bool {
+	listeners := lb.ListenerPortsAndProtocol.ListenerPortAndProtocol
 
-	// Set default backends is not allowed when vserver group is enabled.
-	// Because different service may have different default backend under SLB reusing case.
-	return vgs.EnsureVGroup(nodes)
-	//if err := vgs.EnsureVGroup(nodes);err != nil {
-	//	return fmt.Errorf("update backend servers: error %s",err.Error())
-	//}
-	//return s.UpdateDefaultServerGroup(nodes, lb)
+	// legacy listener has a empty name or '-'
+	for _, lis := range listeners {
+		if lis.Description == "" ||
+			lis.Description == "-" {
+				if ! hasPort(svc,int32(lis.ListenerPort)){
+					continue
+				}
+				glog.Infof("port %d has legacy listener, " +
+					"apply default backend server group. [%s]",lis.ListenerPort,lis.Description)
+				return true
+		}
+	}
+	return false
 }
 
+func hasPort(svc *v1.Service, port int32) bool {
+	for _, p := range svc.Spec.Ports {
+		if p.Port == port {
+			return true
+		}
+	}
+	return false
+}
 
 func (s *LoadBalancerClient) EnsureLoadBalanceDeleted(service *v1.Service) error {
 

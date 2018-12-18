@@ -58,7 +58,9 @@ func (v *vgroup) Add() 	 	error{
 		LoadBalancerId: v.LoadBalancerId,
 		VServerGroupName: v.NamedKey.Key(),
 		RegionId: 		  v.RegionId,
-		BackendServers:   string(backends),
+	}
+	if len(v.BackendServers) > 0 {
+		vgp.BackendServers = string(backends)
 	}
 	gp,err := v.Client.CreateVServerGroup(&vgp)
 	if err != nil {
