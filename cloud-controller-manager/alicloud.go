@@ -235,7 +235,7 @@ func (c *Cloud) UpdateLoadBalancer(clusterName string, service *v1.Service, node
 	if err != nil {
 		return err
 	}
-	return c.climgr.LoadBalancers().UpdateLoadBalancer(service, ns)
+	return c.climgr.LoadBalancers().UpdateLoadBalancer(service, ns,true)
 }
 
 // EnsureLoadBalancerDeleted deletes the specified load balancer if it
