@@ -192,10 +192,14 @@ type mockClientSLB struct {
 	describeTags                          func(args *slb.DescribeTagsArgs) (tags []slb.TagItemType, pagination *common.PaginationResult, err error)
 	addTags                               func(args *slb.AddTagsArgs) error
 
-	createVServerGroup       func(args *slb.CreateVServerGroupArgs) (response *slb.CreateVServerGroupResponse, err error)
-	describeVServerGroups    func(args *slb.DescribeVServerGroupsArgs) (response *slb.DescribeVServerGroupsResponse, err error)
-	deleteVServerGroup       func(args *slb.DeleteVServerGroupArgs) (response *slb.DeleteVServerGroupResponse, err error)
-	setVServerGroupAttribute func(args *slb.SetVServerGroupAttributeArgs) (response *slb.SetVServerGroupAttributeResponse, err error)
+	createVServerGroup               func(args *slb.CreateVServerGroupArgs) (response *slb.CreateVServerGroupResponse, err error)
+	describeVServerGroups            func(args *slb.DescribeVServerGroupsArgs) (response *slb.DescribeVServerGroupsResponse, err error)
+	deleteVServerGroup               func(args *slb.DeleteVServerGroupArgs) (response *slb.DeleteVServerGroupResponse, err error)
+	setVServerGroupAttribute         func(args *slb.SetVServerGroupAttributeArgs) (response *slb.SetVServerGroupAttributeResponse, err error)
+	describeVServerGroupAttribute    func(args *slb.DescribeVServerGroupAttributeArgs) (response *slb.DescribeVServerGroupAttributeResponse, err error)
+	modifyVServerGroupBackendServers func(args *slb.ModifyVServerGroupBackendServersArgs) (response *slb.ModifyVServerGroupBackendServersResponse, err error)
+	addVServerGroupBackendServers    func(args *slb.AddVServerGroupBackendServersArgs) (response *slb.AddVServerGroupBackendServersResponse, err error)
+	removeVServerGroupBackendServers func(args *slb.RemoveVServerGroupBackendServersArgs) (response *slb.RemoveVServerGroupBackendServersResponse, err error)
 }
 
 var (
@@ -412,6 +416,30 @@ func (c *mockClientSLB) DeleteVServerGroup(args *slb.DeleteVServerGroupArgs) (re
 func (c *mockClientSLB) SetVServerGroupAttribute(args *slb.SetVServerGroupAttributeArgs) (response *slb.SetVServerGroupAttributeResponse, err error) {
 	if c.setVServerGroupAttribute != nil {
 		return c.setVServerGroupAttribute(args)
+	}
+	return nil, nil
+}
+func (c *mockClientSLB) DescribeVServerGroupAttribute(args *slb.DescribeVServerGroupAttributeArgs) (response *slb.DescribeVServerGroupAttributeResponse, err error) {
+	if c.describeVServerGroupAttribute != nil {
+		return c.describeVServerGroupAttribute(args)
+	}
+	return nil, nil
+}
+func (c *mockClientSLB) ModifyVServerGroupBackendServers(args *slb.ModifyVServerGroupBackendServersArgs) (response *slb.ModifyVServerGroupBackendServersResponse, err error) {
+	if c.modifyVServerGroupBackendServers != nil {
+		return c.modifyVServerGroupBackendServers(args)
+	}
+	return nil, nil
+}
+func (c *mockClientSLB) AddVServerGroupBackendServers(args *slb.AddVServerGroupBackendServersArgs) (response *slb.AddVServerGroupBackendServersResponse, err error) {
+	if c.addVServerGroupBackendServers != nil {
+		return c.addVServerGroupBackendServers(args)
+	}
+	return nil, nil
+}
+func (c *mockClientSLB) RemoveVServerGroupBackendServers(args *slb.RemoveVServerGroupBackendServersArgs) (response *slb.RemoveVServerGroupBackendServersResponse, err error) {
+	if c.removeVServerGroupBackendServers != nil {
+		return c.removeVServerGroupBackendServers(args)
 	}
 	return nil, nil
 }

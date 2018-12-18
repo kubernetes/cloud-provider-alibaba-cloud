@@ -199,6 +199,7 @@ func (n *Listener) Instance() IListener {
 
 func (n *Listener) Apply() error {
 	glog.Infof("apply: check listener for %s, name:[%s]", n.Action, n.Name)
+	glog.V(6).Infof("Listener: %s => \n%+v\n", n.Action, PrettyJson(n))
 	switch n.Action {
 	case ACTION_UPDATE:
 		err := n.Instance().Update()
@@ -399,6 +400,10 @@ func mergeListeners(svc *v1.Service, service, console Listeners) (Listeners, err
 						return addition, fmt.Errorf("error: service[%s] trying "+
 							"to declare a port belongs to somebody else [%s]", local.NamedKey.Key(), remote.Name)
 					}
+				}
+				if remote.TransforedProto != local.TransforedProto {
+					// do add
+					break
 				}
 				// port matched. updated . skip
 				found = true
