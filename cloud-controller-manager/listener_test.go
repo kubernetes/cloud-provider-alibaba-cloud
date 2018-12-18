@@ -177,10 +177,14 @@ func TestUpdateListenerPorts(t *testing.T) {
 		},
 		describeVServerGroups: func(args *slb.DescribeVServerGroupsArgs) (response *slb.DescribeVServerGroupsResponse, err error) {
 			return &slb.DescribeVServerGroupsResponse{
-				VServerGroups: []slb.VServerGroup{{
-					VServerGroupId:   grp[0].VGroupId,
-					VServerGroupName: grp[0].NamedKey.Key(),
-				}},
+				VServerGroups: struct {
+					VServerGroup []slb.VServerGroup
+				}{
+					[]slb.VServerGroup{{
+						VServerGroupId:   grp[0].VGroupId,
+						VServerGroupName: grp[0].NamedKey.Key(),
+					}},
+				},
 			}, nil
 		},
 		createVServerGroup: func(args *slb.CreateVServerGroupArgs) (response *slb.CreateVServerGroupResponse, err error) {
@@ -193,7 +197,7 @@ func TestUpdateListenerPorts(t *testing.T) {
 
 	// buildVGroupFromService is compatiable with v1 listener.
 	vgs := buildVGroupFromService(service, detail, mgr.loadbalancer.c, detail.RegionId)
-	if err := EnsureVGroup(vgs, []*v1.Node{}); err != nil {
+	if err := vgs.EnsureVGroup([]*v1.Node{}); err != nil {
 		t.Fatal("error ensure vserver group.")
 	}
 
@@ -383,7 +387,7 @@ func TestUpdateListenerBackendPorts(t *testing.T) {
 		},
 	})
 
-	err := EnsureListeners(mgr.loadbalancer.c, service, detail, nil)
+	err := EnsureListeners(mgr.loadbalancer.c, service, detail, &grp)
 
 	if err != nil {
 		t.Fatal("listener update error! ")

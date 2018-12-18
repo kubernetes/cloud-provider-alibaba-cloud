@@ -173,7 +173,7 @@ func newReadyService() *v1.Service {
 		},
 		Spec: v1.ServiceSpec{
 			Ports: []v1.ServicePort{
-				{Port: listenPort1, TargetPort: targetPort1, Protocol: v1.ProtocolTCP, NodePort: nodePort1},
+				{Port: listenPort1, TargetPort: targetPort1, Protocol: v1.ProtocolTCP, NodePort: 31789},
 			},
 			Type:            v1.ServiceTypeLoadBalancer,
 			SessionAffinity: v1.ServiceAffinityNone,
@@ -369,10 +369,14 @@ func newMockClientSLB(service *v1.Service, nodes []*v1.Node, base *[]slb.LoadBal
 		},
 		describeVServerGroups: func(args *slb.DescribeVServerGroupsArgs) (response *slb.DescribeVServerGroupsResponse, err error) {
 			return &slb.DescribeVServerGroupsResponse{
-				VServerGroups: []slb.VServerGroup{{
-					VServerGroupId:   grp[0].VGroupId,
-					VServerGroupName: grp[0].NamedKey.Key(),
-				}},
+				VServerGroups: struct {
+					VServerGroup []slb.VServerGroup
+				}{
+					[]slb.VServerGroup{{
+						VServerGroupId:   grp[0].VGroupId,
+						VServerGroupName: grp[0].NamedKey.Key(),
+					}},
+				},
 			}, nil
 		},
 		createVServerGroup: func(args *slb.CreateVServerGroupArgs) (response *slb.CreateVServerGroupResponse, err error) {
