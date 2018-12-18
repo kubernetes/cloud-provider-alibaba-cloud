@@ -70,7 +70,7 @@ type CloudConfig struct {
 		Region               string `json:"region"`
 		ZoneID               string `json:"zoneid"`
 		VswitchID            string `json:"vswitchid"`
-		ClusterID 			 string `json:"clusterID"`
+		ClusterID            string `json:"clusterID"`
 
 		AccessKeyID     string `json:"accessKeyID"`
 		AccessKeySecret string `json:"accessKeySecret"`
@@ -105,7 +105,7 @@ func init() {
 				}
 				if cfg.Global.ClusterID != "" {
 					CLUSTER_ID = cfg.Global.ClusterID
-					glog.Infof("use clusterid %s",CLUSTER_ID)
+					glog.Infof("use clusterid %s", CLUSTER_ID)
 				}
 			}
 			if keyid == "" || keysecret == "" {
@@ -235,7 +235,7 @@ func (c *Cloud) UpdateLoadBalancer(clusterName string, service *v1.Service, node
 	if err != nil {
 		return err
 	}
-	return c.climgr.LoadBalancers().UpdateLoadBalancer(service, ns,true)
+	return c.climgr.LoadBalancers().UpdateLoadBalancer(service, ns, true)
 }
 
 // EnsureLoadBalancerDeleted deletes the specified load balancer if it

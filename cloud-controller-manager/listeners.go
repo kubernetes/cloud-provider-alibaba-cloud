@@ -22,8 +22,8 @@ import (
 	"github.com/denverdino/aliyungo/slb"
 	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
-	"strings"
 	"strconv"
+	"strings"
 )
 
 var DEFAULT_LISTENER_BANDWIDTH = -1
@@ -51,7 +51,7 @@ var DEFAULT_LISTENER_BANDWIDTH = -1
 	 ----------------------------------------------------------------------------
 	ListenerV2 Name Format:     k8s/Port/ServiceName/Namespace/ClusterID
 	VServer Group Name Format:  k8s/NodePort/ServiceName/Namespace/ClusterID
- */
+*/
 
 func Protocol(annotation string, port v1.ServicePort) (string, error) {
 
@@ -81,17 +81,17 @@ func Protocol(annotation string, port v1.ServicePort) (string, error) {
 }
 
 type IListener interface {
-	Describe() 	error
-	Add() 	 	error
-	Remove() 	error
-	Update() 	error
+	Describe() error
+	Add() error
+	Remove() error
+	Update() error
 }
 
 var FORMAT_ERROR = "ListenerName Format Error: k8s/${port}/${service}/${namespace}/${clusterid} format is expected"
 
-type formatError struct {key string}
+type formatError struct{ key string }
 
-func (f formatError) Error() string {return fmt.Sprintf("%s. Got [%s]",FORMAT_ERROR,f.key) }
+func (f formatError) Error() string { return fmt.Sprintf("%s. Got [%s]", FORMAT_ERROR, f.key) }
 
 var DEFAULT_PREFIX = "k8s"
 
@@ -107,14 +107,14 @@ func (n *NamedKey) Key() string {
 	if n.Prefix == "" {
 		n.Prefix = DEFAULT_PREFIX
 	}
-	return fmt.Sprintf("%s/%d/%s/%s/%s",n.Prefix,n.Port,n.ServiceName,n.Namespace,n.CID)
+	return fmt.Sprintf("%s/%d/%s/%s/%s", n.Prefix, n.Port, n.ServiceName, n.Namespace, n.CID)
 }
 
 func (n *NamedKey) ServiceURI() string {
 	if n.Prefix == "" {
 		n.Prefix = DEFAULT_PREFIX
 	}
-	return fmt.Sprintf("%s/%s/%s/%s",n.Prefix,n.ServiceName,n.Namespace,n.CID)
+	return fmt.Sprintf("%s/%s/%s/%s", n.Prefix, n.ServiceName, n.Namespace, n.CID)
 }
 
 func (n *NamedKey) Reference(backport int32) string {
@@ -123,17 +123,17 @@ func (n *NamedKey) Reference(backport int32) string {
 		Namespace:   n.Namespace,
 		CID:         n.CID,
 		Port:        backport,
-		ServiceName: n.ServiceName, }).Key()
+		ServiceName: n.ServiceName}).Key()
 }
 
 func URIfromService(svc *v1.Service) string {
-	return fmt.Sprintf("%s/%s/%s/%s",DEFAULT_PREFIX,svc.Name,svc.Namespace,CLUSTER_ID)
+	return fmt.Sprintf("%s/%s/%s/%s", DEFAULT_PREFIX, svc.Name, svc.Namespace, CLUSTER_ID)
 }
 
-func LoadNamedKey(key string) (*NamedKey,error) {
+func LoadNamedKey(key string) (*NamedKey, error) {
 	metas := strings.Split(key, "/")
 	if len(metas) != 5 || metas[0] != DEFAULT_PREFIX {
-		return nil, formatError{key:key}
+		return nil, formatError{key: key}
 	}
 	port, err := strconv.Atoi(metas[1])
 	if err != nil {
@@ -144,44 +144,43 @@ func LoadNamedKey(key string) (*NamedKey,error) {
 		Namespace:   metas[3],
 		ServiceName: metas[2],
 		Port:        int32(port),
-		Prefix:      DEFAULT_PREFIX,}, nil
+		Prefix:      DEFAULT_PREFIX}, nil
 }
 
-
 type Listener struct {
-	Name 			string
+	Name string
 	// NamedKey Map between ServiceName and Listener from console view.
-	NamedKey 		*NamedKey
+	NamedKey *NamedKey
 
 	// Proto is the protocol from console view
-	Proto  			string
+	Proto string
 
 	// TransforedProto is the real protocol that a listener indicated.
 	TransforedProto string
 
-	Port 			int32
+	Port int32
 
 	// NodePort Backend server port
-	NodePort 		int32
+	NodePort int32
 
 	// ServiceName reference from k8s service
-	Service 		*v1.Service
+	Service *v1.Service
 
 	// LoadBalancerID service connected SLB.
-	LoadBalancerID	string
+	LoadBalancerID string
 
 	// Action indicate the operate method. ADD UPDATE DELETE
-	Action 			string
+	Action string
 
-	Client 			ClientSLBSDK
+	Client ClientSLBSDK
 
-	VGroups 		*vgroups
+	VGroups *vgroups
 }
 
 var (
-	ACTION_ADD 		= "ADD"
-	ACTION_UPDATE 	= "UPDATE"
-	ACTION_DELETE 	= "DELETE"
+	ACTION_ADD    = "ADD"
+	ACTION_UPDATE = "UPDATE"
+	ACTION_DELETE = "DELETE"
 )
 
 func (n *Listener) Instance() IListener {
@@ -199,10 +198,10 @@ func (n *Listener) Instance() IListener {
 }
 
 func (n *Listener) Apply() error {
-	glog.Infof("apply: check listener for %s, name:[%s]",n.Action,n.Name)
+	glog.Infof("apply: check listener for %s, name:[%s]", n.Action, n.Name)
 	switch n.Action {
 	case ACTION_UPDATE:
-		err := n.Instance().Update();
+		err := n.Instance().Update()
 		if err != nil {
 			return err
 		}
@@ -216,20 +215,20 @@ func (n *Listener) Apply() error {
 	case ACTION_DELETE:
 		return n.Instance().Remove()
 	}
-	return fmt.Errorf("UnKnownAction: %s, %s/%s",n.Action,n.Service.Namespace,n.Service.Name)
+	return fmt.Errorf("UnKnownAction: %s, %s/%s", n.Action, n.Service.Namespace, n.Service.Name)
 }
 
 func (n *Listener) Start() error {
 	return n.Client.StartLoadBalancerListener(
-				n.LoadBalancerID, int(n.Port))
+		n.LoadBalancerID, int(n.Port))
 }
 
-func (t *Listener) Describe()error {
+func (t *Listener) Describe() error {
 
 	return fmt.Errorf("unimplemented")
 }
 
-func (t *Listener) Remove() 	error {
+func (t *Listener) Remove() error {
 	err := t.Client.StopLoadBalancerListener(t.LoadBalancerID, int(t.Port))
 	if err != nil {
 		return err
@@ -240,11 +239,11 @@ func (t *Listener) Remove() 	error {
 func (t *Listener) findVgroup(key string) string {
 	for _, v := range *t.VGroups {
 		if v.NamedKey.Key() == key {
-			glog.Infof("found: key=%s, groupid=%s, try use vserver group mode.",key, v.VGroupId)
+			glog.Infof("found: key=%s, groupid=%s, try use vserver group mode.", key, v.VGroupId)
 			return v.VGroupId
 		}
 	}
-	glog.Infof("find: vserver group [%s] does not found. use default backend group.",key)
+	glog.Infof("find: vserver group [%s] does not found. use default backend group.", key)
 	return STRINGS_EMPTY
 }
 
@@ -257,51 +256,51 @@ type Listeners []*Listener
 // 3. Third, Merge the up two listeners to decide whether add/update/remove is needed.
 // 4. Do update.  Clean unused vserver group.
 func EnsureListeners(client ClientSLBSDK,
-					service *v1.Service,
-					lb *slb.LoadBalancerType, vgs *vgroups) error {
+	service *v1.Service,
+	lb *slb.LoadBalancerType, vgs *vgroups) error {
 
-	local, err := buildListenersFromService(service,lb,client,vgs)
+	local, err := buildListenersFromService(service, lb, client, vgs)
 	if err != nil {
-		return fmt.Errorf("build listener from service: %s",err.Error())
+		return fmt.Errorf("build listener from service: %s", err.Error())
 	}
 
 	// Merge listeners generate an listener list to be updated/deleted/added.
-	updates, err := mergeListeners(service, local, buildListenersFromAPI(service,lb, client,vgs))
+	updates, err := mergeListeners(service, local, buildListenersFromAPI(service, lb, client, vgs))
 	if err != nil {
-		return fmt.Errorf("merge listener: %s",err.Error())
+		return fmt.Errorf("merge listener: %s", err.Error())
 	}
-	glog.Infof("ensure listener: %d updates for %s", len(updates),lb.LoadBalancerId)
+	glog.Infof("ensure listener: %d updates for %s", len(updates), lb.LoadBalancerId)
 	// do update/add/delete
 	for _, up := range updates {
 		err := up.Apply()
 		if err != nil {
-			return fmt.Errorf("ensure listener: %s",err.Error())
+			return fmt.Errorf("ensure listener: %s", err.Error())
 		}
 	}
 
-	return CleanUPVGroupMerged(service,lb,client,vgs)
+	return CleanUPVGroupMerged(service, lb, client, vgs)
 }
 
 // Only listener which owned by my service was deleted.
 func EnsureListenersDeleted(client ClientSLBSDK,
-							service *v1.Service,
-							lb *slb.LoadBalancerType, vgs *vgroups) error {
-	// annotate
-	local, err := buildListenersFromService(service,lb,client,vgs)
+	service *v1.Service,
+	lb *slb.LoadBalancerType, vgs *vgroups) error {
+
+	local, err := buildListenersFromService(service, lb, client, vgs)
 	if err != nil {
-		return fmt.Errorf("build listener from service: %s",err.Error())
+		return fmt.Errorf("build listener from service: %s", err.Error())
 	}
-	remote := buildListenersFromAPI(service,lb, client,vgs)
+	remote := buildListenersFromAPI(service, lb, client, vgs)
 
 	for _, loc := range local {
-		for _, rem :=range remote {
+		for _, rem := range remote {
 			if !isManagedByMyService(service, rem) {
 				continue
 			}
 			if loc.Port == rem.Port {
 				err := loc.Remove()
 				if err != nil {
-					return fmt.Errorf("ensure listener: %s",err.Error())
+					return fmt.Errorf("ensure listener: %s", err.Error())
 				}
 			}
 		}
@@ -310,7 +309,7 @@ func EnsureListenersDeleted(client ClientSLBSDK,
 	return CleanUPVGroupDirect(vgs)
 }
 
-func isManagedByMyService(svc *v1.Service, remote *Listener) bool{
+func isManagedByMyService(svc *v1.Service, remote *Listener) bool {
 	if remote.Name == STRINGS_EMPTY ||
 		remote.Name == "-" {
 		// Assume listener without a name or named '-' to be k8s managed listener.
@@ -331,7 +330,7 @@ func isUserManagedListener(remote *Listener) bool {
 // 4. LoadBalancer created by kubernetes is not allowed to be reused.
 func mergeListeners(svc *v1.Service, service, console Listeners) (Listeners, error) {
 	override := isOverrideListeners(serviceAnnotation(svc, ServiceAnnotationLoadBalancerOverrideListener))
-	addition,updation,deletion := Listeners{},Listeners{},Listeners{}
+	addition, updation, deletion := Listeners{}, Listeners{}, Listeners{}
 	// For updations and deletions
 	for _, remote := range console {
 
@@ -340,22 +339,22 @@ func mergeListeners(svc *v1.Service, service, console Listeners) (Listeners, err
 			if remote.Port == local.Port {
 				// port matched. that is where the conflict case begin.
 				if isUserManagedListener(remote) {
-					if ! override {
+					if !override {
 						// port conflict with user managed port.
-						return nil, fmt.Errorf("port matched, but conflict with user managed port. " +
+						return nil, fmt.Errorf("port matched, but conflict with user managed port. "+
 							"Port:%d, ListenerName:%s, Service: %s. Protocol:[source:%s dst:%s]",
-							remote.Port,remote.Name, local.NamedKey.Key(),remote.TransforedProto,local.TransforedProto)
-					}else {
+							remote.Port, remote.Name, local.NamedKey.Key(), remote.TransforedProto, local.TransforedProto)
+					} else {
 						overridePort = true
 						break
 					}
 				}
-				if ! isManagedByMyService(svc, remote) {
-					if ! override {
+				if !isManagedByMyService(svc, remote) {
+					if !override {
 						// port conflict with other service
 						return nil, fmt.Errorf("port matched. but not managed by this service[%s]. "+
 							"conflict with service[%s]", local.NamedKey.Key(), remote.NamedKey.Key())
-					}else {
+					} else {
 						overridePort = true
 						break
 					}
@@ -371,17 +370,17 @@ func mergeListeners(svc *v1.Service, service, console Listeners) (Listeners, err
 			}
 		}
 
-		if ! skipDeletion {
+		if !skipDeletion {
 			if overridePort {
 				remote.Action = ACTION_DELETE
-				deletion 	  = append(deletion, remote)
-			}else {
+				deletion = append(deletion, remote)
+			} else {
 				// only delete listeners which managed by kubernetes and by my service.
-				if isManagedByMyService(svc,remote) && !isUserManagedListener(remote) {
+				if isManagedByMyService(svc, remote) && !isUserManagedListener(remote) {
 					remote.Action = ACTION_DELETE
-					deletion 	  = append(deletion, remote)
-				}else {
-					glog.Infof("managed by other service or user managed listener, skip delete. [%s]",remote.Name)
+					deletion = append(deletion, remote)
+				} else {
+					glog.Infof("managed by other service or user managed listener, skip delete. [%s]", remote.Name)
 				}
 			}
 		}
@@ -396,9 +395,9 @@ func mergeListeners(svc *v1.Service, service, console Listeners) (Listeners, err
 					if override {
 						// do add
 						break
-					}else {
-						return addition,fmt.Errorf("error: service[%s] trying " +
-							"to declare a port belongs to somebody else [%s]",local.NamedKey.Key(),remote.Name)
+					} else {
+						return addition, fmt.Errorf("error: service[%s] trying "+
+							"to declare a port belongs to somebody else [%s]", local.NamedKey.Key(), remote.Name)
 					}
 				}
 				// port matched. updated . skip
@@ -413,16 +412,16 @@ func mergeListeners(svc *v1.Service, service, console Listeners) (Listeners, err
 	}
 
 	// Pls be careful of the sequence. deletion first,then addition, last updation
-	return append(append(deletion,addition...),updation...), nil
+	return append(append(deletion, addition...), updation...), nil
 }
 
 // buildListenersFromService Build expected listeners
 func buildListenersFromService(service *v1.Service,
-								lb *slb.LoadBalancerType,
-								client ClientSLBSDK,vgrps *vgroups) (Listeners,error) {
+	lb *slb.LoadBalancerType,
+	client ClientSLBSDK, vgrps *vgroups) (Listeners, error) {
 	listeners := Listeners{}
 	for _, port := range service.Spec.Ports {
-		proto,err := Protocol(serviceAnnotation(service, ServiceAnnotationLoadBalancerProtocolPort),port)
+		proto, err := Protocol(serviceAnnotation(service, ServiceAnnotationLoadBalancerProtocolPort), port)
 		if err != nil {
 			return nil, err
 		}
@@ -432,46 +431,45 @@ func buildListenersFromService(service *v1.Service,
 				Namespace:   service.Namespace,
 				ServiceName: service.Name,
 				Port:        port.Port,
-				Prefix:      DEFAULT_PREFIX,},
+				Prefix:      DEFAULT_PREFIX},
 			Port:            port.Port,
 			NodePort:        port.NodePort,
 			Proto:           string(port.Protocol),
 			Service:         service,
 			TransforedProto: proto,
-			Client: 	     client,
+			Client:          client,
 			VGroups:         vgrps,
 			LoadBalancerID:  lb.LoadBalancerId,
 		}
-		n.Name    = n.NamedKey.Key()
+		n.Name = n.NamedKey.Key()
 		listeners = append(listeners, &n)
 	}
 	return listeners, nil
 }
 
-
 // buildListenersFromAPI Load current listeners
 func buildListenersFromAPI(service *v1.Service,
-					lb *slb.LoadBalancerType,
-					client ClientSLBSDK, vgrps *vgroups) (listeners Listeners) {
+	lb *slb.LoadBalancerType,
+	client ClientSLBSDK, vgrps *vgroups) (listeners Listeners) {
 	ports := lb.ListenerPortsAndProtocol.ListenerPortAndProtocol
 	for _, port := range ports {
 		key, err := LoadNamedKey(port.Description)
 		if err != nil {
-			glog.Warningf("alicloud: error parse listener description[%s]. %s",port.Description,err.Error())
+			glog.Warningf("alicloud: error parse listener description[%s]. %s", port.Description, err.Error())
 		}
 		proto := port.ListenerProtocol
 		if strings.ToUpper(proto) == "HTTP" ||
 			strings.ToUpper(proto) == "HTTPS" {
-				proto = "TCP"
+			proto = "TCP"
 		}
 		n := Listener{
-			Name: 			 port.Description,
+			Name:            port.Description,
 			NamedKey:        key,
 			Port:            int32(port.ListenerPort),
 			Proto:           proto,
 			TransforedProto: port.ListenerProtocol,
 			LoadBalancerID:  lb.LoadBalancerId,
-			Service: 		 service,
+			Service:         service,
 			Client:          client,
 			VGroups:         vgrps,
 		}
@@ -480,9 +478,9 @@ func buildListenersFromAPI(service *v1.Service,
 	return listeners
 }
 
-type tcp struct { *Listener }
+type tcp struct{ *Listener }
 
-func (t *tcp) Add() 	error {
+func (t *tcp) Add() error {
 	def, _ := ExtractAnnotationRequest(t.Service)
 	return t.Client.CreateLoadBalancerTCPListener(
 		&slb.CreateLoadBalancerTCPListenerArgs{
@@ -494,7 +492,7 @@ func (t *tcp) Add() 	error {
 			PersistenceTimeout: def.PersistenceTimeout,
 			Description:        t.NamedKey.Key(),
 
-			VServerGroupId:     t.findVgroup(t.NamedKey.Reference(t.NodePort)),
+			VServerGroupId:            t.findVgroup(t.NamedKey.Reference(t.NodePort)),
 			HealthCheckType:           def.HealthCheckType,
 			HealthCheckURI:            def.HealthCheckURI,
 			HealthCheckConnectPort:    def.HealthCheckConnectPort,
@@ -508,18 +506,18 @@ func (t *tcp) Add() 	error {
 		})
 }
 
-func (t *tcp) Update() 	error{
+func (t *tcp) Update() error {
 	def, request := ExtractAnnotationRequest(t.Service)
 
 	response, err := t.Client.DescribeLoadBalancerTCPListenerAttribute(t.LoadBalancerID, int(t.Port))
 	if err != nil {
-		return fmt.Errorf("update tcp listener: %s",err.Error())
+		return fmt.Errorf("update tcp listener: %s", err.Error())
 	}
 	config := &slb.SetLoadBalancerTCPListenerAttributeArgs{
 		LoadBalancerId:    t.LoadBalancerID,
 		ListenerPort:      int(t.Port),
 		BackendServerPort: int(t.NodePort),
-		Description:        t.NamedKey.Key(),
+		Description:       t.NamedKey.Key(),
 		//Health Check
 		Bandwidth:          DEFAULT_LISTENER_BANDWIDTH,
 		PersistenceTimeout: response.PersistenceTimeout,
@@ -616,20 +614,20 @@ func (t *tcp) Update() 	error{
 	return t.Client.SetLoadBalancerTCPListenerAttribute(config)
 }
 
+type udp struct{ *Listener }
 
-type udp   struct { *Listener }
-func (t *udp) Describe()error {
+func (t *udp) Describe() error {
 	return fmt.Errorf("unimplemented")
 }
-func (t *udp) Add() 	error {
+func (t *udp) Add() error {
 	def, _ := ExtractAnnotationRequest(t.Service)
 	return t.Client.CreateLoadBalancerUDPListener(
 		&slb.CreateLoadBalancerUDPListenerArgs{
 			LoadBalancerId:    t.LoadBalancerID,
 			ListenerPort:      int(t.Port),
 			BackendServerPort: int(t.NodePort),
-			Description:        t.NamedKey.Key(),
-			VServerGroupId:     t.findVgroup(t.NamedKey.Reference(t.NodePort)),
+			Description:       t.NamedKey.Key(),
+			VServerGroupId:    t.findVgroup(t.NamedKey.Reference(t.NodePort)),
 			//Health Check
 			Bandwidth:          DEFAULT_LISTENER_BANDWIDTH,
 			PersistenceTimeout: def.PersistenceTimeout,
@@ -646,7 +644,7 @@ func (t *udp) Add() 	error {
 	)
 }
 
-func (t *udp) Update() 	error{
+func (t *udp) Update() error {
 	def, request := ExtractAnnotationRequest(t.Service)
 	response, err := t.Client.DescribeLoadBalancerUDPListenerAttribute(t.LoadBalancerID, int(t.Port))
 	if err != nil {
@@ -656,8 +654,8 @@ func (t *udp) Update() 	error{
 		LoadBalancerId:    t.LoadBalancerID,
 		ListenerPort:      int(t.Port),
 		BackendServerPort: int(t.NodePort),
-		Description:        t.NamedKey.Key(),
-		VServerGroupId:     t.findVgroup(t.NamedKey.Reference(t.NodePort)),
+		Description:       t.NamedKey.Key(),
+		VServerGroupId:    t.findVgroup(t.NamedKey.Reference(t.NodePort)),
 		//Health Check
 		Bandwidth:          DEFAULT_LISTENER_BANDWIDTH,
 		PersistenceTimeout: response.PersistenceTimeout,
@@ -732,19 +730,20 @@ func (t *udp) Update() 	error{
 	return t.Client.SetLoadBalancerUDPListenerAttribute(config)
 }
 
-type http  struct { *Listener }
-func (t *http) Describe()error {
+type http struct{ *Listener }
+
+func (t *http) Describe() error {
 	return fmt.Errorf("unimplemented")
 }
-func (t *http) Add() 	error {
+func (t *http) Add() error {
 	def, request := ExtractAnnotationRequest(t.Service)
 	return t.Client.CreateLoadBalancerHTTPListener(
 		&slb.CreateLoadBalancerHTTPListenerArgs{
 			LoadBalancerId:    t.LoadBalancerID,
 			ListenerPort:      int(t.Port),
 			BackendServerPort: int(t.NodePort),
-			Description:        t.NamedKey.Key(),
-			VServerGroupId:     t.findVgroup(t.NamedKey.Reference(t.NodePort)),
+			Description:       t.NamedKey.Key(),
+			VServerGroupId:    t.findVgroup(t.NamedKey.Reference(t.NodePort)),
 			//Health Check
 			Bandwidth:         DEFAULT_LISTENER_BANDWIDTH,
 			StickySession:     def.StickySession,
@@ -765,12 +764,12 @@ func (t *http) Add() 	error {
 			HealthCheckHttpCode: def.HealthCheckHttpCode,
 		})
 }
-func (t *http) Remove() 	error {
+func (t *http) Remove() error {
 
 	return fmt.Errorf("unimplemented")
 }
 
-func (t *http) Update() 	error{
+func (t *http) Update() error {
 
 	def, request := ExtractAnnotationRequest(t.Service)
 	response, err := t.Client.DescribeLoadBalancerHTTPListenerAttribute(t.LoadBalancerID, int(t.Port))
@@ -897,11 +896,12 @@ func (t *http) Update() 	error{
 	return t.Client.SetLoadBalancerHTTPListenerAttribute(config)
 }
 
-type https struct { *Listener }
-func (t *https) Describe()error {
+type https struct{ *Listener }
+
+func (t *https) Describe() error {
 	return fmt.Errorf("unimplemented")
 }
-func (t *https) Add() 	error {
+func (t *https) Add() error {
 
 	def, request := ExtractAnnotationRequest(t.Service)
 	return t.Client.CreateLoadBalancerHTTPSListener(
@@ -934,7 +934,7 @@ func (t *https) Add() 	error {
 	)
 }
 
-func (t *https) Update() 	error{
+func (t *https) Update() error {
 	def, request := ExtractAnnotationRequest(t.Service)
 	response, err := t.Client.DescribeLoadBalancerHTTPSListenerAttribute(t.LoadBalancerID, int(t.Port))
 	if err != nil {

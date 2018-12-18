@@ -232,10 +232,10 @@ func newMockClientInstanceSDK(instanceid string) ClientInstanceSDK {
 func newMockClientSLB(service *v1.Service, nodes []*v1.Node, base *[]slb.LoadBalancerType, detail *slb.LoadBalancerType) *mockClientSLB {
 	grp := vgroups{
 		{
-			NamedKey: &NamedKey{CID:CLUSTER_ID, ServiceName: service.Name, Namespace: service.Namespace, Port: listenPort1},
+			NamedKey:       &NamedKey{CID: CLUSTER_ID, ServiceName: service.Name, Namespace: service.Namespace, Port: listenPort1},
 			LoadBalancerId: detail.LoadBalancerId,
-			RegionId:  detail.RegionId,
-			VGroupId: "v-idvgroup",
+			RegionId:       detail.RegionId,
+			VGroupId:       "v-idvgroup",
 		},
 	}
 	return &mockClientSLB{
@@ -367,19 +367,19 @@ func newMockClientSLB(service *v1.Service, nodes []*v1.Node, base *[]slb.LoadBal
 			detail.BackendServers.BackendServer = append(detail.BackendServers.BackendServer, backendServers...)
 			return detail.BackendServers.BackendServer, nil
 		},
-		describeVServerGroups: func (args *slb.DescribeVServerGroupsArgs) (response *slb.DescribeVServerGroupsResponse, err error) {
+		describeVServerGroups: func(args *slb.DescribeVServerGroupsArgs) (response *slb.DescribeVServerGroupsResponse, err error) {
 			return &slb.DescribeVServerGroupsResponse{
 				VServerGroups: []slb.VServerGroup{{
-					VServerGroupId: grp[0].VGroupId,
+					VServerGroupId:   grp[0].VGroupId,
 					VServerGroupName: grp[0].NamedKey.Key(),
-				},},
-			},nil
+				}},
+			}, nil
 		},
-		createVServerGroup: func (args *slb.CreateVServerGroupArgs) (response *slb.CreateVServerGroupResponse, err error) {
+		createVServerGroup: func(args *slb.CreateVServerGroupArgs) (response *slb.CreateVServerGroupResponse, err error) {
 			return &slb.CreateVServerGroupResponse{
 				VServerGroupName: args.VServerGroupName,
 				VServerGroupId:   grp[0].VGroupId,
-			},nil
+			}, nil
 		},
 		deleteLoadBalancer: func(loadBalancerId string) (err error) {
 			*base = []slb.LoadBalancerType{}
@@ -460,6 +460,14 @@ func TestEnsureLoadBalancerWithPortChange(t *testing.T) {
 
 	base := newBaseLoadbalancer()
 	detail := loadbalancerAttrib(&base[0])
+	grp := vgroups{
+		{
+			NamedKey:       &NamedKey{CID: CLUSTER_ID, ServiceName: service.Name, Namespace: service.Namespace, Port: listenPort1},
+			LoadBalancerId: detail.LoadBalancerId,
+			RegionId:       detail.RegionId,
+			VGroupId:       "v-idvgroup",
+		},
+	}
 	t.Log(PrettyJson(detail))
 	// New Mock cloud to test
 	cloud, err := newMockCloud(newMockClientSLB(service, nodes, &base, detail), nil, newMockClientInstanceSDK(node1), nil)
@@ -484,7 +492,7 @@ func TestEnsureLoadBalancerWithPortChange(t *testing.T) {
 	if !Contains(detail.ListenerPorts.ListenerPort, 80) {
 		t.Fatal("TestEnsureLoadBalancerWithPortChange error, expected to be port 80")
 	}
-	if !Contains(detail.ListenerPorts.ListenerPort , 443) {
+	if !Contains(detail.ListenerPorts.ListenerPort, 443) {
 		t.Fatal("TestEnsureLoadBalancerWithPortChange error, expected to be port 443")
 	}
 }

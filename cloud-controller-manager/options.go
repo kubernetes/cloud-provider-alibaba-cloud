@@ -334,7 +334,7 @@ func ExtractAnnotationRequest(service *v1.Service) (*AnnotationRequest, *Annotat
 
 	ipVersion, ok := annotation[ServiceAnnotationLoadBalancerIPVersion]
 	if ok {
-		request.AddressIPVersion   = slb.AddressIPVersionType(ipVersion)
+		request.AddressIPVersion = slb.AddressIPVersionType(ipVersion)
 		defaulted.AddressIPVersion = request.AddressIPVersion
 	}
 

@@ -102,17 +102,17 @@ func TestUpdateListenerPorts(t *testing.T) {
 	detail := loadbalancerAttrib(&base[0])
 	grp := vgroups{
 		{
-			NamedKey: &NamedKey{CID:CLUSTER_ID, ServiceName: service.Name, Namespace: service.Namespace, Port: 80},
+			NamedKey:       &NamedKey{CID: CLUSTER_ID, ServiceName: service.Name, Namespace: service.Namespace, Port: 80},
 			LoadBalancerId: detail.LoadBalancerId,
-			RegionId:  detail.RegionId,
-			VGroupId: "v-idvgroup",
+			RegionId:       detail.RegionId,
+			VGroupId:       "v-idvgroup",
 		},
 
 		{
-			NamedKey: &NamedKey{CID:CLUSTER_ID, ServiceName: service.Name, Namespace: service.Namespace, Port: 443},
+			NamedKey:       &NamedKey{CID: CLUSTER_ID, ServiceName: service.Name, Namespace: service.Namespace, Port: 443},
 			LoadBalancerId: detail.LoadBalancerId,
-			RegionId:  detail.RegionId,
-			VGroupId: "v-idvgroup2",
+			RegionId:       detail.RegionId,
+			VGroupId:       "v-idvgroup2",
 		},
 	}
 	mgr, _ := NewMockClientMgr(&mockClientSLB{
@@ -175,29 +175,29 @@ func TestUpdateListenerPorts(t *testing.T) {
 			}
 			return nil, errors.New("not found")
 		},
-		describeVServerGroups: func (args *slb.DescribeVServerGroupsArgs) (response *slb.DescribeVServerGroupsResponse, err error) {
+		describeVServerGroups: func(args *slb.DescribeVServerGroupsArgs) (response *slb.DescribeVServerGroupsResponse, err error) {
 			return &slb.DescribeVServerGroupsResponse{
 				VServerGroups: []slb.VServerGroup{{
-					VServerGroupId: grp[0].VGroupId,
+					VServerGroupId:   grp[0].VGroupId,
 					VServerGroupName: grp[0].NamedKey.Key(),
-				},},
-			},nil
+				}},
+			}, nil
 		},
-		createVServerGroup: func (args *slb.CreateVServerGroupArgs) (response *slb.CreateVServerGroupResponse, err error) {
+		createVServerGroup: func(args *slb.CreateVServerGroupArgs) (response *slb.CreateVServerGroupResponse, err error) {
 			return &slb.CreateVServerGroupResponse{
 				VServerGroupName: args.VServerGroupName,
 				VServerGroupId:   grp[0].VGroupId,
-			},nil
+			}, nil
 		},
 	})
 
 	// buildVGroupFromService is compatiable with v1 listener.
-	vgs := buildVGroupFromService(service,detail,mgr.loadbalancer.c,detail.RegionId)
-	if err := EnsureVGroup(vgs,[]*v1.Node{});err != nil {
+	vgs := buildVGroupFromService(service, detail, mgr.loadbalancer.c, detail.RegionId)
+	if err := EnsureVGroup(vgs, []*v1.Node{}); err != nil {
 		t.Fatal("error ensure vserver group.")
 	}
 
-	err := EnsureListeners(mgr.loadbalancer.c, service, detail,vgs)
+	err := EnsureListeners(mgr.loadbalancer.c, service, detail, vgs)
 
 	if err != nil {
 		t.Fatal("listener update error! ")
@@ -289,17 +289,17 @@ func TestUpdateListenerBackendPorts(t *testing.T) {
 	detail := loadbalancerAttrib(&base[0])
 	grp := vgroups{
 		{
-			NamedKey: &NamedKey{CID:CLUSTER_ID, ServiceName: service.Name, Namespace: service.Namespace, Port: 80},
+			NamedKey:       &NamedKey{CID: CLUSTER_ID, ServiceName: service.Name, Namespace: service.Namespace, Port: 80},
 			LoadBalancerId: detail.LoadBalancerId,
-			RegionId:  detail.RegionId,
-			VGroupId: "v-idvgroup",
+			RegionId:       detail.RegionId,
+			VGroupId:       "v-idvgroup",
 		},
 
 		{
-			NamedKey: &NamedKey{CID:CLUSTER_ID, ServiceName: service.Name, Namespace: service.Namespace, Port: 442},
+			NamedKey:       &NamedKey{CID: CLUSTER_ID, ServiceName: service.Name, Namespace: service.Namespace, Port: 442},
 			LoadBalancerId: detail.LoadBalancerId,
-			RegionId:  detail.RegionId,
-			VGroupId: "v-idvgroup2",
+			RegionId:       detail.RegionId,
+			VGroupId:       "v-idvgroup2",
 		},
 	}
 	mgr, _ := NewMockClientMgr(&mockClientSLB{
@@ -361,29 +361,29 @@ func TestUpdateListenerBackendPorts(t *testing.T) {
 			}
 			return nil, errors.New("not found")
 		},
-		describeVServerGroups: func (args *slb.DescribeVServerGroupsArgs) (response *slb.DescribeVServerGroupsResponse, err error) {
+		describeVServerGroups: func(args *slb.DescribeVServerGroupsArgs) (response *slb.DescribeVServerGroupsResponse, err error) {
 			return &slb.DescribeVServerGroupsResponse{
-				VServerGroups:struct {
+				VServerGroups: struct {
 					VServerGroup []slb.VServerGroup
 				}{
 					VServerGroup: []slb.VServerGroup{
 						{
-							VServerGroupId: grp[0].VGroupId,
+							VServerGroupId:   grp[0].VGroupId,
 							VServerGroupName: grp[0].NamedKey.Key(),
 						},
 					},
 				},
-			},nil
+			}, nil
 		},
-		createVServerGroup: func (args *slb.CreateVServerGroupArgs) (response *slb.CreateVServerGroupResponse, err error) {
+		createVServerGroup: func(args *slb.CreateVServerGroupArgs) (response *slb.CreateVServerGroupResponse, err error) {
 			return &slb.CreateVServerGroupResponse{
 				VServerGroupName: args.VServerGroupName,
 				VServerGroupId:   grp[0].VGroupId,
-			},nil
+			}, nil
 		},
 	})
 
-	err := EnsureListeners(mgr.loadbalancer.c, service, detail,nil)
+	err := EnsureListeners(mgr.loadbalancer.c, service, detail, nil)
 
 	if err != nil {
 		t.Fatal("listener update error! ")

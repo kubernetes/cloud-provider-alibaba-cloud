@@ -277,7 +277,7 @@ func (s *LoadBalancerClient) EnsureLoadBalancer(service *v1.Service, nodes []*v1
 	if err != nil {
 		return nil, err
 	}
-	glog.V(4).Infof("alicloud: find " +
+	glog.V(4).Infof("alicloud: find "+
 		"loadbalancer with result, exist=%v\n %s\n", exists, PrettyJson(origined))
 	_, request := ExtractAnnotationRequest(service)
 
@@ -300,7 +300,7 @@ func (s *LoadBalancerClient) EnsureLoadBalancer(service *v1.Service, nodes []*v1
 		}
 
 		// From here, we need to create a new loadbalancer
-		glog.V(5).Infof("alicloud: can not find a " +
+		glog.V(5).Infof("alicloud: can not find a "+
 			"loadbalancer with service name [%s/%s], creating a new one\n", service.Namespace, service.Name)
 		opts := s.getLoadBalancerOpts(service, vswitchid)
 		lbr, err := s.c.CreateLoadBalancer(opts)
@@ -339,18 +339,18 @@ func (s *LoadBalancerClient) EnsureLoadBalancer(service *v1.Service, nodes []*v1
 		// Reuse SLB is not allowed when the SLB is created by k8s service.
 		tags, _, err := s.c.DescribeTags(
 			&slb.DescribeTagsArgs{
-				RegionId:origined.RegionId,
-				LoadBalancerID:origined.LoadBalancerId,
+				RegionId:       origined.RegionId,
+				LoadBalancerID: origined.LoadBalancerId,
 			})
 		if err != nil {
-			return origined,err
+			return origined, err
 		}
 		if isLoadBalancerCreatedByKubernetes(tags) &&
-			isUserDefinedLoadBalancer(request){
-			return origined, fmt.Errorf("alicloud: can not reuse loadbalancer created by kubernetes. %s",origined.LoadBalancerId)
+			isUserDefinedLoadBalancer(request) {
+			return origined, fmt.Errorf("alicloud: can not reuse loadbalancer created by kubernetes. %s", origined.LoadBalancerId)
 		}
 		needUpdate, charge, bandwidth := false, origined.InternetChargeType, origined.Bandwidth
-		glog.V(5).Infof("alicloud: found " +
+		glog.V(5).Infof("alicloud: found "+
 			"an exist loadbalancer[%s], check to see whether update is needed.", origined.LoadBalancerId)
 		if request.MasterZoneID != "" && request.MasterZoneID != origined.MasterZoneId {
 			return nil, fmt.Errorf("alicloud: can not change LoadBalancer master zone id once created.")
@@ -358,7 +358,7 @@ func (s *LoadBalancerClient) EnsureLoadBalancer(service *v1.Service, nodes []*v1
 		if request.SlaveZoneID != "" && request.SlaveZoneID != origined.SlaveZoneId {
 			return nil, fmt.Errorf("alicloud: can not change LoadBalancer slave zone id once created.")
 		}
-		if ! equalsAddressIPVersion(request.AddressIPVersion, origined.AddressIPVersion) {
+		if !equalsAddressIPVersion(request.AddressIPVersion, origined.AddressIPVersion) {
 			return nil, fmt.Errorf("alicloud: can not change LoadBalancer AddressIPVersion once created.")
 		}
 		if request.ChargeType != "" && request.ChargeType != origined.InternetChargeType {
@@ -400,11 +400,11 @@ func (s *LoadBalancerClient) EnsureLoadBalancer(service *v1.Service, nodes []*v1
 		glog.Errorf("alicloud: can not get loadbalancer[%s] attribute. ", origined.LoadBalancerId)
 		return nil, err
 	}
-	vgs := buildVGroupFromService(service,origined,s.c,origined.RegionId)
+	vgs := buildVGroupFromService(service, origined, s.c, origined.RegionId)
 
 	// Make sure virtual server backend group has been updated.
-	if err := vgs.EnsureVGroup(nodes);err != nil {
-		return origined,fmt.Errorf("update backend servers: error %s",err.Error())
+	if err := vgs.EnsureVGroup(nodes); err != nil {
+		return origined, fmt.Errorf("update backend servers: error %s", err.Error())
 	}
 	// Apply listener when
 	//   1. user does not assign loadbalancer id by themselves.
@@ -414,17 +414,16 @@ func (s *LoadBalancerClient) EnsureLoadBalancer(service *v1.Service, nodes []*v1
 		glog.V(2).Infof("alicloud: not user defined loadbalancer[%s], start to apply listener.\n", origined.LoadBalancerId)
 		// If listener update is needed. Switch to vserver group immediately.
 		// No longer update default backend servers.
-		if err := EnsureListeners(s.c,service,origined, vgs);
-			err != nil {
+		if err := EnsureListeners(s.c, service, origined, vgs); err != nil {
 
-				return origined, fmt.Errorf("ensure listener error: %s",err.Error())
+			return origined, fmt.Errorf("ensure listener error: %s", err.Error())
 		}
 	}
-	return origined, s.UpdateLoadBalancer(service,nodes,false)
+	return origined, s.UpdateLoadBalancer(service, nodes, false)
 }
 
 func isLoadBalancerCreatedByKubernetes(tags []slb.TagItemType) bool {
-	for _,tag :=range tags {
+	for _, tag := range tags {
 		if tag.TagKey == TAGKEY {
 			return true
 		}
@@ -442,34 +441,34 @@ func (s *LoadBalancerClient) UpdateLoadBalancer(service *v1.Service, nodes []*v1
 		return fmt.Errorf("the loadbalance you specified by name [%s] does not exist", service.Name)
 	}
 	if withVgroup {
-		vgs := buildVGroupFromService(service,lb,s.c,lb.RegionId)
-		if err := vgs.EnsureVGroup(nodes);err != nil {
-			return fmt.Errorf("update backend servers: error %s",err.Error())
+		vgs := buildVGroupFromService(service, lb, s.c, lb.RegionId)
+		if err := vgs.EnsureVGroup(nodes); err != nil {
+			return fmt.Errorf("update backend servers: error %s", err.Error())
 		}
 	}
-	if !needUpdateDefaultBackend(service,lb){
+	if !needUpdateDefaultBackend(service, lb) {
 		return nil
 	}
-	glog.Infof("update default backend server group, %s/%s",service.Namespace,service.Name)
+	glog.Infof("update default backend server group, %s/%s", service.Namespace, service.Name)
 	return s.UpdateDefaultServerGroup(nodes, lb)
 }
 
 // needUpdateDefaultBackend when listeners have legacy listener.
 // which means legacy listener
 // we do not update default backend server group when listener enables virtual server group mode.
-func needUpdateDefaultBackend(svc *v1.Service,lb *slb.LoadBalancerType) bool {
+func needUpdateDefaultBackend(svc *v1.Service, lb *slb.LoadBalancerType) bool {
 	listeners := lb.ListenerPortsAndProtocol.ListenerPortAndProtocol
 
 	// legacy listener has a empty name or '-'
 	for _, lis := range listeners {
 		if lis.Description == "" ||
 			lis.Description == "-" {
-				if ! hasPort(svc,int32(lis.ListenerPort)){
-					continue
-				}
-				glog.Infof("port %d has legacy listener, " +
-					"apply default backend server group. [%s]",lis.ListenerPort,lis.Description)
-				return true
+			if !hasPort(svc, int32(lis.ListenerPort)) {
+				continue
+			}
+			glog.Infof("port %d has legacy listener, "+
+				"apply default backend server group. [%s]", lis.ListenerPort, lis.Description)
+			return true
 		}
 	}
 	return false
@@ -502,15 +501,13 @@ func (s *LoadBalancerClient) EnsureLoadBalanceDeleted(service *v1.Service) error
 	_, request := ExtractAnnotationRequest(service)
 	// skip delete user defined loadbalancer
 	if isUserDefinedLoadBalancer(request) {
-		glog.Infof("alicloud: user managed " +
+		glog.Infof("alicloud: user managed "+
 			"loadbalancer will not be deleted by cloudprovider. service [%s]", service.Name)
-		return EnsureListenersDeleted(s.c,service,lb,buildVGroupFromService(service,lb,s.c,lb.RegionId))
+		return EnsureListenersDeleted(s.c, service, lb, buildVGroupFromService(service, lb, s.c, lb.RegionId))
 	}
 
 	return s.c.DeleteLoadBalancer(lb.LoadBalancerId)
 }
-
-
 
 func (s *LoadBalancerClient) getLoadBalancerOpts(service *v1.Service, vswitchid string) (args *slb.CreateLoadBalancerArgs) {
 	ar, req := ExtractAnnotationRequest(service)
@@ -561,7 +558,7 @@ func (s *LoadBalancerClient) UpdateDefaultServerGroup(nodes []*v1.Node, lb *slb.
 			}
 		}
 		if !found {
-			additions = append(additions, slb.BackendServerType{ServerId: string(id), Weight: DEFAULT_SERVER_WEIGHT,Type:"ecs"})
+			additions = append(additions, slb.BackendServerType{ServerId: string(id), Weight: DEFAULT_SERVER_WEIGHT, Type: "ecs"})
 		}
 	}
 	if len(additions) > 0 {
