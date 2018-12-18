@@ -192,11 +192,10 @@ type mockClientSLB struct {
 	describeTags                          func(args *slb.DescribeTagsArgs) (tags []slb.TagItemType, pagination *common.PaginationResult, err error)
 	addTags                               func(args *slb.AddTagsArgs) error
 
-
-	createVServerGroup 				func(args *slb.CreateVServerGroupArgs) (response *slb.CreateVServerGroupResponse, err error)
-	describeVServerGroups 			func(args *slb.DescribeVServerGroupsArgs) (response *slb.DescribeVServerGroupsResponse, err error)
-	deleteVServerGroup 				func(args *slb.DeleteVServerGroupArgs) (response *slb.DeleteVServerGroupResponse, err error)
-	setVServerGroupAttribute 		func(args *slb.SetVServerGroupAttributeArgs) (response *slb.SetVServerGroupAttributeResponse, err error)
+	createVServerGroup       func(args *slb.CreateVServerGroupArgs) (response *slb.CreateVServerGroupResponse, err error)
+	describeVServerGroups    func(args *slb.DescribeVServerGroupsArgs) (response *slb.DescribeVServerGroupsResponse, err error)
+	deleteVServerGroup       func(args *slb.DeleteVServerGroupArgs) (response *slb.DeleteVServerGroupResponse, err error)
+	setVServerGroupAttribute func(args *slb.SetVServerGroupAttributeArgs) (response *slb.SetVServerGroupAttributeResponse, err error)
 }
 
 var (
@@ -395,7 +394,7 @@ func (c *mockClientSLB) CreateVServerGroup(args *slb.CreateVServerGroupArgs) (re
 	if c.createVServerGroup != nil {
 		return c.createVServerGroup(args)
 	}
-	return nil,nil
+	return nil, nil
 }
 func (c *mockClientSLB) DescribeVServerGroups(args *slb.DescribeVServerGroupsArgs) (response *slb.DescribeVServerGroupsResponse, err error) {
 
