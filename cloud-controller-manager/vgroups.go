@@ -110,38 +110,64 @@ func (v *vgroup) Update() error {
 	}
 
 	if len(add) > 0 {
-		additions, err := json.Marshal(add)
-		if err != nil {
-			return fmt.Errorf("error marshal backends: %s, %v", err.Error(), add)
-		}
-		glog.Infof("update: try to update vserver group[%s],"+
-			" backend add[%s]", v.NamedKey.Key(), string(additions))
-		_, err = v.Client.AddVServerGroupBackendServers(
-			&slb.AddVServerGroupBackendServersArgs{
-				VServerGroupId: v.VGroupId,
-				RegionId:       v.RegionId,
-				BackendServers: string(additions),
-			})
-		if err != nil {
+		if err := BatchProcess(add,
+			func(list []slb.VBackendServerType) error {
+				additions, err := json.Marshal(list)
+				if err != nil {
+					return fmt.Errorf("error marshal backends: %s, %v", err.Error(), list)
+				}
+				glog.Infof("update: try to update vserver group[%s],"+
+					" backend add[%s]", v.NamedKey.Key(), string(additions))
+				_, err = v.Client.AddVServerGroupBackendServers(
+					&slb.AddVServerGroupBackendServersArgs{
+						VServerGroupId: v.VGroupId,
+						RegionId:       v.RegionId,
+						BackendServers: string(additions),
+					})
+				return err
+			}); err != nil {
+
 			return err
 		}
 	}
 	if len(del) > 0 {
-		deletions, err := json.Marshal(del)
-		if err != nil {
-			return fmt.Errorf("error marshal backends: %s, %v", err.Error(), del)
-		}
-		glog.Infof("update: try to update vserver group[%s],"+
-			" backend del[%s]", v.NamedKey.Key(), string(deletions))
-		_, err = v.Client.RemoveVServerGroupBackendServers(
-			&slb.RemoveVServerGroupBackendServersArgs{
-				VServerGroupId: v.VGroupId,
-				RegionId:       v.RegionId,
-				BackendServers: string(deletions),
+		return BatchProcess(del,
+			func(list []slb.VBackendServerType) error {
+				deletions, err := json.Marshal(list)
+				if err != nil {
+					return fmt.Errorf("error marshal backends: %s, %v", err.Error(), list)
+				}
+				glog.Infof("update: try to update vserver group[%s],"+
+					" backend del[%s]", v.NamedKey.Key(), string(deletions))
+				_, err = v.Client.RemoveVServerGroupBackendServers(
+					&slb.RemoveVServerGroupBackendServersArgs{
+						VServerGroupId: v.VGroupId,
+						RegionId:       v.RegionId,
+						BackendServers: string(deletions),
+					})
+				return err
 			})
-		return err
 	}
 	return nil
+}
+
+const MAX_BACKEND_NUM = 19
+
+func BatchProcess(list []slb.VBackendServerType,
+	batch func(list []slb.VBackendServerType) error) error {
+
+	glog.Infof("batch process virtual server backend, length %d", len(list))
+	for len(list) > MAX_BACKEND_NUM {
+		if err := batch(list[0:MAX_BACKEND_NUM]); err != nil {
+
+			return err
+		}
+		list = list[MAX_BACKEND_NUM:]
+	}
+	if len(list) <= 0 {
+		return nil
+	}
+	return batch(list)
 }
 
 func (v *vgroup) diff(apis, nodes []slb.VBackendServerType) (
