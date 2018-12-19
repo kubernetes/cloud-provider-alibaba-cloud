@@ -50,24 +50,17 @@ func (v *vgroup) Add() error {
 	if v.NamedKey == nil {
 		return fmt.Errorf("format error of vgroup name")
 	}
-	backends, err := json.Marshal(v.BackendServers)
-	if err != nil {
-		return fmt.Errorf("add: error marshal backends")
-	}
 	vgp := slb.CreateVServerGroupArgs{
 		LoadBalancerId:   v.LoadBalancerId,
 		VServerGroupName: v.NamedKey.Key(),
 		RegionId:         v.RegionId,
-	}
-	if len(v.BackendServers) > 0 {
-		vgp.BackendServers = string(backends)
 	}
 	gp, err := v.Client.CreateVServerGroup(&vgp)
 	if err != nil {
 		return fmt.Errorf("CreateVServerGroup. %s", err.Error())
 	}
 	glog.Infof("create new vserver group[%s]"+
-		" for loadbalancer[%s] with backend list count[%s]", v.NamedKey.Key(), v.LoadBalancerId, len(v.BackendServers))
+		" for loadbalancer[%s] with empty backend list", v.NamedKey.Key(), v.LoadBalancerId)
 	v.VGroupId = gp.VServerGroupId
 	return nil
 }
@@ -89,7 +82,9 @@ func (v *vgroup) Update() error {
 			if !strings.Contains(err.Error(), "not found") {
 				return fmt.Errorf("update: vserver group error, %s", err.Error())
 			}
-			return v.Add()
+			if err := v.Add(); err != nil {
+				return err
+			}
 		}
 	}
 
