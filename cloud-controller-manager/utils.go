@@ -17,7 +17,9 @@ limitations under the License.
 package alicloud
 
 import (
+	"fmt"
 	"k8s.io/api/core/v1"
+	"net"
 	"sync"
 )
 
@@ -70,4 +72,35 @@ func Contains(list []int, x int) bool {
 		}
 	}
 	return false
+}
+
+func RealContainsCidr(outer string, inner string) (bool, error) {
+	contains, err := ContainsCidr(outer, inner)
+	if err != nil {
+		return false, err
+	}
+	if outer == inner {
+		return false, nil
+	}
+	return contains, nil
+}
+
+func ContainsCidr(outer string, inner string) (bool, error) {
+	_, outerCidr, err := net.ParseCIDR(outer)
+	if err != nil {
+		return false, fmt.Errorf("error parse outer cidr: %s, message: %s", outer, err.Error())
+	}
+	_, innerCidr, err := net.ParseCIDR(inner)
+	if err != nil {
+		return false, fmt.Errorf("error parse inner cidr: %s, message: %s", inner, err.Error())
+	}
+
+	lastIP := make([]byte, len(innerCidr.IP))
+	for i := range lastIP {
+		lastIP[i] = innerCidr.IP[i] | ^innerCidr.Mask[i]
+	}
+	if !outerCidr.Contains(innerCidr.IP) || !outerCidr.Contains(lastIP) {
+		return false, nil
+	}
+	return true, nil
 }

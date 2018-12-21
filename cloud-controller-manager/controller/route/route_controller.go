@@ -39,6 +39,7 @@ import (
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/cloud-provider-alibaba-cloud/cloud-controller-manager"
 	v1node "k8s.io/kubernetes/pkg/api/v1/node"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/controller"
@@ -152,9 +153,22 @@ func (rc *RouteController) reconcile(nodes []*v1.Node, routes []*cloudprovider.R
 	rateLimiter := make(chan struct{}, 1)
 	for _, route := range routes {
 		if rc.isResponsibleForRoute(route) {
+			nodesCidrRealContainsRoute := false
+			for _, node := range nodes {
+				if node.Spec.PodCIDR != "" {
+					if realContains, err := alicloud.RealContainsCidr(node.Spec.PodCIDR, route.DestinationCIDR); err != nil {
+						glog.Errorf("Could not judge relation between cidrs, will skip. node: %s, route: %s. error: %v", node.Spec.PodCIDR, route.DestinationCIDR, err)
+						continue
+					} else if realContains {
+						nodesCidrRealContainsRoute = true
+						break
+					}
+				}
+			}
+
 			// Check if this route is a blackhole, or applies to a node we know about & has an incorrect CIDR.
-			if route.Blackhole || (cidrForNode(nodes, string(route.TargetNode)) != route.DestinationCIDR) {
-				glog.Infof("responsible for: %t, %t,%t", route.Blackhole, cidrForNode(nodes, string(route.TargetNode)) != route.DestinationCIDR, route.Blackhole || (cidrForNode(nodes, string(route.TargetNode)) != route.DestinationCIDR))
+			if  route.Blackhole || nodesCidrRealContainsRoute {
+				glog.Infof("responsible for: %t, %t", route.Blackhole, nodesCidrRealContainsRoute)
 				wg.Add(1)
 				// Delete the route.
 				startTime := time.Now()
@@ -252,16 +266,6 @@ func (rc *RouteController) reconcile(nodes []*v1.Node, routes []*cloudprovider.R
 	return nil
 }
 
-func cidrForNode(nodes []*v1.Node, providerID string) string {
-	for _, node := range nodes {
-		if node.Spec.ProviderID == providerID {
-			return node.Spec.PodCIDR
-		}
-	}
-	return ""
-}
-
-// Update network condition of node in K8S
 func (rc *RouteController) updateNetworkingCondition(nodeName types.NodeName, routeCreated bool) error {
 	var err error
 	for i := 0; i < updateNodeStatusMaxRetries; i++ {
