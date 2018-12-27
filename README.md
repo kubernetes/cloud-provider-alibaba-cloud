@@ -2,13 +2,19 @@
 
 `cloud-controller-manager` is the external Kubernetes cloud controller manager implementation for AliCloud(Alibaba Cloud). Running `cloud-controller-manager` allows you build your kubernetes clusters leverage on many cloud services on AliCloud. You can read more about Kubernetes cloud controller manager [here](https://kubernetes.io/docs/tasks/administer-cluster/running-cloud-controller/).
 
-## developing
+## Development
 
 Test project with command ```make test``` and Build an image with command ```make image```
 
-## License
-Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with the License. You may obtain a copy of the License at
+## Community, discussion, contribution, and support
 
-http://www.apache.org/licenses/LICENSE-2.0
+Learn how to engage with the Kubernetes community on the [community page](http://kubernetes.io/community/).
 
-Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions and limitations under the License.
+You can reach the maintainers of this project at:
+
+- [Slack channel](https://kubernetes.slack.com/messages/sig-cloud-provider)
+- [Mailing list](https://groups.google.com/forum/#!forum/kubernetes-sig-cloud-provider)
+
+### Code of conduct
+
+Participation in the Kubernetes community is governed by the [Kubernetes Code of Conduct](code-of-conduct.md).
