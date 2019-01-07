@@ -6,10 +6,14 @@
 
 ## Deploy out-of-tree CloudProvider in Alibaba Cloud.
 
-### Bring up a latest supported Kubernetes Cluster of version v1.10 with Kubeadm.
+### Set up a latest supported Kubernetes Cluster of version v1.10+ with Kubeadm.
+
 Kubeadm is an official installation tool for kubernetes. You could bring up a single master kubernetes cluster by following the instruction in this [page](https://kubernetes.io/docs/setup/independent/create-cluster-kubeadm/).
 
-Be advise that kubeadm accept a serious of certain parameters to customize your cluster with kubeadm.conf file. If you want to use your own secure ETCD cluster or image repository, you may find the template [kubeadm.conf](examples/kubeadm.conf) is useful. 
+1. install Docker or other CRI runtime: https://kubernetes.io/docs/setup/cri/
+2. install kubeadm, kubelet and kubectl: https://kubernetes.io/docs/setup/independent/install-kubeadm/
+3. update kubelet info with provider id info and restart kubelet: You should provide ```--hostname-override=${REGION_ID}.${INSTANCE_ID} --provider-id=${REGION_ID}.${INSTANCE_ID}``` arguments in all of your kubelet unit file. The format is ```${REGION_ID}.${INSTANCE_ID}```. See [kubelet.service](examples/kubelet.service) for more details.
+4. init kubeadm: Be advised that kubeadm accept a serious of certain parameters to customize your cluster with kubeadm.conf file. If you want to use your own secure ETCD cluster or image repository, you may find the template [kubeadm.conf](examples/kubeadm.conf) or [kubeadm-new.conf for k8s 1.12+](examples/kubeadm.conf) is useful. 
 
 Run the command below to initialize a kubernetes cluster.
 ```$bash
@@ -18,15 +22,14 @@ kubeadm init --config kubeadm.conf
 
 >> Note:
 1. ```cloudProvider: external``` is required to set in kubeadm.conf file for you to deploy alibaba out-of-tree cloudprovider.
-2. Set ```imageRepository: registry-vpc.${region}.aliyuncs.com/acs``` is a best practice to enable you the ability to pull image faster in China. 
-3. You should provide ```--hostname-override=${REGION_ID}.${INSTANCE_ID} --provider-id=${REGION_ID}.${INSTANCE_ID}``` arguments in all of your kubelet unit file. The format is ```${REGION_ID}.${INSTANCE_ID}```. See [kubelet.service](examples/kubelet.service) for more details.
-
-If you are not sure how to find your ECS instance's ID and region id, try to run these command in your ECS instance:
-
+2. Set ```imageRepository: registry-vpc.${region}.aliyuncs.com/acs``` is a best practice to enable you the ability to pull image faster in China (for example: cn-hangzhou or cn-hongkong).
+3. If you are not sure how to find your ECS instance's ID and region id, try to run these command in your ECS instance:
 ```bash
 $ META_EP=http://100.100.100.200/latest/meta-data
 $ echo `curl -s $META_EP/region-id`.`curl -s $META_EP/instance-id`
 ```
+
+
 For now, you should have a running kubernetes cluster. Try some example command like ```kubectl get no ```
 
 ### Install Alibaba CloudProvider support.
@@ -105,7 +108,7 @@ $ kubectl create -f nginx.yaml
 
 Then create service with type: LoadBalancer:
 ```bash
-$ kubectl expose deployment nginx-example --name=nginx-example --type=LoadBalancer
+$ kubectl expose deployment nginx-example --name=nginx-example --type=LoadBalancer --port=80
 $ kubectl get svc
 NAME            CLUSTER-IP        EXTERNAL-IP     PORT(S)        AGE
 nginx-example   192.168.250.19    106.xx.xx.xxx   80:31205/TCP   5s

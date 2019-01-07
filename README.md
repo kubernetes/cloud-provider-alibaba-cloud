@@ -1,10 +1,18 @@
 # Kubernetes Cloud Controller Manager for Alibaba Cloud
 
-`cloud-controller-manager` is the external Kubernetes cloud controller manager implementation for AliCloud(Alibaba Cloud). Running `cloud-controller-manager` allows you build your kubernetes clusters leverage on many cloud services on AliCloud. You can read more about Kubernetes cloud controller manager [here](https://kubernetes.io/docs/tasks/administer-cluster/running-cloud-controller/).
+Thank you for visiting the cloud-provider-alibaba-cloud repository!
+
+
+`cloud-provider-alibaba-cloud` is the external Kubernetes cloud controller manager implementation for AliCloud(Alibaba Cloud). Running `cloud-provider-alibaba-cloud` allows you build your kubernetes clusters leverage on many cloud services on AliCloud. You can read more about Kubernetes cloud controller manager [here](https://kubernetes.io/docs/tasks/administer-cluster/running-cloud-controller/).
 
 ## Development
 
 Test project with command ```make test``` and Build an image with command ```make image```
+
+## QuickStart
+
+- [Getting-started](docs/getting-started.md)
+
 
 ## Community, discussion, contribution, and support
 
