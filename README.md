@@ -12,6 +12,7 @@ Test project with command ```make test``` and Build an image with command ```mak
 ## QuickStart
 
 - [Getting-started](docs/getting-started.md)
+- [Usage Guide](docs/usage.md)
 
 
 ## Community, discussion, contribution, and support
