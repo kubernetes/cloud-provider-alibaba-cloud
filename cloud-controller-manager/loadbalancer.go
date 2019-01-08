@@ -435,11 +435,11 @@ func (s *LoadBalancerClient) UpdateBackendServers(nodes []*v1.Node, lb *slb.Load
 			if len(additions) > MAX_LOADBALANCER_BACKEND {
 				target = additions[0:MAX_LOADBALANCER_BACKEND]
 				additions = additions[MAX_LOADBALANCER_BACKEND:]
-				glog.V(5).Infof("alicloud: batch add backend servers, %s", target)
+				glog.V(5).Infof("alicloud: batch add backend servers, %v", target)
 			} else {
 				target = additions
 				additions = []slb.BackendServerType{}
-				glog.V(5).Infof("alicloud: batch add backend servers, else %s", target)
+				glog.V(5).Infof("alicloud: batch add backend servers, else %v", target)
 			}
 			if _, err := s.c.AddBackendServers(lb.LoadBalancerId, target); err != nil {
 				return err

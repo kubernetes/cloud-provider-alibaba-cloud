@@ -85,7 +85,7 @@ func (r *RoutesClient) findRouter(region common.Region, vpcid string) (*ecs.VRou
 		}
 		if len(vroute) <= 0 {
 			return nil, fmt.Errorf("can not find VRouter metadata "+
-				"by instance. region=%s,vpcid=%s, error=[no VRouter found by specified id]", region, vpc)
+				"by instance. region=%s,vpcid=%v, error=[no VRouter found by specified id]", region, vpc)
 		}
 		r.routers.Set(routerkey, &vroute[0], defaultCacheExpiration)
 		route = &vroute[0]
