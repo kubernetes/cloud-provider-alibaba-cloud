@@ -117,7 +117,7 @@ spec:
 
 **限制负载均衡的带宽**
 
-只限制负载均衡实例下的总带宽，所有监听共享实例的总带宽，参见[共享实例带宽](../../../../intl.zh-CN/用户指南/监听/共享实例带宽.md#)。
+只限制负载均衡实例下的总带宽，所有监听共享实例的总带宽，参见[共享实例带宽](https://help.aliyun.com/document_detail/85930.html)。
 
 ```
 apiVersion: v1
@@ -349,13 +349,12 @@ spec:
   type: LoadBalancer
 ```
 
-**说明：** 注释的内容是区分大小写的。
+**说明：** 注解的内容是区分大小写的。
 
 |注释|描述|默认值|
 |--|--|---|
 |service.beta.kubernetes.io/alicloud-loadbalancer-protocol-port|多个值之间由逗号分隔，比如：https:443,http:80|无|
 |service.beta.kubernetes.io/alicloud-loadbalancer-address-type|取值可以是internet或者intranet|internet|
-|service.beta.kubernetes.io/alicloud-loadbalancer-slb-network-type|负载均衡的网络类型，取值可以是classic或者vpc|classic|
 |service.beta.kubernetes.io/alicloud-loadbalancer-charge-type|取值可以是paybytraffic或者paybybandwidth|paybytraffic|
 |service.beta.kubernetes.io/alicloud-loadbalancer-id|负载均衡实例的 ID。通过 service.beta.kubernetes.io/alicloud-loadbalancer-id指定您已有的SLB，已有监听会被覆盖， 删除 service 时该 SLB 不会被删除。|无|
 |service.beta.kubernetes.io/alicloud-loadbalancer-backend-label|通过 label 指定 SLB 后端挂载哪些worker节点。|无|
