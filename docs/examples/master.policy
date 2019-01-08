@@ -13,7 +13,24 @@
         "ecs:DeleteRouteEntry",
         "ecs:DetachDisk",
         "ecs:ModifyAutoSnapshotPolicyEx",
-        "ecs:ModifyDiskAttribute"
+        "ecs:ModifyDiskAttribute",
+        "ecs:CreateNetworkInterface",
+        "ecs:DescribeNetworkInterfaces",
+        "ecs:AttachNetworkInterface",
+        "ecs:DetachNetworkInterface",
+        "ecs:DeleteNetworkInterface",
+        "ecs:DescribeInstanceAttribute"
+      ],
+      "Resource": [
+        "*"
+      ],
+      "Effect": "Allow"
+    },
+    {
+      "Action": [
+        "cr:Get*",
+        "cr:List*",
+        "cr:PullRepository"
       ],
       "Resource": [
         "*"

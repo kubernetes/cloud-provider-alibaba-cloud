@@ -1,0 +1,102 @@
+{
+  "Version": "1",
+  "Statement": [
+    {
+      "Action": [
+        "ecs:AttachDisk",
+        "ecs:DetachDisk",
+        "ecs:DescribeDisks",
+        "ecs:CreateDisk",
+        "ecs:CreateSnapshot",
+        "ecs:DeleteDisk",
+        "ecs:CreateNetworkInterface",
+        "ecs:DescribeNetworkInterfaces",
+        "ecs:AttachNetworkInterface",
+        "ecs:DetachNetworkInterface",
+        "ecs:DeleteNetworkInterface",
+        "ecs:DescribeInstanceAttribute"
+      ],
+      "Resource": [
+        "*"
+      ],
+      "Effect": "Allow"
+    },
+    {
+      "Action": [
+        "cr:Get*",
+        "cr:List*",
+        "cr:PullRepository"
+      ],
+      "Resource": [
+        "*"
+      ],
+      "Effect": "Allow"
+    },
+    {
+      "Action": [
+        "eci:CreateContainerGroup",
+        "eci:DeleteContainerGroup",
+        "eci:DescribeContainerGroups",
+        "eci:DescribeContainerLog"
+      ],
+      "Resource": [
+        "*"
+      ],
+      "Effect": "Allow"
+    },
+    {
+      "Action": [
+        "nas:*"
+      ],
+      "Resource": [
+        "*"
+      ],
+      "Effect": "Allow"
+    },
+    {
+      "Action": [
+        "oss:*"
+      ],
+      "Resource": [
+        "*"
+      ],
+      "Effect": "Allow"
+    },
+    {
+      "Action": [
+        "log:*"
+      ],
+      "Resource": [
+        "*"
+      ],
+      "Effect": "Allow"
+    },
+    {
+      "Action": [
+        "cms:*"
+      ],
+      "Resource": [
+        "*"
+      ],
+      "Effect": "Allow"
+    },
+    {
+      "Action": [
+        "vpc:*"
+      ],
+      "Resource": [
+        "*"
+      ],
+      "Effect": "Allow"
+    },
+    {
+      "Action": [
+        "rds:*"
+      ],
+      "Resource": [
+        "*"
+      ],
+      "Effect": "Allow"
+    }
+  ]
+}
