@@ -377,3 +377,35 @@ spec:
   type: LoadBalancer
 ```
 
+ps: Annotation list
+
+|Annotation |Description |Default value |
+|----|----|---|
+|service.beta.kubernetes.io/alicloud-loadbalancer-protocol-port|	Use a commas (,) to separate two values, for example, https:443,http:80.	|None|
+|service.beta.kubernetes.io/alicloud-loadbalancer-address-type|	Valid values: internet or intranet.	|internet|
+|service.beta.kubernetes.io/alicloud-loadbalancer-charge-type|	Valid values: paybytraffic or paybybandwidth.	|paybytraffic|
+|service.beta.kubernetes.io/alicloud-loadbalancer-id|	ID of the SLB instance. Specify an existing SLB instance you own through service.beta.kubernetes.io/alicloud-loadbalancer-id and the existing listeners are overridden. Note that the SLB instance is not deleted when you delete the service.	|None|
+|service.beta.kubernetes.io/alicloud-loadbalancer-backend-label|	Use labels to specify the Worker nodes to be mounted to the backend of the SLB instance.	|None|
+|service.beta.kubernetes.io/alicloud-loadbalancer-spec|	Specification of the SLB instance. For more information, see [CreateLoadBalancer](https://www.alibabacloud.com/help/doc-detail/27577.htm?#SLB-api-CreateLoadBalancer)	|None|
+|service.beta.kubernetes.io/alicloud-loadbalancer-persistence-timeout|	Session timeout period.It applies only to TCP listeners and the value range is 0 to 3600 (seconds).The default value is 0, indicating that the session remains closed.For more information, see [CreateLoadBalancerTCPListener](https://www.alibabacloud.com/help/doc-detail/27594.htm?#slb-api-CreateLoadBalancerTCPListener).|0|
+|service.beta.kubernetes.io/alicloud-loadbalancer-sticky-session|	Whether to enable session persistence. Valid values: on or off.Note It applies only to HTTP and HTTPS listeners.For more information, see [CreateLoadBalancerHTTPListener](https://www.alibabacloud.com/help/doc-detail/27592.htm?#slb-api-CreateLoadBalancerHTTPListener) and [CreateLoadBalancerHTTPSListener](https://www.alibabacloud.com/help/doc-detail/27593.htm?#slb-api-CreateLoadBalancerHTTPSListener).|off|
+|service.beta.kubernetes.io/alicloud-loadbalancer-sticky-session-type|	Method used to handle the cookie. Valid values: </br> - insert: Insert the cookie. </br> - server: Rewrite the cookie.</br> Note It applies only to HTTP and HTTPS listeners.When the parameter service.beta.kubernetes.io/alicloud-loadbalancer-sticky-session is set to on, this parameter is mandatory.|None|
+|service.beta.kubernetes.io/alicloud-loadbalancer-cookie-timeout|	Timeout period of the cookie. Value range: 1–8640 (seconds).Note When the parameter service.beta.kubernetes.io/alicloud-loadbalancer-sticky-session is set to on and the parameter service.beta.kubernetes.io/alicloud-loadbalancer-sticky-session-type is set to insert, this parameter is mandatory.|None|
+|service.beta.kubernetes.io/alicloud-loadbalancer-cookie|	Cookie configured on the server.The cookie must be 1 to 200 characters in length and can only contain ASCII English letters and numeric characters. It cannot contain commas, semicolons, or spaces, or begin with $.Note  When the parameter service.beta.kubernetes.io/alicloud-loadbalancer-sticky-session is set to on and the parameter service.beta.kubernetes.io/alicloud-loadbalancer-sticky-session-type is set to server, this parameter is mandatory.|None|
+|service.beta.kubernetes.io/alicloud-loadbalancer-master-zoneid|	Availability zone ID of the primary backend server.	|None|
+|service.beta.kubernetes.io/alicloud-loadbalancer-slave-zoneid|	Availability zone ID of the secondary backend server.	|None|
+|externalTrafficPolicy|	Nodes that can be used as backend servers. Valid values:Cluster: Use all backend nodes as backend servers.Local: Use the nodes where pods are located as backend servers.|Cluster|
+|service.beta.kubernetes.io/alicloud-loadbalancer-force-override-listeners|	Whether to forcibly override the listeners when you specify an existing SLB instance.	|false: Do not override.|
+|service.beta.kubernetes.io/alicloud-loadbalancer-region|	Rgion where the SLB instance is located.	|None|
+|service.beta.kubernetes.io/alicloud-loadbalancer-bandwidth|	Bandwidth of the SLB instance.	|50|
+|service.beta.kubernetes.io/alicloud-loadbalancer-cert-id|	ID of a certificate on Alibaba Cloud. You must have uploaded a certificate first.	|None|
+|service.beta.kubernetes.io/alicloud-loadbalancer-health-check-flag|	Valid values: on or off.	|The default value is off. No need to modify this parameter for TCP, because health check is enabled for TCP by default and this parameter cannot be set.|
+|service.beta.kubernetes.io/alicloud-loadbalancer-health-check-type|	Health check type. Valid values: tcp or http. |tcp|
+|service.beta.kubernetes.io/alicloud-loadbalancer-health-check-uri|	URI used for health check.Note If the health check type is TCP, you do not need to set this parameter.|None|
+|service.beta.kubernetes.io/alicloud-loadbalancer-health-check-connect-port|	Port used for health check. Valid values:</br>  -520: The backend port configured for the listener is used by default.</br>  1-65535: The port opened on the backend server for health check is used. |None|
+|service.beta.kubernetes.io/alicloud-loadbalancer-healthy-threshold|	For more information, see CreateLoadBalancerTCPListener.|None|
+|service.beta.kubernetes.io/alicloud-loadbalancer-unhealthy-threshold|	The number of consecutive health check successes before the backend server is deemed as healthy (from failure to success). Value range: 2–10. |None|
+|service.beta.kubernetes.io/alicloud-loadbalancer-health-check-interval|	Time interval between two consecutive health checks. Value range: 1–50 (seconds).|None|
+|service.beta.kubernetes.io/alicloud-loadbalancer-health-check-connect-timeout|	Amount of time waiting for the response from the health check. If the backend ECS instance does not send a valid response within a specified period of time, the health check fails. value range: 1–300 (seconds).Note If the value of the parameter service.beta.kubernetes.io/alicloud-loadbalancer-health-check-connect-timeout is less than that of the parameter service.beta.kubernetes.io/alicloud-loadbalancer-health-check-interval, the parameter service.beta.kubernetes.io/alicloud-loadbalancer-health-check-connect-timeout is invalid and the timeout period equals the value of service.beta.kubernetes.io/alicloud-loadbalancer-health-check-interval.|None|
+|service.beta.kubernetes.io/alicloud-loadbalancer-health-check-timeout|	Amount of time waiting for the response from health check. If the backend ECS instance does not send a valid response within a specified period of time, the health check fails.Value range: 1–300 (seconds).Note If the value of the parameter service.beta.kubernetes.io/alicloud-loadbalancer-health-check-timeout is less than that of the parameter service.beta.kubernetes.io/alicloud-loadbalancer-health-check-interval, the parameter service.beta.kubernetes.io/alicloud-loadbalancer-health-check-timeout is invalid, and the timeout period equals the value of the parameter service.beta.kubernetes.io/alicloud-loadbalancer-health-check-interval.|None|
+
