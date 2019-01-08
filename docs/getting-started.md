@@ -1,6 +1,6 @@
 
-## Pre-Requirement
-- Version: kubernetes version great than v1.7.2 is required.
+## Prerequisites
+- Version: kubernetes version > 1.7.2 is required.
 - CloudNetwork: Only Alibaba Cloud VPC network is supported.
 
 
@@ -10,10 +10,10 @@
 
 Kubeadm is an official installation tool for kubernetes. You could bring up a single master kubernetes cluster by following the instruction in this [page](https://kubernetes.io/docs/setup/independent/create-cluster-kubeadm/).
 
-1. install Docker or other CRI runtime: https://kubernetes.io/docs/setup/cri/
-2. install kubeadm, kubelet and kubectl: https://kubernetes.io/docs/setup/independent/install-kubeadm/
-3. update kubelet info with provider id info and restart kubelet: You should provide ```--hostname-override=${REGION_ID}.${INSTANCE_ID} --provider-id=${REGION_ID}.${INSTANCE_ID}``` arguments in all of your kubelet unit file. The format is ```${REGION_ID}.${INSTANCE_ID}```. See [kubelet.service](examples/kubelet.service) for more details.
-4. init kubeadm: Be advised that kubeadm accept a serious of certain parameters to customize your cluster with kubeadm.conf file. If you want to use your own secure ETCD cluster or image repository, you may find the template [kubeadm.conf](examples/kubeadm.conf) or [kubeadm-new.conf for k8s 1.12+](examples/kubeadm.conf) is useful. 
+1. Install Docker or other CRI runtime: https://kubernetes.io/docs/setup/cri/
+2. Install kubeadm, kubelet and kubectl: https://kubernetes.io/docs/setup/independent/install-kubeadm/
+3. Update kubelet info with provider id info and restart kubelet: You should provide ```--hostname-override=${REGION_ID}.${INSTANCE_ID} --provider-id=${REGION_ID}.${INSTANCE_ID}``` arguments in all of your kubelet unit file. The format is ```${REGION_ID}.${INSTANCE_ID}```. See [kubelet.service](examples/kubelet.service) for more details.
+4. Init kubeadm: Be advised that kubeadm accept a serious of certain parameters to customize your cluster with kubeadm.conf file. If you want to use your own secure ETCD cluster or image repository, you may find the template [kubeadm.conf](examples/kubeadm.conf) or [kubeadm-new.conf for k8s 1.12+](examples/kubeadm-new.conf) is useful. 
 
 Run the command below to initialize a kubernetes cluster.
 ```$bash
@@ -34,9 +34,17 @@ For now, you should have a running kubernetes cluster. Try some example command 
 
 ### Install Alibaba CloudProvider support.
 
+CloudProvider needs certain permissions to access Alibaba Cloud, you will need to create a few RAM policies for your ECS instances or use AccessKeyID&Secret directly.
+
+**RAM role Policy**
+
+[What is the RAM role of an instance](https://www.alibabacloud.com/help/doc-detail/54235.htm)
+
+The sample [master policy](examples/master.policy) is a bit open and can be scaled back depending on the use case. Adjust these based on your needs.
+
 **AccessKeyID & AccessKeySecret**
 
-CloudProvider needs certain permissions to access Alibaba Cloud. Here we use Alibaba AccessKeyID&Secret to authorize the CloudProvider. Please make sure that the AccessKeyID has the listed permissions in [permissions.policy](examples/permissions.policy)
+Or we use Alibaba AccessKeyID&Secret to authorize the CloudProvider. Please make sure that the AccessKeyID has the listed permissions in [master.policy](examples/master.policy)
 
 [How to get AccessKey?](https://usercenter.console.aliyun.com/#/manage/ak)
 
@@ -79,6 +87,10 @@ clusters:
 
 An available cloudprovider daemonset yaml file is being prepared in [cloud-controller-manager.yml](examples/cloud-controller-manager.yml). The only thing you need to do is to replace the ${CLUSTER_CIDR} with your own real cluster cidr. 
 And then ``` kubectl apply -f examples/cloud-controller-manager.yml``` to finish the installation. 
+
+>> Note:
+1. If you use RAM role policy , please delete env ACCESS_KEY_ID and ACCESS_KEY_SECRET from cloud-controller-manager.yml.
+
 
 ## Try With Simple Example
 Once `cloud-controller-manager` is up and running, run a sample nginx deployment:
