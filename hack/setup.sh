@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e -x
 if [ -z $APISERVER_IP ];then
-	APISERVER_IP=120.55.105.57
+	APISERVER_IP=47.110.118.25
 fi
 ### rename your cloud-controller-manager image.
 kubectl get ds -n kube-system cloud-controller-manager -o yaml |grep image:|awk -F "image: " '{print $2}'|xargs -I '{}' kubectl set image ds/cloud-controller-manager -n kube-system cloud-controller-manager={}-bak
@@ -15,25 +15,8 @@ setup_localproxy()
 	echo "1. check to see whether metaserver proxy is running..."
 	cnt=$(kubectl get deploy 2>&1|grep metaserver|wc -l)
 	if [[ "$cnt" == *"0"* ]];then
-	    kubectl run  metaserver --image=registry.cn-hangzhou.aliyuncs.com/spacexnice/nginx-net:latest
-	    cat <<EOF | kubectl apply -f -
-apiVersion: v1
-kind: Service
-metadata:
-  labels:
-    run: metaserver
-  name: metaserver
-  namespace: default
-spec:
-  ports:
-  - nodePort: 31977
-    port: 80
-    protocol: TCP
-    targetPort: 80
-  selector:
-    run: metaserver
-  type: NodePort
-EOF
+	    kubectl apply -f hack/metaserver-deploy.yaml
+	    kubectl apply -f hack/metaserver-svc.yaml
 	    echo "    run new metaserver successfully."
 	fi
 

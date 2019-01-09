@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: metaserver
+  name: metaserver
+  namespace: default
+spec:
+  ports:
+    - nodePort: 31977
+      port: 80
+      protocol: TCP
+      targetPort: 80
+  selector:
+    app: metaserver
+  type: NodePort
