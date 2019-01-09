@@ -54,6 +54,9 @@ const (
 	ServiceAnnotationLoadBalancerHealthCheckDomain             = ServiceAnnotationLoadBalancerPrefix + "health-check-domain"
 	ServiceAnnotationLoadBalancerHealthCheckHTTPCode           = ServiceAnnotationLoadBalancerPrefix + "health-check-httpcode"
 
+	// For example: "Key1=Val1,Key2=Val2,KeyNoVal1=,KeyNoVal2",same with aws
+	ServiceAnnotationLoadBalancerAdditionalTags				   = ServiceAnnotationLoadBalancerPrefix + "additional-resource-tags"
+
 	ServiceAnnotationLoadBalancerOverrideListener = ServiceAnnotationLoadBalancerPrefix + "force-override-listeners"
 
 	ServiceAnnotationLoadBalancerSpec               = ServiceAnnotationLoadBalancerPrefix + "spec"
@@ -67,14 +70,20 @@ const (
 	MAX_LOADBALANCER_BACKEND = 18
 )
 
+//compatible to old camel annotation
+func getBackwardsCompatibleAnnotation(annotations map[string]string)(map[string]string){
+	newAnnotation := make(map[string]string)
+	for k, v := range annotations {
+		newAnnotation[replaceCamel(k)] = v
+	}
+	return newAnnotation;
+}
+
 // defaulted is the parameters which set by programe.
 // request represent user defined parameters.
 func ExtractAnnotationRequest(service *v1.Service) (*AnnotationRequest, *AnnotationRequest) {
 	defaulted, request := &AnnotationRequest{}, &AnnotationRequest{}
-	annotation := make(map[string]string)
-	for k, v := range service.Annotations {
-		annotation[replaceCamel(k)] = v
-	}
+	annotation := getBackwardsCompatibleAnnotation(service.Annotations);
 	bandwidth, ok := annotation[ServiceAnnotationLoadBalancerBandwidth]
 	if ok {
 		if i, err := strconv.Atoi(bandwidth); err == nil {
