@@ -286,15 +286,15 @@ func (s *LoadBalancerClient) EnsureLoadBalancer(service *v1.Service, nodes []*v1
 		}
 
 		//deal with loadBalancer tags
-		tags := getLoadBalancerAdditionalTags(getBackwardsCompatibleAnnotation(service.Annotations));
+		tags := getLoadBalancerAdditionalTags(getBackwardsCompatibleAnnotation(service.Annotations))
 		loadbalancerName := cloudprovider.GetLoadBalancerName(service)
 		// Add default tags
 		tags[TAGKEY] = loadbalancerName
 
-		tagItemArr := make([]slb.TagItem,0)
+		tagItemArr := make([]slb.TagItem, 0)
 		for key, value := range tags {
-			tagItemArr=append(tagItemArr, slb.TagItem{TagKey: key, TagValue: value})
-			}
+			tagItemArr = append(tagItemArr, slb.TagItem{TagKey: key, TagValue: value})
+		}
 		// TODO if the key size or value size > slb's tag limit or number of tags  >limit(20), tags will insert error.
 
 		tagItems, err := json.Marshal(tagItemArr)
