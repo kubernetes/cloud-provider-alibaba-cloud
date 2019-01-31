@@ -3,7 +3,7 @@
 Thank you for visiting the cloud-provider-alibaba-cloud repository!
 
 
-`cloud-provider-alibaba-cloud` is the external Kubernetes cloud controller manager implementation for AliCloud(Alibaba Cloud). Running `cloud-provider-alibaba-cloud` allows you build your kubernetes clusters leverage on many cloud services on AliCloud. You can read more about Kubernetes cloud controller manager [here](https://kubernetes.io/docs/tasks/administer-cluster/running-cloud-controller/).
+`cloud-provider-alibaba-cloud` is the external Kubernetes cloud controller manager implementation for Alibaba Cloud. Running `cloud-provider-alibaba-cloud` allows you build your kubernetes clusters leverage on many cloud services on Alibaba Cloud. You can read more about Kubernetes cloud controller manager [here](https://kubernetes.io/docs/tasks/administer-cluster/running-cloud-controller/).
 
 ## Development
 
