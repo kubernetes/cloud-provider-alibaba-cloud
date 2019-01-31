@@ -1,8 +1,8 @@
-# 通过负载均衡（Server Load Balancer）访问服务 
+# 通过负载均衡（Server Load Balancer）访问服务
 
 您可以使用阿里云负载均衡来访问服务。
 
-## 背景信息 
+## 背景信息
 
 如果您的集群的cloud-controller-manager版本大于等于v1.9.3，对于指定已有SLB的时候，系统默认不再为该SLB处理监听，用户需要手动配置该SLB的监听规则。
 
@@ -14,14 +14,14 @@ root@master # kubectl get po -n kube-system -o yaml|grep image:|grep cloud-con|u
   image: registry-vpc.cn-hangzhou.aliyuncs.com/acs/cloud-controller-manager-amd64:v1.9.3
 ```
 
-## 通过命令行操作 
+## 通过命令行操作
 
 
 1.  通过命令行工具创建一个 Nginx 应用。
 
     ```
     root@master # kubectl run nginx --image=registry.aliyuncs.com/acs/netdia:latest
-    root@master # kubectl get po 
+    root@master # kubectl get po
     NAME                                   READY     STATUS    RESTARTS   AGE
     nginx-2721357637-dvwq3                 1/1       Running   1          6s
     ```
@@ -37,11 +37,11 @@ root@master # kubectl get po -n kube-system -o yaml|grep image:|grep cloud-con|u
 
 3.  在浏览器中访问 `http://101.37.192.20`，来访问您的 Nginx 服务。
 
-## 更多信息 
+## 更多信息
 
 阿里云负载均衡还支持丰富的配置参数，包含健康检查、收费类型、负载均衡类型等参数。详细信息参见[负载均衡配置参数表]。
 
-## 注释 
+## 注释
 
 阿里云可以通过注释`annotations`的形式支持丰富的负载均衡功能。
 
@@ -177,7 +177,7 @@ spec:
     targetPort: 443
   selector:
     run: nginx
-  type: LoadBalancer: LoadBalancer
+  type: LoadBalancer
 ```
 
 ****使用已有的负载均衡，并强制覆盖已有监听****

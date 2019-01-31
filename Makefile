@@ -81,6 +81,6 @@ cloud-controller-manager-$(ARCH): pre-requisite
 		-v $(SOURCE)/build:/go/src/k8s.io/cloud-provider-alibaba-cloud/build \
 		registry.cn-hangzhou.aliyuncs.com/google-containers/kube-cross:$(KUBE_CROSS_TAG) /bin/bash -c '\
 		cd /go/src/k8s.io/cloud-provider-alibaba-cloud && \
-		CGO_ENABLED=1 make -e cloud-controller-manager && \
+		TAG=$(TAG) CGO_ENABLED=1 make -e cloud-controller-manager && \
 		mv cloud-controller-manager-alicloud build/cloud-controller-manager-$(ARCH) && \
 		file build/cloud-controller-manager-$(ARCH)'
