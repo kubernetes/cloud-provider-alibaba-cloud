@@ -6,7 +6,6 @@ import (
 	"github.com/denverdino/aliyungo/slb"
 	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/staging/src/k8s.io/apimachinery/pkg/util/json"
 	"strings"
 )
@@ -200,7 +199,7 @@ func (v *vgroup) Ensure(nodes []*v1.Node) error {
 
 	var backend []slb.VBackendServerType
 	for _, node := range nodes {
-		_, id, err := nodeinfo(types.NodeName(node.Spec.ProviderID))
+		_, id, err := nodeFromProviderID(node.Spec.ProviderID)
 		if err != nil {
 			return fmt.Errorf("ensure: error parse providerid. %s. expected: ${regionid}.${nodeid}", node.Spec.ProviderID)
 		}

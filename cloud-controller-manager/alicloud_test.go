@@ -168,7 +168,7 @@ func newReadyService() *v1.Service {
 			Name:        "my-service",
 			UID:         types.UID(serviceUID),
 			Annotations: map[string]string{
-			//ServiceAnnotationLoadBalancerId: "idbllll",
+				//ServiceAnnotationLoadBalancerId: "idbllll",
 			},
 		},
 		Spec: v1.ServiceSpec{
@@ -229,7 +229,7 @@ func newMockClientInstanceSDK(instanceid string) ClientInstanceSDK {
 	}
 
 }
-func newMockClientSLB(service *v1.Service, nodes []*v1.Node, base *[]slb.LoadBalancerType, detail *slb.LoadBalancerType) *mockClientSLB {
+func newMockClientSLB(service *v1.Service, nodes []*v1.Node, base *[]*slb.LoadBalancerType, detail *slb.LoadBalancerType) *mockClientSLB {
 	grp := vgroups{
 		{
 			NamedKey:       &NamedKey{CID: CLUSTER_ID, ServiceName: service.Name, Namespace: service.Namespace, Port: listenPort1},
@@ -242,22 +242,44 @@ func newMockClientSLB(service *v1.Service, nodes []*v1.Node, base *[]slb.LoadBal
 		describeLoadBalancers: func(args *slb.DescribeLoadBalancersArgs) (loadBalancers []slb.LoadBalancerType, err error) {
 
 			if args.LoadBalancerId != "" {
-				(*base)[0].LoadBalancerId = args.LoadBalancerId
-				return *base, nil
+				for i, _ := range *base {
+					if args.LoadBalancerId == (*base)[i].LoadBalancerId {
+						if len(args.Tags) > 0 {
+							(*base)[0].LoadBalancerName = cloudprovider.GetLoadBalancerName(service)
+						}
+						return []slb.LoadBalancerType{*(*base)[0]}, nil
+					}
+				}
+				return []slb.LoadBalancerType{}, fmt.Errorf("not found by id, %s", args.LoadBalancerId)
 			}
 			if args.LoadBalancerName != "" {
-				(*base)[0].LoadBalancerName = args.LoadBalancerName
-				return *base, nil
+				for i, _ := range *base {
+					if args.LoadBalancerName == (*base)[i].LoadBalancerName {
+						if len(args.Tags) > 0 {
+							(*base)[0].LoadBalancerName = cloudprovider.GetLoadBalancerName(service)
+						}
+						return []slb.LoadBalancerType{*(*base)[0]}, nil
+					}
+				}
+				return []slb.LoadBalancerType{}, fmt.Errorf("not found by name, %s", args.LoadBalancerName)
 			}
-			if len(args.Tags) > 0 {
-				(*base)[0].LoadBalancerName = cloudprovider.GetLoadBalancerName(service)
-			} else {
-				return nil, errors.New("loadbalancerid or loadbanancername must be specified")
+			kid := []slb.LoadBalancerType{}
+			for i, _ := range *base {
+				if len(args.Tags) > 0 {
+					(*base)[i].LoadBalancerName = cloudprovider.GetLoadBalancerName(service)
+				}
+				kid = append(kid, *(*base)[i])
 			}
-			return *base, nil
+			return kid, nil
 		},
 		describeLoadBalancerAttribute: func(loadBalancerId string) (loadBalancer *slb.LoadBalancerType, err error) {
-			return loadbalancerAttrib(&((*base)[0])), nil
+			for i, _ := range *base {
+				if loadBalancerId == (*base)[i].LoadBalancerId {
+
+					return (*base)[0], nil
+				}
+			}
+			return &slb.LoadBalancerType{}, fmt.Errorf("not found")
 		},
 		createLoadBalancerTCPListener: func(args *slb.CreateLoadBalancerTCPListenerArgs) (err error) {
 			li := slb.ListenerPortAndProtocolType{
@@ -282,25 +304,38 @@ func newMockClientSLB(service *v1.Service, nodes []*v1.Node, base *[]slb.LoadBal
 			return nil
 		},
 		deleteLoadBalancerListener: func(loadBalancerId string, port int) (err error) {
-			response := []slb.ListenerPortAndProtocolType{}
-			ports := detail.ListenerPortsAndProtocol.ListenerPortAndProtocol
-			for _, p := range ports {
-				if p.ListenerPort == port {
+			found := false
+			for i, _ := range *base {
+				if (*base)[i].LoadBalancerId != loadBalancerId {
 					continue
 				}
-				response = append(response, p)
-			}
+				found = true
+				response := []slb.ListenerPortAndProtocolType{}
+				ports := (*base)[i].ListenerPortsAndProtocol.ListenerPortAndProtocol
+				for _, p := range ports {
+					if p.ListenerPort == port {
+						continue
+					}
+					response = append(response, p)
+				}
 
-			listports := []int{}
-			lports := detail.ListenerPorts.ListenerPort
-			for _, po := range lports {
-				if po == port {
-					continue
+				listports := []int{}
+				lports := (*base)[i].ListenerPorts.ListenerPort
+				for _, po := range lports {
+					if po == port {
+						continue
+					}
+					listports = append(listports, po)
 				}
-				listports = append(listports, po)
+				(*base)[i].ListenerPortsAndProtocol.ListenerPortAndProtocol = response
+				(*base)[i].ListenerPorts.ListenerPort = listports
+
+				//fmt.Println("MyBASE: %v\n",util.PrettyJson(base))
+				return nil
 			}
-			detail.ListenerPortsAndProtocol.ListenerPortAndProtocol = response
-			detail.ListenerPorts.ListenerPort = listports
+			if !found {
+				return fmt.Errorf("not found")
+			}
 			return nil
 		},
 		describeLoadBalancerTCPListenerAttribute: func(loadBalancerId string, port int) (response *slb.DescribeLoadBalancerTCPListenerAttributeResponse, err error) {
@@ -385,8 +420,14 @@ func newMockClientSLB(service *v1.Service, nodes []*v1.Node, base *[]slb.LoadBal
 				VServerGroupId:   grp[0].VGroupId,
 			}, nil
 		},
+		describeVServerGroupAttribute: func(args *slb.DescribeVServerGroupAttributeArgs) (response *slb.DescribeVServerGroupAttributeResponse, err error) {
+			return &slb.DescribeVServerGroupAttributeResponse{
+				VServerGroupName: grp[0].NamedKey.Key(),
+				VServerGroupId:   grp[0].VGroupId,
+			}, nil
+		},
 		deleteLoadBalancer: func(loadBalancerId string) (err error) {
-			*base = []slb.LoadBalancerType{}
+			*base = []*slb.LoadBalancerType{}
 			return nil
 		},
 	}
@@ -397,9 +438,7 @@ func TestEnsureLoadBalancerBasic(t *testing.T) {
 		newNode1(),
 	}
 	base := newBaseLoadbalancer()
-	detail := loadbalancerAttrib(&base[0])
-	t.Log(PrettyJson(detail))
-
+	detail := loadbalancerAttrib(base[0])
 	// New Mock cloud to test
 	cloud, err := newMockCloud(newMockClientSLB(service, nodes, &base, detail), nil, newMockClientInstanceSDK(node1), nil)
 
@@ -412,17 +451,17 @@ func TestEnsureLoadBalancerBasic(t *testing.T) {
 		t.Errorf("TestEnsureLoadBalancer error: %s\n", e.Error())
 	}
 	t.Log(PrettyJson(status))
-	t.Log(PrettyJson(detail))
-	if len(detail.BackendServers.BackendServer) != 1 {
+	t.Log(PrettyJson(base))
+	if len(base[0].BackendServers.BackendServer) != 1 {
 		t.Fatal("TestEnsureLoadBalancer error, expected only 1 backend left")
 	}
-	if detail.BackendServers.BackendServer[0].ServerId != node1 {
+	if base[0].BackendServers.BackendServer[0].ServerId != node1 {
 		t.Fatal(fmt.Sprintf("TestEnsureLoadBalancer error, expected to be instance [%s]", node1))
 	}
-	if len(detail.ListenerPorts.ListenerPort) != 1 {
+	if len(base[0].ListenerPorts.ListenerPort) != 1 {
 		t.Fatal("TestEnsureLoadBalancer error, expected only 1 listener port left")
 	}
-	if detail.ListenerPorts.ListenerPort[0] != 80 {
+	if base[0].ListenerPorts.ListenerPort[0] != 80 {
 		t.Fatal("TestEnsureLoadBalancer error, expected to be port 80")
 	}
 }
@@ -434,7 +473,7 @@ func TestEnsureLoadBalancerHTTPS(t *testing.T) {
 		newNode1(),
 	}
 	base := newBaseLoadbalancer()
-	detail := loadbalancerAttrib(&base[0])
+	detail := loadbalancerAttrib(base[0])
 	t.Log(PrettyJson(detail))
 	// New Mock cloud to test
 	cloud, err := newMockCloud(newMockClientSLB(service, nodes, &base, detail), nil, newMockClientInstanceSDK(node1), nil)
@@ -463,15 +502,7 @@ func TestEnsureLoadBalancerWithPortChange(t *testing.T) {
 	}
 
 	base := newBaseLoadbalancer()
-	detail := loadbalancerAttrib(&base[0])
-	grp := vgroups{
-		{
-			NamedKey:       &NamedKey{CID: CLUSTER_ID, ServiceName: service.Name, Namespace: service.Namespace, Port: listenPort1},
-			LoadBalancerId: detail.LoadBalancerId,
-			RegionId:       detail.RegionId,
-			VGroupId:       "v-idvgroup",
-		},
-	}
+	detail := loadbalancerAttrib(base[0])
 	t.Log(PrettyJson(detail))
 	// New Mock cloud to test
 	cloud, err := newMockCloud(newMockClientSLB(service, nodes, &base, detail), nil, newMockClientInstanceSDK(node1), nil)
@@ -545,8 +576,9 @@ func TestEnsureLoadbalancerDeleted(t *testing.T) {
 	service := newReadyService()
 
 	base := newBaseLoadbalancer()
+	detail := loadbalancerAttrib(base[0])
 	// New Mock cloud to test
-	cloud, err := newMockCloud(newMockClientSLB(service, nil, &base, nil), nil, newMockClientInstanceSDK(node1), nil)
+	cloud, err := newMockCloud(newMockClientSLB(service, nil, &base, detail), nil, newMockClientInstanceSDK(node1), nil)
 
 	if err != nil {
 		t.Errorf("TestEnsureLoadbalancerDeleted error newCloud: %s\n", err.Error())
@@ -567,9 +599,10 @@ func TestEnsureLoadbalancerDeleted(t *testing.T) {
 func TestEnsureLoadBalancerDeleteWithUserDefined(t *testing.T) {
 	base := newBaseLoadbalancer()
 	service := newReadyService()
+	detail := loadbalancerAttrib(base[0])
 	t.Log(PrettyJson(base))
 	// New Mock cloud to test
-	cloud, err := newMockCloud(newMockClientSLB(service, nil, &base, nil), nil, nil, nil)
+	cloud, err := newMockCloud(newMockClientSLB(service, nil, &base, detail), nil, nil, nil)
 	if err != nil {
 		t.Fatal(fmt.Sprintf("TestEnsureLoadBalancerDeleteWithUserDefined error newCloud: %s\n", err.Error()))
 	}
