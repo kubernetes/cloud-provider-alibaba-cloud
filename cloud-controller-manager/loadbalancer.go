@@ -23,11 +23,11 @@ import (
 	"strings"
 
 	"encoding/json"
+
 	"github.com/denverdino/aliyungo/common"
 	"github.com/denverdino/aliyungo/slb"
 	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 )
 
@@ -446,14 +446,14 @@ func (s *LoadBalancerClient) UpdateBackendServers(nodes []*v1.Node, lb *slb.Load
 	// checkout for newly added servers
 	for _, n1 := range nodes {
 		found := false
-		_, id, err := nodeinfo(types.NodeName(n1.Spec.ProviderID))
+		_, id, err := nodeFromProviderID(n1.Spec.ProviderID)
 		for _, n2 := range lb.BackendServers.BackendServer {
 			if err != nil {
 				glog.Errorf("alicloud: node providerid=%s is not"+
 					" in the correct form, expect regionid.instanceid. skip add op", n1.Spec.ProviderID)
 				continue
 			}
-			if string(id) == n2.ServerId {
+			if id == n2.ServerId {
 				found = true
 				break
 			}
@@ -486,13 +486,13 @@ func (s *LoadBalancerClient) UpdateBackendServers(nodes []*v1.Node, lb *slb.Load
 	for _, n1 := range lb.BackendServers.BackendServer {
 		found := false
 		for _, n2 := range nodes {
-			_, id, err := nodeinfo(types.NodeName(n2.Spec.ProviderID))
+			_, id, err := nodeFromProviderID(n2.Spec.ProviderID)
 			if err != nil {
 				glog.Errorf("alicloud: node providerid=%s is not "+
 					"in the correct form, expect regionid.instanceid.. skip delete op... [%s]", n2.Spec.ProviderID, err.Error())
 				continue
 			}
-			if n1.ServerId == string(id) {
+			if n1.ServerId == id {
 				found = true
 				break
 			}
