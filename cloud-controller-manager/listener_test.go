@@ -99,7 +99,7 @@ func TestUpdateListenerPorts(t *testing.T) {
 	}
 
 	base := newBaseLoadbalancer()
-	detail := loadbalancerAttrib(&base[0])
+	detail := loadbalancerAttrib(base[0])
 	grp := vgroups{
 		{
 			NamedKey:       &NamedKey{CID: CLUSTER_ID, ServiceName: service.Name, Namespace: service.Namespace, Port: 80},
@@ -190,6 +190,12 @@ func TestUpdateListenerPorts(t *testing.T) {
 		createVServerGroup: func(args *slb.CreateVServerGroupArgs) (response *slb.CreateVServerGroupResponse, err error) {
 			return &slb.CreateVServerGroupResponse{
 				VServerGroupName: args.VServerGroupName,
+				VServerGroupId:   grp[0].VGroupId,
+			}, nil
+		},
+		describeVServerGroupAttribute: func(args *slb.DescribeVServerGroupAttributeArgs) (response *slb.DescribeVServerGroupAttributeResponse, err error) {
+			return &slb.DescribeVServerGroupAttributeResponse{
+				VServerGroupName: grp[0].NamedKey.Key(),
 				VServerGroupId:   grp[0].VGroupId,
 			}, nil
 		},
@@ -290,7 +296,7 @@ func TestUpdateListenerBackendPorts(t *testing.T) {
 	}
 
 	base := newBaseLoadbalancer()
-	detail := loadbalancerAttrib(&base[0])
+	detail := loadbalancerAttrib(base[0])
 	grp := vgroups{
 		{
 			NamedKey:       &NamedKey{CID: CLUSTER_ID, ServiceName: service.Name, Namespace: service.Namespace, Port: 80},
