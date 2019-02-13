@@ -1,4 +1,3 @@
-
 ##############################################################################################################
 
 .PHONY: test e2e-test cover gofmt gofmt-fix  clean cloud-controller-manager
@@ -10,10 +9,12 @@ REGISTRY?=registry.cn-hangzhou.aliyuncs.com/google-containers/cloud-controller-m
 TAG?=$(shell git describe --tags)
 ARCH?=amd64
 
+CGO_ENABLED=1
 # Set the (cross) compiler to use for different architectures
 ifeq ($(ARCH),amd64)
 	LIB_DIR=x86_64-linux-gnu
 	CC=gcc
+	CGO_ENABLED=0
 endif
 
 ifeq ($(LOCAL),)
@@ -26,7 +27,7 @@ KUBE_CROSS_TAG=v1.9.3-1
 IPTABLES_VERSION=1.4.21
 
 cloud-controller-manager: $(shell find . -type f  -name '*.go')
-	go build -o cloud-controller-manager-alicloud -ldflags "-X k8s.io/cloud-provider-alibaba-cloud/version.Version=$(TAG)" \
+        CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o cloud-controller-manager-alicloud -ldflags "-X k8s.io/cloud-provider-alibaba-cloud/version.Version=$(TAG)" \
 		cmd/cloudprovider/cloudprovider-alibaba-cloud.go
 
 
@@ -51,15 +52,15 @@ pre-requisite:
 
 test:
 	#go test -v k8s.io/cloud-provider-alibaba-cloud/cloud-controller-manager/alicloud
-	docker run -e CC=$(CC) -e GOARM=$(GOARM) -e GOARCH=$(ARCH) \
+	docker run -e CC=$(CC) -e GOARM=$(GOARM) -e GOARCH=$(ARCH) -e CGO_ENABLED=$(CGO_ENABLED) \
 		-v $(SOURCE):/go/src/k8s.io/cloud-provider-alibaba-cloud \
 		-v $(SOURCE)/build:/go/src/k8s.io/cloud-provider-alibaba-cloud/build \
 		registry.cn-hangzhou.aliyuncs.com/google-containers/kube-cross:$(KUBE_CROSS_TAG) /bin/bash -c '\
 		cd /go/src/k8s.io/cloud-provider-alibaba-cloud && \
-		CGO_ENABLED=1 go test -v k8s.io/cloud-provider-alibaba-cloud/cloud-controller-manager/alicloud'
+		go test -v k8s.io/cloud-provider-alibaba-cloud/cloud-controller-manager/alicloud'
 
 image: cloud-controller-manager-$(ARCH)
-	docker build -f build/Dockerfile -t $(REGISTRY):$(TAG) ./build/
+	docker build -t $(REGISTRY):$(TAG) .
 
 docker-push:
 	docker push $(REGISTRY):$(TAG)
@@ -76,11 +77,11 @@ cloud-controller-manager-$(ARCH): pre-requisite
 	# Build for other platforms with ARCH=$$ARCH make build
 	# valid values for $$ARCH are [amd64 arm arm64 ppc64le]
 
-	docker run -e CC=$(CC) -e GOARM=$(GOARM) -e GOARCH=$(ARCH) \
+	docker run -e CC=$(CC) -e GOARM=$(GOARM) -e GOARCH=$(ARCH) -e CGO_ENABLED=$(CGO_ENABLED) \
 		-v $(SOURCE):/go/src/k8s.io/cloud-provider-alibaba-cloud \
 		-v $(SOURCE)/build:/go/src/k8s.io/cloud-provider-alibaba-cloud/build \
 		registry.cn-hangzhou.aliyuncs.com/google-containers/kube-cross:$(KUBE_CROSS_TAG) /bin/bash -c '\
 		cd /go/src/k8s.io/cloud-provider-alibaba-cloud && \
-		TAG=$(TAG) CGO_ENABLED=1 make -e cloud-controller-manager && \
+		TAG=$(TAG) make -e cloud-controller-manager && \
 		mv cloud-controller-manager-alicloud build/cloud-controller-manager-$(ARCH) && \
 		file build/cloud-controller-manager-$(ARCH)'
