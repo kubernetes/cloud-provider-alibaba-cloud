@@ -200,7 +200,7 @@ func New(
 	serviceInformer.Informer().AddEventHandlerWithResyncPeriod(
 		cache.ResourceEventHandlerFuncs{
 			AddFunc: func(cur interface{}) {
-				//if !needLoadBalancer(cur.(*v1.ServiceName)) {
+				//if !needLoadBalancer(cur.(*v1.Service)) {
 				//	key, _ := controller.KeyFunc(cur)
 				//	glog.Infof("controller: do not need loadbalancer ,skip. %s\n",key)
 				//	return
@@ -274,7 +274,7 @@ func (s *ServiceController) syncEnpoints(obj interface{}) {
 	s.enqueueServiceForNodes(service)
 }
 
-// obj could be an *v1.ServiceName, or a DeletionFinalStateUnknown marker item.
+// obj could be an *v1.Service, or a DeletionFinalStateUnknown marker item.
 func (s *ServiceController) enqueueService(obj interface{}) {
 	key, err := controller.KeyFunc(obj)
 	if err != nil {
@@ -285,7 +285,7 @@ func (s *ServiceController) enqueueService(obj interface{}) {
 	s.workingQueue.Add(key)
 }
 
-// obj could be an *v1.ServiceName, or a DeletionFinalStateUnknown marker item.
+// obj could be an *v1.Service, or a DeletionFinalStateUnknown marker item.
 func (s *ServiceController) enqueueServiceForNodes(obj interface{}) {
 	key, err := controller.KeyFunc(obj)
 	if err != nil {
@@ -579,7 +579,7 @@ func (s *ServiceController) syncBackend(service *cachedService) error {
 	// service holds the latest service info from apiserver
 	_, err = s.serviceLister.Services(service.state.Namespace).Get(service.state.Name)
 	if errors.IsNotFound(err) {
-		glog.Infof("SyncBackend: ServiceName has been deleted %v", key)
+		glog.Infof("SyncBackend: Service has been deleted %v", key)
 		return nil
 	}
 	// here we should not check for the neediness of updating loadbalancer.
@@ -1085,7 +1085,7 @@ func (s *cachedService) resetRetryDelay() {
 	s.lastRetryDelay = time.Duration(0)
 }
 
-// syncService will sync the ServiceName with the given key if it has had its expectations fulfilled,
+// syncService will sync the Service with the given key if it has had its expectations fulfilled,
 // meaning it did not expect to see any more of its pods created or deleted. This function is not meant to be
 // invoked concurrently with the same key.
 func (s *ServiceController) syncService(key string) error {
@@ -1110,7 +1110,7 @@ func (s *ServiceController) syncService(key string) error {
 	switch {
 	case errors.IsNotFound(err):
 		// service absence in store means watcher caught the deletion, ensure LB info is cleaned
-		glog.Infof("ServiceName has been deleted %v", key)
+		glog.Infof("Service has been deleted %v", key)
 		err, retryDelay = s.processServiceDeletion(key)
 	case err != nil:
 		glog.Infof("Unable to retrieve service %v from store: %v", key, err)
