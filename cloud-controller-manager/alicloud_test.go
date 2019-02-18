@@ -539,7 +539,7 @@ func TestEnsureLoadBalancerWithPortChange(t *testing.T) {
 //		t.Errorf("TestEnsureLoadBalancerHTTPSHealthCheck error newCloud: %s\n", err.Error())
 //	}
 //
-//	service := &v1.ServiceName{
+//	service := &v1.Service{
 //		ObjectMeta: metav1.ObjectMeta{
 //			Name: "my-service",
 //			UID:  types.UID(serviceUID),
