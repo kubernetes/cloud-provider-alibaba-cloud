@@ -24,26 +24,28 @@ import (
 	"errors"
 	"github.com/denverdino/aliyungo/common"
 	"github.com/denverdino/aliyungo/ecs"
-	"github.com/patrickmn/go-cache"
 )
 
 func NewMockRouteMgr(client RouteSDK) (*ClientMgr, error) {
 	mgr := &ClientMgr{
 		routes: &RoutesClient{
-			client:  client,
-			routers: cache.New(defaultCacheExpiration, defaultCacheExpiration),
-			vpcs:    cache.New(defaultCacheExpiration, defaultCacheExpiration),
+			client: client,
+			region: string(common.Beijing),
 		},
 	}
+	mgr.routes.WithVPC(vpcid, "")
 	return mgr, nil
 }
 
-func TestListRoutes(t *testing.T) {
-	vpcid := "vpc-2zeaybwqmvn6qgabfd3pe"
-	vrouterid := "vrt-2zegcm0ty46mq243fmxoj"
-	vswitchid := "vsw-2zeclpmxy66zzxj4cg4ls"
-	routetableid := "vtb-2zedne8cr43rp5oqsr9xg"
+var (
+	vpcid        = "vpc-2zeaybwqmvn6qgabfd3pe"
+	vrouterid    = "vrt-2zegcm0ty46mq243fmxoj"
+	routetableid = "vtb-2zedne8cr43rp5oqsr9xg"
+)
 
+func TestListRoutes(t *testing.T) {
+
+	vswitchid := "vsw-2zeclpmxy66zzxj4cg4ls"
 	entries := []ecs.RouteEntrySetType{
 		{
 			RouteTableId:         routetableid,
@@ -108,6 +110,11 @@ func TestListRoutes(t *testing.T) {
 					},
 					CidrBlock: "192.168.0.0/16",
 					VRouterId: vrouterid,
+					RouterTableIds: struct {
+						RouterTableIds []string
+					}{
+						RouterTableIds: []string{routetableid},
+					},
 				},
 			}
 			return vpcs, nil, nil
@@ -153,9 +160,9 @@ func TestListRoutes(t *testing.T) {
 		t.Fatal("failed to create client manager")
 	}
 
-	route, err := cmgr.Routes().ListRoutes(common.Beijing, []string{""})
+	route, err := cmgr.Routes().ListRoutes()
 	if err != nil {
-		t.Fatal("failed to list routes")
+		t.Fatal("failed to list routes, %v", err)
 	}
 	for _, r := range route {
 		found := false
