@@ -272,7 +272,7 @@ func TestSep(t *testing.T) {
 	testCamel(t, "alicloud-loadbalancer-HealthCheckTimeout", "alicloud-loadbalancer-HealthCheckTimeout")
 }
 
-func TestRealClient(t *testing.T) {
+func RealClient(t *testing.T) {
 	realRouteClient(keyid, keysecret)
 }
 

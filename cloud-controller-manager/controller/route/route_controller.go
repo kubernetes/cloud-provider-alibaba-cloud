@@ -39,6 +39,7 @@ import (
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/cloud-provider-alibaba-cloud/cloud-controller-manager"
 	v1node "k8s.io/kubernetes/pkg/api/v1/node"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/controller"
@@ -140,31 +141,48 @@ func (rc *RouteController) reconcile(nodes []*v1.Node, routes []*cloudprovider.R
 	// routeMap maps routeTargetNode->route
 	routeMap := make(map[types.NodeName]*cloudprovider.Route)
 	for _, route := range routes {
-		glog.Infof("ListRoutes: reconcile %+v", route)
+		glog.V(5).Infof("ListRoutes: reconcile %+v", route)
 		if route.TargetNode != "" {
 			routeMap[route.TargetNode] = route
 		}
 	}
 
 	wg := sync.WaitGroup{}
-	rateLimiter := make(chan struct{}, maxConcurrentRouteCreations)
+
+	// Aoxn: Alibaba Cloud does not support concurrent route operation
+	rateLimiter := make(chan struct{}, 1)
 	for _, route := range routes {
 		if rc.isResponsibleForRoute(route) {
+			nodesCidrRealContainsRoute := false
+			for _, node := range nodes {
+				if node.Spec.PodCIDR != "" {
+					if realContains, err := alicloud.RealContainsCidr(node.Spec.PodCIDR, route.DestinationCIDR); err != nil {
+						glog.Errorf("Could not judge relation between cidrs, will skip. node: %s, route: %s. error: %v", node.Spec.PodCIDR, route.DestinationCIDR, err)
+						continue
+					} else if realContains {
+						nodesCidrRealContainsRoute = true
+						break
+					}
+				}
+			}
+
 			// Check if this route is a blackhole, or applies to a node we know about & has an incorrect CIDR.
-			if route.Blackhole || (cidrForNode(nodes, string(route.TargetNode)) != route.DestinationCIDR) {
-				glog.Infof("responsible for: %t, %t,%t", route.Blackhole, cidrForNode(nodes, string(route.TargetNode)) != route.DestinationCIDR, route.Blackhole || (cidrForNode(nodes, string(route.TargetNode)) != route.DestinationCIDR))
+			if  route.Blackhole || nodesCidrRealContainsRoute {
+				glog.Infof("responsible for: %t, %t", route.Blackhole, nodesCidrRealContainsRoute)
 				wg.Add(1)
 				// Delete the route.
-				go func(route *cloudprovider.Route, startTime time.Time) {
-					glog.Infof("Deleting route %s %s", route.Name, route.DestinationCIDR)
-					if err := rc.routes.DeleteRoute(rc.clusterName, route); err != nil {
-						glog.Errorf("Could not delete route %s %s after %v: %v", route.Name, route.DestinationCIDR, time.Now().Sub(startTime), err)
-					} else {
-						glog.Infof("Deleted route %s %s after %v", route.Name, route.DestinationCIDR, time.Now().Sub(startTime))
-					}
-					wg.Done()
+				startTime := time.Now()
+				// Aoxn: Alibaba Cloud does not support concurrent route operation
+				//go func(route *cloudprovider.Route, startTime time.Time) {
+				glog.Infof("Deleting route %s %s", route.Name, route.DestinationCIDR)
+				if err := rc.routes.DeleteRoute(rc.clusterName, route); err != nil {
+					glog.Errorf("Could not delete route %s %s after %v: %v", route.Name, route.DestinationCIDR, time.Now().Sub(startTime), err)
+				} else {
+					glog.Infof("Deleted route %s %s after %v", route.Name, route.DestinationCIDR, time.Now().Sub(startTime))
+				}
+				wg.Done()
 
-				}(route, time.Now())
+				//}(route, time.Now())
 			}
 		}
 	}
@@ -172,6 +190,8 @@ func (rc *RouteController) reconcile(nodes []*v1.Node, routes []*cloudprovider.R
 	for _, node := range nodes {
 		// Skip if the node hasn't been assigned a CIDR yet.
 		if node.Spec.PodCIDR == "" {
+			// UpdateNetworkUnavailable When PodCIDR is not allocated.
+			rc.updateNetworkingCondition(types.NodeName(node.Name), false)
 			continue
 		}
 		if node.Spec.ProviderID == "" {
@@ -180,7 +200,7 @@ func (rc *RouteController) reconcile(nodes []*v1.Node, routes []*cloudprovider.R
 		providerID := types.NodeName(node.Spec.ProviderID)
 		// Check if we have a route for this node w/ the correct CIDR.
 		r := routeMap[providerID]
-		glog.Infof("Node: %s, r=%+v, node.Spec.PodCIDR=%s", node.Name, r, node.Spec.PodCIDR)
+		glog.V(5).Infof("Node: %s, r=%+v, node.Spec.PodCIDR=%s", node.Name, r, node.Spec.PodCIDR)
 		if r == nil || r.DestinationCIDR != node.Spec.PodCIDR {
 			// If not, create the route.
 			route := &cloudprovider.Route{
@@ -208,7 +228,7 @@ func (rc *RouteController) reconcile(nodes []*v1.Node, routes []*cloudprovider.R
 					if err != nil && strings.Contains(err.Error(), "please wait a moment and try again") {
 						// Throttled, wait a second.
 						glog.Infof("alicloud: throttle triggered. sleep for 10s before proceeding.")
-						time.Sleep(10 * time.Second)
+						time.Sleep(5 * time.Second)
 					}
 					<-rateLimiter
 
@@ -246,16 +266,6 @@ func (rc *RouteController) reconcile(nodes []*v1.Node, routes []*cloudprovider.R
 	return nil
 }
 
-func cidrForNode(nodes []*v1.Node, providerID string) string {
-	for _, node := range nodes {
-		if node.Spec.ProviderID == providerID {
-			return node.Spec.PodCIDR
-		}
-	}
-	return ""
-}
-
-// Update network condition of node in K8S
 func (rc *RouteController) updateNetworkingCondition(nodeName types.NodeName, routeCreated bool) error {
 	var err error
 	for i := 0; i < updateNodeStatusMaxRetries; i++ {

@@ -209,12 +209,14 @@ func (r *RoutesClient) reCreateRoute(table ecs.RouteTableSetType, route *ecs.Cre
 				continue
 			}
 
-			// 0.0.0.0/0 => ECS1 this kind of route is used for DNAT. so we keep it
-			if e.DestinationCidrBlock == "0.0.0.0/0" {
+			if contains, err := ContainsCidr(e.DestinationCidrBlock, route.DestinationCidrBlock); err != nil {
+				glog.Errorf("error on compare cidr blocks, message=%s.", err.Error())
+			} else if contains {
 				glog.V(2).Infof("keep route entry: rtableid=%s, CIDR=%s, "+
-					"NextHop=%s For DNAT\n", e.RouteTableId, e.DestinationCidrBlock, e.InstanceId)
+					"NextHop=%s since the bigger cidr has lower priority than subcidr\n", e.RouteTableId, e.DestinationCidrBlock, e.InstanceId)
 				continue
 			}
+
 			// Fix: here we delete all the route which targeted to us(instance) except the specified route.
 			// That means only one CIDR was allowed to target to the instance. Think if We need to change this
 			// to adapt to multi CIDR and deal with unavailable route entry.

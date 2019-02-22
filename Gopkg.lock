@@ -35,7 +35,7 @@
     "slb",
     "util"
   ]
-  revision = "82830dbc7c38fb69f936ea20dc529583a13f6eca"
+  revision = "7d118cb1616f4fd9821585674887e72d44c22d86"
 
 [[projects]]
   name = "github.com/dgrijalva/jwt-go"
@@ -650,13 +650,14 @@
     "plugin/pkg/scheduler/algorithm/priorities/util",
     "plugin/pkg/scheduler/api",
     "plugin/pkg/scheduler/schedulercache",
-    "plugin/pkg/scheduler/util"
+    "plugin/pkg/scheduler/util",
+    "staging/src/k8s.io/apimachinery/pkg/util/json"
   ]
   revision = "3b33517c1ea2657e5b6be64b87725790a8f29a43"
 
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "591cf23af8967858b18f445d0a6d9acae47c5a36e8d6c35be4f159c42bbbc5a5"
+  inputs-digest = "6a73176836d8503c9d1864308fc9e7e9e23fcb5c3d175d8cf0b54aa7a234d1de"
   solver-name = "gps-cdcl"
   solver-version = 1

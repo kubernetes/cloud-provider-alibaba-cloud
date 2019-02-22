@@ -85,25 +85,41 @@ func TestFindLoadBalancer(t *testing.T) {
 	base := newBaseLoadbalancer()
 	mgr, _ := NewMockClientMgr(&mockClientSLB{
 		describeLoadBalancers: func(args *slb.DescribeLoadBalancersArgs) (loadBalancers []slb.LoadBalancerType, err error) {
-
 			if args.LoadBalancerId != "" {
-				base[0].LoadBalancerId = args.LoadBalancerId
-				return base, nil
+				for i, _ := range base {
+					if args.LoadBalancerId == base[i].LoadBalancerId {
+						if len(args.Tags) > 0 {
+							base[0].LoadBalancerName = cloudprovider.GetLoadBalancerName(service)
+						}
+						return []slb.LoadBalancerType{*(base)[0]}, nil
+					}
+				}
+				return []slb.LoadBalancerType{}, fmt.Errorf("not found by id, %s", args.LoadBalancerId)
 			}
 			if args.LoadBalancerName != "" {
-				base[0].LoadBalancerName = args.LoadBalancerName
-				return base, nil
+				for i, _ := range base {
+					if args.LoadBalancerName == base[i].LoadBalancerName {
+						if len(args.Tags) > 0 {
+							base[0].LoadBalancerName = cloudprovider.GetLoadBalancerName(service)
+						}
+						return []slb.LoadBalancerType{*(base)[0]}, nil
+					}
+				}
+				return []slb.LoadBalancerType{}, fmt.Errorf("not found by name, %s", args.LoadBalancerName)
 			}
-			if len(args.Tags) > 0 {
-				base[0].LoadBalancerName = cloudprovider.GetLoadBalancerName(service)
-			} else {
-				return nil, errors.New("loadbalancerid or loadbanancername must be specified.\n")
+			kid := []slb.LoadBalancerType{}
+			for i, _ := range base {
+				if len(args.Tags) > 0 {
+					base[i].LoadBalancerName = cloudprovider.GetLoadBalancerName(service)
+				}
+				kid = append(kid, *base[i])
 			}
-			return base, nil
+			return kid, nil
 		},
 		describeLoadBalancerAttribute: func(loadBalancerId string) (loadBalancer *slb.LoadBalancerType, err error) {
 			t.Logf("findloadbalancer, [%s]", loadBalancerId)
-			return loadbalancerAttrib(&base[0]), nil
+			base[0].LoadBalancerId = loadBalancerId
+			return loadbalancerAttrib(base[0]), nil
 		},
 	})
 
@@ -119,7 +135,7 @@ func TestFindLoadBalancer(t *testing.T) {
 	if lb.LoadBalancerName != cloudprovider.GetLoadBalancerName(service) {
 		t.Fatal("find loadbalancer fail. suppose to find by name.")
 	}
-
+	base[0].LoadBalancerId = LOADBALANCER_ID + "-new"
 	// 2.
 	// user need to use an exist loadbalancer through annotations
 	service.Annotations[ServiceAnnotationLoadBalancerId] = LOADBALANCER_ID + "-new"
@@ -191,6 +207,15 @@ type mockClientSLB struct {
 	removeTags                            func(args *slb.RemoveTagsArgs) error
 	describeTags                          func(args *slb.DescribeTagsArgs) (tags []slb.TagItemType, pagination *common.PaginationResult, err error)
 	addTags                               func(args *slb.AddTagsArgs) error
+
+	createVServerGroup               func(args *slb.CreateVServerGroupArgs) (response *slb.CreateVServerGroupResponse, err error)
+	describeVServerGroups            func(args *slb.DescribeVServerGroupsArgs) (response *slb.DescribeVServerGroupsResponse, err error)
+	deleteVServerGroup               func(args *slb.DeleteVServerGroupArgs) (response *slb.DeleteVServerGroupResponse, err error)
+	setVServerGroupAttribute         func(args *slb.SetVServerGroupAttributeArgs) (response *slb.SetVServerGroupAttributeResponse, err error)
+	describeVServerGroupAttribute    func(args *slb.DescribeVServerGroupAttributeArgs) (response *slb.DescribeVServerGroupAttributeResponse, err error)
+	modifyVServerGroupBackendServers func(args *slb.ModifyVServerGroupBackendServersArgs) (response *slb.ModifyVServerGroupBackendServersResponse, err error)
+	addVServerGroupBackendServers    func(args *slb.AddVServerGroupBackendServersArgs) (response *slb.AddVServerGroupBackendServersResponse, err error)
+	removeVServerGroupBackendServers func(args *slb.RemoveVServerGroupBackendServersArgs) (response *slb.RemoveVServerGroupBackendServersResponse, err error)
 }
 
 var (
@@ -200,8 +225,8 @@ var (
 	LOADBALANCER_NETWORK_TYPE = "classic"
 )
 
-func newBaseLoadbalancer() []slb.LoadBalancerType {
-	return []slb.LoadBalancerType{
+func newBaseLoadbalancer() []*slb.LoadBalancerType {
+	return []*slb.LoadBalancerType{
 		{
 			LoadBalancerId:     LOADBALANCER_ID,
 			LoadBalancerName:   LOADBALANCER_NAME,
@@ -225,7 +250,7 @@ func (c *mockClientSLB) DescribeLoadBalancers(args *slb.DescribeLoadBalancersArg
 	if c.describeLoadBalancers != nil {
 		return c.describeLoadBalancers(args)
 	}
-	return newBaseLoadbalancer(), nil
+	return []slb.LoadBalancerType{}, fmt.Errorf("not implemented")
 }
 
 func (c *mockClientSLB) StopLoadBalancerListener(loadBalancerId string, port int) (err error) {
@@ -385,6 +410,55 @@ func (c *mockClientSLB) AddTags(args *slb.AddTagsArgs) error {
 	return nil
 }
 
+func (c *mockClientSLB) CreateVServerGroup(args *slb.CreateVServerGroupArgs) (response *slb.CreateVServerGroupResponse, err error) {
+	if c.createVServerGroup != nil {
+		return c.createVServerGroup(args)
+	}
+	return nil, nil
+}
+func (c *mockClientSLB) DescribeVServerGroups(args *slb.DescribeVServerGroupsArgs) (response *slb.DescribeVServerGroupsResponse, err error) {
+
+	if c.describeVServerGroups != nil {
+		return c.describeVServerGroups(args)
+	}
+	return nil, nil
+}
+func (c *mockClientSLB) DeleteVServerGroup(args *slb.DeleteVServerGroupArgs) (response *slb.DeleteVServerGroupResponse, err error) {
+	if c.deleteVServerGroup != nil {
+		return c.deleteVServerGroup(args)
+	}
+	return nil, nil
+}
+func (c *mockClientSLB) SetVServerGroupAttribute(args *slb.SetVServerGroupAttributeArgs) (response *slb.SetVServerGroupAttributeResponse, err error) {
+	if c.setVServerGroupAttribute != nil {
+		return c.setVServerGroupAttribute(args)
+	}
+	return nil, nil
+}
+func (c *mockClientSLB) DescribeVServerGroupAttribute(args *slb.DescribeVServerGroupAttributeArgs) (response *slb.DescribeVServerGroupAttributeResponse, err error) {
+	if c.describeVServerGroupAttribute != nil {
+		return c.describeVServerGroupAttribute(args)
+	}
+	return nil, nil
+}
+func (c *mockClientSLB) ModifyVServerGroupBackendServers(args *slb.ModifyVServerGroupBackendServersArgs) (response *slb.ModifyVServerGroupBackendServersResponse, err error) {
+	if c.modifyVServerGroupBackendServers != nil {
+		return c.modifyVServerGroupBackendServers(args)
+	}
+	return nil, nil
+}
+func (c *mockClientSLB) AddVServerGroupBackendServers(args *slb.AddVServerGroupBackendServersArgs) (response *slb.AddVServerGroupBackendServersResponse, err error) {
+	if c.addVServerGroupBackendServers != nil {
+		return c.addVServerGroupBackendServers(args)
+	}
+	return nil, nil
+}
+func (c *mockClientSLB) RemoveVServerGroupBackendServers(args *slb.RemoveVServerGroupBackendServersArgs) (response *slb.RemoveVServerGroupBackendServersResponse, err error) {
+	if c.removeVServerGroupBackendServers != nil {
+		return c.removeVServerGroupBackendServers(args)
+	}
+	return nil, nil
+}
 
 func TestGetLoadBalancerAdditionalTags(t *testing.T) {
 	tagTests := []struct {
@@ -395,8 +469,7 @@ func TestGetLoadBalancerAdditionalTags(t *testing.T) {
 			Annotations: map[string]string{
 				ServiceAnnotationLoadBalancerAdditionalTags: "",
 			},
-			Tags: map[string]string{
-			},
+			Tags: map[string]string{},
 		},
 		{
 			Annotations: map[string]string{
