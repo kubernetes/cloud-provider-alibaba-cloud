@@ -82,7 +82,7 @@ func NewClientMgr(key, secret string) (*ClientMgr, error) {
 			if err != nil {
 				return nil, err
 			}
-			glog.V(2).Infof("alicloud: clientmgr, using role=[%s] with initial token=[%+v]", ROLE_NAME, role)
+			glog.V(2).Infof("alicloud: clientmgr, using role name [%s]", ROLE_NAME)
 			token.auth = role
 			token.active = true
 		}
