@@ -337,10 +337,13 @@ func (c *Cloud) CurrentNodeName(hostname string) (types.NodeName, error) {
 // InstanceExistsByProviderID returns true if the instance for the given provider id still is running.
 // If false is returned with no error, the instance will be immediately deleted by the cloud controller manager.
 func (c *Cloud) InstanceExistsByProviderID(providerID string) (bool, error) {
+	if providerID == "" {
+		return false, fmt.Errorf("Alicloud.InstanceExistsByProviderID(), providerID is empty")
+	}
 	_, err := c.climgr.Instances().findInstanceByProviderID(providerID)
 	if err == cloudprovider.InstanceNotFound {
 		glog.V(2).Infof("Alicloud.InstanceExistsByProviderID(\"%s\") message=[%s]", providerID, err.Error())
-		return false, err
+		return false, nil
 	}
 	return true, err
 }
