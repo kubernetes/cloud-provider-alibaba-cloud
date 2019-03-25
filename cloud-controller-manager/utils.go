@@ -27,6 +27,7 @@ import (
 // this is a workaround of BUG #https://github.com/kubernetes/kubernetes/issues/59084
 var (
 	versionCache *localService
+	serviceCache *kvstore
 	once         sync.Once
 )
 
@@ -35,12 +36,27 @@ type localService struct {
 	lock               sync.RWMutex
 }
 
-func GetLocalService() *localService {
+type kvstore struct {
+	store map[string]int64
+	lock  sync.RWMutex
+}
+
+func init() {
 	once.Do(func() {
 		versionCache = &localService{
 			maxResourceVersion: map[string]bool{},
 		}
+		serviceCache = &kvstore{
+			store: map[string]int64{},
+		}
 	})
+}
+
+func GetPrivateZoneRecordCache() *kvstore {
+	return serviceCache
+}
+
+func GetLocalService() *localService {
 	return versionCache
 }
 
@@ -55,6 +71,26 @@ func (s *localService) get(serviceUID string) (found bool) {
 	defer s.lock.RUnlock()
 	_, found = s.maxResourceVersion[serviceUID]
 	return
+}
+
+func (kv *kvstore) get(key string) (int64, bool) {
+	kv.lock.RLock()
+	defer kv.lock.RUnlock()
+
+	value, found := kv.store[key]
+	return value, found
+}
+
+func (kv *kvstore) set(key string, value int64) {
+	kv.lock.Lock()
+	defer kv.lock.Unlock()
+	kv.store[key] = value
+}
+
+func (kv *kvstore) remove(key string) {
+	kv.lock.Lock()
+	defer kv.lock.Unlock()
+	delete(kv.store, key)
 }
 
 func NodeList(nodes []*v1.Node) []string {
