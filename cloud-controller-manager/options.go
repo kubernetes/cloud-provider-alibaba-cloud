@@ -30,7 +30,9 @@ import (
 )
 
 const (
-	ServiceAnnotationLoadBalancerPrefix                        = "service.beta.kubernetes.io/alicloud-loadbalancer-"
+	ServiceAnnotationLoadBalancerPrefix = "service.beta.kubernetes.io/alicloud-loadbalancer-"
+	ServiceAnnotationPrivateZonePrefix  = "service.beta.kubernetes.io/alicloud-private-zone-"
+
 	ServiceAnnotationLoadBalancerProtocolPort                  = ServiceAnnotationLoadBalancerPrefix + "protocol-port"
 	ServiceAnnotationLoadBalancerAddressType                   = ServiceAnnotationLoadBalancerPrefix + "address-type"
 	ServiceAnnotationLoadBalancerSLBNetworkType                = ServiceAnnotationLoadBalancerPrefix + "slb-network-type"
@@ -55,7 +57,7 @@ const (
 	ServiceAnnotationLoadBalancerHealthCheckHTTPCode           = ServiceAnnotationLoadBalancerPrefix + "health-check-httpcode"
 
 	// For example: "Key1=Val1,Key2=Val2,KeyNoVal1=,KeyNoVal2",same with aws
-	ServiceAnnotationLoadBalancerAdditionalTags				   = ServiceAnnotationLoadBalancerPrefix + "additional-resource-tags"
+	ServiceAnnotationLoadBalancerAdditionalTags = ServiceAnnotationLoadBalancerPrefix + "additional-resource-tags"
 
 	ServiceAnnotationLoadBalancerOverrideListener = ServiceAnnotationLoadBalancerPrefix + "force-override-listeners"
 
@@ -68,22 +70,27 @@ const (
 	MagicHealthCheckConnectPort                     = -520
 	ServiceAnnotationLoadBalancerIPVersion          = ServiceAnnotationLoadBalancerPrefix + "ip-version"
 	MAX_LOADBALANCER_BACKEND                        = 18
+
+	ServiceAnnotationLoadBalancerPrivateZoneName       = ServiceAnnotationPrivateZonePrefix + "name"
+	ServiceAnnotationLoadBalancerPrivateZoneId         = ServiceAnnotationPrivateZonePrefix + "id"
+	ServiceAnnotationLoadBalancerPrivateZoneRecordName = ServiceAnnotationPrivateZonePrefix + "record-name"
+	ServiceAnnotationLoadBalancerPrivateZoneRecordTTL  = ServiceAnnotationPrivateZonePrefix + "record-ttl"
 )
 
 //compatible to old camel annotation
-func getBackwardsCompatibleAnnotation(annotations map[string]string)(map[string]string){
+func getBackwardsCompatibleAnnotation(annotations map[string]string) map[string]string {
 	newAnnotation := make(map[string]string)
 	for k, v := range annotations {
 		newAnnotation[replaceCamel(k)] = v
 	}
-	return newAnnotation;
+	return newAnnotation
 }
 
 // defaulted is the parameters which set by programe.
 // request represent user defined parameters.
 func ExtractAnnotationRequest(service *v1.Service) (*AnnotationRequest, *AnnotationRequest) {
 	defaulted, request := &AnnotationRequest{}, &AnnotationRequest{}
-	annotation := getBackwardsCompatibleAnnotation(service.Annotations);
+	annotation := getBackwardsCompatibleAnnotation(service.Annotations)
 	bandwidth, ok := annotation[ServiceAnnotationLoadBalancerBandwidth]
 	if ok {
 		if i, err := strconv.Atoi(bandwidth); err == nil {
@@ -336,6 +343,38 @@ func ExtractAnnotationRequest(service *v1.Service) (*AnnotationRequest, *Annotat
 	if ok {
 		request.AddressIPVersion = slb.AddressIPVersionType(ipVersion)
 		defaulted.AddressIPVersion = request.AddressIPVersion
+	}
+
+	privateZoneName, ok := annotation[ServiceAnnotationLoadBalancerPrivateZoneName]
+	if ok {
+		request.PrivateZoneName = privateZoneName
+		defaulted.PrivateZoneName = request.PrivateZoneName
+	}
+
+	privateZoneId, ok := annotation[ServiceAnnotationLoadBalancerPrivateZoneId]
+	if ok {
+		request.PrivateZoneId = privateZoneId
+		defaulted.PrivateZoneId = request.PrivateZoneId
+	}
+
+	privateZoneRecordName, ok := annotation[ServiceAnnotationLoadBalancerPrivateZoneRecordName]
+	if ok {
+		request.PrivateZoneRecordName = privateZoneRecordName
+		defaulted.PrivateZoneRecordName = request.PrivateZoneRecordName
+	}
+
+	privateZoneRecordTTL, ok := annotation[ServiceAnnotationLoadBalancerPrivateZoneRecordTTL]
+	if ok {
+		ttl, err := strconv.Atoi(privateZoneRecordTTL)
+		if err != nil {
+			glog.Warningf("annotation "+ServiceAnnotationLoadBalancerPrivateZoneRecordTTL+
+				" must be integer, but got [%s], use default number 60. message=[%s]\n",
+				privateZoneRecordTTL, err.Error())
+			defaulted.PrivateZoneRecordTTL = 60
+		} else {
+			defaulted.PrivateZoneRecordTTL = ttl
+			request.PrivateZoneRecordTTL = defaulted.PrivateZoneRecordTTL
+		}
 	}
 
 	return defaulted, request
