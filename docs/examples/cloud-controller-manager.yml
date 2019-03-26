@@ -158,7 +158,7 @@ spec:
       - command:
         -  /cloud-controller-manager
         - --kubeconfig=/etc/kubernetes/cloud-controller-manager.conf
-        - --address=127.0.0.1
+        - --address=0.0.0.0
         - --allow-untagged-cloud=true
         - --leader-elect=true
         - --cloud-provider=alicloud

@@ -21,7 +21,7 @@ spec:
     - --kubeconfig=/etc/kubernetes/controller-manager.conf
     - --root-ca-file=/etc/kubernetes/pki/ca.crt
     - --cluster-signing-key-file=/etc/kubernetes/pki/ca.key
-    - --address=127.0.0.1
+    - --address=0.0.0.0
     - --use-service-account-credentials=true
     - --service-account-private-key-file=/etc/kubernetes/pki/sa.key
     - --cluster-signing-cert-file=/etc/kubernetes/pki/ca.crt
