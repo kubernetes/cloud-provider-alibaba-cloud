@@ -26,7 +26,6 @@ import (
 	"github.com/denverdino/aliyungo/metadata"
 	"github.com/denverdino/aliyungo/slb"
 	"github.com/golang/glog"
-	"github.com/patrickmn/go-cache"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"strings"
 )
@@ -82,7 +81,7 @@ func NewClientMgr(key, secret string) (*ClientMgr, error) {
 			if err != nil {
 				return nil, err
 			}
-			glog.V(2).Infof("alicloud: clientmgr, using role=[%s] with initial token=[%+v]", ROLE_NAME, role)
+			glog.V(2).Infof("alicloud: clientmgr, using role name [%s]", ROLE_NAME)
 			token.auth = role
 			token.active = true
 		}
@@ -97,6 +96,9 @@ func NewClientMgr(key, secret string) (*ClientMgr, error) {
 	slbclient := slb.NewSLBClientWithSecurityToken(keyid, sec, tok, common.Region(region))
 	slbclient.SetUserAgent(KUBERNETES_ALICLOUD_IDENTITY)
 
+	vpcclient := ecs.NewVPCClientWithSecurityToken(keyid, sec, tok, common.Region(region))
+	vpcclient.SetUserAgent(KUBERNETES_ALICLOUD_IDENTITY)
+
 	mgr := &ClientMgr{
 		stop:  make(<-chan struct{}, 1),
 		token: token,
@@ -108,9 +110,8 @@ func NewClientMgr(key, secret string) (*ClientMgr, error) {
 			c: slbclient,
 		},
 		routes: &RoutesClient{
-			client:  ecsclient,
-			routers: cache.New(defaultCacheExpiration, defaultCacheExpiration),
-			vpcs:    cache.New(defaultCacheExpiration, defaultCacheExpiration),
+			client: vpcclient,
+			region: region,
 		},
 	}
 	if !token.active && cfg.Global.UID == "" {
