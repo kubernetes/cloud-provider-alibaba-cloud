@@ -557,7 +557,7 @@ func (s *LoadBalancerClient) UpdateDefaultServerGroup(nodes []*v1.Node, lb *slb.
 				break
 			}
 		}
-		if !found {
+		if !found && id != "" {
 			additions = append(additions, slb.BackendServerType{ServerId: string(id), Weight: DEFAULT_SERVER_WEIGHT, Type: "ecs"})
 		}
 	}
