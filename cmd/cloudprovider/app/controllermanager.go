@@ -39,18 +39,19 @@ import (
 	"k8s.io/client-go/tools/leaderelection"
 	"k8s.io/client-go/tools/leaderelection/resourcelock"
 	"k8s.io/client-go/tools/record"
-	routecontroller "k8s.io/cloud-provider-alibaba-cloud/cloud-controller-manager/controller/route"
 	servicecontroller "k8s.io/cloud-provider-alibaba-cloud/cloud-controller-manager/controller/service"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/controller"
 	cloudcontrollers "k8s.io/kubernetes/pkg/controller/cloud"
+	routecontroller "k8s.io/kubernetes/pkg/controller/route"
 	"k8s.io/kubernetes/pkg/util/configz"
 
 	"github.com/golang/glog"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
+	"k8s.io/cloud-provider-alibaba-cloud/cloud-controller-manager/controller/route"
 	"k8s.io/cloud-provider-alibaba-cloud/cmd/cloudprovider/app/options"
 )
 
@@ -195,6 +196,13 @@ func StartControllers(s *options.CloudControllerManagerServer, kubeconfig *restc
 		return clientBuilder.ClientOrDie(serviceAccountName)
 	}
 
+	route.Options = route.RoutesOptions{
+		ClusterCIDR:               s.ClusterCIDR,
+		AllocateNodeCIDRs:         s.AllocateNodeCIDRs,
+		ConfigCloudRoutes:         s.ConfigureCloudRoutes,
+		RouteReconciliationPeriod: s.RouteReconciliationPeriod,
+		ControllerStartInterval:   s.ControllerStartInterval,
+	}
 	if cloud != nil {
 		// Initialize the cloud provider with a reference to the clientBuilder
 		cloud.Initialize(clientBuilder)

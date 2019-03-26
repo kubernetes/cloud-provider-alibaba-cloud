@@ -29,9 +29,16 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/informers"
+	"k8s.io/cloud-provider-alibaba-cloud/cloud-controller-manager/controller/route"
 	"k8s.io/kubernetes/pkg/cloudprovider"
-	"k8s.io/kubernetes/pkg/controller"
+	ctrlclient "k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/version"
+	"math/rand"
+	"net"
+	"strings"
+	"time"
 )
 
 // ProviderName is the name of this cloud provider.
@@ -71,6 +78,7 @@ type CloudConfig struct {
 		ZoneID               string `json:"zoneid"`
 		VswitchID            string `json:"vswitchid"`
 		ClusterID            string `json:"clusterID"`
+		RouteTableIDS        string `json:"routeTableIDs"`
 
 		AccessKeyID     string `json:"accessKeyID"`
 		AccessKeySecret string `json:"accessKeySecret"`
@@ -85,6 +93,7 @@ func init() {
 			var (
 				keyid     = ""
 				keysecret = ""
+				rtableids = ""
 			)
 			if config != nil {
 				if err := json.NewDecoder(config).Decode(&cfg); err != nil {
@@ -107,6 +116,10 @@ func init() {
 					CLUSTER_ID = cfg.Global.ClusterID
 					glog.Infof("use clusterid %s", CLUSTER_ID)
 				}
+
+				if cfg.Global.RouteTableIDS != "" {
+					rtableids = cfg.Global.RouteTableIDS
+				}
 			}
 			if keyid == "" || keysecret == "" {
 				glog.V(2).Infof("cloud config does not have keyid and keysecret . try environment ACCESS_KEY_ID ACCESS_KEY_SECRET")
@@ -117,22 +130,16 @@ func init() {
 			if err != nil {
 				return nil, err
 			}
-			return newAliCloud(mgr)
+			return newAliCloud(mgr, rtableids)
 		})
 }
 
-func newAliCloud(mgr *ClientMgr) (*Cloud, error) {
-
-	defer func() {
-		if err := recover(); err != nil {
-			fmt.Println(err)
-		}
-	}()
+func newAliCloud(mgr *ClientMgr, rtableids string) (*Cloud, error) {
 
 	region, err := mgr.MetaData().Region()
 	if err != nil {
-		return nil, errors.New("Please provide region in Alicloud configuration file or " +
-			"make sure your ECS is under VPC network.")
+		return nil, errors.New("please provide region in " +
+			"Alicloud configuration file or make sure your ECS is under VPC network")
 	}
 	DEFAULT_REGION = common.Region(region)
 
@@ -141,12 +148,51 @@ func newAliCloud(mgr *ClientMgr) (*Cloud, error) {
 		return nil, fmt.Errorf("Alicloud: error get vpcid. %s\n", err.Error())
 	}
 	glog.Infof("Using vpc region: region=%s, vpcid=%s", region, vpc)
-
+	err = mgr.Routes().WithVPC(vpc, rtableids)
+	if err != nil {
+		return nil, fmt.Errorf("set vpc info error: %s", err.Error())
+	}
 	return &Cloud{climgr: mgr, region: common.Region(region), vpcID: vpc}, nil
 }
 
 // Initialize passes a Kubernetes clientBuilder interface to the cloud provider
-func (c *Cloud) Initialize(clientBuilder controller.ControllerClientBuilder) {}
+func (c *Cloud) Initialize(builder ctrlclient.ControllerClientBuilder) {
+	if !route.Options.ConfigCloudRoutes {
+		return
+	}
+
+	cidr := route.Options.ClusterCIDR
+	if len(strings.TrimSpace(cidr)) == 0 {
+		panic(fmt.Sprintf("ivalid cluster CIDR %s", cidr))
+	}
+	_, cidrc, err := net.ParseCIDR(cidr)
+	if err != nil {
+		panic(fmt.Sprintf("Unsuccessful parsing of cluster CIDR %v: %v", cidr, err))
+	}
+
+	shared := informers.NewSharedInformerFactory(
+		builder.ClientOrDie("shared-informers"), syncPeriod())
+	clusterid := ""
+	if c.cfg != nil {
+		clusterid = c.cfg.Global.KubernetesClusterTag
+	}
+	ctrl, err := route.New(c,
+		builder.ClientOrDie(route.ROUTE_CONTROLLER),
+		shared.Core().V1().Nodes(),
+		clusterid, cidrc)
+	if err != nil {
+		panic(fmt.Sprintf("unable to initialize route controller, %s", err.Error()))
+	}
+	var stop <-chan struct{}
+	go ctrl.Run(stop, route.Options.RouteReconciliationPeriod.Duration)
+	time.Sleep(wait.Jitter(route.Options.ControllerStartInterval.Duration, 1.0))
+	shared.Start(stop)
+	glog.Infof("route controller started.")
+}
+
+func syncPeriod() time.Duration {
+	return time.Duration(float64(route.Options.MinResyncPeriod.Nanoseconds()) * (rand.Float64() + 1))
+}
 
 // TODO: Break this up into different interfaces (LB, etc) when we have more than one type of service
 // GetLoadBalancer returns whether the specified load balancer exists, and
@@ -344,25 +390,21 @@ func (c *Cloud) InstanceExistsByProviderID(providerID string) (bool, error) {
 	}
 	return true, err
 }
+func (c *Cloud) RouteTables(clusterName string) ([]string, error) {
+	return c.climgr.Routes().RouteTables()
+}
 
 // ListRoutes lists all managed routes that belong to the specified clusterName
-func (c *Cloud) ListRoutes(clusterName string) ([]*cloudprovider.Route, error) {
+func (c *Cloud) ListRoutes(clusterName string, tableid string) ([]*cloudprovider.Route, error) {
 	glog.V(5).Infof("alicloud: ListRoutes \n")
-	vpcid, err := c.climgr.MetaData().VpcID()
-	if err != nil {
-		return nil, fmt.Errorf("alicloud: can not determin vpcid while list routes. %s", err.Error())
-	}
-	region, err := c.climgr.MetaData().Region()
-	if err != nil {
-		return nil, fmt.Errorf("alicloud: can not determin region id while list routes, %s", err.Error())
-	}
-	return c.climgr.Routes().ListRoutes(common.Region(region), []string{vpcid})
+
+	return c.climgr.Routes().ListRoutes(tableid)
 }
 
 // CreateRoute creates the described managed route
 // route.Name will be ignored, although the cloud-provider may use nameHint
 // to create a more user-meaningful name.
-func (c *Cloud) CreateRoute(clusterName string, nameHint string, route *cloudprovider.Route) error {
+func (c *Cloud) CreateRoute(clusterName string, nameHint string, tableid string, route *cloudprovider.Route) error {
 	glog.V(2).Infof("Alicloud.CreateRoute(\"%s, %+v\")", clusterName, route)
 	ins, err := c.climgr.Instances().findInstanceByProviderID(string(route.TargetNode))
 	if err != nil {
@@ -373,12 +415,12 @@ func (c *Cloud) CreateRoute(clusterName string, nameHint string, route *cloudpro
 		DestinationCIDR: route.DestinationCIDR,
 		TargetNode:      types.NodeName(ins.InstanceId),
 	}
-	return c.climgr.Routes().CreateRoute(cRoute, ins.RegionId, ins.VpcAttributes.VpcId)
+	return c.climgr.Routes().CreateRoute(tableid, cRoute, ins.RegionId, ins.VpcAttributes.VpcId)
 }
 
 // DeleteRoute deletes the specified managed route
 // Route should be as returned by ListRoutes
-func (c *Cloud) DeleteRoute(clusterName string, route *cloudprovider.Route) error {
+func (c *Cloud) DeleteRoute(clusterName string, tableid string, route *cloudprovider.Route) error {
 	glog.V(2).Infof("Alicloud.DeleteRoute(\"%s, %+v\")", clusterName, route)
 	ins, err := c.climgr.Instances().findInstanceByProviderID(string(route.TargetNode))
 	if err != nil {
@@ -389,7 +431,7 @@ func (c *Cloud) DeleteRoute(clusterName string, route *cloudprovider.Route) erro
 		DestinationCIDR: route.DestinationCIDR,
 		TargetNode:      types.NodeName(ins.InstanceId),
 	}
-	return c.climgr.Routes().DeleteRoute(cRoute, ins.RegionId, ins.VpcAttributes.VpcId)
+	return c.climgr.Routes().DeleteRoute(tableid, cRoute, ins.RegionId, ins.VpcAttributes.VpcId)
 }
 
 // GetZone returns the Zone containing the current failure zone and locality region that the program is running in
@@ -458,14 +500,10 @@ func (c *Cloud) Master(clusterName string) (string, error) {
 }
 
 // Clusters returns the list of clusters.
-func (c *Cloud) Clusters() (cloudprovider.Clusters, bool) {
-	return nil, false
-}
+func (c *Cloud) Clusters() (cloudprovider.Clusters, bool) { return nil, false }
 
 // ProviderName returns the cloud provider ID.
-func (c *Cloud) ProviderName() string {
-	return ProviderName
-}
+func (c *Cloud) ProviderName() string { return ProviderName }
 
 // ScrubDNS filters DNS settings for pods.
 func (c *Cloud) ScrubDNS(nameservers, searches []string) (nsOut, srchOut []string) {
@@ -473,49 +511,22 @@ func (c *Cloud) ScrubDNS(nameservers, searches []string) (nsOut, srchOut []strin
 }
 
 // LoadBalancer returns an implementation of LoadBalancer for Alicloud Services.
-func (c *Cloud) LoadBalancer() (cloudprovider.LoadBalancer, bool) {
-	return c, true
-}
+func (c *Cloud) LoadBalancer() (cloudprovider.LoadBalancer, bool) { return c, true }
 
 // Instances returns an implementation of Instances for Alicloud Services.
-func (c *Cloud) Instances() (cloudprovider.Instances, bool) {
-	return c, true
-}
+func (c *Cloud) Instances() (cloudprovider.Instances, bool) { return c, true }
 
 // Zones returns an implementation of Zones for Alicloud Services.
-func (c *Cloud) Zones() (cloudprovider.Zones, bool) {
-	return c, true
-}
+func (c *Cloud) Zones() (cloudprovider.Zones, bool) { return c, true }
 
 // Routes returns an implementation of Routes for Alicloud Services.
-func (c *Cloud) Routes() (cloudprovider.Routes, bool) {
-	if c.vpcID != "" {
-		glog.V(2).Infof("Alicloud.Routes(): routes enabled!\n")
-		return c, true
-	}
-	return nil, false
-}
+func (c *Cloud) Routes() (cloudprovider.Routes, bool) { return nil, false }
 
 // HasClusterID returns true if a ClusterID is required and set
-func (c *Cloud) HasClusterID() bool {
-	return CLUSTER_ID != "clusterid"
-}
+func (c *Cloud) HasClusterID() bool { return CLUSTER_ID != "clusterid" }
 
 //
 func (c *Cloud) fileOutNode(nodes []*v1.Node, service *v1.Service) ([]*v1.Node, error) {
-
 	ar, _ := ExtractAnnotationRequest(service)
-	//ns, err := c.climgr.Instances().filterOutByRegion(nodes, ar.Region)
-	//if err != nil {
-	//	return []*v1.Node{}, err
-	//}
-	//targets, err := c.climgr.Instances().filterOutByLabel(nodes, ar.BackendLabel)
-	//if err != nil {
-	//	return []*v1.Node{}, err
-	//}
-	//// Add 20 nodes at most .
-	//if len(targets) > MAX_LOADBALANCER_BACKEND {
-	//	return targets[0:MAX_LOADBALANCER_BACKEND], nil
-	//}
 	return c.climgr.Instances().filterOutByLabel(nodes, ar.BackendLabel)
 }

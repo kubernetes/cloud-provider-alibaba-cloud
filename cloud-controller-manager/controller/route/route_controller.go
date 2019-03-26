@@ -19,7 +19,6 @@ package route
 import (
 	"fmt"
 	"net"
-	"sync"
 	"time"
 
 	"strings"
@@ -39,7 +38,6 @@ import (
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
-	"k8s.io/cloud-provider-alibaba-cloud/cloud-controller-manager"
 	v1node "k8s.io/kubernetes/pkg/api/v1/node"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/controller"
@@ -48,17 +46,30 @@ import (
 )
 
 const (
-	// Maximal number of concurrent CreateRoute API calls.
-	// TODO: This should be per-provider.
-	maxConcurrentRouteCreations int = 200
-	// Maximum number of retries of route creations.
-	maxRetries int = 5
+	ROUTE_CONTROLLER = "route-controller"
+
 	// Maximum number of retries of node status update.
 	updateNodeStatusMaxRetries int = 3
 )
 
+// Routes is an abstract, pluggable interface for advanced routing rules.
+type Routes interface {
+
+	// RouteTables get all available route tables.
+	RouteTables(clusterName string) ([]string, error)
+	// ListRoutes lists all managed routes that belong to the specified clusterName
+	ListRoutes(clusterName string, table string) ([]*cloudprovider.Route, error)
+	// CreateRoute creates the described managed route
+	// route.Name will be ignored, although the cloud-provider may use nameHint
+	// to create a more user-meaningful name.
+	CreateRoute(clusterName string, nameHint string, table string, route *cloudprovider.Route) error
+	// DeleteRoute deletes the specified managed route
+	// Route should be as returned by ListRoutes
+	DeleteRoute(clusterName string, table string, route *cloudprovider.Route) error
+}
+
 type RouteController struct {
-	routes           cloudprovider.Routes
+	routes           Routes
 	kubeClient       clientset.Interface
 	clusterName      string
 	clusterCIDR      *net.IPNet
@@ -68,31 +79,31 @@ type RouteController struct {
 	recorder         record.EventRecorder
 }
 
-func New(routes cloudprovider.Routes, kubeClient clientset.Interface, nodeInformer coreinformers.NodeInformer, clusterName string, clusterCIDR *net.IPNet) *RouteController {
+func New(routes Routes,
+	kubeClient clientset.Interface,
+	nodeInformer coreinformers.NodeInformer,
+	clusterName string, clusterCIDR *net.IPNet) (*RouteController, error) {
+
 	if kubeClient != nil && kubeClient.CoreV1().RESTClient().GetRateLimiter() != nil {
-		metrics.RegisterMetricAndTrackRateLimiterUsage("route_controller", kubeClient.CoreV1().RESTClient().GetRateLimiter())
+		metrics.RegisterMetricAndTrackRateLimiterUsage(ROUTE_CONTROLLER, kubeClient.CoreV1().RESTClient().GetRateLimiter())
 	}
 
 	if clusterCIDR == nil {
-		glog.Fatal("RouteController: Must specify clusterCIDR.")
+		return nil, fmt.Errorf("RouteController: Must specify clusterCIDR")
 	}
 
-	eventBroadcaster := record.NewBroadcaster()
-	eventBroadcaster.StartLogging(glog.Infof)
-	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "route_controller"})
+	eventer, caster := broadcaster()
 
-	rc := &RouteController{
+	return &RouteController{
 		routes:           routes,
 		kubeClient:       kubeClient,
 		clusterName:      clusterName,
 		clusterCIDR:      clusterCIDR,
 		nodeLister:       nodeInformer.Lister(),
 		nodeListerSynced: nodeInformer.Informer().HasSynced,
-		broadcaster:      eventBroadcaster,
-		recorder:         recorder,
-	}
-
-	return rc
+		broadcaster:      caster,
+		recorder:         eventer,
+	}, nil
 }
 
 func (rc *RouteController) Run(stopCh <-chan struct{}, syncPeriod time.Duration) {
@@ -101,12 +112,15 @@ func (rc *RouteController) Run(stopCh <-chan struct{}, syncPeriod time.Duration)
 	glog.Info("Starting route controller")
 	defer glog.Info("Shutting down route controller")
 
-	if !controller.WaitForCacheSync("route", stopCh, rc.nodeListerSynced) {
+	if !controller.WaitForCacheSync(ROUTE_CONTROLLER, stopCh, rc.nodeListerSynced) {
 		return
 	}
 
 	if rc.broadcaster != nil {
-		rc.broadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: v1core.New(rc.kubeClient.CoreV1().RESTClient()).Events("")})
+		sink := &v1core.EventSinkImpl{
+			Interface: v1core.New(rc.kubeClient.CoreV1().RESTClient()).Events(""),
+		}
+		rc.broadcaster.StartRecordingToSink(sink)
 	}
 
 	// TODO: If we do just the full Resync every 5 minutes (default value)
@@ -115,7 +129,7 @@ func (rc *RouteController) Run(stopCh <-chan struct{}, syncPeriod time.Duration)
 	// We should have a watch on node and if we observe a new node (with CIDR?)
 	// trigger reconciliation for that node.
 	go wait.NonSlidingUntil(func() {
-		if err := rc.reconcileNodeRoutes(); err != nil {
+		if err := rc.reconcile(); err != nil {
 			glog.Errorf("Couldn't reconcile node routes: %v", err)
 		}
 	}, syncPeriod, stopCh)
@@ -123,147 +137,170 @@ func (rc *RouteController) Run(stopCh <-chan struct{}, syncPeriod time.Duration)
 	<-stopCh
 }
 
-func (rc *RouteController) reconcileNodeRoutes() error {
-	routeList, err := rc.routes.ListRoutes(rc.clusterName)
-	if err != nil {
-		return fmt.Errorf("error listing routes: %v", err)
-	}
+func (rc *RouteController) reconcile() error {
 	nodes, err := rc.nodeLister.List(labels.Everything())
 	if err != nil {
 		return fmt.Errorf("error listing nodes: %v", err)
 	}
-	return rc.reconcile(nodes, routeList)
+	tabs, err := rc.routes.RouteTables(rc.clusterName)
+	if err != nil {
+		return fmt.Errorf("RouteTables: %s", err.Error())
+	}
+	for _, table := range tabs {
+		//ListRoutes & Sync
+		routeList, err := rc.routes.ListRoutes(rc.clusterName, table)
+		if err != nil {
+			return fmt.Errorf("error listing routes: %v", err)
+		}
+		if err := rc.sync(table, nodes, routeList); err != nil {
+			return fmt.Errorf("reconcile route for table [%s] error: %s", table, err.Error())
+		}
+	}
+	return nil
 }
 
-func (rc *RouteController) reconcile(nodes []*v1.Node, routes []*cloudprovider.Route) error {
-	// nodeCIDRs maps nodeName->nodeCIDR
-	nodeCIDRs := make(map[types.NodeName]string)
-	// routeMap maps routeTargetNode->route
-	routeMap := make(map[types.NodeName]*cloudprovider.Route)
+// Aoxn: Alibaba Cloud does not support concurrent route operation
+func (rc *RouteController) sync(table string, nodes []*v1.Node, routes []*cloudprovider.Route) error {
+
+	//try delete conflicted route from vpc route table.
 	for _, route := range routes {
-		glog.V(5).Infof("ListRoutes: reconcile %+v", route)
-		if route.TargetNode != "" {
-			routeMap[route.TargetNode] = route
+		if !rc.isResponsibleForRoute(route) { continue }
+
+		// Check if this route is a blackhole, or applies to a node we know about & has an incorrect CIDR.
+		if route.Blackhole || rc.isRouteConflicted(nodes, route) {
+
+			// Aoxn: Alibaba Cloud does not support concurrent route operation
+			glog.Infof("Deleting route %s %s", route.Name, route.DestinationCIDR)
+			if err := rc.routes.DeleteRoute(rc.clusterName, table, route); err != nil {
+				glog.Errorf("Could not delete route %s %s from table %s, %s", route.Name, route.DestinationCIDR, table, err.Error())
+				continue
+			}
+			glog.Infof("Delete route %s %s from table %s SUCCESS.", route.Name, route.DestinationCIDR, table)
 		}
 	}
-
-	wg := sync.WaitGroup{}
-
-	// Aoxn: Alibaba Cloud does not support concurrent route operation
-	rateLimiter := make(chan struct{}, 1)
-	for _, route := range routes {
-		if rc.isResponsibleForRoute(route) {
-			nodesCidrRealContainsRoute := false
-			for _, node := range nodes {
-				if node.Spec.PodCIDR != "" {
-					if realContains, err := alicloud.RealContainsCidr(node.Spec.PodCIDR, route.DestinationCIDR); err != nil {
-						glog.Errorf("Could not judge relation between cidrs, will skip. node: %s, route: %s. error: %v", node.Spec.PodCIDR, route.DestinationCIDR, err)
-						continue
-					} else if realContains {
-						nodesCidrRealContainsRoute = true
-						break
-					}
-				}
-			}
-
-			// Check if this route is a blackhole, or applies to a node we know about & has an incorrect CIDR.
-			if  route.Blackhole || nodesCidrRealContainsRoute {
-				glog.Infof("responsible for: %t, %t", route.Blackhole, nodesCidrRealContainsRoute)
-				wg.Add(1)
-				// Delete the route.
-				startTime := time.Now()
-				// Aoxn: Alibaba Cloud does not support concurrent route operation
-				//go func(route *cloudprovider.Route, startTime time.Time) {
-				glog.Infof("Deleting route %s %s", route.Name, route.DestinationCIDR)
-				if err := rc.routes.DeleteRoute(rc.clusterName, route); err != nil {
-					glog.Errorf("Could not delete route %s %s after %v: %v", route.Name, route.DestinationCIDR, time.Now().Sub(startTime), err)
-				} else {
-					glog.Infof("Deleted route %s %s after %v", route.Name, route.DestinationCIDR, time.Now().Sub(startTime))
-				}
-				wg.Done()
-
-				//}(route, time.Now())
-			}
-		}
-	}
-	wg.Wait()
+	cached := RouteCacheMap(routes)
+	// try create desired routes
 	for _, node := range nodes {
-		// Skip if the node hasn't been assigned a CIDR yet.
+
 		if node.Spec.PodCIDR == "" {
-			// UpdateNetworkUnavailable When PodCIDR is not allocated.
 			rc.updateNetworkingCondition(types.NodeName(node.Name), false)
 			continue
 		}
 		if node.Spec.ProviderID == "" {
 			glog.Errorf("Node %s has no Provider ID, skip it", node.Name)
+			continue
 		}
-		providerID := types.NodeName(node.Spec.ProviderID)
-		// Check if we have a route for this node w/ the correct CIDR.
-		r := routeMap[providerID]
-		glog.V(5).Infof("Node: %s, r=%+v, node.Spec.PodCIDR=%s", node.Name, r, node.Spec.PodCIDR)
-		if r == nil || r.DestinationCIDR != node.Spec.PodCIDR {
-			// If not, create the route.
-			route := &cloudprovider.Route{
-				TargetNode:      providerID,
-				DestinationCIDR: node.Spec.PodCIDR,
-			}
-
-			wg.Add(1)
-			go func(node *v1.Node, route *cloudprovider.Route) {
-				defer wg.Done()
-				backoff := wait.Backoff{
-					Duration: 4 * time.Second,
-					Factor:   2,
-					Jitter:   1,
-					Steps:    8,
-				}
-				wait.ExponentialBackoff(backoff, func() (bool, error) {
-					startTime := time.Now()
-					nameHint := node.Name
-					// Ensure that we don't have more than maxConcurrentRouteCreations
-					// CreateRoute calls in flight.
-					rateLimiter <- struct{}{}
-					glog.Infof("Creating route for node %s %s with hint %s, throttled %v", node.Name, route.DestinationCIDR, nameHint, time.Now().Sub(startTime))
-					err := rc.routes.CreateRoute(rc.clusterName, nameHint, route)
-					if err != nil && strings.Contains(err.Error(), "please wait a moment and try again") {
-						// Throttled, wait a second.
-						glog.Infof("alicloud: throttle triggered. sleep for 10s before proceeding.")
-						time.Sleep(5 * time.Second)
-					}
-					<-rateLimiter
-
-					rc.updateNetworkingCondition(types.NodeName(node.Name), err == nil)
-					if err != nil {
-						msg := fmt.Sprintf("Could not create route %s %s for node %s after %v: %v", nameHint, route.DestinationCIDR, node.Name, time.Now().Sub(startTime), err)
-						if rc.recorder != nil {
-							rc.recorder.Eventf(
-								&v1.ObjectReference{
-									Kind:      "Node",
-									Name:      node.Name,
-									UID:       node.UID,
-									Namespace: "",
-								}, v1.EventTypeWarning, "FailedToCreateRoute", msg)
-						}
-						glog.Error(msg)
-
-					} else {
-						glog.Infof("Created route for node %s %s with hint %s after %v", node.Name, route.DestinationCIDR, nameHint, time.Now().Sub(startTime))
-						return true, nil
-					}
-					return false, nil
-				})
-			}(node, route)
-		} else {
-			// Update condition only if it doesn't reflect the current state.
-			_, condition := v1node.GetNodeCondition(&node.Status, v1.NodeNetworkUnavailable)
-			if condition == nil || condition.Status != v1.ConditionFalse {
-				rc.updateNetworkingCondition(types.NodeName(node.Name), true)
-			}
-		}
-		nodeCIDRs[providerID] = node.Spec.PodCIDR
+		// ignore error return. Try it next time anyway.
+		rc.tryCreateRoute(table, node, cached)
 	}
-	wg.Wait()
 	return nil
+}
+
+func RouteCacheMap(routes []*cloudprovider.Route) map[types.NodeName]*cloudprovider.Route {
+	// routeMap maps routeTargetNode->route
+	routeMap := make(map[types.NodeName]*cloudprovider.Route)
+	for _, route := range routes {
+		if route.TargetNode != "" {
+			routeMap[route.TargetNode] = route
+		}
+	}
+	return routeMap
+}
+
+func (rc *RouteController) tryCreateRoute(table string,
+	node *v1.Node,
+	cache map[types.NodeName]*cloudprovider.Route) error {
+
+	if node.Spec.PodCIDR == "" {
+		return rc.updateNetworkingCondition(types.NodeName(node.Name), false)
+	}
+	if node.Spec.ProviderID == "" {
+		fmt.Errorf("node %s has no node.Spec.ProviderID, skip it", node.Name)
+		return nil
+	}
+	providerID := types.NodeName(node.Spec.ProviderID)
+	// Check if we have a route for this node w/ the correct CIDR.
+	r := cache[providerID]
+	if r == nil || r.DestinationCIDR != node.Spec.PodCIDR {
+		// If not, create the route.
+		route := &cloudprovider.Route{
+			TargetNode:      providerID,
+			DestinationCIDR: node.Spec.PodCIDR,
+		}
+
+		backoff := wait.Backoff{
+			Duration: 4 * time.Second,
+			Factor:   2,
+			Jitter:   1,
+			Steps:    8,
+		}
+		var lasterr error
+		err := wait.ExponentialBackoff(backoff, func() (bool, error) {
+
+			glog.Infof("Creating route for node %s %s with hint %s", node.Name, route.DestinationCIDR, node.Name)
+			err := rc.routes.CreateRoute(rc.clusterName, node.Name, table, route)
+			if err != nil {
+				lasterr = err
+				glog.Errorf("Backoff creating route: %s", err.Error())
+				return false, nil
+			}
+			return true, nil
+		})
+		if err != nil {
+			msg := fmt.Sprintf("could not create route %s for node %s: %v -> %v", route.DestinationCIDR, node.Name, err, lasterr)
+			if rc.recorder != nil {
+				rc.recorder.Eventf(
+					&v1.ObjectReference{
+						Kind:      "Node",
+						Name:      node.Name,
+						UID:       node.UID,
+						Namespace: "",
+					}, v1.EventTypeWarning, "FailedToCreateRoute", msg)
+			}
+			glog.Error(msg)
+		}
+		glog.Infof("Created route for %s with %s -> %s", table, node.Name, node.Spec.PodCIDR)
+		return rc.updateNetworkingCondition(types.NodeName(node.Name), err == nil)
+	}
+	// Update condition only if it doesn't reflect the current state.
+	_, condition := v1node.GetNodeCondition(&node.Status, v1.NodeNetworkUnavailable)
+	if condition != nil &&
+		condition.Status == v1.ConditionTrue {
+		return nil
+	}
+	return rc.updateNetworkingCondition(types.NodeName(node.Name), true)
+}
+
+func (rc *RouteController) isRouteConflicted(nodes []*v1.Node, route *cloudprovider.Route) bool {
+	for _, node := range nodes {
+		// skip node without podcidr
+		if node.Spec.PodCIDR == "" { continue }
+
+		if node.Spec.PodCIDR == route.DestinationCIDR &&
+			!strings.Contains(node.Spec.ProviderID, string(route.TargetNode)) {
+			// conflicted with exist route.
+			return true
+		}
+		contains, err := RealContainsCidr(node.Spec.PodCIDR, route.DestinationCIDR)
+		if err != nil {
+			// record event an error out.
+			msg := fmt.Sprintf("isRouteConflicted: node.Spec.PodCIDR=%s -> "+
+				"route.CIDR=%s, %s", node.Spec.PodCIDR, route.DestinationCIDR, err.Error())
+			if rc.recorder != nil {
+				rc.recorder.Eventf(
+					&v1.ObjectReference{
+						Kind:      "Node",
+						Name:      node.Name,
+						UID:       node.UID,
+						Namespace: "",
+					}, v1.EventTypeWarning, "FailedToCreateRoute", msg)
+			}
+			glog.Error(msg)
+			return false
+		}
+		if contains { return true }
+	}
+	return false
 }
 
 func (rc *RouteController) updateNetworkingCondition(nodeName types.NodeName, routeCreated bool) error {
@@ -317,4 +354,11 @@ func (rc *RouteController) isResponsibleForRoute(route *cloudprovider.Route) boo
 		return false
 	}
 	return true
+}
+
+func broadcaster() (record.EventRecorder, record.EventBroadcaster) {
+	caster := record.NewBroadcaster()
+	caster.StartLogging(glog.Infof)
+	source := v1.EventSource{Component: ROUTE_CONTROLLER}
+	return caster.NewRecorder(scheme.Scheme, source), caster
 }

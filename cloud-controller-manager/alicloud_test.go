@@ -105,7 +105,7 @@ func newMockCloud(slb ClientSLBSDK, route RouteSDK, ins ClientInstanceSDK, meta 
 		},
 	}
 
-	return newAliCloud(mgr)
+	return newAliCloud(mgr, "")
 }
 
 func newBasicService() *v1.Service {
@@ -194,6 +194,23 @@ func newNode1() *v1.Node {
 		ObjectMeta: metav1.ObjectMeta{Name: node1},
 		Spec: v1.NodeSpec{
 			ProviderID: nodeid(regionId, node1),
+		},
+	}
+}
+
+func newMockClientRoute() RouteSDK {
+	return &mockRouteSDK{
+		describeVpcs: func(args *ecs.DescribeVpcsArgs) (vpcs []ecs.VpcSetType, pagination *common.PaginationResult, err error) {
+			return []ecs.VpcSetType{
+				{
+					VpcId: "vpc1",
+					RouterTableIds: struct {
+						RouterTableIds []string
+					}{
+						RouterTableIds: []string{"table1"},
+					},
+				},
+			}, nil, nil
 		},
 	}
 }
@@ -440,8 +457,7 @@ func TestEnsureLoadBalancerBasic(t *testing.T) {
 	base := newBaseLoadbalancer()
 	detail := loadbalancerAttrib(base[0])
 	// New Mock cloud to test
-	cloud, err := newMockCloud(newMockClientSLB(service, nodes, &base, detail), nil, newMockClientInstanceSDK(node1), nil)
-
+	cloud, err := newMockCloud(newMockClientSLB(service, nodes, &base, detail), newMockClientRoute(), newMockClientInstanceSDK(node1), nil)
 	if err != nil {
 		t.Fatal(fmt.Sprintf("TestEnsureLoadBalancer error newCloud: %s\n", err.Error()))
 	}
@@ -476,7 +492,7 @@ func TestEnsureLoadBalancerHTTPS(t *testing.T) {
 	detail := loadbalancerAttrib(base[0])
 	t.Log(PrettyJson(detail))
 	// New Mock cloud to test
-	cloud, err := newMockCloud(newMockClientSLB(service, nodes, &base, detail), nil, newMockClientInstanceSDK(node1), nil)
+	cloud, err := newMockCloud(newMockClientSLB(service, nodes, &base, detail), newMockClientRoute(), newMockClientInstanceSDK(node1), nil)
 
 	if err != nil {
 		t.Fatal(fmt.Sprintf("TestEnsureLoadBalancer error newCloud: %s\n", err.Error()))
@@ -505,7 +521,7 @@ func TestEnsureLoadBalancerWithPortChange(t *testing.T) {
 	detail := loadbalancerAttrib(base[0])
 	t.Log(PrettyJson(detail))
 	// New Mock cloud to test
-	cloud, err := newMockCloud(newMockClientSLB(service, nodes, &base, detail), nil, newMockClientInstanceSDK(node1), nil)
+	cloud, err := newMockCloud(newMockClientSLB(service, nodes, &base, detail), newMockClientRoute(), newMockClientInstanceSDK(node1), nil)
 
 	if err != nil {
 		t.Fatal(fmt.Sprintf("TestEnsureLoadBalancer error newCloud: %s\n", err.Error()))
@@ -578,7 +594,7 @@ func TestEnsureLoadbalancerDeleted(t *testing.T) {
 	base := newBaseLoadbalancer()
 	detail := loadbalancerAttrib(base[0])
 	// New Mock cloud to test
-	cloud, err := newMockCloud(newMockClientSLB(service, nil, &base, detail), nil, newMockClientInstanceSDK(node1), nil)
+	cloud, err := newMockCloud(newMockClientSLB(service, nil, &base, detail), newMockClientRoute(), newMockClientInstanceSDK(node1), nil)
 
 	if err != nil {
 		t.Errorf("TestEnsureLoadbalancerDeleted error newCloud: %s\n", err.Error())
@@ -602,7 +618,7 @@ func TestEnsureLoadBalancerDeleteWithUserDefined(t *testing.T) {
 	detail := loadbalancerAttrib(base[0])
 	t.Log(PrettyJson(base))
 	// New Mock cloud to test
-	cloud, err := newMockCloud(newMockClientSLB(service, nil, &base, detail), nil, nil, nil)
+	cloud, err := newMockCloud(newMockClientSLB(service, nil, &base, detail), newMockClientRoute(), nil, nil)
 	if err != nil {
 		t.Fatal(fmt.Sprintf("TestEnsureLoadBalancerDeleteWithUserDefined error newCloud: %s\n", err.Error()))
 	}
@@ -619,7 +635,7 @@ func TestEnsureLoadBalancerDeleteWithUserDefined(t *testing.T) {
 
 func TestNodeAddressAndInstanceID(t *testing.T) {
 	// New Mock cloud to test
-	cloud, err := newMockCloud(nil, nil, newMockClientInstanceSDK(node1), nil)
+	cloud, err := newMockCloud(nil, newMockClientRoute(), newMockClientInstanceSDK(node1), nil)
 
 	if err != nil {
 		t.Errorf("TestNodeAddressAndInstanceID error: newcloud %s\n", err.Error())
