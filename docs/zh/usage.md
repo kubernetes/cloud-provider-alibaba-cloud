@@ -37,6 +37,16 @@ root@master # kubectl get po -n kube-system -o yaml|grep image:|grep cloud-con|u
 
 3.  在浏览器中访问 `http://101.37.192.20`，来访问您的 Nginx 服务。
 
+## 负载均衡与 Private Zone 的绑定
+
+在新版的cloud-controller-manager中支持了在配置文件中自动将SLB与Private Zone的解析记录绑定。
+
+该功能能够为自动创建的SLB能够在内网中与某个域名绑定起来，方便自动创建的SLB的管理。具体的Private Zone服务请参考[什么是Private Zone](https://help.aliyun.com/document_detail/64611.html)。
+
+要使用本功能，还需要授予k8s集群的Master节点相应的RAM授权，让Master节点能够访问Private Zone服务API。
+
+需要在[RAM 角色管理控制台](https://ram.console.aliyun.com/roles)中找到Master节点的RAM角色，并给与PrivateZone的访问权。
+
 ## 更多信息
 
 阿里云负载均衡还支持丰富的配置参数，包含健康检查、收费类型、负载均衡类型等参数。详细信息参见[负载均衡配置参数表]。
@@ -349,6 +359,53 @@ spec:
   type: LoadBalancer
 ```
 
+**为负载均衡指定PrivateZone解析**
+
+```
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: foo
+  name: foo-service
+  namespace: default
+  annotations:
+    service.beta.kubernetes.io/alibaba-cloud-private-zone-name: "service.ali"
+    service.beta.kubernetes.io/alibaba-cloud-private-zone-record-name: "foo"
+spec:
+  ports:
+    - port: 80
+      protocol: TCP
+      targetPort: 80
+  selector:
+    app: foo
+  type: LoadBalancer
+```
+
+**为负载均衡指定PrivateZone解析与TTL过期时间**
+
+```
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: foo
+  name: foo-service
+  namespace: default
+  annotations:
+    service.beta.kubernetes.io/alibaba-cloud-private-zone-name: "service.ali"
+    service.beta.kubernetes.io/alibaba-cloud-private-zone-record-name: "foo"
+    service.beta.kubernetes.io/alibaba-cloud-private-zone-record-ttl: "10"
+spec:
+  ports:
+    - port: 80
+      protocol: TCP
+      targetPort: 80
+  selector:
+    app: foo
+  type: LoadBalancer
+```
+
 **说明：** 注解的内容是区分大小写的。
 
 |注释|描述|默认值|
@@ -380,3 +437,7 @@ spec:
 |service.beta.kubernetes.io/alicloud-loadbalancer-health-check-interval| 健康检查的时间间隔。</br></br> 取值：1-50（秒）</br></br> 可参考：[CreateLoadBalancerTCPListener](https://help.aliyun.com/document_detail/27594.html?spm=a2c4g.11186623.2.23.16bb609awRQFbk#slb-api-CreateLoadBalancerTCPListener)</br></br> |无|
 |service.beta.kubernetes.io/alicloud-loadbalancer-health-check-connect-timeout| 接收来自运行状况检查的响应需要等待的时间。如果后端ECS在指定的时间内没有正确响应，则判定为健康检查失败。</br></br> 取值：1-300（秒）</br></br> **说明：** 如果service.beta.kubernetes.io/alicloud-loadbalancer-health-check-connect-timeout的值小于service.beta.kubernetes.io/alicloud-loadbalancer-health-check-interval的值，则service.beta.kubernetes.io/alicloud-loadbalancer-health-check-connect-timeout无效，超时时间为service.beta.kubernetes.io/alicloud-loadbalancer-health-check-interval的值。</br></br> 可参考：[CreateLoadBalancerTCPListener](https://help.aliyun.com/document_detail/27594.html?spm=a2c4g.11186623.2.23.16bb609awRQFbk#slb-api-CreateLoadBalancerTCPListener)</br></br> |无|
 |service.beta.kubernetes.io/alicloud-loadbalancer-health-check-timeout|接收来自运行状况检查的响应需要等待的时间。如果后端ECS在指定的时间内没有正确响应，则判定为健康检查失败。取值：1-300（秒）</br></br>**说明：** 如果 service.beta.kubernetes.io/alicloud-loadbalancer-health-check-timeout的值小于service.beta.kubernetes.io/alicloud-loadbalancer-health-check-interval的值，则 service.beta.kubernetes.io/alicloud-loadbalancer-health-check-timeout无效，超时时间为 service.beta.kubernetes.io/alicloud-loadbalancer-health-check-interval的值。</br></br>可参考：[CreateLoadBalancerHTTPListener](https://help.aliyun.com/document_detail/27592.html?spm=a2c4g.11186623.2.24.16bb609awRQFbk#slb-api-CreateLoadBalancerHTTPListener)</br></br>|无|
+|service.beta.kubernetes.io/alibaba-cloud-private-zone-name|PrivateZone的名称，cloud provider 不会自动创建新的Private Zone，用户需要自己创建PrivateZone|无|
+|service.beta.kubernetes.io/alibaba-cloud-private-zone-id|PrivateZone的id，当名称和id同时存在时，优先采用id|无|
+|service.beta.kubernetes.io/alibaba-cloud-private-zone-record-name|PrivateZone的记录名，记录名与Private Zone名称共同组成最后的域名|无|
+|service.beta.kubernetes.io/alibaba-cloud-private-zone-record-ttl|PrivateZone的记录缓存过期时间，默认为60秒|60|
