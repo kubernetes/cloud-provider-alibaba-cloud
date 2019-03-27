@@ -31,7 +31,7 @@ import (
 
 const (
 	ServiceAnnotationLoadBalancerPrefix = "service.beta.kubernetes.io/alicloud-loadbalancer-"
-	ServiceAnnotationPrivateZonePrefix  = "service.beta.kubernetes.io/alicloud-private-zone-"
+	ServiceAnnotationPrivateZonePrefix  = "service.beta.kubernetes.io/alibaba-cloud-private-zone-"
 
 	ServiceAnnotationLoadBalancerProtocolPort                  = ServiceAnnotationLoadBalancerPrefix + "protocol-port"
 	ServiceAnnotationLoadBalancerAddressType                   = ServiceAnnotationLoadBalancerPrefix + "address-type"
