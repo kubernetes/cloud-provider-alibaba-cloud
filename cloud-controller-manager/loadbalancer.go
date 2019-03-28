@@ -70,6 +70,11 @@ type AnnotationRequest struct {
 	AddressIPVersion   slb.AddressIPVersionType
 
 	OverrideListeners string
+
+	PrivateZoneName       string
+	PrivateZoneId         string
+	PrivateZoneRecordName string
+	PrivateZoneRecordTTL  int
 }
 
 const TAGKEY = "kubernetes.do.not.delete"
@@ -484,7 +489,6 @@ func hasPort(svc *v1.Service, port int32) bool {
 }
 
 func (s *LoadBalancerClient) EnsureLoadBalanceDeleted(service *v1.Service) error {
-
 	// need to save the resource version when deleted event
 	err := keepResourceVesion(service)
 	if err != nil {

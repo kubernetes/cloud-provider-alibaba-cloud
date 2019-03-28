@@ -96,7 +96,7 @@ func (client *Client) NewInitForAssumeRole(endpoint, version, accessKeyId, acces
 //getLocationEndpoint
 func (client *Client) getEndpointByLocation() string {
 	locationClient := NewLocationClient(client.AccessKeyId, client.AccessKeySecret, client.securityToken)
-	//locationClient.SetDebug(true)
+	locationClient.SetDebug(true)
 	return locationClient.DescribeOpenAPIEndpoint(client.regionID, client.serviceCode)
 }
 

@@ -26,6 +26,30 @@ spec:
   type: LoadBalancer
 ```
 
+**Private Zone** In latest version of cloud controller manager, you can use annotation to bind SLB ip to private zone record. Here is a example:
+```
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: foo
+  name: foo-service
+  namespace: default
+  annotations:
+    service.beta.kubernetes.io/alibaba-cloud-private-zone-name: "service.ali"
+    service.beta.kubernetes.io/alibaba-cloud-private-zone-record-name: "foo"
+spec:
+  ports:
+    - port: 80
+      protocol: TCP
+      targetPort: 80
+  selector:
+    app: foo
+  type: LoadBalancer
+``` 
+
+To make private zone work, you need config RAM role of K8s master node. Find the role in [RAM control panel](https://ram.console.aliyun.com/roles) and add private zone access permissions to it.
+
 \>> **Note：**    
 
 - CloudProvider would not deal with your LoadBalancer(which was provided by user) listener by default if your cloud-controller-manager version is great equal then v1.9.3. User need to config their listener by themselves or using ```service.beta.kubernetes.io/alicloud-loadbalancer-force-override-listeners: "true"``` to force overwrite listeners. 
@@ -408,4 +432,8 @@ ps: Annotation list
 |service.beta.kubernetes.io/alicloud-loadbalancer-health-check-interval|	Time interval between two consecutive health checks. Value range: 1–50 (seconds).|None|
 |service.beta.kubernetes.io/alicloud-loadbalancer-health-check-connect-timeout|	Amount of time waiting for the response from the health check. If the backend ECS instance does not send a valid response within a specified period of time, the health check fails. value range: 1–300 (seconds).Note If the value of the parameter service.beta.kubernetes.io/alicloud-loadbalancer-health-check-connect-timeout is less than that of the parameter service.beta.kubernetes.io/alicloud-loadbalancer-health-check-interval, the parameter service.beta.kubernetes.io/alicloud-loadbalancer-health-check-connect-timeout is invalid and the timeout period equals the value of service.beta.kubernetes.io/alicloud-loadbalancer-health-check-interval.|None|
 |service.beta.kubernetes.io/alicloud-loadbalancer-health-check-timeout|	Amount of time waiting for the response from health check. If the backend ECS instance does not send a valid response within a specified period of time, the health check fails.Value range: 1–300 (seconds).Note If the value of the parameter service.beta.kubernetes.io/alicloud-loadbalancer-health-check-timeout is less than that of the parameter service.beta.kubernetes.io/alicloud-loadbalancer-health-check-interval, the parameter service.beta.kubernetes.io/alicloud-loadbalancer-health-check-timeout is invalid, and the timeout period equals the value of the parameter service.beta.kubernetes.io/alicloud-loadbalancer-health-check-interval.|None|
+|service.beta.kubernetes.io/alibaba-cloud-private-zone-name|name of PrivateZone, cloud-controller will not to create new PrivateZone|无|
+|service.beta.kubernetes.io/alibaba-cloud-private-zone-id|id of PrivateZone, when it was configured with name together, cloud provider will find PrivateZone by id first.|None|
+|service.beta.kubernetes.io/alibaba-cloud-private-zone-record-name|name of PrivateZone record.|None|
+|service.beta.kubernetes.io/alibaba-cloud-private-zone-record-ttl|ttl of PrivateZone record, 60s as default value.|60|
 
