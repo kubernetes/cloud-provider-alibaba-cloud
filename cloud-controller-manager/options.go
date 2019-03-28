@@ -30,8 +30,11 @@ import (
 )
 
 const (
-	ServiceAnnotationLoadBalancerPrefix = "service.beta.kubernetes.io/alicloud-loadbalancer-"
-	ServiceAnnotationPrivateZonePrefix  = "service.beta.kubernetes.io/alibaba-cloud-private-zone-"
+	ServiceAnnotationPrefix       = "service.beta.kubernetes.io/alibaba-cloud-"
+	ServiceAnnotationLegacyPrefix = "service.beta.kubernetes.io/alicloud-"
+
+	ServiceAnnotationLoadBalancerPrefix = ServiceAnnotationPrefix + "loadbalancer-"
+	ServiceAnnotationPrivateZonePrefix  = ServiceAnnotationPrefix + "private-zone-"
 
 	ServiceAnnotationLoadBalancerProtocolPort                  = ServiceAnnotationLoadBalancerPrefix + "protocol-port"
 	ServiceAnnotationLoadBalancerAddressType                   = ServiceAnnotationLoadBalancerPrefix + "address-type"
@@ -81,7 +84,7 @@ const (
 func getBackwardsCompatibleAnnotation(annotations map[string]string) map[string]string {
 	newAnnotation := make(map[string]string)
 	for k, v := range annotations {
-		newAnnotation[replaceCamel(k)] = v
+		newAnnotation[replaceCamel(normalizePrefix(k))] = v
 	}
 	return newAnnotation
 }
@@ -435,6 +438,16 @@ func serviceAnnotation(service *v1.Service, annotate string) string {
 		}
 	}
 	return ""
+}
+
+// Change the legacy prefix 'alicloud' to 'alibaba-cloud'
+func normalizePrefix(str string) string {
+	if !strings.HasPrefix(str, ServiceAnnotationLegacyPrefix) {
+		// If it is not start with ServiceAnnotationLegacyPrefix, just skip
+		return str
+	}
+
+	return ServiceAnnotationPrefix + str[len(ServiceAnnotationLegacyPrefix):]
 }
 
 func replaceCamel(str string) string {
