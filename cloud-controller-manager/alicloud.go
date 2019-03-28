@@ -207,8 +207,16 @@ func (c *Cloud) GetLoadBalancer(clusterName string, service *v1.Service) (status
 		return nil, exists, err
 	}
 
+	zone, record, exists, err := c.climgr.PrivateZones().findExactRecordByService(service, lb.Address)
+	if err != nil || !exists {
+		return nil, exists, err
+	}
+
 	return &v1.LoadBalancerStatus{
-		Ingress: []v1.LoadBalancerIngress{{IP: lb.Address}}}, true, nil
+		Ingress: []v1.LoadBalancerIngress{{
+			IP:       lb.Address,
+			Hostname: getHostName(zone, record),
+		}}}, true, nil
 }
 
 // EnsureLoadBalancer creates a new load balancer 'name', or updates the existing one. Returns the status of the balancer
@@ -261,10 +269,17 @@ func (c *Cloud) EnsureLoadBalancer(clusterName string, service *v1.Service, node
 	if err != nil {
 		return nil, err
 	}
+
+	pz, pzr, err := c.climgr.PrivateZones().EnsurePrivateZoneRecord(service, lb.Address)
+	if err != nil {
+		return nil, err
+	}
+
 	return &v1.LoadBalancerStatus{
 		Ingress: []v1.LoadBalancerIngress{
 			{
-				IP: lb.Address,
+				IP:       lb.Address,
+				Hostname: getHostName(pz, pzr),
 			},
 		},
 	}, nil
@@ -295,6 +310,14 @@ func (c *Cloud) UpdateLoadBalancer(clusterName string, service *v1.Service, node
 func (c *Cloud) EnsureLoadBalancerDeleted(clusterName string, service *v1.Service) error {
 	glog.V(2).Infof("Alicloud.EnsureLoadBalancerDeleted(%v, %v, %v, %v, %v, %v)",
 		clusterName, service.Namespace, service.Name, c.region, service.Spec.LoadBalancerIP, service.Spec.Ports)
+
+	if len(service.Status.LoadBalancer.Ingress) > 0 {
+		err := c.climgr.PrivateZones().EnsurePrivateZoneRecordDeleted(service, service.Status.LoadBalancer.Ingress[0].IP)
+		if err != nil {
+			return err
+		}
+	}
+
 	return c.climgr.LoadBalancers().EnsureLoadBalanceDeleted(service)
 }
 

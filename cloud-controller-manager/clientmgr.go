@@ -24,6 +24,7 @@ import (
 	"github.com/denverdino/aliyungo/common"
 	"github.com/denverdino/aliyungo/ecs"
 	"github.com/denverdino/aliyungo/metadata"
+	"github.com/denverdino/aliyungo/pvtz"
 	"github.com/denverdino/aliyungo/slb"
 	"github.com/golang/glog"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -59,6 +60,7 @@ type ClientMgr struct {
 	meta         IMetaData
 	routes       *RoutesClient
 	loadbalancer *LoadBalancerClient
+	privateZone  *PrivateZoneClient
 	instance     *InstanceClient
 }
 
@@ -95,6 +97,9 @@ func NewClientMgr(key, secret string) (*ClientMgr, error) {
 	ecsclient.SetUserAgent(KUBERNETES_ALICLOUD_IDENTITY)
 	slbclient := slb.NewSLBClientWithSecurityToken(keyid, sec, tok, common.Region(region))
 	slbclient.SetUserAgent(KUBERNETES_ALICLOUD_IDENTITY)
+	// private zone service only can works with cn-hangzhou region
+	pvtzclient := pvtz.NewPVTZClientWithSecurityToken(keyid, sec, tok, common.Hangzhou)
+	pvtzclient.SetUserAgent(KUBERNETES_ALICLOUD_IDENTITY)
 
 	vpcclient := ecs.NewVPCClientWithSecurityToken(keyid, sec, tok, common.Region(region))
 	vpcclient.SetUserAgent(KUBERNETES_ALICLOUD_IDENTITY)
@@ -108,6 +113,9 @@ func NewClientMgr(key, secret string) (*ClientMgr, error) {
 		},
 		loadbalancer: &LoadBalancerClient{
 			c: slbclient,
+		},
+		privateZone: &PrivateZoneClient{
+			c: pvtzclient,
 		},
 		routes: &RoutesClient{
 			client: vpcclient,
@@ -141,6 +149,9 @@ func NewClientMgr(key, secret string) (*ClientMgr, error) {
 		slbclient.WithSecurityToken(rtok).
 			WithAccessKeyId(rkey).
 			WithAccessKeySecret(rsecret)
+		pvtzclient.WithSecurityToken(rtok).
+			WithAccessKeyId(rkey).
+			WithAccessKeySecret(rsecret)
 	}, time.Duration(TOKEN_RESYNC_PERIOD), mgr.stop)
 
 	return mgr, nil
@@ -156,6 +167,10 @@ func (c *ClientMgr) Routes() *RoutesClient {
 
 func (c *ClientMgr) LoadBalancers() *LoadBalancerClient {
 	return c.loadbalancer
+}
+
+func (c *ClientMgr) PrivateZones() *PrivateZoneClient {
+	return c.privateZone
 }
 
 func (c *ClientMgr) MetaData() IMetaData {
