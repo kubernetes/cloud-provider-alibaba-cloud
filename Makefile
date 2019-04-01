@@ -27,7 +27,7 @@ KUBE_CROSS_TAG=v1.9.3-1
 IPTABLES_VERSION=1.4.21
 
 cloud-controller-manager: $(shell find . -type f  -name '*.go')
-        CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o cloud-controller-manager-alicloud -ldflags "-X k8s.io/cloud-provider-alibaba-cloud/version.Version=$(TAG)" \
+		CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o cloud-controller-manager-alicloud -ldflags "-X k8s.io/cloud-provider-alibaba-cloud/version.Version=$(TAG)" \
 		cmd/cloudprovider/cloudprovider-alibaba-cloud.go
 
 
