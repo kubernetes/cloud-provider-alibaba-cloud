@@ -52,7 +52,7 @@ type RouteSDK interface {
 
 func (r *RoutesClient) WithVPC(vpcid string, tableids string) error {
 	args := &ecs.DescribeVpcsArgs{
-		VpcId:    r.vpc.vpcid,
+		VpcId:    vpcid,
 		RegionId: common.Region(r.region),
 	}
 	vpcs, _, err := r.client.DescribeVpcs(args)
@@ -61,12 +61,14 @@ func (r *RoutesClient) WithVPC(vpcid string, tableids string) error {
 	}
 	if len(vpcs) != 1 {
 		return fmt.Errorf("alicloud: "+
-			"multiple vpc found by id[%s], length(vpcs)=%d", r.vpc.vpcid, len(vpcs))
+			"multiple vpc found by id[%s], length(vpcs)=%d", vpcid, len(vpcs))
 	}
 	r.vpc.vrouterid = vpcs[0].VRouterId
 	r.vpc.vpcid = vpcid
 	if tableids != "" {
-		r.vpc.tableids = strings.Split(tableids, ",")
+		for _, s := range strings.Split(tableids, ",") {
+			r.vpc.tableids = append(r.vpc.tableids, strings.TrimSpace(s))
+		}
 		glog.Infof("using user customized route table ids (%v)", r.vpc.tableids)
 	}
 	return nil
