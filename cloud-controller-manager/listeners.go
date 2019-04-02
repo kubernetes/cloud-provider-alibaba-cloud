@@ -769,10 +769,6 @@ func (t *http) Add() error {
 			HealthCheckHttpCode: def.HealthCheckHttpCode,
 		})
 }
-func (t *http) Remove() error {
-
-	return fmt.Errorf("unimplemented")
-}
 
 func (t *http) Update() error {
 
