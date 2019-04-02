@@ -152,6 +152,9 @@ func NewClientMgr(key, secret string) (*ClientMgr, error) {
 		pvtzclient.WithSecurityToken(rtok).
 			WithAccessKeyId(rkey).
 			WithAccessKeySecret(rsecret)
+		vpcclient.WithSecurityToken(rtok).
+			WithAccessKeyId(rkey).
+			WithAccessKeySecret(rsecret)
 	}, time.Duration(TOKEN_RESYNC_PERIOD), mgr.stop)
 
 	return mgr, nil
