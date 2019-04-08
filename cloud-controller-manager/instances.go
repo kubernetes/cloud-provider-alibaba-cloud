@@ -30,12 +30,14 @@ import (
 	"k8s.io/kubernetes/pkg/cloudprovider"
 )
 
+// InstanceClient wrap for instance sdk
 type InstanceClient struct {
 	c               ClientInstanceSDK
 	lock            sync.RWMutex
 	CurrentNodeName types.NodeName
 }
 
+// ClientInstanceSDK instance sdk
 type ClientInstanceSDK interface {
 	DescribeInstances(args *ecs.DescribeInstancesArgs) (instances []ecs.InstanceAttributesType, pagination *common.PaginationResult, err error)
 }

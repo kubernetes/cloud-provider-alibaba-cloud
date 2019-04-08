@@ -31,6 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/cloudprovider"
 )
 
+// AnnotationRequest annotated parameters.
 type AnnotationRequest struct {
 	Loadbalancerid string
 	BackendLabel   string
@@ -77,8 +78,10 @@ type AnnotationRequest struct {
 	PrivateZoneRecordTTL  int
 }
 
+// TAGKEY Default tag key.
 const TAGKEY = "kubernetes.do.not.delete"
 
+// ClientSLBSDK client sdk for slb
 type ClientSLBSDK interface {
 	DescribeLoadBalancers(args *slb.DescribeLoadBalancersArgs) (loadBalancers []slb.LoadBalancerType, err error)
 	CreateLoadBalancer(args *slb.CreateLoadBalancerArgs) (response *slb.CreateLoadBalancerResponse, err error)
@@ -119,6 +122,7 @@ type ClientSLBSDK interface {
 	RemoveVServerGroupBackendServers(args *slb.RemoveVServerGroupBackendServersArgs) (response *slb.RemoveVServerGroupBackendServersResponse, err error)
 }
 
+// LoadBalancerClient slb client wrapper
 type LoadBalancerClient struct {
 	c ClientSLBSDK
 	// known service resource version
@@ -275,6 +279,7 @@ func equalsAddressIPVersion(request, origined slb.AddressIPVersionType) bool {
 	return request == origined
 }
 
+// EnsureLoadBalancer make sure slb is reconciled
 func (s *LoadBalancerClient) EnsureLoadBalancer(service *v1.Service, nodes []*v1.Node, vswitchid string) (*slb.LoadBalancerType, error) {
 	glog.V(4).Infof("alicloud: ensure loadbalancer with service details, \n%+v", PrettyJson(service))
 
@@ -286,6 +291,7 @@ func (s *LoadBalancerClient) EnsureLoadBalancer(service *v1.Service, nodes []*v1
 		"loadbalancer with result, exist=%v\n %s\n", exists, PrettyJson(origined))
 	_, request := ExtractAnnotationRequest(service)
 
+	var derr error
 	// this is a workaround for issue: https://github.com/kubernetes/kubernetes/issues/59084
 	if !exists {
 		// If need created, double check if the resource id has been deleted
@@ -338,7 +344,7 @@ func (s *LoadBalancerClient) EnsureLoadBalancer(service *v1.Service, nodes []*v1
 			return nil, err
 		}
 
-		origined, err = s.c.DescribeLoadBalancerAttribute(lbr.LoadBalancerId)
+		origined, derr = s.c.DescribeLoadBalancerAttribute(lbr.LoadBalancerId)
 	} else {
 		// Need to verify loadbalancer.
 		// Reuse SLB is not allowed when the SLB is created by k8s service.
@@ -399,9 +405,9 @@ func (s *LoadBalancerClient) EnsureLoadBalancer(service *v1.Service, nodes []*v1
 			return nil, errors.New("alicloud: change loadbalancer " +
 				"address type after service has been created is not supported. delete and retry")
 		}
-		origined, err = s.c.DescribeLoadBalancerAttribute(origined.LoadBalancerId)
+		origined, derr = s.c.DescribeLoadBalancerAttribute(origined.LoadBalancerId)
 	}
-	if err != nil {
+	if derr != nil {
 		glog.Errorf("alicloud: can not get loadbalancer[%s] attribute. ", origined.LoadBalancerId)
 		return nil, err
 	}
@@ -436,6 +442,7 @@ func isLoadBalancerCreatedByKubernetes(tags []slb.TagItemType) bool {
 	return false
 }
 
+//UpdateLoadBalancer make sure slb backend is reconciled
 func (s *LoadBalancerClient) UpdateLoadBalancer(service *v1.Service, nodes []*v1.Node, withVgroup bool) error {
 
 	exists, lb, err := s.findLoadBalancer(service)
@@ -488,6 +495,7 @@ func hasPort(svc *v1.Service, port int32) bool {
 	return false
 }
 
+// EnsureLoadBalanceDeleted make sure slb is deleted
 func (s *LoadBalancerClient) EnsureLoadBalanceDeleted(service *v1.Service) error {
 	// need to save the resource version when deleted event
 	err := keepResourceVesion(service)
@@ -541,8 +549,10 @@ func (s *LoadBalancerClient) getLoadBalancerOpts(service *v1.Service, vswitchid 
 	return
 }
 
+// DEFAULT_SERVER_WEIGHT default server weight
 const DEFAULT_SERVER_WEIGHT = 100
 
+// UpdateDefaultServerGroup update default server group
 func (s *LoadBalancerClient) UpdateDefaultServerGroup(nodes []*v1.Node, lb *slb.LoadBalancerType) error {
 	additions, deletions := []slb.BackendServerType{}, []string{}
 	glog.V(5).Infof("alicloud: try to update loadbalancer backend servers. [%s]\n", lb.LoadBalancerId)
@@ -569,7 +579,7 @@ func (s *LoadBalancerClient) UpdateDefaultServerGroup(nodes []*v1.Node, lb *slb.
 		glog.V(5).Infof("alicloud: add loadbalancer backend for [%s] \n %s\n", lb.LoadBalancerId, PrettyJson(additions))
 		// only 20 backend servers is accepted per delete.
 		for len(additions) > 0 {
-			target := []slb.BackendServerType{}
+			var target []slb.BackendServerType
 			if len(additions) > MAX_LOADBALANCER_BACKEND {
 				target = additions[0:MAX_LOADBALANCER_BACKEND]
 				additions = additions[MAX_LOADBALANCER_BACKEND:]
@@ -608,7 +618,7 @@ func (s *LoadBalancerClient) UpdateDefaultServerGroup(nodes []*v1.Node, lb *slb.
 		glog.V(5).Infof("alicloud: delete loadbalancer backend for [%s] %v\n", lb.LoadBalancerId, deletions)
 		// only 20 backend servers is accepted per delete.
 		for len(deletions) > 0 {
-			target := []string{}
+			var target []string
 			if len(deletions) > MAX_LOADBALANCER_BACKEND {
 				target = deletions[0:MAX_LOADBALANCER_BACKEND]
 				deletions = deletions[MAX_LOADBALANCER_BACKEND:]

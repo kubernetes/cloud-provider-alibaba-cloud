@@ -29,7 +29,7 @@ func (v *vgroup) Describe() error {
 	}
 	vgrp, err := v.Client.DescribeVServerGroups(&vargs)
 	if err != nil {
-		return fmt.Errorf("decribe: vgroup error, %s", err.Error())
+		return fmt.Errorf("describe: vgroup error, %s", err.Error())
 	}
 	if vgrp != nil {
 		for _, val := range vgrp.VServerGroups.VServerGroup {
@@ -145,8 +145,10 @@ func (v *vgroup) Update() error {
 	return nil
 }
 
+// MAX_BACKEND_NUM max batch backend num
 const MAX_BACKEND_NUM = 19
 
+//BatchProcess batch update backend.
 func BatchProcess(list []slb.VBackendServerType,
 	batch func(list []slb.VBackendServerType) error) error {
 
@@ -230,7 +232,7 @@ func (vgrps *vgroups) EnsureVGroup(nodes []*v1.Node) error {
 	return nil
 }
 
-// Merge with service port and do clean vserver group
+//CleanUPVGroupMerged Merge with service port and do clean vserver group
 func CleanUPVGroupMerged(service *v1.Service,
 	lb *slb.LoadBalancerType,
 	client ClientSLBSDK, local *vgroups) error {
@@ -266,7 +268,7 @@ func CleanUPVGroupMerged(service *v1.Service,
 	return nil
 }
 
-// Merge with service port and do clean vserver group
+//CleanUPVGroupDirect do clean vserver group
 func CleanUPVGroupDirect(local *vgroups) error {
 	for _, vg := range *local {
 		if vg.VGroupId == "" {

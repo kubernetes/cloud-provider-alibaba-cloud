@@ -31,12 +31,16 @@ import (
 	"strings"
 )
 
+// ROLE_NAME default kubernetes master role name
 var ROLE_NAME = "KubernetesMasterRole"
 
+// ASSUME_ROLE_NAME managed kubernetes role name
 var ASSUME_ROLE_NAME = "AliyunCSManagedKubernetesRole"
 
+// TOKEN_RESYNC_PERIOD default token sync period
 var TOKEN_RESYNC_PERIOD = 5 * time.Minute
 
+// TokenAuth token auth struct
 type TokenAuth struct {
 	lock   sync.RWMutex
 	auth   metadata.RoleAuth
@@ -52,6 +56,7 @@ func (token *TokenAuth) authid() (string, string, string) {
 		token.auth.SecurityToken
 }
 
+// ClientMgr client manager for aliyun sdk
 type ClientMgr struct {
 	stop <-chan struct{}
 
@@ -64,6 +69,7 @@ type ClientMgr struct {
 	instance     *InstanceClient
 }
 
+// NewClientMgr return a new client manager
 func NewClientMgr(key, secret string) (*ClientMgr, error) {
 	token := &TokenAuth{
 		auth: metadata.RoleAuth{
@@ -75,18 +81,18 @@ func NewClientMgr(key, secret string) (*ClientMgr, error) {
 	m := NewMetaData()
 
 	if key == "" || secret == "" {
-		if rolename, err := m.RoleName(); err != nil {
+		rolename, err := m.RoleName()
+		if err != nil {
 			return nil, err
-		} else {
-			ROLE_NAME = rolename
-			role, err := m.RamRoleToken(ROLE_NAME)
-			if err != nil {
-				return nil, err
-			}
-			glog.V(2).Infof("alicloud: clientmgr, using role name [%s]", ROLE_NAME)
-			token.auth = role
-			token.active = true
 		}
+		ROLE_NAME = rolename
+		role, err := m.RamRoleToken(ROLE_NAME)
+		if err != nil {
+			return nil, err
+		}
+		glog.V(2).Infof("alicloud: clientmgr, using role name [%s]", ROLE_NAME)
+		token.auth = role
+		token.active = true
 	}
 	keyid, sec, tok := token.authid()
 	region, err := m.Region()
@@ -160,27 +166,22 @@ func NewClientMgr(key, secret string) (*ClientMgr, error) {
 	return mgr, nil
 }
 
-func (c *ClientMgr) Instances() *InstanceClient {
-	return c.instance
-}
+// Instances return instance client
+func (c *ClientMgr) Instances() *InstanceClient { return c.instance }
 
-func (c *ClientMgr) Routes() *RoutesClient {
-	return c.routes
-}
+// Routes return routes client
+func (c *ClientMgr) Routes() *RoutesClient { return c.routes }
 
-func (c *ClientMgr) LoadBalancers() *LoadBalancerClient {
-	return c.loadbalancer
-}
+// LoadBalancers return loadbalancer client
+func (c *ClientMgr) LoadBalancers() *LoadBalancerClient { return c.loadbalancer }
 
-func (c *ClientMgr) PrivateZones() *PrivateZoneClient {
-	return c.privateZone
-}
+// PrivateZones return PrivateZones client
+func (c *ClientMgr) PrivateZones() *PrivateZoneClient { return c.privateZone }
 
-func (c *ClientMgr) MetaData() IMetaData {
+// MetaData return MetaData client
+func (c *ClientMgr) MetaData() IMetaData { return c.meta }
 
-	return c.meta
-}
-
+// IMetaData metadata interface
 type IMetaData interface {
 	HostName() (string, error)
 	ImageID() (string, error)
@@ -202,6 +203,7 @@ type IMetaData interface {
 	VswitchID() (string, error)
 }
 
+// NewMetaData return new metadata
 func NewMetaData() IMetaData {
 	if cfg.Global.VpcID != "" &&
 		cfg.Global.VswitchID != "" {

@@ -30,54 +30,125 @@ import (
 )
 
 const (
-	ServiceAnnotationPrefix       = "service.beta.kubernetes.io/alibaba-cloud-"
+	// ServiceAnnotationPrefix prefix of service annotation
+	ServiceAnnotationPrefix = "service.beta.kubernetes.io/alibaba-cloud-"
+
+	// ServiceAnnotationLegacyPrefix legacy prefix of service annotation
 	ServiceAnnotationLegacyPrefix = "service.beta.kubernetes.io/alicloud-"
 
+	// ServiceAnnotationLoadBalancerPrefix loadbalancer prefix
 	ServiceAnnotationLoadBalancerPrefix = ServiceAnnotationPrefix + "loadbalancer-"
-	ServiceAnnotationPrivateZonePrefix  = ServiceAnnotationPrefix + "private-zone-"
 
-	ServiceAnnotationLoadBalancerProtocolPort                  = ServiceAnnotationLoadBalancerPrefix + "protocol-port"
-	ServiceAnnotationLoadBalancerAddressType                   = ServiceAnnotationLoadBalancerPrefix + "address-type"
-	ServiceAnnotationLoadBalancerSLBNetworkType                = ServiceAnnotationLoadBalancerPrefix + "slb-network-type"
-	ServiceAnnotationLoadBalancerChargeType                    = ServiceAnnotationLoadBalancerPrefix + "charge-type"
-	ServiceAnnotationLoadBalancerId                            = ServiceAnnotationLoadBalancerPrefix + "id"
-	ServiceAnnotationLoadBalancerBackendLabel                  = ServiceAnnotationLoadBalancerPrefix + "backend-label"
-	ServiceAnnotationLoadBalancerRegion                        = ServiceAnnotationLoadBalancerPrefix + "region"
-	ServiceAnnotationLoadBalancerMasterZoneID                  = ServiceAnnotationLoadBalancerPrefix + "master-zoneid"
-	ServiceAnnotationLoadBalancerSlaveZoneID                   = ServiceAnnotationLoadBalancerPrefix + "slave-zoneid"
-	ServiceAnnotationLoadBalancerBandwidth                     = ServiceAnnotationLoadBalancerPrefix + "bandwidth"
-	ServiceAnnotationLoadBalancerCertID                        = ServiceAnnotationLoadBalancerPrefix + "cert-id"
-	ServiceAnnotationLoadBalancerHealthCheckFlag               = ServiceAnnotationLoadBalancerPrefix + "health-check-flag"
-	ServiceAnnotationLoadBalancerHealthCheckType               = ServiceAnnotationLoadBalancerPrefix + "health-check-type"
-	ServiceAnnotationLoadBalancerHealthCheckURI                = ServiceAnnotationLoadBalancerPrefix + "health-check-uri"
-	ServiceAnnotationLoadBalancerHealthCheckConnectPort        = ServiceAnnotationLoadBalancerPrefix + "health-check-connect-port"
-	ServiceAnnotationLoadBalancerHealthCheckHealthyThreshold   = ServiceAnnotationLoadBalancerPrefix + "healthy-threshold"
+	// ServiceAnnotationPrivateZonePrefix private zone prefix
+	ServiceAnnotationPrivateZonePrefix = ServiceAnnotationPrefix + "private-zone-"
+
+	// ServiceAnnotationLoadBalancerProtocolPort protocol port
+	ServiceAnnotationLoadBalancerProtocolPort = ServiceAnnotationLoadBalancerPrefix + "protocol-port"
+
+	// ServiceAnnotationLoadBalancerAddressType loadbalancer address type
+	ServiceAnnotationLoadBalancerAddressType = ServiceAnnotationLoadBalancerPrefix + "address-type"
+
+	// ServiceAnnotationLoadBalancerSLBNetworkType loadbalancer network type
+	ServiceAnnotationLoadBalancerSLBNetworkType = ServiceAnnotationLoadBalancerPrefix + "slb-network-type"
+	// ServiceAnnotationLoadBalancerChargeType lb charge type
+	ServiceAnnotationLoadBalancerChargeType = ServiceAnnotationLoadBalancerPrefix + "charge-type"
+
+	// ServiceAnnotationLoadBalancerId lb id
+	ServiceAnnotationLoadBalancerId = ServiceAnnotationLoadBalancerPrefix + "id"
+
+	// ServiceAnnotationLoadBalancerBackendLabel backend labels
+	ServiceAnnotationLoadBalancerBackendLabel = ServiceAnnotationLoadBalancerPrefix + "backend-label"
+
+	// ServiceAnnotationLoadBalancerRegion region
+	ServiceAnnotationLoadBalancerRegion = ServiceAnnotationLoadBalancerPrefix + "region"
+
+	// ServiceAnnotationLoadBalancerMasterZoneID master zone id
+	ServiceAnnotationLoadBalancerMasterZoneID = ServiceAnnotationLoadBalancerPrefix + "master-zoneid"
+
+	// ServiceAnnotationLoadBalancerSlaveZoneID slave zone id
+	ServiceAnnotationLoadBalancerSlaveZoneID = ServiceAnnotationLoadBalancerPrefix + "slave-zoneid"
+
+	// ServiceAnnotationLoadBalancerBandwidth bandwidth
+	ServiceAnnotationLoadBalancerBandwidth = ServiceAnnotationLoadBalancerPrefix + "bandwidth"
+
+	// ServiceAnnotationLoadBalancerCertID cert id
+	ServiceAnnotationLoadBalancerCertID = ServiceAnnotationLoadBalancerPrefix + "cert-id"
+
+	// ServiceAnnotationLoadBalancerHealthCheckFlag health check flag
+	ServiceAnnotationLoadBalancerHealthCheckFlag = ServiceAnnotationLoadBalancerPrefix + "health-check-flag"
+
+	// ServiceAnnotationLoadBalancerHealthCheckType health check type
+	ServiceAnnotationLoadBalancerHealthCheckType = ServiceAnnotationLoadBalancerPrefix + "health-check-type"
+
+	// ServiceAnnotationLoadBalancerHealthCheckURI health check uri
+	ServiceAnnotationLoadBalancerHealthCheckURI = ServiceAnnotationLoadBalancerPrefix + "health-check-uri"
+
+	// ServiceAnnotationLoadBalancerHealthCheckConnectPort health check connect port
+	ServiceAnnotationLoadBalancerHealthCheckConnectPort = ServiceAnnotationLoadBalancerPrefix + "health-check-connect-port"
+
+	// ServiceAnnotationLoadBalancerHealthCheckHealthyThreshold health check healthy thresh hold
+	ServiceAnnotationLoadBalancerHealthCheckHealthyThreshold = ServiceAnnotationLoadBalancerPrefix + "healthy-threshold"
+
+	// ServiceAnnotationLoadBalancerHealthCheckUnhealthyThreshold health check unhealthy thresh hold
 	ServiceAnnotationLoadBalancerHealthCheckUnhealthyThreshold = ServiceAnnotationLoadBalancerPrefix + "unhealthy-threshold"
-	ServiceAnnotationLoadBalancerHealthCheckInterval           = ServiceAnnotationLoadBalancerPrefix + "health-check-interval"
-	ServiceAnnotationLoadBalancerHealthCheckConnectTimeout     = ServiceAnnotationLoadBalancerPrefix + "health-check-connect-timeout"
-	ServiceAnnotationLoadBalancerHealthCheckTimeout            = ServiceAnnotationLoadBalancerPrefix + "health-check-timeout"
-	ServiceAnnotationLoadBalancerHealthCheckDomain             = ServiceAnnotationLoadBalancerPrefix + "health-check-domain"
-	ServiceAnnotationLoadBalancerHealthCheckHTTPCode           = ServiceAnnotationLoadBalancerPrefix + "health-check-httpcode"
 
-	// For example: "Key1=Val1,Key2=Val2,KeyNoVal1=,KeyNoVal2",same with aws
+	// ServiceAnnotationLoadBalancerHealthCheckInterval health check interval
+	ServiceAnnotationLoadBalancerHealthCheckInterval = ServiceAnnotationLoadBalancerPrefix + "health-check-interval"
+
+	// ServiceAnnotationLoadBalancerHealthCheckConnectTimeout health check connect timeout
+	ServiceAnnotationLoadBalancerHealthCheckConnectTimeout = ServiceAnnotationLoadBalancerPrefix + "health-check-connect-timeout"
+
+	// ServiceAnnotationLoadBalancerHealthCheckTimeout health check timeout
+	ServiceAnnotationLoadBalancerHealthCheckTimeout = ServiceAnnotationLoadBalancerPrefix + "health-check-timeout"
+
+	// ServiceAnnotationLoadBalancerHealthCheckDomain health check domain
+	ServiceAnnotationLoadBalancerHealthCheckDomain = ServiceAnnotationLoadBalancerPrefix + "health-check-domain"
+
+	// ServiceAnnotationLoadBalancerHealthCheckHTTPCode health check http code
+	ServiceAnnotationLoadBalancerHealthCheckHTTPCode = ServiceAnnotationLoadBalancerPrefix + "health-check-httpcode"
+
+	// ServiceAnnotationLoadBalancerAdditionalTags For example: "Key1=Val1,Key2=Val2,KeyNoVal1=,KeyNoVal2",same with aws
 	ServiceAnnotationLoadBalancerAdditionalTags = ServiceAnnotationLoadBalancerPrefix + "additional-resource-tags"
 
+	// ServiceAnnotationLoadBalancerOverrideListener force override listeners
 	ServiceAnnotationLoadBalancerOverrideListener = ServiceAnnotationLoadBalancerPrefix + "force-override-listeners"
 
-	ServiceAnnotationLoadBalancerSpec               = ServiceAnnotationLoadBalancerPrefix + "spec"
-	ServiceAnnotationLoadBalancerSessionStick       = ServiceAnnotationLoadBalancerPrefix + "sticky-session"
-	ServiceAnnotationLoadBalancerSessionStickType   = ServiceAnnotationLoadBalancerPrefix + "sticky-session-type"
-	ServiceAnnotationLoadBalancerCookieTimeout      = ServiceAnnotationLoadBalancerPrefix + "cookie-timeout"
-	ServiceAnnotationLoadBalancerCookie             = ServiceAnnotationLoadBalancerPrefix + "cookie"
-	ServiceAnnotationLoadBalancerPersistenceTimeout = ServiceAnnotationLoadBalancerPrefix + "persistence-timeout"
-	MagicHealthCheckConnectPort                     = -520
-	ServiceAnnotationLoadBalancerIPVersion          = ServiceAnnotationLoadBalancerPrefix + "ip-version"
-	MAX_LOADBALANCER_BACKEND                        = 18
+	// ServiceAnnotationLoadBalancerSpec slb spec
+	ServiceAnnotationLoadBalancerSpec = ServiceAnnotationLoadBalancerPrefix + "spec"
 
-	ServiceAnnotationLoadBalancerPrivateZoneName       = ServiceAnnotationPrivateZonePrefix + "name"
-	ServiceAnnotationLoadBalancerPrivateZoneId         = ServiceAnnotationPrivateZonePrefix + "id"
+	// ServiceAnnotationLoadBalancerSessionStick sticky session
+	ServiceAnnotationLoadBalancerSessionStick = ServiceAnnotationLoadBalancerPrefix + "sticky-session"
+
+	// ServiceAnnotationLoadBalancerSessionStickType session sticky type
+	ServiceAnnotationLoadBalancerSessionStickType = ServiceAnnotationLoadBalancerPrefix + "sticky-session-type"
+
+	// ServiceAnnotationLoadBalancerCookieTimeout cookie timeout
+	ServiceAnnotationLoadBalancerCookieTimeout = ServiceAnnotationLoadBalancerPrefix + "cookie-timeout"
+
+	//ServiceAnnotationLoadBalancerCookie lb cookie
+	ServiceAnnotationLoadBalancerCookie = ServiceAnnotationLoadBalancerPrefix + "cookie"
+
+	// ServiceAnnotationLoadBalancerPersistenceTimeout persistence timeout
+	ServiceAnnotationLoadBalancerPersistenceTimeout = ServiceAnnotationLoadBalancerPrefix + "persistence-timeout"
+	//MagicHealthCheckConnectPort                     = -520
+
+	//ServiceAnnotationLoadBalancerIPVersion ip version
+	ServiceAnnotationLoadBalancerIPVersion = ServiceAnnotationLoadBalancerPrefix + "ip-version"
+
+	// MAX_LOADBALANCER_BACKEND max default lb backend count.
+	MAX_LOADBALANCER_BACKEND = 18
+
+	// ServiceAnnotationLoadBalancerPrivateZoneName private zone name
+	ServiceAnnotationLoadBalancerPrivateZoneName = ServiceAnnotationPrivateZonePrefix + "name"
+
+	// ServiceAnnotationLoadBalancerPrivateZoneId private zone id
+	ServiceAnnotationLoadBalancerPrivateZoneId = ServiceAnnotationPrivateZonePrefix + "id"
+
+	// ServiceAnnotationLoadBalancerPrivateZoneRecordName private zone record name
 	ServiceAnnotationLoadBalancerPrivateZoneRecordName = ServiceAnnotationPrivateZonePrefix + "record-name"
-	ServiceAnnotationLoadBalancerPrivateZoneRecordTTL  = ServiceAnnotationPrivateZonePrefix + "record-ttl"
+
+	// ServiceAnnotationLoadBalancerPrivateZoneRecordTTL private zone record ttl
+	ServiceAnnotationLoadBalancerPrivateZoneRecordTTL = ServiceAnnotationPrivateZonePrefix + "record-ttl"
 )
 
 //compatible to old camel annotation
@@ -89,6 +160,7 @@ func getBackwardsCompatibleAnnotation(annotations map[string]string) map[string]
 	return newAnnotation
 }
 
+// ExtractAnnotationRequest  extract annotations from service labels
 // defaulted is the parameters which set by programe.
 // request represent user defined parameters.
 func ExtractAnnotationRequest(service *v1.Service) (*AnnotationRequest, *AnnotationRequest) {
@@ -461,6 +533,7 @@ func replaceCamel(str string) string {
 	return ServiceAnnotationLoadBalancerPrefix + strings.Join(res, "-")
 }
 
+// PrettyJson  pretty json output
 func PrettyJson(obj interface{}) string {
 	pretty := bytes.Buffer{}
 	data, err := json.Marshal(obj)
