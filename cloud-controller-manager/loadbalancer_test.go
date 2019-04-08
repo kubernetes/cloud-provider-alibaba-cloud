@@ -86,7 +86,7 @@ func TestFindLoadBalancer(t *testing.T) {
 	mgr, _ := NewMockClientMgr(&mockClientSLB{
 		describeLoadBalancers: func(args *slb.DescribeLoadBalancersArgs) (loadBalancers []slb.LoadBalancerType, err error) {
 			if args.LoadBalancerId != "" {
-				for i, _ := range base {
+				for i := range base {
 					if args.LoadBalancerId == base[i].LoadBalancerId {
 						if len(args.Tags) > 0 {
 							base[0].LoadBalancerName = cloudprovider.GetLoadBalancerName(service)
@@ -97,7 +97,7 @@ func TestFindLoadBalancer(t *testing.T) {
 				return []slb.LoadBalancerType{}, fmt.Errorf("not found by id, %s", args.LoadBalancerId)
 			}
 			if args.LoadBalancerName != "" {
-				for i, _ := range base {
+				for i := range base {
 					if args.LoadBalancerName == base[i].LoadBalancerName {
 						if len(args.Tags) > 0 {
 							base[0].LoadBalancerName = cloudprovider.GetLoadBalancerName(service)
@@ -108,7 +108,7 @@ func TestFindLoadBalancer(t *testing.T) {
 				return []slb.LoadBalancerType{}, fmt.Errorf("not found by name, %s", args.LoadBalancerName)
 			}
 			kid := []slb.LoadBalancerType{}
-			for i, _ := range base {
+			for i := range base {
 				if len(args.Tags) > 0 {
 					base[i].LoadBalancerName = cloudprovider.GetLoadBalancerName(service)
 				}
@@ -160,21 +160,21 @@ func realSlbClient(keyid, keysec string) {
 	if err == nil {
 		a, _ := json.Marshal(lb)
 		var prettyJSON bytes.Buffer
-		err = json.Indent(&prettyJSON, a, "", "    ")
+		json.Indent(&prettyJSON, a, "", "    ")
 		fmt.Printf(string(prettyJSON.Bytes()))
 	}
 	lbs, err := slbclient.DescribeLoadBalancerAttribute(LOADBALANCER_ID)
 	if err == nil {
 		a, _ := json.Marshal(lbs)
 		var prettyJSON bytes.Buffer
-		err = json.Indent(&prettyJSON, a, "", "    ")
+		json.Indent(&prettyJSON, a, "", "    ")
 		fmt.Printf(string(prettyJSON.Bytes()))
 	}
 	listener, err := slbclient.DescribeLoadBalancerTCPListenerAttribute(LOADBALANCER_ID, 80)
 	if err == nil {
 		a, _ := json.Marshal(listener)
 		var prettyJSON bytes.Buffer
-		err = json.Indent(&prettyJSON, a, "", "    ")
+		json.Indent(&prettyJSON, a, "", "    ")
 		fmt.Printf(string(prettyJSON.Bytes()))
 	}
 }

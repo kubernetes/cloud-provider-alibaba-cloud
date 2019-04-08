@@ -259,7 +259,7 @@ func newMockClientSLB(service *v1.Service, nodes []*v1.Node, base *[]*slb.LoadBa
 		describeLoadBalancers: func(args *slb.DescribeLoadBalancersArgs) (loadBalancers []slb.LoadBalancerType, err error) {
 
 			if args.LoadBalancerId != "" {
-				for i, _ := range *base {
+				for i := range *base {
 					if args.LoadBalancerId == (*base)[i].LoadBalancerId {
 						if len(args.Tags) > 0 {
 							(*base)[0].LoadBalancerName = cloudprovider.GetLoadBalancerName(service)
@@ -270,7 +270,7 @@ func newMockClientSLB(service *v1.Service, nodes []*v1.Node, base *[]*slb.LoadBa
 				return []slb.LoadBalancerType{}, fmt.Errorf("not found by id, %s", args.LoadBalancerId)
 			}
 			if args.LoadBalancerName != "" {
-				for i, _ := range *base {
+				for i := range *base {
 					if args.LoadBalancerName == (*base)[i].LoadBalancerName {
 						if len(args.Tags) > 0 {
 							(*base)[0].LoadBalancerName = cloudprovider.GetLoadBalancerName(service)
@@ -281,7 +281,7 @@ func newMockClientSLB(service *v1.Service, nodes []*v1.Node, base *[]*slb.LoadBa
 				return []slb.LoadBalancerType{}, fmt.Errorf("not found by name, %s", args.LoadBalancerName)
 			}
 			kid := []slb.LoadBalancerType{}
-			for i, _ := range *base {
+			for i := range *base {
 				if len(args.Tags) > 0 {
 					(*base)[i].LoadBalancerName = cloudprovider.GetLoadBalancerName(service)
 				}
@@ -290,7 +290,7 @@ func newMockClientSLB(service *v1.Service, nodes []*v1.Node, base *[]*slb.LoadBa
 			return kid, nil
 		},
 		describeLoadBalancerAttribute: func(loadBalancerId string) (loadBalancer *slb.LoadBalancerType, err error) {
-			for i, _ := range *base {
+			for i := range *base {
 				if loadBalancerId == (*base)[i].LoadBalancerId {
 
 					return (*base)[0], nil
@@ -322,7 +322,7 @@ func newMockClientSLB(service *v1.Service, nodes []*v1.Node, base *[]*slb.LoadBa
 		},
 		deleteLoadBalancerListener: func(loadBalancerId string, port int) (err error) {
 			found := false
-			for i, _ := range *base {
+			for i := range *base {
 				if (*base)[i].LoadBalancerId != loadBalancerId {
 					continue
 				}

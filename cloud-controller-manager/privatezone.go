@@ -7,8 +7,10 @@ import (
 	"k8s.io/api/core/v1"
 )
 
+// DEFAULT_LANG default lang
 const DEFAULT_LANG = "en"
 
+// ClientPVTZSDK private zone sdk interface
 type ClientPVTZSDK interface {
 	DescribeZones(args *pvtz.DescribeZonesArgs) (zones []pvtz.ZoneType, err error)
 	AddZone(args *pvtz.AddZoneArgs) (response *pvtz.AddZoneResponse, err error)
@@ -27,6 +29,7 @@ type ClientPVTZSDK interface {
 	SetZoneRecordStatus(args *pvtz.SetZoneRecordStatusArgs) (err error)
 }
 
+// PrivateZoneClient private zone client wrapper
 type PrivateZoneClient struct {
 	c ClientPVTZSDK
 	// known service resource version
@@ -104,7 +107,7 @@ func (s *PrivateZoneClient) findPrivateZoneByName(name string) (bool, *pvtz.Desc
 		selectedZoneId = zones[0].ZoneId
 	}
 
-	return s.findPrivateZoneById(zones[0].ZoneId)
+	return s.findPrivateZoneById(selectedZoneId)
 }
 
 func (s *PrivateZoneClient) findRecordByRr(zone *pvtz.DescribeZoneInfoResponse, rr string) (*pvtz.ZoneRecordType, error) {
@@ -157,6 +160,9 @@ func (s *PrivateZoneClient) findExactRecordByService(service *v1.Service, ip str
 		return nil, nil, false, err
 	}
 
+	if record == nil {
+		return nil, nil, false, nil
+	}
 	// check the ip is matched with ip address, if not it may be user managed
 	if record.Type != "A" || record.Value != ip {
 		return zone, record, false, nil
@@ -197,6 +203,7 @@ func (s *PrivateZoneClient) updateRecordCache(service *v1.Service, zone *pvtz.De
 	return zone, record, err
 }
 
+// EnsurePrivateZoneRecord make sure private zone record is reconciled
 func (s *PrivateZoneClient) EnsurePrivateZoneRecord(service *v1.Service, ip string) (zone *pvtz.DescribeZoneInfoResponse, record *pvtz.ZoneRecordType, err error) {
 	glog.V(4).Infof("alicloud: ensure private zone record for ip(%s) with service details, \n%+v", ip, PrettyJson(service))
 
@@ -245,7 +252,7 @@ func (s *PrivateZoneClient) EnsurePrivateZoneRecord(service *v1.Service, ip stri
 		}
 
 		if record == nil {
-			return nil, nil, fmt.Errorf("alicloud: unknown error on creating private zone record, it shouldn't be happend. ")
+			return nil, nil, fmt.Errorf("alicloud: unknown error on creating private zone record, it shouldn't be happened. ")
 		}
 	} else if record.Type != "A" || record.Value != ip {
 		glog.V(4).Infof("alicloud: update private zone record [%s.%s] bind to ip [%s]",
@@ -269,6 +276,7 @@ func (s *PrivateZoneClient) EnsurePrivateZoneRecord(service *v1.Service, ip stri
 	return zone, record, nil
 }
 
+// EnsurePrivateZoneRecordDeleted make sure private zone record is deleted.
 func (s *PrivateZoneClient) EnsurePrivateZoneRecordDeleted(service *v1.Service, ip string) error {
 	// need to save the resource version when deleted event
 	err := keepResourceVesion(service)

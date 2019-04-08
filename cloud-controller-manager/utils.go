@@ -50,10 +50,12 @@ func init() {
 	})
 }
 
+// GetPrivateZoneRecordCache return record cache
 func GetPrivateZoneRecordCache() *kvstore {
 	return serviceCache
 }
 
+// GetLocalService return service cache
 func GetLocalService() *localService {
 	return versionCache
 }
@@ -91,6 +93,7 @@ func (kv *kvstore) remove(key string) {
 	delete(kv.store, key)
 }
 
+// NodeList return nodes list in string
 func NodeList(nodes []*v1.Node) []string {
 	ns := []string{}
 	for _, node := range nodes {
@@ -99,6 +102,7 @@ func NodeList(nodes []*v1.Node) []string {
 	return ns
 }
 
+// Contains contains in
 func Contains(list []int, x int) bool {
 	for _, item := range list {
 		if item == x {
