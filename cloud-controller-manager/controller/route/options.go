@@ -6,6 +6,7 @@ import (
 	"net"
 )
 
+// RoutesOptions route controller options
 type RoutesOptions struct {
 	AllocateNodeCIDRs         bool
 	ClusterCIDR               string
@@ -15,8 +16,10 @@ type RoutesOptions struct {
 	ControllerStartInterval   metav1.Duration
 }
 
+// Options global options for route controller
 var Options = RoutesOptions{}
 
+// RealContainsCidr real contains cidr
 func RealContainsCidr(outer string, inner string) (bool, error) {
 	contains, err := ContainsCidr(outer, inner)
 	if err != nil {
@@ -28,6 +31,7 @@ func RealContainsCidr(outer string, inner string) (bool, error) {
 	return contains, nil
 }
 
+// ContainsCidr contains with equal.
 func ContainsCidr(outer string, inner string) (bool, error) {
 	_, outerCidr, err := net.ParseCIDR(outer)
 	if err != nil {

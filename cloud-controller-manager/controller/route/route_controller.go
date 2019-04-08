@@ -46,6 +46,7 @@ import (
 )
 
 const (
+	// ROUTE_CONTROLLER route controller name
 	ROUTE_CONTROLLER = "route-controller"
 
 	// Maximum number of retries of node status update.
@@ -68,6 +69,7 @@ type Routes interface {
 	DeleteRoute(clusterName string, table string, route *cloudprovider.Route) error
 }
 
+// RouteController response for route reconcile
 type RouteController struct {
 	routes           Routes
 	kubeClient       clientset.Interface
@@ -79,6 +81,7 @@ type RouteController struct {
 	recorder         record.EventRecorder
 }
 
+// New new route controller
 func New(routes Routes,
 	kubeClient clientset.Interface,
 	nodeInformer coreinformers.NodeInformer,
@@ -106,6 +109,7 @@ func New(routes Routes,
 	}, nil
 }
 
+// Run start route controller
 func (rc *RouteController) Run(stopCh <-chan struct{}, syncPeriod time.Duration) {
 	defer utilruntime.HandleCrash()
 
@@ -164,7 +168,9 @@ func (rc *RouteController) sync(table string, nodes []*v1.Node, routes []*cloudp
 
 	//try delete conflicted route from vpc route table.
 	for _, route := range routes {
-		if !rc.isResponsibleForRoute(route) { continue }
+		if !rc.isResponsibleForRoute(route) {
+			continue
+		}
 
 		// Check if this route is a blackhole, or applies to a node we know about & has an incorrect CIDR.
 		if route.Blackhole || rc.isRouteConflicted(nodes, route) {
@@ -196,6 +202,7 @@ func (rc *RouteController) sync(table string, nodes []*v1.Node, routes []*cloudp
 	return nil
 }
 
+// RouteCacheMap return cached map for routes
 func RouteCacheMap(routes []*cloudprovider.Route) map[types.NodeName]*cloudprovider.Route {
 	// routeMap maps routeTargetNode->route
 	routeMap := make(map[types.NodeName]*cloudprovider.Route)
@@ -215,7 +222,7 @@ func (rc *RouteController) tryCreateRoute(table string,
 		return rc.updateNetworkingCondition(types.NodeName(node.Name), false)
 	}
 	if node.Spec.ProviderID == "" {
-		fmt.Errorf("node %s has no node.Spec.ProviderID, skip it", node.Name)
+		glog.Warningf("node %s has no node.Spec.ProviderID, skip it", node.Name)
 		return nil
 	}
 	providerID := types.NodeName(node.Spec.ProviderID)
@@ -274,7 +281,9 @@ func (rc *RouteController) tryCreateRoute(table string,
 func (rc *RouteController) isRouteConflicted(nodes []*v1.Node, route *cloudprovider.Route) bool {
 	for _, node := range nodes {
 		// skip node without podcidr
-		if node.Spec.PodCIDR == "" { continue }
+		if node.Spec.PodCIDR == "" {
+			continue
+		}
 
 		if node.Spec.PodCIDR == route.DestinationCIDR &&
 			!strings.Contains(node.Spec.ProviderID, string(route.TargetNode)) {
@@ -298,7 +307,9 @@ func (rc *RouteController) isRouteConflicted(nodes []*v1.Node, route *cloudprovi
 			glog.Error(msg)
 			return false
 		}
-		if contains { return true }
+		if contains {
+			return true
+		}
 	}
 	return false
 }

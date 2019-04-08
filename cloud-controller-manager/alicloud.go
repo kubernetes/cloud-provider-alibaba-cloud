@@ -44,6 +44,7 @@ import (
 // ProviderName is the name of this cloud provider.
 const ProviderName = "alicloud"
 
+// CLUSTER_ID default cluster id if it is not specified.
 var CLUSTER_ID = "clusterid"
 
 // KUBERNETES_ALICLOUD_IDENTITY is for statistic purpose.
@@ -60,8 +61,13 @@ type Cloud struct {
 }
 
 var (
-	DEFAULT_CHARGE_TYPE  = common.PayByTraffic
-	DEFAULT_BANDWIDTH    = 100
+	// DEFAULT_CHARGE_TYPE default charge type
+	DEFAULT_CHARGE_TYPE = common.PayByTraffic
+
+	// DEFAULT_BANDWIDTH default bandwidth
+	DEFAULT_BANDWIDTH = 100
+
+	// DEFAULT_ADDRESS_TYPE default address type
 	DEFAULT_ADDRESS_TYPE = slb.InternetAddressType
 
 	// DEFAULT_REGION should be override in cloud initialize.
@@ -194,11 +200,11 @@ func syncPeriod() time.Duration {
 	return time.Duration(float64(route.Options.MinResyncPeriod.Nanoseconds()) * (rand.Float64() + 1))
 }
 
-// TODO: Break this up into different interfaces (LB, etc) when we have more than one type of service
 // GetLoadBalancer returns whether the specified load balancer exists, and
 // if so, what its status is.
 // Implementations must treat the *v1.Service parameter as read-only and not modify it.
 // Parameter 'clusterName' is the name of the cluster as presented to kube-controller-manager
+// TODO: Break this up into different interfaces (LB, etc) when we have more than one type of service
 func (c *Cloud) GetLoadBalancer(clusterName string, service *v1.Service) (status *v1.LoadBalancerStatus, exists bool, err error) {
 
 	exists, lb, err := c.climgr.LoadBalancers().findLoadBalancer(service)
@@ -413,6 +419,8 @@ func (c *Cloud) InstanceExistsByProviderID(providerID string) (bool, error) {
 	}
 	return true, err
 }
+
+// RouteTables return route table list
 func (c *Cloud) RouteTables(clusterName string) ([]string, error) {
 	return c.climgr.Routes().RouteTables()
 }

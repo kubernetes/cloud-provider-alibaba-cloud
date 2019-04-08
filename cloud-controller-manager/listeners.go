@@ -26,6 +26,7 @@ import (
 	"strings"
 )
 
+// DEFAULT_LISTENER_BANDWIDTH default listener bandwidth
 var DEFAULT_LISTENER_BANDWIDTH = -1
 
 /*
@@ -53,6 +54,7 @@ var DEFAULT_LISTENER_BANDWIDTH = -1
 	VServer Group Name Format:  k8s/NodePort/ServiceName/Namespace/ClusterID
 */
 
+// Protocol for protocol transform
 func Protocol(annotation string, port v1.ServicePort) (string, error) {
 
 	if annotation == "" {
@@ -80,6 +82,7 @@ func Protocol(annotation string, port v1.ServicePort) (string, error) {
 	return strings.ToLower(string(port.Protocol)), nil
 }
 
+// IListener listener interface
 type IListener interface {
 	Describe() error
 	Add() error
@@ -87,14 +90,17 @@ type IListener interface {
 	Update() error
 }
 
+// FORMAT_ERROR format error message
 var FORMAT_ERROR = "ListenerName Format Error: k8s/${port}/${service}/${namespace}/${clusterid} format is expected"
 
 type formatError struct{ key string }
 
 func (f formatError) Error() string { return fmt.Sprintf("%s. Got [%s]", FORMAT_ERROR, f.key) }
 
+// DEFAULT_PREFIX default prefix for listener
 var DEFAULT_PREFIX = "k8s"
 
+// NamedKey identify listeners on grouped attributes
 type NamedKey struct {
 	Prefix      string
 	CID         string
@@ -103,6 +109,7 @@ type NamedKey struct {
 	Port        int32
 }
 
+// Key key of NamedKey
 func (n *NamedKey) Key() string {
 	if n.Prefix == "" {
 		n.Prefix = DEFAULT_PREFIX
@@ -110,6 +117,7 @@ func (n *NamedKey) Key() string {
 	return fmt.Sprintf("%s/%d/%s/%s/%s", n.Prefix, n.Port, n.ServiceName, n.Namespace, n.CID)
 }
 
+//ServiceURI service URI for the NamedKey.
 func (n *NamedKey) ServiceURI() string {
 	if n.Prefix == "" {
 		n.Prefix = DEFAULT_PREFIX
@@ -117,6 +125,7 @@ func (n *NamedKey) ServiceURI() string {
 	return fmt.Sprintf("%s/%s/%s/%s", n.Prefix, n.ServiceName, n.Namespace, n.CID)
 }
 
+// Reference reference
 func (n *NamedKey) Reference(backport int32) string {
 	return (&NamedKey{
 		Prefix:      n.Prefix,
@@ -126,10 +135,12 @@ func (n *NamedKey) Reference(backport int32) string {
 		ServiceName: n.ServiceName}).Key()
 }
 
+// URIfromService build ServiceURI from service
 func URIfromService(svc *v1.Service) string {
 	return fmt.Sprintf("%s/%s/%s/%s", DEFAULT_PREFIX, svc.Name, svc.Namespace, CLUSTER_ID)
 }
 
+// LoadNamedKey build NamedKey from string.
 func LoadNamedKey(key string) (*NamedKey, error) {
 	metas := strings.Split(key, "/")
 	if len(metas) != 5 || metas[0] != DEFAULT_PREFIX {
@@ -147,6 +158,7 @@ func LoadNamedKey(key string) (*NamedKey, error) {
 		Prefix:      DEFAULT_PREFIX}, nil
 }
 
+// Listener loadbalancer listener
 type Listener struct {
 	Name string
 	// NamedKey Map between ServiceName and Listener from console view.
@@ -178,11 +190,17 @@ type Listener struct {
 }
 
 var (
-	ACTION_ADD    = "ADD"
+	// ACTION_ADD actions add
+	ACTION_ADD = "ADD"
+
+	// ACTION_UPDATE update
 	ACTION_UPDATE = "UPDATE"
+
+	// ACTION_DELETE delete
 	ACTION_DELETE = "DELETE"
 )
 
+// Instance  listener instance
 func (n *Listener) Instance() IListener {
 	switch strings.ToUpper(n.TransforedProto) {
 	case "TCP":
@@ -197,6 +215,7 @@ func (n *Listener) Instance() IListener {
 	return &tcp{n}
 }
 
+// Apply apply listener operate . add/update/delete etc.
 func (n *Listener) Apply() error {
 	glog.Infof("apply: check listener for %s, name:[%s]", n.Action, n.Name)
 	glog.V(6).Infof("Listener: %s => \n%+v\n", n.Action, PrettyJson(n))
@@ -219,26 +238,29 @@ func (n *Listener) Apply() error {
 	return fmt.Errorf("UnKnownAction: %s, %s/%s", n.Action, n.Service.Namespace, n.Service.Name)
 }
 
+// Start start listener
 func (n *Listener) Start() error {
 	return n.Client.StartLoadBalancerListener(
 		n.LoadBalancerID, int(n.Port))
 }
 
-func (t *Listener) Describe() error {
+// Describe describe listener
+func (n *Listener) Describe() error {
 
 	return fmt.Errorf("unimplemented")
 }
 
-func (t *Listener) Remove() error {
-	err := t.Client.StopLoadBalancerListener(t.LoadBalancerID, int(t.Port))
+// Remove remove Listener
+func (n *Listener) Remove() error {
+	err := n.Client.StopLoadBalancerListener(n.LoadBalancerID, int(n.Port))
 	if err != nil {
 		return err
 	}
-	return t.Client.DeleteLoadBalancerListener(t.LoadBalancerID, int(t.Port))
+	return n.Client.DeleteLoadBalancerListener(n.LoadBalancerID, int(n.Port))
 }
 
-func (t *Listener) findVgroup(key string) string {
-	for _, v := range *t.VGroups {
+func (n *Listener) findVgroup(key string) string {
+	for _, v := range *n.VGroups {
 		if v.NamedKey.Key() == key {
 			glog.Infof("found: key=%s, groupid=%s, try use vserver group mode.", key, v.VGroupId)
 			return v.VGroupId
@@ -248,10 +270,13 @@ func (t *Listener) findVgroup(key string) string {
 	return STRINGS_EMPTY
 }
 
+// STRINGS_EMPTY empty string
 var STRINGS_EMPTY = ""
 
+// Listeners listeners collection
 type Listeners []*Listener
 
+// EnsureListeners make sure listeners reconciled
 // 1. First, build listeners config from aliyun API output.
 // 2. Second, build listeners from k8s service object.
 // 3. Third, Merge the up two listeners to decide whether add/update/remove is needed.
@@ -282,7 +307,7 @@ func EnsureListeners(client ClientSLBSDK,
 	return CleanUPVGroupMerged(service, lb, client, vgs)
 }
 
-// Only listener which owned by my service was deleted.
+// EnsureListenersDeleted Only listener which owned by my service was deleted.
 func EnsureListenersDeleted(client ClientSLBSDK,
 	service *v1.Service,
 	lb *slb.LoadBalancerType, vgs *vgroups) error {
@@ -327,7 +352,7 @@ func isUserManagedListener(remote *Listener) bool {
 
 // 1. We update listener to the latest version2 when updation is needed.
 // 2. We assume listener with an empty name to be legacy version.
-// 3. We assume listener with an arbitary name to be user managed listener.
+// 3. We assume listener with an arbitrary name to be user managed listener.
 // 4. LoadBalancer created by kubernetes is not allowed to be reused.
 func mergeListeners(svc *v1.Service, service, console Listeners) (Listeners, error) {
 	override := isOverrideListeners(serviceAnnotation(svc, ServiceAnnotationLoadBalancerOverrideListener))
@@ -345,20 +370,18 @@ func mergeListeners(svc *v1.Service, service, console Listeners) (Listeners, err
 						return nil, fmt.Errorf("port matched, but conflict with user managed port. "+
 							"Port:%d, ListenerName:%s, Service: %s. Protocol:[source:%s dst:%s]",
 							remote.Port, remote.Name, local.NamedKey.Key(), remote.TransforedProto, local.TransforedProto)
-					} else {
-						overridePort = true
-						break
 					}
+					overridePort = true
+					break
 				}
 				if !isManagedByMyService(svc, remote) {
 					if !override {
 						// port conflict with other service
 						return nil, fmt.Errorf("port matched. but not managed by this service[%s]. "+
 							"conflict with service[%s]", local.NamedKey.Key(), remote.NamedKey.Key())
-					} else {
-						overridePort = true
-						break
 					}
+					overridePort = true
+					break
 				}
 				if remote.TransforedProto == local.TransforedProto {
 					// protocol matched. do update.
