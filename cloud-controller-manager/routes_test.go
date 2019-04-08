@@ -160,9 +160,9 @@ func TestListRoutes(t *testing.T) {
 		t.Fatal("failed to create client manager")
 	}
 
-	route, err := cmgr.Routes().ListRoutes()
+	route, err := cmgr.Routes().ListRoutes(routetableid)
 	if err != nil {
-		t.Fatal("failed to list routes, %v", err)
+		t.Fatal(fmt.Sprintf("failed to list routes, %v", err))
 	}
 	for _, r := range route {
 		found := false
@@ -232,7 +232,7 @@ func (m *mockRouteSDK) WaitForAllRouteEntriesAvailable(vrouterId string, routeTa
 }
 
 func testCamel(t *testing.T, original, expected string) {
-	converted := replaceCamel(original)
+	converted := replaceCamel(normalizePrefix(original))
 	if converted != expected {
 		t.Errorf("failed to replace camel from %s to %s: %s", original, expected, converted)
 	}

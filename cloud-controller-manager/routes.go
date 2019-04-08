@@ -33,6 +33,7 @@ type vpc struct {
 	tableids  []string
 }
 
+//RoutesClient wrap route sdk
 type RoutesClient struct {
 	region string
 	vpc    vpc
@@ -41,6 +42,7 @@ type RoutesClient struct {
 
 var index = 1
 
+//RouteSDK define route sdk interface
 type RouteSDK interface {
 	DescribeVpcs(args *ecs.DescribeVpcsArgs) (vpcs []ecs.VpcSetType, pagination *common.PaginationResult, err error)
 	DescribeVRouters(args *ecs.DescribeVRoutersArgs) (vrouters []ecs.VRouterSetType, pagination *common.PaginationResult, err error)
@@ -50,6 +52,7 @@ type RouteSDK interface {
 	WaitForAllRouteEntriesAvailable(vrouterId string, routeTableId string, timeout int) error
 }
 
+//WithVPC set vpc id and and route table ids.
 func (r *RoutesClient) WithVPC(vpcid string, tableids string) error {
 	args := &ecs.DescribeVpcsArgs{
 		VpcId:    vpcid,
@@ -119,6 +122,7 @@ func routeEntry(table ecs.RouteTableSetType, region string) []*cloudprovider.Rou
 	return routes
 }
 
+//RouteTables return all the tables in the vpc network.
 func (r *RoutesClient) RouteTables() ([]string, error) {
 	if len(r.vpc.tableids) != 0 {
 		return r.vpc.tableids, nil
@@ -190,6 +194,7 @@ func (r *RoutesClient) DeleteRoute(tabid string, route *cloudprovider.Route, reg
 	return WaitDelete(r, tabid, args)
 }
 
+// WaitCreate create route and wait for route ready
 func WaitCreate(rc *RoutesClient, tableid string, route *ecs.CreateRouteEntryArgs) error {
 	err := rc.client.CreateRouteEntry(route)
 	if err != nil {
@@ -198,6 +203,7 @@ func WaitCreate(rc *RoutesClient, tableid string, route *ecs.CreateRouteEntryArg
 	return WaitForRouteEntryAvailable(rc.client, rc.vpc.vrouterid, tableid)
 }
 
+// WaitDelete delete route and wait for route ready
 func WaitDelete(rc *RoutesClient, tableid string, route *ecs.DeleteRouteEntryArgs) error {
 	if err := rc.client.DeleteRouteEntry(route); err != nil {
 		if strings.Contains(err.Error(), "InvalidRouteEntry.NotFound") {
@@ -209,6 +215,7 @@ func WaitDelete(rc *RoutesClient, tableid string, route *ecs.DeleteRouteEntryArg
 	return WaitForRouteEntryAvailable(rc.client, rc.vpc.vrouterid, tableid)
 }
 
+// Error implement error
 func (r *RoutesClient) Error(e error) string {
 	if e == nil {
 		return ""
@@ -216,6 +223,7 @@ func (r *RoutesClient) Error(e error) string {
 	return e.Error()
 }
 
+// WaitForRouteEntryAvailable wait for route entry available
 func WaitForRouteEntryAvailable(client RouteSDK, routeid, tableid string) error {
 	return client.WaitForAllRouteEntriesAvailable(routeid, tableid, 60)
 }

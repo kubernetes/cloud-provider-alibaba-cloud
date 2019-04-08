@@ -201,7 +201,7 @@ func TestUpdateListenerPorts(t *testing.T) {
 		},
 	})
 
-	// buildVGroupFromService is compatiable with v1 listener.
+	// buildVGroupFromService is compatible with v1 listener.
 	vgs := buildVGroupFromService(service, detail, mgr.loadbalancer.c, detail.RegionId)
 	if err := vgs.EnsureVGroup([]*v1.Node{}); err != nil {
 		t.Fatal("error ensure vserver group.")
