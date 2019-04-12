@@ -505,7 +505,7 @@ func splitCamel(src string) (entries []string) {
 
 func serviceAnnotation(service *v1.Service, annotate string) string {
 	for k, v := range service.Annotations {
-		if annotate == replaceCamel(k) {
+		if annotate == replaceCamel(normalizePrefix(k)) {
 			return v
 		}
 	}
