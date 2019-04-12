@@ -58,6 +58,7 @@ var DEFAULT_LISTENER_BANDWIDTH = -1
 func Protocol(annotation string, port v1.ServicePort) (string, error) {
 
 	if annotation == "" {
+		glog.Infof("transfor protocol, empty annotation")
 		return strings.ToLower(string(port.Protocol)), nil
 	}
 	for _, v := range strings.Split(annotation, ",") {
@@ -76,6 +77,7 @@ func Protocol(annotation string, port v1.ServicePort) (string, error) {
 		}
 
 		if pp[1] == fmt.Sprintf("%d", port.Port) {
+			glog.Infof("transfor protocol from %s to %s", string(port.Protocol), pp[0])
 			return pp[0], nil
 		}
 	}
@@ -217,7 +219,7 @@ func (n *Listener) Instance() IListener {
 
 // Apply apply listener operate . add/update/delete etc.
 func (n *Listener) Apply() error {
-	glog.Infof("apply: check listener for %s, name:[%s]", n.Action, n.Name)
+	glog.Infof("apply: %s listener for %s with trans protocol %s", n.Action, n.NamedKey.Key(), n.TransforedProto)
 	glog.V(6).Infof("Listener: %s => \n%+v\n", n.Action, PrettyJson(n))
 	switch n.Action {
 	case ACTION_UPDATE:
