@@ -219,7 +219,7 @@ func (n *Listener) Instance() IListener {
 
 // Apply apply listener operate . add/update/delete etc.
 func (n *Listener) Apply() error {
-	glog.Infof("apply: %s listener for %s with trans protocol %s", n.Action, n.NamedKey.Key(), n.TransforedProto)
+	glog.Infof("apply: %s listener for %v with trans protocol %s", n.Action, n.NamedKey, n.TransforedProto)
 	glog.V(6).Infof("Listener: %s => \n%+v\n", n.Action, PrettyJson(n))
 	switch n.Action {
 	case ACTION_UPDATE:
