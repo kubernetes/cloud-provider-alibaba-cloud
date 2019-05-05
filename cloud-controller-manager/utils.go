@@ -17,7 +17,10 @@ limitations under the License.
 package alicloud
 
 import (
+	"fmt"
+	"github.com/docker/distribution/uuid"
 	"k8s.io/api/core/v1"
+	"strings"
 	"sync"
 )
 
@@ -110,4 +113,8 @@ func Contains(list []int, x int) bool {
 		}
 	}
 	return false
+}
+
+func newid() string {
+	return fmt.Sprintf("lb-%s", strings.ToLower(uuid.Generate().String())[0:15])
 }
