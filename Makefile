@@ -50,6 +50,14 @@ clean:
 pre-requisite:
 	@echo "Warning: Tag your branch before make. or makefile can not autodetect image tag."
 
+unit-test:
+	go test -race -coverprofile=coverage.txt -covermode=atomic \
+		k8s.io/cloud-provider-alibaba-cloud/cloud-controller-manager \
+		k8s.io/cloud-provider-alibaba-cloud/cloud-controller-manager/controller/route
+
+check:
+	gometalinter --disable-all --skip vendor -E ineffassign -E misspell -d ./...
+
 test:
 	#go test -v k8s.io/cloud-provider-alibaba-cloud/cloud-controller-manager/alicloud
 	docker run -e CC=$(CC) -e GOARM=$(GOARM) -e GOARCH=$(ARCH) -e CGO_ENABLED=$(CGO_ENABLED) \
