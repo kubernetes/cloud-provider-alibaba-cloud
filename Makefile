@@ -51,7 +51,7 @@ pre-requisite:
 	@echo "Warning: Tag your branch before make. or makefile can not autodetect image tag."
 
 unit-test:
-	go test -race -coverprofile=coverage.txt -covermode=atomic \
+	pwd && echo $GOROOT && echo $GOPATH && go test -race -coverprofile=coverage.txt -covermode=atomic \
 		k8s.io/cloud-provider-alibaba-cloud/cloud-controller-manager \
 		k8s.io/cloud-provider-alibaba-cloud/cloud-controller-manager/controller/route
 
