@@ -56,6 +56,7 @@ unit-test:
 		k8s.io/cloud-provider-alibaba-cloud/cloud-controller-manager/controller/route
 
 check:
+	which gometalinter || go get -u github.com/alecthomas/gometalinter && gometalinter --install > /dev/null
 	gometalinter --disable-all --skip vendor -E ineffassign -E misspell -d ./...
 
 test:
