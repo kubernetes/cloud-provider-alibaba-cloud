@@ -1068,6 +1068,11 @@ func (t *https) Update() error {
 		needUpdate = true
 		config.HealthCheckDomain = def.HealthCheckDomain
 	}
+	if request.CertID != "" &&
+		def.CertID != response.ServerCertificateId {
+		needUpdate = true
+		config.ServerCertificateId = def.CertID
+	}
 	// backend server port has changed.
 	if int(t.NodePort) != response.BackendServerPort {
 		needUpdate = true
