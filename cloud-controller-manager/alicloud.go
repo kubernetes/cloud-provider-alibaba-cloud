@@ -86,6 +86,8 @@ type CloudConfig struct {
 		ClusterID            string `json:"clusterID"`
 		RouteTableIDS        string `json:"routeTableIDs"`
 
+		EnablePublicSLB bool `json:"enablePublicSLB"`
+
 		AccessKeyID     string `json:"accessKeyID"`
 		AccessKeySecret string `json:"accessKeySecret"`
 	}
@@ -233,6 +235,13 @@ func (c *Cloud) EnsureLoadBalancer(clusterName string, service *v1.Service, node
 
 	glog.V(2).Infof("Alicloud.EnsureLoadBalancer(%v, %s/%s, %v, %v)",
 		clusterName, service.Namespace, service.Name, c.region, NodeList(nodes))
+	defaulted, _ := ExtractAnnotationRequest(service)
+	if defaulted.AddressType == slb.InternetAddressType {
+		if !c.cfg.Global.EnablePublicSLB {
+			return nil, fmt.Errorf("PublicAddress SLB is Not allowed")
+		}
+	}
+
 	ns, err := c.fileOutNode(nodes, service)
 	if err != nil {
 		return nil, err
