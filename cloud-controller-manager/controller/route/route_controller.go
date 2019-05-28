@@ -237,9 +237,9 @@ func (rc *RouteController) tryCreateRoute(table string,
 
 		backoff := wait.Backoff{
 			Duration: 4 * time.Second,
+			Steps:    3,
 			Factor:   2,
 			Jitter:   1,
-			Steps:    8,
 		}
 		var lasterr error
 		err := wait.ExponentialBackoff(backoff, func() (bool, error) {

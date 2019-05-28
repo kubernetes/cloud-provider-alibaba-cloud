@@ -48,6 +48,9 @@ const (
 	// ServiceAnnotationLoadBalancerAddressType loadbalancer address type
 	ServiceAnnotationLoadBalancerAddressType = ServiceAnnotationLoadBalancerPrefix + "address-type"
 
+	// ServiceAnnotationLoadBalancerVswitch loadbalancer vswitch id
+	ServiceAnnotationLoadBalancerVswitch = ServiceAnnotationLoadBalancerPrefix + "vswitch-id"
+
 	// ServiceAnnotationLoadBalancerSLBNetworkType loadbalancer network type
 	ServiceAnnotationLoadBalancerSLBNetworkType = ServiceAnnotationLoadBalancerPrefix + "slb-network-type"
 	// ServiceAnnotationLoadBalancerChargeType lb charge type
@@ -187,6 +190,12 @@ func ExtractAnnotationRequest(service *v1.Service) (*AnnotationRequest, *Annotat
 		request.AddressType = defaulted.AddressType
 	} else {
 		defaulted.AddressType = slb.InternetAddressType
+	}
+
+	vswid, ok := annotation[ServiceAnnotationLoadBalancerVswitch]
+	if ok {
+		defaulted.VswitchID = vswid
+		request.VswitchID = defaulted.VswitchID
 	}
 
 	networkType, ok := annotation[ServiceAnnotationLoadBalancerSLBNetworkType]

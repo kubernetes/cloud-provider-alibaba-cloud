@@ -69,18 +69,22 @@ func TestInstanceRefeshInstance(t *testing.T) {
 		WithInstance(),
 	)
 
-	ins, err := mgr.Instances().refreshInstance(INSTANCEID, REGION)
+	ins, err := mgr.Instances().getInstances([]string{INSTANCEID}, REGION)
 	if err != nil {
 		t.Errorf("TestInstanceRefeshInstance error: %s\n", err.Error())
 	}
-	if ins.InstanceId != INSTANCEID {
+	if len(ins) != 1 {
+		fmt.Printf("instance length must be 1")
+		t.Fail()
+	}
+	if ins[0].InstanceId != INSTANCEID {
 		t.Fatal("refresh instance error.")
 	}
-	ins, err = mgr.Instances().findInstanceByProviderID(fmt.Sprintf("%s.%s", REGION, INSTANCEID))
+	insa, err := mgr.Instances().findInstanceByProviderID(fmt.Sprintf("%s.%s", REGION, INSTANCEID))
 	if err != nil {
 		t.Fatal(fmt.Sprintf("findInstanceByNode error: %s\n", err.Error()))
 	}
-	if ins.InstanceId != INSTANCEID {
+	if insa.InstanceId != INSTANCEID {
 		t.Fatal("find instance error.")
 	}
 }

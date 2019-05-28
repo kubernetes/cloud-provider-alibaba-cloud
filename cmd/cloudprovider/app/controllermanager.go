@@ -212,13 +212,13 @@ func StartControllers(s *options.CloudControllerManagerServer, kubeconfig *restc
 	sharedInformers := informers.NewSharedInformerFactory(versionedClient, resyncPeriod(s)())
 
 	// Start the CloudNodeController
-	nodeController := cloudcontrollers.NewCloudNodeController(
-		sharedInformers.Core().V1().Nodes(),
-		client("cloud-node-controller"), cloud,
-		s.NodeMonitorPeriod.Duration,
-		s.NodeStatusUpdateFrequency.Duration, s.ConfigureCloudRoutes)
-
-	nodeController.Run()
+	//nodeController := cloudcontrollers.NewCloudNodeController(
+	//	sharedInformers.Core().V1().Nodes(),
+	//	client("cloud-node-controller"), cloud,
+	//	s.NodeMonitorPeriod.Duration,
+	//	s.NodeStatusUpdateFrequency.Duration, s.ConfigureCloudRoutes)
+	//
+	//nodeController.Run()
 	time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
 
 	// Start the PersistentVolumeLabelController

@@ -38,6 +38,7 @@ type AnnotationRequest struct {
 
 	SSLPorts       string
 	AddressType    slb.AddressType
+	VswitchID      string
 	SLBNetworkType string
 
 	ChargeType slb.InternetChargeType

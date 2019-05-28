@@ -1,13 +1,13 @@
 #!/bin/bash
 set -e -x
 if [ -z $APISERVER_IP ];then
-	APISERVER_IP=161.117.109.43
+	APISERVER_IP=47.93.67.185
 fi
 ### rename your cloud-controller-manager image.
 kubectl get ds -n kube-system cloud-controller-manager -o yaml |grep image:|awk -F "image: " '{print $2}'|xargs -I '{}' kubectl set image ds/cloud-controller-manager -n kube-system cloud-controller-manager={}-bak
 
-    ### restart your cloud-controller-manager.
-kubectl get po -n kube-system|grep cloud-con|awk '{print $1}'|xargs -I '{}' kubectl delete po -n kube-system {}
+### restart your cloud-controller-manager.
+#kubectl get po -n kube-system|grep cloud-con|awk '{print $1}'|xargs -I '{}' kubectl delete po -n kube-system {}
 
 setup_localproxy()
 {

@@ -80,3 +80,5 @@ func (m *mockClientInstanceSDK) DescribeInstances(args *ecs.DescribeInstancesArg
 	)
 	return results, nil, nil
 }
+
+func (m *mockClientInstanceSDK) AddTags(args *ecs.AddTagsArgs) error { return nil }
