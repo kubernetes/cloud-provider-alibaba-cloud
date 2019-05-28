@@ -274,6 +274,11 @@ func CleanUPVGroupDirect(local *vgroups) error {
 		if vg.VGroupId == "" {
 			err := vg.Describe()
 			if err != nil {
+				if strings.Contains(err.Error(), "not found") {
+					// skip none exist vgroup
+					glog.Infof("skip none exist vgroup. %s", vg.LoadBalancerId)
+					continue
+				}
 				return err
 			}
 		}
