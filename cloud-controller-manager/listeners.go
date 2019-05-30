@@ -22,6 +22,7 @@ import (
 	"github.com/denverdino/aliyungo/slb"
 	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
+	"sort"
 	"strconv"
 	"strings"
 )
@@ -298,6 +299,20 @@ func EnsureListeners(client ClientSLBSDK,
 		return fmt.Errorf("merge listener: %s", err.Error())
 	}
 	glog.Infof("ensure listener: %d updates for %s", len(updates), lb.LoadBalancerId)
+
+	// make https come first.
+	// ensure https listeners to be created first
+	sort.SliceStable(
+		updates,
+		func(i, j int) bool {
+			if strings.ToUpper(
+				updates[i].TransforedProto,
+			) == "HTTPS" {
+				return true
+			}
+			return false
+		},
+	)
 	// do update/add/delete
 	for _, up := range updates {
 		err := up.Apply()
@@ -767,32 +782,68 @@ func (t *http) Describe() error {
 }
 func (t *http) Add() error {
 	def, request := ExtractAnnotationRequest(t.Service)
-	return t.Client.CreateLoadBalancerHTTPListener(
-		&slb.CreateLoadBalancerHTTPListenerArgs{
-			LoadBalancerId:    t.LoadBalancerID,
-			ListenerPort:      int(t.Port),
-			BackendServerPort: int(t.NodePort),
-			Description:       t.NamedKey.Key(),
-			VServerGroupId:    t.findVgroup(t.NamedKey.Reference(t.NodePort)),
-			//Health Check
-			Bandwidth:         DEFAULT_LISTENER_BANDWIDTH,
-			StickySession:     def.StickySession,
-			StickySessionType: def.StickySessionType,
-			CookieTimeout:     def.CookieTimeout,
-			Cookie:            def.Cookie,
+	httpc := &slb.CreateLoadBalancerHTTPListenerArgs{
+		LoadBalancerId:    t.LoadBalancerID,
+		ListenerPort:      int(t.Port),
+		BackendServerPort: int(t.NodePort),
+		Description:       t.NamedKey.Key(),
+		VServerGroupId:    t.findVgroup(t.NamedKey.Reference(t.NodePort)),
+		//Health Check
+		Bandwidth:         DEFAULT_LISTENER_BANDWIDTH,
+		StickySession:     def.StickySession,
+		StickySessionType: def.StickySessionType,
+		CookieTimeout:     def.CookieTimeout,
+		Cookie:            def.Cookie,
 
-			//HealthCheckType:           request.HealthCheckType,
-			HealthCheckURI:         request.HealthCheckURI,
-			HealthCheckConnectPort: request.HealthCheckConnectPort,
-			HealthyThreshold:       request.HealthyThreshold,
-			UnhealthyThreshold:     request.UnhealthyThreshold,
-			//HealthCheckConnectTimeout: request.HealthCheckConnectTimeout,
-			HealthCheckInterval: request.HealthCheckInterval,
-			HealthCheckDomain:   def.HealthCheckDomain,
-			HealthCheck:         def.HealthCheck,
-			HealthCheckTimeout:  def.HealthCheckTimeout,
-			HealthCheckHttpCode: def.HealthCheckHttpCode,
-		})
+		//HealthCheckType:           request.HealthCheckType,
+		HealthCheckURI:         request.HealthCheckURI,
+		HealthCheckConnectPort: request.HealthCheckConnectPort,
+		HealthyThreshold:       request.HealthyThreshold,
+		UnhealthyThreshold:     request.UnhealthyThreshold,
+		//HealthCheckConnectTimeout: request.HealthCheckConnectTimeout,
+		HealthCheckInterval: request.HealthCheckInterval,
+		HealthCheckDomain:   def.HealthCheckDomain,
+		HealthCheck:         def.HealthCheck,
+		HealthCheckTimeout:  def.HealthCheckTimeout,
+		HealthCheckHttpCode: def.HealthCheckHttpCode,
+	}
+	forward := forwardPort(def.ForwardPort, t.Port)
+	if forward != 0 {
+		httpc.ListenerForward = slb.OnFlag
+	} else {
+		httpc.ListenerForward = slb.OffFlag
+	}
+	httpc.ForwardPort = int(forward)
+	return t.Client.CreateLoadBalancerHTTPListener(httpc)
+}
+
+func forwardPort(port string, target int32) int32 {
+	if port == "" {
+		return 0
+	}
+	forwarded := ""
+	tmps := strings.Split(port, ",")
+	for _, v := range tmps {
+		ports := strings.Split(v, ":")
+		if len(ports) != 2 {
+			glog.Infof("forward-port format error: %s, expect 80:443,88:6443", port)
+			continue
+		}
+		if ports[0] == strconv.Itoa(int(target)) {
+			forwarded = ports[1]
+			break
+		}
+	}
+	if forwarded != "" {
+		forward, err := strconv.Atoi(forwarded)
+		if err != nil {
+			glog.Errorf("forward port is not an integer, %s", forwarded)
+			return 0
+		}
+		glog.Infof("forward http port %d to %d", target, forward)
+		return int32(forward)
+	}
+	return 0
 }
 
 func (t *http) Update() error {
@@ -826,6 +877,7 @@ func (t *http) Update() error {
 		HealthCheckInterval:    response.HealthCheckInterval,
 	}
 	needUpdate := false
+	needRecrete := false
 	/*
 		if request.Bandwidth != 0 &&
 			request.Bandwidth != response.Bandwidth {
@@ -900,10 +952,26 @@ func (t *http) Update() error {
 		needUpdate = true
 		config.HealthCheckDomain = def.HealthCheckDomain
 	}
+	forward := forwardPort(def.ForwardPort, t.Port)
+	if forward != 0 {
+		if response.ListenerForward != slb.OnFlag {
+			needRecrete = true
+			config.ListenerForward = slb.OnFlag
+		}
+	} else {
+		if response.ListenerForward != slb.OffFlag {
+			needRecrete = true
+			config.ListenerForward = slb.OffFlag
+		}
+	}
+	config.ForwardPort = int(forward)
 	// backend server port has changed.
-	if int(t.NodePort) != response.BackendServerPort {
+	if needRecrete ||
+		int(t.NodePort) != response.BackendServerPort {
+
 		config.BackendServerPort = int(t.NodePort)
-		glog.V(2).Infof("HTTP listener checker [BackendServerPort] changed, request=%d. response=%d", t.NodePort, response.BackendServerPort)
+		glog.V(2).Infof("HTTP listener checker [BackendServerPort]"+
+			" changed, request=%d. response=%d", t.NodePort, response.BackendServerPort)
 		err := t.Client.DeleteLoadBalancerListener(t.LoadBalancerID, int(t.Port))
 		if err != nil {
 			return err
@@ -916,7 +984,7 @@ func (t *http) Update() error {
 		// no recreate needed.  skip
 		return nil
 	}
-	glog.V(2).Infof("HTTP listener checker changed, request recreate [%s]\n", t.LoadBalancerID)
+	glog.V(2).Infof("HTTP listener checker changed, request update [%s]\n", t.LoadBalancerID)
 	glog.V(5).Infof(PrettyJson(request))
 	glog.V(5).Infof(PrettyJson(response))
 	return t.Client.SetLoadBalancerHTTPListenerAttribute(config)

@@ -51,6 +51,9 @@ const (
 	// ServiceAnnotationLoadBalancerVswitch loadbalancer vswitch id
 	ServiceAnnotationLoadBalancerVswitch = ServiceAnnotationLoadBalancerPrefix + "vswitch-id"
 
+	// ServiceAnnotationLoadBalancerForwardPort loadbalancer forward port
+	ServiceAnnotationLoadBalancerForwardPort = ServiceAnnotationLoadBalancerPrefix + "forward-port"
+
 	// ServiceAnnotationLoadBalancerSLBNetworkType loadbalancer network type
 	ServiceAnnotationLoadBalancerSLBNetworkType = ServiceAnnotationLoadBalancerPrefix + "slb-network-type"
 	// ServiceAnnotationLoadBalancerChargeType lb charge type
@@ -196,6 +199,12 @@ func ExtractAnnotationRequest(service *v1.Service) (*AnnotationRequest, *Annotat
 	if ok {
 		defaulted.VswitchID = vswid
 		request.VswitchID = defaulted.VswitchID
+	}
+
+	forward, ok := annotation[ServiceAnnotationLoadBalancerForwardPort]
+	if ok {
+		defaulted.ForwardPort = forward
+		request.ForwardPort = defaulted.ForwardPort
 	}
 
 	networkType, ok := annotation[ServiceAnnotationLoadBalancerSLBNetworkType]
