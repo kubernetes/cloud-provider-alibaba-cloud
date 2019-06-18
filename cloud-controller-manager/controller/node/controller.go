@@ -99,7 +99,7 @@ type CloudInstance interface {
 
 // NewCloudNodeController creates a CloudNodeController object
 func NewCloudNodeController(
-	nodeInformer coreinformers.NodeInformer,
+	ninformer coreinformers.NodeInformer,
 	kubeClient clientset.Interface,
 	cloud cloudprovider.Interface,
 	nodeMonitorPeriod time.Duration,
@@ -110,41 +110,48 @@ func NewCloudNodeController(
 
 	if kubeClient != nil && kubeClient.CoreV1().RESTClient().GetRateLimiter() != nil {
 		limitor := kubeClient.CoreV1().RESTClient().GetRateLimiter()
-		metrics.RegisterMetricAndTrackRateLimiterUsage(NODE_CONTROLLER, limitor)
-		glog.V(0).Infof("Sending events to api server.")
+		_ = metrics.RegisterMetricAndTrackRateLimiterUsage(NODE_CONTROLLER, limitor)
+		glog.Infof("start sending events to api server.")
 	} else {
-		glog.V(0).Infof("No api server defined - no events will be sent to API server.")
+		glog.Infof("no api server defined - no events will be sent to API server.")
 	}
 
 	cnc := &CloudNodeController{
-		informer:         nodeInformer,
+		informer:         ninformer,
 		kclient:          kubeClient,
 		recorder:         eventer,
 		broadcaster:      caster,
 		cloud:            cloud,
 		monitorPeriod:    nodeMonitorPeriod,
 		statusFrequency:  nodeStatusUpdateFrequency,
-		nodeListerSynced: nodeInformer.Informer().HasSynced,
+		nodeListerSynced: ninformer.Informer().HasSynced,
 	}
 
-	nodeInformer.Informer().AddEventHandler(
+	HandlerForNode(cnc, ninformer)
+
+	return cnc
+}
+
+func HandlerForNode(
+	cnc *CloudNodeController,
+	ninformer coreinformers.NodeInformer,
+) {
+	ninformer.Informer().AddEventHandlerWithResyncPeriod(
 		cache.ResourceEventHandlerFuncs{
 			AddFunc: func(obj interface{}) {
 				node := obj.(*v1.Node)
 				cnc.AddCloudNode(node)
 			},
 		},
+		5*time.Minute,
 	)
-
-	return cnc
 }
 
 // This controller deletes a node if kubelet is not reporting
 // and the node is gone from the cloud provider.
 func (cnc *CloudNodeController) Run(stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
-	glog.Info("Starting node controller")
-	defer glog.Info("Shutting down node controller")
+	glog.Info("starting node controller")
 
 	if !controller.WaitForCacheSync(
 		NODE_CONTROLLER,
@@ -173,6 +180,7 @@ func (cnc *CloudNodeController) Run(stopCh <-chan struct{}) {
 				return
 			}
 
+			// ignore return value, retry on error
 			batchAddressUpdate(
 				nodes.Items,
 				cnc.syncNodeAddress,
@@ -190,7 +198,7 @@ func (cnc *CloudNodeController) Run(stopCh <-chan struct{}) {
 				glog.Errorf("Error monitoring node status: %v", err)
 				return
 			}
-
+			// ignore return value, retry on error
 			batchAddressUpdate(
 				nodes.Items,
 				cnc.syncCloudNodes,

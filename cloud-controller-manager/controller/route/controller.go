@@ -113,8 +113,8 @@ func New(routes Routes,
 func (rc *RouteController) Run(stopCh <-chan struct{}, syncPeriod time.Duration) {
 	defer utilruntime.HandleCrash()
 
-	glog.Info("Starting route controller")
-	defer glog.Info("Shutting down route controller")
+	glog.Info("starting route controller")
+	defer glog.Info("shutting down route controller")
 
 	if !controller.WaitForCacheSync(ROUTE_CONTROLLER, stopCh, rc.nodeListerSynced) {
 		return
