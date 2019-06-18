@@ -18,7 +18,6 @@ package main
 
 import (
 	f "flag"
-	"fmt"
 	"os"
 
 	"github.com/spf13/pflag"
@@ -27,10 +26,11 @@ import (
 	"k8s.io/apiserver/pkg/util/logs"
 	_ "k8s.io/cloud-provider-alibaba-cloud/cloud-controller-manager"
 	"k8s.io/cloud-provider-alibaba-cloud/cmd/cloudprovider/app"
-	"k8s.io/cloud-provider-alibaba-cloud/cmd/cloudprovider/app/options"
 	_ "k8s.io/kubernetes/pkg/client/metrics/prometheus"
 	_ "k8s.io/kubernetes/pkg/version/prometheus"
 	"k8s.io/kubernetes/pkg/version/verflag"
+	"github.com/golang/glog"
+	"k8s.io/cloud-provider-alibaba-cloud/cmd/cloudprovider/app/options"
 )
 
 func init() {
@@ -40,16 +40,17 @@ func init() {
 func main() {
 	f.CommandLine.Parse([]string{})
 
-	s := options.NewCloudControllerManagerServer()
-	s.AddFlags(pflag.CommandLine)
+	ccm := app.NewServerCCM()
+	options.AddFlags(ccm,pflag.CommandLine)
 
 	flag.InitFlags()
 	logs.InitLogs()
 	defer logs.FlushLogs()
 	verflag.PrintAndExitIfRequested()
 
-	if err := app.Run(s); err != nil {
-		fmt.Fprintf(os.Stderr, "%v\n", err)
-		os.Exit(1)
+	if err := app.Run(ccm);
+		err != nil {
+			glog.Errorf("Run CCM error: %s",err.Error())
+			os.Exit(1)
 	}
 }
