@@ -934,7 +934,16 @@ func (s *ServiceController) getNodeConditionPredicate(service *v1.Service) (core
 		// As of 1.6, we will taint the master, but not necessarily mark it unschedulable.
 		// Recognize nodes labeled as master, and filter them also, as we were doing previously.
 		if _, hasMasterRoleLabel := node.Labels[LabelNodeRoleMaster]; hasMasterRoleLabel {
-			return false
+			// has taint of master role
+			hasMasterRoleTaint := false
+			for _, taint := range node.Spec.Taints {
+				if taint.Key == LabelNodeRoleMaster {
+					hasMasterRoleTaint = true
+				}
+			}
+			if hasMasterRoleTaint {
+				return false
+			}
 		}
 
 		if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.ServiceNodeExclusion) {
