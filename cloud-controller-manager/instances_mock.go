@@ -15,13 +15,13 @@ type InstanceStore struct {
 	instance sync.Map
 }
 
-func WithNewInstanceStore() InitialSet {
+func WithNewInstanceStore() CloudDataMock {
 	return func() {
 		INSTANCE = InstanceStore{}
 	}
 }
 
-func WithInstance() InitialSet {
+func WithInstance() CloudDataMock {
 	return func() {
 		INSTANCE.instance.Store(
 			INSTANCEID,

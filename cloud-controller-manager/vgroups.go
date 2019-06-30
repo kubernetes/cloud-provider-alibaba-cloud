@@ -54,6 +54,14 @@ func (v *vgroup) Add() error {
 		VServerGroupName: v.NamedKey.Key(),
 		RegionId:         v.RegionId,
 	}
+
+	if len(v.BackendServers) > 0 {
+		backend,err := json.Marshal(v.BackendServers)
+		if err != nil {
+			return fmt.Errorf("add new vserver group: %s",err.Error())
+		}
+		vgp.BackendServers = string(backend)
+	}
 	gp, err := v.Client.CreateVServerGroup(&vgp)
 	if err != nil {
 		return fmt.Errorf("CreateVServerGroup. %s", err.Error())

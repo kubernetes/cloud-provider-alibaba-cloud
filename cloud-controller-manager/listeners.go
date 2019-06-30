@@ -401,7 +401,7 @@ func mergeListeners(svc *v1.Service, service, console Listeners) (Listeners, err
 					if !override {
 						// port conflict with user managed port.
 						return nil, fmt.Errorf("port matched, but conflict with user managed port. "+
-							"Port:%d, ListenerName:%s, Service: %s. Protocol:[source:%s dst:%s]",
+							"Port:%d, ListenerName:%s, svc: %s. Protocol:[source:%s dst:%s]",
 							remote.Port, remote.Name, local.NamedKey.Key(), remote.TransforedProto, local.TransforedProto)
 					}
 					overridePort = true

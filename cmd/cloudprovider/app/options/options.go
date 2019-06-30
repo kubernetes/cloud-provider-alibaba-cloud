@@ -45,7 +45,7 @@ func AddFlags(ccm *app.ServerCCM, fs *pflag.FlagSet) {
 	fs.StringVar(&ccm.ServiceAccountKeyFile, "service-account-private-key-file", ccm.ServiceAccountKeyFile, "Filename containing a PEM-encoded private RSA or ECDSA key used to sign service account tokens.")
 	fs.MarkDeprecated("service-account-private-key-file", "This flag is currently no-op and will be deleted.")
 	fs.BoolVar(&ccm.UseServiceAccountCredentials, "use-service-account-credentials", ccm.UseServiceAccountCredentials, "If true, use individual service account credentials for each controller.")
-	fs.DurationVar(&ccm.RouteReconciliationPeriod.Duration, "route-reconciliation-period", ccm.RouteReconciliationPeriod.Duration, "The period for reconciling routes created for Nodes by cloud provider.")
+	fs.DurationVar(&ccm.RouteReconciliationPeriod.Duration, "route-reconciliation-period", ccm.RouteReconciliationPeriod.Duration, "The period for reconciling routes created for nodes by cloud provider.")
 	fs.BoolVar(&ccm.ConfigureCloudRoutes, "configure-cloud-routes", true, "Should CIDRs allocated by allocate-node-cidrs be configured on the cloud provider.")
 	fs.BoolVar(&ccm.EnableProfiling, "profiling", true, "Enable profiling via web interface host:port/debug/pprof/.")
 	fs.BoolVar(&ccm.EnableContentionProfiling, "contention-profiling", false, "Enable lock contention profiling, if profiling is enabled.")

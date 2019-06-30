@@ -163,7 +163,7 @@ func (rc *RouteController) reconcile() error {
 	return nil
 }
 
-// Aoxn: Alibaba Cloud does not support concurrent route operation
+// Aoxn: Alibaba cloud does not support concurrent route operation
 func (rc *RouteController) sync(table string, nodes []*v1.Node, routes []*cloudprovider.Route) error {
 
 	//try delete conflicted route from vpc route table.
@@ -175,7 +175,7 @@ func (rc *RouteController) sync(table string, nodes []*v1.Node, routes []*cloudp
 		// Check if this route is a blackhole, or applies to a node we know about & has an incorrect CIDR.
 		if route.Blackhole || rc.isRouteConflicted(nodes, route) {
 
-			// Aoxn: Alibaba Cloud does not support concurrent route operation
+			// Aoxn: Alibaba cloud does not support concurrent route operation
 			glog.Infof("Deleting route %s %s", route.Name, route.DestinationCIDR)
 			if err := rc.routes.DeleteRoute(rc.clusterName, table, route); err != nil {
 				glog.Errorf("Could not delete route %s %s from table %s, %s", route.Name, route.DestinationCIDR, table, err.Error())
