@@ -12,13 +12,13 @@ import (
 	"time"
 )
 
-func WithNewLoadBalancerStore() InitialSet {
+func WithNewLoadBalancerStore() CloudDataMock {
 	return func() {
 		LOADBALANCER = LBStore{}
 	}
 }
 
-func WithLoadBalancer() InitialSet {
+func WithLoadBalancer() CloudDataMock {
 	return func() {
 		LOADBALANCER.loadbalancer.Store(
 			LOADBALANCER_ID,
@@ -36,6 +36,29 @@ func WithLoadBalancer() InitialSet {
 				SlaveZoneId:        fmt.Sprintf("%s-b", REGION),
 			},
 		)
+		listener := &slb.DescribeLoadBalancerTCPListenerAttributeResponse{
+			DescribeLoadBalancerListenerAttributeResponse: slb.DescribeLoadBalancerListenerAttributeResponse{},
+			TCPListenerType: slb.TCPListenerType{
+				LoadBalancerId:            LOADBALANCER_ID,
+				ListenerPort:              80,
+				BackendServerPort:         32999,
+				Bandwidth:                 50,
+				Description:               "",
+				VServerGroupId:            "",
+				VServerGroup:              "",
+				HealthCheck:               "on",
+				HealthCheckURI:            "",
+				//HealthCheckConnectPort:    args.HealthCheckConnectPort,
+				//HealthCheckConnectTimeout: args.HealthCheckConnectTimeout,
+				//HealthCheckDomain:         args.HealthCheckDomain,
+				//HealthCheckHttpCode:       args.HealthCheckHttpCode,
+				//HealthCheckInterval:       args.HealthCheckInterval,
+				//HealthCheckType:           args.HealthCheckType,
+				//HealthyThreshold:          args.HealthyThreshold,
+				//UnhealthyThreshold:        args.UnhealthyThreshold,
+			},
+		}
+		LOADBALANCER.listeners.Store(listenerKey(LOADBALANCER_ID, 80), listener)
 	}
 }
 
@@ -467,6 +490,7 @@ func (c *mockClientSLB) CreateLoadBalancerHTTPSListener(args *slb.CreateLoadBala
 				HealthyThreshold:       args.HealthyThreshold,
 				UnhealthyThreshold:     args.UnhealthyThreshold,
 			},
+			ServerCertificateId: args.ServerCertificateId,
 		},
 	}
 	LOADBALANCER.listeners.Store(listenerKey(args.LoadBalancerId, args.ListenerPort), listener)

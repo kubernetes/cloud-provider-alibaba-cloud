@@ -19,12 +19,10 @@ package alicloud
 import (
 	b64 "encoding/base64"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"strings"
 	"testing"
 
-	"github.com/denverdino/aliyungo/metadata"
 	"github.com/denverdino/aliyungo/slb"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -55,206 +53,126 @@ var (
 	nodeName          = "iZuf694l8lw6xvdx6gh7tkZ"
 )
 
-func newMockCloud() (*Cloud, error) {
-	return newMockCloudWithSDK(
-		&mockClientSLB{},
-		&mockRouteSDK{},
-		&mockClientInstanceSDK{},
-		nil,
-	)
-}
-
-func newMockCloudWithSDK(
-	slb ClientSLBSDK,
-	route RouteSDK,
-	ins ClientInstanceSDK,
-	meta *metadata.MetaData,
-) (*Cloud, error) {
-
-	if meta == nil {
-		meta = metadata.NewMockMetaData(
-			nil,
-			func(resource string) (string, error) {
-				if strings.Contains(resource, metadata.REGION) {
-					return string(REGION), nil
-				}
-				if strings.Contains(resource, metadata.VPC_ID) {
-					return VPCID, nil
-				}
-				return "", errors.New("not found")
-			},
-		)
-	}
-	mgr := &ClientMgr{
-		stop:         make(<-chan struct{}, 1),
-		meta:         meta,
-		loadbalancer: &LoadBalancerClient{c: slb},
-		routes:       &RoutesClient{client: route, region: string(REGION)},
-		instance:     &InstanceClient{c: ins},
-	}
-
-	return newAliCloud(mgr, "")
-}
-
+// Ensure loadbalancer basic setup
 func TestEnsureLoadBalancerBasic(t *testing.T) {
 
 	// Test case Example
 	// Name: TestEnsureLoadBalancerBasic
 	// Step 1: define your node & service object.
-	svc := &v1.Service{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "basic-service",
-			UID:  types.UID(serviceUID),
-		},
-		Spec: v1.ServiceSpec{
-			Ports: []v1.ServicePort{
-				{Port: listenPort1, TargetPort: targetPort1, Protocol: v1.ProtocolTCP, NodePort: nodePort1},
-			},
-			Type:            v1.ServiceTypeLoadBalancer,
-			SessionAffinity: v1.ServiceAffinityNone,
-		},
-	}
 	prid := nodeid(string(REGION), INSTANCEID)
-	nodes := []*v1.Node{
-		{
-			ObjectMeta: metav1.ObjectMeta{Name: prid},
-			Spec: v1.NodeSpec{
-				ProviderID: prid,
+	f := NewDefaultFrameWork(
+		// initial service based on your definition
+		&v1.Service{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "basic-service",
+				UID:  types.UID(serviceUID),
+			},
+			Spec: v1.ServiceSpec{
+				Ports: []v1.ServicePort{
+					{
+						Port: listenPort1,
+						TargetPort: targetPort1,
+						Protocol: v1.ProtocolTCP,
+						NodePort: nodePort1,
+					},
+				},
+				Type:            v1.ServiceTypeLoadBalancer,
+				SessionAffinity: v1.ServiceAffinityNone,
 			},
 		},
-	}
-
-	// Step 2: init cloud cache data.
-	PreSetCloudData(
-		// LoadBalancer
-		WithNewLoadBalancerStore(),
-		WithLoadBalancer(),
-
-		// VPC & Route
-		WithNewRouteStore(),
-		WithVpcs(),
-		WithVRouter(),
-
-		// Instance Store
-		WithNewInstanceStore(),
-		WithInstance(),
+		// initial node based on your definition.
+		// backend of the created loadbalaner
+		[]*v1.Node{
+			{
+				ObjectMeta: metav1.ObjectMeta{Name: prid},
+				Spec: v1.NodeSpec{
+					ProviderID: prid,
+				},
+			},
+		},
+		nil,
 	)
 
-	// Step3: New Mock cloud to test
-	cloud, err := newMockCloud()
-	if err != nil {
-		t.Fatal(fmt.Sprintf("TestEnsureLoadBalancer error newCloud: %s\n", err.Error()))
-	}
-
-	// Step4: Call the func which you want to test. eg. EnsureLoadBalancer
-	status, e := cloud.EnsureLoadBalancer(clusterName, svc, nodes)
-	if e != nil {
-		t.Errorf("TestEnsureLoadBalancer error: %s\n", e.Error())
-	}
-
-	// Step5: do the check.
-	exist, mlb, err := cloud.climgr.loadbalancer.findLoadBalancer(svc)
-	if err != nil || !exist {
-		t.Fatalf("slb not found, %v, %v", exist, err)
-	}
-
-	if len(mlb.ListenerPorts.ListenerPort) != 1 {
-		t.Fatal("TestEnsureLoadBalancer error, expected only 1 listener port left")
-	}
-	if mlb.ListenerPorts.ListenerPort[0] != 80 {
-		t.Fatalf("TestEnsureLoadBalancer error, expected to be port 80, Got %d", mlb.ListenerPorts.ListenerPort[0])
-	}
-	if len(status.Ingress) <= 0 {
-		t.Fatalf("slb ingress <= 0, %v", status.Ingress)
-	}
-
-	args := slb.DescribeVServerGroupsArgs{
-		LoadBalancerId: mlb.LoadBalancerId,
-	}
-	res, err := cloud.climgr.loadbalancer.c.DescribeVServerGroups(&args)
-	if err != nil {
-		t.Fatalf("vserver group: %v", err)
-	}
-	if len(res.VServerGroups.VServerGroup) != 1 {
-		t.Fatalf("vserver group must be 1")
-	}
-	varg := slb.DescribeVServerGroupAttributeArgs{
-		VServerGroupId: res.VServerGroups.VServerGroup[0].VServerGroupId,
-	}
-	vg, err := cloud.climgr.loadbalancer.c.DescribeVServerGroupAttribute(&varg)
-	if err != nil {
-		t.Fatalf("vserver group attribute error: %v", err)
-	}
-	if len(vg.BackendServers.BackendServer) != 1 {
-		t.Fatalf("vgroup backend server must be 1")
-	}
-
-	if vg.BackendServers.BackendServer[0].ServerId != INSTANCEID {
-		t.Fatalf("vgroup backend id error.")
-	}
+	// Step2: Run start a test on specified function.
+	f.RunDefault(t, "Basic LoadBalancer Creation Test")
 }
 
 // EnsureLoadBalancer and HTTPS with UpdateLoadBalancer.
 func TestEnsureLoadBalancerHTTPS(t *testing.T) {
-	svc := &v1.Service{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "https-service",
-			UID:  types.UID(serviceUID),
-			Annotations: map[string]string{
-				ServiceAnnotationLoadBalancerProtocolPort: fmt.Sprintf("https:%d", listenPort1),
-				ServiceAnnotationLoadBalancerCertID:       certID,
-			},
-		},
-		Spec: v1.ServiceSpec{
-			Ports: []v1.ServicePort{
-				{Port: listenPort1, TargetPort: targetPort1, Protocol: v1.ProtocolTCP, NodePort: nodePort1},
-			},
-			Type:            v1.ServiceTypeLoadBalancer,
-			SessionAffinity: v1.ServiceAffinityNone,
-		},
-	}
-	prid := nodeid(string(REGION), INSTANCEID)
-	nodes := []*v1.Node{
-		{
-			ObjectMeta: metav1.ObjectMeta{Name: prid},
-			Spec: v1.NodeSpec{
-				ProviderID: prid,
-			},
-		},
-	}
 
-	fmt.Printf("svc: %v, node:%v", svc, nodes)
+	prid := nodeid(string(REGION), INSTANCEID)
+	f := NewDefaultFrameWork(
+		// initial service based on your definition
+		&v1.Service{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "https-service",
+				UID:  types.UID(serviceUID),
+				Annotations: map[string]string{
+					ServiceAnnotationLoadBalancerProtocolPort: fmt.Sprintf("https:%d", listenPort1),
+					ServiceAnnotationLoadBalancerCertID:       certID,
+				},
+			},
+			Spec: v1.ServiceSpec{
+				Ports: []v1.ServicePort{
+					{Port: listenPort1, TargetPort: targetPort1, Protocol: v1.ProtocolTCP, NodePort: nodePort1},
+				},
+				Type:            v1.ServiceTypeLoadBalancer,
+				SessionAffinity: v1.ServiceAffinityNone,
+			},
+		},
+		// initial node based on your definition.
+		// backend of the created loadbalaner
+		[]*v1.Node{
+			{
+				ObjectMeta: metav1.ObjectMeta{Name: prid},
+				Spec: v1.NodeSpec{
+					ProviderID: prid,
+				},
+			},
+		},
+		nil,
+	)
+
+	f.RunDefault(t, "Create HTTPS Loadbalancer")
 }
 
 func TestEnsureLoadBalancerWithPortChange(t *testing.T) {
-	svc := &v1.Service{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "port-range-service",
-			UID:  types.UID(serviceUID),
+
+	prid := nodeid(string(REGION), INSTANCEID)
+	f := NewDefaultFrameWork(
+		// initial service based on your definition
+		&v1.Service{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "port-range-service",
+				UID:  types.UID(serviceUID),
+			},
+			Spec: v1.ServiceSpec{
+				Ports: []v1.ServicePort{
+					{
+						Port: listenPort1, TargetPort: targetPort1, Protocol: v1.ProtocolTCP, NodePort: nodePort1,
+					}, {
+						Port: 443, TargetPort: intstr.FromInt(443), Protocol: v1.ProtocolTCP, NodePort: 30443,
+					},
+				},
+				Type:            v1.ServiceTypeLoadBalancer,
+				SessionAffinity: v1.ServiceAffinityNone,
+			},
 		},
-		Spec: v1.ServiceSpec{
-			Ports: []v1.ServicePort{
-				{
-					Port: listenPort1, TargetPort: targetPort1, Protocol: v1.ProtocolTCP, NodePort: nodePort1,
-				}, {
-					Port: 443, TargetPort: intstr.FromInt(443), Protocol: v1.ProtocolTCP, NodePort: 30443,
+		// initial node based on your definition.
+		// backend of the created loadbalaner
+		[]*v1.Node{
+			{
+				ObjectMeta: metav1.ObjectMeta{Name: prid},
+				Spec: v1.NodeSpec{
+					ProviderID: prid,
 				},
 			},
-			Type:            v1.ServiceTypeLoadBalancer,
-			SessionAffinity: v1.ServiceAffinityNone,
 		},
-	}
-	prid := nodeid(string(REGION), INSTANCEID)
-	nodes := []*v1.Node{
-		{
-			ObjectMeta: metav1.ObjectMeta{Name: prid},
-			Spec: v1.NodeSpec{
-				ProviderID: prid,
-			},
-		},
-	}
+		nil,
+	)
+	f.RunDefault(t,"PortChange")
 
-	fmt.Printf("svc: %v, node:%v", svc, nodes)
+	//fmt.Printf("svc: %v, node:%v", svc, nodes)
 
 }
 
@@ -392,7 +310,7 @@ func TestNodeAddressAndInstanceID(t *testing.T) {
 	)
 
 	// New Mock cloud to test
-	cloud, err := newMockCloud()
+	cloud, err := NewMockCloud()
 
 	if err != nil {
 		t.Errorf("TestNodeAddressAndInstanceID error: newcloud %s\n", err.Error())

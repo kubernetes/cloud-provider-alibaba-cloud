@@ -34,13 +34,13 @@ type mockRouteSDK struct {
 	waitForAllRouteEntriesAvailable func(vrouterId string, routeTableId string, timeout int) error
 }
 
-func WithNewRouteStore() InitialSet {
+func WithNewRouteStore() CloudDataMock {
 	return func() {
 		ROUTES = RouteStore{}
 	}
 }
 
-func WithVpcs() InitialSet {
+func WithVpcs() CloudDataMock {
 	return func() {
 		ROUTES.vpcs.Store(
 			key(string(REGION), VPCID),
@@ -64,7 +64,7 @@ func WithVpcs() InitialSet {
 	}
 }
 
-func WithVRouter() InitialSet {
+func WithVRouter() CloudDataMock {
 	return func() {
 		ROUTES.routers.Store(
 			key(string(REGION), VROUTER_ID),
@@ -82,7 +82,7 @@ func WithVRouter() InitialSet {
 	}
 }
 
-func WithRouteTableEntrySet() InitialSet {
+func WithRouteTableEntrySet() CloudDataMock {
 	return func() {
 		ROUTES.tables.Store(
 			ROUTE_TABLE_ID,

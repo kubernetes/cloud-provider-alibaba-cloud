@@ -366,7 +366,7 @@ func (con *Controller) ServiceSyncTask(k string) error {
 			return nil
 		}
 		// service absence in store means watcher caught the deletion, ensure LB
-		// info is cleaned delete error would cause ReEnqueue Service, which mean retry.
+		// info is cleaned delete error would cause ReEnqueue svc, which mean retry.
 		glog.Infof("service has been deleted %v", key(cached))
 		return retry(nil, con.delete, cached)
 	case err != nil:
