@@ -105,7 +105,7 @@ func NodeList(nodes []*v1.Node) []string {
 	return ns
 }
 
-// Contains contains in
+// Contains containsLabel in
 func Contains(list []int, x int) bool {
 	for _, item := range list {
 		if item == x {

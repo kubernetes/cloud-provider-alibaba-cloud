@@ -55,10 +55,11 @@ func (v *vgroup) Add() error {
 		RegionId:         v.RegionId,
 	}
 
-	if len(v.BackendServers) > 0 {
-		backend,err := json.Marshal(v.BackendServers)
+	if len(v.BackendServers) >= 1 {
+		// work around for vserver group old version,it needs backend on creating.
+		backend, err := json.Marshal(v.BackendServers[0:1])
 		if err != nil {
-			return fmt.Errorf("add new vserver group: %s",err.Error())
+			return fmt.Errorf("add new vserver group: %s", err.Error())
 		}
 		vgp.BackendServers = string(backend)
 	}

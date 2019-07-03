@@ -43,7 +43,8 @@ func PreSetCloudData(sets ...CloudDataMock) {
 }
 
 var (
-	INSTANCEID = "i-xlakjbidlslkcdxxxx"
+	INSTANCEID  = "i-xlakjbidlslkcdxxxx"
+	INSTANCEID2 = "i-xlakjbidlslkcdxxxx2"
 )
 
 var (
@@ -139,6 +140,9 @@ func newMockCloudWithSDK(
 				if strings.Contains(resource, metadata.VPC_ID) {
 					return VPCID, nil
 				}
+				if strings.Contains(resource, metadata.VSWITCH_ID) {
+					return VSWITCH_ID, nil
+				}
 				return "", fmt.Errorf("not found")
 			},
 		)
@@ -221,10 +225,10 @@ func (f *FrameWork) Run(
 		run = func() {
 			status, e := f.cloud.EnsureLoadBalancer(CLUSTER_ID, f.svc, f.nodes)
 			if e != nil {
-				t.Errorf("TestEnsureLoadBalancerHTTPS error: %s\n", e.Error())
+				t.Fatalf("EnsureLoadBalancer error: %s\n", e.Error())
 			}
 			if !f.ExpectExistAndEqual(t) {
-				t.Fatalf("https test fail")
+				t.Fatalf("test fail, expect equal")
 			}
 
 			if status == nil || len(status.Ingress) <= 0 {
@@ -261,12 +265,11 @@ func (f *FrameWork) ExpectExistAndEqual(t *testing.T) bool {
 			if p.Port == int32(v.ListenerPort) &&
 				proto == v.ListenerProtocol {
 				if err := f.ListenerEqual(mlb.LoadBalancerId, p, proto); err != nil {
-					t.Fatalf("listener configuration not equal")
+					t.Fatalf(fmt.Sprintf("listener configuration not equal, %s", err.Error()))
 				}
 				found = true
 				break
 			}
-
 		}
 		if !found {
 			t.Fatalf("port not found %d", p.Port)
@@ -274,10 +277,13 @@ func (f *FrameWork) ExpectExistAndEqual(t *testing.T) bool {
 	}
 
 	// 3. backend server
-	res, err := f.SLBSDK().DescribeVServerGroups(&slb.DescribeVServerGroupsArgs{
-		LoadBalancerId: mlb.LoadBalancerId,
-	})
-	if err != nil && !strings.Contains(err.Error(), "not found") {
+	res, err := f.SLBSDK().DescribeVServerGroups(
+		&slb.DescribeVServerGroupsArgs{
+			LoadBalancerId: mlb.LoadBalancerId,
+		},
+	)
+	if err != nil &&
+		!strings.Contains(err.Error(), "not found") {
 		t.Fatalf("vserver group: %v", err)
 	}
 	if res == nil {
@@ -305,6 +311,7 @@ func (f *FrameWork) ExpectExistAndEqual(t *testing.T) bool {
 		},
 	)
 
+	defd, _ := ExtractAnnotationRequest(f.svc)
 	for _, v := range res.VServerGroups.VServerGroup {
 		vg, err := f.SLBSDK().DescribeVServerGroupAttribute(
 			&slb.DescribeVServerGroupAttributeArgs{
@@ -328,14 +335,44 @@ func (f *FrameWork) ExpectExistAndEqual(t *testing.T) bool {
 				return false
 			},
 		)
+
+		nodes := f.nodes
+		if f.hasAnnotation(ServiceAnnotationLoadBalancerBackendLabel) {
+			var tpms []*v1.Node
+			for _, v := range f.nodes {
+				if containsLabel(
+					v,
+					strings.Split(defd.BackendLabel, ","),
+				) {
+					tpms = append(tpms, v)
+				}
+			}
+			nodes = tpms
+		}
+		if len(backends) > len(nodes) {
+			t.Fatalf("backend node not equal")
+		}
 		for k, v := range backends {
-			_, ida, err := nodeFromProviderID(f.nodes[k].Spec.ProviderID)
+			_, ida, err := nodeFromProviderID(nodes[k].Spec.ProviderID)
 			if err != nil {
 				t.Fatalf("unexpected provider id")
 			}
 			if v.ServerId != ida {
 				t.Fatalf("backend not equal")
 			}
+		}
+	}
+
+	// 4. describe tags
+	if f.hasAnnotation(ServiceAnnotationLoadBalancerAdditionalTags) {
+		arg := &slb.DescribeTagsArgs{LoadBalancerID: mlb.LoadBalancerId}
+		tags, _, err := f.SLBSDK().DescribeTags(arg)
+		if err != nil {
+			t.Fatalf("describe tags:%s", err.Error())
+		}
+
+		if !tagsEqual(f.svc.Annotations[ServiceAnnotationLoadBalancerAdditionalTags], tags) {
+			t.Fatalf("tags not equal")
 		}
 	}
 
@@ -352,7 +389,7 @@ func (f *FrameWork) SLBSpecEqual(t *testing.T, mlb *slb.LoadBalancerType) bool {
 	}
 	if f.hasAnnotation(ServiceAnnotationLoadBalancerSlaveZoneID) {
 		if mlb.SlaveZoneId != defd.SlaveZoneID {
-			t.Fatalf("slave zoneid error")
+			t.Fatalf(fmt.Sprintf("slave zoneid error:%s, %s", mlb.SlaveZoneId, defd.SlaveZoneID))
 		}
 	}
 	if f.hasAnnotation(ServiceAnnotationLoadBalancerBandwidth) {
@@ -363,12 +400,12 @@ func (f *FrameWork) SLBSpecEqual(t *testing.T, mlb *slb.LoadBalancerType) bool {
 
 	if f.hasAnnotation(ServiceAnnotationLoadBalancerAddressType) {
 		if mlb.AddressType != defd.AddressType {
-			t.Fatalf("address type error")
+			t.Fatalf("address type error: %s, %s", mlb.AddressType, defd.AddressType)
 		}
 	}
 	if f.hasAnnotation(ServiceAnnotationLoadBalancerVswitch) {
 		if mlb.VSwitchId != defd.VswitchID {
-			t.Fatalf("vswitch id error")
+			t.Fatalf("vswitch id error: %s, %s", mlb.VSwitchId, defd.VswitchID)
 		}
 	}
 	if f.hasAnnotation(ServiceAnnotationLoadBalancerSLBNetworkType) {
@@ -413,9 +450,9 @@ func (f *FrameWork) ListenerEqual(id string, p v1.ServicePort, proto string) err
 
 		sessionStick       = ""
 		sessionStickType   = ""
-		cookieTimeout      = ""
+		cookieTimeout      = 0
 		cookie             = ""
-		persistenceTimeout = ""
+		persistenceTimeout = 0
 
 		privateZoneName       = ""
 		privateZoneId         = ""
@@ -429,7 +466,8 @@ func (f *FrameWork) ListenerEqual(id string, p v1.ServicePort, proto string) err
 		if err != nil {
 			return err
 		}
-		if resp.BackendServerPort != int(p.NodePort) {
+		if resp.BackendServerPort == 0 ||
+			resp.BackendServerPort != int(p.NodePort) {
 			return fmt.Errorf("TCPBackendServerPortNotEqual")
 		}
 
@@ -443,12 +481,14 @@ func (f *FrameWork) ListenerEqual(id string, p v1.ServicePort, proto string) err
 		healthCheckHealthyThreshold = resp.HealthyThreshold
 		healthCheckUnhealthyThreshold = resp.UnhealthyThreshold
 		healthCheck = string(resp.HealthCheck)
+		persistenceTimeout = resp.PersistenceTimeout
 	case "udp":
 		resp, err := f.SLBSDK().DescribeLoadBalancerUDPListenerAttribute(id, int(p.Port))
 		if err != nil {
 			return err
 		}
-		if resp.BackendServerPort != int(p.NodePort) {
+		if resp.BackendServerPort == 0 ||
+			resp.BackendServerPort != int(p.NodePort) {
 			return fmt.Errorf("UDPBackendServerPortNotEqual")
 		}
 
@@ -463,7 +503,8 @@ func (f *FrameWork) ListenerEqual(id string, p v1.ServicePort, proto string) err
 		if err != nil {
 			return err
 		}
-		if resp.BackendServerPort != int(p.NodePort) {
+		if resp.BackendServerPort == 0 ||
+			resp.BackendServerPort != int(p.NodePort) {
 			return fmt.Errorf("HTTPBackendServerPortNotEqual")
 		}
 
@@ -476,15 +517,21 @@ func (f *FrameWork) ListenerEqual(id string, p v1.ServicePort, proto string) err
 		healthCheckHealthyThreshold = resp.HealthyThreshold
 		healthCheckUnhealthyThreshold = resp.UnhealthyThreshold
 		healthCheck = string(resp.HealthCheck)
+		sessionStick = string(resp.StickySession)
+		sessionStickType = string(resp.StickySessionType)
+		cookie = resp.Cookie
+		cookieTimeout = resp.CookieTimeout
 	case "https":
 		resp, err := f.SLBSDK().DescribeLoadBalancerHTTPSListenerAttribute(id, int(p.Port))
 		if err != nil {
 			return err
 		}
-		if resp.BackendServerPort != int(p.NodePort) {
+		if resp.BackendServerPort == 0 ||
+			resp.BackendServerPort != int(p.NodePort) {
 			return fmt.Errorf("HTTPSBackendServerPortNotEqual")
 		}
-		if resp.ServerCertificateId != defd.CertID {
+		if resp.ServerCertificateId == "" ||
+			resp.ServerCertificateId != defd.CertID {
 			return fmt.Errorf("HTTPSCertIDNotEqual")
 		}
 		healthCheckTimeout = resp.HealthCheckTimeout
@@ -496,6 +543,11 @@ func (f *FrameWork) ListenerEqual(id string, p v1.ServicePort, proto string) err
 		healthCheckHealthyThreshold = resp.HealthyThreshold
 		healthCheckUnhealthyThreshold = resp.UnhealthyThreshold
 		healthCheck = string(resp.HealthCheck)
+		sessionStick = string(resp.StickySession)
+		sessionStickType = string(resp.StickySessionType)
+		cookie = resp.Cookie
+		cookieTimeout = resp.CookieTimeout
+		//persistenceTimeout = res
 	default:
 		return fmt.Errorf("unknown proto: %s", proto)
 	}
@@ -514,7 +566,7 @@ func (f *FrameWork) ListenerEqual(id string, p v1.ServicePort, proto string) err
 	}
 
 	if f.hasAnnotation(ServiceAnnotationLoadBalancerCookieTimeout) {
-		if cookieTimeout != string(defd.CookieTimeout) {
+		if cookieTimeout != defd.CookieTimeout {
 			return fmt.Errorf("cookie timeout error")
 		}
 	}
@@ -525,9 +577,10 @@ func (f *FrameWork) ListenerEqual(id string, p v1.ServicePort, proto string) err
 		}
 	}
 
-	if f.hasAnnotation(ServiceAnnotationLoadBalancerPersistenceTimeout) {
-		if persistenceTimeout != string(defd.PersistenceTimeout) {
-			return fmt.Errorf("persistency timeout error")
+	if proto == "tcp" &&
+		f.hasAnnotation(ServiceAnnotationLoadBalancerPersistenceTimeout) {
+		if persistenceTimeout != defd.PersistenceTimeout {
+			return fmt.Errorf("persistency timeout error: %d, %d", persistenceTimeout, defd.PersistenceTimeout)
 		}
 	}
 
@@ -557,9 +610,10 @@ func (f *FrameWork) ListenerEqual(id string, p v1.ServicePort, proto string) err
 	}
 
 	//=========================== Health Check Test ============================
-	if f.hasAnnotation(ServiceAnnotationLoadBalancerHealthCheckType) {
+	if proto == "tcp" &&
+		f.hasAnnotation(ServiceAnnotationLoadBalancerHealthCheckType) {
 		if healthCheckType != string(defd.HealthCheckType) {
-			return fmt.Errorf("health check type error")
+			return fmt.Errorf("health check type error: %s,%s", healthCheckType, defd.HealthCheckType)
 		}
 	}
 	if f.hasAnnotation(ServiceAnnotationLoadBalancerHealthCheckURI) {
@@ -592,7 +646,8 @@ func (f *FrameWork) ListenerEqual(id string, p v1.ServicePort, proto string) err
 		}
 	}
 
-	if f.hasAnnotation(ServiceAnnotationLoadBalancerHealthCheckConnectTimeout) {
+	if (proto == "tcp" || proto == "udp") &&
+		f.hasAnnotation(ServiceAnnotationLoadBalancerHealthCheckConnectTimeout) {
 		if healthCheckConnectTimeout != defd.HealthCheckConnectTimeout {
 			return fmt.Errorf("health check connect timeout error")
 		}
@@ -616,7 +671,8 @@ func (f *FrameWork) ListenerEqual(id string, p v1.ServicePort, proto string) err
 		}
 	}
 
-	if f.hasAnnotation(ServiceAnnotationLoadBalancerHealthCheckFlag) {
+	if (proto == "http" || proto == "https") &&
+		f.hasAnnotation(ServiceAnnotationLoadBalancerHealthCheckFlag) {
 		if healthCheck != string(defd.HealthCheck) {
 			return fmt.Errorf("health check flag error")
 		}
@@ -624,4 +680,39 @@ func (f *FrameWork) ListenerEqual(id string, p v1.ServicePort, proto string) err
 	//=========================== Health Check Test ============================
 
 	return nil
+}
+
+func containsLabel(node *v1.Node, lbl []string) bool {
+	for _, m := range lbl {
+		found := false
+		for k, v := range node.Labels {
+			label := fmt.Sprintf("%s=%s", k, v)
+			if label == m {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return false
+		}
+	}
+	return true
+}
+
+func tagsEqual(tags string, items []slb.TagItemType) bool {
+	stags := strings.Split(tags, ",")
+	for _, m := range stags {
+		found := false
+		for _, v := range items {
+			label := fmt.Sprintf("%s=%s", v.TagKey, v.TagValue)
+			if label == m {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return false
+		}
+	}
+	return true
 }
