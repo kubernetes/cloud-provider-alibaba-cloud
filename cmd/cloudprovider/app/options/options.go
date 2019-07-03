@@ -27,8 +27,6 @@ import (
 	"k8s.io/cloud-provider-alibaba-cloud/cmd/cloudprovider/app"
 )
 
-
-
 // AddFlags adds flags for a specific ExternalCMServer to the specified FlagSet
 func AddFlags(ccm *app.ServerCCM, fs *pflag.FlagSet) {
 	fs.Int32Var(&ccm.Port, "port", ccm.Port, "The port that the cloud-controller-manager'ccm http service runs on.")

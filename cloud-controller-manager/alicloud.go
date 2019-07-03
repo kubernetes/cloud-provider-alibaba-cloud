@@ -300,7 +300,7 @@ func (c *Cloud) EnsureLoadBalancer(clusterName string, service *v1.Service, node
 			var err error
 			vswitchid, err = c.climgr.MetaData().VswitchID()
 			if err != nil {
-				return nil, err
+				return nil, fmt.Errorf("can not obtain vswitchid %s", err)
 			}
 			glog.V(2).Infof("alicloud: current vswitchid=%s\n", vswitchid)
 			if vswitchid == "" {
@@ -311,7 +311,7 @@ func (c *Cloud) EnsureLoadBalancer(clusterName string, service *v1.Service, node
 			for _, v := range ns {
 				i, err := c.climgr.Instances().findInstanceByProviderID(v.Spec.ProviderID)
 				if err != nil {
-					return nil, err
+					return nil, fmt.Errorf("no nodes provided, obtain vswitch error: %s", err.Error())
 				}
 				vswitchid = i.VpcAttributes.VSwitchId
 				break

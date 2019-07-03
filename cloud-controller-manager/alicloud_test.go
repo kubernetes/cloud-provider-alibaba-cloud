@@ -53,13 +53,14 @@ var (
 	nodeName          = "iZuf694l8lw6xvdx6gh7tkZ"
 )
 
-// Ensure loadbalancer basic setup
+// EnsureBasicLoadBalancer Configure
 func TestEnsureLoadBalancerBasic(t *testing.T) {
 
 	// Test case Example
 	// Name: TestEnsureLoadBalancerBasic
 	// Step 1: define your node & service object.
 	prid := nodeid(string(REGION), INSTANCEID)
+	prid2 := nodeid(string(REGION), INSTANCEID2)
 	f := NewDefaultFrameWork(
 		// initial service based on your definition
 		&v1.Service{
@@ -70,11 +71,92 @@ func TestEnsureLoadBalancerBasic(t *testing.T) {
 			Spec: v1.ServiceSpec{
 				Ports: []v1.ServicePort{
 					{
-						Port: listenPort1,
+						Port:       listenPort1,
 						TargetPort: targetPort1,
-						Protocol: v1.ProtocolTCP,
-						NodePort: nodePort1,
+						Protocol:   v1.ProtocolTCP,
+						NodePort:   nodePort1,
 					},
+				},
+				Type:            v1.ServiceTypeLoadBalancer,
+				SessionAffinity: v1.ServiceAffinityNone,
+			},
+		},
+		// initial node based on your definition.
+		// backend of the created loadbalaner
+		[]*v1.Node{
+			{
+				ObjectMeta: metav1.ObjectMeta{Name: prid},
+				Spec: v1.NodeSpec{
+					ProviderID: prid,
+				},
+			},
+			{
+				ObjectMeta: metav1.ObjectMeta{Name: prid2},
+				Spec: v1.NodeSpec{
+					ProviderID: prid2,
+				},
+			},
+		},
+		nil,
+	)
+
+	// Step2: Run start a test on specified function.
+	f.RunDefault(t, "Basic LoadBalancer Creation Test")
+}
+
+// Test Http configuration.
+func TestEnsureLoadBalancerAnnotation(t *testing.T) {
+
+	prid := nodeid(string(REGION), INSTANCEID)
+	f := NewDefaultFrameWork(
+		// initial service based on your definition
+		&v1.Service{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "https-service",
+				UID:  types.UID(serviceUID),
+				Annotations: map[string]string{
+					ServiceAnnotationLoadBalancerProtocolPort: "http:80",
+					ServiceAnnotationLoadBalancerAddressType:  string(slb.InternetAddressType),
+					//ServiceAnnotationLoadBalancerVswitch: 		VSWITCH_ID,
+					ServiceAnnotationLoadBalancerForwardPort: "443",
+					//ServiceAnnotationLoadBalancerSLBNetworkType: "classic",
+					ServiceAnnotationLoadBalancerChargeType: string(slb.PayByTraffic),
+					//ServiceAnnotationLoadBalancerId: "ic",
+					//ServiceAnnotationLoadBalancerBackendLabel: "key=value",
+					ServiceAnnotationLoadBalancerRegion:       string(REGION),
+					ServiceAnnotationLoadBalancerMasterZoneID: string(REGION_A),
+					ServiceAnnotationLoadBalancerSlaveZoneID:  string(REGION_A),
+					ServiceAnnotationLoadBalancerBandwidth:    "70",
+					//ServiceAnnotationLoadBalancerCertID:	   "certid",
+					ServiceAnnotationLoadBalancerHealthCheckFlag:               "off",
+					ServiceAnnotationLoadBalancerHealthCheckType:               "tcp",
+					ServiceAnnotationLoadBalancerHealthCheckURI:                "/v1/check",
+					ServiceAnnotationLoadBalancerHealthCheckConnectPort:        "80",
+					ServiceAnnotationLoadBalancerHealthCheckHealthyThreshold:   "20",
+					ServiceAnnotationLoadBalancerHealthCheckUnhealthyThreshold: "5",
+					ServiceAnnotationLoadBalancerHealthCheckInterval:           "5",
+					ServiceAnnotationLoadBalancerHealthCheckConnectTimeout:     "5",
+					ServiceAnnotationLoadBalancerHealthCheckTimeout:            "5",
+					ServiceAnnotationLoadBalancerHealthCheckDomain:             "aliyun.com",
+					ServiceAnnotationLoadBalancerHealthCheckHTTPCode:           "200",
+					ServiceAnnotationLoadBalancerAdditionalTags:                "k1=v1,k2=v2",
+					ServiceAnnotationLoadBalancerOverrideListener:              "true",
+					ServiceAnnotationLoadBalancerSpec:                          "lb-mini-spec",
+					ServiceAnnotationLoadBalancerSessionStick:                  "on",
+					ServiceAnnotationLoadBalancerSessionStickType:              "cookie",
+					ServiceAnnotationLoadBalancerCookieTimeout:                 "5000",
+					ServiceAnnotationLoadBalancerCookie:                        "none-cookie",
+					ServiceAnnotationLoadBalancerPersistenceTimeout:            "7400",
+					ServiceAnnotationLoadBalancerIPVersion:                     string(slb.IPv4),
+					ServiceAnnotationLoadBalancerPrivateZoneName:               "",
+					ServiceAnnotationLoadBalancerPrivateZoneId:                 "",
+					ServiceAnnotationLoadBalancerPrivateZoneRecordName:         "",
+					ServiceAnnotationLoadBalancerPrivateZoneRecordTTL:          "",
+				},
+			},
+			Spec: v1.ServiceSpec{
+				Ports: []v1.ServicePort{
+					{Port: listenPort1, TargetPort: targetPort1, Protocol: v1.ProtocolTCP, NodePort: nodePort1},
 				},
 				Type:            v1.ServiceTypeLoadBalancer,
 				SessionAffinity: v1.ServiceAffinityNone,
@@ -93,11 +175,173 @@ func TestEnsureLoadBalancerBasic(t *testing.T) {
 		nil,
 	)
 
-	// Step2: Run start a test on specified function.
-	f.RunDefault(t, "Basic LoadBalancer Creation Test")
+	f.RunDefault(t, "TestAnnotation")
 }
 
-// EnsureLoadBalancer and HTTPS with UpdateLoadBalancer.
+// Test Http configuration.
+func TestEnsureLoadBalancerSpec(t *testing.T) {
+
+	prid := nodeid(string(REGION), INSTANCEID)
+	f := NewDefaultFrameWork(
+		// initial service based on your definition
+		&v1.Service{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "https-service",
+				UID:  types.UID(serviceUID),
+				Annotations: map[string]string{
+					ServiceAnnotationLoadBalancerSpec: "lb-spec-mini",
+				},
+			},
+			Spec: v1.ServiceSpec{
+				Ports: []v1.ServicePort{
+					{Port: listenPort1, TargetPort: targetPort1, Protocol: v1.ProtocolTCP, NodePort: nodePort1},
+				},
+				Type:            v1.ServiceTypeLoadBalancer,
+				SessionAffinity: v1.ServiceAffinityNone,
+			},
+		},
+		// initial node based on your definition.
+		// backend of the created loadbalaner
+		[]*v1.Node{
+			{
+				ObjectMeta: metav1.ObjectMeta{Name: prid},
+				Spec: v1.NodeSpec{
+					ProviderID: prid,
+				},
+			},
+		},
+		nil,
+	)
+
+	f.RunDefault(t, "Create Loadbalancer With SPEC")
+}
+
+// Test Http configuration.
+func TestEnsureLoadBalancerVswitchID(t *testing.T) {
+
+	prid := nodeid(string(REGION), INSTANCEID)
+	f := NewDefaultFrameWork(
+		// initial service based on your definition
+		&v1.Service{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "https-service",
+				UID:  types.UID(serviceUID),
+				Annotations: map[string]string{
+					ServiceAnnotationLoadBalancerVswitch:     VSWITCH_ID,
+					ServiceAnnotationLoadBalancerAddressType: string(slb.IntranetAddressType),
+				},
+			},
+			Spec: v1.ServiceSpec{
+				Ports: []v1.ServicePort{
+					{Port: listenPort1, TargetPort: targetPort1, Protocol: v1.ProtocolTCP, NodePort: nodePort1},
+				},
+				Type:            v1.ServiceTypeLoadBalancer,
+				SessionAffinity: v1.ServiceAffinityNone,
+			},
+		},
+		// initial node based on your definition.
+		// backend of the created loadbalaner
+		[]*v1.Node{
+			{
+				ObjectMeta: metav1.ObjectMeta{Name: prid},
+				Spec: v1.NodeSpec{
+					ProviderID: prid,
+				},
+			},
+		},
+		nil,
+	)
+
+	f.RunDefault(t, "Create Loadbalancer With VswitchID")
+}
+
+// Test Http configuration.
+func TestEnsureLoadBalancerBackendLable(t *testing.T) {
+
+	prid := nodeid(string(REGION), INSTANCEID)
+	f := NewDefaultFrameWork(
+		// initial service based on your definition
+		&v1.Service{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "https-service",
+				UID:  types.UID(serviceUID),
+				Annotations: map[string]string{
+					ServiceAnnotationLoadBalancerProtocolPort: "http:80",
+					ServiceAnnotationLoadBalancerAddressType:  string(slb.InternetAddressType),
+					//ServiceAnnotationLoadBalancerVswitch: 		VSWITCH_ID,
+					ServiceAnnotationLoadBalancerBackendLabel: "key=value",
+					//ServiceAnnotationLoadBalancerAdditionalTags: "k1=v1,k2=v2",
+				},
+			},
+			Spec: v1.ServiceSpec{
+				Ports: []v1.ServicePort{
+					{Port: listenPort1, TargetPort: targetPort1, Protocol: v1.ProtocolTCP, NodePort: nodePort1},
+				},
+				Type:            v1.ServiceTypeLoadBalancer,
+				SessionAffinity: v1.ServiceAffinityNone,
+			},
+		},
+		// initial node based on your definition.
+		// backend of the created loadbalaner
+		[]*v1.Node{
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: prid,
+					Labels: map[string]string{
+						"key":     "value",
+						"ingress": "true",
+					},
+				},
+				Spec: v1.NodeSpec{
+					ProviderID: prid,
+				},
+			},
+		},
+		nil,
+	)
+
+	f.RunDefault(t, "TestBackendLabel")
+}
+
+// Test Http configuration.
+func TestEnsureLoadBalancerHTTP(t *testing.T) {
+
+	prid := nodeid(string(REGION), INSTANCEID)
+	f := NewDefaultFrameWork(
+		// initial service based on your definition
+		&v1.Service{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "https-service",
+				UID:  types.UID(serviceUID),
+				Annotations: map[string]string{
+					ServiceAnnotationLoadBalancerProtocolPort: fmt.Sprintf("http:%d", listenPort1),
+				},
+			},
+			Spec: v1.ServiceSpec{
+				Ports: []v1.ServicePort{
+					{Port: listenPort1, TargetPort: targetPort1, Protocol: v1.ProtocolTCP, NodePort: nodePort1},
+				},
+				Type:            v1.ServiceTypeLoadBalancer,
+				SessionAffinity: v1.ServiceAffinityNone,
+			},
+		},
+		// initial node based on your definition.
+		// backend of the created loadbalaner
+		[]*v1.Node{
+			{
+				ObjectMeta: metav1.ObjectMeta{Name: prid},
+				Spec: v1.NodeSpec{
+					ProviderID: prid,
+				},
+			},
+		},
+		nil,
+	)
+
+	f.RunDefault(t, "Create HTTPS Loadbalancer")
+}
+
+// Test Https configuration.
 func TestEnsureLoadBalancerHTTPS(t *testing.T) {
 
 	prid := nodeid(string(REGION), INSTANCEID)
@@ -136,23 +380,26 @@ func TestEnsureLoadBalancerHTTPS(t *testing.T) {
 	f.RunDefault(t, "Create HTTPS Loadbalancer")
 }
 
-func TestEnsureLoadBalancerWithPortChange(t *testing.T) {
+func TestEnsureLoadBalancerHTTPSHealthCheck(t *testing.T) {
 
 	prid := nodeid(string(REGION), INSTANCEID)
 	f := NewDefaultFrameWork(
 		// initial service based on your definition
 		&v1.Service{
 			ObjectMeta: metav1.ObjectMeta{
-				Name: "port-range-service",
+				Name: "my-service",
 				UID:  types.UID(serviceUID),
+				Annotations: map[string]string{
+					ServiceAnnotationLoadBalancerProtocolPort:           fmt.Sprintf("https:%d", listenPort1),
+					ServiceAnnotationLoadBalancerCertID:                 certID,
+					ServiceAnnotationLoadBalancerHealthCheckFlag:        string(slb.OnFlag),
+					ServiceAnnotationLoadBalancerHealthCheckURI:         "/v2/check",
+					ServiceAnnotationLoadBalancerHealthCheckConnectPort: targetPort1.String(),
+				},
 			},
 			Spec: v1.ServiceSpec{
 				Ports: []v1.ServicePort{
-					{
-						Port: listenPort1, TargetPort: targetPort1, Protocol: v1.ProtocolTCP, NodePort: nodePort1,
-					}, {
-						Port: 443, TargetPort: intstr.FromInt(443), Protocol: v1.ProtocolTCP, NodePort: 30443,
-					},
+					{Port: listenPort1, TargetPort: targetPort1, Protocol: v1.ProtocolTCP, NodePort: nodePort1},
 				},
 				Type:            v1.ServiceTypeLoadBalancer,
 				SessionAffinity: v1.ServiceAffinityNone,
@@ -170,124 +417,107 @@ func TestEnsureLoadBalancerWithPortChange(t *testing.T) {
 		},
 		nil,
 	)
-	f.RunDefault(t,"PortChange")
-
-	//fmt.Printf("svc: %v, node:%v", svc, nodes)
-
-}
-
-func TestEnsureLoadBalancerHTTPSHealthCheck(t *testing.T) {
-
-	svc := &v1.Service{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "my-service",
-			UID:  types.UID(serviceUID),
-			Annotations: map[string]string{
-				ServiceAnnotationLoadBalancerProtocolPort:           fmt.Sprintf("https:%d", listenPort1),
-				ServiceAnnotationLoadBalancerCertID:                 certID,
-				ServiceAnnotationLoadBalancerHealthCheckFlag:        string(slb.OnFlag),
-				ServiceAnnotationLoadBalancerHealthCheckURI:         "/v2/check",
-				ServiceAnnotationLoadBalancerHealthCheckConnectPort: targetPort1.String(),
-			},
-		},
-		Spec: v1.ServiceSpec{
-			Ports: []v1.ServicePort{
-				{Port: listenPort1, TargetPort: targetPort1, Protocol: v1.ProtocolTCP, NodePort: nodePort1},
-			},
-			Type:            v1.ServiceTypeLoadBalancer,
-			SessionAffinity: v1.ServiceAffinityNone,
-		},
-	}
-	prid := nodeid(string(REGION), INSTANCEID)
-	nodes := []*v1.Node{
-		{
-			ObjectMeta: metav1.ObjectMeta{Name: prid},
-			Spec: v1.NodeSpec{
-				ProviderID: prid,
-			},
-		},
-	}
-
-	fmt.Printf("svc: %v, node:%v", svc, nodes)
+	f.RunDefault(t, "HTTPS health check")
 }
 
 func TestEnsureLoadbalancerDeleted(t *testing.T) {
-	svc := &v1.Service{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:        "my-service",
-			UID:         types.UID(serviceUID),
-			Annotations: map[string]string{
-				//ServiceAnnotationLoadBalancerId: "idbllll",
+	prid := nodeid(string(REGION), INSTANCEID)
+	f := NewDefaultFrameWork(
+		// initial service based on your definition
+		&v1.Service{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:        "https-service",
+				UID:         types.UID(serviceUID),
+				Annotations: map[string]string{},
+			},
+			Spec: v1.ServiceSpec{
+				Ports: []v1.ServicePort{
+					{Port: listenPort1, TargetPort: targetPort1, Protocol: v1.ProtocolTCP, NodePort: nodePort1},
+				},
+				Type:            v1.ServiceTypeLoadBalancer,
+				SessionAffinity: v1.ServiceAffinityNone,
 			},
 		},
-		Spec: v1.ServiceSpec{
-			Ports: []v1.ServicePort{
-				{Port: listenPort1, TargetPort: targetPort1, Protocol: v1.ProtocolTCP, NodePort: 31789},
-			},
-			Type:            v1.ServiceTypeLoadBalancer,
-			SessionAffinity: v1.ServiceAffinityNone,
-		},
-		Status: v1.ServiceStatus{
-			LoadBalancer: v1.LoadBalancerStatus{
-				Ingress: []v1.LoadBalancerIngress{
-					{
-						IP: "1.1.1.1",
-					},
+		// initial node based on your definition.
+		// backend of the created loadbalaner
+		[]*v1.Node{
+			{
+				ObjectMeta: metav1.ObjectMeta{Name: prid},
+				Spec: v1.NodeSpec{
+					ProviderID: prid,
 				},
 			},
 		},
-	}
-	prid := nodeid(string(REGION), INSTANCEID)
-	nodes := []*v1.Node{
-		{
-			ObjectMeta: metav1.ObjectMeta{Name: prid},
-			Spec: v1.NodeSpec{
-				ProviderID: prid,
-			},
+		nil,
+	)
+
+	f.Run(
+		t,
+		"Delete Loadbalancer",
+		func() {
+			_, err := f.cloud.EnsureLoadBalancer(CLUSTER_ID, f.svc, f.nodes)
+			if err != nil {
+				t.Fatalf("delete loadbalancer error: create %s", err.Error())
+			}
+			err = f.cloud.EnsureLoadBalancerDeleted(CLUSTER_ID, f.svc)
+			if err != nil {
+				t.Fatalf("ensure loadbalancer delete error, %s", err.Error())
+			}
+			exist, _, err := f.LoadBalancer().findLoadBalancer(f.svc)
+			if err != nil || exist {
+				t.Fatalf("Delete LoadBalancer error: %v, %t", err, exist)
+			}
 		},
-	}
-
-	fmt.Printf("svc: %v, node:%v", svc, nodes)
-
+	)
 }
 
 func TestEnsureLoadBalancerDeleteWithUserDefined(t *testing.T) {
-	svc := &v1.Service{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:        "my-service",
-			UID:         types.UID(serviceUID),
-			Annotations: map[string]string{
-				//ServiceAnnotationLoadBalancerId: "idbllll",
+	prid := nodeid(string(REGION), INSTANCEID)
+	f := NewDefaultFrameWork(
+		// initial service based on your definition
+		&v1.Service{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "https-service",
+				UID:  types.UID(serviceUID),
+				Annotations: map[string]string{
+					ServiceAnnotationLoadBalancerId: LOADBALANCER_ID,
+				},
+			},
+			Spec: v1.ServiceSpec{
+				Ports: []v1.ServicePort{
+					{Port: listenPort1, TargetPort: targetPort1, Protocol: v1.ProtocolTCP, NodePort: nodePort1},
+				},
+				Type:            v1.ServiceTypeLoadBalancer,
+				SessionAffinity: v1.ServiceAffinityNone,
 			},
 		},
-		Spec: v1.ServiceSpec{
-			Ports: []v1.ServicePort{
-				{Port: listenPort1, TargetPort: targetPort1, Protocol: v1.ProtocolTCP, NodePort: 31789},
-			},
-			Type:            v1.ServiceTypeLoadBalancer,
-			SessionAffinity: v1.ServiceAffinityNone,
-		},
-		Status: v1.ServiceStatus{
-			LoadBalancer: v1.LoadBalancerStatus{
-				Ingress: []v1.LoadBalancerIngress{
-					{
-						IP: "1.1.1.1",
-					},
+		// initial node based on your definition.
+		// backend of the created loadbalaner
+		[]*v1.Node{
+			{
+				ObjectMeta: metav1.ObjectMeta{Name: prid},
+				Spec: v1.NodeSpec{
+					ProviderID: prid,
 				},
 			},
 		},
-	}
-	prid := nodeid(string(REGION), INSTANCEID)
-	nodes := []*v1.Node{
-		{
-			ObjectMeta: metav1.ObjectMeta{Name: prid},
-			Spec: v1.NodeSpec{
-				ProviderID: prid,
-			},
-		},
-	}
+		nil,
+	)
 
-	fmt.Printf("svc: %v, node:%v", svc, nodes)
+	f.Run(
+		t,
+		"Delete User Defined Loadbalancer",
+		func() {
+			err := f.cloud.EnsureLoadBalancerDeleted(CLUSTER_ID, f.svc)
+			if err != nil {
+				t.Fatalf("ensure loadbalancer delete error, %s", err.Error())
+			}
+			exist, _, err := f.LoadBalancer().findLoadBalancer(f.svc)
+			if err != nil || !exist {
+				t.Fatalf("Delete LoadBalancer error: %v, %t", err, exist)
+			}
+		},
+	)
 
 }
 
@@ -313,7 +543,7 @@ func TestNodeAddressAndInstanceID(t *testing.T) {
 	cloud, err := NewMockCloud()
 
 	if err != nil {
-		t.Errorf("TestNodeAddressAndInstanceID error: newcloud %s\n", err.Error())
+		t.Fatalf("TestNodeAddressAndInstanceID error: newcloud %s\n", err.Error())
 	}
 	prid := nodeid(string(REGION), INSTANCEID)
 

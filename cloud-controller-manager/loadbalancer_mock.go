@@ -39,15 +39,15 @@ func WithLoadBalancer() CloudDataMock {
 		listener := &slb.DescribeLoadBalancerTCPListenerAttributeResponse{
 			DescribeLoadBalancerListenerAttributeResponse: slb.DescribeLoadBalancerListenerAttributeResponse{},
 			TCPListenerType: slb.TCPListenerType{
-				LoadBalancerId:            LOADBALANCER_ID,
-				ListenerPort:              80,
-				BackendServerPort:         32999,
-				Bandwidth:                 50,
-				Description:               "",
-				VServerGroupId:            "",
-				VServerGroup:              "",
-				HealthCheck:               "on",
-				HealthCheckURI:            "",
+				LoadBalancerId:    LOADBALANCER_ID,
+				ListenerPort:      80,
+				BackendServerPort: 32999,
+				Bandwidth:         50,
+				Description:       "",
+				VServerGroupId:    "",
+				VServerGroup:      "",
+				HealthCheck:       "on",
+				HealthCheckURI:    "",
 				//HealthCheckConnectPort:    args.HealthCheckConnectPort,
 				//HealthCheckConnectTimeout: args.HealthCheckConnectTimeout,
 				//HealthCheckDomain:         args.HealthCheckDomain,
@@ -193,6 +193,14 @@ func (c *mockClientSLB) CreateLoadBalancer(args *slb.CreateLoadBalancerArgs) (re
 	if args.LoadBalancerName == "" {
 		return nil, fmt.Errorf("slb name must not be empty")
 	}
+	addrtype := slb.InternetAddressType
+	if args.AddressType != "" {
+		addrtype = args.AddressType
+	}
+	ipver := slb.IPv4
+	if args.AddressIPVersion != "" {
+		ipver = args.AddressIPVersion
+	}
 	ins := slb.LoadBalancerType{
 		LoadBalancerId:     newid(),
 		LoadBalancerName:   args.LoadBalancerName,
@@ -201,10 +209,12 @@ func (c *mockClientSLB) CreateLoadBalancer(args *slb.CreateLoadBalancerArgs) (re
 		Bandwidth:          args.Bandwidth,
 		InternetChargeType: args.InternetChargeType,
 		Address:            LOADBALANCER_ADDRESS,
+		AddressType:        addrtype,
 		VSwitchId:          args.VSwitchId,
 		VpcId:              VPCID,
-		MasterZoneId:       fmt.Sprintf("%s-a", args.RegionId),
-		SlaveZoneId:        fmt.Sprintf("%s-b", args.RegionId),
+		AddressIPVersion:   ipver,
+		MasterZoneId:       args.MasterZoneId,
+		SlaveZoneId:        args.SlaveZoneId,
 	}
 	LOADBALANCER.loadbalancer.Store(ins.LoadBalancerId, ins)
 	return &slb.CreateLoadBalancerResponse{
@@ -754,15 +764,12 @@ func (c *mockClientSLB) DescribeTags(args *slb.DescribeTagsArgs) (tags []slb.Tag
 	if !ok {
 		return []slb.TagItemType{}, nil, nil
 	}
-	ins, ok := v.([]slb.TagItem)
+	ins, ok := v.([]slb.TagItemType)
 	if !ok {
 		return nil, nil, fmt.Errorf("TagItem not found type %s", reflect.TypeOf(v))
 	}
-	var result []slb.TagItemType
-	for _, v := range ins {
-		result = append(result, slb.TagItemType{TagItem: v})
-	}
-	return result, nil, nil
+
+	return ins, nil, nil
 }
 func (c *mockClientSLB) AddTags(args *slb.AddTagsArgs) error {
 	if c.addTags != nil {
@@ -773,12 +780,16 @@ func (c *mockClientSLB) AddTags(args *slb.AddTagsArgs) error {
 	if err != nil {
 		return err
 	}
+	var tagstype []slb.TagItemType
+	for _, tag := range *tags {
+		tagstype = append(tagstype, slb.TagItemType{TagItem: tag})
+	}
 	v, ok := LOADBALANCER.tags.Load(args.LoadBalancerID)
 	if !ok {
-		LOADBALANCER.tags.Store(args.LoadBalancerID, tags)
+		LOADBALANCER.tags.Store(args.LoadBalancerID, tagstype)
 		return nil
 	}
-	ins, ok := v.([]slb.TagItem)
+	ins, ok := v.([]slb.TagItemType)
 	if !ok {
 		return fmt.Errorf("TagItem not found type %s", reflect.TypeOf(v))
 	}
@@ -793,7 +804,7 @@ func (c *mockClientSLB) AddTags(args *slb.AddTagsArgs) error {
 			}
 		}
 		if !found {
-			ins = append(ins, tag)
+			ins = append(ins, slb.TagItemType{TagItem: tag})
 		}
 	}
 	LOADBALANCER.tags.Store(args.LoadBalancerID, ins)
