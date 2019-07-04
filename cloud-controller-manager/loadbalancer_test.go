@@ -68,81 +68,95 @@ func NewMockClientMgr(client ClientSLBSDK) (*ClientMgr, error) {
 }
 
 func TestFindLoadBalancer(t *testing.T) {
-	service := &v1.Service{
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace:   "default",
-			Name:        "service-test",
-			UID:         SERVICE_UID,
-			Annotations: map[string]string{},
+	prid := nodeid(string(REGION), INSTANCEID)
+	f := NewDefaultFrameWork(
+		// initial service based on your definition
+		&v1.Service{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace:   "default",
+				Name:        "service-test",
+				UID:         types.UID(serviceUIDExist),
+				Annotations: map[string]string{},
+			},
+			Spec: v1.ServiceSpec{
+				Type: "LoadBalancer",
+			},
 		},
-		Spec: v1.ServiceSpec{
-			Type: "LoadBalancer",
+		// initial node based on your definition.
+		// backend of the created loadbalaner
+		[]*v1.Node{
+			{
+				ObjectMeta: metav1.ObjectMeta{Name: prid},
+				Spec: v1.NodeSpec{
+					ProviderID: prid,
+				},
+			},
 		},
-	}
-
-	mgr, _ := NewMockClientMgr(&mockClientSLB{})
-
-	// initialize cloud dat
-	PreSetCloudData(
-		WithNewLoadBalancerStore(),
-		WithLoadBalancer(),
+		nil,
 	)
 
-	// ==================================================================================
-	// 1. No LOADBALANCER_ID specified, Exist.
-	//    user need to create new loadbalancer. did not specify any exist loadbalancer.
-	//	  Expected fallback to use service UID to generate slb .
-	t.Logf("1. findLoadBalancer: No LOADBALANCER_ID specified, Expect:Exist")
-	exist, lb, err := mgr.loadbalancer.findLoadBalancer(service)
-	if err != nil || !exist {
-		t.Fatal("Test findLoadBalancer fail. user need to create new loadbalancer. did not specify any exist loadbalancer.")
-	}
-	if lb.LoadBalancerName != cloudprovider.GetLoadBalancerName(service) {
-		t.Fatal("find loadbalancer fail. suppose to find by name.")
-	}
+	f.Run(
+		t,
+		"Create Loadbalancer With SPEC",
+		func() {
 
-	// ==================================================================================
-	// 2. No LOADBALANCER_ID specified, None-Exist.
-	//    user need to create new loadbalancer. did not specify any exist loadbalancer.
-	//	  Expected fallback to use service UID to generate slb .
-	t.Logf("2. findLoadBalancer: No LOADBALANCER_ID specified, Expect:Non-Exist")
-	service.UID = types.UID("xxxxxxxxxxxxxxxxxxx-new")
-	exist, _, err = mgr.loadbalancer.findLoadBalancer(service)
-	if err != nil {
-		t.Fatal("Test findLoadBalancer fail.", err.Error())
-	}
-	if exist {
-		t.Fatal(fmt.Sprintf("loadbalancer should not exist, %s", service.UID))
-	}
+			// ==================================================================================
+			// 1. No LOADBALANCER_ID specified, Exist.
+			//    user need to create new loadbalancer. did not specify any exist loadbalancer.
+			//	  Expected fallback to use service UID to generate slb .
+			t.Logf("1. findLoadBalancer: No LOADBALANCER_ID specified, Expect:Exist")
+			exist, lb, err := f.LoadBalancer().findLoadBalancer(f.svc)
+			if err != nil || !exist {
+				t.Fatal("Test findLoadBalancer fail. user need to create new loadbalancer. did not specify any exist loadbalancer.")
+			}
+			if lb.LoadBalancerName != cloudprovider.GetLoadBalancerName(f.svc) {
+				t.Fatal("find loadbalancer fail. suppose to find by name.")
+			}
 
-	// ==================================================================================
-	// 3. Loadbalancer id was specified, Expect: Exist
-	// user need to use an exist loadbalancer through annotations
-	t.Logf("3. findLoadBalancer: Loadbalancer id was specified, Expect:Exist")
-	service.Annotations[ServiceAnnotationLoadBalancerId] = LOADBALANCER_ID
-	exist, lb, err = mgr.loadbalancer.findLoadBalancer(service)
-	if err != nil || !exist {
-		t.Fatal("3. findLoadBalancer: Loadbalancer id was specified, Expect:Exist")
-	}
-	if lb.LoadBalancerId != LOADBALANCER_ID {
-		t.Fatal("find loadbalancer fail. suppose to find by exist loadbalancerid.")
-	}
+			// ==================================================================================
+			// 2. No LOADBALANCER_ID specified, None-Exist.
+			//    user need to create new loadbalancer. did not specify any exist loadbalancer.
+			//	  Expected fallback to use service UID to generate slb .
+			t.Logf("2. findLoadBalancer: No LOADBALANCER_ID specified, Expect:Non-Exist")
+			f.svc.UID = types.UID("xxxxxxxxxxxxxxxxxxx-new")
+			exist, _, err = f.LoadBalancer().findLoadBalancer(f.svc)
+			if err != nil {
+				t.Fatal("Test findLoadBalancer fail.", err.Error())
+			}
+			if exist {
+				t.Fatal(fmt.Sprintf("loadbalancer should not exist, %s", f.svc.UID))
+			}
 
-	// ==================================================================================
-	// 4. Loadbalancer id was specified, Expect: NonExist
-	// user need to use an exist loadbalancer through annotations
-	t.Logf("4. findLoadBalancer: Loadbalancer id was specified, Expect:NonExist")
-	service.Annotations[ServiceAnnotationLoadBalancerId] = LOADBALANCER_ID + "-new"
-	exist, lb, err = mgr.loadbalancer.findLoadBalancer(service)
-	if err != nil {
-		t.Logf("4. error: %s", err.Error())
-		t.Fail()
-	}
-	if exist {
-		t.Logf("4. findLoadBalancer: Loadbalancer id was specified, Expect:NonExist")
-		t.Logf("   user need to use an exist loadbalancer through annotations")
-		t.Fail()
-	}
+			// ==================================================================================
+			// 3. Loadbalancer id was specified, Expect: Exist
+			// user need to use an exist loadbalancer through annotations
+			t.Logf("3. findLoadBalancer: Loadbalancer id was specified, Expect:Exist")
+			f.svc.Annotations[ServiceAnnotationLoadBalancerId] = LOADBALANCER_ID
+			exist, lb, err = f.LoadBalancer().findLoadBalancer(f.svc)
+			if err != nil || !exist {
+				t.Fatal("3. findLoadBalancer: Loadbalancer id was specified, Expect:Exist")
+			}
+			if lb.LoadBalancerId != LOADBALANCER_ID {
+				t.Fatal("find loadbalancer fail. suppose to find by exist loadbalancerid.")
+			}
+
+			// ==================================================================================
+			// 4. Loadbalancer id was specified, Expect: NonExist
+			// user need to use an exist loadbalancer through annotations
+			t.Logf("4. findLoadBalancer: Loadbalancer id was specified, Expect:NonExist")
+			f.svc.Annotations[ServiceAnnotationLoadBalancerId] = LOADBALANCER_ID + "-new"
+			exist, lb, err = f.LoadBalancer().findLoadBalancer(f.svc)
+			if err != nil {
+				t.Logf("4. error: %s", err.Error())
+				t.Fail()
+			}
+			if exist {
+				t.Logf("4. findLoadBalancer: Loadbalancer id was specified, Expect:NonExist")
+				t.Logf("   user need to use an exist loadbalancer through annotations")
+				t.Fail()
+			}
+		},
+	)
 }
 
 func realSlbClient(keyid, keysec string) {

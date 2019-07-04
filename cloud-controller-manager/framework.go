@@ -48,8 +48,9 @@ var (
 )
 
 var (
-	LOADBALANCER_ID           = "lb-bp1ids9hmq5924m6uk5w1"
-	LOADBALANCER_NAME         = "a2cb99d47cc8311e899db00163e12560"
+	LOADBALANCER_ID = "lb-bp1ids9hmq5924m6uk5w1"
+	// do not change LOADBALANCER_NAME unless needed
+	LOADBALANCER_NAME         = "ac83f8bed812e11e9a0ad00163e0a398"
 	LOADBALANCER_ADDRESS      = "47.97.241.114"
 	LOADBALANCER_NETWORK_TYPE = "classic"
 	LOADBALANCER_SPEC         = slb.LoadBalancerSpecType(slb.S1Small)
@@ -458,6 +459,9 @@ func (f *FrameWork) ListenerEqual(id string, p v1.ServicePort, proto string) err
 		privateZoneId         = ""
 		privateZoneRecordName = ""
 		privateZoneRecordTTL  = ""
+		aclStatus             = ""
+		aclId                 = ""
+		aclType               = ""
 	)
 	defd, _ := ExtractAnnotationRequest(f.svc)
 	switch proto {
@@ -482,6 +486,9 @@ func (f *FrameWork) ListenerEqual(id string, p v1.ServicePort, proto string) err
 		healthCheckUnhealthyThreshold = resp.UnhealthyThreshold
 		healthCheck = string(resp.HealthCheck)
 		persistenceTimeout = resp.PersistenceTimeout
+		aclId = resp.AclId
+		aclStatus = resp.AclStatus
+		aclType = resp.AclType
 	case "udp":
 		resp, err := f.SLBSDK().DescribeLoadBalancerUDPListenerAttribute(id, int(p.Port))
 		if err != nil {
@@ -498,6 +505,9 @@ func (f *FrameWork) ListenerEqual(id string, p v1.ServicePort, proto string) err
 		healthCheckHealthyThreshold = resp.HealthyThreshold
 		healthCheckUnhealthyThreshold = resp.UnhealthyThreshold
 		healthCheck = string(resp.HealthCheck)
+		aclId = resp.AclId
+		aclStatus = resp.AclStatus
+		aclType = resp.AclType
 	case "http":
 		resp, err := f.SLBSDK().DescribeLoadBalancerHTTPListenerAttribute(id, int(p.Port))
 		if err != nil {
@@ -521,6 +531,9 @@ func (f *FrameWork) ListenerEqual(id string, p v1.ServicePort, proto string) err
 		sessionStickType = string(resp.StickySessionType)
 		cookie = resp.Cookie
 		cookieTimeout = resp.CookieTimeout
+		aclId = resp.AclId
+		aclStatus = resp.AclStatus
+		aclType = resp.AclType
 	case "https":
 		resp, err := f.SLBSDK().DescribeLoadBalancerHTTPSListenerAttribute(id, int(p.Port))
 		if err != nil {
@@ -547,9 +560,30 @@ func (f *FrameWork) ListenerEqual(id string, p v1.ServicePort, proto string) err
 		sessionStickType = string(resp.StickySessionType)
 		cookie = resp.Cookie
 		cookieTimeout = resp.CookieTimeout
+		aclId = resp.AclId
+		aclStatus = resp.AclStatus
+		aclType = resp.AclType
 		//persistenceTimeout = res
 	default:
 		return fmt.Errorf("unknown proto: %s", proto)
+	}
+	// --------------------------- acl ---------------------------
+	if f.hasAnnotation(ServiceAnnotationLoadBalancerAclID) {
+		if aclId != string(defd.AclID) {
+			return fmt.Errorf("acl id error")
+		}
+	}
+
+	if f.hasAnnotation(ServiceAnnotationLoadBalancerAclStatus) {
+		if aclStatus != string(defd.AclStatus) {
+			return fmt.Errorf("acl status error")
+		}
+	}
+
+	if f.hasAnnotation(ServiceAnnotationLoadBalancerAclType) {
+		if aclType != defd.AclType {
+			return fmt.Errorf("acl type error")
+		}
 	}
 
 	// --------------------------- SessionStick ----------------------------
