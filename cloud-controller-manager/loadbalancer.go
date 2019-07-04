@@ -38,6 +38,10 @@ type AnnotationRequest struct {
 
 	SSLPorts       string
 	AddressType    slb.AddressType
+	Class          string
+	AclStatus      string
+	AclID          string
+	AclType        string
 	VswitchID      string
 	ForwardPort    string
 	SLBNetworkType string
@@ -702,6 +706,6 @@ func keepResourceVesion(service *v1.Service) error {
 		glog.V(2).Infof("alicloud: service %s's uid %v has "+
 			"already been kept in the DeletedSvcKeeper, no need to update.\n", service.Name, serviceUID)
 	}
-	// keeper.set(serviceUID, currentVersion)
+	// keeper.set(serviceUIDNoneExist, currentVersion)
 	return nil
 }

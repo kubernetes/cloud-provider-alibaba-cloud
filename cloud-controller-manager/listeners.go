@@ -554,6 +554,9 @@ func (t *tcp) Add() error {
 			Description:        t.NamedKey.Key(),
 
 			VServerGroupId:            t.findVgroup(t.NamedKey.Reference(t.NodePort)),
+			AclType:                   def.AclType,
+			AclStatus:                 def.AclStatus,
+			AclId:                     def.AclID,
 			HealthCheckType:           def.HealthCheckType,
 			HealthCheckURI:            def.HealthCheckURI,
 			HealthCheckConnectPort:    def.HealthCheckConnectPort,
@@ -584,6 +587,9 @@ func (t *tcp) Update() error {
 		PersistenceTimeout: response.PersistenceTimeout,
 		VServerGroupId:     t.findVgroup(t.NamedKey.Reference(t.NodePort)),
 
+		AclType:                   response.AclType,
+		AclStatus:                 response.AclStatus,
+		AclId:                     response.AclId,
 		HealthCheckType:           response.HealthCheckType,
 		HealthCheckURI:            response.HealthCheckURI,
 		HealthCheckConnectPort:    response.HealthCheckConnectPort,
@@ -604,6 +610,19 @@ func (t *tcp) Update() error {
 			glog.V(2).Infof("TCP listener checker [bandwidth] changed, request=%d. response=%d", def.Bandwidth, response.Bandwidth)
 		}
 	*/
+
+	if def.AclStatus != response.AclStatus {
+		needUpdate = true
+		config.AclStatus = def.AclStatus
+	}
+	if def.AclID != response.AclId {
+		needUpdate = true
+		config.AclId = def.AclID
+	}
+	if def.AclType != response.AclType {
+		needUpdate = true
+		config.AclType = def.AclType
+	}
 
 	// todo: perform healthcheck update.
 	if def.HealthCheckType != response.HealthCheckType {
@@ -693,6 +712,9 @@ func (t *udp) Add() error {
 			Bandwidth:          DEFAULT_LISTENER_BANDWIDTH,
 			PersistenceTimeout: def.PersistenceTimeout,
 
+			AclType:   def.AclType,
+			AclStatus: def.AclStatus,
+			AclId:     def.AclID,
 			//HealthCheckType:           request.HealthCheckType,
 			//HealthCheckURI:            request.HealthCheckURI,
 			HealthCheckConnectPort:    def.HealthCheckConnectPort,
@@ -717,6 +739,9 @@ func (t *udp) Update() error {
 		BackendServerPort: int(t.NodePort),
 		Description:       t.NamedKey.Key(),
 		VServerGroupId:    t.findVgroup(t.NamedKey.Reference(t.NodePort)),
+		AclType:           response.AclType,
+		AclStatus:         response.AclStatus,
+		AclId:             response.AclId,
 		//Health Check
 		Bandwidth:          DEFAULT_LISTENER_BANDWIDTH,
 		PersistenceTimeout: response.PersistenceTimeout,
@@ -738,6 +763,18 @@ func (t *udp) Update() error {
 			glog.V(2).Infof("UDP listener checker [bandwidth] changed, request=%d. response=%d", request.Bandwidth, response.Bandwidth)
 		}
 	*/
+	if def.AclStatus != response.AclStatus {
+		needUpdate = true
+		config.AclStatus = def.AclStatus
+	}
+	if def.AclID != response.AclId {
+		needUpdate = true
+		config.AclId = def.AclID
+	}
+	if def.AclType != response.AclType {
+		needUpdate = true
+		config.AclType = def.AclType
+	}
 
 	// todo: perform healthcheck update.
 	if request.HealthCheckConnectPort != 0 &&
@@ -813,6 +850,9 @@ func (t *http) Add() error {
 		CookieTimeout:     def.CookieTimeout,
 		Cookie:            def.Cookie,
 
+		AclType:   def.AclType,
+		AclStatus: def.AclStatus,
+		AclId:     def.AclID,
 		//HealthCheckType:           request.HealthCheckType,
 		HealthCheckURI:         request.HealthCheckURI,
 		HealthCheckConnectPort: request.HealthCheckConnectPort,
@@ -884,6 +924,9 @@ func (t *http) Update() error {
 		Description:       t.NamedKey.Key(),
 		VServerGroupId:    t.findVgroup(t.NamedKey.Reference(t.NodePort)),
 
+		AclType:                response.AclType,
+		AclStatus:              response.AclStatus,
+		AclId:                  response.AclId,
 		HealthCheck:            response.HealthCheck,
 		HealthCheckURI:         response.HealthCheckURI,
 		HealthCheckConnectPort: response.HealthCheckConnectPort,
@@ -904,6 +947,18 @@ func (t *http) Update() error {
 			glog.V(2).Infof("HTTP listener checker [bandwidth] changed, request=%d. response=%d", request.Bandwidth, response.Bandwidth)
 		}
 	*/
+	if def.AclStatus != response.AclStatus {
+		needUpdate = true
+		config.AclStatus = def.AclStatus
+	}
+	if def.AclID != response.AclId {
+		needUpdate = true
+		config.AclId = def.AclID
+	}
+	if def.AclType != response.AclType {
+		needUpdate = true
+		config.AclType = def.AclType
+	}
 
 	// todo: perform healthcheck update.
 	if def.HealthCheck != response.HealthCheck {
@@ -1024,6 +1079,9 @@ func (t *https) Add() error {
 				BackendServerPort: int(t.NodePort),
 				Description:       t.NamedKey.Key(),
 				VServerGroupId:    t.findVgroup(t.NamedKey.Reference(t.NodePort)),
+				AclType:           def.AclType,
+				AclStatus:         def.AclStatus,
+				AclId:             def.AclID,
 				//Health Check
 				HealthCheck:       def.HealthCheck,
 				Bandwidth:         DEFAULT_LISTENER_BANDWIDTH,
@@ -1067,6 +1125,9 @@ func (t *https) Update() error {
 			CookieTimeout:     response.CookieTimeout,
 			Cookie:            response.Cookie,
 
+			AclType:                response.AclType,
+			AclStatus:              response.AclStatus,
+			AclId:                  response.AclId,
 			HealthCheckURI:         response.HealthCheckURI,
 			HealthCheckConnectPort: response.HealthCheckConnectPort,
 			HealthyThreshold:       response.HealthyThreshold,
@@ -1098,6 +1159,19 @@ func (t *https) Update() error {
 		needUpdate = true
 		config.HealthCheckURI = def.HealthCheckURI
 	}
+	if def.AclStatus != response.AclStatus {
+		needUpdate = true
+		config.AclStatus = def.AclStatus
+	}
+	if def.AclID != response.AclId {
+		needUpdate = true
+		config.AclId = def.AclID
+	}
+	if def.AclType != response.AclType {
+		needUpdate = true
+		config.AclType = def.AclType
+	}
+
 	if request.HealthCheckConnectPort != 0 &&
 		def.HealthCheckConnectPort != response.HealthCheckConnectPort {
 		needUpdate = true

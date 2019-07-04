@@ -42,6 +42,18 @@ const (
 	// ServiceAnnotationPrivateZonePrefix private zone prefix
 	ServiceAnnotationPrivateZonePrefix = ServiceAnnotationPrefix + "private-zone-"
 
+	// ServiceAnnotationLoadBalancerClass class process service with empty or "alibaba" class
+	ServiceAnnotationLoadBalancerClass = ServiceAnnotationLoadBalancerPrefix + "class"
+
+	// ServiceAnnotationLoadBalancerAclStatus enable or disable acl on all listener
+	ServiceAnnotationLoadBalancerAclStatus = ServiceAnnotationLoadBalancerPrefix + "acl-status"
+
+	// ServiceAnnotationLoadBalancerAclID acl id
+	ServiceAnnotationLoadBalancerAclID = ServiceAnnotationLoadBalancerPrefix + "acl-id"
+
+	// ServiceAnnotationLoadBalancerAclType acl type, black or white
+	ServiceAnnotationLoadBalancerAclType = ServiceAnnotationLoadBalancerPrefix + "acl-type"
+
 	// ServiceAnnotationLoadBalancerProtocolPort protocol port
 	ServiceAnnotationLoadBalancerProtocolPort = ServiceAnnotationLoadBalancerPrefix + "protocol-port"
 
@@ -199,6 +211,31 @@ func ExtractAnnotationRequest(service *v1.Service) (*AnnotationRequest, *Annotat
 	if ok {
 		defaulted.VswitchID = vswid
 		request.VswitchID = defaulted.VswitchID
+	}
+
+	class, ok := annotation[ServiceAnnotationLoadBalancerClass]
+	if ok {
+		defaulted.Class = class
+		request.Class = defaulted.Class
+	}
+
+	status, ok := annotation[ServiceAnnotationLoadBalancerAclStatus]
+	if ok {
+		defaulted.AclStatus = status
+		request.AclStatus = defaulted.AclStatus
+	} else {
+		defaulted.AclStatus = "off"
+	}
+
+	aclid, ok := annotation[ServiceAnnotationLoadBalancerAclID]
+	if ok {
+		defaulted.AclID = aclid
+		request.AclID = defaulted.AclID
+	}
+	acltype, ok := annotation[ServiceAnnotationLoadBalancerAclType]
+	if ok {
+		defaulted.AclType = acltype
+		request.AclType = defaulted.AclType
 	}
 
 	forward, ok := annotation[ServiceAnnotationLoadBalancerForwardPort]

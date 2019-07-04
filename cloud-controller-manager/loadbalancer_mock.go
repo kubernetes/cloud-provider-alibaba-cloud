@@ -140,6 +140,7 @@ func (c *mockClientSLB) DescribeLoadBalancers(args *slb.DescribeLoadBalancersArg
 	var results []slb.LoadBalancerType
 	LOADBALANCER.loadbalancer.Range(
 		func(key, value interface{}) bool {
+
 			v, ok := value.(slb.LoadBalancerType)
 			if !ok {
 				fmt.Printf("API: DescribeLoadBalancers, "+
@@ -430,9 +431,17 @@ func (c *mockClientSLB) CreateLoadBalancerTCPListener(args *slb.CreateLoadBalanc
 			HealthCheckType:           args.HealthCheckType,
 			HealthyThreshold:          args.HealthyThreshold,
 			UnhealthyThreshold:        args.UnhealthyThreshold,
+			AclType:                   args.AclType,
+			AclId:                     args.AclId,
+			AclStatus:                 args.AclStatus,
 		},
 	}
-	LOADBALANCER.listeners.Store(listenerKey(args.LoadBalancerId, args.ListenerPort), listener)
+	key := listenerKey(args.LoadBalancerId, args.ListenerPort)
+	_, ok := LOADBALANCER.listeners.Load(key)
+	if ok {
+		return fmt.Errorf("tcp listener exist %d", args.ListenerPort)
+	}
+	LOADBALANCER.listeners.Store(key, listener)
 	return nil
 }
 
@@ -458,9 +467,17 @@ func (c *mockClientSLB) CreateLoadBalancerUDPListener(args *slb.CreateLoadBalanc
 			HealthCheckInterval:       args.HealthCheckInterval,
 			HealthyThreshold:          args.HealthyThreshold,
 			UnhealthyThreshold:        args.UnhealthyThreshold,
+			AclType:                   args.AclType,
+			AclId:                     args.AclId,
+			AclStatus:                 args.AclStatus,
 		},
 	}
-	LOADBALANCER.listeners.Store(listenerKey(args.LoadBalancerId, args.ListenerPort), listener)
+	key := listenerKey(args.LoadBalancerId, args.ListenerPort)
+	_, ok := LOADBALANCER.listeners.Load(key)
+	if ok {
+		return fmt.Errorf("listener exist %d", args.ListenerPort)
+	}
+	LOADBALANCER.listeners.Store(key, listener)
 	return nil
 }
 func (c *mockClientSLB) DeleteLoadBalancerListener(loadBalancerId string, port int) (err error) {
@@ -499,11 +516,19 @@ func (c *mockClientSLB) CreateLoadBalancerHTTPSListener(args *slb.CreateLoadBala
 				HealthCheckInterval:    args.HealthCheckInterval,
 				HealthyThreshold:       args.HealthyThreshold,
 				UnhealthyThreshold:     args.UnhealthyThreshold,
+				AclType:                args.AclType,
+				AclId:                  args.AclId,
+				AclStatus:              args.AclStatus,
 			},
 			ServerCertificateId: args.ServerCertificateId,
 		},
 	}
-	LOADBALANCER.listeners.Store(listenerKey(args.LoadBalancerId, args.ListenerPort), listener)
+	key := listenerKey(args.LoadBalancerId, args.ListenerPort)
+	_, ok := LOADBALANCER.listeners.Load(key)
+	if ok {
+		return fmt.Errorf("https listener exist %d", args.ListenerPort)
+	}
+	LOADBALANCER.listeners.Store(key, listener)
 
 	return nil
 }
@@ -534,9 +559,17 @@ func (c *mockClientSLB) CreateLoadBalancerHTTPListener(args *slb.CreateLoadBalan
 			HealthCheckInterval:    args.HealthCheckInterval,
 			HealthyThreshold:       args.HealthyThreshold,
 			UnhealthyThreshold:     args.UnhealthyThreshold,
+			AclType:                args.AclType,
+			AclId:                  args.AclId,
+			AclStatus:              args.AclStatus,
 		},
 	}
-	LOADBALANCER.listeners.Store(listenerKey(args.LoadBalancerId, args.ListenerPort), listener)
+	key := listenerKey(args.LoadBalancerId, args.ListenerPort)
+	_, ok := LOADBALANCER.listeners.Load(key)
+	if ok {
+		return fmt.Errorf("http listener exist %d", args.ListenerPort)
+	}
+	LOADBALANCER.listeners.Store(key, listener)
 	return nil
 }
 func (c *mockClientSLB) DescribeLoadBalancerHTTPSListenerAttribute(loadBalancerId string, port int) (response *slb.DescribeLoadBalancerHTTPSListenerAttributeResponse, err error) {
@@ -630,6 +663,9 @@ func (c *mockClientSLB) SetLoadBalancerHTTPListenerAttribute(args *slb.SetLoadBa
 	lb.Description = args.Description
 	lb.Bandwidth = args.Bandwidth
 	lb.BackendServerPort = args.BackendServerPort
+	lb.AclStatus = args.AclStatus
+	lb.AclId = args.AclId
+	lb.AclType = args.AclType
 	LOADBALANCER.listeners.Store(listenerKey(args.LoadBalancerId, args.ListenerPort), lb)
 	return nil
 }
@@ -661,6 +697,9 @@ func (c *mockClientSLB) SetLoadBalancerHTTPSListenerAttribute(args *slb.SetLoadB
 	lb.Description = args.Description
 	lb.Bandwidth = args.Bandwidth
 	lb.BackendServerPort = args.BackendServerPort
+	lb.AclStatus = args.AclStatus
+	lb.AclId = args.AclId
+	lb.AclType = args.AclType
 	LOADBALANCER.listeners.Store(listenerKey(args.LoadBalancerId, args.ListenerPort), lb)
 	return nil
 }
@@ -690,6 +729,9 @@ func (c *mockClientSLB) SetLoadBalancerTCPListenerAttribute(args *slb.SetLoadBal
 	lb.Bandwidth = args.Bandwidth
 	lb.PersistenceTimeout = args.PersistenceTimeout
 	lb.BackendServerPort = args.BackendServerPort
+	lb.AclStatus = args.AclStatus
+	lb.AclId = args.AclId
+	lb.AclType = args.AclType
 	LOADBALANCER.listeners.Store(listenerKey(args.LoadBalancerId, args.ListenerPort), lb)
 	return nil
 }
@@ -716,6 +758,9 @@ func (c *mockClientSLB) SetLoadBalancerUDPListenerAttribute(args *slb.SetLoadBal
 	lb.Bandwidth = args.Bandwidth
 	lb.PersistenceTimeout = lb.PersistenceTimeout
 	lb.BackendServerPort = args.BackendServerPort
+	lb.AclStatus = args.AclStatus
+	lb.AclId = args.AclId
+	lb.AclType = args.AclType
 	LOADBALANCER.listeners.Store(listenerKey(args.LoadBalancerId, args.ListenerPort), lb)
 	return nil
 }
