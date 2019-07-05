@@ -312,6 +312,7 @@ func RunControllers(
 	}
 
 	ifactory.Start(stop)
+	glog.Infof("informer started")
 
 	select {}
 }

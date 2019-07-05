@@ -26,7 +26,7 @@ import (
 
 const (
 	//SERVICE_SYNC_PERIOD Interval of synchronizing service status from apiserver
-	SERVICE_SYNC_PERIOD = 30 * time.Second
+	SERVICE_SYNC_PERIOD = 1 * time.Minute
 	SERVICE_QUEUE       = "service-queue"
 	NODE_QUEUE          = "node-queue"
 	SERVICE_CONTROLLER  = "service-controller"
@@ -36,6 +36,7 @@ const (
 	// LabelNodeRoleExcludeBalancer specifies that the node should be
 	// exclude from load balancers created by a cloud provider.
 	LabelNodeRoleExcludeBalancer = "alpha.service-controller.kubernetes.io/exclude-balancer"
+	CCM_CLASS                    = "service.beta.kubernetes.io/class"
 )
 
 type Controller struct {
@@ -43,7 +44,7 @@ type Controller struct {
 	client      clientset.Interface
 	ifactory    informers.SharedInformerFactory
 	clusterName string
-	local       Context
+	local       *Context
 	caster      record.EventBroadcaster
 	recorder    record.EventRecorder
 
@@ -78,7 +79,7 @@ func NewController(
 		cloud:       cloud,
 		clusterName: clusterName,
 		ifactory:    ifactory,
-		local:       Context{},
+		local:       &Context{},
 		caster:      caster,
 		recorder:    recorder,
 		client:      client,
@@ -167,7 +168,7 @@ func Enqueue(queue queue.DelayingInterface, k interface{}) {
 }
 
 func HandlerForNodesChange(
-	ctx Context,
+	ctx *Context,
 	que queue.DelayingInterface,
 	informer cache.SharedIndexInformer,
 ) {
@@ -183,9 +184,14 @@ func HandlerForNodesChange(
 		ctx.Range(
 			func(k string, svc *v1.Service) bool {
 				if !NeedLoadBalancer(svc) {
-					glog.Infof("node change: service [%s] does not need loadbalancer, skip", key(svc))
-					return false
+					glog.Infof("node change: loadbalancer is not needed %s, skip", key(svc))
+					return true
 				}
+				if !isProcessNeeded(svc) {
+					glog.Infof("node change: class not empty, skip process %s", key(svc))
+					return true
+				}
+				glog.Infof("node chenge: enque %s", key(svc))
 				Enqueue(que, key(svc))
 				return true
 			},
@@ -196,14 +202,13 @@ func HandlerForNodesChange(
 		cache.ResourceEventHandlerFuncs{
 			AddFunc: syncNodes,
 			UpdateFunc: func(obja, objb interface{}) {
-
 				node1, ok1 := obja.(*v1.Node)
 				node2, ok2 := objb.(*v1.Node)
 				if ok1 && ok2 &&
 					NodeSpecChanged(node1, node2) {
 					// label and schedulable changed .
 					// status healthy should be considered
-					glog.V(5).Infof("controller: node[%s/%s] update event", node1.Namespace, node1.Name)
+					glog.Infof("controller: node[%s/%s] update event", node1.Namespace, node1.Name)
 					syncNodes(node1)
 				}
 			},
@@ -214,7 +219,7 @@ func HandlerForNodesChange(
 }
 
 func HandlerForEndpointChange(
-	context Context,
+	context *Context,
 	que queue.DelayingInterface,
 	informer cache.SharedIndexInformer,
 ) {
@@ -230,9 +235,13 @@ func HandlerForEndpointChange(
 				"endpoints[%s/%s], skip sync endpoint.\n", ep.Namespace, ep.Name)
 			return
 		}
+		if !isProcessNeeded(svc) {
+			glog.Infof("endpoint: class not empty, skip process %s", key(svc))
+			return
+		}
 		if !NeedLoadBalancer(svc) {
 			// we are safe here to skip process syncEnpoint.
-			glog.Infof("endpoint change: service[%s] does not need LoadBalancer , skip", svc.Name)
+			glog.Infof("endpoint change: loadBalancer is not needed %s, skip", key(svc))
 			return
 		}
 		glog.Infof("enqueue endpoint: %s/%s", ep.Namespace, ep.Name)
@@ -245,7 +254,7 @@ func HandlerForEndpointChange(
 				ep1, ok1 := obja.(*v1.Endpoints)
 				ep2, ok2 := objb.(*v1.Endpoints)
 				if ok1 && ok2 && !reflect.DeepEqual(ep1.Subsets, ep2.Subsets) {
-					glog.V(5).Infof("controller: endpoints update event, endpoints [%s/%s]\n", ep1.Namespace, ep1.Name)
+					glog.Infof("controller: endpoints update event, endpoints [%s/%s]\n", ep1.Namespace, ep1.Name)
 					syncEndpoints(ep1)
 				}
 			},
@@ -256,12 +265,16 @@ func HandlerForEndpointChange(
 }
 
 func HandlerForServiceChange(
-	context Context,
+	context *Context,
 	que queue.DelayingInterface,
 	informer cache.SharedIndexInformer,
 	record record.EventRecorder,
 ) {
 	syncService := func(svc *v1.Service) {
+		if !isProcessNeeded(svc) {
+			glog.Infof("class not empty, skip process")
+			return
+		}
 		Enqueue(que, key(svc))
 	}
 
@@ -302,7 +315,7 @@ func HandlerForServiceChange(
 }
 
 func WorkerFunc(
-	contex Context,
+	contex *Context,
 	queue queue.DelayingInterface,
 	syncd SyncTask,
 ) func() {
@@ -379,8 +392,9 @@ func (con *Controller) ServiceSyncTask(k string) error {
 		}
 		return con.update(cached, service)
 	}
-	return nil
 }
+
+func isProcessNeeded(svc *v1.Service) bool { return svc.Annotations[CCM_CLASS] == "" }
 
 func retry(
 	backoff *wait.Backoff,
@@ -613,7 +627,6 @@ func (con *Controller) NodeSyncTask(k string) error {
 		}
 		return con.cloud.UpdateLoadBalancer(con.clusterName, service, nodes)
 	}
-	return nil
 }
 
 func AvailableNodes(

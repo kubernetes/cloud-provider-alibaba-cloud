@@ -42,9 +42,6 @@ const (
 	// ServiceAnnotationPrivateZonePrefix private zone prefix
 	ServiceAnnotationPrivateZonePrefix = ServiceAnnotationPrefix + "private-zone-"
 
-	// ServiceAnnotationLoadBalancerClass class process service with empty or "alibaba" class
-	ServiceAnnotationLoadBalancerClass = ServiceAnnotationLoadBalancerPrefix + "class"
-
 	// ServiceAnnotationLoadBalancerAclStatus enable or disable acl on all listener
 	ServiceAnnotationLoadBalancerAclStatus = ServiceAnnotationLoadBalancerPrefix + "acl-status"
 
@@ -211,12 +208,6 @@ func ExtractAnnotationRequest(service *v1.Service) (*AnnotationRequest, *Annotat
 	if ok {
 		defaulted.VswitchID = vswid
 		request.VswitchID = defaulted.VswitchID
-	}
-
-	class, ok := annotation[ServiceAnnotationLoadBalancerClass]
-	if ok {
-		defaulted.Class = class
-		request.Class = defaulted.Class
 	}
 
 	status, ok := annotation[ServiceAnnotationLoadBalancerAclStatus]

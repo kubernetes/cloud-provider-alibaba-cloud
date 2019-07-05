@@ -16,7 +16,9 @@ limitations under the License.
 package node
 
 import (
+	"encoding/json"
 	"fmt"
+	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"time"
 
 	"github.com/golang/glog"
@@ -44,12 +46,6 @@ import (
 	"k8s.io/kubernetes/staging/src/k8s.io/client-go/kubernetes"
 	"strings"
 )
-
-var backoff = wait.Backoff{
-	Steps:    20,
-	Duration: 50 * time.Millisecond,
-	Jitter:   1.0,
-}
 
 type CloudNodeController struct {
 	informer    coreinformers.NodeInformer
@@ -142,8 +138,12 @@ func HandlerForNode(
 				node := obj.(*v1.Node)
 				cnc.AddCloudNode(node)
 			},
+			UpdateFunc: func(old, newm interface{}) {
+				newmo := newm.(*v1.Node)
+				cnc.AddCloudNode(newmo)
+			},
 		},
-		5*time.Minute,
+		3*time.Minute,
 	)
 }
 
@@ -205,22 +205,6 @@ func (cnc *CloudNodeController) Run(stopCh <-chan struct{}) {
 			)
 		},
 		cnc.monitorPeriod,
-		wait.NeverStop,
-	)
-
-	// Start a loop to periodically check if any nodes have been deleted from cloudprovider
-	go wait.Until(
-		func() {
-			nodes, err := nodeLists(cnc.kclient)
-			if err != nil {
-				glog.Errorf("Error monitoring node status: %v", err)
-				return
-			}
-			for i := range nodes.Items {
-				cnc.AddCloudNode(&nodes.Items[i])
-			}
-		},
-		10*time.Minute,
 		wait.NeverStop,
 	)
 }
@@ -318,13 +302,18 @@ func (cnc *CloudNodeController) doAddCloudNode(node *v1.Node) error {
 		return fmt.Errorf("cloud instance is not implemented")
 	}
 	err := clientretry.RetryOnConflict(
-		backoff,
+		wait.Backoff{
+			Steps:    5,
+			Duration: 1 * time.Millisecond,
+			Factor:   2,
+			Jitter:   1.0,
+		},
 		func() error {
 			curNode, err := cnc.kclient.CoreV1().Nodes().Get(node.Name, metav1.GetOptions{})
 			if err != nil {
 				return fmt.Errorf("retrieve node error: %s", err.Error())
 			}
-
+			orignode := curNode.DeepCopy()
 			setDefaultProviderID(cnc, curNode)
 
 			nodes, err := ins.ListInstances([]string{curNode.Spec.ProviderID})
@@ -388,7 +377,8 @@ func (cnc *CloudNodeController) doAddCloudNode(node *v1.Node) error {
 				// It is ok to skip `Forbidden` error for compatible reason.
 			}
 
-			if _, err = cnc.kclient.CoreV1().Nodes().Update(curNode); err != nil {
+			_, err = PatchNode(cnc.kclient, orignode, curNode)
+			if err != nil {
 				return fmt.Errorf("patch error: %s", err.Error())
 			}
 			// After adding, call UpdateNodeAddress to set the CloudProvider provided IPAddresses
@@ -641,4 +631,27 @@ func broadcaster() (record.EventRecorder, record.EventBroadcaster) {
 	caster.StartLogging(glog.Infof)
 	source := v1.EventSource{Component: "node-controller"}
 	return caster.NewRecorder(scheme.Scheme, source), caster
+}
+
+func PatchNode(
+	kdm kubernetes.Interface,
+	origined, patched *v1.Node,
+) (*v1.Node, error) {
+
+	originedData, err := json.Marshal(origined)
+	if err != nil {
+		return nil, err
+	}
+	patchedData, err := json.Marshal(patched)
+	if err != nil {
+		return nil, err
+	}
+	data, err := strategicpatch.CreateTwoWayMergePatch(originedData, patchedData, &v1.Node{})
+	if err != nil {
+		return nil, err
+	}
+	return kdm.
+		CoreV1().
+		Nodes().
+		Patch(patched.Name, types.MergePatchType, data)
 }
