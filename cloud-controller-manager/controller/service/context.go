@@ -6,6 +6,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	"reflect"
 	"sort"
+	"strings"
 	"sync"
 )
 
@@ -105,23 +106,21 @@ func NodeSpecChanged(a, b *v1.Node) bool {
 }
 
 func NodeConditionChanged(a, b []v1.NodeCondition) bool {
-
 	if len(a) != len(b) {
 		return true
 	}
-	cmp := func(i, j int) bool {
-		if a[i].Type > a[j].Type {
-			return true
-		}
-		return false
-	}
-	sort.SliceStable(a, cmp)
 
-	sort.SliceStable(b, cmp)
+	sort.SliceStable(a, func(i, j int) bool {
+		return strings.Compare(string(a[i].Type), string(a[j].Type)) <= 0
+	})
 
-	for i, cona := range a {
-		if cona.Type != b[i].Type ||
-			cona.Status != b[i].Status {
+	sort.SliceStable(b, func(i, j int) bool {
+		return strings.Compare(string(b[i].Type), string(b[j].Type)) <= 0
+	})
+
+	for i := range a {
+		if a[i].Type != b[i].Type ||
+			a[i].Status != b[i].Status {
 			return true
 		}
 	}

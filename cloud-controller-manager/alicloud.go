@@ -145,6 +145,11 @@ func init() {
 			if err != nil {
 				return nil, err
 			}
+			// wait for client initialized
+			err = mgr.Start(RefreshToken)
+			if err != nil {
+				panic(fmt.Sprintf("token not ready %s", err.Error()))
+			}
 			return newAliCloud(mgr, rtableids)
 		})
 }
@@ -273,12 +278,6 @@ func (c *Cloud) EnsureLoadBalancer(clusterName string, service *v1.Service, node
 	glog.V(2).Infof("Alicloud.EnsureLoadBalancer(%v, %s/%s, %v, %v)",
 		clusterName, service.Namespace, service.Name, c.region, NodeList(nodes))
 	defaulted, _ := ExtractAnnotationRequest(service)
-
-	if defaulted.Class != "" {
-		glog.Infof("ensure: skip processing service %s/%s "+
-			"with loadbalancer class %s", service.Namespace, service.Name, defaulted.Class)
-		return nil, nil
-	}
 	if defaulted.AddressType == slb.InternetAddressType {
 		if c.cfg != nil && c.cfg.Global.DisablePublicSLB {
 			return nil, fmt.Errorf("PublicAddress SLB is Not allowed")
@@ -352,13 +351,6 @@ func (c *Cloud) EnsureLoadBalancer(clusterName string, service *v1.Service, node
 func (c *Cloud) UpdateLoadBalancer(clusterName string, service *v1.Service, nodes []*v1.Node) error {
 	glog.V(2).Infof("Alicloud.UpdateLoadBalancer(%v, %v, %v, %v, %v, %v, %v)",
 		clusterName, service.Namespace, service.Name, c.region, service.Spec.LoadBalancerIP, service.Spec.Ports, NodeList(nodes))
-	defaulted, _ := ExtractAnnotationRequest(service)
-
-	if defaulted.Class != "" {
-		glog.Infof("update: skip processing service %s/%s "+
-			"with loadbalancer class %s", service.Namespace, service.Name, defaulted.Class)
-		return nil
-	}
 	ns, err := c.fileOutNode(nodes, service)
 	if err != nil {
 		return err
@@ -377,14 +369,6 @@ func (c *Cloud) UpdateLoadBalancer(clusterName string, service *v1.Service, node
 func (c *Cloud) EnsureLoadBalancerDeleted(clusterName string, service *v1.Service) error {
 	glog.V(2).Infof("Alicloud.EnsureLoadBalancerDeleted(%v, %v, %v, %v, %v, %v)",
 		clusterName, service.Namespace, service.Name, c.region, service.Spec.LoadBalancerIP, service.Spec.Ports)
-
-	defaulted, _ := ExtractAnnotationRequest(service)
-
-	if defaulted.Class != "" {
-		glog.Infof("delete: skip processing service %s/%s "+
-			"with loadbalancer class %s", service.Namespace, service.Name, defaulted.Class)
-		return nil
-	}
 
 	if len(service.Status.LoadBalancer.Ingress) > 0 {
 		err := c.climgr.PrivateZones().EnsurePrivateZoneRecordDeleted(service, service.Status.LoadBalancer.Ingress[0].IP)

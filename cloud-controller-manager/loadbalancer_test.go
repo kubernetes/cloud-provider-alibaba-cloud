@@ -42,17 +42,8 @@ func TestNewClient(t *testing.T) {
 }
 
 func NewMockClientMgr(client ClientSLBSDK) (*ClientMgr, error) {
-	token := &TokenAuth{
-		auth: metadata.RoleAuth{
-			AccessKeyId:     "xxxxxxx",
-			AccessKeySecret: "yyyyyyyyyyyyyyyyyyyyy",
-		},
-		active: false,
-	}
-
 	mgr := &ClientMgr{
-		stop:  make(<-chan struct{}, 1),
-		token: token,
+		stop: make(<-chan struct{}, 1),
 		meta: metadata.NewMockMetaData(
 			nil,
 			func(resource string) (string, error) {

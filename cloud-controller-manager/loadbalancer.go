@@ -38,7 +38,6 @@ type AnnotationRequest struct {
 
 	SSLPorts       string
 	AddressType    slb.AddressType
-	Class          string
 	AclStatus      string
 	AclID          string
 	AclType        string
