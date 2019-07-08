@@ -87,6 +87,7 @@ type ClientSLBSDK interface {
 	CreateLoadBalancer(args *slb.CreateLoadBalancerArgs) (response *slb.CreateLoadBalancerResponse, err error)
 	DeleteLoadBalancer(loadBalancerId string) (err error)
 	ModifyLoadBalancerInternetSpec(args *slb.ModifyLoadBalancerInternetSpecArgs) (err error)
+	ModifyLoadBalancerInstanceSpec(args *slb.ModifyLoadBalancerInstanceSpecArgs) (err error)
 	DescribeLoadBalancerAttribute(loadBalancerId string) (loadBalancer *slb.LoadBalancerType, err error)
 	RemoveBackendServers(loadBalancerId string, backendServers []string) (result []slb.BackendServerType, err error)
 	AddBackendServers(loadBalancerId string, backendServers []slb.BackendServerType) (result []slb.BackendServerType, err error)
@@ -388,22 +389,37 @@ func (s *LoadBalancerClient) EnsureLoadBalancer(service *v1.Service, nodes []*v1
 			glog.Infof("alicloud: bandwidth([%d] -> [%d]) changed, update loadbalancer [%s]\n",
 				origined.Bandwidth, request.Bandwidth, origined.LoadBalancerName)
 		}
-		if needUpdate {
-			if err := s.c.ModifyLoadBalancerInternetSpec(
-				&slb.ModifyLoadBalancerInternetSpecArgs{
-					LoadBalancerId:     origined.LoadBalancerId,
-					InternetChargeType: charge,
-					Bandwidth:          bandwidth,
-				}); err != nil {
-				return nil, err
-			}
-		}
 		if request.AddressType != "" && request.AddressType != origined.AddressType {
 			glog.Errorf("alicloud: warning! can not change "+
 				"loadbalancer address type after it has been created! please "+
 				"recreate the service.[%s]->[%s],[%s]\n", origined.AddressType, request.AddressType, origined.LoadBalancerName)
 			return nil, errors.New("alicloud: change loadbalancer " +
 				"address type after service has been created is not supported. delete and retry")
+		}
+		if needUpdate {
+			if origined.AddressType == "internet" {
+				if err := s.c.ModifyLoadBalancerInternetSpec(
+					&slb.ModifyLoadBalancerInternetSpecArgs{
+						LoadBalancerId:     origined.LoadBalancerId,
+						InternetChargeType: charge,
+						Bandwidth:          bandwidth,
+					}); err != nil {
+					return nil, err
+				}
+			}
+		}
+
+		// update instance spec
+		if request.LoadBalancerSpec != "" && request.LoadBalancerSpec != origined.LoadBalancerSpec {
+			glog.Infof("alicloud: loadbalancerspec([%d] -> [%d]) changed, update loadbalancer [%s]\n",
+				origined.LoadBalancerSpec, request.LoadBalancerSpec, origined.LoadBalancerName)
+			if err := s.c.ModifyLoadBalancerInstanceSpec(&slb.ModifyLoadBalancerInstanceSpecArgs{
+				RegionId:         origined.RegionId,
+				LoadBalancerId:   origined.LoadBalancerId,
+				LoadBalancerSpec: request.LoadBalancerSpec,
+			}); err != nil {
+				return nil, err
+			}
 		}
 		origined, derr = s.c.DescribeLoadBalancerAttribute(origined.LoadBalancerId)
 	}
