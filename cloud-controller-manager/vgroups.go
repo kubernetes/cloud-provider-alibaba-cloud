@@ -3,10 +3,12 @@ package alicloud
 import (
 	"fmt"
 	"github.com/denverdino/aliyungo/common"
+	"github.com/denverdino/aliyungo/ecs"
 	"github.com/denverdino/aliyungo/slb"
 	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
 	"k8s.io/kubernetes/staging/src/k8s.io/apimachinery/pkg/util/json"
+	"reflect"
 	"strings"
 )
 
@@ -14,8 +16,10 @@ type vgroup struct {
 	NamedKey       *NamedKey
 	LoadBalancerId string
 	RegionId       common.Region
+	VpcID          string
 	VGroupId       string
 	Client         ClientSLBSDK
+	InsClient      ClientInstanceSDK
 	BackendServers []slb.VBackendServerType
 }
 
@@ -206,20 +210,67 @@ func (v *vgroup) diff(apis, nodes []slb.VBackendServerType) (
 	return addition, deletions
 }
 
-func (v *vgroup) Ensure(nodes []*v1.Node) error {
-
+func Ensure(v *vgroup, nodes interface{}) error {
 	var backend []slb.VBackendServerType
-	for _, node := range nodes {
-		_, id, err := nodeFromProviderID(node.Spec.ProviderID)
-		if err != nil {
-			return fmt.Errorf("ensure: error parse providerid. %s. expected: ${regionid}.${nodeid}", node.Spec.ProviderID)
+	switch nodes.(type) {
+	case []*v1.Node:
+		for _, node := range nodes.([]*v1.Node) {
+			_, id, err := nodeFromProviderID(node.Spec.ProviderID)
+			if err != nil {
+				return fmt.Errorf("ensure: error parse providerid. %s. expected: ${regionid}.${nodeid}", node.Spec.ProviderID)
+			}
+			backend = append(backend, slb.VBackendServerType{
+				ServerId: string(id),
+				Weight:   100,
+				Port:     int(v.NamedKey.Port),
+				Type:     "ecs",
+			})
 		}
-		backend = append(backend, slb.VBackendServerType{
-			ServerId: string(id),
-			Weight:   100,
-			Port:     int(v.NamedKey.Port),
-			Type:     "ecs",
-		})
+	case *v1.Endpoints:
+		targs := &ecs.DescribeNetworkInterfacesArgs{
+			VpcId:    v.VpcID,
+			RegionId: v.RegionId,
+		}
+		resp, err := v.InsClient.DescribeNetworkInterfaces(targs)
+		if err != nil {
+			return fmt.Errorf("call DescribeNetworkInterfaces: %s", err.Error())
+		}
+		for _, ep := range nodes.(*v1.Endpoints).Subsets {
+			for _, addr := range ep.Addresses {
+				found := false
+				eniid := ""
+				for _, eni := range resp.NetworkInterfaceSets.NetworkInterfaceSet {
+					for _, ip := range eni.PrivateIpSets.PrivateIpSet {
+						if addr.IP == ip.PrivateIpAddress {
+							found = true
+							eniid = eni.NetworkInterfaceId
+							break
+						}
+					}
+					if found {
+						break
+					}
+				}
+				if !found {
+					return fmt.Errorf("private ip address not found in openapi %s", addr.IP)
+				}
+				if eniid == "" {
+					return fmt.Errorf("unexpected empty eni id found %s", addr.IP)
+				}
+				backend = append(
+					backend,
+					slb.VBackendServerType{
+						ServerId: eniid,
+						Weight:   100,
+						Type:     "eni",
+						Port:     int(v.NamedKey.Port),
+						ServerIp: addr.IP,
+					},
+				)
+			}
+		}
+	default:
+		return fmt.Errorf("unknown backend type, %s", reflect.TypeOf(nodes))
 	}
 	v.BackendServers = backend
 	return v.Update()
@@ -227,13 +278,13 @@ func (v *vgroup) Ensure(nodes []*v1.Node) error {
 
 type vgroups []*vgroup
 
-func (vgrps *vgroups) EnsureVGroup(nodes []*v1.Node) error {
+func EnsureVirtualGroups(vgrps *vgroups, nodes interface{}) error {
 	glog.Infof("ensure vserver group: %d vgroup need to be processed.", len(*vgrps))
 	for _, v := range *vgrps {
 		if v == nil {
 			return fmt.Errorf("unexpected nil vgroup ")
 		}
-		if err := v.Ensure(nodes); err != nil {
+		if err := Ensure(v, nodes); err != nil {
 			return fmt.Errorf("ensure vgroup: %s. %s", err.Error(), v.NamedKey.Key())
 		}
 		glog.Infof("EnsureGroup: id=[%s], Name:[%s], LoadBalancerId:[%s]", v.VGroupId, v.NamedKey.Key(), v.LoadBalancerId)
@@ -242,11 +293,16 @@ func (vgrps *vgroups) EnsureVGroup(nodes []*v1.Node) error {
 }
 
 //CleanUPVGroupMerged Merge with service port and do clean vserver group
-func CleanUPVGroupMerged(service *v1.Service,
+func CleanUPVGroupMerged(
+	service *v1.Service,
 	lb *slb.LoadBalancerType,
-	client ClientSLBSDK, local *vgroups) error {
+	client ClientSLBSDK,
+	inclient ClientInstanceSDK,
+	vpcid string,
+	local *vgroups,
+) error {
 
-	remote, err := buildVGroupFromRemoteAPI(lb, client, lb.RegionId)
+	remote, err := buildVGroupFromRemoteAPI(lb, client, inclient, vpcid, lb.RegionId)
 	if err != nil {
 		return fmt.Errorf("build vserver group from remote: %s", err.Error())
 	}
@@ -301,10 +357,14 @@ func CleanUPVGroupDirect(local *vgroups) error {
 	return nil
 }
 
-func buildVGroupFromService(service *v1.Service,
+func buildVGroupFromService(
+	service *v1.Service,
 	lb *slb.LoadBalancerType,
 	client ClientSLBSDK,
-	region common.Region) *vgroups {
+	insclient ClientInstanceSDK,
+	vpcid string,
+	region common.Region,
+) *vgroups {
 	vgrps := vgroups{}
 	for _, port := range service.Spec.Ports {
 		vg := &vgroup{
@@ -318,6 +378,8 @@ func buildVGroupFromService(service *v1.Service,
 			LoadBalancerId: lb.LoadBalancerId,
 			Client:         client,
 			RegionId:       region,
+			InsClient:      insclient,
+			VpcID:          vpcid,
 		}
 		vgrps = append(vgrps, vg)
 	}
@@ -325,9 +387,13 @@ func buildVGroupFromService(service *v1.Service,
 	return &vgrps
 }
 
-func buildVGroupFromRemoteAPI(lb *slb.LoadBalancerType,
+func buildVGroupFromRemoteAPI(
+	lb *slb.LoadBalancerType,
 	client ClientSLBSDK,
-	region common.Region) (vgroups, error) {
+	insclient ClientInstanceSDK,
+	vpcid string,
+	region common.Region,
+) (vgroups, error) {
 	vgrps := vgroups{}
 	vargs := slb.DescribeVServerGroupsArgs{
 		RegionId:       region,
@@ -347,6 +413,8 @@ func buildVGroupFromRemoteAPI(lb *slb.LoadBalancerType,
 		vgrps = append(vgrps, &vgroup{
 			NamedKey:       key,
 			LoadBalancerId: lb.LoadBalancerId,
+			VpcID:          vpcid,
+			InsClient:      insclient,
 			Client:         client,
 			RegionId:       region,
 			VGroupId:       val.VServerGroupId,

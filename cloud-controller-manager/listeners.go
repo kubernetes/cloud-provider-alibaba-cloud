@@ -284,9 +284,14 @@ type Listeners []*Listener
 // 2. Second, build listeners from k8s service object.
 // 3. Third, Merge the up two listeners to decide whether add/update/remove is needed.
 // 4. Do update.  Clean unused vserver group.
-func EnsureListeners(client ClientSLBSDK,
+func EnsureListeners(
+	client ClientSLBSDK,
+	insclient ClientInstanceSDK,
+	vpcid string,
 	service *v1.Service,
-	lb *slb.LoadBalancerType, vgs *vgroups) error {
+	lb *slb.LoadBalancerType,
+	vgs *vgroups,
+) error {
 
 	local, err := buildListenersFromService(service, lb, client, vgs)
 	if err != nil {
@@ -329,7 +334,7 @@ func EnsureListeners(client ClientSLBSDK,
 		}
 	}
 
-	return CleanUPVGroupMerged(service, lb, client, vgs)
+	return CleanUPVGroupMerged(service, lb, client, insclient, vpcid, vgs)
 }
 
 func isDeleteAction(action string) bool { return action == ACTION_DELETE }
