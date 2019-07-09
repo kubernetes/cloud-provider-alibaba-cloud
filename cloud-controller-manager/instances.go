@@ -22,11 +22,13 @@ import (
 	"strings"
 	"sync"
 
+	"encoding/json"
 	"github.com/denverdino/aliyungo/common"
 	"github.com/denverdino/aliyungo/ecs"
 	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/cloud-provider-alibaba-cloud/cloud-controller-manager/controller/node"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 )
 
@@ -39,7 +41,9 @@ type InstanceClient struct {
 
 // ClientInstanceSDK instance sdk
 type ClientInstanceSDK interface {
+	AddTags(args *ecs.AddTagsArgs) error
 	DescribeInstances(args *ecs.DescribeInstancesArgs) (instances []ecs.InstanceAttributesType, pagination *common.PaginationResult, err error)
+	DescribeNetworkInterfaces(args *ecs.DescribeNetworkInterfacesArgs) (resp *ecs.DescribeNetworkInterfacesResponse, err error)
 }
 
 // filterOutByRegion Used for multi-region or multi-vpc. works for single region or vpc too.
@@ -135,10 +139,10 @@ func (s *InstanceClient) findAddressByNodeName(nodeName types.NodeName) ([]v1.No
 		return nil, err
 	}
 
-	return s.findAddressByInstance(instance)
+	return s.findAddressByInstance(instance), nil
 }
 
-func (s *InstanceClient) findAddressByInstance(instance *ecs.InstanceAttributesType) ([]v1.NodeAddress, error) {
+func (s *InstanceClient) findAddressByInstance(instance *ecs.InstanceAttributesType) []v1.NodeAddress {
 	addrs := []v1.NodeAddress{}
 
 	if len(instance.PublicIpAddress.IpAddress) > 0 {
@@ -167,7 +171,7 @@ func (s *InstanceClient) findAddressByInstance(instance *ecs.InstanceAttributesT
 		addrs = append(addrs, v1.NodeAddress{Type: v1.NodeInternalIP, Address: instance.VpcAttributes.NatIpAddress})
 	}
 
-	return addrs, nil
+	return addrs
 }
 
 // findAddressByProviderID returns an address slice by it's providerID.
@@ -179,7 +183,7 @@ func (s *InstanceClient) findAddressByProviderID(providerID string) ([]v1.NodeAd
 		return nil, err
 	}
 
-	return s.findAddressByInstance(instance)
+	return s.findAddressByInstance(instance), nil
 }
 
 // Returns instance information. Currently, we had a constraint that the name should has the same as provider id for compatibility concern.
@@ -192,27 +196,78 @@ func (s *InstanceClient) findInstanceByProviderID(providerID string) (*ecs.Insta
 	if err != nil {
 		return nil, err
 	}
-	return s.refreshInstance(nodeid, common.Region(region))
+	ins, err := s.getInstances([]string{nodeid}, region)
+	if len(ins) == 0 {
+		glog.Infof("alicloud: InstanceNotFound, instanceid=[%s.%s]. It is likely to be deleted.\n", region, nodeid)
+		return nil, cloudprovider.InstanceNotFound
+	}
+	if len(ins) > 1 {
+		glog.Warningf("alicloud: multipul instance found by nodename=[%s], "+
+			"the first one will be used, instanceid=[%s]\n", string(nodeid), ins[0].InstanceId)
+	}
+	return &ins[0], nil
 }
 
-func (s *InstanceClient) refreshInstance(nodeID string, region common.Region) (*ecs.InstanceAttributesType, error) {
+func (s *InstanceClient) ListInstances(ids []string) (map[string]*node.CloudNodeAttribute, error) {
+	var (
+		idsp   []string
+		region common.Region
+	)
+	for _, id := range ids {
+		regionid, nodeid, err := nodeFromProviderID(id)
+		if err != nil {
+			return nil, err
+		}
+		idsp = append(idsp, nodeid)
+		region = regionid
+	}
+	ins, err := s.getInstances(idsp, region)
+	if err != nil {
+		return nil, err
+	}
+	mins := make(map[string]*node.CloudNodeAttribute)
+	for _, id := range ids {
+		mins[id] = nil
+		for _, n := range ins {
+			if strings.Contains(id, n.InstanceId) {
+				mins[id] = &node.CloudNodeAttribute{
+					InstanceID:   n.InstanceId,
+					InstanceType: n.InstanceType,
+					Addresses:    s.findAddressByInstance(&n),
+				}
+				break
+			}
+		}
+	}
+	return mins, nil
+}
+
+func (s *InstanceClient) getInstances(ids []string, region common.Region) ([]ecs.InstanceAttributesType, error) {
+	bids, err := json.Marshal(ids)
+	if err != nil {
+		return nil, fmt.Errorf("get instances error: %s", err.Error())
+	}
 	args := ecs.DescribeInstancesArgs{
 		RegionId:    region,
-		InstanceIds: fmt.Sprintf("[\"%s\"]", nodeID),
+		InstanceIds: string(bids),
+		Pagination:  common.Pagination{PageSize: 50},
 	}
 
 	instances, _, err := s.c.DescribeInstances(&args)
 	if err != nil {
-		glog.Errorf("alicloud: calling DescribeInstances error. region=%s, instancename=%s, message=[%s].\n", args.RegionId, args.InstanceName, err.Error())
+		glog.Errorf("alicloud: calling DescribeInstances error. region=%s, "+
+			"instancename=%s, message=[%s].\n", args.RegionId, args.InstanceName, err.Error())
 		return nil, err
 	}
+	return instances, nil
+}
 
-	if len(instances) == 0 {
-		glog.Infof("alicloud: InstanceNotFound, instanceid=[%s.%s]. It is likely to be deleted.\n", region, nodeID)
-		return nil, cloudprovider.InstanceNotFound
+func (s *InstanceClient) AddCloudTags(id string, tags map[string]string, region common.Region) error {
+	args := &ecs.AddTagsArgs{
+		ResourceId:   id,
+		Tag:          tags,
+		RegionId:     region,
+		ResourceType: ecs.TagResourceInstance,
 	}
-	if len(instances) > 1 {
-		glog.Warningf("alicloud: multipul instance found by nodename=[%s], the first one will be used, instanceid=[%s]\n", string(nodeID), instances[0].InstanceId)
-	}
-	return &instances[0], nil
+	return s.c.AddTags(args)
 }

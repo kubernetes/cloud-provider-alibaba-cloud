@@ -113,8 +113,8 @@ func New(routes Routes,
 func (rc *RouteController) Run(stopCh <-chan struct{}, syncPeriod time.Duration) {
 	defer utilruntime.HandleCrash()
 
-	glog.Info("Starting route controller")
-	defer glog.Info("Shutting down route controller")
+	glog.Info("starting route controller")
+	defer glog.Info("shutting down route controller")
 
 	if !controller.WaitForCacheSync(ROUTE_CONTROLLER, stopCh, rc.nodeListerSynced) {
 		return
@@ -163,7 +163,7 @@ func (rc *RouteController) reconcile() error {
 	return nil
 }
 
-// Aoxn: Alibaba Cloud does not support concurrent route operation
+// Aoxn: Alibaba cloud does not support concurrent route operation
 func (rc *RouteController) sync(table string, nodes []*v1.Node, routes []*cloudprovider.Route) error {
 
 	//try delete conflicted route from vpc route table.
@@ -175,7 +175,7 @@ func (rc *RouteController) sync(table string, nodes []*v1.Node, routes []*cloudp
 		// Check if this route is a blackhole, or applies to a node we know about & has an incorrect CIDR.
 		if route.Blackhole || rc.isRouteConflicted(nodes, route) {
 
-			// Aoxn: Alibaba Cloud does not support concurrent route operation
+			// Aoxn: Alibaba cloud does not support concurrent route operation
 			glog.Infof("Deleting route %s %s", route.Name, route.DestinationCIDR)
 			if err := rc.routes.DeleteRoute(rc.clusterName, table, route); err != nil {
 				glog.Errorf("Could not delete route %s %s from table %s, %s", route.Name, route.DestinationCIDR, table, err.Error())
@@ -237,9 +237,9 @@ func (rc *RouteController) tryCreateRoute(table string,
 
 		backoff := wait.Backoff{
 			Duration: 4 * time.Second,
+			Steps:    3,
 			Factor:   2,
 			Jitter:   1,
-			Steps:    8,
 		}
 		var lasterr error
 		err := wait.ExponentialBackoff(backoff, func() (bool, error) {

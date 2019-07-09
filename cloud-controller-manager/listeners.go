@@ -22,6 +22,8 @@ import (
 	"github.com/denverdino/aliyungo/slb"
 	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
+	"k8s.io/cloud-provider-alibaba-cloud/cloud-controller-manager/controller/service"
+	"sort"
 	"strconv"
 	"strings"
 )
@@ -283,21 +285,46 @@ type Listeners []*Listener
 // 2. Second, build listeners from k8s service object.
 // 3. Third, Merge the up two listeners to decide whether add/update/remove is needed.
 // 4. Do update.  Clean unused vserver group.
-func EnsureListeners(client ClientSLBSDK,
+func EnsureListeners(
+	slbins *LoadBalancerClient,
 	service *v1.Service,
-	lb *slb.LoadBalancerType, vgs *vgroups) error {
+	lb *slb.LoadBalancerType,
+	vgs *vgroups,
+) error {
 
-	local, err := buildListenersFromService(service, lb, client, vgs)
+	local, err := BuildListenersFromService(service, lb, slbins.c, vgs)
 	if err != nil {
 		return fmt.Errorf("build listener from service: %s", err.Error())
 	}
 
 	// Merge listeners generate an listener list to be updated/deleted/added.
-	updates, err := mergeListeners(service, local, buildListenersFromAPI(service, lb, client, vgs))
+	updates, err := mergeListeners(service, local, BuildListenersFromAPI(service, lb, slbins.c, vgs))
 	if err != nil {
 		return fmt.Errorf("merge listener: %s", err.Error())
 	}
 	glog.Infof("ensure listener: %d updates for %s", len(updates), lb.LoadBalancerId)
+
+	// make https come first.
+	// ensure https listeners to be created first for http forward
+	sort.SliceStable(
+		updates,
+		func(i, j int) bool {
+			// 1. https comes first.
+			// 2. DELETE action comes before https
+			if isDeleteAction(updates[i].Action) {
+				return true
+			}
+			if isDeleteAction(updates[j].Action) {
+				return false
+			}
+			if strings.ToUpper(
+				updates[i].TransforedProto,
+			) == "HTTPS" {
+				return true
+			}
+			return false
+		},
+	)
 	// do update/add/delete
 	for _, up := range updates {
 		err := up.Apply()
@@ -306,19 +333,24 @@ func EnsureListeners(client ClientSLBSDK,
 		}
 	}
 
-	return CleanUPVGroupMerged(service, lb, client, vgs)
+	return CleanUPVGroupMerged(slbins, service, lb, vgs)
 }
 
-// EnsureListenersDeleted Only listener which owned by my service was deleted.
-func EnsureListenersDeleted(client ClientSLBSDK,
-	service *v1.Service,
-	lb *slb.LoadBalancerType, vgs *vgroups) error {
+func isDeleteAction(action string) bool { return action == ACTION_DELETE }
 
-	local, err := buildListenersFromService(service, lb, client, vgs)
+// EnsureListenersDeleted Only listener which owned by my service was deleted.
+func EnsureListenersDeleted(
+	client ClientSLBSDK,
+	service *v1.Service,
+	lb *slb.LoadBalancerType,
+	vgs *vgroups,
+) error {
+
+	local, err := BuildListenersFromService(service, lb, client, vgs)
 	if err != nil {
 		return fmt.Errorf("build listener from service: %s", err.Error())
 	}
-	remote := buildListenersFromAPI(service, lb, client, vgs)
+	remote := BuildListenersFromAPI(service, lb, client, vgs)
 
 	for _, loc := range local {
 		for _, rem := range remote {
@@ -357,8 +389,14 @@ func isUserManagedListener(remote *Listener) bool {
 // 3. We assume listener with an arbitrary name to be user managed listener.
 // 4. LoadBalancer created by kubernetes is not allowed to be reused.
 func mergeListeners(svc *v1.Service, service, console Listeners) (Listeners, error) {
-	override := isOverrideListeners(serviceAnnotation(svc, ServiceAnnotationLoadBalancerOverrideListener))
-	addition, updation, deletion := Listeners{}, Listeners{}, Listeners{}
+	override := isOverrideListeners(
+		serviceAnnotation(svc, ServiceAnnotationLoadBalancerOverrideListener),
+	)
+	var (
+		addition = Listeners{}
+		updation = Listeners{}
+		deletion = Listeners{}
+	)
 	// For updations and deletions
 	for _, remote := range console {
 
@@ -370,7 +408,7 @@ func mergeListeners(svc *v1.Service, service, console Listeners) (Listeners, err
 					if !override {
 						// port conflict with user managed port.
 						return nil, fmt.Errorf("port matched, but conflict with user managed port. "+
-							"Port:%d, ListenerName:%s, Service: %s. Protocol:[source:%s dst:%s]",
+							"Port:%d, ListenerName:%s, svc: %s. Protocol:[source:%s dst:%s]",
 							remote.Port, remote.Name, local.NamedKey.Key(), remote.TransforedProto, local.TransforedProto)
 					}
 					overridePort = true
@@ -445,31 +483,41 @@ func mergeListeners(svc *v1.Service, service, console Listeners) (Listeners, err
 	return append(append(deletion, addition...), updation...), nil
 }
 
-// buildListenersFromService Build expected listeners
-func buildListenersFromService(service *v1.Service,
+func isEniBackend(svc *v1.Service) bool {
+	return svc.Annotations[service.BACKEND_TYPE_LABEL] == "eni"
+}
+
+// BuildListenersFromService Build expected listeners
+func BuildListenersFromService(
+	svc *v1.Service,
 	lb *slb.LoadBalancerType,
-	client ClientSLBSDK, vgrps *vgroups) (Listeners, error) {
+	client ClientSLBSDK,
+	vgrps *vgroups,
+) (Listeners, error) {
 	listeners := Listeners{}
-	for _, port := range service.Spec.Ports {
-		proto, err := Protocol(serviceAnnotation(service, ServiceAnnotationLoadBalancerProtocolPort), port)
+	for _, port := range svc.Spec.Ports {
+		proto, err := Protocol(serviceAnnotation(svc, ServiceAnnotationLoadBalancerProtocolPort), port)
 		if err != nil {
 			return nil, err
 		}
 		n := Listener{
 			NamedKey: &NamedKey{
 				CID:         CLUSTER_ID,
-				Namespace:   service.Namespace,
-				ServiceName: service.Name,
+				Namespace:   svc.Namespace,
+				ServiceName: svc.Name,
 				Port:        port.Port,
 				Prefix:      DEFAULT_PREFIX},
 			Port:            port.Port,
 			NodePort:        port.NodePort,
 			Proto:           string(port.Protocol),
-			Service:         service,
+			Service:         svc,
 			TransforedProto: proto,
 			Client:          client,
 			VGroups:         vgrps,
 			LoadBalancerID:  lb.LoadBalancerId,
+		}
+		if isEniBackend(svc) {
+			n.NodePort = port.Port
 		}
 		n.Name = n.NamedKey.Key()
 		listeners = append(listeners, &n)
@@ -477,10 +525,13 @@ func buildListenersFromService(service *v1.Service,
 	return listeners, nil
 }
 
-// buildListenersFromAPI Load current listeners
-func buildListenersFromAPI(service *v1.Service,
+// BuildListenersFromAPI Load current listeners
+func BuildListenersFromAPI(
+	service *v1.Service,
 	lb *slb.LoadBalancerType,
-	client ClientSLBSDK, vgrps *vgroups) (listeners Listeners) {
+	client ClientSLBSDK,
+	vgrps *vgroups,
+) (listeners Listeners) {
 	ports := lb.ListenerPortsAndProtocol.ListenerPortAndProtocol
 	for _, port := range ports {
 		key, err := LoadNamedKey(port.Description)
@@ -518,11 +569,15 @@ func (t *tcp) Add() error {
 			ListenerPort:      int(t.Port),
 			BackendServerPort: int(t.NodePort),
 			//Health Check
+			Scheduler:          slb.SchedulerType(def.Scheduler),
 			Bandwidth:          DEFAULT_LISTENER_BANDWIDTH,
 			PersistenceTimeout: def.PersistenceTimeout,
 			Description:        t.NamedKey.Key(),
 
 			VServerGroupId:            t.findVgroup(t.NamedKey.Reference(t.NodePort)),
+			AclType:                   def.AclType,
+			AclStatus:                 def.AclStatus,
+			AclId:                     def.AclID,
 			HealthCheckType:           def.HealthCheckType,
 			HealthCheckURI:            def.HealthCheckURI,
 			HealthCheckConnectPort:    def.HealthCheckConnectPort,
@@ -549,10 +604,14 @@ func (t *tcp) Update() error {
 		BackendServerPort: int(t.NodePort),
 		Description:       t.NamedKey.Key(),
 		//Health Check
+		Scheduler:          slb.SchedulerType(response.Scheduler),
 		Bandwidth:          DEFAULT_LISTENER_BANDWIDTH,
 		PersistenceTimeout: response.PersistenceTimeout,
 		VServerGroupId:     t.findVgroup(t.NamedKey.Reference(t.NodePort)),
 
+		AclType:                   response.AclType,
+		AclStatus:                 response.AclStatus,
+		AclId:                     response.AclId,
 		HealthCheckType:           response.HealthCheckType,
 		HealthCheckURI:            response.HealthCheckURI,
 		HealthCheckConnectPort:    response.HealthCheckConnectPort,
@@ -573,6 +632,25 @@ func (t *tcp) Update() error {
 			glog.V(2).Infof("TCP listener checker [bandwidth] changed, request=%d. response=%d", def.Bandwidth, response.Bandwidth)
 		}
 	*/
+
+	if def.AclStatus != response.AclStatus {
+		needUpdate = true
+		config.AclStatus = def.AclStatus
+	}
+	if def.AclID != response.AclId {
+		needUpdate = true
+		config.AclId = def.AclID
+	}
+	if def.AclType != response.AclType {
+		needUpdate = true
+		config.AclType = def.AclType
+	}
+
+	if request.Scheduler != "" &&
+		def.Scheduler != string(response.Scheduler) {
+		needUpdate = true
+		config.Scheduler = slb.SchedulerType(def.Scheduler)
+	}
 
 	// todo: perform healthcheck update.
 	if def.HealthCheckType != response.HealthCheckType {
@@ -634,11 +712,11 @@ func (t *tcp) Update() error {
 		return t.Client.CreateLoadBalancerTCPListener((*slb.CreateLoadBalancerTCPListenerArgs)(config))
 	}
 	if !needUpdate {
-		glog.V(2).Infof("alicloud: tcp listener did not change, skip [update], port=[%d], nodeport=[%d]\n", t.Port, t.NodePort)
+		glog.Infof("alicloud: tcp listener did not change, skip [update], port=[%d], nodeport=[%d]\n", t.Port, t.NodePort)
 		// no recreate needed.  skip
 		return nil
 	}
-	glog.V(2).Infof("TCP listener checker changed, request update listener attribute [%s]\n", t.LoadBalancerID)
+	glog.Infof("TCP listener checker changed, request update listener attribute [%s]\n", t.LoadBalancerID)
 	glog.V(5).Infof(PrettyJson(def))
 	glog.V(5).Infof(PrettyJson(response))
 	return t.Client.SetLoadBalancerTCPListenerAttribute(config)
@@ -659,9 +737,13 @@ func (t *udp) Add() error {
 			Description:       t.NamedKey.Key(),
 			VServerGroupId:    t.findVgroup(t.NamedKey.Reference(t.NodePort)),
 			//Health Check
+			Scheduler:          slb.SchedulerType(def.Scheduler),
 			Bandwidth:          DEFAULT_LISTENER_BANDWIDTH,
 			PersistenceTimeout: def.PersistenceTimeout,
 
+			AclType:   def.AclType,
+			AclStatus: def.AclStatus,
+			AclId:     def.AclID,
 			//HealthCheckType:           request.HealthCheckType,
 			//HealthCheckURI:            request.HealthCheckURI,
 			HealthCheckConnectPort:    def.HealthCheckConnectPort,
@@ -686,7 +768,11 @@ func (t *udp) Update() error {
 		BackendServerPort: int(t.NodePort),
 		Description:       t.NamedKey.Key(),
 		VServerGroupId:    t.findVgroup(t.NamedKey.Reference(t.NodePort)),
+		AclType:           response.AclType,
+		AclStatus:         response.AclStatus,
+		AclId:             response.AclId,
 		//Health Check
+		Scheduler:          slb.SchedulerType(response.Scheduler),
 		Bandwidth:          DEFAULT_LISTENER_BANDWIDTH,
 		PersistenceTimeout: response.PersistenceTimeout,
 		//HealthCheckType:           response.HealthCheckType,
@@ -707,7 +793,24 @@ func (t *udp) Update() error {
 			glog.V(2).Infof("UDP listener checker [bandwidth] changed, request=%d. response=%d", request.Bandwidth, response.Bandwidth)
 		}
 	*/
+	if def.AclStatus != response.AclStatus {
+		needUpdate = true
+		config.AclStatus = def.AclStatus
+	}
+	if def.AclID != response.AclId {
+		needUpdate = true
+		config.AclId = def.AclID
+	}
+	if def.AclType != response.AclType {
+		needUpdate = true
+		config.AclType = def.AclType
+	}
 
+	if request.Scheduler != "" &&
+		def.Scheduler != string(response.Scheduler) {
+		needUpdate = true
+		config.Scheduler = slb.SchedulerType(def.Scheduler)
+	}
 	// todo: perform healthcheck update.
 	if request.HealthCheckConnectPort != 0 &&
 		def.HealthCheckConnectPort != response.HealthCheckConnectPort {
@@ -741,7 +844,8 @@ func (t *udp) Update() error {
 	// backend server port has changed.
 	if int(t.NodePort) != response.BackendServerPort {
 		config.BackendServerPort = int(t.NodePort)
-		glog.V(2).Infof("UDP listener checker [BackendServerPort] changed, request=%d. response=%d", t.NodePort, response.BackendServerPort)
+		glog.Infof("alicloud: udp listener checker [BackendServerPort] changed, "+
+			"request=%d. response=%d", t.NodePort, response.BackendServerPort)
 		err := t.Client.DeleteLoadBalancerListener(t.LoadBalancerID, int(t.Port))
 		if err != nil {
 			return err
@@ -750,11 +854,12 @@ func (t *udp) Update() error {
 	}
 
 	if !needUpdate {
-		glog.V(2).Infof("alicloud: udp listener did not change, skip [update], port=[%d], nodeport=[%d]\n", t.Port, t.NodePort)
+		glog.Infof("alicloud: udp listener did not change, skip "+
+			"[update], port=[%d], nodeport=[%d]\n", t.Port, t.NodePort)
 		// no recreate needed.  skip
 		return nil
 	}
-	glog.V(2).Infof("UDP listener checker changed, request recreate [%s]\n", t.LoadBalancerID)
+	glog.Infof("alicloud: UDP listener checker changed, request recreate [%s]\n", t.LoadBalancerID)
 	glog.V(5).Infof(PrettyJson(request))
 	glog.V(5).Infof(PrettyJson(response))
 	return t.Client.SetLoadBalancerUDPListenerAttribute(config)
@@ -767,32 +872,72 @@ func (t *http) Describe() error {
 }
 func (t *http) Add() error {
 	def, request := ExtractAnnotationRequest(t.Service)
-	return t.Client.CreateLoadBalancerHTTPListener(
-		&slb.CreateLoadBalancerHTTPListenerArgs{
-			LoadBalancerId:    t.LoadBalancerID,
-			ListenerPort:      int(t.Port),
-			BackendServerPort: int(t.NodePort),
-			Description:       t.NamedKey.Key(),
-			VServerGroupId:    t.findVgroup(t.NamedKey.Reference(t.NodePort)),
-			//Health Check
-			Bandwidth:         DEFAULT_LISTENER_BANDWIDTH,
-			StickySession:     def.StickySession,
-			StickySessionType: def.StickySessionType,
-			CookieTimeout:     def.CookieTimeout,
-			Cookie:            def.Cookie,
+	httpc := &slb.CreateLoadBalancerHTTPListenerArgs{
+		LoadBalancerId:    t.LoadBalancerID,
+		ListenerPort:      int(t.Port),
+		BackendServerPort: int(t.NodePort),
+		Description:       t.NamedKey.Key(),
+		VServerGroupId:    t.findVgroup(t.NamedKey.Reference(t.NodePort)),
+		//Health Check
+		Scheduler:         slb.SchedulerType(def.Scheduler),
+		Bandwidth:         DEFAULT_LISTENER_BANDWIDTH,
+		StickySession:     def.StickySession,
+		StickySessionType: def.StickySessionType,
+		CookieTimeout:     def.CookieTimeout,
+		Cookie:            def.Cookie,
 
-			//HealthCheckType:           request.HealthCheckType,
-			HealthCheckURI:         request.HealthCheckURI,
-			HealthCheckConnectPort: request.HealthCheckConnectPort,
-			HealthyThreshold:       request.HealthyThreshold,
-			UnhealthyThreshold:     request.UnhealthyThreshold,
-			//HealthCheckConnectTimeout: request.HealthCheckConnectTimeout,
-			HealthCheckInterval: request.HealthCheckInterval,
-			HealthCheckDomain:   def.HealthCheckDomain,
-			HealthCheck:         def.HealthCheck,
-			HealthCheckTimeout:  def.HealthCheckTimeout,
-			HealthCheckHttpCode: def.HealthCheckHttpCode,
-		})
+		AclType:   def.AclType,
+		AclStatus: def.AclStatus,
+		AclId:     def.AclID,
+		//HealthCheckType:           request.HealthCheckType,
+		HealthCheckURI:         request.HealthCheckURI,
+		HealthCheckConnectPort: request.HealthCheckConnectPort,
+		HealthyThreshold:       request.HealthyThreshold,
+		UnhealthyThreshold:     request.UnhealthyThreshold,
+		//HealthCheckConnectTimeout: request.HealthCheckConnectTimeout,
+		HealthCheckInterval: request.HealthCheckInterval,
+		HealthCheckDomain:   def.HealthCheckDomain,
+		HealthCheck:         def.HealthCheck,
+		HealthCheckTimeout:  def.HealthCheckTimeout,
+		HealthCheckHttpCode: def.HealthCheckHttpCode,
+	}
+	forward := forwardPort(def.ForwardPort, t.Port)
+	if forward != 0 {
+		httpc.ListenerForward = slb.OnFlag
+	} else {
+		httpc.ListenerForward = slb.OffFlag
+	}
+	httpc.ForwardPort = int(forward)
+	return t.Client.CreateLoadBalancerHTTPListener(httpc)
+}
+
+func forwardPort(port string, target int32) int32 {
+	if port == "" {
+		return 0
+	}
+	forwarded := ""
+	tmps := strings.Split(port, ",")
+	for _, v := range tmps {
+		ports := strings.Split(v, ":")
+		if len(ports) != 2 {
+			glog.Infof("forward-port format error: %s, expect 80:443,88:6443", port)
+			continue
+		}
+		if ports[0] == strconv.Itoa(int(target)) {
+			forwarded = ports[1]
+			break
+		}
+	}
+	if forwarded != "" {
+		forward, err := strconv.Atoi(forwarded)
+		if err != nil {
+			glog.Errorf("forward port is not an integer, %s", forwarded)
+			return 0
+		}
+		glog.Infof("forward http port %d to %d", target, forward)
+		return int32(forward)
+	}
+	return 0
 }
 
 func (t *http) Update() error {
@@ -807,6 +952,7 @@ func (t *http) Update() error {
 		ListenerPort:      int(t.Port),
 		BackendServerPort: int(t.NodePort),
 		//Health Check
+		Scheduler:         slb.SchedulerType(response.Scheduler),
 		Bandwidth:         DEFAULT_LISTENER_BANDWIDTH,
 		StickySession:     response.StickySession,
 		StickySessionType: response.StickySessionType,
@@ -815,6 +961,9 @@ func (t *http) Update() error {
 		Description:       t.NamedKey.Key(),
 		VServerGroupId:    t.findVgroup(t.NamedKey.Reference(t.NodePort)),
 
+		AclType:                response.AclType,
+		AclStatus:              response.AclStatus,
+		AclId:                  response.AclId,
 		HealthCheck:            response.HealthCheck,
 		HealthCheckURI:         response.HealthCheckURI,
 		HealthCheckConnectPort: response.HealthCheckConnectPort,
@@ -826,6 +975,7 @@ func (t *http) Update() error {
 		HealthCheckInterval:    response.HealthCheckInterval,
 	}
 	needUpdate := false
+	needRecrete := false
 	/*
 		if request.Bandwidth != 0 &&
 			request.Bandwidth != response.Bandwidth {
@@ -834,7 +984,23 @@ func (t *http) Update() error {
 			glog.V(2).Infof("HTTP listener checker [bandwidth] changed, request=%d. response=%d", request.Bandwidth, response.Bandwidth)
 		}
 	*/
-
+	if def.AclStatus != response.AclStatus {
+		needUpdate = true
+		config.AclStatus = def.AclStatus
+	}
+	if def.AclID != response.AclId {
+		needUpdate = true
+		config.AclId = def.AclID
+	}
+	if def.AclType != response.AclType {
+		needUpdate = true
+		config.AclType = def.AclType
+	}
+	if request.Scheduler != "" &&
+		def.Scheduler != string(response.Scheduler) {
+		needUpdate = true
+		config.Scheduler = slb.SchedulerType(def.Scheduler)
+	}
 	// todo: perform healthcheck update.
 	if def.HealthCheck != response.HealthCheck {
 		needUpdate = true
@@ -900,10 +1066,26 @@ func (t *http) Update() error {
 		needUpdate = true
 		config.HealthCheckDomain = def.HealthCheckDomain
 	}
+	forward := forwardPort(def.ForwardPort, t.Port)
+	if forward != 0 {
+		if response.ListenerForward != slb.OnFlag {
+			needRecrete = true
+			config.ListenerForward = slb.OnFlag
+		}
+	} else {
+		if response.ListenerForward != slb.OffFlag {
+			needRecrete = true
+			config.ListenerForward = slb.OffFlag
+		}
+	}
+	config.ForwardPort = int(forward)
 	// backend server port has changed.
-	if int(t.NodePort) != response.BackendServerPort {
+	if needRecrete ||
+		int(t.NodePort) != response.BackendServerPort {
+
 		config.BackendServerPort = int(t.NodePort)
-		glog.V(2).Infof("HTTP listener checker [BackendServerPort] changed, request=%d. response=%d", t.NodePort, response.BackendServerPort)
+		glog.Infof("alicloud: HTTP listener checker [BackendServerPort]"+
+			" changed, request=%d. response=%d", t.NodePort, response.BackendServerPort)
 		err := t.Client.DeleteLoadBalancerListener(t.LoadBalancerID, int(t.Port))
 		if err != nil {
 			return err
@@ -912,11 +1094,11 @@ func (t *http) Update() error {
 	}
 
 	if !needUpdate {
-		glog.V(2).Infof("alicloud: http listener did not change, skip [update], port=[%d], nodeport=[%d]\n", t.Port, t.NodePort)
+		glog.Infof("alicloud: http listener did not change, skip [update], port=[%d], nodeport=[%d]\n", t.Port, t.NodePort)
 		// no recreate needed.  skip
 		return nil
 	}
-	glog.V(2).Infof("HTTP listener checker changed, request recreate [%s]\n", t.LoadBalancerID)
+	glog.Infof("alicloud: http listener checker changed, request update [%s]\n", t.LoadBalancerID)
 	glog.V(5).Infof(PrettyJson(request))
 	glog.V(5).Infof(PrettyJson(response))
 	return t.Client.SetLoadBalancerHTTPListenerAttribute(config)
@@ -938,7 +1120,11 @@ func (t *https) Add() error {
 				BackendServerPort: int(t.NodePort),
 				Description:       t.NamedKey.Key(),
 				VServerGroupId:    t.findVgroup(t.NamedKey.Reference(t.NodePort)),
+				AclType:           def.AclType,
+				AclStatus:         def.AclStatus,
+				AclId:             def.AclID,
 				//Health Check
+				Scheduler:         slb.SchedulerType(def.Scheduler),
 				HealthCheck:       def.HealthCheck,
 				Bandwidth:         DEFAULT_LISTENER_BANDWIDTH,
 				StickySession:     def.StickySession,
@@ -974,6 +1160,7 @@ func (t *https) Update() error {
 			Description:       t.NamedKey.Key(),
 			VServerGroupId:    t.findVgroup(t.NamedKey.Reference(t.NodePort)),
 			//Health Check
+			Scheduler:         slb.SchedulerType(response.Scheduler),
 			HealthCheck:       response.HealthCheck,
 			Bandwidth:         DEFAULT_LISTENER_BANDWIDTH,
 			StickySession:     response.StickySession,
@@ -981,6 +1168,9 @@ func (t *https) Update() error {
 			CookieTimeout:     response.CookieTimeout,
 			Cookie:            response.Cookie,
 
+			AclType:                response.AclType,
+			AclStatus:              response.AclStatus,
+			AclId:                  response.AclId,
 			HealthCheckURI:         response.HealthCheckURI,
 			HealthCheckConnectPort: response.HealthCheckConnectPort,
 			HealthyThreshold:       response.HealthyThreshold,
@@ -999,7 +1189,7 @@ func (t *https) Update() error {
 			request.Bandwidth != response.Bandwidth {
 			needUpdate = true
 			config.Bandwidth = request.Bandwidth
-			glog.V(2).Infof("HTTPS listener checker [bandwidth] changed, request=%d. response=%d", request.Bandwidth, response.Bandwidth)
+			glog.Infof("HTTPS listener checker [bandwidth] changed, request=%d. response=%d", request.Bandwidth, response.Bandwidth)
 		}
 	*/
 	// todo: perform healthcheck update.
@@ -1011,6 +1201,23 @@ func (t *https) Update() error {
 		def.HealthCheckURI != response.HealthCheckURI {
 		needUpdate = true
 		config.HealthCheckURI = def.HealthCheckURI
+	}
+	if def.AclStatus != response.AclStatus {
+		needUpdate = true
+		config.AclStatus = def.AclStatus
+	}
+	if def.AclID != response.AclId {
+		needUpdate = true
+		config.AclId = def.AclID
+	}
+	if def.AclType != response.AclType {
+		needUpdate = true
+		config.AclType = def.AclType
+	}
+	if request.Scheduler != "" &&
+		def.Scheduler != string(response.Scheduler) {
+		needUpdate = true
+		config.Scheduler = slb.SchedulerType(def.Scheduler)
 	}
 	if request.HealthCheckConnectPort != 0 &&
 		def.HealthCheckConnectPort != response.HealthCheckConnectPort {
@@ -1068,11 +1275,16 @@ func (t *https) Update() error {
 		needUpdate = true
 		config.HealthCheckDomain = def.HealthCheckDomain
 	}
+	if request.CertID != "" &&
+		def.CertID != response.ServerCertificateId {
+		needUpdate = true
+		config.ServerCertificateId = def.CertID
+	}
 	// backend server port has changed.
 	if int(t.NodePort) != response.BackendServerPort {
 		needUpdate = true
 		config.BackendServerPort = int(t.NodePort)
-		glog.V(2).Infof("HTTPS listener checker [BackendServerPort] changed, request=%d. response=%d", t.NodePort, response.BackendServerPort)
+		glog.Infof("alicloud: listener checker [BackendServerPort] changed, request=%d. response=%d", t.NodePort, response.BackendServerPort)
 		err := t.Client.DeleteLoadBalancerListener(t.LoadBalancerID, int(t.Port))
 		if err != nil {
 			return err
@@ -1081,11 +1293,11 @@ func (t *https) Update() error {
 	}
 
 	if !needUpdate {
-		glog.V(2).Infof("alicloud: https listener did not change, skip [update], port=[%d], nodeport=[%d]\n", t.Port, t.NodePort)
+		glog.Infof("alicloud: https listener did not change, skip [update], port=[%d], nodeport=[%d]\n", t.Port, t.NodePort)
 		// no recreate needed.  skip
 		return nil
 	}
-	glog.V(2).Infof("HTTPS listener checker changed, request recreate [%s]\n", t.LoadBalancerID)
+	glog.Infof("alicloud: https listener checker changed, request recreate [%s]\n", t.LoadBalancerID)
 	glog.V(5).Infof(PrettyJson(request))
 	glog.V(5).Infof(PrettyJson(response))
 	return t.Client.SetLoadBalancerHTTPSListenerAttribute(config)

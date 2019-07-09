@@ -42,6 +42,7 @@ type DescribeNetworkInterfacesArgs struct {
 	NetworkInterfaceId   []string `query:"list"`
 	PageNumber           int
 	PageSize             int
+	VpcId				 string
 }
 type NetworkInterfaceType struct {
 	NetworkInterfaceId   string
