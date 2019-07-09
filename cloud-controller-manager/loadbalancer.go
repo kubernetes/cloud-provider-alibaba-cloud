@@ -131,8 +131,9 @@ type ClientSLBSDK interface {
 
 // LoadBalancerClient slb client wrapper
 type LoadBalancerClient struct {
-	vpcid string
-	c     ClientSLBSDK
+	region string
+	vpcid  string
+	c      ClientSLBSDK
 	// known service resource version
 	ins ClientInstanceSDK
 }
@@ -420,7 +421,7 @@ func (s *LoadBalancerClient) EnsureLoadBalancer(service *v1.Service, nodes inter
 		glog.Errorf("alicloud: can not get loadbalancer[%s] attribute. ", origined.LoadBalancerId)
 		return nil, err
 	}
-	vgs := buildVGroupFromService(service, origined, s.c, s.ins, s.vpcid, origined.RegionId)
+	vgs := BuildVirturalGroupFromService(s, service, origined)
 
 	// Make sure virtual server backend group has been updated.
 	if err := EnsureVirtualGroups(vgs, nodes); err != nil {
@@ -434,7 +435,7 @@ func (s *LoadBalancerClient) EnsureLoadBalancer(service *v1.Service, nodes inter
 		glog.V(2).Infof("alicloud: not user defined loadbalancer[%s], start to apply listener.\n", origined.LoadBalancerId)
 		// If listener update is needed. Switch to vserver group immediately.
 		// No longer update default backend servers.
-		if err := EnsureListeners(s.c, s.ins, s.vpcid, service, origined, vgs); err != nil {
+		if err := EnsureListeners(s, service, origined, vgs); err != nil {
 
 			return origined, fmt.Errorf("ensure listener error: %s", err.Error())
 		}
@@ -462,7 +463,7 @@ func (s *LoadBalancerClient) UpdateLoadBalancer(service *v1.Service, nodes inter
 		return fmt.Errorf("the loadbalance you specified by name [%s] does not exist", service.Name)
 	}
 	if withVgroup {
-		vgs := buildVGroupFromService(service, lb, s.c, s.ins, s.vpcid, lb.RegionId)
+		vgs := BuildVirturalGroupFromService(s, service, lb)
 		if err := EnsureVirtualGroups(vgs, nodes); err != nil {
 			return fmt.Errorf("update backend servers: error %s", err.Error())
 		}
@@ -524,7 +525,7 @@ func (s *LoadBalancerClient) EnsureLoadBalanceDeleted(service *v1.Service) error
 	if isUserDefinedLoadBalancer(request) {
 		glog.Infof("alicloud: user managed "+
 			"loadbalancer will not be deleted by cloudprovider. service [%s]", service.Name)
-		return EnsureListenersDeleted(s.c, service, lb, buildVGroupFromService(service, lb, s.c, s.ins, s.vpcid, lb.RegionId))
+		return EnsureListenersDeleted(s.c, service, lb, BuildVirturalGroupFromService(s, service, lb))
 	}
 
 	return s.c.DeleteLoadBalancer(lb.LoadBalancerId)
@@ -551,7 +552,7 @@ func (s *LoadBalancerClient) getLoadBalancerOpts(service *v1.Service, vswitchid 
 		strings.Compare(string(ar.AddressType), string(slb.IntranetAddressType)) == 0 {
 
 		glog.Infof("alicloud: intranet vpc "+
-			"loadbalancer will be created. address type=%s, switchid=%s\n", ar.AddressType, vswitchid)
+			"loadbalancer will be created. address type=%s, switchid=%s", ar.AddressType, vswitchid)
 		args.VSwitchId = vswitchid
 	}
 	args.LoadBalancerName = cloudprovider.GetLoadBalancerName(service)

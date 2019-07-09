@@ -52,7 +52,7 @@ type EnsureENI interface {
 	// status of the balancer. Implementations must treat the *v1.svc and *v1.Endpoints
 	// parameters as read-only and not modify them.
 	// Parameter 'name' is the name of the cluster as presented to kube-controller-manager
-	EnsureLoadbalancerWithENI(name string, svc *v1.Service, endpoint *v1.Endpoints) (*v1.LoadBalancerStatus, error)
+	EnsureLoadBalancerWithENI(name string, svc *v1.Service, endpoint *v1.Endpoints) (*v1.LoadBalancerStatus, error)
 
 	// UpdateLoadBalancerWithENI updates hosts under the specified load balancer.
 	// Implementations must treat the *v1.Service and *v1.Enodpoints
@@ -305,7 +305,7 @@ func HandlerForServiceChange(
 			AddFunc: func(add interface{}) {
 				svc, ok := add.(*v1.Service)
 				if !ok {
-					glog.Info("add: not type service %s, skip", reflect.TypeOf(add))
+					glog.Infof("add: not type service %s, skip", reflect.TypeOf(add))
 					return
 				}
 				glog.Infof("service addiontion event received %s", key(svc))
@@ -321,10 +321,10 @@ func HandlerForServiceChange(
 				}
 			},
 			DeleteFunc: func(cur interface{}) {
-				glog.Info("controller: service deletion received, %+v", cur)
+				glog.Infof("controller: service deletion received, %+v", cur)
 				svc, ok := cur.(*v1.Service)
 				if !ok {
-					glog.Info("delete: not type service %s, skip", reflect.TypeOf(cur))
+					glog.Infof("delete: not type service %s, skip", reflect.TypeOf(cur))
 					return
 				}
 				// recorder service in local context
@@ -477,20 +477,24 @@ func (con *Controller) update(cached, svc *v1.Service) error {
 	} else {
 
 		glog.Infof("start to ensure loadbalancer %s", key(svc))
-
+		var (
+			err error
+		)
 		if IsENIBackendType(svc) {
 			// Ensure ENI type backend
 			eni, ok := con.cloud.(EnsureENI)
 			if !ok {
 				return fmt.Errorf("cloud does not implement EnsureENI interface")
 			}
-			eps, err := con.ifactory.Core().V1().Endpoints().Lister().Endpoints(svc.Namespace).Get(svc.Name)
+			var eps *v1.Endpoints
+			eps, err = con.ifactory.Core().V1().Endpoints().Lister().Endpoints(svc.Namespace).Get(svc.Name)
 			if err != nil {
 				return fmt.Errorf("get available endpoints for eni: %s", err.Error())
 			}
-			newm, err = eni.EnsureLoadbalancerWithENI(con.clusterName, svc, eps)
+			newm, err = eni.EnsureLoadBalancerWithENI(con.clusterName, svc, eps)
 		} else {
-			nodes, err := AvailableNodes(svc, con.ifactory)
+			var nodes []*v1.Node
+			nodes, err = AvailableNodes(svc, con.ifactory)
 			if err != nil {
 				return fmt.Errorf("error get avaliable nodes %s", err.Error())
 			}
@@ -506,9 +510,9 @@ func (con *Controller) update(cached, svc *v1.Service) error {
 				)
 			}
 			newm, err = con.cloud.EnsureLoadBalancer(con.clusterName, svc, nodes)
-			if err != nil {
-				return fmt.Errorf("ensure loadbalancer error: %s", err)
-			}
+		}
+		if err != nil {
+			return fmt.Errorf("ensure loadbalancer error: %s", err)
 		}
 		con.recorder.Eventf(
 			svc,
@@ -529,6 +533,9 @@ func (con *Controller) update(cached, svc *v1.Service) error {
 	return nil
 }
 func (con *Controller) updateStatus(svc *v1.Service, pre, newm *v1.LoadBalancerStatus) error {
+	if newm == nil {
+		return fmt.Errorf("status not updated for nil status reason")
+	}
 	// Write the state if changed
 	// TODO: Be careful here ... what if there were other changes to the service?
 	if !v1helper.LoadBalancerStatusEqual(pre, newm) {
@@ -733,7 +740,7 @@ func NodeConditionPredicate(
 		}
 
 		if _, exclude := node.Labels[LabelNodeRoleExcludeBalancer]; exclude {
-			glog.Info("ignore node with exclude label %s", node.Name)
+			glog.Infof("ignore node with exclude label %s", node.Name)
 			return false
 		}
 

@@ -22,6 +22,7 @@ import (
 	"github.com/denverdino/aliyungo/slb"
 	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
+	"k8s.io/cloud-provider-alibaba-cloud/cloud-controller-manager/controller/service"
 	"sort"
 	"strconv"
 	"strings"
@@ -285,21 +286,19 @@ type Listeners []*Listener
 // 3. Third, Merge the up two listeners to decide whether add/update/remove is needed.
 // 4. Do update.  Clean unused vserver group.
 func EnsureListeners(
-	client ClientSLBSDK,
-	insclient ClientInstanceSDK,
-	vpcid string,
+	slbins *LoadBalancerClient,
 	service *v1.Service,
 	lb *slb.LoadBalancerType,
 	vgs *vgroups,
 ) error {
 
-	local, err := buildListenersFromService(service, lb, client, vgs)
+	local, err := BuildListenersFromService(service, lb, slbins.c, vgs)
 	if err != nil {
 		return fmt.Errorf("build listener from service: %s", err.Error())
 	}
 
 	// Merge listeners generate an listener list to be updated/deleted/added.
-	updates, err := mergeListeners(service, local, buildListenersFromAPI(service, lb, client, vgs))
+	updates, err := mergeListeners(service, local, BuildListenersFromAPI(service, lb, slbins.c, vgs))
 	if err != nil {
 		return fmt.Errorf("merge listener: %s", err.Error())
 	}
@@ -334,21 +333,24 @@ func EnsureListeners(
 		}
 	}
 
-	return CleanUPVGroupMerged(service, lb, client, insclient, vpcid, vgs)
+	return CleanUPVGroupMerged(slbins, service, lb, vgs)
 }
 
 func isDeleteAction(action string) bool { return action == ACTION_DELETE }
 
 // EnsureListenersDeleted Only listener which owned by my service was deleted.
-func EnsureListenersDeleted(client ClientSLBSDK,
+func EnsureListenersDeleted(
+	client ClientSLBSDK,
 	service *v1.Service,
-	lb *slb.LoadBalancerType, vgs *vgroups) error {
+	lb *slb.LoadBalancerType,
+	vgs *vgroups,
+) error {
 
-	local, err := buildListenersFromService(service, lb, client, vgs)
+	local, err := BuildListenersFromService(service, lb, client, vgs)
 	if err != nil {
 		return fmt.Errorf("build listener from service: %s", err.Error())
 	}
-	remote := buildListenersFromAPI(service, lb, client, vgs)
+	remote := BuildListenersFromAPI(service, lb, client, vgs)
 
 	for _, loc := range local {
 		for _, rem := range remote {
@@ -481,31 +483,41 @@ func mergeListeners(svc *v1.Service, service, console Listeners) (Listeners, err
 	return append(append(deletion, addition...), updation...), nil
 }
 
-// buildListenersFromService Build expected listeners
-func buildListenersFromService(service *v1.Service,
+func isEniBackend(svc *v1.Service) bool {
+	return svc.Annotations[service.BACKEND_TYPE_LABEL] == "eni"
+}
+
+// BuildListenersFromService Build expected listeners
+func BuildListenersFromService(
+	svc *v1.Service,
 	lb *slb.LoadBalancerType,
-	client ClientSLBSDK, vgrps *vgroups) (Listeners, error) {
+	client ClientSLBSDK,
+	vgrps *vgroups,
+) (Listeners, error) {
 	listeners := Listeners{}
-	for _, port := range service.Spec.Ports {
-		proto, err := Protocol(serviceAnnotation(service, ServiceAnnotationLoadBalancerProtocolPort), port)
+	for _, port := range svc.Spec.Ports {
+		proto, err := Protocol(serviceAnnotation(svc, ServiceAnnotationLoadBalancerProtocolPort), port)
 		if err != nil {
 			return nil, err
 		}
 		n := Listener{
 			NamedKey: &NamedKey{
 				CID:         CLUSTER_ID,
-				Namespace:   service.Namespace,
-				ServiceName: service.Name,
+				Namespace:   svc.Namespace,
+				ServiceName: svc.Name,
 				Port:        port.Port,
 				Prefix:      DEFAULT_PREFIX},
 			Port:            port.Port,
 			NodePort:        port.NodePort,
 			Proto:           string(port.Protocol),
-			Service:         service,
+			Service:         svc,
 			TransforedProto: proto,
 			Client:          client,
 			VGroups:         vgrps,
 			LoadBalancerID:  lb.LoadBalancerId,
+		}
+		if isEniBackend(svc) {
+			n.NodePort = port.Port
 		}
 		n.Name = n.NamedKey.Key()
 		listeners = append(listeners, &n)
@@ -513,10 +525,13 @@ func buildListenersFromService(service *v1.Service,
 	return listeners, nil
 }
 
-// buildListenersFromAPI Load current listeners
-func buildListenersFromAPI(service *v1.Service,
+// BuildListenersFromAPI Load current listeners
+func BuildListenersFromAPI(
+	service *v1.Service,
 	lb *slb.LoadBalancerType,
-	client ClientSLBSDK, vgrps *vgroups) (listeners Listeners) {
+	client ClientSLBSDK,
+	vgrps *vgroups,
+) (listeners Listeners) {
 	ports := lb.ListenerPortsAndProtocol.ListenerPortAndProtocol
 	for _, port := range ports {
 		key, err := LoadNamedKey(port.Description)
