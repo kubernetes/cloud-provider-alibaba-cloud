@@ -131,6 +131,9 @@ const (
 	// ServiceAnnotationLoadBalancerSpec slb spec
 	ServiceAnnotationLoadBalancerSpec = ServiceAnnotationLoadBalancerPrefix + "spec"
 
+	// ServiceAnnotationLoadBalancerScheduler slb scheduler
+	ServiceAnnotationLoadBalancerScheduler = ServiceAnnotationLoadBalancerPrefix + "scheduler"
+
 	// ServiceAnnotationLoadBalancerSessionStick sticky session
 	ServiceAnnotationLoadBalancerSessionStick = ServiceAnnotationLoadBalancerPrefix + "sticky-session"
 
@@ -409,8 +412,16 @@ func ExtractAnnotationRequest(service *v1.Service) (*AnnotationRequest, *Annotat
 	if ok {
 		defaulted.LoadBalancerSpec = slb.LoadBalancerSpecType(loadbalancerSpec)
 		request.LoadBalancerSpec = defaulted.LoadBalancerSpec
-	}else {
+	} else {
 		defaulted.LoadBalancerSpec = "slb.s1.small"
+	}
+
+	scheduler, ok := annotation[ServiceAnnotationLoadBalancerScheduler]
+	if ok {
+		defaulted.Scheduler = scheduler
+		request.Scheduler = defaulted.Scheduler
+	} else {
+		defaulted.Scheduler = "rr"
 	}
 
 	// stick session

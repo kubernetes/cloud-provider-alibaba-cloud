@@ -434,6 +434,7 @@ func (c *mockClientSLB) CreateLoadBalancerTCPListener(args *slb.CreateLoadBalanc
 			AclType:                   args.AclType,
 			AclId:                     args.AclId,
 			AclStatus:                 args.AclStatus,
+			Scheduler:                 args.Scheduler,
 		},
 	}
 	key := listenerKey(args.LoadBalancerId, args.ListenerPort)
@@ -470,6 +471,7 @@ func (c *mockClientSLB) CreateLoadBalancerUDPListener(args *slb.CreateLoadBalanc
 			AclType:                   args.AclType,
 			AclId:                     args.AclId,
 			AclStatus:                 args.AclStatus,
+			Scheduler:                 args.Scheduler,
 		},
 	}
 	key := listenerKey(args.LoadBalancerId, args.ListenerPort)
@@ -519,6 +521,7 @@ func (c *mockClientSLB) CreateLoadBalancerHTTPSListener(args *slb.CreateLoadBala
 				AclType:                args.AclType,
 				AclId:                  args.AclId,
 				AclStatus:              args.AclStatus,
+				Scheduler:              args.Scheduler,
 			},
 			ServerCertificateId: args.ServerCertificateId,
 		},
@@ -562,6 +565,7 @@ func (c *mockClientSLB) CreateLoadBalancerHTTPListener(args *slb.CreateLoadBalan
 			AclType:                args.AclType,
 			AclId:                  args.AclId,
 			AclStatus:              args.AclStatus,
+			Scheduler:              args.Scheduler,
 		},
 	}
 	key := listenerKey(args.LoadBalancerId, args.ListenerPort)
@@ -666,6 +670,7 @@ func (c *mockClientSLB) SetLoadBalancerHTTPListenerAttribute(args *slb.SetLoadBa
 	lb.AclStatus = args.AclStatus
 	lb.AclId = args.AclId
 	lb.AclType = args.AclType
+	lb.Scheduler = args.Scheduler
 	LOADBALANCER.listeners.Store(listenerKey(args.LoadBalancerId, args.ListenerPort), lb)
 	return nil
 }
@@ -700,6 +705,7 @@ func (c *mockClientSLB) SetLoadBalancerHTTPSListenerAttribute(args *slb.SetLoadB
 	lb.AclStatus = args.AclStatus
 	lb.AclId = args.AclId
 	lb.AclType = args.AclType
+	lb.Scheduler = args.Scheduler
 	LOADBALANCER.listeners.Store(listenerKey(args.LoadBalancerId, args.ListenerPort), lb)
 	return nil
 }
@@ -732,6 +738,7 @@ func (c *mockClientSLB) SetLoadBalancerTCPListenerAttribute(args *slb.SetLoadBal
 	lb.AclStatus = args.AclStatus
 	lb.AclId = args.AclId
 	lb.AclType = args.AclType
+	lb.Scheduler = args.Scheduler
 	LOADBALANCER.listeners.Store(listenerKey(args.LoadBalancerId, args.ListenerPort), lb)
 	return nil
 }
@@ -761,6 +768,7 @@ func (c *mockClientSLB) SetLoadBalancerUDPListenerAttribute(args *slb.SetLoadBal
 	lb.AclStatus = args.AclStatus
 	lb.AclId = args.AclId
 	lb.AclType = args.AclType
+	lb.Scheduler = args.Scheduler
 	LOADBALANCER.listeners.Store(listenerKey(args.LoadBalancerId, args.ListenerPort), lb)
 	return nil
 }

@@ -68,6 +68,7 @@ type AnnotationRequest struct {
 	HealthCheckTimeout        int                 // for https and http
 
 	LoadBalancerSpec slb.LoadBalancerSpecType
+	Scheduler        string
 
 	StickySession      slb.FlagType
 	StickySessionType  slb.StickySessionType

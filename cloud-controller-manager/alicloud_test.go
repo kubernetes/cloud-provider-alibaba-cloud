@@ -129,6 +129,7 @@ func TestEnsureLoadBalancerAnnotation(t *testing.T) {
 					ServiceAnnotationLoadBalancerMasterZoneID: string(REGION_A),
 					ServiceAnnotationLoadBalancerSlaveZoneID:  string(REGION_A),
 					ServiceAnnotationLoadBalancerBandwidth:    "70",
+					ServiceAnnotationLoadBalancerScheduler:    "wlc",
 
 					//acl
 					ServiceAnnotationLoadBalancerAclType:   "white",
