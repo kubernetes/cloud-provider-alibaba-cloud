@@ -18,9 +18,9 @@ package main
 
 import (
 	f "flag"
-	"fmt"
 	"os"
 
+	"github.com/golang/glog"
 	"github.com/spf13/pflag"
 	"k8s.io/apiserver/pkg/server/healthz"
 	"k8s.io/apiserver/pkg/util/flag"
@@ -40,16 +40,16 @@ func init() {
 func main() {
 	f.CommandLine.Parse([]string{})
 
-	s := options.NewCloudControllerManagerServer()
-	s.AddFlags(pflag.CommandLine)
+	ccm := app.NewServerCCM()
+	options.AddFlags(ccm, pflag.CommandLine)
 
 	flag.InitFlags()
 	logs.InitLogs()
 	defer logs.FlushLogs()
 	verflag.PrintAndExitIfRequested()
 
-	if err := app.Run(s); err != nil {
-		fmt.Fprintf(os.Stderr, "%v\n", err)
+	if err := app.Run(ccm); err != nil {
+		glog.Errorf("Run CCM error: %s", err.Error())
 		os.Exit(1)
 	}
 }

@@ -17,7 +17,10 @@ limitations under the License.
 package alicloud
 
 import (
+	"fmt"
+	"github.com/docker/distribution/uuid"
 	"k8s.io/api/core/v1"
+	"strings"
 	"sync"
 )
 
@@ -102,7 +105,17 @@ func NodeList(nodes []*v1.Node) []string {
 	return ns
 }
 
-// Contains contains in
+func EndpointIpsList(nodes *v1.Endpoints) []string {
+	var ips []string
+	for _, ep := range nodes.Subsets {
+		for _, addr := range ep.Addresses {
+			ips = append(ips, addr.IP)
+		}
+	}
+	return ips
+}
+
+// Contains containsLabel in
 func Contains(list []int, x int) bool {
 	for _, item := range list {
 		if item == x {
@@ -110,4 +123,8 @@ func Contains(list []int, x int) bool {
 		}
 	}
 	return false
+}
+
+func newid() string {
+	return fmt.Sprintf("lb-%s", strings.ToLower(uuid.Generate().String())[0:15])
 }

@@ -42,11 +42,26 @@ const (
 	// ServiceAnnotationPrivateZonePrefix private zone prefix
 	ServiceAnnotationPrivateZonePrefix = ServiceAnnotationPrefix + "private-zone-"
 
+	// ServiceAnnotationLoadBalancerAclStatus enable or disable acl on all listener
+	ServiceAnnotationLoadBalancerAclStatus = ServiceAnnotationLoadBalancerPrefix + "acl-status"
+
+	// ServiceAnnotationLoadBalancerAclID acl id
+	ServiceAnnotationLoadBalancerAclID = ServiceAnnotationLoadBalancerPrefix + "acl-id"
+
+	// ServiceAnnotationLoadBalancerAclType acl type, black or white
+	ServiceAnnotationLoadBalancerAclType = ServiceAnnotationLoadBalancerPrefix + "acl-type"
+
 	// ServiceAnnotationLoadBalancerProtocolPort protocol port
 	ServiceAnnotationLoadBalancerProtocolPort = ServiceAnnotationLoadBalancerPrefix + "protocol-port"
 
 	// ServiceAnnotationLoadBalancerAddressType loadbalancer address type
 	ServiceAnnotationLoadBalancerAddressType = ServiceAnnotationLoadBalancerPrefix + "address-type"
+
+	// ServiceAnnotationLoadBalancerVswitch loadbalancer vswitch id
+	ServiceAnnotationLoadBalancerVswitch = ServiceAnnotationLoadBalancerPrefix + "vswitch-id"
+
+	// ServiceAnnotationLoadBalancerForwardPort loadbalancer forward port
+	ServiceAnnotationLoadBalancerForwardPort = ServiceAnnotationLoadBalancerPrefix + "forward-port"
 
 	// ServiceAnnotationLoadBalancerSLBNetworkType loadbalancer network type
 	ServiceAnnotationLoadBalancerSLBNetworkType = ServiceAnnotationLoadBalancerPrefix + "slb-network-type"
@@ -115,6 +130,9 @@ const (
 
 	// ServiceAnnotationLoadBalancerSpec slb spec
 	ServiceAnnotationLoadBalancerSpec = ServiceAnnotationLoadBalancerPrefix + "spec"
+
+	// ServiceAnnotationLoadBalancerScheduler slb scheduler
+	ServiceAnnotationLoadBalancerScheduler = ServiceAnnotationLoadBalancerPrefix + "scheduler"
 
 	// ServiceAnnotationLoadBalancerSessionStick sticky session
 	ServiceAnnotationLoadBalancerSessionStick = ServiceAnnotationLoadBalancerPrefix + "sticky-session"
@@ -187,6 +205,37 @@ func ExtractAnnotationRequest(service *v1.Service) (*AnnotationRequest, *Annotat
 		request.AddressType = defaulted.AddressType
 	} else {
 		defaulted.AddressType = slb.InternetAddressType
+	}
+
+	vswid, ok := annotation[ServiceAnnotationLoadBalancerVswitch]
+	if ok {
+		defaulted.VswitchID = vswid
+		request.VswitchID = defaulted.VswitchID
+	}
+
+	status, ok := annotation[ServiceAnnotationLoadBalancerAclStatus]
+	if ok {
+		defaulted.AclStatus = status
+		request.AclStatus = defaulted.AclStatus
+	} else {
+		defaulted.AclStatus = "off"
+	}
+
+	aclid, ok := annotation[ServiceAnnotationLoadBalancerAclID]
+	if ok {
+		defaulted.AclID = aclid
+		request.AclID = defaulted.AclID
+	}
+	acltype, ok := annotation[ServiceAnnotationLoadBalancerAclType]
+	if ok {
+		defaulted.AclType = acltype
+		request.AclType = defaulted.AclType
+	}
+
+	forward, ok := annotation[ServiceAnnotationLoadBalancerForwardPort]
+	if ok {
+		defaulted.ForwardPort = forward
+		request.ForwardPort = defaulted.ForwardPort
 	}
 
 	networkType, ok := annotation[ServiceAnnotationLoadBalancerSLBNetworkType]
@@ -363,6 +412,16 @@ func ExtractAnnotationRequest(service *v1.Service) (*AnnotationRequest, *Annotat
 	if ok {
 		defaulted.LoadBalancerSpec = slb.LoadBalancerSpecType(loadbalancerSpec)
 		request.LoadBalancerSpec = defaulted.LoadBalancerSpec
+	} else {
+		defaulted.LoadBalancerSpec = "slb.s1.small"
+	}
+
+	scheduler, ok := annotation[ServiceAnnotationLoadBalancerScheduler]
+	if ok {
+		defaulted.Scheduler = scheduler
+		request.Scheduler = defaulted.Scheduler
+	} else {
+		defaulted.Scheduler = "rr"
 	}
 
 	// stick session

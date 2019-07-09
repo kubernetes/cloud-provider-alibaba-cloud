@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"reflect"
 	"strings"
 
 	"encoding/json"
@@ -38,6 +39,11 @@ type AnnotationRequest struct {
 
 	SSLPorts       string
 	AddressType    slb.AddressType
+	AclStatus      string
+	AclID          string
+	AclType        string
+	VswitchID      string
+	ForwardPort    string
 	SLBNetworkType string
 
 	ChargeType slb.InternetChargeType
@@ -62,6 +68,7 @@ type AnnotationRequest struct {
 	HealthCheckTimeout        int                 // for https and http
 
 	LoadBalancerSpec slb.LoadBalancerSpecType
+	Scheduler        string
 
 	StickySession      slb.FlagType
 	StickySessionType  slb.StickySessionType
@@ -124,8 +131,11 @@ type ClientSLBSDK interface {
 
 // LoadBalancerClient slb client wrapper
 type LoadBalancerClient struct {
-	c ClientSLBSDK
+	region string
+	vpcid  string
+	c      ClientSLBSDK
 	// known service resource version
+	ins ClientInstanceSDK
 }
 
 func (s *LoadBalancerClient) findLoadBalancer(service *v1.Service) (bool, *slb.LoadBalancerType, error) {
@@ -279,8 +289,8 @@ func equalsAddressIPVersion(request, origined slb.AddressIPVersionType) bool {
 	return request == origined
 }
 
-// EnsureLoadBalancer make sure slb is reconciled
-func (s *LoadBalancerClient) EnsureLoadBalancer(service *v1.Service, nodes []*v1.Node, vswitchid string) (*slb.LoadBalancerType, error) {
+// EnsureLoadBalancer make sure slb is reconciled nodes []*v1.Node
+func (s *LoadBalancerClient) EnsureLoadBalancer(service *v1.Service, nodes interface{}, vswitchid string) (*slb.LoadBalancerType, error) {
 	glog.V(4).Infof("alicloud: ensure loadbalancer with service details, \n%+v", PrettyJson(service))
 
 	exists, origined, err := s.findLoadBalancer(service)
@@ -364,13 +374,13 @@ func (s *LoadBalancerClient) EnsureLoadBalancer(service *v1.Service, nodes []*v1
 		glog.V(5).Infof("alicloud: found "+
 			"an exist loadbalancer[%s], check to see whether update is needed.", origined.LoadBalancerId)
 		if request.MasterZoneID != "" && request.MasterZoneID != origined.MasterZoneId {
-			return nil, fmt.Errorf("alicloud: can not change LoadBalancer master zone id once created.")
+			return nil, fmt.Errorf("alicloud: can not change LoadBalancer master zone id once created")
 		}
 		if request.SlaveZoneID != "" && request.SlaveZoneID != origined.SlaveZoneId {
-			return nil, fmt.Errorf("alicloud: can not change LoadBalancer slave zone id once created.")
+			return nil, fmt.Errorf("alicloud: can not change LoadBalancer slave zone id once created")
 		}
 		if !equalsAddressIPVersion(request.AddressIPVersion, origined.AddressIPVersion) {
-			return nil, fmt.Errorf("alicloud: can not change LoadBalancer AddressIPVersion once created.")
+			return nil, fmt.Errorf("alicloud: can not change LoadBalancer AddressIPVersion once created")
 		}
 		if request.ChargeType != "" && request.ChargeType != origined.InternetChargeType {
 			needUpdate = true
@@ -411,10 +421,10 @@ func (s *LoadBalancerClient) EnsureLoadBalancer(service *v1.Service, nodes []*v1
 		glog.Errorf("alicloud: can not get loadbalancer[%s] attribute. ", origined.LoadBalancerId)
 		return nil, err
 	}
-	vgs := buildVGroupFromService(service, origined, s.c, origined.RegionId)
+	vgs := BuildVirturalGroupFromService(s, service, origined)
 
 	// Make sure virtual server backend group has been updated.
-	if err := vgs.EnsureVGroup(nodes); err != nil {
+	if err := EnsureVirtualGroups(vgs, nodes); err != nil {
 		return origined, fmt.Errorf("update backend servers: error %s", err.Error())
 	}
 	// Apply listener when
@@ -425,7 +435,7 @@ func (s *LoadBalancerClient) EnsureLoadBalancer(service *v1.Service, nodes []*v1
 		glog.V(2).Infof("alicloud: not user defined loadbalancer[%s], start to apply listener.\n", origined.LoadBalancerId)
 		// If listener update is needed. Switch to vserver group immediately.
 		// No longer update default backend servers.
-		if err := EnsureListeners(s.c, service, origined, vgs); err != nil {
+		if err := EnsureListeners(s, service, origined, vgs); err != nil {
 
 			return origined, fmt.Errorf("ensure listener error: %s", err.Error())
 		}
@@ -443,7 +453,7 @@ func isLoadBalancerCreatedByKubernetes(tags []slb.TagItemType) bool {
 }
 
 //UpdateLoadBalancer make sure slb backend is reconciled
-func (s *LoadBalancerClient) UpdateLoadBalancer(service *v1.Service, nodes []*v1.Node, withVgroup bool) error {
+func (s *LoadBalancerClient) UpdateLoadBalancer(service *v1.Service, nodes interface{}, withVgroup bool) error {
 
 	exists, lb, err := s.findLoadBalancer(service)
 	if err != nil {
@@ -453,8 +463,8 @@ func (s *LoadBalancerClient) UpdateLoadBalancer(service *v1.Service, nodes []*v1
 		return fmt.Errorf("the loadbalance you specified by name [%s] does not exist", service.Name)
 	}
 	if withVgroup {
-		vgs := buildVGroupFromService(service, lb, s.c, lb.RegionId)
-		if err := vgs.EnsureVGroup(nodes); err != nil {
+		vgs := BuildVirturalGroupFromService(s, service, lb)
+		if err := EnsureVirtualGroups(vgs, nodes); err != nil {
 			return fmt.Errorf("update backend servers: error %s", err.Error())
 		}
 	}
@@ -515,7 +525,7 @@ func (s *LoadBalancerClient) EnsureLoadBalanceDeleted(service *v1.Service) error
 	if isUserDefinedLoadBalancer(request) {
 		glog.Infof("alicloud: user managed "+
 			"loadbalancer will not be deleted by cloudprovider. service [%s]", service.Name)
-		return EnsureListenersDeleted(s.c, service, lb, buildVGroupFromService(service, lb, s.c, lb.RegionId))
+		return EnsureListenersDeleted(s.c, service, lb, BuildVirturalGroupFromService(s, service, lb))
 	}
 
 	return s.c.DeleteLoadBalancer(lb.LoadBalancerId)
@@ -542,7 +552,7 @@ func (s *LoadBalancerClient) getLoadBalancerOpts(service *v1.Service, vswitchid 
 		strings.Compare(string(ar.AddressType), string(slb.IntranetAddressType)) == 0 {
 
 		glog.Infof("alicloud: intranet vpc "+
-			"loadbalancer will be created. address type=%s, switchid=%s\n", ar.AddressType, vswitchid)
+			"loadbalancer will be created. address type=%s, switchid=%s", ar.AddressType, vswitchid)
 		args.VSwitchId = vswitchid
 	}
 	args.LoadBalancerName = cloudprovider.GetLoadBalancerName(service)
@@ -553,7 +563,12 @@ func (s *LoadBalancerClient) getLoadBalancerOpts(service *v1.Service, vswitchid 
 const DEFAULT_SERVER_WEIGHT = 100
 
 // UpdateDefaultServerGroup update default server group
-func (s *LoadBalancerClient) UpdateDefaultServerGroup(nodes []*v1.Node, lb *slb.LoadBalancerType) error {
+func (s *LoadBalancerClient) UpdateDefaultServerGroup(backends interface{}, lb *slb.LoadBalancerType) error {
+	nodes, ok := backends.([]*v1.Node)
+	if !ok {
+		glog.Infof("skip default server group update for type %s", reflect.TypeOf(backends))
+		return nil
+	}
 	additions, deletions := []slb.BackendServerType{}, []string{}
 	glog.V(5).Infof("alicloud: try to update loadbalancer backend servers. [%s]\n", lb.LoadBalancerId)
 	// checkout for newly added servers
@@ -700,6 +715,6 @@ func keepResourceVesion(service *v1.Service) error {
 		glog.V(2).Infof("alicloud: service %s's uid %v has "+
 			"already been kept in the DeletedSvcKeeper, no need to update.\n", service.Name, serviceUID)
 	}
-	// keeper.set(serviceUID, currentVersion)
+	// keeper.set(serviceUIDNoneExist, currentVersion)
 	return nil
 }

@@ -128,7 +128,6 @@ func TestUpdateListenerPorts(t *testing.T) {
 				ListenerPort:     args.ListenerPort,
 				ListenerProtocol: "tcp",
 			}
-			t.Logf("PPPP: %v\n", li)
 			detail.ListenerPorts.ListenerPort = append(detail.ListenerPorts.ListenerPort, args.ListenerPort)
 			detail.ListenerPortsAndProtocol.ListenerPortAndProtocol = append(detail.ListenerPortsAndProtocol.ListenerPortAndProtocol, li)
 			return nil
@@ -201,13 +200,13 @@ func TestUpdateListenerPorts(t *testing.T) {
 		},
 	})
 
-	// buildVGroupFromService is compatible with v1 listener.
-	vgs := buildVGroupFromService(service, detail, mgr.loadbalancer.c, detail.RegionId)
-	if err := vgs.EnsureVGroup([]*v1.Node{}); err != nil {
+	// BuildVirturalGroupFromService is compatible with v1 listener.
+	vgs := BuildVirturalGroupFromService(mgr.loadbalancer, service, detail)
+	if err := EnsureVirtualGroups(vgs, []*v1.Node{}); err != nil {
 		t.Fatal("error ensure vserver group.")
 	}
 
-	err := EnsureListeners(mgr.loadbalancer.c, service, detail, vgs)
+	err := EnsureListeners(mgr.loadbalancer, service, detail, vgs)
 
 	if err != nil {
 		t.Fatal("listener update error! ")
@@ -393,7 +392,7 @@ func TestUpdateListenerBackendPorts(t *testing.T) {
 		},
 	})
 
-	err := EnsureListeners(mgr.loadbalancer.c, service, detail, &grp)
+	err := EnsureListeners(mgr.loadbalancer, service, detail, &grp)
 
 	if err != nil {
 		t.Fatal("listener update error! ")

@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/informers"
+	"k8s.io/cloud-provider-alibaba-cloud/cloud-controller-manager/controller/node"
 	"k8s.io/cloud-provider-alibaba-cloud/cloud-controller-manager/controller/route"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	ctrlclient "k8s.io/kubernetes/pkg/controller"
@@ -50,7 +51,7 @@ var CLUSTER_ID = "clusterid"
 // KUBERNETES_ALICLOUD_IDENTITY is for statistic purpose.
 var KUBERNETES_ALICLOUD_IDENTITY = fmt.Sprintf("Kubernetes.Alicloud/%s", version.Get().String())
 
-// Cloud is an implementation of Interface, LoadBalancer and Instances for Alicloud Services.
+// cloud is an implementation of Interface, LoadBalancer and Instances for Alicloud Services.
 type Cloud struct {
 	climgr *ClientMgr
 
@@ -70,6 +71,10 @@ var (
 	// DEFAULT_ADDRESS_TYPE default address type
 	DEFAULT_ADDRESS_TYPE = slb.InternetAddressType
 
+	DEFAULT_NODE_MONITOR_PERIOD = 120 * time.Second
+
+	DEFAULT_NODE_ADDR_SYNC_PERIOD = 240 * time.Second
+
 	// DEFAULT_REGION should be override in cloud initialize.
 	DEFAULT_REGION = common.Hangzhou
 )
@@ -77,7 +82,9 @@ var (
 // CloudConfig wraps the settings for the Alicloud provider.
 type CloudConfig struct {
 	Global struct {
-		KubernetesClusterTag string
+		KubernetesClusterTag string `json:"kubernetesClusterTag"`
+		NodeMonitorPeriod    int64  `json:"nodeMonitorPeriod"`
+		NodeAddrSyncPeriod   int64  `json:"nodeAddrSyncPeriod"`
 		UID                  string `json:"uid"`
 		VpcID                string `json:"vpcid"`
 		Region               string `json:"region"`
@@ -85,6 +92,8 @@ type CloudConfig struct {
 		VswitchID            string `json:"vswitchid"`
 		ClusterID            string `json:"clusterID"`
 		RouteTableIDS        string `json:"routeTableIDs"`
+
+		DisablePublicSLB bool `json:"disablePublicSLB"`
 
 		AccessKeyID     string `json:"accessKeyID"`
 		AccessKeySecret string `json:"accessKeySecret"`
@@ -136,6 +145,11 @@ func init() {
 			if err != nil {
 				return nil, err
 			}
+			// wait for client initialized
+			err = mgr.Start(RefreshToken)
+			if err != nil {
+				panic(fmt.Sprintf("token not ready %s", err.Error()))
+			}
 			return newAliCloud(mgr, rtableids)
 		})
 }
@@ -158,42 +172,72 @@ func newAliCloud(mgr *ClientMgr, rtableids string) (*Cloud, error) {
 	if err != nil {
 		return nil, fmt.Errorf("set vpc info error: %s", err.Error())
 	}
-	return &Cloud{climgr: mgr, region: common.Region(region), vpcID: vpc}, nil
+	return &Cloud{
+		climgr: mgr,
+		region: common.Region(region),
+		vpcID:  vpc,
+		cfg:    &cfg,
+	}, nil
 }
 
 // Initialize passes a Kubernetes clientBuilder interface to the cloud provider
 func (c *Cloud) Initialize(builder ctrlclient.ControllerClientBuilder) {
-	if !route.Options.ConfigCloudRoutes {
-		return
-	}
-
-	cidr := route.Options.ClusterCIDR
-	if len(strings.TrimSpace(cidr)) == 0 {
-		panic(fmt.Sprintf("ivalid cluster CIDR %s", cidr))
-	}
-	_, cidrc, err := net.ParseCIDR(cidr)
-	if err != nil {
-		panic(fmt.Sprintf("Unsuccessful parsing of cluster CIDR %v: %v", cidr, err))
-	}
-
 	shared := informers.NewSharedInformerFactory(
 		builder.ClientOrDie("shared-informers"), syncPeriod())
-	clusterid := ""
-	if c.cfg != nil {
-		clusterid = c.cfg.Global.KubernetesClusterTag
-	}
-	ctrl, err := route.New(c,
-		builder.ClientOrDie(route.ROUTE_CONTROLLER),
-		shared.Core().V1().Nodes(),
-		clusterid, cidrc)
-	if err != nil {
-		panic(fmt.Sprintf("unable to initialize route controller, %s", err.Error()))
-	}
+
 	var stop <-chan struct{}
-	go ctrl.Run(stop, route.Options.RouteReconciliationPeriod.Duration)
+	if route.Options.ConfigCloudRoutes {
+		cidr := route.Options.ClusterCIDR
+		if len(strings.TrimSpace(cidr)) == 0 {
+			panic(fmt.Sprintf("ivalid cluster CIDR %s", cidr))
+		}
+		_, cidrc, err := net.ParseCIDR(cidr)
+		if err != nil {
+			panic(fmt.Sprintf("Unsuccessful parsing of cluster CIDR %v: %v", cidr, err))
+		}
+
+		clusterid := ""
+		if c.cfg != nil {
+			clusterid = c.cfg.Global.KubernetesClusterTag
+		}
+
+		ctrl, err := route.New(c,
+			builder.ClientOrDie(route.ROUTE_CONTROLLER),
+			shared.Core().V1().Nodes(),
+			clusterid, cidrc)
+		if err != nil {
+			panic(fmt.Sprintf("unable to initialize route controller, %s", err.Error()))
+		}
+		go ctrl.Run(stop, route.Options.RouteReconciliationPeriod.Duration)
+		glog.Infof("route controller started.")
+	}
+
+	func() {
+		nodeMonitorPeriod := DEFAULT_NODE_MONITOR_PERIOD
+		nodeAddrSyncPeriod := DEFAULT_NODE_ADDR_SYNC_PERIOD
+		if c.cfg != nil &&
+			c.cfg.Global.NodeMonitorPeriod != 0 {
+			nodeMonitorPeriod = time.Duration(cfg.Global.NodeMonitorPeriod * int64(time.Second))
+		}
+		if c.cfg != nil &&
+			c.cfg.Global.NodeAddrSyncPeriod != 0 {
+			nodeAddrSyncPeriod = time.Duration(cfg.Global.NodeAddrSyncPeriod * int64(time.Second))
+		}
+		// run node controller
+		nctrl := node.NewCloudNodeController(
+			shared.Core().V1().Nodes(),
+			builder.ClientOrDie(node.NODE_CONTROLLER),
+			c,
+			// delete node monitor
+			nodeMonitorPeriod,
+			// node address updator
+			nodeAddrSyncPeriod,
+		)
+		go nctrl.Run(stop)
+	}()
+
 	time.Sleep(wait.Jitter(route.Options.ControllerStartInterval.Duration, 1.0))
 	shared.Start(stop)
-	glog.Infof("route controller started.")
 }
 
 func syncPeriod() time.Duration {
@@ -202,7 +246,7 @@ func syncPeriod() time.Duration {
 
 // GetLoadBalancer returns whether the specified load balancer exists, and
 // if so, what its status is.
-// Implementations must treat the *v1.Service parameter as read-only and not modify it.
+// Implementations must treat the *v1.svc parameter as read-only and not modify it.
 // Parameter 'clusterName' is the name of the cluster as presented to kube-controller-manager
 // TODO: Break this up into different interfaces (LB, etc) when we have more than one type of service
 func (c *Cloud) GetLoadBalancer(clusterName string, service *v1.Service) (status *v1.LoadBalancerStatus, exists bool, err error) {
@@ -226,50 +270,41 @@ func (c *Cloud) GetLoadBalancer(clusterName string, service *v1.Service) (status
 }
 
 // EnsureLoadBalancer creates a new load balancer 'name', or updates the existing one. Returns the status of the balancer
-// Implementations must treat the *v1.Service and *v1.Node
+// Implementations must treat the *v1.svc and *v1.Node
 // parameters as read-only and not modify them.
 // Parameter 'clusterName' is the name of the cluster as presented to kube-controller-manager
 func (c *Cloud) EnsureLoadBalancer(clusterName string, service *v1.Service, nodes []*v1.Node) (*v1.LoadBalancerStatus, error) {
 
 	glog.V(2).Infof("Alicloud.EnsureLoadBalancer(%v, %s/%s, %v, %v)",
 		clusterName, service.Namespace, service.Name, c.region, NodeList(nodes))
+	defaulted, _ := ExtractAnnotationRequest(service)
+	if defaulted.AddressType == slb.InternetAddressType {
+		if c.cfg != nil && c.cfg.Global.DisablePublicSLB {
+			return nil, fmt.Errorf("PublicAddress SLB is Not allowed")
+		}
+	}
+
 	ns, err := c.fileOutNode(nodes, service)
 	if err != nil {
 		return nil, err
 	}
-	glog.V(5).Infof("alicloud: ensure loadbalancer with final nodes list , %v\n", NodeList(ns))
-	//if service.Spec.SessionAffinity != v1.ServiceAffinityNone {
-	//	// Does not support SessionAffinity
-	//	return nil, fmt.Errorf("unsupported load balancer affinity: %v", service.Spec.SessionAffinity)
-	//}
+
 	if len(service.Spec.Ports) == 0 {
 		return nil, fmt.Errorf("requested load balancer with no ports")
 	}
-	if service.Spec.LoadBalancerIP != "" {
-		return nil, fmt.Errorf("LoadBalancerIP cannot be specified for Alicloud SLB")
-	}
-	vswitchid := ""
-	if len(ns) <= 0 {
+	vswitchid := defaulted.VswitchID
+	if vswitchid == "" {
 		var err error
 		vswitchid, err = c.climgr.MetaData().VswitchID()
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("can not obtain vswitchid %s", err)
 		}
-		glog.V(2).Infof("alicloud: current vswitchid=%s\n", vswitchid)
 		if vswitchid == "" {
-			glog.Warningf("alicloud: can not find vswitch id, this will prevent you " +
-				"from creating VPC intranet SLB. But classic LB is still available.")
-		}
-	} else {
-		for _, v := range ns {
-			i, err := c.climgr.Instances().findInstanceByProviderID(v.Spec.ProviderID)
-			if err != nil {
-				return nil, err
-			}
-			vswitchid = i.VpcAttributes.VSwitchId
-			break
+			glog.Warningf("vswitch id not found, vpc intranet slb creation would fail")
 		}
 	}
+
+	glog.Infof("using vswitch id=%s", vswitchid)
 
 	lb, err := c.climgr.LoadBalancers().EnsureLoadBalancer(service, ns, vswitchid)
 	if err != nil {
@@ -291,8 +326,57 @@ func (c *Cloud) EnsureLoadBalancer(clusterName string, service *v1.Service, node
 	}, nil
 }
 
+func (c *Cloud) EnsureLoadBalancerWithENI(name string, service *v1.Service, endpoint *v1.Endpoints) (*v1.LoadBalancerStatus, error) {
+
+	glog.V(2).Infof("Alicloud.EnsureLoadBalancerWithENI(%v, %s/%s, %v, %v)",
+		name, service.Namespace, service.Name, c.region, EndpointIpsList(endpoint))
+	defaulted, _ := ExtractAnnotationRequest(service)
+	if defaulted.AddressType == slb.InternetAddressType {
+		if c.cfg != nil && c.cfg.Global.DisablePublicSLB {
+			return nil, fmt.Errorf("public address SLB is Not allowed")
+		}
+	}
+
+	if len(service.Spec.Ports) == 0 {
+		return nil, fmt.Errorf("requested load balancer with no ports")
+	}
+	vswitchid := defaulted.VswitchID
+	if vswitchid == "" {
+		var err error
+		vswitchid, err = c.climgr.MetaData().VswitchID()
+		if err != nil {
+			return nil, fmt.Errorf("can not obtain vswitchid %s", err)
+		}
+		if vswitchid == "" {
+			glog.Warningf("vswitch id not found, vpc intranet slb creation would fail")
+		}
+	}
+
+	glog.Infof("using vswitch id=%s", vswitchid)
+
+	lb, err := c.climgr.LoadBalancers().EnsureLoadBalancer(service, endpoint, vswitchid)
+	if err != nil {
+		return nil, fmt.Errorf("ensure loadbalancer: %s", err.Error())
+	}
+
+	pz, pzr, err := c.climgr.PrivateZones().EnsurePrivateZoneRecord(service, lb.Address)
+	if err != nil {
+		return nil, fmt.Errorf("ensure pvtz: %s", err.Error())
+	}
+
+	status := &v1.LoadBalancerStatus{
+		Ingress: []v1.LoadBalancerIngress{
+			{
+				IP:       lb.Address,
+				Hostname: getHostName(pz, pzr),
+			},
+		},
+	}
+	return status, nil
+}
+
 // UpdateLoadBalancer updates hosts under the specified load balancer.
-// Implementations must treat the *v1.Service and *v1.Node
+// Implementations must treat the *v1.svc and *v1.Node
 // parameters as read-only and not modify them.
 // Parameter 'clusterName' is the name of the cluster as presented to kube-controller-manager
 func (c *Cloud) UpdateLoadBalancer(clusterName string, service *v1.Service, nodes []*v1.Node) error {
@@ -305,13 +389,20 @@ func (c *Cloud) UpdateLoadBalancer(clusterName string, service *v1.Service, node
 	return c.climgr.LoadBalancers().UpdateLoadBalancer(service, ns, true)
 }
 
+func (c *Cloud) UpdateLoadBalancerWithENI(name string, service *v1.Service, endpoint *v1.Endpoints) error {
+	glog.V(2).Infof("Alicloud.UpdateLoadBalancerWithENI(%v, %v, %v, %v, %v, %v, %v)",
+		name, service.Namespace, service.Name, c.region, service.Spec.LoadBalancerIP, service.Spec.Ports, EndpointIpsList(endpoint))
+
+	return c.climgr.LoadBalancers().UpdateLoadBalancer(service, endpoint, true)
+}
+
 // EnsureLoadBalancerDeleted deletes the specified load balancer if it
 // exists, returning nil if the load balancer specified either didn't exist or
 // was successfully deleted.
 // This construction is useful because many cloud providers' load balancers
 // have multiple underlying components, meaning a Get could say that the LB
 // doesn't exist even if some part of it is still laying around.
-// Implementations must treat the *v1.Service parameter as read-only and not modify it.
+// Implementations must treat the *v1.svc parameter as read-only and not modify it.
 // Parameter 'clusterName' is the name of the cluster as presented to kube-controller-manager
 func (c *Cloud) EnsureLoadBalancerDeleted(clusterName string, service *v1.Service) error {
 	glog.V(2).Infof("Alicloud.EnsureLoadBalancerDeleted(%v, %v, %v, %v, %v, %v)",
@@ -335,6 +426,14 @@ func (c *Cloud) NodeAddresses(name types.NodeName) ([]v1.NodeAddress, error) {
 	glog.V(2).Infof("Alicloud.NodeAddresses(\"%s\")", name)
 
 	return c.climgr.Instances().findAddressByNodeName(name)
+}
+
+func (c *Cloud) ListInstances(ids []string) (map[string]*node.CloudNodeAttribute, error) {
+	return c.climgr.Instances().ListInstances(ids)
+}
+
+func (c *Cloud) SetInstanceTags(insid string, tags map[string]string) error {
+	return c.climgr.Instances().AddCloudTags(insid, tags, c.region)
 }
 
 // InstanceTypeByProviderID returns the cloudprovider instance type of the node with the specified unique providerID

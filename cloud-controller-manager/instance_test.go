@@ -17,93 +17,24 @@ limitations under the License.
 package alicloud
 
 import (
-	"errors"
 	"fmt"
-	"strings"
 	"testing"
 
-	"github.com/denverdino/aliyungo/common"
 	"github.com/denverdino/aliyungo/ecs"
 )
 
-func NewMockClientInstanceMgr(client ClientInstanceSDK) (*ClientMgr, error) {
+func NewMockClientInstanceMgr() (*ClientMgr, error) {
 
 	mgr := &ClientMgr{
 		instance: &InstanceClient{
-			c: client,
+			c: &mockClientInstanceSDK{},
 		},
 	}
 	return mgr, nil
 }
 
-func TestInstanceRefeshInstance(t *testing.T) {
-	instanceid := "i-2zecarjjmtkx3oru4233"
-	mgr, err := NewMockClientInstanceMgr(&mockClientInstanceSDK{
-		describeInstances: func(args *ecs.DescribeInstancesArgs) (instances []ecs.InstanceAttributesType, pagination *common.PaginationResult, err error) {
-			if !strings.Contains(args.InstanceIds, instanceid) {
-				return nil, nil, errors.New("not found")
-			}
-			instances = []ecs.InstanceAttributesType{
-				{
-					InstanceId:          instanceid,
-					ImageId:             "centos_7_04_64_20G_alibase_201701015.vhd",
-					RegionId:            "cn-beijing",
-					ZoneId:              "cn-beijing-f",
-					InstanceType:        "ecs.sn1ne.large",
-					InstanceTypeFamily:  "ecs.sn1ne",
-					Status:              "running",
-					InstanceNetworkType: "vpc",
-					VpcAttributes: ecs.VpcAttributesType{
-						VpcId:     "vpc-2zeaybwqmvn6qgabfd3pe",
-						VSwitchId: "vsw-2zeclpmxy66zzxj4cg4ls",
-						PrivateIpAddress: ecs.IpAddressSetType{
-							IpAddress: []string{"192.168.211.130"},
-						},
-					},
-					InstanceChargeType: common.PostPaid,
-				},
-			}
-
-			return instances, nil, nil
-		},
-	})
-	id := "cn-hangzhou.i-2zecarjjmtkx3oru4233"
-	if err != nil {
-		t.Fatal(fmt.Sprintf("create client manager fail. [%s]\n", err.Error()))
-	}
-	ins, err := mgr.Instances().refreshInstance(instanceid, common.Beijing)
-	if err != nil {
-		t.Errorf("TestInstanceRefeshInstance error: %s\n", err.Error())
-	}
-	if ins.InstanceId != instanceid {
-		t.Fatal("refresh instance error.")
-	}
-	ins, err = mgr.Instances().findInstanceByProviderID(id)
-	if err != nil {
-		t.Fatal(fmt.Sprintf("findInstanceByNode error: %s\n", err.Error()))
-	}
-	if ins.InstanceId != instanceid {
-		t.Fatal("find instance error.")
-	}
-}
-
-type mockClientInstanceSDK struct {
-	describeInstances func(args *ecs.DescribeInstancesArgs) (instances []ecs.InstanceAttributesType, pagination *common.PaginationResult, err error)
-}
-
-func (m *mockClientInstanceSDK) DescribeInstances(args *ecs.DescribeInstancesArgs) (instances []ecs.InstanceAttributesType, pagination *common.PaginationResult, err error) {
-	if m.describeInstances != nil {
-		return m.describeInstances(args)
-	}
-	return nil, nil, errors.New("not implemented")
-}
-
 func TestNewMgr(t *testing.T) {
-	_, err := NewMockClientInstanceMgr(&mockClientInstanceSDK{
-		describeInstances: func(args *ecs.DescribeInstancesArgs) (instances []ecs.InstanceAttributesType, pagination *common.PaginationResult, err error) {
-			return nil, nil, errors.New("not implemented")
-		},
-	})
+	_, err := NewMockClientInstanceMgr()
 	if err != nil {
 		t.Fatal("error create new instance client")
 	}
@@ -122,4 +53,38 @@ func realInsClient(keyid, keysec string) {
 		InstanceIds: fmt.Sprintf("[\"%s\"]", string(nodeName)),
 	})
 	fmt.Printf("%s\n", PrettyJson(ins))
+}
+
+// ======================================= This begins the TESTS ============================================
+
+func TestInstanceRefeshInstance(t *testing.T) {
+
+	mgr, err := NewMockClientInstanceMgr()
+	if err != nil {
+		t.Fatal(fmt.Sprintf("create client manager fail. [%s]\n", err.Error()))
+	}
+
+	PreSetCloudData(
+		WithNewInstanceStore(),
+		WithInstance(),
+	)
+
+	ins, err := mgr.Instances().getInstances([]string{INSTANCEID}, REGION)
+	if err != nil {
+		t.Errorf("TestInstanceRefeshInstance error: %s\n", err.Error())
+	}
+	if len(ins) != 1 {
+		fmt.Printf("instance length must be 1")
+		t.Fail()
+	}
+	if ins[0].InstanceId != INSTANCEID {
+		t.Fatal("refresh instance error.")
+	}
+	insa, err := mgr.Instances().findInstanceByProviderID(fmt.Sprintf("%s.%s", REGION, INSTANCEID))
+	if err != nil {
+		t.Fatal(fmt.Sprintf("findInstanceByNode error: %s\n", err.Error()))
+	}
+	if insa.InstanceId != INSTANCEID {
+		t.Fatal("find instance error.")
+	}
 }
