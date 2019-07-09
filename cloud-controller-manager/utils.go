@@ -105,6 +105,16 @@ func NodeList(nodes []*v1.Node) []string {
 	return ns
 }
 
+func EndpointIpsList(nodes *v1.Endpoints) []string {
+	var ips []string
+	for _, ep := range nodes.Subsets {
+		for _, addr := range ep.Addresses {
+			ips = append(ips, addr.IP)
+		}
+	}
+	return ips
+}
+
 // Contains containsLabel in
 func Contains(list []int, x int) bool {
 	for _, item := range list {

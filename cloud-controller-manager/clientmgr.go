@@ -62,15 +62,21 @@ func NewClientMgr(key, secret string) (*ClientMgr, error) {
 	if err != nil {
 		return nil, fmt.Errorf("can not determin region: %s", err.Error())
 	}
-
+	vpcid, err := m.VpcID()
+	if err != nil {
+		return nil, fmt.Errorf("can not determin vpcid: %s", err.Error())
+	}
+	ecsclient := ecs.NewECSClientWithSecurityToken(key, secret, "", common.Region(region))
 	mgr := &ClientMgr{
 		stop: make(<-chan struct{}, 1),
 		meta: m,
 		instance: &InstanceClient{
-			c: ecs.NewECSClientWithSecurityToken(key, secret, "", common.Region(region)),
+			c: ecsclient,
 		},
 		loadbalancer: &LoadBalancerClient{
-			c: slb.NewSLBClientWithSecurityToken(key, secret, "", common.Region(region)),
+			vpcid: vpcid,
+			ins:   ecsclient,
+			c:     slb.NewSLBClientWithSecurityToken(key, secret, "", common.Region(region)),
 		},
 		privateZone: &PrivateZoneClient{
 			c: pvtz.NewPVTZClientWithSecurityToken(key, secret, "", common.Region(region)),

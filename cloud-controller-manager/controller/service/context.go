@@ -40,6 +40,10 @@ func ServiceModeLocal(svc *v1.Service) bool {
 	return svc.Spec.ExternalTrafficPolicy == v1.ServiceExternalTrafficPolicyTypeLocal
 }
 
+func IsENIBackendType(svc *v1.Service) bool {
+	return svc.Annotations[BACKEND_TYPE_LABEL] == BACKEND_TYPE_ENI
+}
+
 // NeedUpdate compare old and new service for possible changes
 func NeedUpdate(old, newm *v1.Service, record record.EventRecorder) bool {
 	if !NeedLoadBalancer(old) &&

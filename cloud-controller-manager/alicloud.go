@@ -288,41 +288,23 @@ func (c *Cloud) EnsureLoadBalancer(clusterName string, service *v1.Service, node
 	if err != nil {
 		return nil, err
 	}
-	glog.V(5).Infof("alicloud: ensure loadbalancer with final nodes list , %v\n", NodeList(ns))
-	//if service.Spec.SessionAffinity != v1.ServiceAffinityNone {
-	//	// Does not support SessionAffinity
-	//	return nil, fmt.Errorf("unsupported load balancer affinity: %v", service.Spec.SessionAffinity)
-	//}
+
 	if len(service.Spec.Ports) == 0 {
 		return nil, fmt.Errorf("requested load balancer with no ports")
 	}
-	if service.Spec.LoadBalancerIP != "" {
-		return nil, fmt.Errorf("LoadBalancerIP cannot be specified for Alicloud SLB")
-	}
 	vswitchid := defaulted.VswitchID
 	if vswitchid == "" {
-		if len(ns) <= 0 {
-			var err error
-			vswitchid, err = c.climgr.MetaData().VswitchID()
-			if err != nil {
-				return nil, fmt.Errorf("can not obtain vswitchid %s", err)
-			}
-			glog.V(2).Infof("alicloud: current vswitchid=%s\n", vswitchid)
-			if vswitchid == "" {
-				glog.Warningf("alicloud: can not find vswitch id, this will prevent you " +
-					"from creating VPC intranet SLB. But classic LB is still available.")
-			}
-		} else {
-			for _, v := range ns {
-				i, err := c.climgr.Instances().findInstanceByProviderID(v.Spec.ProviderID)
-				if err != nil {
-					return nil, fmt.Errorf("no nodes provided, obtain vswitch error: %s", err.Error())
-				}
-				vswitchid = i.VpcAttributes.VSwitchId
-				break
-			}
+		var err error
+		vswitchid, err = c.climgr.MetaData().VswitchID()
+		if err != nil {
+			return nil, fmt.Errorf("can not obtain vswitchid %s", err)
+		}
+		if vswitchid == "" {
+			glog.Warningf("vswitch id not found, vpc intranet slb creation would fail")
 		}
 	}
+
+	glog.Infof("using vswitch id=%s", vswitchid)
 
 	lb, err := c.climgr.LoadBalancers().EnsureLoadBalancer(service, ns, vswitchid)
 	if err != nil {
@@ -344,6 +326,55 @@ func (c *Cloud) EnsureLoadBalancer(clusterName string, service *v1.Service, node
 	}, nil
 }
 
+func (c *Cloud) EnsureLoadBalancerWithENI(name string, service *v1.Service, endpoint *v1.Endpoints) (*v1.LoadBalancerStatus, error) {
+
+	glog.V(2).Infof("Alicloud.EnsureLoadBalancerWithENI(%v, %s/%s, %v, %v)",
+		name, service.Namespace, service.Name, c.region, EndpointIpsList(endpoint))
+	defaulted, _ := ExtractAnnotationRequest(service)
+	if defaulted.AddressType == slb.InternetAddressType {
+		if c.cfg != nil && c.cfg.Global.DisablePublicSLB {
+			return nil, fmt.Errorf("public address SLB is Not allowed")
+		}
+	}
+
+	if len(service.Spec.Ports) == 0 {
+		return nil, fmt.Errorf("requested load balancer with no ports")
+	}
+	vswitchid := defaulted.VswitchID
+	if vswitchid == "" {
+		var err error
+		vswitchid, err = c.climgr.MetaData().VswitchID()
+		if err != nil {
+			return nil, fmt.Errorf("can not obtain vswitchid %s", err)
+		}
+		if vswitchid == "" {
+			glog.Warningf("vswitch id not found, vpc intranet slb creation would fail")
+		}
+	}
+
+	glog.Infof("using vswitch id=%s", vswitchid)
+
+	lb, err := c.climgr.LoadBalancers().EnsureLoadBalancer(service, endpoint, vswitchid)
+	if err != nil {
+		return nil, fmt.Errorf("ensure loadbalancer: %s", err.Error())
+	}
+
+	pz, pzr, err := c.climgr.PrivateZones().EnsurePrivateZoneRecord(service, lb.Address)
+	if err != nil {
+		return nil, fmt.Errorf("ensure pvtz: %s", err.Error())
+	}
+
+	status := &v1.LoadBalancerStatus{
+		Ingress: []v1.LoadBalancerIngress{
+			{
+				IP:       lb.Address,
+				Hostname: getHostName(pz, pzr),
+			},
+		},
+	}
+	return status, nil
+}
+
 // UpdateLoadBalancer updates hosts under the specified load balancer.
 // Implementations must treat the *v1.svc and *v1.Node
 // parameters as read-only and not modify them.
@@ -356,6 +387,13 @@ func (c *Cloud) UpdateLoadBalancer(clusterName string, service *v1.Service, node
 		return err
 	}
 	return c.climgr.LoadBalancers().UpdateLoadBalancer(service, ns, true)
+}
+
+func (c *Cloud) UpdateLoadBalancerWithENI(clusterName string, service *v1.Service, eps *v1.Endpoints) error {
+	glog.V(2).Infof("Alicloud.UpdateLoadBalancerWithENI(%v, %v, %v, %v, %v, %v, %v)",
+		clusterName, service.Namespace, service.Name, c.region, service.Spec.LoadBalancerIP, service.Spec.Ports, EndpointIpsList(eps))
+
+	return c.climgr.LoadBalancers().UpdateLoadBalancer(service, eps, true)
 }
 
 // EnsureLoadBalancerDeleted deletes the specified load balancer if it

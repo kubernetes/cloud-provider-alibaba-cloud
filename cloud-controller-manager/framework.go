@@ -33,6 +33,7 @@ func DefaultPreset() {
 		// Instance Store
 		WithNewInstanceStore(),
 		WithInstance(),
+		WithENI(),
 	)
 }
 
@@ -151,7 +152,7 @@ func newMockCloudWithSDK(
 	mgr := &ClientMgr{
 		stop:         make(<-chan struct{}, 1),
 		meta:         meta,
-		loadbalancer: &LoadBalancerClient{c: slb},
+		loadbalancer: &LoadBalancerClient{c: slb, ins: ins, vpcid: VPCID},
 		routes:       &RoutesClient{client: route, region: string(REGION)},
 		instance:     &InstanceClient{c: ins},
 	}
@@ -162,6 +163,7 @@ func newMockCloudWithSDK(
 func NewDefaultFrameWork(
 	svc *v1.Service,
 	nodes []*v1.Node,
+	endpoint *v1.Endpoints,
 	preset func(),
 ) *FrameWork {
 	if preset == nil {
@@ -172,22 +174,24 @@ func NewDefaultFrameWork(
 	if err != nil {
 		panic(err)
 	}
-	return NewFrameWork(cloud, svc, nodes, nil)
+	return NewFrameWork(cloud, svc, nodes, endpoint, nil)
 }
 
 func NewFrameWork(
 	cloud *Cloud,
 	svc *v1.Service,
 	nodes []*v1.Node,
+	endpoint *v1.Endpoints,
 	preset func(),
 ) *FrameWork {
 	if preset != nil {
 		preset()
 	}
 	return &FrameWork{
-		cloud: cloud,
-		svc:   svc,
-		nodes: nodes,
+		cloud:    cloud,
+		svc:      svc,
+		nodes:    nodes,
+		endpoint: endpoint,
 	}
 }
 
@@ -195,6 +199,7 @@ type FrameWork struct {
 	cloud         *Cloud
 	svc           *v1.Service
 	nodes         []*v1.Node
+	endpoint      *v1.Endpoints
 	cloudDataMock func()
 }
 
@@ -213,20 +218,37 @@ func (f *FrameWork) RunDefault(
 	t *testing.T,
 	describe string,
 ) {
-	f.Run(t, describe, nil)
+	f.Run(t, describe, "ecs", nil)
+}
+
+func (f *FrameWork) RunWithENI(
+	t *testing.T,
+	describe string,
+) {
+	f.Run(t, describe, "eni", nil)
 }
 
 func (f *FrameWork) Run(
 	t *testing.T,
 	describe string,
+	ntype string,
 	run func(),
 ) {
 	t.Log(describe)
 	if run == nil {
 		run = func() {
-			status, e := f.cloud.EnsureLoadBalancer(CLUSTER_ID, f.svc, f.nodes)
-			if e != nil {
-				t.Fatalf("EnsureLoadBalancer error: %s\n", e.Error())
+			var (
+				err    error
+				status *v1.LoadBalancerStatus
+			)
+			switch ntype {
+			case "eni":
+				status, err = f.cloud.EnsureLoadBalancerWithENI(CLUSTER_ID, f.svc, f.endpoint)
+			case "ecs":
+				status, err = f.cloud.EnsureLoadBalancer(CLUSTER_ID, f.svc, f.nodes)
+			}
+			if err != nil {
+				t.Fatalf("EnsureLoadBalancer error: %s\n", err.Error())
 			}
 			if !f.ExpectExistAndEqual(t) {
 				t.Fatalf("test fail, expect equal")
@@ -324,43 +346,89 @@ func (f *FrameWork) ExpectExistAndEqual(t *testing.T) bool {
 		}
 
 		backends := vg.BackendServers.BackendServer
-		if len(backends) != len(f.nodes) {
-			t.Fatalf("vgroup backend server must be %d", len(f.nodes))
-		}
-		sort.SliceStable(
-			backends,
-			func(i, j int) bool {
-				if backends[i].ServerId > backends[j].ServerId {
-					return true
-				}
-				return false
-			},
-		)
 
-		nodes := f.nodes
-		if f.hasAnnotation(ServiceAnnotationLoadBalancerBackendLabel) {
-			var tpms []*v1.Node
-			for _, v := range f.nodes {
-				if containsLabel(
-					v,
-					strings.Split(defd.BackendLabel, ","),
-				) {
-					tpms = append(tpms, v)
+		if f.svc.Annotations["service.beta.kubernetes.io/backend-type"] == "eni" {
+			if len(backends) != len(f.endpoint.Subsets[0].Addresses) {
+				t.Fatalf("endpoint vgroup backend server must be %d", len(f.nodes))
+			}
+			sort.SliceStable(
+				backends,
+				func(i, j int) bool {
+					if backends[i].ServerIp < backends[j].ServerIp {
+						return true
+					}
+					return false
+				},
+			)
+			endpoints := f.endpoint.Subsets[0].Addresses
+
+			sort.SliceStable(
+				endpoints,
+				func(i, j int) bool {
+					if endpoints[i].IP < endpoints[j].IP {
+						return true
+					}
+					return false
+				},
+			)
+			for k, v := range backends {
+				if v.ServerIp != endpoints[k].IP {
+					t.Fatalf("backend not equal endpoint")
 				}
 			}
-			nodes = tpms
-		}
-		if len(backends) > len(nodes) {
-			t.Fatalf("backend node not equal")
-		}
-		for k, v := range backends {
-			_, ida, err := nodeFromProviderID(nodes[k].Spec.ProviderID)
-			if err != nil {
-				t.Fatalf("unexpected provider id")
+		} else {
+			if len(backends) != len(f.nodes) {
+				t.Fatalf("node vgroup backend server must be %d", len(f.nodes))
 			}
-			if v.ServerId != ida {
-				t.Fatalf("backend not equal")
+			sort.SliceStable(
+				backends,
+				func(i, j int) bool {
+					if backends[i].ServerId < backends[j].ServerId {
+						return true
+					}
+					return false
+				},
+			)
+			sort.SliceStable(
+				f.nodes,
+				func(i, j int) bool {
+					_, ida, err := nodeFromProviderID(f.nodes[i].Spec.ProviderID)
+					_, idb, err := nodeFromProviderID(f.nodes[j].Spec.ProviderID)
+					if err != nil {
+						t.Fatalf("node id error")
+					}
+					if ida < idb {
+						return true
+					}
+					return false
+				},
+			)
+			nodes := f.nodes
+			if f.hasAnnotation(ServiceAnnotationLoadBalancerBackendLabel) {
+				var tpms []*v1.Node
+				for _, v := range f.nodes {
+					if containsLabel(
+						v,
+						strings.Split(defd.BackendLabel, ","),
+					) {
+						tpms = append(tpms, v)
+					}
+				}
+				nodes = tpms
 			}
+			if len(backends) > len(nodes) {
+				t.Fatalf("backend node not equal")
+			}
+			for k, v := range backends {
+				_, ida, err := nodeFromProviderID(nodes[k].Spec.ProviderID)
+				if err != nil {
+					t.Fatalf("unexpected provider id")
+				}
+				if v.ServerId != ida {
+					t.Fatalf("backend not equal")
+				}
+			}
+
 		}
 	}
 

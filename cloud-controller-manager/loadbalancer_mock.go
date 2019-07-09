@@ -988,7 +988,8 @@ func (c *mockClientSLB) AddVServerGroupBackendServers(args *slb.AddVServerGroupB
 	for _, b := range *backends {
 		found := false
 		for _, cac := range vgr.BackendServers.BackendServer {
-			if b.ServerId == cac.ServerId {
+			if b.ServerId == cac.ServerId &&
+				b.ServerIp == cac.ServerIp {
 				found = true
 				break
 			}
@@ -1034,7 +1035,8 @@ func (c *mockClientSLB) RemoveVServerGroupBackendServers(args *slb.RemoveVServer
 	for _, b := range vgr.BackendServers.BackendServer {
 		found := false
 		for _, cac := range *backends {
-			if b.ServerId == cac.ServerId {
+			if b.ServerId == cac.ServerId &&
+				b.ServerIp == cac.ServerIp {
 				found = true
 				break
 			}

@@ -43,6 +43,7 @@ type InstanceClient struct {
 type ClientInstanceSDK interface {
 	AddTags(args *ecs.AddTagsArgs) error
 	DescribeInstances(args *ecs.DescribeInstancesArgs) (instances []ecs.InstanceAttributesType, pagination *common.PaginationResult, err error)
+	DescribeNetworkInterfaces(args *ecs.DescribeNetworkInterfacesArgs) (resp *ecs.DescribeNetworkInterfacesResponse, err error)
 }
 
 // filterOutByRegion Used for multi-region or multi-vpc. works for single region or vpc too.

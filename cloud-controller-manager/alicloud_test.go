@@ -99,6 +99,7 @@ func TestEnsureLoadBalancerBasic(t *testing.T) {
 			},
 		},
 		nil,
+		nil,
 	)
 
 	// Step2: Run start a test on specified function.
@@ -179,6 +180,7 @@ func TestEnsureLoadBalancerAnnotation(t *testing.T) {
 			},
 		},
 		nil,
+		nil,
 	)
 
 	f.RunDefault(t, "TestAnnotation")
@@ -216,6 +218,7 @@ func TestEnsureLoadBalancerSpec(t *testing.T) {
 				},
 			},
 		},
+		nil,
 		nil,
 	)
 
@@ -255,6 +258,7 @@ func TestEnsureLoadBalancerVswitchID(t *testing.T) {
 				},
 			},
 		},
+		nil,
 		nil,
 	)
 
@@ -304,6 +308,7 @@ func TestEnsureLoadBalancerBackendLable(t *testing.T) {
 			},
 		},
 		nil,
+		nil,
 	)
 
 	f.RunDefault(t, "TestBackendLabel")
@@ -341,6 +346,7 @@ func TestEnsureLoadBalancerHTTP(t *testing.T) {
 				},
 			},
 		},
+		nil,
 		nil,
 	)
 
@@ -380,6 +386,7 @@ func TestEnsureLoadBalancerHTTPS(t *testing.T) {
 			},
 		},
 		nil,
+		nil,
 	)
 
 	f.RunDefault(t, "Create HTTPS Loadbalancer")
@@ -417,6 +424,7 @@ func TestHTTPSFromHttp(t *testing.T) {
 				},
 			},
 		},
+		nil,
 		nil,
 	)
 
@@ -463,8 +471,55 @@ func TestEnsureLoadBalancerHTTPSHealthCheck(t *testing.T) {
 			},
 		},
 		nil,
+		nil,
 	)
 	f.RunDefault(t, "HTTPS health check")
+}
+
+func TestEnsureLoadBalancerWithENI(t *testing.T) {
+
+	prid := nodeid(string(REGION), INSTANCEID)
+	f := NewDefaultFrameWork(
+		// initial service based on your definition
+		&v1.Service{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "my-service",
+				UID:  types.UID(serviceUIDNoneExist),
+				Annotations: map[string]string{
+					"service.beta.kubernetes.io/backend-type": "eni",
+				},
+			},
+			Spec: v1.ServiceSpec{
+				Ports: []v1.ServicePort{
+					{Port: listenPort1, TargetPort: targetPort1, Protocol: v1.ProtocolTCP, NodePort: nodePort1},
+				},
+				Type: v1.ServiceTypeLoadBalancer,
+			},
+		},
+		nil,
+		&v1.Endpoints{
+			ObjectMeta: metav1.ObjectMeta{Name: prid},
+			Subsets: []v1.EndpointSubset{
+				{
+					Addresses: []v1.EndpointAddress{
+						{
+							IP: ENI_ADDR_1,
+						},
+						{
+							IP: ENI_ADDR_2,
+						},
+					},
+					Ports: []v1.EndpointPort{
+						{
+							Port: listenPort1,
+						},
+					},
+				},
+			},
+		},
+		nil,
+	)
+	f.RunWithENI(t, "ENI backend Type test")
 }
 
 func TestEnsureLoadbalancerDeleted(t *testing.T) {
@@ -496,11 +551,12 @@ func TestEnsureLoadbalancerDeleted(t *testing.T) {
 			},
 		},
 		nil,
+		nil,
 	)
 
 	f.Run(
 		t,
-		"Delete Loadbalancer",
+		"Delete Loadbalancer", "ecs",
 		func() {
 			_, err := f.cloud.EnsureLoadBalancer(CLUSTER_ID, f.svc, f.nodes)
 			if err != nil {
@@ -549,11 +605,13 @@ func TestEnsureLoadBalancerDeleteWithUserDefined(t *testing.T) {
 			},
 		},
 		nil,
+		nil,
 	)
 
 	f.Run(
 		t,
 		"Delete User Defined Loadbalancer",
+		"ecs",
 		func() {
 			err := f.cloud.EnsureLoadBalancerDeleted(CLUSTER_ID, f.svc)
 			if err != nil {

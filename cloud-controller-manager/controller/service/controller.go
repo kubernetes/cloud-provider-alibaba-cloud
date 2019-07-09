@@ -37,7 +37,29 @@ const (
 	// exclude from load balancers created by a cloud provider.
 	LabelNodeRoleExcludeBalancer = "alpha.service-controller.kubernetes.io/exclude-balancer"
 	CCM_CLASS                    = "service.beta.kubernetes.io/class"
+	BACKEND_TYPE_LABEL           = "service.beta.kubernetes.io/backend-type"
 )
+
+const (
+	BACKEND_TYPE_ENI = "eni"
+	BACKEND_TYPE_ECS = "ecs"
+)
+
+type EnsureENI interface {
+
+	// EnsureLoadbalancerWithENI
+	// creates a new load balancer 'name', or updates the existing one. Returns the
+	// status of the balancer. Implementations must treat the *v1.svc and *v1.Endpoints
+	// parameters as read-only and not modify them.
+	// Parameter 'name' is the name of the cluster as presented to kube-controller-manager
+	EnsureLoadbalancerWithENI(name string, svc *v1.Service, endpoint *v1.Endpoints) (*v1.LoadBalancerStatus, error)
+
+	// UpdateLoadBalancerWithENI updates hosts under the specified load balancer.
+	// Implementations must treat the *v1.Service and *v1.Enodpoints
+	// parameters as read-only and not modify them.
+	// Parameter 'name' is the name of the cluster as presented to kube-controller-manager
+	UpdateLoadBalancerWithENI(name string, service *v1.Service, endpoint *v1.Endpoints) error
+}
 
 type Controller struct {
 	cloud       cloudprovider.LoadBalancer
@@ -456,27 +478,38 @@ func (con *Controller) update(cached, svc *v1.Service) error {
 
 		glog.Infof("start to ensure loadbalancer %s", key(svc))
 
-		nodes, err := AvailableNodes(svc, con.ifactory)
-		if err != nil {
-			return fmt.Errorf("error get avaliable nodes %s", err.Error())
+		if IsENIBackendType(svc) {
+			// Ensure ENI type backend
+			eni, ok := con.cloud.(EnsureENI)
+			if !ok {
+				return fmt.Errorf("cloud does not implement EnsureENI interface")
+			}
+			eps, err := con.ifactory.Core().V1().Endpoints().Lister().Endpoints(svc.Namespace).Get(svc.Name)
+			if err != nil {
+				return fmt.Errorf("get available endpoints for eni: %s", err.Error())
+			}
+			newm, err = eni.EnsureLoadbalancerWithENI(con.clusterName, svc, eps)
+		} else {
+			nodes, err := AvailableNodes(svc, con.ifactory)
+			if err != nil {
+				return fmt.Errorf("error get avaliable nodes %s", err.Error())
+			}
+			// Fire warning event if there are no available nodes
+			// for loadbalancer service
+			if len(nodes) == 0 {
+				con.recorder.Eventf(
+					svc,
+					v1.EventTypeWarning,
+					"UnAvailableLoadBalancer",
+					"There are no available backend loadbalancer nodes for service %s",
+					key(svc),
+				)
+			}
+			newm, err = con.cloud.EnsureLoadBalancer(con.clusterName, svc, nodes)
+			if err != nil {
+				return fmt.Errorf("ensure loadbalancer error: %s", err)
+			}
 		}
-		// Fire warning event if there are no available nodes
-		// for loadbalancer service
-		if len(nodes) == 0 {
-			con.recorder.Eventf(
-				svc,
-				v1.EventTypeWarning,
-				"UnAvailableLoadBalancer",
-				"There are no available backend loadbalancer nodes for service %s",
-				key(svc),
-			)
-		}
-
-		status, err := con.cloud.EnsureLoadBalancer(con.clusterName, svc, nodes)
-		if err != nil {
-			return fmt.Errorf("ensure loadbalancer error: %s", err)
-		}
-
 		con.recorder.Eventf(
 			svc,
 			v1.EventTypeNormal,
@@ -484,7 +517,6 @@ func (con *Controller) update(cached, svc *v1.Service) error {
 			"Finished ensured loadbalancer, %s",
 			key(svc),
 		)
-		newm = status
 	}
 	if err := con.updateStatus(svc, pre, newm); err != nil {
 		return fmt.Errorf("update service status: %s", err.Error())
@@ -610,7 +642,17 @@ func (con *Controller) NodeSyncTask(k string) error {
 		}
 
 		defer glog.Infof("finish sync backend for service [%s]\n\n", key(service))
-
+		if IsENIBackendType(service) {
+			eni, ok := con.cloud.(EnsureENI)
+			if !ok {
+				return fmt.Errorf("cloud does not implement EnsureENI interface")
+			}
+			eps, err := con.ifactory.Core().V1().Endpoints().Lister().Endpoints(service.Namespace).Get(service.Name)
+			if err != nil {
+				return fmt.Errorf("get available endpoints for eni: %s", err.Error())
+			}
+			return eni.UpdateLoadBalancerWithENI(con.clusterName, service, eps)
+		}
 		nodes, err := AvailableNodes(service, con.ifactory)
 		if err != nil {
 			return fmt.Errorf("get available nodes: %s", err.Error())
