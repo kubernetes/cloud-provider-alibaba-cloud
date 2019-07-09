@@ -554,6 +554,7 @@ func (t *tcp) Add() error {
 			ListenerPort:      int(t.Port),
 			BackendServerPort: int(t.NodePort),
 			//Health Check
+			Scheduler:          slb.SchedulerType(def.Scheduler),
 			Bandwidth:          DEFAULT_LISTENER_BANDWIDTH,
 			PersistenceTimeout: def.PersistenceTimeout,
 			Description:        t.NamedKey.Key(),
@@ -588,6 +589,7 @@ func (t *tcp) Update() error {
 		BackendServerPort: int(t.NodePort),
 		Description:       t.NamedKey.Key(),
 		//Health Check
+		Scheduler:          slb.SchedulerType(response.Scheduler),
 		Bandwidth:          DEFAULT_LISTENER_BANDWIDTH,
 		PersistenceTimeout: response.PersistenceTimeout,
 		VServerGroupId:     t.findVgroup(t.NamedKey.Reference(t.NodePort)),
@@ -627,6 +629,12 @@ func (t *tcp) Update() error {
 	if def.AclType != response.AclType {
 		needUpdate = true
 		config.AclType = def.AclType
+	}
+
+	if request.Scheduler != "" &&
+		def.Scheduler != string(response.Scheduler) {
+		needUpdate = true
+		config.Scheduler = slb.SchedulerType(def.Scheduler)
 	}
 
 	// todo: perform healthcheck update.
@@ -714,6 +722,7 @@ func (t *udp) Add() error {
 			Description:       t.NamedKey.Key(),
 			VServerGroupId:    t.findVgroup(t.NamedKey.Reference(t.NodePort)),
 			//Health Check
+			Scheduler:          slb.SchedulerType(def.Scheduler),
 			Bandwidth:          DEFAULT_LISTENER_BANDWIDTH,
 			PersistenceTimeout: def.PersistenceTimeout,
 
@@ -748,6 +757,7 @@ func (t *udp) Update() error {
 		AclStatus:         response.AclStatus,
 		AclId:             response.AclId,
 		//Health Check
+		Scheduler:          slb.SchedulerType(response.Scheduler),
 		Bandwidth:          DEFAULT_LISTENER_BANDWIDTH,
 		PersistenceTimeout: response.PersistenceTimeout,
 		//HealthCheckType:           response.HealthCheckType,
@@ -781,6 +791,11 @@ func (t *udp) Update() error {
 		config.AclType = def.AclType
 	}
 
+	if request.Scheduler != "" &&
+		def.Scheduler != string(response.Scheduler) {
+		needUpdate = true
+		config.Scheduler = slb.SchedulerType(def.Scheduler)
+	}
 	// todo: perform healthcheck update.
 	if request.HealthCheckConnectPort != 0 &&
 		def.HealthCheckConnectPort != response.HealthCheckConnectPort {
@@ -849,6 +864,7 @@ func (t *http) Add() error {
 		Description:       t.NamedKey.Key(),
 		VServerGroupId:    t.findVgroup(t.NamedKey.Reference(t.NodePort)),
 		//Health Check
+		Scheduler:         slb.SchedulerType(def.Scheduler),
 		Bandwidth:         DEFAULT_LISTENER_BANDWIDTH,
 		StickySession:     def.StickySession,
 		StickySessionType: def.StickySessionType,
@@ -921,6 +937,7 @@ func (t *http) Update() error {
 		ListenerPort:      int(t.Port),
 		BackendServerPort: int(t.NodePort),
 		//Health Check
+		Scheduler:         slb.SchedulerType(response.Scheduler),
 		Bandwidth:         DEFAULT_LISTENER_BANDWIDTH,
 		StickySession:     response.StickySession,
 		StickySessionType: response.StickySessionType,
@@ -964,7 +981,11 @@ func (t *http) Update() error {
 		needUpdate = true
 		config.AclType = def.AclType
 	}
-
+	if request.Scheduler != "" &&
+		def.Scheduler != string(response.Scheduler) {
+		needUpdate = true
+		config.Scheduler = slb.SchedulerType(def.Scheduler)
+	}
 	// todo: perform healthcheck update.
 	if def.HealthCheck != response.HealthCheck {
 		needUpdate = true
@@ -1088,6 +1109,7 @@ func (t *https) Add() error {
 				AclStatus:         def.AclStatus,
 				AclId:             def.AclID,
 				//Health Check
+				Scheduler:         slb.SchedulerType(def.Scheduler),
 				HealthCheck:       def.HealthCheck,
 				Bandwidth:         DEFAULT_LISTENER_BANDWIDTH,
 				StickySession:     def.StickySession,
@@ -1123,6 +1145,7 @@ func (t *https) Update() error {
 			Description:       t.NamedKey.Key(),
 			VServerGroupId:    t.findVgroup(t.NamedKey.Reference(t.NodePort)),
 			//Health Check
+			Scheduler:         slb.SchedulerType(response.Scheduler),
 			HealthCheck:       response.HealthCheck,
 			Bandwidth:         DEFAULT_LISTENER_BANDWIDTH,
 			StickySession:     response.StickySession,
@@ -1176,7 +1199,11 @@ func (t *https) Update() error {
 		needUpdate = true
 		config.AclType = def.AclType
 	}
-
+	if request.Scheduler != "" &&
+		def.Scheduler != string(response.Scheduler) {
+		needUpdate = true
+		config.Scheduler = slb.SchedulerType(def.Scheduler)
+	}
 	if request.HealthCheckConnectPort != 0 &&
 		def.HealthCheckConnectPort != response.HealthCheckConnectPort {
 		needUpdate = true

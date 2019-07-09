@@ -530,6 +530,7 @@ func (f *FrameWork) ListenerEqual(id string, p v1.ServicePort, proto string) err
 		aclStatus             = ""
 		aclId                 = ""
 		aclType               = ""
+		scheduler             = ""
 	)
 	defd, _ := ExtractAnnotationRequest(f.svc)
 	switch proto {
@@ -557,6 +558,7 @@ func (f *FrameWork) ListenerEqual(id string, p v1.ServicePort, proto string) err
 		aclId = resp.AclId
 		aclStatus = resp.AclStatus
 		aclType = resp.AclType
+		scheduler = string(resp.Scheduler)
 	case "udp":
 		resp, err := f.SLBSDK().DescribeLoadBalancerUDPListenerAttribute(id, int(p.Port))
 		if err != nil {
@@ -576,6 +578,7 @@ func (f *FrameWork) ListenerEqual(id string, p v1.ServicePort, proto string) err
 		aclId = resp.AclId
 		aclStatus = resp.AclStatus
 		aclType = resp.AclType
+		scheduler = string(resp.Scheduler)
 	case "http":
 		resp, err := f.SLBSDK().DescribeLoadBalancerHTTPListenerAttribute(id, int(p.Port))
 		if err != nil {
@@ -602,6 +605,7 @@ func (f *FrameWork) ListenerEqual(id string, p v1.ServicePort, proto string) err
 		aclId = resp.AclId
 		aclStatus = resp.AclStatus
 		aclType = resp.AclType
+		scheduler = string(resp.Scheduler)
 	case "https":
 		resp, err := f.SLBSDK().DescribeLoadBalancerHTTPSListenerAttribute(id, int(p.Port))
 		if err != nil {
@@ -631,6 +635,7 @@ func (f *FrameWork) ListenerEqual(id string, p v1.ServicePort, proto string) err
 		aclId = resp.AclId
 		aclStatus = resp.AclStatus
 		aclType = resp.AclType
+		scheduler = string(resp.Scheduler)
 		//persistenceTimeout = res
 	default:
 		return fmt.Errorf("unknown proto: %s", proto)
@@ -654,6 +659,11 @@ func (f *FrameWork) ListenerEqual(id string, p v1.ServicePort, proto string) err
 		}
 	}
 
+	if f.hasAnnotation(ServiceAnnotationLoadBalancerScheduler) {
+		if scheduler != defd.Scheduler {
+			return fmt.Errorf("scheduler type error")
+		}
+	}
 	// --------------------------- SessionStick ----------------------------
 	if f.hasAnnotation(ServiceAnnotationLoadBalancerSessionStick) {
 		if sessionStick != string(defd.StickySession) {
