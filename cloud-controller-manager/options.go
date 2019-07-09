@@ -409,6 +409,8 @@ func ExtractAnnotationRequest(service *v1.Service) (*AnnotationRequest, *Annotat
 	if ok {
 		defaulted.LoadBalancerSpec = slb.LoadBalancerSpecType(loadbalancerSpec)
 		request.LoadBalancerSpec = defaulted.LoadBalancerSpec
+	}else {
+		defaulted.LoadBalancerSpec = "slb.s1.small"
 	}
 
 	// stick session
