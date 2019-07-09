@@ -200,13 +200,13 @@ func TestUpdateListenerPorts(t *testing.T) {
 		},
 	})
 
-	// buildVGroupFromService is compatible with v1 listener.
-	vgs := buildVGroupFromService(service, detail, mgr.loadbalancer.c, mgr.loadbalancer.ins, mgr.loadbalancer.vpcid, detail.RegionId)
+	// BuildVirturalGroupFromService is compatible with v1 listener.
+	vgs := BuildVirturalGroupFromService(mgr.loadbalancer, service, detail)
 	if err := EnsureVirtualGroups(vgs, []*v1.Node{}); err != nil {
 		t.Fatal("error ensure vserver group.")
 	}
 
-	err := EnsureListeners(mgr.loadbalancer.c, mgr.loadbalancer.ins, mgr.loadbalancer.vpcid, service, detail, vgs)
+	err := EnsureListeners(mgr.loadbalancer, service, detail, vgs)
 
 	if err != nil {
 		t.Fatal("listener update error! ")
@@ -392,7 +392,7 @@ func TestUpdateListenerBackendPorts(t *testing.T) {
 		},
 	})
 
-	err := EnsureListeners(mgr.loadbalancer.c, mgr.loadbalancer.ins, mgr.loadbalancer.vpcid, service, detail, &grp)
+	err := EnsureListeners(mgr.loadbalancer, service, detail, &grp)
 
 	if err != nil {
 		t.Fatal("listener update error! ")

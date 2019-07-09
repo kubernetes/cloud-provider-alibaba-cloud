@@ -540,7 +540,8 @@ func (f *FrameWork) ListenerEqual(id string, p v1.ServicePort, proto string) err
 			return err
 		}
 		if resp.BackendServerPort == 0 ||
-			resp.BackendServerPort != int(p.NodePort) {
+			(!isEniBackend(f.svc) && resp.BackendServerPort != int(p.NodePort)) ||
+			(isEniBackend(f.svc) && resp.BackendServerPort != int(p.Port)) {
 			return fmt.Errorf("TCPBackendServerPortNotEqual")
 		}
 
@@ -565,7 +566,8 @@ func (f *FrameWork) ListenerEqual(id string, p v1.ServicePort, proto string) err
 			return err
 		}
 		if resp.BackendServerPort == 0 ||
-			resp.BackendServerPort != int(p.NodePort) {
+			(!isEniBackend(f.svc) && resp.BackendServerPort != int(p.NodePort)) ||
+			(isEniBackend(f.svc) && resp.BackendServerPort != int(p.Port)) {
 			return fmt.Errorf("UDPBackendServerPortNotEqual")
 		}
 
@@ -585,7 +587,8 @@ func (f *FrameWork) ListenerEqual(id string, p v1.ServicePort, proto string) err
 			return err
 		}
 		if resp.BackendServerPort == 0 ||
-			resp.BackendServerPort != int(p.NodePort) {
+			(!isEniBackend(f.svc) && resp.BackendServerPort != int(p.NodePort)) ||
+			(isEniBackend(f.svc) && resp.BackendServerPort != int(p.Port)) {
 			return fmt.Errorf("HTTPBackendServerPortNotEqual")
 		}
 
@@ -612,7 +615,8 @@ func (f *FrameWork) ListenerEqual(id string, p v1.ServicePort, proto string) err
 			return err
 		}
 		if resp.BackendServerPort == 0 ||
-			resp.BackendServerPort != int(p.NodePort) {
+			(!isEniBackend(f.svc) && resp.BackendServerPort != int(p.NodePort)) ||
+			(isEniBackend(f.svc) && resp.BackendServerPort != int(p.Port)) {
 			return fmt.Errorf("HTTPSBackendServerPortNotEqual")
 		}
 		if resp.ServerCertificateId == "" ||

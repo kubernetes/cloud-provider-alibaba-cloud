@@ -389,11 +389,11 @@ func (c *Cloud) UpdateLoadBalancer(clusterName string, service *v1.Service, node
 	return c.climgr.LoadBalancers().UpdateLoadBalancer(service, ns, true)
 }
 
-func (c *Cloud) UpdateLoadBalancerWithENI(clusterName string, service *v1.Service, eps *v1.Endpoints) error {
+func (c *Cloud) UpdateLoadBalancerWithENI(name string, service *v1.Service, endpoint *v1.Endpoints) error {
 	glog.V(2).Infof("Alicloud.UpdateLoadBalancerWithENI(%v, %v, %v, %v, %v, %v, %v)",
-		clusterName, service.Namespace, service.Name, c.region, service.Spec.LoadBalancerIP, service.Spec.Ports, EndpointIpsList(eps))
+		name, service.Namespace, service.Name, c.region, service.Spec.LoadBalancerIP, service.Spec.Ports, EndpointIpsList(endpoint))
 
-	return c.climgr.LoadBalancers().UpdateLoadBalancer(service, eps, true)
+	return c.climgr.LoadBalancers().UpdateLoadBalancer(service, endpoint, true)
 }
 
 // EnsureLoadBalancerDeleted deletes the specified load balancer if it

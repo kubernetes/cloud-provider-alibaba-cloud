@@ -186,7 +186,8 @@ func (v *vgroup) diff(apis, nodes []slb.VBackendServerType) (
 	for _, api := range apis {
 		found := false
 		for _, node := range nodes {
-			if api.ServerId == node.ServerId {
+			if api.ServerId == node.ServerId &&
+				api.ServerIp == node.ServerIp {
 				found = true
 				break
 			}
@@ -198,7 +199,8 @@ func (v *vgroup) diff(apis, nodes []slb.VBackendServerType) (
 	for _, node := range nodes {
 		found := false
 		for _, api := range apis {
-			if api.ServerId == node.ServerId {
+			if api.ServerId == node.ServerId &&
+				api.ServerIp == node.ServerIp {
 				found = true
 				break
 			}
@@ -294,15 +296,13 @@ func EnsureVirtualGroups(vgrps *vgroups, nodes interface{}) error {
 
 //CleanUPVGroupMerged Merge with service port and do clean vserver group
 func CleanUPVGroupMerged(
+	slbins *LoadBalancerClient,
 	service *v1.Service,
 	lb *slb.LoadBalancerType,
-	client ClientSLBSDK,
-	inclient ClientInstanceSDK,
-	vpcid string,
 	local *vgroups,
 ) error {
 
-	remote, err := buildVGroupFromRemoteAPI(lb, client, inclient, vpcid, lb.RegionId)
+	remote, err := BuildVirtualGroupFromRemoteAPI(lb, slbins)
 	if err != nil {
 		return fmt.Errorf("build vserver group from remote: %s", err.Error())
 	}
@@ -325,7 +325,7 @@ func CleanUPVGroupMerged(
 			err := rem.Remove()
 			if err != nil {
 				glog.Errorf("cleanup vgroup warining: "+
-					"failed to remove vgroup[%s] is ok. wait for next try. %s", rem.NamedKey.Key(), err.Error())
+					"failed to remove vgroup[%s]. wait for next try. %s", rem.NamedKey.Key(), err.Error())
 				return err
 			}
 		}
@@ -350,20 +350,17 @@ func CleanUPVGroupDirect(local *vgroups) error {
 		err := vg.Remove()
 		if err != nil {
 			glog.Errorf("cleanup vgroup warining: "+
-				"failed to remove vgroup[%s] is ok. wait for next try. %s", vg.NamedKey.Key(), err.Error())
+				"failed to remove vgroup[%s] directly. wait for next try. %s", vg.NamedKey.Key(), err.Error())
 			return err
 		}
 	}
 	return nil
 }
 
-func buildVGroupFromService(
+func BuildVirturalGroupFromService(
+	client *LoadBalancerClient,
 	service *v1.Service,
-	lb *slb.LoadBalancerType,
-	client ClientSLBSDK,
-	insclient ClientInstanceSDK,
-	vpcid string,
-	region common.Region,
+	slbins *slb.LoadBalancerType,
 ) *vgroups {
 	vgrps := vgroups{}
 	for _, port := range service.Spec.Ports {
@@ -375,11 +372,14 @@ func buildVGroupFromService(
 				ServiceName: service.Name,
 				Prefix:      DEFAULT_PREFIX,
 			},
-			LoadBalancerId: lb.LoadBalancerId,
-			Client:         client,
-			RegionId:       region,
-			InsClient:      insclient,
-			VpcID:          vpcid,
+			LoadBalancerId: slbins.LoadBalancerId,
+			Client:         client.c,
+			RegionId:       common.Region(client.region),
+			InsClient:      client.ins,
+			VpcID:          client.vpcid,
+		}
+		if isEniBackend(service) {
+			vg.NamedKey.Port = port.Port
 		}
 		vgrps = append(vgrps, vg)
 	}
@@ -387,19 +387,16 @@ func buildVGroupFromService(
 	return &vgrps
 }
 
-func buildVGroupFromRemoteAPI(
+func BuildVirtualGroupFromRemoteAPI(
 	lb *slb.LoadBalancerType,
-	client ClientSLBSDK,
-	insclient ClientInstanceSDK,
-	vpcid string,
-	region common.Region,
+	slbins *LoadBalancerClient,
 ) (vgroups, error) {
 	vgrps := vgroups{}
 	vargs := slb.DescribeVServerGroupsArgs{
-		RegionId:       region,
+		RegionId:       common.Region(slbins.region),
 		LoadBalancerId: lb.LoadBalancerId,
 	}
-	vgrp, err := client.DescribeVServerGroups(&vargs)
+	vgrp, err := slbins.c.DescribeVServerGroups(&vargs)
 	if err != nil {
 		return vgrps, fmt.Errorf("list: vgroup error, %s", err.Error())
 	}
@@ -410,15 +407,18 @@ func buildVGroupFromRemoteAPI(
 				"unexpected vserver group name: [%s]. Assume user managed vserver group, It is ok to skip this vgroup.", val.VServerGroupName)
 			continue
 		}
-		vgrps = append(vgrps, &vgroup{
-			NamedKey:       key,
-			LoadBalancerId: lb.LoadBalancerId,
-			VpcID:          vpcid,
-			InsClient:      insclient,
-			Client:         client,
-			RegionId:       region,
-			VGroupId:       val.VServerGroupId,
-		})
+		vgrps = append(
+			vgrps,
+			&vgroup{
+				NamedKey:       key,
+				LoadBalancerId: lb.LoadBalancerId,
+				VpcID:          slbins.vpcid,
+				InsClient:      slbins.ins,
+				Client:         slbins.c,
+				RegionId:       common.Region(slbins.region),
+				VGroupId:       val.VServerGroupId,
+			},
+		)
 	}
 	return vgrps, nil
 }
