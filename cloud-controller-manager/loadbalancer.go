@@ -93,8 +93,8 @@ type ClientSLBSDK interface {
 	DescribeLoadBalancers(args *slb.DescribeLoadBalancersArgs) (loadBalancers []slb.LoadBalancerType, err error)
 	CreateLoadBalancer(args *slb.CreateLoadBalancerArgs) (response *slb.CreateLoadBalancerResponse, err error)
 	DeleteLoadBalancer(loadBalancerId string) (err error)
-	ModifyLoadBalancerInternetSpec(args *slb.ModifyLoadBalancerInternetSpecArgs) (err error)
 	ModifyLoadBalancerInstanceSpec(args *slb.ModifyLoadBalancerInstanceSpecArgs) (err error)
+	ModifyLoadBalancerInternetSpec(args *slb.ModifyLoadBalancerInternetSpecArgs) (err error)
 	DescribeLoadBalancerAttribute(loadBalancerId string) (loadBalancer *slb.LoadBalancerType, err error)
 	RemoveBackendServers(loadBalancerId string, backendServers []string) (result []slb.BackendServerType, err error)
 	AddBackendServers(loadBalancerId string, backendServers []slb.BackendServerType) (result []slb.BackendServerType, err error)
@@ -191,6 +191,9 @@ func (s *LoadBalancerClient) findLoadBalancerByID(lbid string) (bool, *slb.LoadB
 }
 
 func (s *LoadBalancerClient) findLoadBalancerByTags(service *v1.Service) (bool, *slb.LoadBalancerType, error) {
+	if service.UID == "" {
+		return false, nil, fmt.Errorf("unexpected empty service uid")
+	}
 	lbn := cloudprovider.GetLoadBalancerName(service)
 	items, err := json.Marshal(
 		[]slb.TagItem{
@@ -368,7 +371,7 @@ func (s *LoadBalancerClient) EnsureLoadBalancer(service *v1.Service, nodes inter
 			return origined, err
 		}
 		if isLoadBalancerCreatedByKubernetes(tags) &&
-			isUserDefinedLoadBalancer(request) {
+			isUserDefinedLoadBalancer(service) {
 			return origined, fmt.Errorf("alicloud: can not reuse loadbalancer created by kubernetes. %s", origined.LoadBalancerId)
 		}
 		needUpdate, charge, bandwidth := false, origined.InternetChargeType, origined.Bandwidth
@@ -396,8 +399,8 @@ func (s *LoadBalancerClient) EnsureLoadBalancer(service *v1.Service, nodes inter
 
 			needUpdate = true
 			bandwidth = request.Bandwidth
-			glog.Infof("alicloud: bandwidth([%d] -> [%d]) changed, update loadbalancer [%s]\n",
-				origined.Bandwidth, request.Bandwidth, origined.LoadBalancerName)
+			glog.Infof("bandwidth changed from ([%d] -> [%d]), update [%s]",
+				origined.Bandwidth, request.Bandwidth, origined.LoadBalancerId)
 		}
 		if request.AddressType != "" && request.AddressType != origined.AddressType {
 			glog.Errorf("alicloud: warning! can not change "+
@@ -408,6 +411,7 @@ func (s *LoadBalancerClient) EnsureLoadBalancer(service *v1.Service, nodes inter
 		}
 		if needUpdate {
 			if origined.AddressType == "internet" {
+				glog.Infof("modify loadbalancer: chargetype=%s, bandwidth=%d", charge, bandwidth)
 				if err := s.c.ModifyLoadBalancerInternetSpec(
 					&slb.ModifyLoadBalancerInternetSpecArgs{
 						LoadBalancerId:     origined.LoadBalancerId,
@@ -416,6 +420,8 @@ func (s *LoadBalancerClient) EnsureLoadBalancer(service *v1.Service, nodes inter
 					}); err != nil {
 					return nil, err
 				}
+			} else {
+				glog.Infof("only internet loadbalancer is allowed to modify bandwidth and pay type")
 			}
 		}
 
@@ -446,8 +452,8 @@ func (s *LoadBalancerClient) EnsureLoadBalancer(service *v1.Service, nodes inter
 	// Apply listener when
 	//   1. user does not assign loadbalancer id by themselves.
 	//   2. force-override-listener annotation is set.
-	if (!isUserDefinedLoadBalancer(request)) ||
-		(isUserDefinedLoadBalancer(request) && isOverrideListeners(request.OverrideListeners)) {
+	if (!isUserDefinedLoadBalancer(service)) ||
+		(isUserDefinedLoadBalancer(service) && isOverrideListeners(service)) {
 		glog.V(2).Infof("alicloud: not user defined loadbalancer[%s], start to apply listener.\n", origined.LoadBalancerId)
 		// If listener update is needed. Switch to vserver group immediately.
 		// No longer update default backend servers.
@@ -536,9 +542,8 @@ func (s *LoadBalancerClient) EnsureLoadBalanceDeleted(service *v1.Service) error
 	if !exists {
 		return nil
 	}
-	_, request := ExtractAnnotationRequest(service)
 	// skip delete user defined loadbalancer
-	if isUserDefinedLoadBalancer(request) {
+	if isUserDefinedLoadBalancer(service) {
 		glog.Infof("alicloud: user managed "+
 			"loadbalancer will not be deleted by cloudprovider. service [%s]", service.Name)
 		return EnsureListenersDeleted(s.c, service, lb, BuildVirturalGroupFromService(s, service, lb))
@@ -673,14 +678,12 @@ func (s *LoadBalancerClient) UpdateDefaultServerGroup(backends interface{}, lb *
 }
 
 // check to see if user has assigned any loadbalancer
-func isUserDefinedLoadBalancer(request *AnnotationRequest) bool {
-
-	return request.Loadbalancerid != ""
+func isUserDefinedLoadBalancer(svc *v1.Service) bool {
+	return serviceAnnotation(svc, ServiceAnnotationLoadBalancerId) != ""
 }
 
-func isOverrideListeners(override string) bool {
-
-	return strings.ToLower(override) == "true"
+func isOverrideListeners(svc *v1.Service) bool {
+	return strings.ToLower(serviceAnnotation(svc, ServiceAnnotationLoadBalancerOverrideListener)) == "true"
 }
 
 // check if the service exists in service definition

@@ -17,435 +17,90 @@ limitations under the License.
 package alicloud
 
 import (
-	"fmt"
-	"k8s.io/api/core/v1"
-	"testing"
-
-	"github.com/denverdino/aliyungo/slb"
-	"github.com/pkg/errors"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"testing"
 )
 
-func loadbalancerAttrib(loadbalancer *slb.LoadBalancerType) *slb.LoadBalancerType {
-
-	lports := struct {
-		ListenerPort []int
-	}{
-		ListenerPort: []int{442, 80},
-	}
-	pproto := struct {
-		ListenerPortAndProtocol []slb.ListenerPortAndProtocolType
-	}{
-		ListenerPortAndProtocol: []slb.ListenerPortAndProtocolType{
-			{
-				ListenerPort:     442,
-				ListenerProtocol: "tcp",
-			},
-			{
-				ListenerPort:     80,
-				ListenerProtocol: "tcp",
-			},
-		},
-	}
-	backend := struct {
-		BackendServer []slb.BackendServerType
-	}{
-		BackendServer: []slb.BackendServerType{
-			{
-				ServerId: "i-bp152coo41mv2dqry64j",
-				Weight:   100,
-			},
-			{
-				ServerId: "i-bp152coo41mv2dqry64i",
-				Weight:   100,
-			},
-		},
-	}
-	loadbalancer.ListenerPorts = lports
-	loadbalancer.ListenerPortsAndProtocol = pproto
-	loadbalancer.BackendServers = backend
-	return loadbalancer
-}
-
 func TestUpdateListenerPorts(t *testing.T) {
-	service := &v1.Service{
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace:   "default",
-			Name:        "service-test",
-			UID:         "abcdefghigklmnopqrstu",
-			Annotations: map[string]string{
-				//ServiceAnnotationLoadBalancerId: LOADBALANCER_ID,
+	prid := nodeid(string(REGION), INSTANCEID)
+	f := NewDefaultFrameWork(
+		// initial service based on your definition
+		&v1.Service{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "https-service",
+				UID:  types.UID(serviceUIDNoneExist),
+			},
+			Spec: v1.ServiceSpec{
+				Ports: []v1.ServicePort{
+					{Port: listenPort1, TargetPort: targetPort1, Protocol: v1.ProtocolTCP, NodePort: nodePort1},
+				},
+				Type:            v1.ServiceTypeLoadBalancer,
+				SessionAffinity: v1.ServiceAffinityNone,
 			},
 		},
-		Spec: v1.ServiceSpec{
-			Type: "LoadBalancer",
-			Ports: []v1.ServicePort{
-				{
-					Name:       "tcp",
-					Protocol:   protocolTcp,
-					Port:       80,
-					TargetPort: intstr.FromInt(80),
-					NodePort:   30480,
-				}, {
-					Name:       "tcp",
-					Protocol:   protocolTcp,
-					Port:       443,
-					TargetPort: intstr.FromInt(443),
-					NodePort:   30443,
+		// initial node based on your definition.
+		// backend of the created loadbalaner
+		[]*v1.Node{
+			{
+				ObjectMeta: metav1.ObjectMeta{Name: prid},
+				Spec: v1.NodeSpec{
+					ProviderID: prid,
 				},
 			},
 		},
+		nil,
+		nil,
+	)
+
+	f.RunDefault(t, "With TCP Listener")
+
+	f.SVC.Spec.Ports = []v1.ServicePort{
+		{Port: listenPort1, TargetPort: targetPort1, Protocol: v1.ProtocolTCP, NodePort: nodePort1},
+		{Port: 443, TargetPort: intstr.FromInt(6443), Protocol: v1.ProtocolTCP, NodePort: 31443},
 	}
 
-	base := newBaseLoadbalancer()
-	detail := loadbalancerAttrib(base[0])
-	grp := vgroups{
-		{
-			NamedKey:       &NamedKey{CID: CLUSTER_ID, ServiceName: service.Name, Namespace: service.Namespace, Port: 80},
-			LoadBalancerId: detail.LoadBalancerId,
-			RegionId:       detail.RegionId,
-			VGroupId:       "v-idvgroup",
-		},
-
-		{
-			NamedKey:       &NamedKey{CID: CLUSTER_ID, ServiceName: service.Name, Namespace: service.Namespace, Port: 443},
-			LoadBalancerId: detail.LoadBalancerId,
-			RegionId:       detail.RegionId,
-			VGroupId:       "v-idvgroup2",
-		},
-	}
-	mgr, _ := NewMockClientMgr(&mockClientSLB{
-		startLoadBalancerListener: func(loadBalancerId string, port int) (err error) {
-
-			return nil
-		},
-		stopLoadBalancerListener: func(loadBalancerId string, port int) (err error) {
-			return nil
-		},
-		createLoadBalancerTCPListener: func(args *slb.CreateLoadBalancerTCPListenerArgs) (err error) {
-			li := slb.ListenerPortAndProtocolType{
-				ListenerPort:     args.ListenerPort,
-				ListenerProtocol: "tcp",
-			}
-			detail.ListenerPorts.ListenerPort = append(detail.ListenerPorts.ListenerPort, args.ListenerPort)
-			detail.ListenerPortsAndProtocol.ListenerPortAndProtocol = append(detail.ListenerPortsAndProtocol.ListenerPortAndProtocol, li)
-			return nil
-		},
-		deleteLoadBalancerListener: func(loadBalancerId string, port int) (err error) {
-			response := []slb.ListenerPortAndProtocolType{}
-			ports := detail.ListenerPortsAndProtocol.ListenerPortAndProtocol
-			for _, p := range ports {
-				if p.ListenerPort == port {
-					continue
-				}
-				response = append(response, p)
-			}
-
-			listports := []int{}
-			lports := detail.ListenerPorts.ListenerPort
-			for _, po := range lports {
-				if po == port {
-					continue
-				}
-				listports = append(listports, po)
-			}
-			detail.ListenerPortsAndProtocol.ListenerPortAndProtocol = response
-			detail.ListenerPorts.ListenerPort = listports
-			return nil
-		},
-		describeLoadBalancerTCPListenerAttribute: func(loadBalancerId string, port int) (response *slb.DescribeLoadBalancerTCPListenerAttributeResponse, err error) {
-			ports := detail.ListenerPortsAndProtocol.ListenerPortAndProtocol
-
-			for _, p := range ports {
-				if p.ListenerPort == port {
-					return &slb.DescribeLoadBalancerTCPListenerAttributeResponse{
-						DescribeLoadBalancerListenerAttributeResponse: slb.DescribeLoadBalancerListenerAttributeResponse{
-							Status: slb.Running,
-						},
-						TCPListenerType: slb.TCPListenerType{
-							LoadBalancerId:    loadBalancerId,
-							ListenerPort:      port,
-							BackendServerPort: 31789,
-							Bandwidth:         50,
-						},
-					}, nil
-				}
-			}
-			return nil, errors.New("not found")
-		},
-		describeVServerGroups: func(args *slb.DescribeVServerGroupsArgs) (response *slb.DescribeVServerGroupsResponse, err error) {
-			return &slb.DescribeVServerGroupsResponse{
-				VServerGroups: struct {
-					VServerGroup []slb.VServerGroup
-				}{
-					[]slb.VServerGroup{{
-						VServerGroupId:   grp[0].VGroupId,
-						VServerGroupName: grp[0].NamedKey.Key(),
-					}},
-				},
-			}, nil
-		},
-		createVServerGroup: func(args *slb.CreateVServerGroupArgs) (response *slb.CreateVServerGroupResponse, err error) {
-			return &slb.CreateVServerGroupResponse{
-				VServerGroupName: args.VServerGroupName,
-				VServerGroupId:   grp[0].VGroupId,
-			}, nil
-		},
-		describeVServerGroupAttribute: func(args *slb.DescribeVServerGroupAttributeArgs) (response *slb.DescribeVServerGroupAttributeResponse, err error) {
-			return &slb.DescribeVServerGroupAttributeResponse{
-				VServerGroupName: grp[0].NamedKey.Key(),
-				VServerGroupId:   grp[0].VGroupId,
-			}, nil
-		},
-	})
-
-	// BuildVirturalGroupFromService is compatible with v1 listener.
-	vgs := BuildVirturalGroupFromService(mgr.loadbalancer, service, detail)
-	if err := EnsureVirtualGroups(vgs, []*v1.Node{}); err != nil {
-		t.Fatal("error ensure vserver group.")
-	}
-
-	err := EnsureListeners(mgr.loadbalancer, service, detail, vgs)
-
-	if err != nil {
-		t.Fatal("listener update error! ")
-	}
-	t.Log(PrettyJson(service))
-	t.Log(PrettyJson(detail))
-
-	for _, sport := range service.Spec.Ports {
-		found := false
-		for _, port := range detail.ListenerPortsAndProtocol.ListenerPortAndProtocol {
-			if int(sport.Port) == port.ListenerPort {
-				found = true
-				break
-			}
-		}
-		if !found {
-			t.Fatal(fmt.Sprintf("1. listen port protocol not found [%d]\n", sport.Port))
-		}
-		found = false
-		for _, port := range detail.ListenerPorts.ListenerPort {
-			if int(sport.Port) == port {
-				found = true
-			}
-		}
-		if !found {
-			t.Fatal(fmt.Sprintf("2. listen port not found [%d]\n", sport.Port))
-		}
-	}
-
-	for _, sport := range detail.ListenerPortsAndProtocol.ListenerPortAndProtocol {
-		found := false
-		for _, port := range service.Spec.Ports {
-			if int(port.Port) == sport.ListenerPort {
-				found = true
-				break
-			}
-		}
-		if !found {
-			t.Fatal(fmt.Sprintf("3. port not found [%d]\n", sport.ListenerPort))
-		}
-	}
-
-	for _, sport := range detail.ListenerPorts.ListenerPort {
-		found := false
-		for _, port := range service.Spec.Ports {
-			if int(port.Port) == sport {
-				found = true
-				break
-			}
-		}
-		if !found {
-			t.Fatal(fmt.Sprintf("4. port not found [%d]\n", sport))
-		}
-	}
-
+	f.RunDefault(t, "Add Listener 443")
 }
 
 func TestUpdateListenerBackendPorts(t *testing.T) {
-	service := &v1.Service{
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace:   "default",
-			Name:        "service-test",
-			UID:         "abcdefghigklmnopqrstu",
-			Annotations: map[string]string{
-				//ServiceAnnotationLoadBalancerId: LOADBALANCER_ID,
+	prid := nodeid(string(REGION), INSTANCEID)
+	f := NewDefaultFrameWork(
+		// initial service based on your definition
+		&v1.Service{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "https-service",
+				UID:  types.UID(serviceUIDNoneExist),
+			},
+			Spec: v1.ServiceSpec{
+				Ports: []v1.ServicePort{
+					{Port: listenPort1, TargetPort: targetPort1, Protocol: v1.ProtocolTCP, NodePort: 31000},
+				},
+				Type:            v1.ServiceTypeLoadBalancer,
+				SessionAffinity: v1.ServiceAffinityNone,
 			},
 		},
-		Spec: v1.ServiceSpec{
-			Type: "LoadBalancer",
-			Ports: []v1.ServicePort{
-				{
-					Name:       "tcp",
-					Protocol:   protocolTcp,
-					Port:       80,
-					TargetPort: intstr.FromInt(80),
-					NodePort:   30480,
-				}, {
-					Name:       "tcp",
-					Protocol:   protocolTcp,
-					Port:       442,
-					TargetPort: intstr.FromInt(443),
-					NodePort:   30443,
+		// initial node based on your definition.
+		// backend of the created loadbalaner
+		[]*v1.Node{
+			{
+				ObjectMeta: metav1.ObjectMeta{Name: prid},
+				Spec: v1.NodeSpec{
+					ProviderID: prid,
 				},
 			},
 		},
+		nil,
+		nil,
+	)
+
+	f.RunDefault(t, "With TCP Listener")
+
+	f.SVC.Spec.Ports = []v1.ServicePort{
+		{Port: listenPort1, TargetPort: targetPort1, Protocol: v1.ProtocolTCP, NodePort: 32000},
 	}
 
-	base := newBaseLoadbalancer()
-	detail := loadbalancerAttrib(base[0])
-	grp := vgroups{
-		{
-			NamedKey:       &NamedKey{CID: CLUSTER_ID, ServiceName: service.Name, Namespace: service.Namespace, Port: 80},
-			LoadBalancerId: detail.LoadBalancerId,
-			RegionId:       detail.RegionId,
-			VGroupId:       "v-idvgroup",
-		},
-
-		{
-			NamedKey:       &NamedKey{CID: CLUSTER_ID, ServiceName: service.Name, Namespace: service.Namespace, Port: 442},
-			LoadBalancerId: detail.LoadBalancerId,
-			RegionId:       detail.RegionId,
-			VGroupId:       "v-idvgroup2",
-		},
-	}
-	mgr, _ := NewMockClientMgr(&mockClientSLB{
-		startLoadBalancerListener: func(loadBalancerId string, port int) (err error) {
-
-			return nil
-		},
-		stopLoadBalancerListener: func(loadBalancerId string, port int) (err error) {
-			return nil
-		},
-		createLoadBalancerTCPListener: func(args *slb.CreateLoadBalancerTCPListenerArgs) (err error) {
-			li := slb.ListenerPortAndProtocolType{
-				ListenerPort:     args.ListenerPort,
-				ListenerProtocol: "tcp",
-			}
-			detail.ListenerPorts.ListenerPort = append(detail.ListenerPorts.ListenerPort, args.ListenerPort)
-			detail.ListenerPortsAndProtocol.ListenerPortAndProtocol = append(detail.ListenerPortsAndProtocol.ListenerPortAndProtocol, li)
-			return nil
-		},
-		deleteLoadBalancerListener: func(loadBalancerId string, port int) (err error) {
-			response := []slb.ListenerPortAndProtocolType{}
-			ports := detail.ListenerPortsAndProtocol.ListenerPortAndProtocol
-			for _, p := range ports {
-				if p.ListenerPort == port {
-					continue
-				}
-				response = append(response, p)
-			}
-
-			listports := []int{}
-			lports := detail.ListenerPorts.ListenerPort
-			for _, po := range lports {
-				if po == port {
-					continue
-				}
-				listports = append(listports, po)
-			}
-			detail.ListenerPortsAndProtocol.ListenerPortAndProtocol = response
-			detail.ListenerPorts.ListenerPort = listports
-			return nil
-		},
-		describeLoadBalancerTCPListenerAttribute: func(loadBalancerId string, port int) (response *slb.DescribeLoadBalancerTCPListenerAttributeResponse, err error) {
-			ports := detail.ListenerPortsAndProtocol.ListenerPortAndProtocol
-
-			for _, p := range ports {
-				if p.ListenerPort == port {
-					return &slb.DescribeLoadBalancerTCPListenerAttributeResponse{
-						DescribeLoadBalancerListenerAttributeResponse: slb.DescribeLoadBalancerListenerAttributeResponse{
-							Status: slb.Running,
-						},
-						TCPListenerType: slb.TCPListenerType{
-							LoadBalancerId:    loadBalancerId,
-							ListenerPort:      port,
-							BackendServerPort: 31789,
-							Bandwidth:         50,
-						},
-					}, nil
-				}
-			}
-			return nil, errors.New("not found")
-		},
-		describeVServerGroups: func(args *slb.DescribeVServerGroupsArgs) (response *slb.DescribeVServerGroupsResponse, err error) {
-			return &slb.DescribeVServerGroupsResponse{
-				VServerGroups: struct {
-					VServerGroup []slb.VServerGroup
-				}{
-					VServerGroup: []slb.VServerGroup{
-						{
-							VServerGroupId:   grp[0].VGroupId,
-							VServerGroupName: grp[0].NamedKey.Key(),
-						},
-					},
-				},
-			}, nil
-		},
-		createVServerGroup: func(args *slb.CreateVServerGroupArgs) (response *slb.CreateVServerGroupResponse, err error) {
-			return &slb.CreateVServerGroupResponse{
-				VServerGroupName: args.VServerGroupName,
-				VServerGroupId:   grp[0].VGroupId,
-			}, nil
-		},
-	})
-
-	err := EnsureListeners(mgr.loadbalancer, service, detail, &grp)
-
-	if err != nil {
-		t.Fatal("listener update error! ")
-	}
-	t.Log(PrettyJson(service))
-	t.Log(PrettyJson(detail))
-
-	for _, sport := range service.Spec.Ports {
-		found := false
-		for _, port := range detail.ListenerPortsAndProtocol.ListenerPortAndProtocol {
-			if int(sport.Port) == port.ListenerPort {
-				found = true
-				break
-			}
-		}
-		if !found {
-			t.Fatal(fmt.Sprintf("1. listen port protocol not found [%d]\n", sport.Port))
-		}
-		found = false
-		for _, port := range detail.ListenerPorts.ListenerPort {
-			if int(sport.Port) == port {
-				found = true
-			}
-		}
-		if !found {
-			t.Fatal(fmt.Sprintf("2. listen port not found [%d]\n", sport.Port))
-		}
-	}
-
-	for _, sport := range detail.ListenerPortsAndProtocol.ListenerPortAndProtocol {
-		found := false
-		for _, port := range service.Spec.Ports {
-			if int(port.Port) == sport.ListenerPort {
-				found = true
-				break
-			}
-		}
-		if !found {
-			t.Fatal(fmt.Sprintf("3. port not found [%d]\n", sport.ListenerPort))
-		}
-	}
-
-	for _, sport := range detail.ListenerPorts.ListenerPort {
-		found := false
-		for _, port := range service.Spec.Ports {
-			if int(port.Port) == sport {
-				found = true
-				break
-			}
-		}
-		if !found {
-			t.Fatal(fmt.Sprintf("4. port not found [%d]\n", sport))
-		}
-	}
-
+	f.RunDefault(t, "Change NodePort from 31000 to 32000")
 }
