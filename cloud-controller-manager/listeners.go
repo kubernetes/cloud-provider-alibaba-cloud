@@ -298,7 +298,7 @@ func EnsureListeners(
 	}
 
 	// Merge listeners generate an listener list to be updated/deleted/added.
-	updates, err := mergeListeners(service, local, BuildListenersFromAPI(service, lb, slbins.c, vgs))
+	updates, err := BuildActionsForListeners(service, local, BuildListenersFromAPI(service, lb, slbins.c, vgs))
 	if err != nil {
 		return fmt.Errorf("merge listener: %s", err.Error())
 	}
@@ -370,28 +370,25 @@ func EnsureListenersDeleted(
 }
 
 func isManagedByMyService(svc *v1.Service, remote *Listener) bool {
-	if remote.Name == STRINGS_EMPTY ||
-		remote.Name == "-" {
-		// Assume listener without a name or named '-' to be k8s managed listener.
-		// This is normally for service update. make a transform
-		return true
-	}
+
 	return remote.NamedKey != nil &&
 		remote.NamedKey.ServiceURI() == URIfromService(svc)
 }
 
-func isUserManagedListener(remote *Listener) bool {
-	return remote.NamedKey == nil && remote.Name != STRINGS_EMPTY && remote.Name != "-"
+func isProtocolMatch(local, remote *Listener) bool {
+	return local.TransforedProto == remote.TransforedProto
+}
+
+func isPortMatch(local, remote *Listener) bool {
+	return local.Port == remote.Port
 }
 
 // 1. We update listener to the latest version2 when updation is needed.
 // 2. We assume listener with an empty name to be legacy version.
 // 3. We assume listener with an arbitrary name to be user managed listener.
 // 4. LoadBalancer created by kubernetes is not allowed to be reused.
-func mergeListeners(svc *v1.Service, service, console Listeners) (Listeners, error) {
-	override := isOverrideListeners(
-		serviceAnnotation(svc, ServiceAnnotationLoadBalancerOverrideListener),
-	)
+func BuildActionsForListeners(svc *v1.Service, service, console Listeners) (Listeners, error) {
+	override := isOverrideListeners(svc)
 	var (
 		addition = Listeners{}
 		updation = Listeners{}
@@ -399,53 +396,48 @@ func mergeListeners(svc *v1.Service, service, console Listeners) (Listeners, err
 	)
 	// For updations and deletions
 	for _, remote := range console {
-
-		skipDeletion, overridePort := false, false
+		found := false
 		for _, local := range service {
 			if remote.Port == local.Port {
+				found = true
 				// port matched. that is where the conflict case begin.
-				if isUserManagedListener(remote) {
-					if !override {
-						// port conflict with user managed port.
-						return nil, fmt.Errorf("port matched, but conflict with user managed port. "+
+				// 1. check protocol match.
+				if isProtocolMatch(local, remote) {
+					// protocol match, need to do update operate no matter managed by whom
+					// consider override annotation & user defined loadbalancer
+					if !override && isUserDefinedLoadBalancer(svc) {
+						// port conflict with user managed slb or listener.
+						return nil, fmt.Errorf("PortProtocolConflict] port matched, but conflict with user managed listener. "+
 							"Port:%d, ListenerName:%s, svc: %s. Protocol:[source:%s dst:%s]",
 							remote.Port, remote.Name, local.NamedKey.Key(), remote.TransforedProto, local.TransforedProto)
 					}
-					overridePort = true
-					break
-				}
-				if !isManagedByMyService(svc, remote) {
-					if !override {
-						// port conflict with other service
-						return nil, fmt.Errorf("port matched. but not managed by this service[%s]. "+
-							"conflict with service[%s]", local.NamedKey.Key(), remote.NamedKey.Key())
-					}
-					overridePort = true
-					break
-				}
-				if remote.TransforedProto == local.TransforedProto {
-					// protocol matched. do update.
-					local.Action = ACTION_UPDATE
-					skipDeletion = true
-					updation = append(updation, local)
-				}
-				// not match , do delete
-				break
-			}
-		}
 
-		if !skipDeletion {
-			if overridePort {
-				remote.Action = ACTION_DELETE
-				deletion = append(deletion, remote)
-			} else {
-				// only delete listeners which managed by kubernetes and by my service.
-				if isManagedByMyService(svc, remote) && !isUserManagedListener(remote) {
+					// do update operate
+					local.Action = ACTION_UPDATE
+					updation = append(updation, local)
+					glog.Infof("found listener with port & protocol match, do update %s", local.NamedKey.Key())
+				} else {
+					// protocol not match, need to recreate
+					if !override && isUserDefinedLoadBalancer(svc) {
+						return nil, fmt.Errorf("[PortProtocolConflict] port matched, "+
+							"while protocol does not. force override listener %t. source[%v], target[%v]", override, local.NamedKey, remote.NamedKey)
+					}
 					remote.Action = ACTION_DELETE
 					deletion = append(deletion, remote)
-				} else {
-					glog.Infof("managed by other service or user managed listener, skip delete. [%s]", remote.Name)
+					glog.Infof("found listener with port match while protocol not, do delete & add %s", local.NamedKey.Key())
 				}
+			}
+		}
+		// Do not delete any listener that no longer managed by my service
+		// for safety. Only conflict case is taking care.
+		if !found {
+			if isManagedByMyService(svc, remote) {
+				remote.Action = ACTION_DELETE
+				deletion = append(deletion, remote)
+				glog.Infof("found listener[%s] which is no longer needed "+
+					"by my service[%s/%s], do delete", remote.NamedKey.Key(), svc.Namespace, svc.Name)
+			} else {
+				glog.Infof("port [%d] not managed by my service [%s/%s], skip processing.", remote.Port, svc.Namespace, svc.Name)
 			}
 		}
 	}
@@ -454,18 +446,10 @@ func mergeListeners(svc *v1.Service, service, console Listeners) (Listeners, err
 	for _, local := range service {
 		found := false
 		for _, remote := range console {
-			if remote.Port == local.Port {
-				if !isManagedByMyService(svc, remote) {
-					if override {
-						// do add
-						break
-					} else {
-						return addition, fmt.Errorf("error: service[%s] trying "+
-							"to declare a port belongs to somebody else [%s]", local.NamedKey.Key(), remote.Name)
-					}
-				}
-				if remote.TransforedProto != local.TransforedProto {
-					// do add
+			if isPortMatch(remote, local) {
+				// port match
+				if !isProtocolMatch(remote, local) {
+					// protocol does not match, do add listener
 					break
 				}
 				// port matched. updated . skip
@@ -476,6 +460,7 @@ func mergeListeners(svc *v1.Service, service, console Listeners) (Listeners, err
 		if !found {
 			local.Action = ACTION_ADD
 			addition = append(addition, local)
+			glog.Infof("add new listener %s", local.NamedKey.Key())
 		}
 	}
 

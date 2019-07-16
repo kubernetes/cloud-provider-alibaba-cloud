@@ -431,8 +431,8 @@ func TestHTTPSFromHttp(t *testing.T) {
 
 	f.RunDefault(t, "With HTTP Listener")
 
-	f.svc.Annotations[ServiceAnnotationLoadBalancerCertID] = certID
-	f.svc.Annotations[ServiceAnnotationLoadBalancerProtocolPort] = fmt.Sprintf("https:%d", listenPort1)
+	f.SVC.Annotations[ServiceAnnotationLoadBalancerCertID] = certID
+	f.SVC.Annotations[ServiceAnnotationLoadBalancerProtocolPort] = fmt.Sprintf("https:%d", listenPort1)
 	f.RunDefault(t, "Change From Http to Https")
 }
 
@@ -559,15 +559,15 @@ func TestEnsureLoadbalancerDeleted(t *testing.T) {
 		t,
 		"Delete Loadbalancer", "ecs",
 		func() {
-			_, err := f.cloud.EnsureLoadBalancer(CLUSTER_ID, f.svc, f.nodes)
+			_, err := f.Cloud.EnsureLoadBalancer(CLUSTER_ID, f.SVC, f.Nodes)
 			if err != nil {
 				t.Fatalf("delete loadbalancer error: create %s", err.Error())
 			}
-			err = f.cloud.EnsureLoadBalancerDeleted(CLUSTER_ID, f.svc)
+			err = f.Cloud.EnsureLoadBalancerDeleted(CLUSTER_ID, f.SVC)
 			if err != nil {
 				t.Fatalf("ensure loadbalancer delete error, %s", err.Error())
 			}
-			exist, _, err := f.LoadBalancer().findLoadBalancer(f.svc)
+			exist, _, err := f.LoadBalancer().findLoadBalancer(f.SVC)
 			if err != nil || exist {
 				t.Fatalf("Delete LoadBalancer error: %v, %t", err, exist)
 			}
@@ -614,11 +614,11 @@ func TestEnsureLoadBalancerDeleteWithUserDefined(t *testing.T) {
 		"Delete User Defined Loadbalancer",
 		"ecs",
 		func() {
-			err := f.cloud.EnsureLoadBalancerDeleted(CLUSTER_ID, f.svc)
+			err := f.Cloud.EnsureLoadBalancerDeleted(CLUSTER_ID, f.SVC)
 			if err != nil {
 				t.Fatalf("ensure loadbalancer delete error, %s", err.Error())
 			}
-			exist, _, err := f.LoadBalancer().findLoadBalancer(f.svc)
+			exist, _, err := f.LoadBalancer().findLoadBalancer(f.SVC)
 			if err != nil || !exist {
 				t.Fatalf("Delete LoadBalancer error: %v, %t", err, exist)
 			}
@@ -629,7 +629,7 @@ func TestEnsureLoadBalancerDeleteWithUserDefined(t *testing.T) {
 
 func TestNodeAddressAndInstanceID(t *testing.T) {
 
-	// Step 2: init cloud cache data.
+	// Step 2: init Cloud cache data.
 	PreSetCloudData(
 		// LoadBalancer
 		WithNewLoadBalancerStore(),
@@ -645,7 +645,7 @@ func TestNodeAddressAndInstanceID(t *testing.T) {
 		WithInstance(),
 	)
 
-	// New Mock cloud to test
+	// New Mock Cloud to test
 	cloud, err := NewMockCloud()
 
 	if err != nil {

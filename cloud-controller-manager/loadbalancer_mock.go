@@ -267,6 +267,28 @@ func (c *mockClientSLB) ModifyLoadBalancerInstanceSpec(args *slb.ModifyLoadBalan
 	return nil
 }
 
+func (c *mockClientSLB) ModifyLoadBalancerInstanceSpec(args *slb.ModifyLoadBalancerInstanceSpecArgs) (err error) {
+	if c.modifyLoadBalancerInstanceSpec != nil {
+		return c.modifyLoadBalancerInstanceSpec(args)
+	}
+	if args.LoadBalancerId == "" {
+		return fmt.Errorf("loadbalancer id must not be empty")
+	}
+	v, ok := LOADBALANCER.loadbalancer.Load(args.LoadBalancerId)
+	if !ok {
+		return fmt.Errorf("loadbalancer not found by id %s", args.LoadBalancerId)
+	}
+	ins, ok := v.(slb.LoadBalancerType)
+	if !ok {
+		return fmt.Errorf("not slb.LoadBalancerType")
+	}
+	if args.LoadBalancerSpec != "" {
+		ins.LoadBalancerSpec = args.LoadBalancerSpec
+	}
+	LOADBALANCER.loadbalancer.Store(ins.LoadBalancerId, ins)
+	return nil
+}
+
 func (c *mockClientSLB) DescribeLoadBalancerAttribute(loadBalancerId string) (loadBalancer *slb.LoadBalancerType, err error) {
 	if c.describeLoadBalancerAttribute != nil {
 		return c.describeLoadBalancerAttribute(loadBalancerId)
