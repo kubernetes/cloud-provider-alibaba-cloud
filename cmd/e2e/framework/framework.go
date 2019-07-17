@@ -55,9 +55,9 @@ func (m *FrameWorkE2E) Logf(format string, args ...interface{}) {
 var TestContext Config
 
 type Config struct {
-	Host        string
-	CloudConfig string
-	KubeConfig  string
+	Host           string
+	CloudConfig    string
+	KubeConfig     string
 	LoadBalancerID string
 }
 
