@@ -67,6 +67,7 @@ type mockClientSLB struct {
 	createLoadBalancer             func(args *slb.CreateLoadBalancerArgs) (response *slb.CreateLoadBalancerResponse, err error)
 	deleteLoadBalancer             func(loadBalancerId string) (err error)
 	modifyLoadBalancerInternetSpec func(args *slb.ModifyLoadBalancerInternetSpecArgs) (err error)
+	modifyLoadBalancerInstanceSpec func(args *slb.ModifyLoadBalancerInstanceSpecArgs) (err error)
 	describeLoadBalancerAttribute  func(loadBalancerId string) (loadBalancer *slb.LoadBalancerType, err error)
 	removeBackendServers           func(loadBalancerId string, backendServers []string) (result []slb.BackendServerType, err error)
 	addBackendServers              func(loadBalancerId string, backendServers []slb.BackendServerType) (result []slb.BackendServerType, err error)
@@ -129,6 +130,7 @@ func newBaseLoadbalancer() []*slb.LoadBalancerType {
 			InternetChargeType: "4",
 			CreateTime:         "2018-03-14T17:16Z",
 			CreateTimeStamp:    util.NewISO6801Time(time.Now()),
+			LoadBalancerSpec:   slb.S1Small,
 		},
 	}
 }
@@ -233,6 +235,7 @@ func (c *mockClientSLB) DeleteLoadBalancer(loadBalancerId string) (err error) {
 	LOADBALANCER.loadbalancer.Delete(loadBalancerId)
 	return nil
 }
+
 func (c *mockClientSLB) ModifyLoadBalancerInternetSpec(args *slb.ModifyLoadBalancerInternetSpecArgs) (err error) {
 	if c.modifyLoadBalancerInternetSpec != nil {
 		return c.modifyLoadBalancerInternetSpec(args)
@@ -255,6 +258,12 @@ func (c *mockClientSLB) ModifyLoadBalancerInternetSpec(args *slb.ModifyLoadBalan
 		ins.InternetChargeType = args.InternetChargeType
 	}
 	LOADBALANCER.loadbalancer.Store(ins.LoadBalancerId, ins)
+	return nil
+}
+func (c *mockClientSLB) ModifyLoadBalancerInstanceSpec(args *slb.ModifyLoadBalancerInstanceSpecArgs) (err error) {
+	if c.modifyLoadBalancerInstanceSpec != nil {
+		return c.modifyLoadBalancerInstanceSpec(args)
+	}
 	return nil
 }
 
