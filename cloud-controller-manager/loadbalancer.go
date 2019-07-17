@@ -295,14 +295,13 @@ func equalsAddressIPVersion(request, origined slb.AddressIPVersionType) bool {
 
 // EnsureLoadBalancer make sure slb is reconciled nodes []*v1.Node
 func (s *LoadBalancerClient) EnsureLoadBalancer(service *v1.Service, nodes interface{}, vswitchid string) (*slb.LoadBalancerType, error) {
-	glog.V(4).Infof("alicloud: ensure loadbalancer with service details, \n%+v", PrettyJson(service))
+	utils.Logf(service,"ensure loadbalancer with service details, \n%+v", PrettyJson(service))
 
 	exists, origined, err := s.findLoadBalancer(service)
 	if err != nil {
 		return nil, err
 	}
-	glog.V(4).Infof("alicloud: find "+
-		"loadbalancer with result, exist=%v\n %s\n", exists, PrettyJson(origined))
+	utils.Logf(service, "find loadbalancer with result, exist=%v\n %s\n", exists, PrettyJson(origined))
 	_, request := ExtractAnnotationRequest(service)
 
 	var derr error
@@ -317,7 +316,7 @@ func (s *LoadBalancerClient) EnsureLoadBalancer(service *v1.Service, nodes inter
 		if isLoadbalancerOwnIngress(service) {
 			return nil, fmt.Errorf("alicloud: not able to find loadbalancer "+
 				"named [%s] in openapi, but it's defined in service.loaderbalancer.ingress. "+
-				"this may happen when you removed loadbalancerid annotation.\n", service.Name)
+				"this may happen when you removed loadbalancerid annotation.", service.Name)
 		}
 		if request.Loadbalancerid != "" {
 			return nil, fmt.Errorf("alicloud: user specified "+
@@ -326,7 +325,7 @@ func (s *LoadBalancerClient) EnsureLoadBalancer(service *v1.Service, nodes inter
 
 		// From here, we need to create a new loadbalancer
 		glog.V(5).Infof("alicloud: can not find a "+
-			"loadbalancer with service name [%s/%s], creating a new one\n", service.Namespace, service.Name)
+			"loadbalancer with service name [%s/%s], creating a new one", service.Namespace, service.Name)
 		opts := s.getLoadBalancerOpts(service, vswitchid)
 		lbr, err := s.c.CreateLoadBalancer(opts)
 		if err != nil {
@@ -390,7 +389,7 @@ func (s *LoadBalancerClient) EnsureLoadBalancer(service *v1.Service, nodes inter
 			needUpdate = true
 			charge = request.ChargeType
 			// Todo: here we need to compare loadbalance
-			utils.Logf(service, "internet charge type([%s] -> [%s]), update loadbalancer [%s]\n",
+			utils.Logf(service, "internet charge type([%s] -> [%s]), update loadbalancer [%s]",
 				string(origined.InternetChargeType), string(request.ChargeType), origined.LoadBalancerName)
 		}
 		if request.ChargeType == slb.PayByBandwidth &&
@@ -404,12 +403,12 @@ func (s *LoadBalancerClient) EnsureLoadBalancer(service *v1.Service, nodes inter
 		if request.AddressType != "" && request.AddressType != origined.AddressType {
 			glog.Errorf("alicloud: warning! can not change "+
 				"loadbalancer address type after it has been created! please "+
-				"recreate the service.[%s]->[%s],[%s]\n", origined.AddressType, request.AddressType, origined.LoadBalancerName)
+				"recreate the service.[%s]->[%s],[%s]", origined.AddressType, request.AddressType, origined.LoadBalancerName)
 			return nil, errors.New("alicloud: change loadbalancer " +
 				"address type after service has been created is not supported. delete and retry")
 		}
 		if needUpdate {
-			if origined.AddressType == "internet" {
+			if origined.AddressType == slb.InternetAddressType {
 				utils.Logf(service, "modify loadbalancer: chargetype=%s, bandwidth=%d", charge, bandwidth)
 				if err := s.c.ModifyLoadBalancerInternetSpec(
 					&slb.ModifyLoadBalancerInternetSpecArgs{
@@ -426,7 +425,7 @@ func (s *LoadBalancerClient) EnsureLoadBalancer(service *v1.Service, nodes inter
 
 		// update instance spec
 		if request.LoadBalancerSpec != "" && request.LoadBalancerSpec != origined.LoadBalancerSpec {
-			glog.Infof("alicloud: loadbalancerspec([%s] -> [%s]) changed, update loadbalancer [%s]\n",
+			glog.Infof("alicloud: loadbalancerspec([%s] -> [%s]) changed, update loadbalancer [%s]",
 				origined.LoadBalancerSpec, request.LoadBalancerSpec, origined.LoadBalancerName)
 			if err := s.c.ModifyLoadBalancerInstanceSpec(&slb.ModifyLoadBalancerInstanceSpecArgs{
 				RegionId:         origined.RegionId,
@@ -453,7 +452,7 @@ func (s *LoadBalancerClient) EnsureLoadBalancer(service *v1.Service, nodes inter
 	//   2. force-override-listener annotation is set.
 	if (!isUserDefinedLoadBalancer(service)) ||
 		(isUserDefinedLoadBalancer(service) && isOverrideListeners(service)) {
-		utils.Logf(service, "not user defined loadbalancer[%s], start to apply listener.\n", origined.LoadBalancerId)
+		utils.Logf(service, "not user defined loadbalancer[%s], start to apply listener.", origined.LoadBalancerId)
 		// If listener update is needed. Switch to vserver group immediately.
 		// No longer update default backend servers.
 		if err := EnsureListeners(s, service, origined, vgs); err != nil {
@@ -588,7 +587,7 @@ func (s *LoadBalancerClient) UpdateDefaultServerGroup(backends interface{}, lb *
 		return nil
 	}
 	additions, deletions := []slb.BackendServerType{}, []string{}
-	glog.V(5).Infof("alicloud: try to update loadbalancer backend servers. [%s]\n", lb.LoadBalancerId)
+	glog.V(5).Infof("alicloud: try to update loadbalancer backend servers. [%s]", lb.LoadBalancerId)
 	// checkout for newly added servers
 	for _, n1 := range nodes {
 		found := false
@@ -648,7 +647,7 @@ func (s *LoadBalancerClient) UpdateDefaultServerGroup(backends interface{}, lb *
 		}
 	}
 	if len(deletions) > 0 {
-		glog.V(5).Infof("alicloud: delete loadbalancer backend for [%s] %v\n", lb.LoadBalancerId, deletions)
+		glog.V(5).Infof("alicloud: delete loadbalancer backend for [%s] %v", lb.LoadBalancerId, deletions)
 		// only 20 backend servers is accepted per delete.
 		for len(deletions) > 0 {
 			var target []string
@@ -667,10 +666,10 @@ func (s *LoadBalancerClient) UpdateDefaultServerGroup(backends interface{}, lb *
 		}
 	}
 	if len(additions) <= 0 && len(deletions) <= 0 {
-		glog.V(5).Infof("alicloud: no backend servers need to be updated.[%s]\n", lb.LoadBalancerId)
+		glog.V(5).Infof("alicloud: no backend servers need to be updated.[%s]", lb.LoadBalancerId)
 		return nil
 	}
-	glog.V(5).Infof("alicloud: update loadbalancer`s backend servers finished! [%s]\n", lb.LoadBalancerId)
+	glog.V(5).Infof("alicloud: update loadbalancer`s backend servers finished! [%s]", lb.LoadBalancerId)
 	return nil
 }
 
