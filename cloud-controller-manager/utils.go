@@ -42,15 +42,16 @@ type kvstore struct {
 	lock  sync.RWMutex
 }
 
+func InitCache() {
+	versionCache = &localService{
+		maxResourceVersion: map[string]bool{},
+	}
+	serviceCache = &kvstore{
+		store: map[string]int64{},
+	}
+}
 func init() {
-	once.Do(func() {
-		versionCache = &localService{
-			maxResourceVersion: map[string]bool{},
-		}
-		serviceCache = &kvstore{
-			store: map[string]int64{},
-		}
-	})
+	once.Do(InitCache)
 }
 
 // GetPrivateZoneRecordCache return record cache

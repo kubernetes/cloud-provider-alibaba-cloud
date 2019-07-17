@@ -23,6 +23,7 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
 	"k8s.io/cloud-provider-alibaba-cloud/cloud-controller-manager/controller/service"
+	"k8s.io/cloud-provider-alibaba-cloud/cloud-controller-manager/utils"
 	"sort"
 	"strconv"
 	"strings"
@@ -60,7 +61,7 @@ var DEFAULT_LISTENER_BANDWIDTH = -1
 func Protocol(annotation string, port v1.ServicePort) (string, error) {
 
 	if annotation == "" {
-		glog.Infof("transfor protocol, empty annotation")
+		glog.Infof("transfor protocol, empty annotation %d/%s", port.Port, port.Protocol)
 		return strings.ToLower(string(port.Protocol)), nil
 	}
 	for _, v := range strings.Split(annotation, ",") {
@@ -221,8 +222,7 @@ func (n *Listener) Instance() IListener {
 
 // Apply apply listener operate . add/update/delete etc.
 func (n *Listener) Apply() error {
-	glog.Infof("apply: %s listener for %v with trans protocol %s", n.Action, n.NamedKey, n.TransforedProto)
-	glog.V(6).Infof("Listener: %s => \n%+v\n", n.Action, PrettyJson(n))
+	glog.Infof("apply %s listener for %v with trans protocol %s", n.Action, n.NamedKey, n.TransforedProto)
 	switch n.Action {
 	case ACTION_UPDATE:
 		err := n.Instance().Update()
@@ -298,11 +298,11 @@ func EnsureListeners(
 	}
 
 	// Merge listeners generate an listener list to be updated/deleted/added.
-	updates, err := mergeListeners(service, local, BuildListenersFromAPI(service, lb, slbins.c, vgs))
+	updates, err := BuildActionsForListeners(service, local, BuildListenersFromAPI(service, lb, slbins.c, vgs))
 	if err != nil {
 		return fmt.Errorf("merge listener: %s", err.Error())
 	}
-	glog.Infof("ensure listener: %d updates for %s", len(updates), lb.LoadBalancerId)
+	utils.Logf(service, "ensure listener: %d updates for %s", len(updates), lb.LoadBalancerId)
 
 	// make https come first.
 	// ensure https listeners to be created first for http forward
@@ -370,28 +370,25 @@ func EnsureListenersDeleted(
 }
 
 func isManagedByMyService(svc *v1.Service, remote *Listener) bool {
-	if remote.Name == STRINGS_EMPTY ||
-		remote.Name == "-" {
-		// Assume listener without a name or named '-' to be k8s managed listener.
-		// This is normally for service update. make a transform
-		return true
-	}
+
 	return remote.NamedKey != nil &&
 		remote.NamedKey.ServiceURI() == URIfromService(svc)
 }
 
-func isUserManagedListener(remote *Listener) bool {
-	return remote.NamedKey == nil && remote.Name != STRINGS_EMPTY && remote.Name != "-"
+func isProtocolMatch(local, remote *Listener) bool {
+	return local.TransforedProto == remote.TransforedProto
+}
+
+func isPortMatch(local, remote *Listener) bool {
+	return local.Port == remote.Port
 }
 
 // 1. We update listener to the latest version2 when updation is needed.
 // 2. We assume listener with an empty name to be legacy version.
 // 3. We assume listener with an arbitrary name to be user managed listener.
 // 4. LoadBalancer created by kubernetes is not allowed to be reused.
-func mergeListeners(svc *v1.Service, service, console Listeners) (Listeners, error) {
-	override := isOverrideListeners(
-		serviceAnnotation(svc, ServiceAnnotationLoadBalancerOverrideListener),
-	)
+func BuildActionsForListeners(svc *v1.Service, service, console Listeners) (Listeners, error) {
+	override := isOverrideListeners(svc)
 	var (
 		addition = Listeners{}
 		updation = Listeners{}
@@ -399,53 +396,48 @@ func mergeListeners(svc *v1.Service, service, console Listeners) (Listeners, err
 	)
 	// For updations and deletions
 	for _, remote := range console {
-
-		skipDeletion, overridePort := false, false
+		found := false
 		for _, local := range service {
 			if remote.Port == local.Port {
+				found = true
 				// port matched. that is where the conflict case begin.
-				if isUserManagedListener(remote) {
-					if !override {
-						// port conflict with user managed port.
-						return nil, fmt.Errorf("port matched, but conflict with user managed port. "+
+				// 1. check protocol match.
+				if isProtocolMatch(local, remote) {
+					// protocol match, need to do update operate no matter managed by whom
+					// consider override annotation & user defined loadbalancer
+					if !override && isUserDefinedLoadBalancer(svc) {
+						// port conflict with user managed slb or listener.
+						return nil, fmt.Errorf("PortProtocolConflict] port matched, but conflict with user managed listener. "+
 							"Port:%d, ListenerName:%s, svc: %s. Protocol:[source:%s dst:%s]",
 							remote.Port, remote.Name, local.NamedKey.Key(), remote.TransforedProto, local.TransforedProto)
 					}
-					overridePort = true
-					break
-				}
-				if !isManagedByMyService(svc, remote) {
-					if !override {
-						// port conflict with other service
-						return nil, fmt.Errorf("port matched. but not managed by this service[%s]. "+
-							"conflict with service[%s]", local.NamedKey.Key(), remote.NamedKey.Key())
-					}
-					overridePort = true
-					break
-				}
-				if remote.TransforedProto == local.TransforedProto {
-					// protocol matched. do update.
-					local.Action = ACTION_UPDATE
-					skipDeletion = true
-					updation = append(updation, local)
-				}
-				// not match , do delete
-				break
-			}
-		}
 
-		if !skipDeletion {
-			if overridePort {
-				remote.Action = ACTION_DELETE
-				deletion = append(deletion, remote)
-			} else {
-				// only delete listeners which managed by kubernetes and by my service.
-				if isManagedByMyService(svc, remote) && !isUserManagedListener(remote) {
+					// do update operate
+					local.Action = ACTION_UPDATE
+					updation = append(updation, local)
+					utils.Logf(svc, "found listener with port & protocol match, do update %s", local.NamedKey.Key())
+				} else {
+					// protocol not match, need to recreate
+					if !override && isUserDefinedLoadBalancer(svc) {
+						return nil, fmt.Errorf("[PortProtocolConflict] port matched, "+
+							"while protocol does not. force override listener %t. source[%v], target[%v]", override, local.NamedKey, remote.NamedKey)
+					}
 					remote.Action = ACTION_DELETE
 					deletion = append(deletion, remote)
-				} else {
-					glog.Infof("managed by other service or user managed listener, skip delete. [%s]", remote.Name)
+					utils.Logf(svc, "found listener with port match while protocol not, do delete & add %s", local.NamedKey.Key())
 				}
+			}
+		}
+		// Do not delete any listener that no longer managed by my service
+		// for safety. Only conflict case is taking care.
+		if !found {
+			if isManagedByMyService(svc, remote) {
+				remote.Action = ACTION_DELETE
+				deletion = append(deletion, remote)
+				utils.Logf(svc, "found listener[%s] which is no longer needed "+
+					"by my service[%s/%s], do delete", remote.NamedKey.Key(), svc.Namespace, svc.Name)
+			} else {
+				utils.Logf(svc, "port [%d] not managed by my service [%s/%s], skip processing.", remote.Port, svc.Namespace, svc.Name)
 			}
 		}
 	}
@@ -454,18 +446,10 @@ func mergeListeners(svc *v1.Service, service, console Listeners) (Listeners, err
 	for _, local := range service {
 		found := false
 		for _, remote := range console {
-			if remote.Port == local.Port {
-				if !isManagedByMyService(svc, remote) {
-					if override {
-						// do add
-						break
-					} else {
-						return addition, fmt.Errorf("error: service[%s] trying "+
-							"to declare a port belongs to somebody else [%s]", local.NamedKey.Key(), remote.Name)
-					}
-				}
-				if remote.TransforedProto != local.TransforedProto {
-					// do add
+			if isPortMatch(remote, local) {
+				// port match
+				if !isProtocolMatch(remote, local) {
+					// protocol does not match, do add listener
 					break
 				}
 				// port matched. updated . skip
@@ -476,6 +460,7 @@ func mergeListeners(svc *v1.Service, service, console Listeners) (Listeners, err
 		if !found {
 			local.Action = ACTION_ADD
 			addition = append(addition, local)
+			utils.Logf(svc, "add new listener %s", local.NamedKey.Key())
 		}
 	}
 
@@ -712,11 +697,11 @@ func (t *tcp) Update() error {
 		return t.Client.CreateLoadBalancerTCPListener((*slb.CreateLoadBalancerTCPListenerArgs)(config))
 	}
 	if !needUpdate {
-		glog.Infof("alicloud: tcp listener did not change, skip [update], port=[%d], nodeport=[%d]\n", t.Port, t.NodePort)
+		utils.Logf(t.Service, "tcp listener did not change, skip [update], port=[%d], nodeport=[%d]", t.Port, t.NodePort)
 		// no recreate needed.  skip
 		return nil
 	}
-	glog.Infof("TCP listener checker changed, request update listener attribute [%s]\n", t.LoadBalancerID)
+	utils.Logf(t.Service, "TCP listener checker changed, request update listener attribute [%s]", t.LoadBalancerID)
 	glog.V(5).Infof(PrettyJson(def))
 	glog.V(5).Infof(PrettyJson(response))
 	return t.Client.SetLoadBalancerTCPListenerAttribute(config)
@@ -844,7 +829,7 @@ func (t *udp) Update() error {
 	// backend server port has changed.
 	if int(t.NodePort) != response.BackendServerPort {
 		config.BackendServerPort = int(t.NodePort)
-		glog.Infof("alicloud: udp listener checker [BackendServerPort] changed, "+
+		utils.Logf(t.Service, "udp listener checker [BackendServerPort] changed, "+
 			"request=%d. response=%d", t.NodePort, response.BackendServerPort)
 		err := t.Client.DeleteLoadBalancerListener(t.LoadBalancerID, int(t.Port))
 		if err != nil {
@@ -854,12 +839,12 @@ func (t *udp) Update() error {
 	}
 
 	if !needUpdate {
-		glog.Infof("alicloud: udp listener did not change, skip "+
+		utils.Logf(t.Service, "udp listener did not change, skip "+
 			"[update], port=[%d], nodeport=[%d]\n", t.Port, t.NodePort)
 		// no recreate needed.  skip
 		return nil
 	}
-	glog.Infof("alicloud: UDP listener checker changed, request recreate [%s]\n", t.LoadBalancerID)
+	utils.Logf(t.Service, "UDP listener checker changed, request recreate [%s]\n", t.LoadBalancerID)
 	glog.V(5).Infof(PrettyJson(request))
 	glog.V(5).Infof(PrettyJson(response))
 	return t.Client.SetLoadBalancerUDPListenerAttribute(config)
@@ -1084,7 +1069,7 @@ func (t *http) Update() error {
 		int(t.NodePort) != response.BackendServerPort {
 
 		config.BackendServerPort = int(t.NodePort)
-		glog.Infof("alicloud: HTTP listener checker [BackendServerPort]"+
+		utils.Logf(t.Service, "HTTP listener checker [BackendServerPort]"+
 			" changed, request=%d. response=%d", t.NodePort, response.BackendServerPort)
 		err := t.Client.DeleteLoadBalancerListener(t.LoadBalancerID, int(t.Port))
 		if err != nil {
@@ -1094,11 +1079,11 @@ func (t *http) Update() error {
 	}
 
 	if !needUpdate {
-		glog.Infof("alicloud: http listener did not change, skip [update], port=[%d], nodeport=[%d]\n", t.Port, t.NodePort)
+		utils.Logf(t.Service, "http listener did not change, skip [update], port=[%d], nodeport=[%d]\n", t.Port, t.NodePort)
 		// no recreate needed.  skip
 		return nil
 	}
-	glog.Infof("alicloud: http listener checker changed, request update [%s]\n", t.LoadBalancerID)
+	utils.Logf(t.Service, "http listener checker changed, request update [%s]\n", t.LoadBalancerID)
 	glog.V(5).Infof(PrettyJson(request))
 	glog.V(5).Infof(PrettyJson(response))
 	return t.Client.SetLoadBalancerHTTPListenerAttribute(config)
@@ -1284,7 +1269,7 @@ func (t *https) Update() error {
 	if int(t.NodePort) != response.BackendServerPort {
 		needUpdate = true
 		config.BackendServerPort = int(t.NodePort)
-		glog.Infof("alicloud: listener checker [BackendServerPort] changed, request=%d. response=%d", t.NodePort, response.BackendServerPort)
+		utils.Logf(t.Service, "listener checker [BackendServerPort] changed, request=%d. response=%d", t.NodePort, response.BackendServerPort)
 		err := t.Client.DeleteLoadBalancerListener(t.LoadBalancerID, int(t.Port))
 		if err != nil {
 			return err
@@ -1293,11 +1278,11 @@ func (t *https) Update() error {
 	}
 
 	if !needUpdate {
-		glog.Infof("alicloud: https listener did not change, skip [update], port=[%d], nodeport=[%d]\n", t.Port, t.NodePort)
+		utils.Logf(t.Service, "https listener did not change, skip [update], port=[%d], nodeport=[%d]\n", t.Port, t.NodePort)
 		// no recreate needed.  skip
 		return nil
 	}
-	glog.Infof("alicloud: https listener checker changed, request recreate [%s]\n", t.LoadBalancerID)
+	utils.Logf(t.Service, "https listener checker changed, request recreate [%s]\n", t.LoadBalancerID)
 	glog.V(5).Infof(PrettyJson(request))
 	glog.V(5).Infof(PrettyJson(response))
 	return t.Client.SetLoadBalancerHTTPSListenerAttribute(config)

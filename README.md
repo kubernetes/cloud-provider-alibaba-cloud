@@ -27,3 +27,6 @@ You can reach the maintainers of this project at:
 ### Code of conduct
 
 Participation in the Kubernetes community is governed by the [Kubernetes Code of Conduct](code-of-conduct.md).
+
+## Testing
+See more info in page [Test](https://github.com/kubernetes/cloud-provider-alibaba-cloud/tree/master/docs/testing.md)

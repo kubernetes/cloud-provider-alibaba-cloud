@@ -8,18 +8,20 @@ import (
 	"github.com/denverdino/aliyungo/slb"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/kubernetes/pkg/controller/service"
 	"sort"
 	"strings"
 	"testing"
 )
 
-// cloudDataMock
-// is a function which set mocked cloud
+// CloudDataMock
+// is a function which set mocked Cloud
 // initial data, include alibaba route/slb/instance
 type CloudDataMock func()
 
 func DefaultPreset() {
-	// Step 2: init cloud cache data.
+	InitCache()
+	// Step 2: init Cloud cache data.
 	PreSetCloudData(
 		// LoadBalancer
 		WithNewLoadBalancerStore(),
@@ -188,31 +190,41 @@ func NewFrameWork(
 		preset()
 	}
 	return &FrameWork{
-		cloud:    cloud,
-		svc:      svc,
-		nodes:    nodes,
-		endpoint: endpoint,
+		Cloud:    cloud,
+		SVC:      svc,
+		Nodes:    nodes,
+		Endpoint: endpoint,
 	}
 }
 
-type FrameWork struct {
-	cloud         *Cloud
-	svc           *v1.Service
-	nodes         []*v1.Node
-	endpoint      *v1.Endpoints
-	cloudDataMock func()
+type OptionsFunc func(f *FrameWork)
+
+func NewFrameWorkWithOptions(
+	option OptionsFunc,
+) *FrameWork {
+	frame := &FrameWork{}
+	option(frame)
+	return frame
 }
 
-func (f *FrameWork) Cloud() *Cloud                     { return f.cloud }
-func (f *FrameWork) Instance() *InstanceClient         { return f.cloud.climgr.Instances() }
-func (f *FrameWork) Route() *RoutesClient              { return f.cloud.climgr.Routes() }
-func (f *FrameWork) LoadBalancer() *LoadBalancerClient { return f.cloud.climgr.LoadBalancers() }
+type FrameWork struct {
+	Cloud         *Cloud
+	SVC           *v1.Service
+	Nodes         []*v1.Node
+	Endpoint      *v1.Endpoints
+	CloudDataMock func()
+}
 
-func (f *FrameWork) SLBSDK() ClientSLBSDK           { return f.cloud.climgr.LoadBalancers().c }
-func (f *FrameWork) RouteSDK() RouteSDK             { return f.cloud.climgr.Routes().client }
-func (f *FrameWork) InstanceSDK() ClientInstanceSDK { return f.cloud.climgr.Instances().c }
+func (f *FrameWork) CloudImpl() *Cloud                 { return f.Cloud }
+func (f *FrameWork) Instance() *InstanceClient         { return f.Cloud.climgr.Instances() }
+func (f *FrameWork) Route() *RoutesClient              { return f.Cloud.climgr.Routes() }
+func (f *FrameWork) LoadBalancer() *LoadBalancerClient { return f.Cloud.climgr.LoadBalancers() }
 
-func (f *FrameWork) hasAnnotation(anno string) bool { return serviceAnnotation(f.svc, anno) != "" }
+func (f *FrameWork) SLBSDK() ClientSLBSDK           { return f.Cloud.climgr.LoadBalancers().c }
+func (f *FrameWork) RouteSDK() RouteSDK             { return f.Cloud.climgr.Routes().client }
+func (f *FrameWork) InstanceSDK() ClientInstanceSDK { return f.Cloud.climgr.Instances().c }
+
+func (f *FrameWork) hasAnnotation(anno string) bool { return serviceAnnotation(f.SVC, anno) != "" }
 
 func (f *FrameWork) RunDefault(
 	t *testing.T,
@@ -243,15 +255,15 @@ func (f *FrameWork) Run(
 			)
 			switch ntype {
 			case "eni":
-				status, err = f.cloud.EnsureLoadBalancerWithENI(CLUSTER_ID, f.svc, f.endpoint)
+				status, err = f.Cloud.EnsureLoadBalancerWithENI(CLUSTER_ID, f.SVC, f.Endpoint)
 			case "ecs":
-				status, err = f.cloud.EnsureLoadBalancer(CLUSTER_ID, f.svc, f.nodes)
+				status, err = f.Cloud.EnsureLoadBalancer(CLUSTER_ID, f.SVC, f.Nodes)
 			}
 			if err != nil {
 				t.Fatalf("EnsureLoadBalancer error: %s\n", err.Error())
 			}
-			if !f.ExpectExistAndEqual(t) {
-				t.Fatalf("test fail, expect equal")
+			if err := ExpectExistAndEqual(f); err != nil {
+				t.Fatalf("test fail, expect equal, %s", err.Error())
 			}
 
 			if status == nil || len(status.Ingress) <= 0 {
@@ -262,40 +274,40 @@ func (f *FrameWork) Run(
 	run()
 }
 
-// service & cloud data must be consistent
-func (f *FrameWork) ExpectExistAndEqual(t *testing.T) bool {
+// service & Cloud data must be consistent
+func ExpectExistAndEqual(f *FrameWork) error {
 
-	exist, mlb, err := f.LoadBalancer().findLoadBalancer(f.svc)
+	exist, mlb, err := f.LoadBalancer().findLoadBalancer(f.SVC)
 	// 1. slb must exist
 	if err != nil || !exist {
-		t.Fatalf("slb not found, %v, %v", exist, err)
+		return fmt.Errorf("slb not found, %v, %v", exist, err)
 	}
 
 	// 1. port length equal
-	if len(f.svc.Spec.Ports) != len(mlb.ListenerPorts.ListenerPort) {
-		t.Fatal("port length not equal")
+	if len(f.SVC.Spec.Ports) > len(mlb.ListenerPorts.ListenerPort) {
+		return fmt.Errorf("not enough ports on loadbalancer: %d, %d", len(f.SVC.Spec.Ports), len(mlb.ListenerPorts.ListenerPort))
 	}
 
 	// 2. port & proto equal
-	for _, p := range f.svc.Spec.Ports {
+	for _, p := range f.SVC.Spec.Ports {
 		found := false
 		for _, v := range mlb.ListenerPortsAndProtocol.ListenerPortAndProtocol {
 
-			proto, err := Protocol(serviceAnnotation(f.svc, ServiceAnnotationLoadBalancerProtocolPort), p)
+			proto, err := Protocol(serviceAnnotation(f.SVC, ServiceAnnotationLoadBalancerProtocolPort), p)
 			if err != nil {
-				t.Fatalf("proto transfor error")
+				return fmt.Errorf("proto transfor error")
 			}
 			if p.Port == int32(v.ListenerPort) &&
 				proto == v.ListenerProtocol {
 				if err := f.ListenerEqual(mlb.LoadBalancerId, p, proto); err != nil {
-					t.Fatalf(fmt.Sprintf("listener configuration not equal, %s", err.Error()))
+					return fmt.Errorf(fmt.Sprintf("listener configuration not equal, %s", err.Error()))
 				}
 				found = true
 				break
 			}
 		}
 		if !found {
-			t.Fatalf("port not found %d", p.Port)
+			return fmt.Errorf("port not found %d", p.Port)
 		}
 	}
 
@@ -307,25 +319,25 @@ func (f *FrameWork) ExpectExistAndEqual(t *testing.T) bool {
 	)
 	if err != nil &&
 		!strings.Contains(err.Error(), "not found") {
-		t.Fatalf("vserver group: %v", err)
+		return fmt.Errorf("vserver group: %v", err)
 	}
 	if res == nil {
-		t.Fatalf("vserver group can not be nil")
+		return fmt.Errorf("vserver group can not be nil")
 	}
-	if len(res.VServerGroups.VServerGroup) != len(f.svc.Spec.Ports) {
-		t.Fatalf("vserver group must be equal to port count")
+	if len(res.VServerGroups.VServerGroup) < len(f.SVC.Spec.Ports) {
+		return fmt.Errorf("vserver group count less than service: %d, %d", len(res.VServerGroups.VServerGroup), len(f.SVC.Spec.Ports))
 	}
 
 	sort.SliceStable(
-		f.nodes,
+		f.Nodes,
 		func(i, j int) bool {
-			_, ida, err := nodeFromProviderID(f.nodes[i].Spec.ProviderID)
+			_, ida, err := nodeFromProviderID(f.Nodes[i].Spec.ProviderID)
 			if err != nil {
-				t.Fatalf("unexpected provider id")
+				panic("unexpected provider id")
 			}
-			_, idb, err := nodeFromProviderID(f.nodes[j].Spec.ProviderID)
+			_, idb, err := nodeFromProviderID(f.Nodes[j].Spec.ProviderID)
 			if err != nil {
-				t.Fatalf("unexpected provider id")
+				panic("unexpected provider id")
 			}
 			if ida > idb {
 				return true
@@ -334,7 +346,7 @@ func (f *FrameWork) ExpectExistAndEqual(t *testing.T) bool {
 		},
 	)
 
-	defd, _ := ExtractAnnotationRequest(f.svc)
+	defd, _ := ExtractAnnotationRequest(f.SVC)
 	for _, v := range res.VServerGroups.VServerGroup {
 		vg, err := f.SLBSDK().DescribeVServerGroupAttribute(
 			&slb.DescribeVServerGroupAttributeArgs{
@@ -342,14 +354,14 @@ func (f *FrameWork) ExpectExistAndEqual(t *testing.T) bool {
 			},
 		)
 		if err != nil {
-			t.Fatalf("vserver group attribute error: %v", err)
+			return fmt.Errorf("vserver group attribute error: %v", err)
 		}
 
 		backends := vg.BackendServers.BackendServer
 
-		if f.svc.Annotations["service.beta.kubernetes.io/backend-type"] == "eni" {
-			if len(backends) != len(f.endpoint.Subsets[0].Addresses) {
-				t.Fatalf("endpoint vgroup backend server must be %d", len(f.nodes))
+		if f.SVC.Annotations["service.beta.kubernetes.io/backend-type"] == "eni" {
+			if len(backends) != len(f.Endpoint.Subsets[0].Addresses) {
+				return fmt.Errorf("Endpoint vgroup backend server must be %d", len(f.Nodes))
 			}
 			sort.SliceStable(
 				backends,
@@ -360,7 +372,7 @@ func (f *FrameWork) ExpectExistAndEqual(t *testing.T) bool {
 					return false
 				},
 			)
-			endpoints := f.endpoint.Subsets[0].Addresses
+			endpoints := f.Endpoint.Subsets[0].Addresses
 
 			sort.SliceStable(
 				endpoints,
@@ -373,12 +385,13 @@ func (f *FrameWork) ExpectExistAndEqual(t *testing.T) bool {
 			)
 			for k, v := range backends {
 				if v.ServerIp != endpoints[k].IP {
-					t.Fatalf("backend not equal endpoint")
+					return fmt.Errorf("backend not equal Endpoint")
 				}
 			}
 		} else {
-			if len(backends) != len(f.nodes) {
-				t.Fatalf("node vgroup backend server must be %d", len(f.nodes))
+			f.Nodes = filterOutMaster(f.Nodes)
+			if len(backends) != len(f.Nodes) {
+				return fmt.Errorf("node vgroup backend server must be %d", len(f.Nodes))
 			}
 			sort.SliceStable(
 				backends,
@@ -390,12 +403,15 @@ func (f *FrameWork) ExpectExistAndEqual(t *testing.T) bool {
 				},
 			)
 			sort.SliceStable(
-				f.nodes,
+				f.Nodes,
 				func(i, j int) bool {
-					_, ida, err := nodeFromProviderID(f.nodes[i].Spec.ProviderID)
-					_, idb, err := nodeFromProviderID(f.nodes[j].Spec.ProviderID)
+					_, ida, err := nodeFromProviderID(f.Nodes[i].Spec.ProviderID)
 					if err != nil {
-						t.Fatalf("node id error")
+						panic("xnode id error")
+					}
+					_, idb, err := nodeFromProviderID(f.Nodes[j].Spec.ProviderID)
+					if err != nil {
+						panic("ynode id error")
 					}
 					if ida < idb {
 						return true
@@ -403,10 +419,10 @@ func (f *FrameWork) ExpectExistAndEqual(t *testing.T) bool {
 					return false
 				},
 			)
-			nodes := f.nodes
+			nodes := f.Nodes
 			if f.hasAnnotation(ServiceAnnotationLoadBalancerBackendLabel) {
 				var tpms []*v1.Node
-				for _, v := range f.nodes {
+				for _, v := range f.Nodes {
 					if containsLabel(
 						v,
 						strings.Split(defd.BackendLabel, ","),
@@ -417,15 +433,15 @@ func (f *FrameWork) ExpectExistAndEqual(t *testing.T) bool {
 				nodes = tpms
 			}
 			if len(backends) > len(nodes) {
-				t.Fatalf("backend node not equal")
+				return fmt.Errorf("backend node not equal")
 			}
 			for k, v := range backends {
 				_, ida, err := nodeFromProviderID(nodes[k].Spec.ProviderID)
 				if err != nil {
-					t.Fatalf("unexpected provider id")
+					return fmt.Errorf("unexpected provider id")
 				}
 				if v.ServerId != ida {
-					t.Fatalf("backend not equal")
+					return fmt.Errorf("backend not equal")
 				}
 			}
 
@@ -437,69 +453,69 @@ func (f *FrameWork) ExpectExistAndEqual(t *testing.T) bool {
 		arg := &slb.DescribeTagsArgs{LoadBalancerID: mlb.LoadBalancerId}
 		tags, _, err := f.SLBSDK().DescribeTags(arg)
 		if err != nil {
-			t.Fatalf("describe tags:%s", err.Error())
+			return fmt.Errorf("describe tags:%s", err.Error())
 		}
 
-		if !tagsEqual(f.svc.Annotations[ServiceAnnotationLoadBalancerAdditionalTags], tags) {
-			t.Fatalf("tags not equal")
+		if !tagsEqual(f.SVC.Annotations[ServiceAnnotationLoadBalancerAdditionalTags], tags) {
+			return fmt.Errorf("tags not equal")
 		}
 	}
 
-	return f.SLBSpecEqual(t, mlb)
+	return f.SLBSpecEqual(mlb)
 }
 
-func (f *FrameWork) SLBSpecEqual(t *testing.T, mlb *slb.LoadBalancerType) bool {
+func (f *FrameWork) SLBSpecEqual(mlb *slb.LoadBalancerType) error {
 
-	defd, _ := ExtractAnnotationRequest(f.svc)
+	defd, _ := ExtractAnnotationRequest(f.SVC)
 	if f.hasAnnotation(ServiceAnnotationLoadBalancerMasterZoneID) {
 		if mlb.MasterZoneId != defd.MasterZoneID {
-			t.Fatalf("master zoneid error")
+			return fmt.Errorf("master zoneid error: %s, %s", mlb.MasterZoneId, defd.MasterZoneID)
 		}
 	}
 	if f.hasAnnotation(ServiceAnnotationLoadBalancerSlaveZoneID) {
 		if mlb.SlaveZoneId != defd.SlaveZoneID {
-			t.Fatalf(fmt.Sprintf("slave zoneid error:%s, %s", mlb.SlaveZoneId, defd.SlaveZoneID))
+			return fmt.Errorf(fmt.Sprintf("slave zoneid error:%s, %s", mlb.SlaveZoneId, defd.SlaveZoneID))
 		}
 	}
 	if f.hasAnnotation(ServiceAnnotationLoadBalancerBandwidth) {
 		if mlb.Bandwidth != defd.Bandwidth {
-			t.Fatalf("bandwidth error")
+			return fmt.Errorf("bandwidth error: %d, %d", mlb.Bandwidth, defd.Bandwidth)
 		}
 	}
 
 	if f.hasAnnotation(ServiceAnnotationLoadBalancerAddressType) {
 		if mlb.AddressType != defd.AddressType {
-			t.Fatalf("address type error: %s, %s", mlb.AddressType, defd.AddressType)
+			return fmt.Errorf("address type error: %s, %s", mlb.AddressType, defd.AddressType)
 		}
 	}
 	if f.hasAnnotation(ServiceAnnotationLoadBalancerVswitch) {
 		if mlb.VSwitchId != defd.VswitchID {
-			t.Fatalf("vswitch id error: %s, %s", mlb.VSwitchId, defd.VswitchID)
+			return fmt.Errorf("vswitch id error: %s, %s", mlb.VSwitchId, defd.VswitchID)
 		}
 	}
 	if f.hasAnnotation(ServiceAnnotationLoadBalancerSLBNetworkType) {
 		if mlb.NetworkType != defd.SLBNetworkType {
-			t.Fatalf("network type error")
+			return fmt.Errorf("network type error")
 		}
 	}
 	if f.hasAnnotation(ServiceAnnotationLoadBalancerChargeType) {
 		if mlb.InternetChargeType != defd.ChargeType {
-			t.Fatalf("charge type error")
+			return fmt.Errorf("charge type error: %s, %s", mlb.InternetChargeType, defd.ChargeType)
 		}
 	}
 
 	if f.hasAnnotation(ServiceAnnotationLoadBalancerSpec) {
 		if mlb.LoadBalancerSpec != defd.LoadBalancerSpec {
-			t.Fatalf("loadbalancer spec error")
+			return fmt.Errorf("loadbalancer spec error")
 		}
 	}
 
 	if f.hasAnnotation(ServiceAnnotationLoadBalancerIPVersion) {
 		if mlb.AddressIPVersion != defd.AddressIPVersion {
-			t.Fatalf("address ip version error")
+			return fmt.Errorf("address ip version error")
 		}
 	}
-	return true
+	return nil
 }
 
 func (f *FrameWork) ListenerEqual(id string, p v1.ServicePort, proto string) error {
@@ -532,7 +548,7 @@ func (f *FrameWork) ListenerEqual(id string, p v1.ServicePort, proto string) err
 		aclType               = ""
 		scheduler             = ""
 	)
-	defd, _ := ExtractAnnotationRequest(f.svc)
+	defd, _ := ExtractAnnotationRequest(f.SVC)
 	switch proto {
 	case "tcp":
 		resp, err := f.SLBSDK().DescribeLoadBalancerTCPListenerAttribute(id, int(p.Port))
@@ -540,8 +556,8 @@ func (f *FrameWork) ListenerEqual(id string, p v1.ServicePort, proto string) err
 			return err
 		}
 		if resp.BackendServerPort == 0 ||
-			(!isEniBackend(f.svc) && resp.BackendServerPort != int(p.NodePort)) ||
-			(isEniBackend(f.svc) && resp.BackendServerPort != int(p.Port)) {
+			(!isEniBackend(f.SVC) && resp.BackendServerPort != int(p.NodePort)) ||
+			(isEniBackend(f.SVC) && resp.BackendServerPort != int(p.Port)) {
 			return fmt.Errorf("TCPBackendServerPortNotEqual")
 		}
 
@@ -566,8 +582,8 @@ func (f *FrameWork) ListenerEqual(id string, p v1.ServicePort, proto string) err
 			return err
 		}
 		if resp.BackendServerPort == 0 ||
-			(!isEniBackend(f.svc) && resp.BackendServerPort != int(p.NodePort)) ||
-			(isEniBackend(f.svc) && resp.BackendServerPort != int(p.Port)) {
+			(!isEniBackend(f.SVC) && resp.BackendServerPort != int(p.NodePort)) ||
+			(isEniBackend(f.SVC) && resp.BackendServerPort != int(p.Port)) {
 			return fmt.Errorf("UDPBackendServerPortNotEqual")
 		}
 
@@ -587,8 +603,8 @@ func (f *FrameWork) ListenerEqual(id string, p v1.ServicePort, proto string) err
 			return err
 		}
 		if resp.BackendServerPort == 0 ||
-			(!isEniBackend(f.svc) && resp.BackendServerPort != int(p.NodePort)) ||
-			(isEniBackend(f.svc) && resp.BackendServerPort != int(p.Port)) {
+			(!isEniBackend(f.SVC) && resp.BackendServerPort != int(p.NodePort)) ||
+			(isEniBackend(f.SVC) && resp.BackendServerPort != int(p.Port)) {
 			return fmt.Errorf("HTTPBackendServerPortNotEqual")
 		}
 
@@ -615,8 +631,8 @@ func (f *FrameWork) ListenerEqual(id string, p v1.ServicePort, proto string) err
 			return err
 		}
 		if resp.BackendServerPort == 0 ||
-			(!isEniBackend(f.svc) && resp.BackendServerPort != int(p.NodePort)) ||
-			(isEniBackend(f.svc) && resp.BackendServerPort != int(p.Port)) {
+			(!isEniBackend(f.SVC) && resp.BackendServerPort != int(p.NodePort)) ||
+			(isEniBackend(f.SVC) && resp.BackendServerPort != int(p.Port)) {
 			return fmt.Errorf("HTTPSBackendServerPortNotEqual")
 		}
 		if resp.ServerCertificateId == "" ||
@@ -831,4 +847,36 @@ func tagsEqual(tags string, items []slb.TagItemType) bool {
 		}
 	}
 	return true
+}
+
+func filterOutMaster(nodes []*v1.Node) []*v1.Node {
+	var result []*v1.Node
+	for _, node := range nodes {
+		found := false
+		for k, _ := range node.Labels {
+			if k == service.LabelNodeRoleMaster {
+				found = true
+			}
+		}
+		if !found {
+			result = append(result, node)
+		}
+	}
+	return result
+}
+
+func ExpectNotExist(f *FrameWork) error {
+	exist, _, err := f.LoadBalancer().findLoadBalancer(f.SVC)
+	if err != nil || exist {
+		return fmt.Errorf("slb should not exist: %v, %t", err, exist)
+	}
+	return nil
+}
+
+func ExpectExist(f *FrameWork) error {
+	exist, _, err := f.LoadBalancer().findLoadBalancer(f.SVC)
+	if err != nil || !exist {
+		return fmt.Errorf("slb should exist: %v, %t", err, exist)
+	}
+	return nil
 }

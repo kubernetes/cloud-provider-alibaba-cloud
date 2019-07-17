@@ -14,6 +14,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	queue "k8s.io/client-go/util/workqueue"
+	"k8s.io/cloud-provider-alibaba-cloud/cloud-controller-manager/utils"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/controller"
@@ -206,14 +207,14 @@ func HandlerForNodesChange(
 		ctx.Range(
 			func(k string, svc *v1.Service) bool {
 				if !NeedLoadBalancer(svc) {
-					glog.Infof("node change: loadbalancer is not needed %s, skip", key(svc))
+					utils.Logf(svc, "node change: loadbalancer is not needed, skip")
 					return true
 				}
 				if !isProcessNeeded(svc) {
-					glog.Infof("node change: class not empty, skip process %s", key(svc))
+					utils.Logf(svc, "node change: class not empty, skip process ")
 					return true
 				}
-				glog.Infof("node chenge: enque %s", key(svc))
+				utils.Logf(svc, "node chenge: enque service")
 				Enqueue(que, key(svc))
 				return true
 			},
@@ -258,15 +259,15 @@ func HandlerForEndpointChange(
 			return
 		}
 		if !isProcessNeeded(svc) {
-			glog.Infof("endpoint: class not empty, skip process %s", key(svc))
+			utils.Logf(svc, "endpoint: class not empty, skip process ")
 			return
 		}
 		if !NeedLoadBalancer(svc) {
 			// we are safe here to skip process syncEnpoint.
-			glog.Infof("endpoint change: loadBalancer is not needed %s, skip", key(svc))
+			utils.Logf(svc, "endpoint change: loadBalancer is not needed, skip")
 			return
 		}
-		glog.Infof("enqueue endpoint: %s/%s", ep.Namespace, ep.Name)
+		utils.Logf(svc, "enqueue endpoint")
 		Enqueue(que, key(svc))
 	}
 	informer.AddEventHandlerWithResyncPeriod(
@@ -294,7 +295,7 @@ func HandlerForServiceChange(
 ) {
 	syncService := func(svc *v1.Service) {
 		if !isProcessNeeded(svc) {
-			glog.Infof("class not empty, skip process")
+			utils.Logf(svc, "class not empty, skip process")
 			return
 		}
 		Enqueue(que, key(svc))
@@ -305,10 +306,10 @@ func HandlerForServiceChange(
 			AddFunc: func(add interface{}) {
 				svc, ok := add.(*v1.Service)
 				if !ok {
-					glog.Infof("add: not type service %s, skip", reflect.TypeOf(add))
+					utils.Logf(svc, "add: not type service %s, skip", reflect.TypeOf(add))
 					return
 				}
-				glog.Infof("service addiontion event received %s", key(svc))
+				utils.Logf(svc, "service addiontion event received %s", reflect.TypeOf(svc))
 				syncService(svc)
 			},
 			UpdateFunc: func(old, cur interface{}) {
@@ -316,17 +317,17 @@ func HandlerForServiceChange(
 				curr, ok2 := cur.(*v1.Service)
 				if ok1 && ok2 &&
 					NeedUpdate(oldd, curr, record) {
-					glog.Infof("service update event %s", key(curr))
+					utils.Logf(curr, "service update event")
 					syncService(curr)
 				}
 			},
 			DeleteFunc: func(cur interface{}) {
-				glog.Infof("controller: service deletion received, %+v", cur)
 				svc, ok := cur.(*v1.Service)
 				if !ok {
-					glog.Infof("delete: not type service %s, skip", reflect.TypeOf(cur))
+					utils.Logf(svc, "delete: not type service %s, skip", reflect.TypeOf(cur))
 					return
 				}
+				utils.Logf(svc, "controller: service deletion received, %s", utils.PrettyJson(svc))
 				// recorder service in local context
 				context.Set(key(svc), svc)
 				syncService(svc)
@@ -353,7 +354,7 @@ func WorkerFunc(
 				}
 				defer queue.Done(key)
 
-				glog.Infof("worker: queued sync for service [%s]", key)
+				glog.Infof("[%s] worker: queued sync for service", key)
 
 				if err := syncd(key.(string)); err != nil {
 					queue.AddAfter(key, 2*time.Second)
@@ -381,7 +382,7 @@ func (con *Controller) ServiceSyncTask(k string) error {
 	cached := con.local.Get(k)
 
 	defer func() {
-		glog.Infof("finished syncing service %q (%v)", k, time.Now().Sub(startTime))
+		glog.Infof("[%s] finished syncing service (%v)", k, time.Now().Sub(startTime))
 	}()
 
 	// service holds the latest service info from apiserver
@@ -402,7 +403,7 @@ func (con *Controller) ServiceSyncTask(k string) error {
 		}
 		// service absence in store means watcher caught the deletion, ensure LB
 		// info is cleaned delete error would cause ReEnqueue svc, which mean retry.
-		glog.Infof("service has been deleted %v", key(cached))
+		utils.Logf(cached, "service has been deleted %v", key(cached))
 		return retry(nil, con.delete, cached)
 	case err != nil:
 		return fmt.Errorf("failed to load service from local context: %s", err.Error())
@@ -467,7 +468,7 @@ func (con *Controller) update(cached, svc *v1.Service) error {
 	var newm *v1.LoadBalancerStatus
 	if !NeedLoadBalancer(svc) {
 		// delete loadbalancer which is no longer needed
-		glog.Infof("try delete loadbalancer which no longer needed for service %s.", key(svc))
+		utils.Logf(svc, "try delete loadbalancer which no longer needed for service.")
 
 		if err := retry(nil, con.delete, svc); err != nil {
 			return err
@@ -476,7 +477,7 @@ func (con *Controller) update(cached, svc *v1.Service) error {
 		newm = &v1.LoadBalancerStatus{}
 	} else {
 
-		glog.Infof("start to ensure loadbalancer %s", key(svc))
+		utils.Logf(svc, "start to ensure loadbalancer")
 		var (
 			err error
 		)
@@ -565,8 +566,8 @@ func (con *Controller) updateStatus(svc *v1.Service, pre, newm *v1.LoadBalancerS
 				// out so that we can process the delete, which we should soon be receiving
 				// if we haven't already.
 				if errors.IsNotFound(err) {
-					glog.Infof("not persisting update to service '%s/%s' that no "+
-						"longer exists: %v", service.Namespace, service.Name, err)
+					utils.Logf(service, "not persisting update to service that no "+
+						"longer exists: %v", err)
 					return nil
 				}
 				// TODO: Try to resolve the conflict if the change was unrelated to load
@@ -582,7 +583,7 @@ func (con *Controller) updateStatus(svc *v1.Service, pre, newm *v1.LoadBalancerS
 			service,
 		)
 	}
-	glog.V(2).Infof("not persisting unchanged LoadBalancerStatus for service %s to registry.", key(svc))
+	utils.Logf(svc, "not persisting unchanged LoadBalancerStatus for service to registry.")
 	return nil
 }
 
@@ -619,7 +620,7 @@ func (con *Controller) delete(svc *v1.Service) error {
 }
 
 func (con *Controller) NodeSyncTask(k string) error {
-	glog.Infof("start sync backend for service [%s].\n", k)
+	glog.Infof("[%s] start sync backend for service.\n", k)
 
 	ns, name, err := cache.SplitMetaNamespaceKey(k)
 	if err != nil {
@@ -648,7 +649,7 @@ func (con *Controller) NodeSyncTask(k string) error {
 			return nil
 		}
 
-		defer glog.Infof("finish sync backend for service [%s]\n\n", key(service))
+		defer utils.Logf(service, "finish sync backend for service\n\n")
 		if IsENIBackendType(service) {
 			eni, ok := con.cloud.(EnsureENI)
 			if !ok {
@@ -712,23 +713,24 @@ func NodeConditionPredicate(
 				"[%s] with error [%s]", key(svc), err.Error())
 		}
 
-		glog.Infof("[%s]endpoint has [%d] subsets. ", key(svc), len(ep.Subsets))
+		utils.Logf(svc, "endpoint has [%d] subsets. ", len(ep.Subsets))
 
 		for _, sub := range ep.Subsets {
 			for _, add := range sub.Addresses {
-				glog.Infof("[%s]prepare to add node [%s] for service backend", key(svc), *add.NodeName)
+				utils.Logf(svc, "prepare to add node [%s] for service backend", *add.NodeName)
 				nodes[*add.NodeName] = *add.NodeName
 				records = append(records, *add.NodeName)
 			}
 		}
 
-		glog.Infof("predicate: local mode service should accept node %v for service[%s]\n", records, key(svc))
+		utils.Logf(svc, "predicate: local mode service should accept node %v for service\n", records)
 	}
 
 	predicate := func(node *v1.Node) bool {
 		// We add the master to the node list, but its unschedulable.
 		// So we use this to filter the master.
 		if node.Spec.Unschedulable {
+			utils.Logf(svc, "ignore node %s with unschedulable condition", node.Name)
 			return false
 		}
 
@@ -740,7 +742,7 @@ func NodeConditionPredicate(
 		}
 
 		if _, exclude := node.Labels[LabelNodeRoleExcludeBalancer]; exclude {
-			glog.Infof("ignore node with exclude label %s", node.Name)
+			utils.Logf(svc, "ignore node with exclude label %s", node.Name)
 			return false
 		}
 
@@ -753,13 +755,14 @@ func NodeConditionPredicate(
 			// condition status is ConditionTrue
 			if cond.Type == v1.NodeReady &&
 				cond.Status != v1.ConditionTrue {
-				glog.Infof("ignoring node %v with %v condition "+
+				utils.Logf(svc, "ignoring node %v with %v condition "+
 					"status %v", node.Name, cond.Type, cond.Status)
 				return false
 			}
 		}
 		if ServiceModeLocal(svc) {
 			if _, exist := nodes[node.Name]; !exist {
+				utils.Logf(svc, "node %s does not contain local pod, ignore.", node.Name)
 				// accept node which the pod is reside in.
 				return false
 			}

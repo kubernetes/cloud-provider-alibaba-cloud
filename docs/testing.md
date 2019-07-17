@@ -1,77 +1,104 @@
 # Testing
 
-### unit test
+### UnitTest
 
 Alibaba Cloud Controller use mocked cloud SDK to implement code unit test.
 
+```go
+// Test Http configuration.
+func TestEnsureLoadBalancerVswitchID(t *testing.T) {
+
+	prid := nodeid(string(REGION), INSTANCEID)
+	f := NewDefaultFrameWork(
+		// initial service based on your definition
+		&v1.Service{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "https-service",
+				UID:  types.UID(serviceUIDNoneExist),
+				Annotations: map[string]string{
+					ServiceAnnotationLoadBalancerVswitch:     VSWITCH_ID,
+					ServiceAnnotationLoadBalancerAddressType: string(slb.IntranetAddressType),
+				},
+			},
+			Spec: v1.ServiceSpec{
+				Ports: []v1.ServicePort{
+					{Port: listenPort1, TargetPort: targetPort1, Protocol: v1.ProtocolTCP, NodePort: nodePort1},
+				},
+				Type:            v1.ServiceTypeLoadBalancer,
+				SessionAffinity: v1.ServiceAffinityNone,
+			},
+		},
+		// initial node based on your definition.
+		// backend of the created loadbalaner
+		[]*v1.Node{
+			{
+				ObjectMeta: metav1.ObjectMeta{Name: prid},
+				Spec: v1.NodeSpec{
+					ProviderID: prid,
+				},
+			},
+		},
+		nil,
+		nil,
+	)
+
+	f.RunDefault(t, "Create Loadbalancer With VswitchID")
+}
 ```
-mgr, _ := NewMockClientMgr(&mockClientSLB{
-		startLoadBalancerListener: func(loadBalancerId string, port int) (err error) {
 
-			return nil
+Here is an example of self defined test point.
+```go
+func TestEnsureLoadbalancerDeleted(t *testing.T) {
+	prid := nodeid(string(REGION), INSTANCEID)
+	f := NewDefaultFrameWork(
+		// initial service based on your definition
+		&v1.Service{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:        "https-service",
+				UID:         types.UID(serviceUIDNoneExist),
+				Annotations: map[string]string{},
+			},
+			Spec: v1.ServiceSpec{
+				Ports: []v1.ServicePort{
+					{Port: listenPort1, TargetPort: targetPort1, Protocol: v1.ProtocolTCP, NodePort: nodePort1},
+				},
+				Type:            v1.ServiceTypeLoadBalancer,
+				SessionAffinity: v1.ServiceAffinityNone,
+			},
 		},
-		stopLoadBalancerListener: func(loadBalancerId string, port int) (err error) {
-			return nil
+		// initial node based on your definition.
+		// backend of the created loadbalaner
+		[]*v1.Node{
+			{
+				ObjectMeta: metav1.ObjectMeta{Name: prid},
+				Spec: v1.NodeSpec{
+					ProviderID: prid,
+				},
+			},
 		},
-		createLoadBalancerTCPListener: func(args *slb.CreateLoadBalancerTCPListenerArgs) (err error) {
-			li := slb.ListenerPortAndProtocolType{
-				ListenerPort:     args.ListenerPort,
-				ListenerProtocol: "tcp",
+		nil,
+		nil,
+	)
+
+	f.Run(
+		t,
+		"Delete Loadbalancer", "ecs",
+		func() {
+			_, err := f.Cloud.EnsureLoadBalancer(CLUSTER_ID, f.SVC, f.Nodes)
+			if err != nil {
+				t.Fatalf("delete loadbalancer error: create %s", err.Error())
 			}
-			t.Logf("PPPP: %v\n", li)
-			detail.ListenerPorts.ListenerPort = append(detail.ListenerPorts.ListenerPort, args.ListenerPort)
-			detail.ListenerPortsAndProtocol.ListenerPortAndProtocol = append(detail.ListenerPortsAndProtocol.ListenerPortAndProtocol, li)
-			return nil
-		},
-		deleteLoadBalancerListener: func(loadBalancerId string, port int) (err error) {
-			response := []slb.ListenerPortAndProtocolType{}
-			ports := detail.ListenerPortsAndProtocol.ListenerPortAndProtocol
-			for _, p := range ports {
-				if p.ListenerPort == port {
-					continue
-				}
-				response = append(response, p)
+			err = f.Cloud.EnsureLoadBalancerDeleted(CLUSTER_ID, f.SVC)
+			if err != nil {
+				t.Fatalf("ensure loadbalancer delete error, %s", err.Error())
 			}
-
-			listports := []int{}
-			lports := detail.ListenerPorts.ListenerPort
-			for _, po := range lports {
-				if po == port {
-					continue
-				}
-				listports = append(listports, po)
+			exist, _, err := f.LoadBalancer().findLoadBalancer(f.SVC)
+			if err != nil || exist {
+				t.Fatalf("Delete LoadBalancer error: %v, %t", err, exist)
 			}
-			detail.ListenerPortsAndProtocol.ListenerPortAndProtocol = response
-			detail.ListenerPorts.ListenerPort = listports
-			return nil
 		},
-		describeLoadBalancerTCPListenerAttribute: func(loadBalancerId string, port int) (response *slb.DescribeLoadBalancerTCPListenerAttributeResponse, err error) {
-			ports := detail.ListenerPortsAndProtocol.ListenerPortAndProtocol
-
-			for _, p := range ports {
-				if p.ListenerPort == port {
-					return &slb.DescribeLoadBalancerTCPListenerAttributeResponse{
-						DescribeLoadBalancerListenerAttributeResponse: slb.DescribeLoadBalancerListenerAttributeResponse{
-							Status: slb.Running,
-						},
-						TCPListenerType: slb.TCPListenerType{
-							LoadBalancerId:    loadBalancerId,
-							ListenerPort:      port,
-							BackendServerPort: 31789,
-							Bandwidth:         50,
-						},
-					}, nil
-				}
-			}
-			return nil, errors.New("not found")
-		},
-	})
-
-	err := NewListenerManager(mgr.loadbalancer.c, service, detail).Apply()
-
-	if err != nil {
-		t.Fatal("listener update error! ")
-	}
+	)
+}
 ```
 
 Faked SDK made unit test easier.
@@ -81,3 +108,6 @@ Use ```make test``` to run unit test.
 ### Integration Test
 
 Alibaba Cloud Controller Manager integration test is expected to follow the kubernetes testgrid rule addressed in https://github.com/kubernetes/community/pull/2224#issuecomment-395410751 for consistency.
+
+For detailed e2etest see `cmd/e2e/README.md`, [Testing E2E](https://github.com/kubernetes/cloud-provider-alibaba-cloud/tree/master/cmd/e2e/README.md)
+

@@ -22,6 +22,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"k8s.io/cloud-provider-alibaba-cloud/cloud-controller-manager/utils"
 	"os"
 
 	"github.com/denverdino/aliyungo/common"
@@ -304,7 +305,7 @@ func (c *Cloud) EnsureLoadBalancer(clusterName string, service *v1.Service, node
 		}
 	}
 
-	glog.Infof("using vswitch id=%s", vswitchid)
+	utils.Logf(service, "using vswitch id=%s", vswitchid)
 
 	lb, err := c.climgr.LoadBalancers().EnsureLoadBalancer(service, ns, vswitchid)
 	if err != nil {
@@ -352,7 +353,7 @@ func (c *Cloud) EnsureLoadBalancerWithENI(name string, service *v1.Service, endp
 		}
 	}
 
-	glog.Infof("using vswitch id=%s", vswitchid)
+	utils.Logf(service, "using vswitch id=%s", vswitchid)
 
 	lb, err := c.climgr.LoadBalancers().EnsureLoadBalancer(service, endpoint, vswitchid)
 	if err != nil {
