@@ -295,7 +295,7 @@ func equalsAddressIPVersion(request, origined slb.AddressIPVersionType) bool {
 
 // EnsureLoadBalancer make sure slb is reconciled nodes []*v1.Node
 func (s *LoadBalancerClient) EnsureLoadBalancer(service *v1.Service, nodes interface{}, vswitchid string) (*slb.LoadBalancerType, error) {
-	utils.Logf(service,"ensure loadbalancer with service details, \n%+v", PrettyJson(service))
+	utils.Logf(service, "ensure loadbalancer with service details, \n%+v", PrettyJson(service))
 
 	exists, origined, err := s.findLoadBalancer(service)
 	if err != nil {
