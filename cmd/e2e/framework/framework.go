@@ -58,6 +58,7 @@ type Config struct {
 	Host        string
 	CloudConfig string
 	KubeConfig  string
+	LoadBalancerID string
 }
 
 func NewFrameWork(
