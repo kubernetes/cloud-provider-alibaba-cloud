@@ -260,12 +260,6 @@ func (c *mockClientSLB) ModifyLoadBalancerInternetSpec(args *slb.ModifyLoadBalan
 	LOADBALANCER.loadbalancer.Store(ins.LoadBalancerId, ins)
 	return nil
 }
-func (c *mockClientSLB) ModifyLoadBalancerInstanceSpec(args *slb.ModifyLoadBalancerInstanceSpecArgs) (err error) {
-	if c.modifyLoadBalancerInstanceSpec != nil {
-		return c.modifyLoadBalancerInstanceSpec(args)
-	}
-	return nil
-}
 
 func (c *mockClientSLB) ModifyLoadBalancerInstanceSpec(args *slb.ModifyLoadBalancerInstanceSpecArgs) (err error) {
 	if c.modifyLoadBalancerInstanceSpec != nil {
