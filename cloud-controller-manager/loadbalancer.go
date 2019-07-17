@@ -19,6 +19,7 @@ package alicloud
 import (
 	"errors"
 	"fmt"
+	"k8s.io/cloud-provider-alibaba-cloud/cloud-controller-manager/utils"
 	"os"
 	"reflect"
 	"strings"
@@ -174,7 +175,7 @@ func (s *LoadBalancerClient) findLoadBalancerByID(lbid string) (bool, *slb.LoadB
 			LoadBalancerId: lbid,
 		},
 	)
-	glog.V(4).Infof("alicloud: find loadbalancer with id [%s], %d found.", lbid, len(lbs))
+	glog.Infof("find loadbalancer with id [%s], %d found.", lbid, len(lbs))
 	if err != nil {
 		return false, nil, err
 	}
@@ -183,8 +184,7 @@ func (s *LoadBalancerClient) findLoadBalancerByID(lbid string) (bool, *slb.LoadB
 		return false, nil, nil
 	}
 	if len(lbs) > 1 {
-		glog.Warningf("alicloud: "+
-			"multiple loadbalancer returned with id [%s], using the first one with IP=%s", lbid, lbs[0].Address)
+		glog.Warningf("multiple loadbalancer returned with id [%s], using the first one with IP=%s", lbid, lbs[0].Address)
 	}
 	lb, err := s.c.DescribeLoadBalancerAttribute(lbs[0].LoadBalancerId)
 	return err == nil, lb, err
@@ -212,7 +212,7 @@ func (s *LoadBalancerClient) findLoadBalancerByTags(service *v1.Service) (bool, 
 			Tags:     string(items),
 		},
 	)
-	glog.V(2).Infof("alicloud: fallback to find loadbalancer by tags [%s]\n", string(items))
+	utils.Logf(service, "alicloud: fallback to find loadbalancer by tags [%s]", string(items))
 	if err != nil {
 		return false, nil, err
 	}
@@ -223,7 +223,7 @@ func (s *LoadBalancerClient) findLoadBalancerByTags(service *v1.Service) (bool, 
 		return s.findLoadBalancerByName(lbn)
 	}
 	if len(lbs) > 1 {
-		glog.Warningf("alicloud: multiple loadbalancer returned with tags [%s], "+
+		utils.Logf(service, "Warning: multiple loadbalancer returned with tags [%s], "+
 			"using the first one with IP=%s", string(items), lbs[0].Address)
 	}
 	lb, err := s.c.DescribeLoadBalancerAttribute(lbs[0].LoadBalancerId)
@@ -237,7 +237,7 @@ func (s *LoadBalancerClient) findLoadBalancerByName(name string) (bool, *slb.Loa
 			LoadBalancerName: name,
 		},
 	)
-	glog.V(2).Infof("alicloud: fallback to find loadbalancer by name [%s]\n", name)
+	glog.V(2).Infof("fallback to find loadbalancer by name [%s]", name)
 	if err != nil {
 		return false, nil, err
 	}
@@ -390,7 +390,7 @@ func (s *LoadBalancerClient) EnsureLoadBalancer(service *v1.Service, nodes inter
 			needUpdate = true
 			charge = request.ChargeType
 			// Todo: here we need to compare loadbalance
-			glog.Infof("alicloud: internet charge type([%s] -> [%s]), update loadbalancer [%s]\n",
+			utils.Logf(service, "internet charge type([%s] -> [%s]), update loadbalancer [%s]\n",
 				string(origined.InternetChargeType), string(request.ChargeType), origined.LoadBalancerName)
 		}
 		if request.ChargeType == slb.PayByBandwidth &&
@@ -399,8 +399,7 @@ func (s *LoadBalancerClient) EnsureLoadBalancer(service *v1.Service, nodes inter
 
 			needUpdate = true
 			bandwidth = request.Bandwidth
-			glog.Infof("bandwidth changed from ([%d] -> [%d]), update [%s]",
-				origined.Bandwidth, request.Bandwidth, origined.LoadBalancerId)
+			utils.Logf(service, "bandwidth changed from ([%d] -> [%d]), update [%s]", origined.Bandwidth, request.Bandwidth, origined.LoadBalancerId)
 		}
 		if request.AddressType != "" && request.AddressType != origined.AddressType {
 			glog.Errorf("alicloud: warning! can not change "+
@@ -411,7 +410,7 @@ func (s *LoadBalancerClient) EnsureLoadBalancer(service *v1.Service, nodes inter
 		}
 		if needUpdate {
 			if origined.AddressType == "internet" {
-				glog.Infof("modify loadbalancer: chargetype=%s, bandwidth=%d", charge, bandwidth)
+				utils.Logf(service, "modify loadbalancer: chargetype=%s, bandwidth=%d", charge, bandwidth)
 				if err := s.c.ModifyLoadBalancerInternetSpec(
 					&slb.ModifyLoadBalancerInternetSpecArgs{
 						LoadBalancerId:     origined.LoadBalancerId,
@@ -421,7 +420,7 @@ func (s *LoadBalancerClient) EnsureLoadBalancer(service *v1.Service, nodes inter
 					return nil, err
 				}
 			} else {
-				glog.Infof("only internet loadbalancer is allowed to modify bandwidth and pay type")
+				utils.Logf(service, "only internet loadbalancer is allowed to modify bandwidth and pay type")
 			}
 		}
 
@@ -454,7 +453,7 @@ func (s *LoadBalancerClient) EnsureLoadBalancer(service *v1.Service, nodes inter
 	//   2. force-override-listener annotation is set.
 	if (!isUserDefinedLoadBalancer(service)) ||
 		(isUserDefinedLoadBalancer(service) && isOverrideListeners(service)) {
-		glog.V(2).Infof("alicloud: not user defined loadbalancer[%s], start to apply listener.\n", origined.LoadBalancerId)
+		utils.Logf(service, "not user defined loadbalancer[%s], start to apply listener.\n", origined.LoadBalancerId)
 		// If listener update is needed. Switch to vserver group immediately.
 		// No longer update default backend servers.
 		if err := EnsureListeners(s, service, origined, vgs); err != nil {
@@ -493,7 +492,7 @@ func (s *LoadBalancerClient) UpdateLoadBalancer(service *v1.Service, nodes inter
 	if !needUpdateDefaultBackend(service, lb) {
 		return nil
 	}
-	glog.Infof("update default backend server group, %s/%s", service.Namespace, service.Name)
+	utils.Logf(service, "update default backend server group")
 	return s.UpdateDefaultServerGroup(nodes, lb)
 }
 
@@ -510,7 +509,7 @@ func needUpdateDefaultBackend(svc *v1.Service, lb *slb.LoadBalancerType) bool {
 			if !hasPort(svc, int32(lis.ListenerPort)) {
 				continue
 			}
-			glog.Infof("port %d has legacy listener, "+
+			utils.Logf(svc, "port %d has legacy listener, "+
 				"apply default backend server group. [%s]", lis.ListenerPort, lis.Description)
 			return true
 		}
@@ -532,8 +531,7 @@ func (s *LoadBalancerClient) EnsureLoadBalanceDeleted(service *v1.Service) error
 	// need to save the resource version when deleted event
 	err := keepResourceVesion(service)
 	if err != nil {
-		glog.Warningf("alicloud: failed to save "+
-			"deleted service resourceVersion, [%s] due to [%s] ", service.Name, err.Error())
+		utils.Logf(service, "Warning: failed to save deleted service resourceVersion,due to [%s] ", err.Error())
 	}
 	exists, lb, err := s.findLoadBalancer(service)
 	if err != nil {
@@ -544,8 +542,7 @@ func (s *LoadBalancerClient) EnsureLoadBalanceDeleted(service *v1.Service) error
 	}
 	// skip delete user defined loadbalancer
 	if isUserDefinedLoadBalancer(service) {
-		glog.Infof("alicloud: user managed "+
-			"loadbalancer will not be deleted by cloudprovider. service [%s]", service.Name)
+		utils.Logf(service, "user managed loadbalancer will not be deleted by cloudprovider.")
 		return EnsureListenersDeleted(s.c, service, lb, BuildVirturalGroupFromService(s, service, lb))
 	}
 
@@ -572,7 +569,7 @@ func (s *LoadBalancerClient) getLoadBalancerOpts(service *v1.Service, vswitchid 
 	if ar.SLBNetworkType != "classic" &&
 		strings.Compare(string(ar.AddressType), string(slb.IntranetAddressType)) == 0 {
 
-		glog.Infof("alicloud: intranet vpc "+
+		utils.Logf(service, "intranet vpc "+
 			"loadbalancer will be created. address type=%s, switchid=%s", ar.AddressType, vswitchid)
 		args.VSwitchId = vswitchid
 	}
@@ -690,12 +687,10 @@ func isOverrideListeners(svc *v1.Service) bool {
 func isLoadbalancerOwnIngress(service *v1.Service) bool {
 	if service == nil ||
 		len(service.Status.LoadBalancer.Ingress) == 0 {
-		glog.V(2).Infof("alicloud: service "+
-			"%s doesn't have ingresses\n", service.Name)
+		utils.Logf(service, "service %s doesn't have ingresses", service.Name)
 		return false
 	}
-	glog.V(2).Infof("alicloud: service %s has"+
-		" ingresses=%v\n", service.Name, service.Status.LoadBalancer.Ingress)
+	utils.Logf(service, "service %s has ingresses=%v", service.Name, service.Status.LoadBalancer.Ingress)
 	return true
 }
 
@@ -709,12 +704,12 @@ func isServiceDeleted(service *v1.Service) bool {
 	keeper := GetLocalService()
 	deleted := keeper.get(serviceUID)
 	if deleted {
-		glog.V(2).Infof("alicloud: service "+
-			"%s's uid %v has been deleted, shouldn't be created again.\n", service.Name, serviceUID)
+		utils.Logf(service, "service "+
+			"%s's uid %v has been deleted, shouldn't be created again.", service.Name, serviceUID)
 		return true
 	}
-	glog.V(2).Infof("alicloud: service %s's uid %v "+
-		"hasn't been deleted, first time to process, as expected.\n", service.Name, serviceUID)
+	utils.Logf(service, "service %s's uid %v "+
+		"hasn't been deleted, first time to process, as expected.", service.Name, serviceUID)
 	return false
 }
 
@@ -728,11 +723,10 @@ func keepResourceVesion(service *v1.Service) error {
 	keeper := GetLocalService()
 	if !keeper.get(serviceUID) {
 		keeper.set(serviceUID)
-		glog.V(2).Infof("alicloud: "+
-			"service %s's uid %v is kept in the DeletedSvcKeeper successfully.\n", service.Name, serviceUID)
+		utils.Logf(service, "service %s's uid %v is kept in the DeletedSvcKeeper successfully.", service.Name, serviceUID)
 	} else {
-		glog.V(2).Infof("alicloud: service %s's uid %v has "+
-			"already been kept in the DeletedSvcKeeper, no need to update.\n", service.Name, serviceUID)
+		utils.Logf(service, "service %s's uid %v has "+
+			"already been kept in the DeletedSvcKeeper, no need to update.", service.Name, serviceUID)
 	}
 	// keeper.set(serviceUIDNoneExist, currentVersion)
 	return nil

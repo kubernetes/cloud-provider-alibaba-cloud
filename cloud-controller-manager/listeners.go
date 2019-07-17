@@ -23,6 +23,7 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
 	"k8s.io/cloud-provider-alibaba-cloud/cloud-controller-manager/controller/service"
+	"k8s.io/cloud-provider-alibaba-cloud/cloud-controller-manager/utils"
 	"sort"
 	"strconv"
 	"strings"
@@ -60,7 +61,7 @@ var DEFAULT_LISTENER_BANDWIDTH = -1
 func Protocol(annotation string, port v1.ServicePort) (string, error) {
 
 	if annotation == "" {
-		glog.Infof("transfor protocol, empty annotation")
+		glog.Infof("transfor protocol, empty annotation %d/%s", port.Port, port.Protocol)
 		return strings.ToLower(string(port.Protocol)), nil
 	}
 	for _, v := range strings.Split(annotation, ",") {
@@ -221,8 +222,7 @@ func (n *Listener) Instance() IListener {
 
 // Apply apply listener operate . add/update/delete etc.
 func (n *Listener) Apply() error {
-	glog.Infof("apply: %s listener for %v with trans protocol %s", n.Action, n.NamedKey, n.TransforedProto)
-	glog.V(6).Infof("Listener: %s => \n%+v\n", n.Action, PrettyJson(n))
+	glog.Infof("apply %s listener for %v with trans protocol %s", n.Action, n.NamedKey, n.TransforedProto)
 	switch n.Action {
 	case ACTION_UPDATE:
 		err := n.Instance().Update()
@@ -302,7 +302,7 @@ func EnsureListeners(
 	if err != nil {
 		return fmt.Errorf("merge listener: %s", err.Error())
 	}
-	glog.Infof("ensure listener: %d updates for %s", len(updates), lb.LoadBalancerId)
+	utils.Logf(service, "ensure listener: %d updates for %s", len(updates), lb.LoadBalancerId)
 
 	// make https come first.
 	// ensure https listeners to be created first for http forward
@@ -415,7 +415,7 @@ func BuildActionsForListeners(svc *v1.Service, service, console Listeners) (List
 					// do update operate
 					local.Action = ACTION_UPDATE
 					updation = append(updation, local)
-					glog.Infof("found listener with port & protocol match, do update %s", local.NamedKey.Key())
+					utils.Logf(svc, "found listener with port & protocol match, do update %s", local.NamedKey.Key())
 				} else {
 					// protocol not match, need to recreate
 					if !override && isUserDefinedLoadBalancer(svc) {
@@ -424,7 +424,7 @@ func BuildActionsForListeners(svc *v1.Service, service, console Listeners) (List
 					}
 					remote.Action = ACTION_DELETE
 					deletion = append(deletion, remote)
-					glog.Infof("found listener with port match while protocol not, do delete & add %s", local.NamedKey.Key())
+					utils.Logf(svc, "found listener with port match while protocol not, do delete & add %s", local.NamedKey.Key())
 				}
 			}
 		}
@@ -434,10 +434,10 @@ func BuildActionsForListeners(svc *v1.Service, service, console Listeners) (List
 			if isManagedByMyService(svc, remote) {
 				remote.Action = ACTION_DELETE
 				deletion = append(deletion, remote)
-				glog.Infof("found listener[%s] which is no longer needed "+
+				utils.Logf(svc, "found listener[%s] which is no longer needed "+
 					"by my service[%s/%s], do delete", remote.NamedKey.Key(), svc.Namespace, svc.Name)
 			} else {
-				glog.Infof("port [%d] not managed by my service [%s/%s], skip processing.", remote.Port, svc.Namespace, svc.Name)
+				utils.Logf(svc, "port [%d] not managed by my service [%s/%s], skip processing.", remote.Port, svc.Namespace, svc.Name)
 			}
 		}
 	}
@@ -460,7 +460,7 @@ func BuildActionsForListeners(svc *v1.Service, service, console Listeners) (List
 		if !found {
 			local.Action = ACTION_ADD
 			addition = append(addition, local)
-			glog.Infof("add new listener %s", local.NamedKey.Key())
+			utils.Logf(svc, "add new listener %s", local.NamedKey.Key())
 		}
 	}
 
@@ -697,11 +697,11 @@ func (t *tcp) Update() error {
 		return t.Client.CreateLoadBalancerTCPListener((*slb.CreateLoadBalancerTCPListenerArgs)(config))
 	}
 	if !needUpdate {
-		glog.Infof("alicloud: tcp listener did not change, skip [update], port=[%d], nodeport=[%d]\n", t.Port, t.NodePort)
+		utils.Logf(t.Service, "tcp listener did not change, skip [update], port=[%d], nodeport=[%d]", t.Port, t.NodePort)
 		// no recreate needed.  skip
 		return nil
 	}
-	glog.Infof("TCP listener checker changed, request update listener attribute [%s]\n", t.LoadBalancerID)
+	utils.Logf(t.Service, "TCP listener checker changed, request update listener attribute [%s]", t.LoadBalancerID)
 	glog.V(5).Infof(PrettyJson(def))
 	glog.V(5).Infof(PrettyJson(response))
 	return t.Client.SetLoadBalancerTCPListenerAttribute(config)
@@ -829,7 +829,7 @@ func (t *udp) Update() error {
 	// backend server port has changed.
 	if int(t.NodePort) != response.BackendServerPort {
 		config.BackendServerPort = int(t.NodePort)
-		glog.Infof("alicloud: udp listener checker [BackendServerPort] changed, "+
+		utils.Logf(t.Service, "udp listener checker [BackendServerPort] changed, "+
 			"request=%d. response=%d", t.NodePort, response.BackendServerPort)
 		err := t.Client.DeleteLoadBalancerListener(t.LoadBalancerID, int(t.Port))
 		if err != nil {
@@ -839,12 +839,12 @@ func (t *udp) Update() error {
 	}
 
 	if !needUpdate {
-		glog.Infof("alicloud: udp listener did not change, skip "+
+		utils.Logf(t.Service, "udp listener did not change, skip "+
 			"[update], port=[%d], nodeport=[%d]\n", t.Port, t.NodePort)
 		// no recreate needed.  skip
 		return nil
 	}
-	glog.Infof("alicloud: UDP listener checker changed, request recreate [%s]\n", t.LoadBalancerID)
+	utils.Logf(t.Service, "UDP listener checker changed, request recreate [%s]\n", t.LoadBalancerID)
 	glog.V(5).Infof(PrettyJson(request))
 	glog.V(5).Infof(PrettyJson(response))
 	return t.Client.SetLoadBalancerUDPListenerAttribute(config)
@@ -1069,7 +1069,7 @@ func (t *http) Update() error {
 		int(t.NodePort) != response.BackendServerPort {
 
 		config.BackendServerPort = int(t.NodePort)
-		glog.Infof("alicloud: HTTP listener checker [BackendServerPort]"+
+		utils.Logf(t.Service, "HTTP listener checker [BackendServerPort]"+
 			" changed, request=%d. response=%d", t.NodePort, response.BackendServerPort)
 		err := t.Client.DeleteLoadBalancerListener(t.LoadBalancerID, int(t.Port))
 		if err != nil {
@@ -1079,11 +1079,11 @@ func (t *http) Update() error {
 	}
 
 	if !needUpdate {
-		glog.Infof("alicloud: http listener did not change, skip [update], port=[%d], nodeport=[%d]\n", t.Port, t.NodePort)
+		utils.Logf(t.Service, "http listener did not change, skip [update], port=[%d], nodeport=[%d]\n", t.Port, t.NodePort)
 		// no recreate needed.  skip
 		return nil
 	}
-	glog.Infof("alicloud: http listener checker changed, request update [%s]\n", t.LoadBalancerID)
+	utils.Logf(t.Service, "http listener checker changed, request update [%s]\n", t.LoadBalancerID)
 	glog.V(5).Infof(PrettyJson(request))
 	glog.V(5).Infof(PrettyJson(response))
 	return t.Client.SetLoadBalancerHTTPListenerAttribute(config)
@@ -1269,7 +1269,7 @@ func (t *https) Update() error {
 	if int(t.NodePort) != response.BackendServerPort {
 		needUpdate = true
 		config.BackendServerPort = int(t.NodePort)
-		glog.Infof("alicloud: listener checker [BackendServerPort] changed, request=%d. response=%d", t.NodePort, response.BackendServerPort)
+		utils.Logf(t.Service, "listener checker [BackendServerPort] changed, request=%d. response=%d", t.NodePort, response.BackendServerPort)
 		err := t.Client.DeleteLoadBalancerListener(t.LoadBalancerID, int(t.Port))
 		if err != nil {
 			return err
@@ -1278,11 +1278,11 @@ func (t *https) Update() error {
 	}
 
 	if !needUpdate {
-		glog.Infof("alicloud: https listener did not change, skip [update], port=[%d], nodeport=[%d]\n", t.Port, t.NodePort)
+		utils.Logf(t.Service, "https listener did not change, skip [update], port=[%d], nodeport=[%d]\n", t.Port, t.NodePort)
 		// no recreate needed.  skip
 		return nil
 	}
-	glog.Infof("alicloud: https listener checker changed, request recreate [%s]\n", t.LoadBalancerID)
+	utils.Logf(t.Service, "https listener checker changed, request recreate [%s]\n", t.LoadBalancerID)
 	glog.V(5).Infof(PrettyJson(request))
 	glog.V(5).Infof(PrettyJson(response))
 	return t.Client.SetLoadBalancerHTTPSListenerAttribute(config)
