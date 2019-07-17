@@ -5,6 +5,7 @@ import (
 	"github.com/denverdino/aliyungo/pvtz"
 	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
+	"k8s.io/cloud-provider-alibaba-cloud/cloud-controller-manager/utils"
 )
 
 // DEFAULT_LANG default lang
@@ -93,14 +94,14 @@ func (s *PrivateZoneClient) findPrivateZoneByName(name string) (bool, *pvtz.Desc
 		}
 
 		if selectedZoneId == "" {
-			glog.Warningf("alicloud: multiple private zone returned with name [%s], "+
+			glog.Warningf("multiple private zone returned with name [%s], "+
 				"and we can't find one which matches to name perfectly,"+
 				"using the first one with ID=%s", name, zones[0].ZoneId)
 			selectedZoneId = zones[0].ZoneId
 		}
 	} else {
 		if zones[0].ZoneName != name {
-			glog.Warningf("alicloud: just one private zone returned with name [%s], "+
+			glog.Warningf("just one private zone returned with name [%s], "+
 				"but this private zone can't match to name perfectly,"+
 				"found private zone ID=%s", name, zones[0].ZoneId)
 		}
@@ -221,15 +222,15 @@ func (s *PrivateZoneClient) EnsurePrivateZoneRecord(service *v1.Service, ip stri
 
 	// we will not create private zone, and user must to create it manually
 	if zone == nil {
-		glog.Infof("alicloud: config or private zone not found, " +
+		utils.Logf(service, "config or private zone not found, "+
 			"we will skip to configure private zone")
 		return nil, nil, nil
 	}
 
-	glog.V(4).Infof("alicloud: find private zone with id %s", zone.ZoneId)
+	utils.Logf(service, "find private zone with id %s", zone.ZoneId)
 
 	if record == nil {
-		glog.V(4).Infof("alicloud: create and bind new private zone record [%s.%s] to ip [%s]",
+		utils.Logf(service, "create and bind new private zone record [%s.%s] to ip [%s]",
 			request.PrivateZoneRecordName,
 			zone.ZoneName,
 			ip)
@@ -255,7 +256,7 @@ func (s *PrivateZoneClient) EnsurePrivateZoneRecord(service *v1.Service, ip stri
 			return nil, nil, fmt.Errorf("alicloud: unknown error on creating private zone record, it shouldn't be happened. ")
 		}
 	} else if record.Type != "A" || record.Value != ip {
-		glog.V(4).Infof("alicloud: update private zone record [%s.%s] bind to ip [%s]",
+		utils.Logf(service, "update private zone record [%s.%s] bind to ip [%s]",
 			request.PrivateZoneRecordName,
 			zone.ZoneName,
 			ip)
@@ -281,7 +282,7 @@ func (s *PrivateZoneClient) EnsurePrivateZoneRecordDeleted(service *v1.Service, 
 	// need to save the resource version when deleted event
 	err := keepResourceVesion(service)
 	if err != nil {
-		glog.Warningf("alicloud: failed to save "+
+		glog.Warningf("failed to save "+
 			"deleted service resourceVersion, [%s] due to [%s] ", service.Name, err.Error())
 	}
 
@@ -292,13 +293,13 @@ func (s *PrivateZoneClient) EnsurePrivateZoneRecordDeleted(service *v1.Service, 
 
 	// check the ip is matched with ip address, if not, it may be user managed record
 	if !exactMatch {
-		glog.Infof("alicloud: private zone record not created by cloudprovider, skip to delete it. "+
+		utils.Logf(service, "private zone record not created by cloudprovider, skip to delete it. "+
 			"service [%s]", service.Name)
 		return nil
 	}
 
 	if zoneInfo != nil && record != nil {
-		glog.Infof("alicloud: private zone record deleted by cloudprovider. service [%s]", service.Name)
+		utils.Logf(service, "private zone record deleted by cloudprovider. service [%s]", service.Name)
 		return s.c.DeleteZoneRecordsByRR(zoneInfo.ZoneId, record.Rr)
 	}
 

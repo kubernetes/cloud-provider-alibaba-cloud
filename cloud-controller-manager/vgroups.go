@@ -23,6 +23,15 @@ type vgroup struct {
 	BackendServers []slb.VBackendServerType
 }
 
+func (v *vgroup) Logf(format string, args ...interface{}) {
+	prefix := ""
+	if v.NamedKey != nil {
+		prefix = fmt.Sprintf("%s/%s", v.NamedKey.Namespace, v.NamedKey.ServiceName)
+	}
+	format = fmt.Sprintf("%s %s", prefix, format)
+	glog.Infof(format, args)
+}
+
 func (v *vgroup) Describe() error {
 	if v.NamedKey == nil {
 		return fmt.Errorf("describe: format error of vgroup name")
@@ -71,7 +80,7 @@ func (v *vgroup) Add() error {
 	if err != nil {
 		return fmt.Errorf("CreateVServerGroup. %s", err.Error())
 	}
-	glog.Infof("create new vserver group[%s]"+
+	v.Logf("create new vserver group[%s]"+
 		" for loadbalancer[%s] with empty backend list", v.NamedKey.Key(), v.LoadBalancerId)
 	v.VGroupId = gp.VServerGroupId
 	return nil
@@ -100,7 +109,7 @@ func (v *vgroup) Update() error {
 		}
 	}
 
-	glog.Infof("update: backend vgroupid [%s]", v.VGroupId)
+	v.Logf("update: backend vgroupid [%s]", v.VGroupId)
 	dsc := &slb.DescribeVServerGroupAttributeArgs{
 		VServerGroupId: v.VGroupId,
 		RegionId:       v.RegionId,
@@ -109,10 +118,10 @@ func (v *vgroup) Update() error {
 	if err != nil {
 		return fmt.Errorf("update: describe vserver group attribute error. %s", err.Error())
 	}
-	glog.Infof("update: apis[%v], node[%v]", att.BackendServers.BackendServer, v.BackendServers)
+	v.Logf("update: apis[%v], node[%v]", att.BackendServers.BackendServer, v.BackendServers)
 	add, del := v.diff(att.BackendServers.BackendServer, v.BackendServers)
 	if len(add) == 0 && len(del) == 0 {
-		glog.Infof("update: no backend need to be added for vgroupid [%s]", v.VGroupId)
+		v.Logf("update: no backend need to be added for vgroupid [%s]", v.VGroupId)
 		return nil
 	}
 
@@ -123,7 +132,7 @@ func (v *vgroup) Update() error {
 				if err != nil {
 					return fmt.Errorf("error marshal backends: %s, %v", err.Error(), list)
 				}
-				glog.Infof("update: try to update vserver group[%s],"+
+				v.Logf("update: try to update vserver group[%s],"+
 					" backend add[%s]", v.NamedKey.Key(), string(additions))
 				_, err = v.Client.AddVServerGroupBackendServers(
 					&slb.AddVServerGroupBackendServersArgs{
@@ -144,7 +153,7 @@ func (v *vgroup) Update() error {
 				if err != nil {
 					return fmt.Errorf("error marshal backends: %s, %v", err.Error(), list)
 				}
-				glog.Infof("update: try to update vserver group[%s],"+
+				v.Logf("update: try to update vserver group[%s],"+
 					" backend del[%s]", v.NamedKey.Key(), string(deletions))
 				_, err = v.Client.RemoveVServerGroupBackendServers(
 					&slb.RemoveVServerGroupBackendServersArgs{
@@ -289,7 +298,7 @@ func EnsureVirtualGroups(vgrps *vgroups, nodes interface{}) error {
 		if err := Ensure(v, nodes); err != nil {
 			return fmt.Errorf("ensure vgroup: %s. %s", err.Error(), v.NamedKey.Key())
 		}
-		glog.Infof("EnsureGroup: id=[%s], Name:[%s], LoadBalancerId:[%s]", v.VGroupId, v.NamedKey.Key(), v.LoadBalancerId)
+		v.Logf("EnsureGroup: id=[%s], Name:[%s], LoadBalancerId:[%s]", v.VGroupId, v.NamedKey.Key(), v.LoadBalancerId)
 	}
 	return nil
 }
@@ -321,10 +330,10 @@ func CleanUPVGroupMerged(
 			}
 		}
 		if !found {
-			glog.Infof("try to remove unused vserver group, [%s][%s]", rem.NamedKey.Key(), rem.VGroupId)
+			rem.Logf("try to remove unused vserver group, [%s][%s]", rem.NamedKey.Key(), rem.VGroupId)
 			err := rem.Remove()
 			if err != nil {
-				glog.Errorf("cleanup vgroup warining: "+
+				rem.Logf("Error: cleanup vgroup warining: "+
 					"failed to remove vgroup[%s]. wait for next try. %s", rem.NamedKey.Key(), err.Error())
 				return err
 			}
@@ -341,7 +350,7 @@ func CleanUPVGroupDirect(local *vgroups) error {
 			if err != nil {
 				if strings.Contains(err.Error(), "not found") {
 					// skip none exist vgroup
-					glog.Infof("skip none exist vgroup. %s", vg.LoadBalancerId)
+					vg.Logf("skip none exist vgroup. %s", vg.LoadBalancerId)
 					continue
 				}
 				return err
@@ -349,7 +358,7 @@ func CleanUPVGroupDirect(local *vgroups) error {
 		}
 		err := vg.Remove()
 		if err != nil {
-			glog.Errorf("cleanup vgroup warining: "+
+			vg.Logf("Error: cleanup vgroup warining: "+
 				"failed to remove vgroup[%s] directly. wait for next try. %s", vg.NamedKey.Key(), err.Error())
 			return err
 		}
@@ -404,7 +413,8 @@ func BuildVirtualGroupFromRemoteAPI(
 		key, err := LoadNamedKey(val.VServerGroupName)
 		if err != nil {
 			glog.Warningf("we just en-counted an "+
-				"unexpected vserver group name: [%s]. Assume user managed vserver group, It is ok to skip this vgroup.", val.VServerGroupName)
+				"unexpected vserver group name: [%s]. Assume user managed "+
+				"vserver group, It is ok to skip this vgroup.", val.VServerGroupName)
 			continue
 		}
 		vgrps = append(
