@@ -13,3 +13,14 @@ $ export REGISTRY=<YOUR_REGISTRY_NAME>
 $ make image
 $ docker images |grep cloud-controller-manager
 ```
+
+
+## Testing
+
+### UnitTest
+
+See [Testing UnitTest](https://github.com/kubernetes/cloud-provider-alibaba-cloud/tree/master/docs/testing.md)
+
+### E2ETest
+
+See [Testing E2E](https://github.com/kubernetes/cloud-provider-alibaba-cloud/tree/master/cmd/e2e/README.md)
