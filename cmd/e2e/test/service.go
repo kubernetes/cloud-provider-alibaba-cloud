@@ -48,7 +48,7 @@ var _ = framework.Mark(
 						Name:      "basic-service",
 						Namespace: framework.NameSpace,
 						Annotations: map[string]string{
-							alicloud.ServiceAnnotationLoadBalancerId:               "lb-2ze6jp9vemd1gvj9ku83e",
+							alicloud.ServiceAnnotationLoadBalancerId:               framework.TestContext.LoadBalancerID,
 							alicloud.ServiceAnnotationLoadBalancerOverrideListener: "true",
 						},
 					},

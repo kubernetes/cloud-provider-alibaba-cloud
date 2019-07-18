@@ -21,6 +21,9 @@ func TestE2E(t *testing.T) {
 	if framework.TestContext.CloudConfig == "" {
 		t.Logf("empty cloud-config")
 	}
+	if framework.TestContext.LoadBalancerID == "" {
+		framework.TestContext.LoadBalancerID = "lb-2ze6jp9vemd1gvj9ku83e"
+	}
 	for i := range framework.Frames {
 		fram := framework.Frames[i]
 		t.Logf("run action: %d", i)
