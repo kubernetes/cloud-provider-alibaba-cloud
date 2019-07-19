@@ -3,6 +3,7 @@ package alicloud
 import (
 	"fmt"
 	"github.com/denverdino/aliyungo/pvtz"
+	"github.com/denverdino/aliyungo/slb"
 	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
 	"k8s.io/cloud-provider-alibaba-cloud/cloud-controller-manager/utils"
@@ -155,7 +156,7 @@ func (s *PrivateZoneClient) findRecordByService(service *v1.Service) (*pvtz.Desc
 	return zone, record, nil
 }
 
-func (s *PrivateZoneClient) findExactRecordByService(service *v1.Service, ip string) (*pvtz.DescribeZoneInfoResponse, *pvtz.ZoneRecordType, bool, error) {
+func (s *PrivateZoneClient) findExactRecordByService(service *v1.Service, ip string, ipVersion slb.AddressIPVersionType) (*pvtz.DescribeZoneInfoResponse, *pvtz.ZoneRecordType, bool, error) {
 	zone, record, err := s.findRecordByService(service)
 	if err != nil {
 		return nil, nil, false, err
@@ -164,8 +165,9 @@ func (s *PrivateZoneClient) findExactRecordByService(service *v1.Service, ip str
 	if record == nil {
 		return nil, nil, false, nil
 	}
+	recordType := getRecordType(ipVersion)
 	// check the ip is matched with ip address, if not it may be user managed
-	if record.Type != "A" || record.Value != ip {
+	if record.Type != recordType || record.Value != ip {
 		return zone, record, false, nil
 	}
 
@@ -205,7 +207,7 @@ func (s *PrivateZoneClient) updateRecordCache(service *v1.Service, zone *pvtz.De
 }
 
 // EnsurePrivateZoneRecord make sure private zone record is reconciled
-func (s *PrivateZoneClient) EnsurePrivateZoneRecord(service *v1.Service, ip string) (zone *pvtz.DescribeZoneInfoResponse, record *pvtz.ZoneRecordType, err error) {
+func (s *PrivateZoneClient) EnsurePrivateZoneRecord(service *v1.Service, ip string, ipVersion slb.AddressIPVersionType) (zone *pvtz.DescribeZoneInfoResponse, record *pvtz.ZoneRecordType, err error) {
 	glog.V(4).Infof("alicloud: ensure private zone record for ip(%s) with service details, \n%+v", ip, PrettyJson(service))
 
 	// update record cache after ensure
@@ -213,6 +215,7 @@ func (s *PrivateZoneClient) EnsurePrivateZoneRecord(service *v1.Service, ip stri
 		zone, record, err = s.updateRecordCache(service, zone, record, err)
 	}()
 
+	recordType := getRecordType(ipVersion)
 	_, request := ExtractAnnotationRequest(service)
 
 	zone, record, err = s.findRecordByService(service)
@@ -239,7 +242,7 @@ func (s *PrivateZoneClient) EnsurePrivateZoneRecord(service *v1.Service, ip stri
 			&pvtz.AddZoneRecordArgs{
 				ZoneId: zone.ZoneId,
 				Rr:     request.PrivateZoneRecordName,
-				Type:   "A",
+				Type:   recordType,
 				Value:  ip,
 			})
 		if err != nil {
@@ -255,7 +258,7 @@ func (s *PrivateZoneClient) EnsurePrivateZoneRecord(service *v1.Service, ip stri
 		if record == nil {
 			return nil, nil, fmt.Errorf("alicloud: unknown error on creating private zone record, it shouldn't be happened. ")
 		}
-	} else if record.Type != "A" || record.Value != ip {
+	} else if record.Type != recordType || record.Value != ip {
 		utils.Logf(service, "update private zone record [%s.%s] bind to ip [%s]",
 			request.PrivateZoneRecordName,
 			zone.ZoneName,
@@ -265,7 +268,7 @@ func (s *PrivateZoneClient) EnsurePrivateZoneRecord(service *v1.Service, ip stri
 			&pvtz.UpdateZoneRecordArgs{
 				RecordId: record.RecordId,
 				Rr:       request.PrivateZoneRecordName,
-				Type:     "A",
+				Type:     recordType,
 				Value:    ip,
 				Lang:     DEFAULT_LANG,
 			})
@@ -278,7 +281,7 @@ func (s *PrivateZoneClient) EnsurePrivateZoneRecord(service *v1.Service, ip stri
 }
 
 // EnsurePrivateZoneRecordDeleted make sure private zone record is deleted.
-func (s *PrivateZoneClient) EnsurePrivateZoneRecordDeleted(service *v1.Service, ip string) error {
+func (s *PrivateZoneClient) EnsurePrivateZoneRecordDeleted(service *v1.Service, ip string, ipVersion slb.AddressIPVersionType) error {
 	// need to save the resource version when deleted event
 	err := keepResourceVesion(service)
 	if err != nil {
@@ -286,7 +289,7 @@ func (s *PrivateZoneClient) EnsurePrivateZoneRecordDeleted(service *v1.Service, 
 			"deleted service resourceVersion, [%s] due to [%s] ", service.Name, err.Error())
 	}
 
-	zoneInfo, record, exactMatch, err := s.findExactRecordByService(service, ip)
+	zoneInfo, record, exactMatch, err := s.findExactRecordByService(service, ip, ipVersion)
 	if err != nil {
 		return err
 	}
@@ -312,4 +315,11 @@ func getHostName(pz *pvtz.DescribeZoneInfoResponse, pzr *pvtz.ZoneRecordType) st
 		hostname = fmt.Sprintf("%s.%s", pzr.Rr, pz.ZoneName)
 	}
 	return hostname
+}
+
+func getRecordType(ipVersion slb.AddressIPVersionType) string {
+	if ipVersion == slb.IPv6 {
+		return "AAAA"
+	}
+	return "A"
 }

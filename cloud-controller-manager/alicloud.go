@@ -258,7 +258,7 @@ func (c *Cloud) GetLoadBalancer(clusterName string, service *v1.Service) (status
 		return nil, exists, err
 	}
 
-	zone, record, exists, err := c.climgr.PrivateZones().findExactRecordByService(service, lb.Address)
+	zone, record, exists, err := c.climgr.PrivateZones().findExactRecordByService(service, lb.Address, lb.AddressIPVersion)
 	if err != nil || !exists {
 		return nil, exists, err
 	}
@@ -312,7 +312,7 @@ func (c *Cloud) EnsureLoadBalancer(clusterName string, service *v1.Service, node
 		return nil, err
 	}
 
-	pz, pzr, err := c.climgr.PrivateZones().EnsurePrivateZoneRecord(service, lb.Address)
+	pz, pzr, err := c.climgr.PrivateZones().EnsurePrivateZoneRecord(service, lb.Address, defaulted.AddressIPVersion)
 	if err != nil {
 		return nil, err
 	}
@@ -360,7 +360,7 @@ func (c *Cloud) EnsureLoadBalancerWithENI(name string, service *v1.Service, endp
 		return nil, fmt.Errorf("ensure loadbalancer: %s", err.Error())
 	}
 
-	pz, pzr, err := c.climgr.PrivateZones().EnsurePrivateZoneRecord(service, lb.Address)
+	pz, pzr, err := c.climgr.PrivateZones().EnsurePrivateZoneRecord(service, lb.Address, defaulted.AddressIPVersion)
 	if err != nil {
 		return nil, fmt.Errorf("ensure pvtz: %s", err.Error())
 	}
@@ -409,8 +409,10 @@ func (c *Cloud) EnsureLoadBalancerDeleted(clusterName string, service *v1.Servic
 	glog.V(2).Infof("Alicloud.EnsureLoadBalancerDeleted(%v, %v, %v, %v, %v, %v)",
 		clusterName, service.Namespace, service.Name, c.region, service.Spec.LoadBalancerIP, service.Spec.Ports)
 
+	defaulted, _ := ExtractAnnotationRequest(service)
+
 	if len(service.Status.LoadBalancer.Ingress) > 0 {
-		err := c.climgr.PrivateZones().EnsurePrivateZoneRecordDeleted(service, service.Status.LoadBalancer.Ingress[0].IP)
+		err := c.climgr.PrivateZones().EnsurePrivateZoneRecordDeleted(service, service.Status.LoadBalancer.Ingress[0].IP, defaulted.AddressIPVersion)
 		if err != nil {
 			return err
 		}
