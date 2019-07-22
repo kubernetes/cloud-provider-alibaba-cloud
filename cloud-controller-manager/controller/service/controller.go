@@ -497,7 +497,7 @@ func (con *Controller) update(cached, svc *v1.Service) error {
 			var nodes []*v1.Node
 			nodes, err = AvailableNodes(svc, con.ifactory)
 			if err != nil {
-				return fmt.Errorf("error get avaliable nodes %s", err.Error())
+				return fmt.Errorf("error get available nodes %s", err.Error())
 			}
 			// Fire warning event if there are no available nodes
 			// for loadbalancer service

@@ -197,6 +197,11 @@ func (s *InstanceClient) findInstanceByProviderID(providerID string) (*ecs.Insta
 		return nil, err
 	}
 	ins, err := s.getInstances([]string{nodeid}, region)
+	if err != nil {
+		glog.Errorf("alicloud: InstanceInspectError, instanceid=[%s.%s]. message=[%s]\n", region, nodeid, err.Error())
+		return nil, err
+	}
+
 	if len(ins) == 0 {
 		glog.Infof("alicloud: InstanceNotFound, instanceid=[%s.%s]. It is likely to be deleted.\n", region, nodeid)
 		return nil, cloudprovider.InstanceNotFound
