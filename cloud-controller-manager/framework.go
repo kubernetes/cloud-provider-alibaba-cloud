@@ -762,13 +762,13 @@ func (f *FrameWork) ListenerEqual(id string, p v1.ServicePort, proto string) err
 
 	if f.hasAnnotation(ServiceAnnotationLoadBalancerHealthCheckHealthyThreshold) {
 		if healthCheckHealthyThreshold != defd.HealthyThreshold {
-			return fmt.Errorf("health check health threshhold error")
+			return fmt.Errorf("health check health threshold error")
 		}
 	}
 
 	if f.hasAnnotation(ServiceAnnotationLoadBalancerHealthCheckUnhealthyThreshold) {
 		if healthCheckUnhealthyThreshold != defd.UnhealthyThreshold {
-			return fmt.Errorf("health check unhealthy threshhold error")
+			return fmt.Errorf("health check unhealthy threshold error")
 		}
 	}
 
