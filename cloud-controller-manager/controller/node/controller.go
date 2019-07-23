@@ -18,10 +18,13 @@ package node
 import (
 	"encoding/json"
 	"fmt"
-	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"time"
 
+	"k8s.io/apimachinery/pkg/util/strategicpatch"
+
 	"github.com/golang/glog"
+
+	"strings"
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -34,7 +37,6 @@ import (
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
-	clientretry "k8s.io/client-go/util/retry"
 	"k8s.io/cloud-provider-alibaba-cloud/cloud-controller-manager/controller/route"
 	nodeutilv1 "k8s.io/kubernetes/pkg/api/v1/node"
 	"k8s.io/kubernetes/pkg/cloudprovider"
@@ -44,7 +46,6 @@ import (
 	nodeutil "k8s.io/kubernetes/pkg/util/node"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 	"k8s.io/kubernetes/staging/src/k8s.io/client-go/kubernetes"
-	"strings"
 )
 
 type CloudNodeController struct {
@@ -301,40 +302,40 @@ func (cnc *CloudNodeController) doAddCloudNode(node *v1.Node) error {
 		utilruntime.HandleError(fmt.Errorf("failed to get ins from cloud provider"))
 		return fmt.Errorf("cloud instance is not implemented")
 	}
-	err := clientretry.RetryOnConflict(
-		wait.Backoff{
-			Steps:    5,
-			Duration: 1 * time.Millisecond,
-			Factor:   2,
-			Jitter:   1.0,
-		},
-		func() error {
+	err := wait.PollImmediate(
+		2*time.Second,
+		20*time.Second,
+		func() (done bool, err error) {
 			curNode, err := cnc.kclient.CoreV1().Nodes().Get(node.Name, metav1.GetOptions{})
 			if err != nil {
-				return fmt.Errorf("retrieve node error: %s", err.Error())
+				glog.Errorf("retrieve node error: %s", err.Error())
+				//retry
+				return false, nil
 			}
 			orignode := curNode.DeepCopy()
 			setDefaultProviderID(cnc, curNode)
 
 			nodes, err := ins.ListInstances([]string{curNode.Spec.ProviderID})
 			if err != nil {
-				return fmt.Errorf("cloud instance api fail, %s", err.Error())
+				glog.Errorf("cloud instance api fail, %s", err.Error())
+				//retry
+				return false, nil
 			}
 			cloudins, ok := nodes[curNode.Spec.ProviderID]
 			if !ok || cloudins == nil {
-				return fmt.Errorf("instance not found")
+				return false, fmt.Errorf("instance not found")
 			}
 
 			// If user provided an IP address, ensure that IP address is found
 			// in the cloud provider before removing the taint on the node
 			nodeIP, ok := isProvidedAddrExist(curNode, cloudins.Addresses)
 			if ok && nodeIP == nil {
-				glog.Errorf("failed to get specified nodeIP in cloudprovider")
-				return nil
+				glog.Errorf("failed to get specified nodeIP in cloudprovider, fail fast")
+				return true, nil
 			}
 
 			if cloudins.InstanceType != "" {
-				glog.V(2).Infof("Adding node label from cloud "+
+				glog.Infof("Adding node label from cloud "+
 					"provider: %s=%s", kubeletapis.LabelInstanceType, cloudins.InstanceType)
 				curNode.ObjectMeta.Labels[kubeletapis.LabelInstanceType] = cloudins.InstanceType
 			}
@@ -358,7 +359,9 @@ func (cnc *CloudNodeController) doAddCloudNode(node *v1.Node) error {
 			}
 
 			if err = setFailureZones(cnc.cloud, curNode); err != nil {
-				return fmt.Errorf("failed zone")
+				glog.Errorf("set failed zone error: %s", err.Error())
+				//retry
+				return false, nil
 			}
 			removeCloudTaints(curNode)
 
@@ -371,20 +374,25 @@ func (cnc *CloudNodeController) doAddCloudNode(node *v1.Node) error {
 			)
 			if err != nil {
 				if !strings.Contains(err.Error(), "Forbidden.RAM") {
-					return fmt.Errorf("tag instance %s error: %s", cloudins.InstanceID, err.Error())
+					glog.Errorf("tag instance %s error: %s", cloudins.InstanceID, err.Error())
+					//retry
+					return false, nil
 				}
 				// Old ROS template does not have AddTags Permission.
 				// It is ok to skip `Forbidden` error for compatible reason.
 			}
 
-			_, err = PatchNode(cnc.kclient, orignode, curNode)
+			nnode, err := PatchNode(cnc.kclient, orignode, curNode)
 			if err != nil {
-				return fmt.Errorf("patch error: %s", err.Error())
+				glog.Errorf("patch error: %s", err.Error())
+				return false, nil
 			}
 			// After adding, call UpdateNodeAddress to set the CloudProvider provided IPAddresses
 			// So that users do not see any significant delay in IP addresses being filled into the node
-			return cnc.syncNodeAddress([]v1.Node{*curNode})
-		})
+			_ = cnc.syncNodeAddress([]v1.Node{*nnode})
+			return true, nil
+		},
+	)
 	if err != nil {
 		glog.Errorf("doAddCloudNode error: %s", err.Error())
 		utilruntime.HandleError(err)
@@ -543,12 +551,12 @@ func setFailureZones(cloud cloudprovider.Interface, node *v1.Node) error {
 		return fmt.Errorf("failed to get zone from cloud provider: %v", err)
 	}
 	if zone.FailureDomain != "" {
-		glog.V(2).Infof("Adding node label from cloud "+
+		glog.Infof("Adding node label from cloud "+
 			"provider: %s=%s", kubeletapis.LabelZoneFailureDomain, zone.FailureDomain)
 		node.ObjectMeta.Labels[kubeletapis.LabelZoneFailureDomain] = zone.FailureDomain
 	}
 	if zone.Region != "" {
-		glog.V(2).Infof("Adding node label from cloud "+
+		glog.Infof("Adding node label from cloud "+
 			"provider: %s=%s", kubeletapis.LabelZoneRegion, zone.Region)
 		node.ObjectMeta.Labels[kubeletapis.LabelZoneRegion] = zone.Region
 	}
@@ -579,7 +587,7 @@ func removeCloudTaints(node *v1.Node) {
 	// make sure only cloud node is processed
 	cloudTaint := findCloudTaint(node.Spec.Taints)
 	if cloudTaint == nil {
-		glog.V(2).Infof("Node %s is registered without "+
+		glog.Infof("Node %s is registered without "+
 			"cloud taint. Will not process.", node.Name)
 		return
 	}
