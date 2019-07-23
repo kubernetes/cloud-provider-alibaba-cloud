@@ -11,6 +11,5 @@ func Logf(svc *v1.Service, format string, args ...interface{}) {
 	if svc != nil {
 		prefix = fmt.Sprintf("[%s/%s]", svc.Namespace, svc.Name)
 	}
-	format = fmt.Sprintf("%s %s", prefix, format)
-	glog.Infof(format, args)
+	glog.Infof(prefix+format, args...)
 }
