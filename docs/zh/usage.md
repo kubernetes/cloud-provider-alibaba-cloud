@@ -215,7 +215,7 @@ spec:
 
 ****使用指定label的worker节点作为后端服务器****
 
-多个label以逗号分隔。例如："k1:v1,k2:v2"
+多个label以逗号分隔。例如："k1=v1,k2=v2"
 
 多个label之间是`and`的关系。
 
@@ -224,7 +224,7 @@ apiVersion: v1
 kind: Service
 metadata:
   annotations:
-    service.beta.kubernetes.io/alicloud-loadbalancer-backend-label: "failure-domain.beta.kubernetes.io/zone:ap-southeast-5a"
+    service.beta.kubernetes.io/alicloud-loadbalancer-backend-label: "failure-domain.beta.kubernetes.io/zone=ap-southeast-5a"
   name: nginx
   namespace: default
 spec:

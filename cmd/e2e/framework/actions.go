@@ -38,16 +38,6 @@ func (u *DefaultAction) RunAction(f *FrameWorkE2E) error {
 	if err != nil {
 		return fmt.Errorf("get node: %s", err.Error())
 	}
-	endps, err := f.
-		Client.
-		CoreV1().
-		Endpoints(f.InitService.Namespace).
-		Get(f.InitService.Name, metav1.GetOptions{})
-	if err != nil {
-		return fmt.Errorf("get endpoints: %s", err.Error())
-	}
-	fa.Nodes = ToPTR(nodes.Items)
-	fa.Endpoint = endps
 	svc, err := f.
 		Client.
 		CoreV1().
@@ -56,7 +46,18 @@ func (u *DefaultAction) RunAction(f *FrameWorkE2E) error {
 	if err != nil {
 		return fmt.Errorf("get service: %s", err.Error())
 	}
+	fa.Nodes = ToPTR(nodes.Items)
 	fa.SVC = svc
+
+	endps, err := f.
+		Client.
+		CoreV1().
+		Endpoints(f.InitService.Namespace).
+		Get(f.InitService.Name, metav1.GetOptions{})
+	if err != nil {
+		return fmt.Errorf("get endpoints: %s", err.Error())
+	}
+	fa.Endpoint = endps
 	ExpectOK := u.ExpectOK
 	if ExpectOK == nil {
 		ExpectOK = cloud.ExpectExistAndEqual
