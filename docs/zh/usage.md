@@ -585,7 +585,7 @@ apiVersion: v1
 kind: Service
 metadata:
   annotations:
-    service.beta.kubernetes.io/alibaba-cloud-loadbalancer-additional-resource-tags: "Key1:Value1,Key2:Value2" 
+    service.beta.kubernetes.io/alibaba-cloud-loadbalancer-additional-resource-tags: "Key1=Value1,Key2=Value2" 
   name: nginx
   namespace: default
 spec:
@@ -616,31 +616,6 @@ spec:
     targetPort: 80
   selector:
     run: nginx
-  type: LoadBalancer
-
-```
-
-**25. 为负载均衡指定PrivateZone解析与TTL过期时间**
-
-```yaml
-apiVersion: v1
-kind: Service
-metadata:
-  labels:
-    app: foo
-  name: foo-service
-  namespace: default
-  annotations:
-    service.beta.kubernetes.io/alibaba-cloud-private-zone-name: "service.ali"
-    service.beta.kubernetes.io/alibaba-cloud-private-zone-record-name: "foo"
-    service.beta.kubernetes.io/alibaba-cloud-private-zone-record-ttl: "10"
-spec:
-  ports:
-    - port: 80
-      protocol: TCP
-      targetPort: 80
-  selector:
-    app: foo
   type: LoadBalancer
 
 ```
@@ -679,16 +654,12 @@ spec:
 | service.beta.kubernetes.io/alicloud-loadbalancer-health-check-timeout | 接收来自运行状况检查的响应需要等待的时间，适用于HTTP模式。如果后端ECS在指定的时间内没有正确响应，则判定为健康检查失败。取值：1-300（秒）<br>**说明：** 如果 service.beta.kubernetes.io/alicloud-loadbalancer-health-check-timeout的值小于service.beta.kubernetes.io/alicloud-loadbalancer-health-check-interval的值，则 service.beta.kubernetes.io/alicloud-loadbalancer-health-check-timeout无效，超时时间为 service.beta.kubernetes.io/alicloud-loadbalancer-health-check-interval的值。<br>可参考：[CreateLoadBalancerHTTPListener](https://help.aliyun.com/document_detail/27592.html?spm=a2c4g.11186623.2.24.16bb609awRQFbk#slb-api-CreateLoadBalancerHTTPListener)<br> | 5                                                            |
 | service.beta.kubernetes.io/alibaba-cloud-loadbalancer-health-check-domain | 用于健康检查的域名。<br>**$_ip**： 后端服务器的私网IP。当指定了IP或该参数未指定时，负载均衡会使用各后端服务器的私网IP当做健康检查使用的域名。<br>**domain**：域名长度为1-80，只能包含字母、数字、点号（.）和连字符（-）。 | 无                                                           |
 | service.beta.kubernetes.io/alibaba-cloud-loadbalancer-health-check-httpcode | 健康检查正常的HTTP状态码，多个状态码用逗号（,）分割。<br>取值：http_2xx（默认值）或http_3xx或http_4xx或http_5xx。 | http_2xx                                                     |
-| service.beta.kubernetes.io/alibaba-cloud-private-zone-name   | PrivateZone的名称，cloud provider 不会自动创建新的Private Zone，用户需要自己创建PrivateZone | 无                                                           |
-| service.beta.kubernetes.io/alibaba-cloud-private-zone-id     | PrivateZone的id，当名称和id同时存在时，优先采用id            | 无                                                           |
-| service.beta.kubernetes.io/alibaba-cloud-private-zone-record-name | PrivateZone的记录名，记录名与Private Zone名称共同组成最后的域名 | 无                                                           |
-| service.beta.kubernetes.io/alibaba-cloud-private-zone-record-ttl | PrivateZone的记录缓存过期时间，默认为60秒                    | 60                                                           |
 | service.beta.kubernetes.io/alicloud-loadbalancer-scheduler   | 调度算法。取值 wrr或wlc或rr。<br>**wrr**（默认值）：权重值越高的后端服务器，被轮询到的次数（概率）也越高。<br>**wlc**：除了根据每台后端服务器设定的权重值来进行轮询，同时还考虑后端服务器的实际负载（即连接数）。当权重值相同时，当前连接数越小的后端服务器被轮询到的次数（概率）也越高。<br>**rr**：按照访问顺序依次将外部请求依序分发到后端服务器。 | wrr                                                          |
 | service.beta.kubernetes.io/alibaba-cloud-loadbalancer-acl-status | 是否开启访问控制功能。取值：on或off                          | off                                                          |
 | service.beta.kubernetes.io/alibaba-cloud-loadbalancer-acl-id | 监听绑定的访问策略组ID。当AclStatus参数的值为on时，该参数必选。 | 无                                                           |
 | service.beta.kubernetes.io/alibaba-cloud-loadbalancer-acl-type | 访问控制类型。<br>取值：white或black。<br>**white**： 仅转发来自所选访问控制策略组中设置的IP地址或地址段的请求，白名单适用于应用只允许特定IP访问的场景。设置白名单存在一定业务风险。一旦设名单，就只有白名单中的IP可以访问负载均衡监听。如果开启了白名单访问，但访问策略组中没有添加任何IP，则负载均衡监听会转发全部请求。<br>**black**： 来自所选访问控制策略组中设置的IP地址或地址段的所有请求都不会转发，黑名单适用于应用只限制某些特定IP访问的场景。如果开启了黑名单访问，但访问策略组中没有添加任何IP，则负载均衡监听会转发全部请求。当AclStatus参数的值为on时，该参数必选。 | 无                                                           |
 | service.beta.kubernetes.io/alibaba-cloud-loadbalancer-vswitch-id | 负载均衡实例所属的VSwitch ID。设置改参数时需同时设置addresstype为intranet。 | 无                                                           |
 | service.beta.kubernetes.io/alibaba-cloud-loadbalancer-forward-port | HTTP至HTTPS的监听转发端口。                                  | 80                                                           |
-| service.beta.kubernetes.io/alibaba-cloud-loadbalancer-additional-resource-tags | 需要添加的Tag列表。如："k1:v1,k2:v2"                         | 无                                                           |
+| service.beta.kubernetes.io/alibaba-cloud-loadbalancer-additional-resource-tags | 需要添加的Tag列表。如："k1=v1,k2=v2"                         | 无                                                           |
 | service.beta.kubernetes.io/alibaba-cloud-loadbalancer-ip-version | 负载均衡实例的IP版本，取值：ipv4或ipv6。                     | ipv4                                                         |
 

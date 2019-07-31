@@ -625,7 +625,7 @@ apiVersion: v1
 kind: Service
 metadata:
   annotations:
-    service.beta.kubernetes.io/alibaba-cloud-loadbalancer-additional-resource-tags: "Key1:Value1,Key2:Value2" 
+    service.beta.kubernetes.io/alibaba-cloud-loadbalancer-additional-resource-tags: "Key1=Value1,Key2=Value2" 
   name: nginx
   namespace: default
 spec:
@@ -656,31 +656,6 @@ spec:
     targetPort: 80
   selector:
     run: nginx
-  type: LoadBalancer
-
-```
-
-#### 25. Create LoadBalancer with PrivateZone  
-
-```yaml
-apiVersion: v1
-kind: Service
-metadata:
-  labels:
-    app: foo
-  name: foo-service
-  namespace: default
-  annotations:
-    service.beta.kubernetes.io/alibaba-cloud-private-zone-name: "service.ali"
-    service.beta.kubernetes.io/alibaba-cloud-private-zone-record-name: "foo"
-    service.beta.kubernetes.io/alibaba-cloud-private-zone-record-ttl: "10"
-spec:
-  ports:
-    - port: 80
-      protocol: TCP
-      targetPort: 80
-  selector:
-    app: foo
   type: LoadBalancer
 
 ```
@@ -719,15 +694,11 @@ ps: Annotation list
 | service.beta.kubernetes.io/alicloud-loadbalancer-health-check-timeout | Amount of time waiting for the response from HTTP type health check. If the backend ECS instance does not send a valid response within a specified period of time, the health check fails.<br>Value range: 1–300 (seconds).<br>**Note** If the value of the parameter *service.beta.kubernetes.io/alicloud-loadbalancer-health-check-timeout*is less than that of the parameter *service.beta.kubernetes.io/alicloud-loadbalancer-health-check-interval*, the parameter *service.beta.kubernetes.io/alicloud-loadbalancer-health-check-timeout* is invalid, and the timeout period equals the value of the parameter *service.beta.kubernetes.io/alicloud-loadbalancer-health-check-interval*. | 5                                                            |
 | service.beta.kubernetes.io/alibaba-cloud-loadbalancer-health-check-domain | The domain used for health checks. <br>Valid values:<br>**$_ip**: Private network IP of the backend server. When IP is specified or the parameter is not specified, load balancer uses the private network IP of each backend server as the domain used for health check.<br>**domain**: The length of domain is between 1-80 characters and can only contain letters, numbers, periods (.) and hyphens (-). | None                                                         |
 | service.beta.kubernetes.io/alibaba-cloud-loadbalancer-health-check-httpcode | Normal HTTP status codes for the health check.<br> Multiple status codes are separated by commas (,).<br>Valid values: http_2xx, http_3xx, http_4xx or http_5xx. | http_2xx                                                     |
-| service.beta.kubernetes.io/alibaba-cloud-private-zone-name   | Name of PrivateZone, cloud-controller will not to create new PrivateZone. | None                                                         |
-| service.beta.kubernetes.io/alibaba-cloud-private-zone-id     | Id of PrivateZone, when it was configured with name together, cloud provider will find PrivateZone by id first. | None                                                         |
-| service.beta.kubernetes.io/alibaba-cloud-private-zone-record-name | Name of PrivateZone record.                                  | None                                                         |
-| service.beta.kubernetes.io/alibaba-cloud-private-zone-record-ttl | TTL of PrivateZone record, 60s as default value.             | 60                                                           |
 | service.beta.kubernetes.io/alicloud-loadbalancer-scheduler   | The scheduling algorithm.<br> Valid values: wrr or wlc or rr. <br>**wrr** (default): The higher the weight value of the backend server, the higher the number of polls (probability). <br>**wlc**: In addition to polling based on the weight value set by each back-end server, the actual load of the back-end server (ie, the number of connections) is also considered. When the weight values are the same, the smaller the number of current connections, the higher the number of times (probability) that the backend server is polled.<br>**rr**: The external requests are sequentially distributed to the backend server in order of access. | wrr                                                          |
 | service.beta.kubernetes.io/alibaba-cloud-loadbalancer-acl-status | Whether to enable access control. <br>Valid values: on or off. | off                                                          |
 | service.beta.kubernetes.io/alibaba-cloud-loadbalancer-acl-id | Access control ID.<br/>**Note** If the value of AclStatus is "on", this parameter must be set. | None                                                         |
 | service.beta.kubernetes.io/alibaba-cloud-loadbalancer-acl-type | The types of access control.<br>Valid values: white or black.<br>**white**：Only requests from IP addresses or address segments set in the selected access control policy group are forwarded. The whitelist is suitable for scenarios where the application only allows specific IP access.Note Once the whitelist is set, only the IPs in the whitelist can access the load balancing listener. If whitelist access is turned on, but no IP is added to the access policy group, the load balancing listener forwards all requests.<br/>**black**： All requests from the IP address or address segment set in the selected access control policy group are not forwarded. The blacklist is suitable for scenarios where the application only rejects certain IPs access.Note If blacklist access is turned on, but no IP is added to the access policy group, the load balancing listener forwards all requests.<br>If the value of AclStatus is "on", this parameter must be set. | None                                                         |
 | service.beta.kubernetes.io/alibaba-cloud-loadbalancer-vswitch-id | VSwitch ID of the load balancer.<br>Note When setting VSwitch ID, the address-type parameter need to be "intranet". | None                                                         |
 | service.beta.kubernetes.io/alibaba-cloud-loadbalancer-forward-port | HTTP to HTTPS listening forwarding port.                     | 80                                                           |
-| service.beta.kubernetes.io/alibaba-cloud-loadbalancer-additional-resource-tags | A list of tags to add.<br>e.g. "k1:v1,k2:v2"                 | None                                                         |
+| service.beta.kubernetes.io/alibaba-cloud-loadbalancer-additional-resource-tags | A list of tags to add.<br>e.g. "k1=v1,k2=v2"                 | None                                                         |
 | service.beta.kubernetes.io/alibaba-cloud-loadbalancer-ip-version | IP version of the load balancer.<br/>Valid values：ipv4 or ipv6. | ipv4                                                         |

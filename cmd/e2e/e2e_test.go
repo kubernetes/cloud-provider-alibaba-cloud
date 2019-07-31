@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"github.com/golang/glog"
 	"k8s.io/cloud-provider-alibaba-cloud/cmd/e2e/framework"
-	_ "k8s.io/cloud-provider-alibaba-cloud/cmd/e2e/test"
+	_ "k8s.io/cloud-provider-alibaba-cloud/cmd/e2e/test-dev"
 	"testing"
 )
 

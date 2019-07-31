@@ -875,3 +875,49 @@ var _ = framework.Mark(
 		)
 	},
 )
+
+// 18:test additional resource tags
+var _ = framework.Mark(
+	func(t *testing.T) error {
+		f := framework.NewFrameWork(
+			func(f *framework.FrameWorkE2E) {
+				f.Desribe = "TestAdditionalTags"
+				f.Test = t
+				f.Client = framework.NewClientOrDie()
+				f.InitService = &v1.Service{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "basic-service",
+						Namespace: framework.NameSpace,
+						Annotations: map[string]string{
+							alicloud.ServiceAnnotationLoadBalancerAdditionalTags: "k1=v1,k2=v2",
+						},
+					},
+					Spec: v1.ServiceSpec{
+						Ports: []v1.ServicePort{
+							{
+								Port:       80,
+								TargetPort: intstr.FromInt(80),
+								Protocol:   v1.ProtocolTCP,
+							},
+						},
+						Type:            v1.ServiceTypeLoadBalancer,
+						SessionAffinity: v1.ServiceAffinityNone,
+						Selector: map[string]string{
+							"run": "nginx",
+						},
+					},
+				}
+			},
+		)
+		err := f.SetUp()
+		if err != nil {
+			return fmt.Errorf("setup error: %s", err.Error())
+		}
+		defer f.Destroy()
+
+		return f.RunDefaultTest(
+			framework.NewDefaultAction(&framework.TestUnit{Description: "default init"}),
+			framework.NewDeleteAction(&framework.TestUnit{Description: "default delete"}),
+		)
+	},
+)
