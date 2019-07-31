@@ -17,12 +17,29 @@ func TestE2E(t *testing.T) {
 	if framework.TestContext.KubeConfig == "" {
 		t.Logf("empty kubeconfig, assume running in cluster")
 	}
-
 	if framework.TestContext.CloudConfig == "" {
 		t.Logf("empty cloud-config")
 	}
 	if framework.TestContext.LoadBalancerID == "" {
-		framework.TestContext.LoadBalancerID = "lb-2ze6jp9vemd1gvj9ku83e"
+		framework.TestContext.LoadBalancerID = "lb-xxxx"
+	}
+	if framework.TestContext.MasterZoneID == "" {
+		framework.TestContext.MasterZoneID = "cn-beijing-g"
+	}
+	if framework.TestContext.SlaveZoneID == "" {
+		framework.TestContext.SlaveZoneID = "cn-beijing-f"
+	}
+	if framework.TestContext.BackendLabel == "" {
+		framework.TestContext.BackendLabel = "failure-domain.beta.kubernetes.io/region=cn-beijing,cs-worker=3"
+	}
+	if framework.TestContext.AclID == "" {
+		framework.TestContext.AclID = "acl-xxxxxx"
+	}
+	if framework.TestContext.VSwitchID == "" {
+		framework.TestContext.VSwitchID = "vsw-xxxxxx"
+	}
+	if framework.TestContext.CertID == "" {
+		framework.TestContext.CertID = "xxxxxx_xxxxxx_xxxxxx_xxxxxx"
 	}
 	for i := range framework.Frames {
 		fram := framework.Frames[i]
