@@ -59,6 +59,12 @@ type Config struct {
 	CloudConfig    string
 	KubeConfig     string
 	LoadBalancerID string
+	MasterZoneID   string
+	SlaveZoneID    string
+	BackendLabel   string
+	AclID          string
+	VSwitchID      string
+	CertID         string
 }
 
 func NewFrameWork(

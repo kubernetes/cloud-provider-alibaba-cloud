@@ -359,7 +359,9 @@ func ExpectExistAndEqual(f *FrameWork) error {
 
 		backends := vg.BackendServers.BackendServer
 
-		if f.SVC.Annotations["service.beta.kubernetes.io/backend-type"] == "eni" {
+		if f.SVC.Spec.ExternalTrafficPolicy == "Local" ||
+			f.SVC.Annotations["service.beta.kubernetes.io/backend-type"] == "eni" {
+
 			if len(backends) != len(f.Endpoint.Subsets[0].Addresses) {
 				return fmt.Errorf("Endpoint vgroup backend server must be %d", len(f.Nodes))
 			}
@@ -390,7 +392,7 @@ func ExpectExistAndEqual(f *FrameWork) error {
 			}
 		} else {
 			f.Nodes = filterOutMaster(f.Nodes)
-			if len(backends) != len(f.Nodes) {
+			if !f.hasAnnotation(ServiceAnnotationLoadBalancerBackendLabel) && len(backends) != len(f.Nodes) {
 				return fmt.Errorf("node vgroup backend server must be %d", len(f.Nodes))
 			}
 			sort.SliceStable(
@@ -877,6 +879,20 @@ func ExpectExist(f *FrameWork) error {
 	exist, _, err := f.LoadBalancer().findLoadBalancer(f.SVC)
 	if err != nil || !exist {
 		return fmt.Errorf("slb should exist: %v, %t", err, exist)
+	}
+	return nil
+}
+
+func ExpectAddressTypeNotEqual(f *FrameWork) error {
+	exist, mlb, err := f.LoadBalancer().findLoadBalancer(f.SVC)
+	if err != nil || !exist {
+		return fmt.Errorf("slb not found, %v, %v", exist, err)
+	}
+	defd, _ := ExtractAnnotationRequest(f.SVC)
+	if f.hasAnnotation(ServiceAnnotationLoadBalancerAddressType) {
+		if mlb.AddressType == defd.AddressType {
+			return fmt.Errorf("address type mutate error: %s, %s", mlb.AddressType, defd.AddressType)
+		}
 	}
 	return nil
 }

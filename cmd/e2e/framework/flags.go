@@ -5,6 +5,7 @@ import "flag"
 func RegisterCommonFlags() {
 	flag.StringVar(&TestContext.KubeConfig, "kubeconfig", "", "kubernetes config path")
 	flag.StringVar(&TestContext.CloudConfig, "cloud-config", "", "cloud config")
+	flag.StringVar(&TestContext.LoadBalancerID, "lbid", "", "reused slb id")
 }
 
 // ViperizeFlags sets up all flag and config processing. Future configuration info should be added to viper, not to flags.
