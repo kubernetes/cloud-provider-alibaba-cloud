@@ -419,7 +419,7 @@ var _ = framework.Mark(
 	},
 )
 
-// 9:test health check
+// 9:test health check (TCP type)
 var _ = framework.Mark(
 	func(t *testing.T) error {
 		f := framework.NewFrameWork(
@@ -432,15 +432,13 @@ var _ = framework.Mark(
 						Name:      "basic-service",
 						Namespace: framework.NameSpace,
 						Annotations: map[string]string{
+							alicloud.ServiceAnnotationLoadBalancerHealthCheckFlag:               "on",
 							alicloud.ServiceAnnotationLoadBalancerHealthCheckType:               "tcp",
-							alicloud.ServiceAnnotationLoadBalancerHealthCheckURI:                "health-check-uri",
 							alicloud.ServiceAnnotationLoadBalancerHealthCheckConnectPort:        "80",
 							alicloud.ServiceAnnotationLoadBalancerHealthCheckHealthyThreshold:   "4",
 							alicloud.ServiceAnnotationLoadBalancerHealthCheckUnhealthyThreshold: "4",
 							alicloud.ServiceAnnotationLoadBalancerHealthCheckInterval:           "3",
 							alicloud.ServiceAnnotationLoadBalancerHealthCheckConnectTimeout:     "100",
-							alicloud.ServiceAnnotationLoadBalancerHealthCheckDomain:             "192.168.0.85",
-							alicloud.ServiceAnnotationLoadBalancerHealthCheckHTTPCode:           "http_404",
 						},
 					},
 					Spec: v1.ServiceSpec{
@@ -473,7 +471,63 @@ var _ = framework.Mark(
 	},
 )
 
-// 10:test backend label
+// 10:test health check (HTTP type)
+var _ = framework.Mark(
+	func(t *testing.T) error {
+		f := framework.NewFrameWork(
+			func(f *framework.FrameWorkE2E) {
+				f.Desribe = "TestHTTPHealthCheck"
+				f.Test = t
+				f.Client = framework.NewClientOrDie()
+				f.InitService = &v1.Service{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "basic-service",
+						Namespace: framework.NameSpace,
+						Annotations: map[string]string{
+							alicloud.ServiceAnnotationLoadBalancerHealthCheckFlag:               "on",
+							alicloud.ServiceAnnotationLoadBalancerHealthCheckType:               "http",
+							alicloud.ServiceAnnotationLoadBalancerHealthCheckURI:                "/index.html",
+							alicloud.ServiceAnnotationLoadBalancerHealthCheckConnectPort:        "80",
+							alicloud.ServiceAnnotationLoadBalancerHealthCheckHealthyThreshold:   "4",
+							alicloud.ServiceAnnotationLoadBalancerHealthCheckUnhealthyThreshold: "4",
+							alicloud.ServiceAnnotationLoadBalancerHealthCheckInterval:           "3",
+							alicloud.ServiceAnnotationLoadBalancerHealthCheckTimeout:            "10",
+							alicloud.ServiceAnnotationLoadBalancerHealthCheckDomain:             "192.168.0.85",
+							alicloud.ServiceAnnotationLoadBalancerHealthCheckHTTPCode:           "http_2xx",
+							alicloud.ServiceAnnotationLoadBalancerProtocolPort:                  "http:80",
+						},
+					},
+					Spec: v1.ServiceSpec{
+						Ports: []v1.ServicePort{
+							{
+								Port:       80,
+								TargetPort: intstr.FromInt(80),
+								Protocol:   v1.ProtocolTCP,
+							},
+						},
+						Type:            v1.ServiceTypeLoadBalancer,
+						SessionAffinity: v1.ServiceAffinityNone,
+						Selector: map[string]string{
+							"run": "nginx",
+						},
+					},
+				}
+			},
+		)
+		err := f.SetUp()
+		if err != nil {
+			return fmt.Errorf("setup error: %s", err.Error())
+		}
+		defer f.Destroy()
+
+		return f.RunDefaultTest(
+			framework.NewDefaultAction(&framework.TestUnit{Description: "default init"}),
+			framework.NewDeleteAction(&framework.TestUnit{Description: "default delete"}),
+		)
+	},
+)
+
+// 11:test backend label
 var _ = framework.Mark(
 	func(t *testing.T) error {
 		f := framework.NewFrameWork(
@@ -519,7 +573,7 @@ var _ = framework.Mark(
 	},
 )
 
-// 11:test network type
+// 12:test network type
 var _ = framework.Mark(
 	func(t *testing.T) error {
 		f := framework.NewFrameWork(
@@ -566,7 +620,7 @@ var _ = framework.Mark(
 	},
 )
 
-// 12:test Access control
+// 13:test Access control
 var _ = framework.Mark(
 	func(t *testing.T) error {
 		f := framework.NewFrameWork(
@@ -625,7 +679,7 @@ var _ = framework.Mark(
 	},
 )
 
-// 13:test forward port
+// 14:test forward port
 var _ = framework.Mark(
 	func(t *testing.T) error {
 		f := framework.NewFrameWork(
@@ -671,7 +725,7 @@ var _ = framework.Mark(
 	},
 )
 
-// 14:test IP version
+// 15:test IP version
 var _ = framework.Mark(
 	func(t *testing.T) error {
 		f := framework.NewFrameWork(
@@ -717,7 +771,7 @@ var _ = framework.Mark(
 	},
 )
 
-// 15:test VSwtich
+// 16:test VSwtich
 // Only the SLB of the intranet needs vswitchid
 var _ = framework.Mark(
 	func(t *testing.T) error {
@@ -765,7 +819,7 @@ var _ = framework.Mark(
 	},
 )
 
-// 16:test PayByBandWidth
+// 17:test PayByBandWidth
 var _ = framework.Mark(
 	func(t *testing.T) error {
 		f := framework.NewFrameWork(
