@@ -124,7 +124,7 @@ kind: Service
 metadata:
   annotations:
     service.beta.kubernetes.io/alicloud-loadbalancer-protocol-port: "https:443"
-    service.beta.kubernetes.io/alicloud-loadbalancer-cert-id: ${YOUR_CERT_ID}
+    service.beta.kubernetes.io/alicloud-loadbalancer-cert-id: "${YOUR_CERT_ID}"
   name: nginx
   namespace: default
 spec:
@@ -189,7 +189,7 @@ apiVersion: v1
 kind: Service
 metadata:
   annotations:
-    service.beta.kubernetes.io/alicloud-loadbalancer-id: "your_loadbalancer_id"
+    service.beta.kubernetes.io/alicloud-loadbalancer-id: "${YOUR_LOADBALACER_ID}"
   name: nginx
   namespace: default
 spec:
@@ -211,7 +211,7 @@ apiVersion: v1
 kind: Service
 metadata:
   annotations:
-    service.beta.kubernetes.io/alicloud-loadbalancer-id: "your_loadbalancer_id"
+    service.beta.kubernetes.io/alicloud-loadbalancer-id: "${YOUR_LOADBALACER_ID}"
     service.beta.kubernetes.io/alicloud-loadbalancer-force-override-listeners: "true"
   name: nginx
   namespace: default
@@ -308,7 +308,7 @@ metadata:
   annotations:
     service.beta.kubernetes.io/alicloud-loadbalancer-sticky-session: "on"
     service.beta.kubernetes.io/alicloud-loadbalancer-sticky-session-type: "server"
-    service.beta.kubernetes.io/alicloud-loadbalancer-cooyour_cookie: "${your_cookie}"
+    service.beta.kubernetes.io/alicloud-loadbalancer-cookie: "${YOUR_COOKIE}"
     service.beta.kubernetes.io/alicloud-loadbalancer-protocol-port: "http:80"
   name: nginx
   namespace: default
@@ -519,7 +519,7 @@ kind: Service
 metadata:
   annotations:
     service.beta.kubernetes.io/alibaba-cloud-loadbalancer-acl-status: "on"
-    service.beta.kubernetes.io/alibaba-cloud-loadbalancer-acl-id: "acl-2zeckgpq7xxx1hbdsxxxx"
+    service.beta.kubernetes.io/alibaba-cloud-loadbalancer-acl-id: "${YOUR_ACL_ID}"
     service.beta.kubernetes.io/alibaba-cloud-loadbalancer-acl-type: "white"
   name: nginx
   namespace: default
@@ -542,7 +542,7 @@ kind: Service
 metadata:
   annotations:
    service.beta.kubernetes.io/alicloud-loadbalancer-address-type: "intranet"
-   service.beta.kubernetes.io/alicloud-loadbalancer-vswitch-id: "vsw-2zewxxxxgr3xhfl2xxxxx"
+   service.beta.kubernetes.io/alicloud-loadbalancer-vswitch-id: "${YOUR_VSWITCH_ID}"
   name: nginx
   namespace: default
 spec:
@@ -563,13 +563,19 @@ apiVersion: v1
 kind: Service
 metadata:
   annotations:
-    service.beta.kubernetes.io/alicloud-loadbalancer-protocol-port: "http:80"
-    service.beta.kubernetes.io/alibaba-cloud-loadbalancer-forward-port: "81"
+    service.beta.kubernetes.io/alicloud-loadbalancer-protocol-port: "https:443,http:80"
+    service.beta.kubernetes.io/alicloud-loadbalancer-cert-id: "${YOUR_CERT_ID}"
+    service.beta.kubernetes.io/alicloud-loadbalancer-forward-port: "80:443"
   name: nginx
   namespace: default
 spec:
   ports:
-  - port: 80
+  - name: https
+    port: 443
+    protocol: TCP
+    targetPort: 443
+  - name: http
+    port: 80
     protocol: TCP
     targetPort: 80
   selector:
@@ -635,7 +641,7 @@ spec:
 | service.beta.kubernetes.io/alicloud-loadbalancer-sticky-session | 是否开启会话保持。取值：on                                   | off<br>**说明：** 仅对HTTP和HTTPS协议的监听生效。<br>可参考：[CreateLoadBalancerHTTPListener](https://help.aliyun.com/document_detail/27592.html?spm=a2c4g.11186623.2.24.16bb609awRQFbk#slb-api-CreateLoadBalancerHTTPListener)和[CreateLoadBalancerHTTPSListener](https://help.aliyun.com/document_detail/27593.html?spm=a2c4g.11186623.2.25.16bb609awRQFbk#slb-api-CreateLoadBalancerHTTPSListener)<br> |
 | service.beta.kubernetes.io/alicloud-loadbalancer-sticky-session-type | cookie的处理方式。<br>取值：<br>**insert**：植入Cookie。<br>**server**：重写Cookie。<br>**说明：**  <br>- 仅对HTTP和HTTPS协议的监听生效。 <br>- 当service.beta.kubernetes.io/alicloud-loadbalancer-sticky-session取值为on时，该参数必选。<br>可参考：[CreateLoadBalancerHTTPListener](https://help.aliyun.com/document_detail/27592.html?spm=a2c4g.11186623.2.24.16bb609awRQFbk#slb-api-CreateLoadBalancerHTTPListener)和[CreateLoadBalancerHTTPSListener](https://help.aliyun.com/document_detail/27593.html?spm=a2c4g.11186623.2.25.16bb609awRQFbk#slb-api-CreateLoadBalancerHTTPSListener)<br> | 无                                                           |
 | service.beta.kubernetes.io/alicloud-loadbalancer-cookie-timeout | Cookie超时时间。取值：1-86400（秒）<br>**说明：** 当service.beta.kubernetes.io/alicloud-loadbalancer-sticky-session为on且service.beta.kubernetes.io/alicloud-loadbalancer-sticky-session-type为insert时，该参数必选。<br>可参考：[CreateLoadBalancerHTTPListener](https://help.aliyun.com/document_detail/27592.html?spm=a2c4g.11186623.2.24.16bb609awRQFbk#slb-api-CreateLoadBalancerHTTPListener)和[CreateLoadBalancerHTTPSListener](https://help.aliyun.com/document_detail/27593.html?spm=a2c4g.11186623.2.25.16bb609awRQFbk#slb-api-CreateLoadBalancerHTTPSListener)<br> | 无                                                           |
-| service.beta.kubernetes.io/alicloud-loadbalancer-cookie      | 服务器上配置的Cookie。长度为1-200个字符，只能包含ASCII英文字母和数字字符，不能包含逗号、分号或空格，也不能以$开头。<br>**说明：** <br>当service.beta.kubernetes.io/alicloud-loadbalancer-sticky-session为on且service.beta.kubernetes.io/alicloud-loadbalancer-sticky-session-type为server时，该参数必选。<br>可参考：[CreateLoadBalancerHTTPListener](https://help.aliyun.com/document_detail/27592.html?spm=a2c4g.11186623.2.24.16bb609awRQFbk#slb-api-CreateLoadBalancerHTTPListener)和[CreateLoadBalancerHTTPSListener](https://help.aliyun.com/document_detail/27593.html?spm=a2c4g.11186623.2.25.16bb609awRQFbk#slb-api-CreateLoadBalancerHTTPSListener)<br> | 无                                                           |
+| service.beta.kubernetes.io/alicloud-loadbalancer-cookie      | 服务器上配置的Cookie名称。长度为1-200个字符，只能包含ASCII英文字母和数字字符，不能包含逗号、分号或空格，也不能以$开头。<br>**说明：** <br>当service.beta.kubernetes.io/alicloud-loadbalancer-sticky-session为on且service.beta.kubernetes.io/alicloud-loadbalancer-sticky-session-type为server时，该参数必选。<br>Cookie名称只能包含字母、数字、‘_’和‘-’。<br>参考：[CreateLoadBalancerHTTPListener](https://help.aliyun.com/document_detail/27592.html?spm=a2c4g.11186623.2.24.16bb609awRQFbk#slb-api-CreateLoadBalancerHTTPListener)和[CreateLoadBalancerHTTPSListener](https://help.aliyun.com/document_detail/27593.html?spm=a2c4g.11186623.2.25.16bb609awRQFbk#slb-api-CreateLoadBalancerHTTPSListener)<br> | 无                                                           |
 | service.beta.kubernetes.io/alicloud-loadbalancer-master-zoneid | 主后端服务器的可用区ID。                                     | 无                                                           |
 | service.beta.kubernetes.io/alicloud-loadbalancer-slave-zoneid | 备后端服务器的可用区ID。                                     | 无                                                           |
 | externalTrafficPolicy                                        | 哪些节点可以作为后端服务器，取值：<br>**Cluster**：使用所有后端节点作为后端服务器。<br> **Local**：使用Pod所在节点作为后端服务器。 | Cluster                                                      |
@@ -659,7 +665,7 @@ spec:
 | service.beta.kubernetes.io/alibaba-cloud-loadbalancer-acl-id | 监听绑定的访问策略组ID。当AclStatus参数的值为on时，该参数必选。 | 无                                                           |
 | service.beta.kubernetes.io/alibaba-cloud-loadbalancer-acl-type | 访问控制类型。<br>取值：white或black。<br>**white**： 仅转发来自所选访问控制策略组中设置的IP地址或地址段的请求，白名单适用于应用只允许特定IP访问的场景。设置白名单存在一定业务风险。一旦设名单，就只有白名单中的IP可以访问负载均衡监听。如果开启了白名单访问，但访问策略组中没有添加任何IP，则负载均衡监听会转发全部请求。<br>**black**： 来自所选访问控制策略组中设置的IP地址或地址段的所有请求都不会转发，黑名单适用于应用只限制某些特定IP访问的场景。如果开启了黑名单访问，但访问策略组中没有添加任何IP，则负载均衡监听会转发全部请求。当AclStatus参数的值为on时，该参数必选。 | 无                                                           |
 | service.beta.kubernetes.io/alibaba-cloud-loadbalancer-vswitch-id | 负载均衡实例所属的VSwitch ID。设置改参数时需同时设置addresstype为intranet。 | 无                                                           |
-| service.beta.kubernetes.io/alibaba-cloud-loadbalancer-forward-port | HTTP至HTTPS的监听转发端口。                                  | 80                                                           |
+| service.beta.kubernetes.io/alibaba-cloud-loadbalancer-forward-port | HTTP至HTTPS的监听转发端口。如80:443                                  | 无                                                          |
 | service.beta.kubernetes.io/alibaba-cloud-loadbalancer-additional-resource-tags | 需要添加的Tag列表。如："k1=v1,k2=v2"                         | 无                                                           |
 | service.beta.kubernetes.io/alibaba-cloud-loadbalancer-ip-version | 负载均衡实例的IP版本，取值：ipv4或ipv6。                     | ipv4                                                         |
 

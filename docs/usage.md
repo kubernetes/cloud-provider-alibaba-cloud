@@ -144,7 +144,7 @@ kind: Service
 metadata:
   annotations:
     service.beta.kubernetes.io/alicloud-loadbalancer-protocol-port: "https:443"
-    service.beta.kubernetes.io/alicloud-loadbalancer-cert-id: ${YOUR_CERT_ID}
+    service.beta.kubernetes.io/alicloud-loadbalancer-cert-id: "${YOUR_CERT_ID}"
   name: nginx
   namespace: default
 spec:
@@ -338,7 +338,7 @@ metadata:
   annotations:
     service.beta.kubernetes.io/alicloud-loadbalancer-sticky-session: "on"
     service.beta.kubernetes.io/alicloud-loadbalancer-sticky-session-type: "server"
-    service.beta.kubernetes.io/alicloud-loadbalancer-cookie: "${YOUR_COOKIE}"
+    service.beta.kubernetes.io/alicloud-loadbalancer-cookie: "your-cookie"
     service.beta.kubernetes.io/alicloud-loadbalancer-protocol-port: "http:80"
   name: nginx
   namespace: default
@@ -559,7 +559,7 @@ kind: Service
 metadata:
   annotations:
     service.beta.kubernetes.io/alibaba-cloud-loadbalancer-acl-status: "on"
-    service.beta.kubernetes.io/alibaba-cloud-loadbalancer-acl-id: "acl-2zeckgpq7xxx1hbdsxxxx"
+    service.beta.kubernetes.io/alibaba-cloud-loadbalancer-acl-id: "${YOUR_ACL_ID}d"
     service.beta.kubernetes.io/alibaba-cloud-loadbalancer-acl-type: "white"
   name: nginx
   namespace: default
@@ -582,7 +582,7 @@ kind: Service
 metadata:
   annotations:
    service.beta.kubernetes.io/alicloud-loadbalancer-address-type: "intranet"
-   service.beta.kubernetes.io/alicloud-loadbalancer-vswitch-id: "vsw-2zewxxxxgr3xhfl2xxxxx"
+   service.beta.kubernetes.io/alicloud-loadbalancer-vswitch-id: "${YOUR_VSWITCH_ID}d"
   name: nginx
   namespace: default
 spec:
@@ -603,13 +603,19 @@ apiVersion: v1
 kind: Service
 metadata:
   annotations:
-    service.beta.kubernetes.io/alicloud-loadbalancer-protocol-port: "http:80"
-    service.beta.kubernetes.io/alibaba-cloud-loadbalancer-forward-port: "81"
+    service.beta.kubernetes.io/alicloud-loadbalancer-protocol-port: "https:443,http:80"
+    service.beta.kubernetes.io/alicloud-loadbalancer-cert-id: "${YOUR_CERT_ID}"
+    service.beta.kubernetes.io/alicloud-loadbalancer-forward-port: "80:443"
   name: nginx
   namespace: default
 spec:
   ports:
-  - port: 80
+  - name: https
+    port: 443
+    protocol: TCP
+    targetPort: 443
+  - name: http
+    port: 80
     protocol: TCP
     targetPort: 80
   selector:
@@ -675,7 +681,7 @@ ps: Annotation list
 | service.beta.kubernetes.io/alicloud-loadbalancer-sticky-session | Whether to enable session persistence. <br/>Valid values: on or off. <br/>**Note** It applies only to HTTP and HTTPS listeners.<br/> For more information, see [CreateLoadBalancerHTTPListener](https://www.alibabacloud.com/help/doc-detail/27592.htm?#slb-api-CreateLoadBalancerHTTPListener) and [CreateLoadBalancerHTTPSListener](https://www.alibabacloud.com/help/doc-detail/27593.htm?#slb-api-CreateLoadBalancerHTTPSListener). | off                                                          |
 | service.beta.kubernetes.io/alicloud-loadbalancer-sticky-session-type | Method used to handle the cookie. <br/>Valid values: <br> - insert: Insert the cookie. <br> - server: Rewrite the cookie.<br> Note It applies only to HTTP and HTTPS listeners.When the parameter *service.beta.kubernetes.io/alicloud-loadbalancer-sticky-session* is set to on, this parameter is mandatory. | None                                                         |
 | service.beta.kubernetes.io/alicloud-loadbalancer-cookie-timeout | Timeout period of the cookie.<br> Value range: 1–8640 (seconds).<br/>**Note** When the parameter *service.beta.kubernetes.io/alicloud-loadbalancer-sticky-session* is set to on and the parameter *service.beta.kubernetes.io/alicloud-loadbalancer-sticky-session-type* is set to insert, this parameter is mandatory. | None                                                         |
-| service.beta.kubernetes.io/alicloud-loadbalancer-cookie      | Cookie configured on the server. <br>The cookie must be 1 to 200 characters in length and can only contain ASCII English letters and numeric characters. It cannot contain commas, semicolons, or spaces, or begin with $.<br>**Note**  When the parameter *service.beta.kubernetes.io/alicloud-loadbalancer-sticky-session* is set to on and the parameter *service.beta.kubernetes.io/alicloud-loadbalancer-sticky-session-type* is set to server, this parameter is mandatory. | None                                                         |
+| service.beta.kubernetes.io/alicloud-loadbalancer-cookie      | Cookie name configured on the server. <br>The cookie must be 1 to 200 characters in length and can only contain ASCII English letters and numeric characters. It cannot contain commas, semicolons, or spaces, or begin with $.<br>**Note**  When the parameter *service.beta.kubernetes.io/alicloud-loadbalancer-sticky-session* is set to on and the parameter *service.beta.kubernetes.io/alicloud-loadbalancer-sticky-session-type* is set to server, this parameter is mandatory. | None                                                         |
 | service.beta.kubernetes.io/alicloud-loadbalancer-master-zoneid | Availability zone ID of the primary backend server.          | None                                                         |
 | service.beta.kubernetes.io/alicloud-loadbalancer-slave-zoneid | Availability zone ID of the secondary backend server.        | None                                                         |
 | externalTrafficPolicy                                        | Nodes that can be used as backend servers. <br/>Valid values:<br/>**Cluster**: Use all backend nodes as backend servers.<br>**Local**: Use the nodes where pods are located as backend servers. | Cluster                                                      |
@@ -699,6 +705,6 @@ ps: Annotation list
 | service.beta.kubernetes.io/alibaba-cloud-loadbalancer-acl-id | Access control ID.<br/>**Note** If the value of AclStatus is "on", this parameter must be set. | None                                                         |
 | service.beta.kubernetes.io/alibaba-cloud-loadbalancer-acl-type | The types of access control.<br>Valid values: white or black.<br>**white**：Only requests from IP addresses or address segments set in the selected access control policy group are forwarded. The whitelist is suitable for scenarios where the application only allows specific IP access.Note Once the whitelist is set, only the IPs in the whitelist can access the load balancing listener. If whitelist access is turned on, but no IP is added to the access policy group, the load balancing listener forwards all requests.<br/>**black**： All requests from the IP address or address segment set in the selected access control policy group are not forwarded. The blacklist is suitable for scenarios where the application only rejects certain IPs access.Note If blacklist access is turned on, but no IP is added to the access policy group, the load balancing listener forwards all requests.<br>If the value of AclStatus is "on", this parameter must be set. | None                                                         |
 | service.beta.kubernetes.io/alibaba-cloud-loadbalancer-vswitch-id | VSwitch ID of the load balancer.<br>Note When setting VSwitch ID, the address-type parameter need to be "intranet". | None                                                         |
-| service.beta.kubernetes.io/alibaba-cloud-loadbalancer-forward-port | HTTP to HTTPS listening forwarding port.                     | 80                                                           |
+| service.beta.kubernetes.io/alibaba-cloud-loadbalancer-forward-port | HTTP to HTTPS listening forwarding port. e.g. 80:443                    | None                                                          |
 | service.beta.kubernetes.io/alibaba-cloud-loadbalancer-additional-resource-tags | A list of tags to add.<br>e.g. "k1=v1,k2=v2"                 | None                                                         |
 | service.beta.kubernetes.io/alibaba-cloud-loadbalancer-ip-version | IP version of the load balancer.<br/>Valid values：ipv4 or ipv6. | ipv4                                                         |

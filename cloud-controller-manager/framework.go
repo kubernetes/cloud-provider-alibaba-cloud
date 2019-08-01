@@ -10,6 +10,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/controller/service"
 	"sort"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -297,13 +298,27 @@ func ExpectExistAndEqual(f *FrameWork) error {
 			if err != nil {
 				return fmt.Errorf("proto transfor error")
 			}
-			if p.Port == int32(v.ListenerPort) &&
-				proto == v.ListenerProtocol {
-				if err := f.ListenerEqual(mlb.LoadBalancerId, p, proto); err != nil {
-					return fmt.Errorf(fmt.Sprintf("listener configuration not equal, %s", err.Error()))
+			// If setting forward port, the BackendServerPort with http proto is 0.
+			// So check whether the http port of slb equals annotation's port.
+			if f.hasAnnotation(ServiceAnnotationLoadBalancerForwardPort) && proto == "http" {
+				ports := strings.Split(serviceAnnotation(f.SVC, ServiceAnnotationLoadBalancerForwardPort), ":")
+				if len(ports) != 2 {
+					return fmt.Errorf(fmt.Sprintf("forward-port format error: %s, expect 80:443,88:6443", ports))
 				}
-				found = true
-				break
+				httpPort, _ := strconv.Atoi(ports[0])
+				if p.Port == int32(v.ListenerPort) && p.Port == int32(httpPort) {
+					found = true
+					break
+				}
+			} else {
+				if p.Port == int32(v.ListenerPort) &&
+					proto == v.ListenerProtocol {
+					if err := f.ListenerEqual(mlb.LoadBalancerId, p, proto); err != nil {
+						return fmt.Errorf(fmt.Sprintf("listener configuration not equal, %s", err.Error()))
+					}
+					found = true
+					break
+				}
 			}
 		}
 		if !found {
