@@ -199,6 +199,7 @@ var _ = framework.Mark(
 						Annotations: map[string]string{
 							alicloud.ServiceAnnotationLoadBalancerId:               framework.TestContext.LoadBalancerID,
 							alicloud.ServiceAnnotationLoadBalancerOverrideListener: "true",
+							alicloud.ServiceAnnotationLoadBalancerProtocolPort:     "http:80",
 						},
 					},
 					Spec: v1.ServiceSpec{
@@ -692,12 +693,21 @@ var _ = framework.Mark(
 						Name:      "basic-service",
 						Namespace: framework.NameSpace,
 						Annotations: map[string]string{
-							alicloud.ServiceAnnotationLoadBalancerForwardPort: "81",
+							alicloud.ServiceAnnotationLoadBalancerProtocolPort: "http:80,https:443",
+							alicloud.ServiceAnnotationLoadBalancerCertID:       framework.TestContext.CertID,
+							alicloud.ServiceAnnotationLoadBalancerForwardPort:  "80:443",
 						},
 					},
 					Spec: v1.ServiceSpec{
 						Ports: []v1.ServicePort{
 							{
+								Name:       "https",
+								Port:       443,
+								TargetPort: intstr.FromInt(443),
+								Protocol:   v1.ProtocolTCP,
+							},
+							{
+								Name:       "http",
 								Port:       80,
 								TargetPort: intstr.FromInt(80),
 								Protocol:   v1.ProtocolTCP,
@@ -871,6 +881,150 @@ var _ = framework.Mark(
 		return f.RunDefaultTest(
 			framework.NewDefaultAction(&framework.TestUnit{Description: "default init"}),
 			framework.NewDefaultAction(spec),
+			framework.NewDeleteAction(&framework.TestUnit{Description: "default delete"}),
+		)
+	},
+)
+
+// 18:test additional resource tags
+var _ = framework.Mark(
+	func(t *testing.T) error {
+		f := framework.NewFrameWork(
+			func(f *framework.FrameWorkE2E) {
+				f.Desribe = "TestAdditionalTags"
+				f.Test = t
+				f.Client = framework.NewClientOrDie()
+				f.InitService = &v1.Service{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "basic-service",
+						Namespace: framework.NameSpace,
+						Annotations: map[string]string{
+							alicloud.ServiceAnnotationLoadBalancerAdditionalTags: "k1=v1,k2=v2",
+						},
+					},
+					Spec: v1.ServiceSpec{
+						Ports: []v1.ServicePort{
+							{
+								Port:       80,
+								TargetPort: intstr.FromInt(80),
+								Protocol:   v1.ProtocolTCP,
+							},
+						},
+						Type:            v1.ServiceTypeLoadBalancer,
+						SessionAffinity: v1.ServiceAffinityNone,
+						Selector: map[string]string{
+							"run": "nginx",
+						},
+					},
+				}
+			},
+		)
+		err := f.SetUp()
+		if err != nil {
+			return fmt.Errorf("setup error: %s", err.Error())
+		}
+		defer f.Destroy()
+
+		return f.RunDefaultTest(
+			framework.NewDefaultAction(&framework.TestUnit{Description: "default init"}),
+			framework.NewDeleteAction(&framework.TestUnit{Description: "default delete"}),
+		)
+	},
+)
+
+// 19: test slb with session sticky (insert cookie)
+var _ = framework.Mark(
+	func(t *testing.T) error {
+		f := framework.NewFrameWork(
+			func(f *framework.FrameWorkE2E) {
+				f.Desribe = "TestSessionSticky-insert-cookie"
+				f.Test = t
+				f.Client = framework.NewClientOrDie()
+				f.InitService = &v1.Service{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "basic-service",
+						Namespace: framework.NameSpace,
+						Annotations: map[string]string{
+							alicloud.ServiceAnnotationLoadBalancerSessionStick:     "on",
+							alicloud.ServiceAnnotationLoadBalancerSessionStickType: "insert",
+							alicloud.ServiceAnnotationLoadBalancerCookieTimeout:    "1800",
+							alicloud.ServiceAnnotationLoadBalancerProtocolPort:     "http:80",
+						},
+					},
+					Spec: v1.ServiceSpec{
+						Ports: []v1.ServicePort{
+							{
+								Port:       80,
+								TargetPort: intstr.FromInt(80),
+								Protocol:   v1.ProtocolTCP,
+							},
+						},
+						Type:            v1.ServiceTypeLoadBalancer,
+						SessionAffinity: v1.ServiceAffinityNone,
+						Selector: map[string]string{
+							"run": "nginx",
+						},
+					},
+				}
+			},
+		)
+		err := f.SetUp()
+		if err != nil {
+			return fmt.Errorf("setup error: %s", err.Error())
+		}
+		defer f.Destroy()
+
+		return f.RunDefaultTest(
+			framework.NewDefaultAction(&framework.TestUnit{Description: "default init"}),
+			framework.NewDeleteAction(&framework.TestUnit{Description: "default delete"}),
+		)
+	},
+)
+
+// 20: test slb with session sticky (server cookie)
+var _ = framework.Mark(
+	func(t *testing.T) error {
+		f := framework.NewFrameWork(
+			func(f *framework.FrameWorkE2E) {
+				f.Desribe = "TestSessionSticky-server-cookie"
+				f.Test = t
+				f.Client = framework.NewClientOrDie()
+				f.InitService = &v1.Service{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "basic-service",
+						Namespace: framework.NameSpace,
+						Annotations: map[string]string{
+							alicloud.ServiceAnnotationLoadBalancerSessionStick:     "on",
+							alicloud.ServiceAnnotationLoadBalancerSessionStickType: "server",
+							alicloud.ServiceAnnotationLoadBalancerCookie:           "your_cookie-1",
+							alicloud.ServiceAnnotationLoadBalancerProtocolPort:     "http:80",
+						},
+					},
+					Spec: v1.ServiceSpec{
+						Ports: []v1.ServicePort{
+							{
+								Port:       80,
+								TargetPort: intstr.FromInt(80),
+								Protocol:   v1.ProtocolTCP,
+							},
+						},
+						Type:            v1.ServiceTypeLoadBalancer,
+						SessionAffinity: v1.ServiceAffinityNone,
+						Selector: map[string]string{
+							"run": "nginx",
+						},
+					},
+				}
+			},
+		)
+		err := f.SetUp()
+		if err != nil {
+			return fmt.Errorf("setup error: %s", err.Error())
+		}
+		defer f.Destroy()
+
+		return f.RunDefaultTest(
+			framework.NewDefaultAction(&framework.TestUnit{Description: "default init"}),
 			framework.NewDeleteAction(&framework.TestUnit{Description: "default delete"}),
 		)
 	},

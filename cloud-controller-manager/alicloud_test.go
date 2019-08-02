@@ -120,7 +120,7 @@ func TestEnsureLoadBalancerAnnotation(t *testing.T) {
 					ServiceAnnotationLoadBalancerProtocolPort: "http:80",
 					ServiceAnnotationLoadBalancerAddressType:  string(slb.InternetAddressType),
 					//ServiceAnnotationLoadBalancerVswitch: 		VSWITCH_ID,
-					ServiceAnnotationLoadBalancerForwardPort: "443",
+					ServiceAnnotationLoadBalancerForwardPort: "80:443",
 					//ServiceAnnotationLoadBalancerSLBNetworkType: "classic",
 					ServiceAnnotationLoadBalancerChargeType: string(slb.PayByTraffic),
 					//ServiceAnnotationLoadBalancerId: "ic",

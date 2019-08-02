@@ -6,9 +6,23 @@ Using the following command to start an E2E test
     k8s.io/cloud-provider-alibaba-cloud/cmd/e2e \
     -test.run ^TestE2E$ \
     --kubeconfig /path/to/.kube/config.e2e \
-    --cloud-config /path/to/.kube/config.cloud
+    --cloud-config /path/to/.kube/config.cloud \
+    --lbid loadbalancer-id \
+    --MasterZoneID cn-beijing-a \
+    --SlaveZoneID cn-beijing-b \
+    --BackendLabel failure-domain.beta.kubernetes.io/region=cn-beijing \
+    --aclid acl-id \
+    --vswitchid vswitch-id \
+    --certid cert-id
 ```
 
+- lbid: When reusing an exist LoadBalancer, you need to set this parameter. You can get LoadBalancer id at https://slbnew.console.aliyun.com/slb/.  
+- MasterZoneID & Slave ZoneID: If you want to create LoadBalancer with specific master zone and slave zone, you need to set this parameter. You can get region/zone information at https://help.aliyun.com/document_detail/40654.html?spm=a2c4g.11186623.2.15.458f41deOaYQvu.  
+- BackendLabel: If you want to create LoadBalancer with specific backend labels, you can use this parameter.  
+- aclid: If you want to create LoadBalancer with access control list, you need to set this parameter. You can get ACL ID at https://slbnew.console.aliyun.com/slb/.  
+- vswitchid: If you want to create LoadBalancer with specific vswitch, you need to set this parameter. You can get vswitch id at https://vpc.console.aliyun.com/.  
+- certid: If you want to create the HTTP protocol LoadBalancer, you need to add the cert id. You can create a certification follow instructions at https://slbnew.console.aliyun.com/slb/.  
+- 
 File `config.e2e` is the kubeconfig file used to connect to the target kubernetes cluster.
 For Example:
 ```$yaml

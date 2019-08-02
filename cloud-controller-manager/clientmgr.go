@@ -364,10 +364,15 @@ func (m *fakeMetaData) VswitchID() (string, error) {
 	}
 	zlist := strings.Split(cfg.Global.VswitchID, ",")
 	if len(zlist) == 1 {
+		vSwitchs := strings.Split(cfg.Global.VswitchID, ":")
+		if len(vSwitchs) == 2 {
+			glog.Infof("only one vswitchid mode, %s", vSwitchs[1])
+			return vSwitchs[1], nil
+		}
 		glog.Infof("simple vswitchid mode, %s", cfg.Global.VswitchID)
 		return cfg.Global.VswitchID, nil
 	}
-	zone, err := m.Zone()
+	mzone, err := m.Zone()
 	if err != nil {
 		return "", fmt.Errorf("retrieve vswitchid error for %s", err.Error())
 	}
@@ -376,11 +381,11 @@ func (m *fakeMetaData) VswitchID() (string, error) {
 		if len(vs) != 2 {
 			return "", fmt.Errorf("cloud-config vswitch format error: %s", cfg.Global.VswitchID)
 		}
-		if vs[0] == zone {
+		if vs[0] == mzone {
 			return vs[1], nil
 		}
 	}
-	glog.Infof("zone[%s] match failed, fallback with simple vswitch id mode, [%s]", zone, cfg.Global.VswitchID)
+	glog.Infof("zone[%s] match failed, fallback with simple vswitch id mode, [%s]", mzone, cfg.Global.VswitchID)
 	return cfg.Global.VswitchID, nil
 }
 
