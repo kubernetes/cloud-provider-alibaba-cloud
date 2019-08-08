@@ -23,14 +23,19 @@ import (
 
 const NameSpace = "e2etest"
 
-var Frames []EntryPoint
+var AllFrames []EntryPoint
+var QuickFrames []EntryPoint
 
 type EntryPoint func(t *testing.T) error
 
 func Mark(
+	label string,
 	f EntryPoint,
 ) error {
-	Frames = append(Frames, f)
+	if label == "quick" {
+		QuickFrames = append(QuickFrames, f)
+	}
+	AllFrames = append(AllFrames, f)
 	return nil
 }
 
@@ -55,16 +60,21 @@ func (m *FrameWorkE2E) Logf(format string, args ...interface{}) {
 var TestContext Config
 
 type Config struct {
-	Host           string
-	CloudConfig    string
-	KubeConfig     string
-	LoadBalancerID string
-	MasterZoneID   string
-	SlaveZoneID    string
-	BackendLabel   string
-	AclID          string
-	VSwitchID      string
-	CertID         string
+	Host                  string
+	CloudConfig           string
+	KubeConfig            string
+	LoadBalancerID        string
+	MasterZoneID          string
+	SlaveZoneID           string
+	BackendLabel          string
+	AclID                 string
+	VSwitchID             string
+	CertID                string
+	PrivateZoneID         string
+	PrivateZoneName       string
+	PrivateZoneRecordName string
+	PrivateZoneRecordTTL  string
+	TestLabel             string
 }
 
 func NewFrameWork(
@@ -124,13 +134,18 @@ func (f *FrameWorkE2E) SetUp() error {
 				Namespaces().
 				Create(ns)
 			if err != nil {
-				if strings.Contains(err.Error(), "exist") {
-					return true, RunNginxDeployment(f.Test, f.Client)
+				if !strings.Contains(err.Error(), "exist") {
+					f.Logf("retry initialize namespace: %s", err.Error())
+					return false, nil
 				}
-				f.Logf("initialize namespace: %s", err.Error())
-				return false, err
+				f.Logf("namespace %s exist", NameSpace)
 			}
-			return false, nil
+			err = RunNginxDeployment(f.Test, f.Client)
+			if err != nil {
+				f.Logf("retry create nginx: %s", err.Error())
+				return false, nil
+			}
+			return true, nil
 		},
 	)
 }
@@ -138,7 +153,7 @@ func (f *FrameWorkE2E) SetUp() error {
 func (f *FrameWorkE2E) Destroy() error {
 	return wait.PollImmediate(
 		6*time.Second,
-		30*time.Second,
+		2*time.Minute,
 		func() (done bool, err error) {
 			result, err := f.Client.
 				CoreV1().
@@ -292,6 +307,7 @@ func RunNginxDeployment(
 	t *testing.T,
 	client kubernetes.Interface,
 ) error {
+	var replica int32 = 2
 	nginx := &v12.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "nginx",
@@ -306,6 +322,7 @@ func RunNginxDeployment(
 					"run": "nginx",
 				},
 			},
+			Replicas: &replica,
 			Template: v1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
@@ -332,5 +349,26 @@ func RunNginxDeployment(
 		}
 		t.Logf("nginx already exist: %s", err.Error())
 	}
-	return nil
+	return wait.Poll(
+		1*time.Second,
+		20*time.Second,
+		func() (done bool, err error) {
+			pods, err := client.CoreV1().Pods(nginx.Namespace).List(metav1.ListOptions{LabelSelector: "run=nginx"})
+			if err != nil {
+				t.Logf("wait for nginx pod ready: %s", err.Error())
+				return false, nil
+			}
+			if len(pods.Items) != int(*nginx.Spec.Replicas) {
+				t.Logf("wait for nginx pod replicas: %d", len(pods.Items))
+				return false, nil
+			}
+			for _, pod := range pods.Items {
+				if pod.Status.Phase != "Running" {
+					t.Logf("wait for nginx pod Running: %s", pod.Name)
+					return false, nil
+				}
+			}
+			return true, nil
+		},
+	)
 }

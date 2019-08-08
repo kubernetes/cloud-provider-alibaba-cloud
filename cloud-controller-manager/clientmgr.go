@@ -79,7 +79,7 @@ func NewClientMgr(key, secret string) (*ClientMgr, error) {
 			c:     slb.NewSLBClientWithSecurityToken(key, secret, "", common.Region(region)),
 		},
 		privateZone: &PrivateZoneClient{
-			c: pvtz.NewPVTZClientWithSecurityToken(key, secret, "", common.Region(region)),
+			c: pvtz.NewPVTZClientWithSecurityToken(key, secret, "", common.Region("cn-hangzhou")),
 		},
 		routes: &RoutesClient{
 			client: ecs.NewVPCClientWithSecurityToken(key, secret, "", common.Region(region)),

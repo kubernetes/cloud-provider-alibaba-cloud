@@ -430,7 +430,7 @@ func ExtractAnnotationRequest(service *v1.Service) (*AnnotationRequest, *Annotat
 		request.StickySession = slb.FlagType(stickSession)
 		defaulted.StickySession = request.StickySession
 	} else {
-		request.StickySession = slb.FlagType(stickSession)
+		request.StickySession = slb.OffFlag
 		defaulted.StickySession = slb.OffFlag
 	}
 
