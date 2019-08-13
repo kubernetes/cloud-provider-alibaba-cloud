@@ -152,8 +152,8 @@ spec:
       - effect: NoSchedule
         operator: Exists
         key: node.cloudprovider.kubernetes.io/uninitialized
-      nodeSelector:
-         node-role.kubernetes.io/master: ""
+      #nodeSelector:
+      #   node-role.kubernetes.io/master: ""
       containers:
       - command:
         -  /cloud-controller-manager
