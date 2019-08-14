@@ -1,5 +1,3 @@
-# Cloud Provider 帮助文档（英文版）
-
 # Alibaba Cloud Provider
 
 ## Alibaba Cloud Provider introduction

@@ -37,6 +37,7 @@ import (
 type AnnotationRequest struct {
 	Loadbalancerid string
 	BackendLabel   string
+	BackendType    string
 
 	SSLPorts       string
 	AddressType    slb.AddressType

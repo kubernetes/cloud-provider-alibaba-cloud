@@ -193,6 +193,11 @@ spec:
 - **使用已有的负载均衡**
 
 默认情况下，使用已有的负载均衡实例，不会覆盖监听，如要强制覆盖已有监听，请配置service.beta.kubernetes.io/alicloud-loadbalancer-force-override-listeners为true。<br />使用已有的负载均衡暂不支持添加额外标签（annotation: service.beta.kubernetes.io/alibaba-cloud-loadbalancer-additional-resource-tags）
+<br />复用已有的负载均衡默认不覆盖已有监听，出于以下两点原因：
+1）如果已有负载均衡的监听上绑定了业务，强制覆盖会引发业务中断
+2）由于CCM目前支持的后端配置有限，无法处理一些复杂配置。如果有复杂的后端配置需求，可以通过手动方式自行配置。
+
+如存在以上两种情况不建议强制覆盖监听，如果已有负载均衡的监听端口不在使用，则可以强制覆盖。
 
 ```yaml
 apiVersion: v1
@@ -214,7 +219,7 @@ spec:
 
 - **使用已有的负载均衡，并强制覆盖已有监听**
 
-强制覆盖已有监听，会删除已有负载均衡实例上的已有监听。
+强制覆盖已有监听，如果监听端口冲突，则会删除已有监听。
 
 ```yaml
 apiVersion: v1

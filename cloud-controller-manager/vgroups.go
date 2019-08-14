@@ -237,47 +237,39 @@ func Ensure(v *vgroup, nodes interface{}) error {
 			})
 		}
 	case *v1.Endpoints:
+		var privateIpAddress []string
+		for _, ep := range nodes.(*v1.Endpoints).Subsets {
+			for _, addr := range ep.Addresses {
+				privateIpAddress = append(privateIpAddress, addr.IP)
+			}
+		}
 		targs := &ecs.DescribeNetworkInterfacesArgs{
-			VpcId:    v.VpcID,
-			RegionId: v.RegionId,
+			VpcID:            v.VpcID,
+			RegionId:         v.RegionId,
+			PrivateIpAddress: privateIpAddress,
 		}
 		resp, err := v.InsClient.DescribeNetworkInterfaces(targs)
 		if err != nil {
 			return fmt.Errorf("call DescribeNetworkInterfaces: %s", err.Error())
 		}
-		for _, ep := range nodes.(*v1.Endpoints).Subsets {
-			for _, addr := range ep.Addresses {
-				found := false
-				eniid := ""
-				for _, eni := range resp.NetworkInterfaceSets.NetworkInterfaceSet {
-					for _, ip := range eni.PrivateIpSets.PrivateIpSet {
-						if addr.IP == ip.PrivateIpAddress {
-							found = true
-							eniid = eni.NetworkInterfaceId
-							break
-						}
-					}
-					if found {
-						break
-					}
-				}
-				if !found {
-					return fmt.Errorf("private ip address not found in openapi %s", addr.IP)
-				}
-				if eniid == "" {
-					return fmt.Errorf("unexpected empty eni id found %s", addr.IP)
-				}
-				backend = append(
-					backend,
-					slb.VBackendServerType{
-						ServerId: eniid,
-						Weight:   100,
-						Type:     "eni",
-						Port:     int(v.NamedKey.Port),
-						ServerIp: addr.IP,
-					},
-				)
+		for _, addrIP := range privateIpAddress {
+			eniid, err := findENIbyAddrIP(resp, addrIP)
+			if err != nil {
+				return err
 			}
+			if eniid == "" {
+				return fmt.Errorf("unexpected empty eni id found %s", addrIP)
+			}
+			backend = append(
+				backend,
+				slb.VBackendServerType{
+					ServerId: eniid,
+					Weight:   100,
+					Type:     "eni",
+					Port:     int(v.NamedKey.Port),
+					ServerIp: addrIP,
+				},
+			)
 		}
 	default:
 		return fmt.Errorf("unknown backend type, %s", reflect.TypeOf(nodes))
@@ -387,7 +379,7 @@ func BuildVirturalGroupFromService(
 			VpcID:          client.vpcid,
 		}
 		if isEniBackend(service) {
-			vg.NamedKey.Port = port.Port
+			vg.NamedKey.Port = port.TargetPort.IntVal
 		}
 		vgrps = append(vgrps, vg)
 	}
@@ -430,4 +422,15 @@ func BuildVirtualGroupFromRemoteAPI(
 		)
 	}
 	return vgrps, nil
+}
+
+func findENIbyAddrIP(resp *ecs.DescribeNetworkInterfacesResponse, addrIP string) (string, error) {
+	for _, eni := range resp.NetworkInterfaceSets.NetworkInterfaceSet {
+		for _, privateIpType := range eni.PrivateIpSets.PrivateIpSet {
+			if addrIP == privateIpType.PrivateIpAddress {
+				return eni.NetworkInterfaceId, nil
+			}
+		}
+	}
+	return "", fmt.Errorf("private ip address not found in openapi %s", addrIP)
 }

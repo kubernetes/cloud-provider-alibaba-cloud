@@ -38,12 +38,6 @@ const (
 	// exclude from load balancers created by a cloud provider.
 	LabelNodeRoleExcludeBalancer = "alpha.service-controller.kubernetes.io/exclude-balancer"
 	CCM_CLASS                    = "service.beta.kubernetes.io/class"
-	BACKEND_TYPE_LABEL           = "service.beta.kubernetes.io/backend-type"
-)
-
-const (
-	BACKEND_TYPE_ENI = "eni"
-	BACKEND_TYPE_ECS = "ecs"
 )
 
 type EnsureENI interface {

@@ -376,17 +376,46 @@ func ExpectExistAndEqual(f *FrameWork) error {
 
 		backends := vg.BackendServers.BackendServer
 
-		if f.SVC.Spec.ExternalTrafficPolicy == "Local" {
+		if f.SVC.Annotations[ServiceAnnotationLoadBalancerBackendType] == "eni" {
+
+			if len(backends) != len(f.Endpoint.Subsets[0].Addresses) {
+				return fmt.Errorf("Endpoint vgroup backend server must be %d", len(f.Nodes))
+			}
+			sort.SliceStable(
+				backends,
+				func(i, j int) bool {
+					if backends[i].ServerIp < backends[j].ServerIp {
+						return true
+					}
+					return false
+				},
+			)
+			endpoints := f.Endpoint.Subsets[0].Addresses
+
+			sort.SliceStable(
+				endpoints,
+				func(i, j int) bool {
+					if endpoints[i].IP < endpoints[j].IP {
+						return true
+					}
+					return false
+				},
+			)
+			for k, v := range backends {
+				if v.ServerIp != endpoints[k].IP {
+					return fmt.Errorf("backend not equal Endpoint")
+				}
+			}
+		} else if f.SVC.Spec.ExternalTrafficPolicy == "Local" {
 
 			if len(f.Endpoint.Subsets) == 0 ||
 				len(backends) != len(f.Endpoint.Subsets[0].Addresses) {
 				return fmt.Errorf("Endpoint vgroup backend is not equal. ")
 			}
 
-			found := false
 			var endpointPrIds []string
 			for _, endpoint := range f.Endpoint.Subsets[0].Addresses {
-				found = false
+				found := false
 				for _, node := range f.Nodes {
 					if *endpoint.NodeName == node.Name {
 						endpointPrId := strings.Split(node.Spec.ProviderID, ".")
@@ -427,36 +456,6 @@ func ExpectExistAndEqual(f *FrameWork) error {
 				}
 			}
 
-		} else if f.SVC.Annotations["service.beta.kubernetes.io/backend-type"] == "eni" {
-
-			if len(backends) != len(f.Endpoint.Subsets[0].Addresses) {
-				return fmt.Errorf("Endpoint vgroup backend server must be %d", len(f.Nodes))
-			}
-			sort.SliceStable(
-				backends,
-				func(i, j int) bool {
-					if backends[i].ServerIp < backends[j].ServerIp {
-						return true
-					}
-					return false
-				},
-			)
-			endpoints := f.Endpoint.Subsets[0].Addresses
-
-			sort.SliceStable(
-				endpoints,
-				func(i, j int) bool {
-					if endpoints[i].IP < endpoints[j].IP {
-						return true
-					}
-					return false
-				},
-			)
-			for k, v := range backends {
-				if v.ServerIp != endpoints[k].IP {
-					return fmt.Errorf("backend not equal Endpoint")
-				}
-			}
 		} else {
 			f.Nodes = filterOutMaster(f.Nodes)
 			if !f.hasAnnotation(ServiceAnnotationLoadBalancerBackendLabel) && len(backends) != len(f.Nodes) {
@@ -624,7 +623,7 @@ func (f *FrameWork) ListenerEqual(id string, p v1.ServicePort, proto string) err
 		}
 		if resp.BackendServerPort == 0 ||
 			(!isEniBackend(f.SVC) && resp.BackendServerPort != int(p.NodePort)) ||
-			(isEniBackend(f.SVC) && resp.BackendServerPort != int(p.Port)) {
+			(isEniBackend(f.SVC) && resp.BackendServerPort != int(p.TargetPort.IntVal)) {
 			return fmt.Errorf("TCPBackendServerPortNotEqual")
 		}
 
@@ -650,7 +649,7 @@ func (f *FrameWork) ListenerEqual(id string, p v1.ServicePort, proto string) err
 		}
 		if resp.BackendServerPort == 0 ||
 			(!isEniBackend(f.SVC) && resp.BackendServerPort != int(p.NodePort)) ||
-			(isEniBackend(f.SVC) && resp.BackendServerPort != int(p.Port)) {
+			(isEniBackend(f.SVC) && resp.BackendServerPort != int(p.TargetPort.IntVal)) {
 			return fmt.Errorf("UDPBackendServerPortNotEqual")
 		}
 
@@ -671,7 +670,7 @@ func (f *FrameWork) ListenerEqual(id string, p v1.ServicePort, proto string) err
 		}
 		if resp.BackendServerPort == 0 ||
 			(!isEniBackend(f.SVC) && resp.BackendServerPort != int(p.NodePort)) ||
-			(isEniBackend(f.SVC) && resp.BackendServerPort != int(p.Port)) {
+			(isEniBackend(f.SVC) && resp.BackendServerPort != int(p.TargetPort.IntVal)) {
 			return fmt.Errorf("HTTPBackendServerPortNotEqual: %v, %v,%v", resp.BackendServerPort, p.NodePort, p.Port)
 		}
 
@@ -699,7 +698,7 @@ func (f *FrameWork) ListenerEqual(id string, p v1.ServicePort, proto string) err
 		}
 		if resp.BackendServerPort == 0 ||
 			(!isEniBackend(f.SVC) && resp.BackendServerPort != int(p.NodePort)) ||
-			(isEniBackend(f.SVC) && resp.BackendServerPort != int(p.Port)) {
+			(isEniBackend(f.SVC) && resp.BackendServerPort != int(p.TargetPort.IntVal)) {
 			return fmt.Errorf("HTTPSBackendServerPortNotEqual")
 		}
 		if resp.ServerCertificateId == "" ||
@@ -842,7 +841,7 @@ func (f *FrameWork) ListenerEqual(id string, p v1.ServicePort, proto string) err
 
 	if f.hasAnnotation(ServiceAnnotationLoadBalancerPrivateZoneRecordTTL) {
 		if privateZoneRecordTTL != defd.PrivateZoneRecordTTL {
-			return fmt.Errorf("error private zone ttl. set %s, get %s ",
+			return fmt.Errorf("error private zone ttl. set %v, get %v ",
 				defd.PrivateZoneRecordTTL, privateZoneRecordTTL)
 		}
 	}
@@ -917,7 +916,6 @@ func (f *FrameWork) ListenerEqual(id string, p v1.ServicePort, proto string) err
 			return fmt.Errorf("health check flag error")
 		}
 	}
-	//=========================== Health Check Test ============================
 
 	return nil
 }

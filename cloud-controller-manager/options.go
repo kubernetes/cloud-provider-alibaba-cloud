@@ -17,6 +17,7 @@ limitations under the License.
 package alicloud
 
 import (
+	"k8s.io/cloud-provider-alibaba-cloud/cloud-controller-manager/utils"
 	"strconv"
 	"strings"
 	"unicode"
@@ -167,6 +168,9 @@ const (
 
 	// ServiceAnnotationLoadBalancerPrivateZoneRecordTTL private zone record ttl
 	ServiceAnnotationLoadBalancerPrivateZoneRecordTTL = ServiceAnnotationPrivateZonePrefix + "record-ttl"
+
+	// ServiceAnnotationLoadBalancerBackendType backend type
+	ServiceAnnotationLoadBalancerBackendType = utils.BACKEND_TYPE_LABEL
 )
 
 //compatible to old camel annotation
@@ -509,6 +513,15 @@ func ExtractAnnotationRequest(service *v1.Service) (*AnnotationRequest, *Annotat
 			defaulted.PrivateZoneRecordTTL = ttl
 			request.PrivateZoneRecordTTL = defaulted.PrivateZoneRecordTTL
 		}
+	}
+
+	backendType, ok := annotation[ServiceAnnotationLoadBalancerBackendType]
+	if ok {
+		request.BackendType = backendType
+		defaulted.BackendType = backendType
+	} else {
+		defaulted.BackendType = utils.BACKEND_TYPE_ECS
+		request.BackendType = defaulted.BackendType
 	}
 
 	return defaulted, request
