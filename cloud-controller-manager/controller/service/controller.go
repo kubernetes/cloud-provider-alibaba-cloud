@@ -2,6 +2,7 @@ package service
 
 import (
 	"fmt"
+	"github.com/denverdino/aliyungo/slb"
 	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -724,8 +725,10 @@ func NodeConditionPredicate(
 		// We add the master to the node list, but its unschedulable.
 		// So we use this to filter the master.
 		if node.Spec.Unschedulable {
-			utils.Logf(svc, "ignore node %s with unschedulable condition", node.Name)
-			return false
+			if slb.FlagType(svc.Annotations[utils.ServiceAnnotationLoadBalancerRemoveUnscheduledBackend]) == slb.OnFlag {
+				utils.Logf(svc, "ignore node %s with unschedulable condition", node.Name)
+				return false
+			}
 		}
 
 		// As of 1.6, we will taint the master, but not necessarily mark
