@@ -133,18 +133,17 @@ func HandlerForNode(
 	cnc *CloudNodeController,
 	ninformer coreinformers.NodeInformer,
 ) {
-	ninformer.Informer().AddEventHandlerWithResyncPeriod(
+	ninformer.Informer().AddEventHandler(
 		cache.ResourceEventHandlerFuncs{
 			AddFunc: func(obj interface{}) {
 				node := obj.(*v1.Node)
-				cnc.AddCloudNode(node)
-			},
-			UpdateFunc: func(old, newm interface{}) {
-				newmo := newm.(*v1.Node)
-				cnc.AddCloudNode(newmo)
+				glog.V(4).Infof("receive node add event: %s",node.Name)
+				err := cnc.AddCloudNode(node)
+				if err != nil {
+					glog.Errorf("remove cloud node taints fail: %s",err.Error())
+				}
 			},
 		},
-		3*time.Minute,
 	)
 }
 
@@ -182,10 +181,13 @@ func (cnc *CloudNodeController) Run(stopCh <-chan struct{}) {
 			}
 
 			// ignore return value, retry on error
-			batchAddressUpdate(
+			err = batchAddressUpdate(
 				nodes.Items,
 				cnc.syncNodeAddress,
 			)
+			if err != nil {
+				glog.Errorf("periodically update address: %s",err.Error())
+			}
 		},
 		cnc.statusFrequency,
 		wait.NeverStop,
@@ -200,23 +202,53 @@ func (cnc *CloudNodeController) Run(stopCh <-chan struct{}) {
 				return
 			}
 			// ignore return value, retry on error
-			batchAddressUpdate(
+			err = batchAddressUpdate(
 				nodes.Items,
 				cnc.syncCloudNodes,
 			)
+			if err != nil {
+				glog.Errorf("periodically try detect node existence: %s",err.Error())
+			}
 		},
 		cnc.monitorPeriod,
 		wait.NeverStop,
 	)
+
+	// Start a loop to periodically check if uninitialized taints has been remove from node
+	go wait.Until(
+		func() {
+			nodes, err := nodeLists(cnc.kclient)
+			if err != nil {
+				glog.Errorf("Error monitoring node status: %v", err)
+				return
+			}
+			for _, node := range nodes.Items {
+				err := cnc.AddCloudNode(&node)
+				if err != nil {
+					glog.Errorf("periodically remove cloud node %s taints: %s",node.Name, err.Error())
+				}
+			}
+		},
+		3 * time.Minute,
+		wait.NeverStop,
+	)
 }
 
-func (cnc *CloudNodeController) AddCloudNode(node *v1.Node) {
-	cloudTaint := findCloudTaint(node.Spec.Taints)
+func (cnc *CloudNodeController) AddCloudNode(node *v1.Node) error {
+	curNode, err := cnc.kclient.
+					CoreV1().
+					Nodes().
+					Get(node.Name, metav1.GetOptions{})
+	if err != nil {
+		//retry
+		return fmt.Errorf("retrieve node error: %s", err.Error())
+	}
+	cloudTaint := findCloudTaint(curNode.Spec.Taints)
 	if cloudTaint == nil {
 		glog.V(4).Infof("Node %s is registered without cloud taint. Will not process.", node.Name)
-		return
+		return nil
 	}
-	cnc.doAddCloudNode(node)
+	return cnc.doAddCloudNode(curNode)
 }
 
 // syncNodeAddress updates the nodeAddress
@@ -306,6 +338,7 @@ func (cnc *CloudNodeController) doAddCloudNode(node *v1.Node) error {
 		2*time.Second,
 		20*time.Second,
 		func() (done bool, err error) {
+			glog.V(5).Infof("try remove cloud taints for %s",node.Name)
 			curNode, err := cnc.kclient.CoreV1().Nodes().Get(node.Name, metav1.GetOptions{})
 			if err != nil {
 				glog.Errorf("retrieve node error: %s", err.Error())
@@ -387,6 +420,7 @@ func (cnc *CloudNodeController) doAddCloudNode(node *v1.Node) error {
 				glog.Errorf("patch error: %s", err.Error())
 				return false, nil
 			}
+			glog.V(5).Infof("finished remove uninitialized cloud taints for %s",node.Name)
 			// After adding, call UpdateNodeAddress to set the CloudProvider provided IPAddresses
 			// So that users do not see any significant delay in IP addresses being filled into the node
 			_ = cnc.syncNodeAddress([]v1.Node{*nnode})
@@ -587,7 +621,7 @@ func removeCloudTaints(node *v1.Node) {
 	// make sure only cloud node is processed
 	cloudTaint := findCloudTaint(node.Spec.Taints)
 	if cloudTaint == nil {
-		glog.Infof("Node %s is registered without "+
+		glog.Infof("RemoveCloudTaints, Node %s is registered without "+
 			"cloud taint. Will not process.", node.Name)
 		return
 	}

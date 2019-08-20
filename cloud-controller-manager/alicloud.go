@@ -432,6 +432,10 @@ func (c *Cloud) NodeAddresses(name types.NodeName) ([]v1.NodeAddress, error) {
 }
 
 func (c *Cloud) ListInstances(ids []string) (map[string]*node.CloudNodeAttribute, error) {
+	start := time.Now()
+	defer func() {
+		glog.V(5).Infof("ListInstance take %s to return", time.Now().Sub(start)/time.Second)
+	}()
 	return c.climgr.Instances().ListInstances(ids)
 }
 
