@@ -307,7 +307,7 @@ func RunNginxDeployment(
 	t *testing.T,
 	client kubernetes.Interface,
 ) error {
-	var replica int32 = 2
+	var replica int32 = 4
 	nginx := &v12.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "nginx",

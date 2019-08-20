@@ -2,7 +2,6 @@ package service
 
 import (
 	"fmt"
-	"github.com/denverdino/aliyungo/slb"
 	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -22,6 +21,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/metrics"
 	"k8s.io/kubernetes/staging/src/k8s.io/client-go/util/workqueue"
 	"reflect"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -42,7 +42,6 @@ const (
 )
 
 type EnsureENI interface {
-
 	// EnsureLoadbalancerWithENI
 	// creates a new load balancer 'name', or updates the existing one. Returns the
 	// status of the balancer. Implementations must treat the *v1.svc and *v1.Endpoints
@@ -678,54 +677,31 @@ func AvailableNodes(
 	svc *v1.Service,
 	ifactory informers.SharedInformerFactory,
 ) ([]*v1.Node, error) {
-	predicate, err := NodeConditionPredicate(svc, ifactory)
+	predicate, err := NodeConditionPredicate(svc)
 	if err != nil {
 		return nil, fmt.Errorf("error get predicate: %s", err.Error())
 	}
-	return ifactory.
+	nodes, err := ifactory.
 		Core().
 		V1().
 		Nodes().
 		Lister().
 		ListWithPredicate(predicate)
+	if err != nil {
+		return nodes, err
+	}
+	if ServiceModeLocal(svc) {
+		nodes, err = AvailableNodeModeLocal(nodes, svc, ifactory)
+	}
+	return nodes, err
 }
 
-func NodeConditionPredicate(
-	svc *v1.Service,
-	ifactory informers.SharedInformerFactory,
-) (corelisters.NodeConditionPredicate, error) {
-
-	var (
-		nodes     = make(map[string]string)
-		records   []string
-		endpoints = ifactory.Core().V1().Endpoints().Lister()
-	)
-
-	if ServiceModeLocal(svc) {
-		ep, err := endpoints.Endpoints(svc.Namespace).Get(svc.Name)
-		if err != nil {
-			return nil, fmt.Errorf("find endpoints for service "+
-				"[%s] with error [%s]", key(svc), err.Error())
-		}
-
-		utils.Logf(svc, "endpoint has [%d] subsets. ", len(ep.Subsets))
-
-		for _, sub := range ep.Subsets {
-			for _, add := range sub.Addresses {
-				utils.Logf(svc, "prepare to add node [%s] for service backend", *add.NodeName)
-				nodes[*add.NodeName] = *add.NodeName
-				records = append(records, *add.NodeName)
-			}
-		}
-
-		utils.Logf(svc, "predicate: local mode service should accept node %v for service\n", records)
-	}
+func NodeConditionPredicate(svc *v1.Service) (corelisters.NodeConditionPredicate, error) {
 
 	predicate := func(node *v1.Node) bool {
-		// We add the master to the node list, but its unschedulable.
-		// So we use this to filter the master.
+		// Filter unschedulable node.
 		if node.Spec.Unschedulable {
-			if slb.FlagType(svc.Annotations[utils.ServiceAnnotationLoadBalancerRemoveUnscheduledBackend]) == slb.OnFlag {
+			if svc.Annotations[utils.ServiceAnnotationLoadBalancerRemoveUnscheduledBackend] == "on" {
 				utils.Logf(svc, "ignore node %s with unschedulable condition", node.Name)
 				return false
 			}
@@ -757,15 +733,53 @@ func NodeConditionPredicate(
 				return false
 			}
 		}
-		if ServiceModeLocal(svc) {
-			if _, exist := nodes[node.Name]; !exist {
-				utils.Logf(svc, "node %s does not contain local pod, ignore.", node.Name)
-				// accept node which the pod is reside in.
-				return false
-			}
-		}
+
 		return true
 	}
 
 	return predicate, nil
+}
+
+func AvailableNodeModeLocal(nodes []*v1.Node, svc *v1.Service,
+	ifactory informers.SharedInformerFactory) ([]*v1.Node, error) {
+	var (
+		availableNodes    []*v1.Node
+		records           []string
+		availableNodesMap = make(map[string]float64)
+		endpoints         = ifactory.Core().V1().Endpoints().Lister()
+		podNum            = 0.0
+	)
+
+	ep, err := endpoints.Endpoints(svc.Namespace).Get(svc.Name)
+	if err != nil {
+		return nil, fmt.Errorf("find endpoints for service "+
+			"[%s] with error [%s]", key(svc), err.Error())
+	}
+
+	utils.Logf(svc, "endpoint has [%d] subsets. ", len(ep.Subsets))
+	for _, sub := range ep.Subsets {
+		for _, add := range sub.Addresses {
+			utils.Logf(svc, "prepare to add node [%s] for service backend", *add.NodeName)
+			if _, exist := availableNodesMap[*add.NodeName]; !exist {
+				availableNodesMap[*add.NodeName] = 1
+			} else {
+				availableNodesMap[*add.NodeName] += 1
+			}
+		}
+	}
+
+	for _, node := range nodes {
+		if _, exist := availableNodesMap[node.Name]; exist {
+			availableNodes = append(availableNodes, node)
+			podNum += availableNodesMap[node.Name]
+			records = append(records, node.Name)
+		}
+	}
+
+	utils.Logf(svc, "predicate: local mode service should accept node %v for service\n", records)
+
+	for _, node := range availableNodes {
+		node.Labels["weight"] = strconv.Itoa(int(availableNodesMap[node.Name] / podNum * 100.0))
+	}
+	return availableNodes, nil
 }

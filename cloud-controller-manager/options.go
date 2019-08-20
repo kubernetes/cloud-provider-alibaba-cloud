@@ -526,10 +526,10 @@ func ExtractAnnotationRequest(service *v1.Service) (*AnnotationRequest, *Annotat
 
 	removeUnscheduledBackend, ok := annotation[utils.ServiceAnnotationLoadBalancerRemoveUnscheduledBackend]
 	if ok {
-		request.RemoveUnscheduledBackend = slb.FlagType(removeUnscheduledBackend)
+		request.RemoveUnscheduledBackend = removeUnscheduledBackend
 		defaulted.RemoveUnscheduledBackend = request.RemoveUnscheduledBackend
 	} else {
-		defaulted.RemoveUnscheduledBackend = slb.OffFlag
+		defaulted.RemoveUnscheduledBackend = "off"
 		request.RemoveUnscheduledBackend = defaulted.RemoveUnscheduledBackend
 	}
 
