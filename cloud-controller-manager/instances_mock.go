@@ -137,7 +137,7 @@ func (m *mockClientInstanceSDK) DescribeNetworkInterfaces(args *ecs.DescribeNetw
 	INSTANCE.enis.Range(
 		func(key, value interface{}) bool {
 			k := key.(string)
-			if strings.Contains(k, args.VpcId) {
+			if strings.Contains(k, args.VpcID) {
 				ntype = append(ntype, value.(ecs.NetworkInterfaceType))
 			}
 			return true

@@ -5,6 +5,7 @@ import (
 	"github.com/denverdino/aliyungo/common"
 	"github.com/denverdino/aliyungo/ecs"
 	"github.com/denverdino/aliyungo/metadata"
+	"github.com/denverdino/aliyungo/pvtz"
 	"github.com/denverdino/aliyungo/slb"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -224,6 +225,7 @@ func (f *FrameWork) LoadBalancer() *LoadBalancerClient { return f.Cloud.climgr.L
 func (f *FrameWork) SLBSDK() ClientSLBSDK           { return f.Cloud.climgr.LoadBalancers().c }
 func (f *FrameWork) RouteSDK() RouteSDK             { return f.Cloud.climgr.Routes().client }
 func (f *FrameWork) InstanceSDK() ClientInstanceSDK { return f.Cloud.climgr.Instances().c }
+func (f *FrameWork) PVTZSDK() ClientPVTZSDK         { return f.Cloud.climgr.PrivateZones().c }
 
 func (f *FrameWork) hasAnnotation(anno string) bool { return serviceAnnotation(f.SVC, anno) != "" }
 
@@ -299,7 +301,7 @@ func ExpectExistAndEqual(f *FrameWork) error {
 				return fmt.Errorf("proto transfor error")
 			}
 			// If setting forward port, the BackendServerPort with http proto is 0.
-			// So check whether the http port of slb equals annotation's port.
+			// So check whether the http port of slb equals the annotation's port.
 			if f.hasAnnotation(ServiceAnnotationLoadBalancerForwardPort) && proto == "http" {
 				ports := strings.Split(serviceAnnotation(f.SVC, ServiceAnnotationLoadBalancerForwardPort), ":")
 				if len(ports) != 2 {
@@ -374,8 +376,7 @@ func ExpectExistAndEqual(f *FrameWork) error {
 
 		backends := vg.BackendServers.BackendServer
 
-		if f.SVC.Spec.ExternalTrafficPolicy == "Local" ||
-			f.SVC.Annotations["service.beta.kubernetes.io/backend-type"] == "eni" {
+		if f.SVC.Annotations[ServiceAnnotationLoadBalancerBackendType] == "eni" {
 
 			if len(backends) != len(f.Endpoint.Subsets[0].Addresses) {
 				return fmt.Errorf("Endpoint vgroup backend server must be %d", len(f.Nodes))
@@ -405,6 +406,56 @@ func ExpectExistAndEqual(f *FrameWork) error {
 					return fmt.Errorf("backend not equal Endpoint")
 				}
 			}
+		} else if f.SVC.Spec.ExternalTrafficPolicy == "Local" {
+
+			if len(f.Endpoint.Subsets) == 0 ||
+				len(backends) != len(f.Endpoint.Subsets[0].Addresses) {
+				return fmt.Errorf("Endpoint vgroup backend is not equal. ")
+			}
+
+			var endpointPrIds []string
+			for _, endpoint := range f.Endpoint.Subsets[0].Addresses {
+				found := false
+				for _, node := range f.Nodes {
+					if *endpoint.NodeName == node.Name {
+						endpointPrId := strings.Split(node.Spec.ProviderID, ".")
+						if len(endpointPrId) != 2 {
+							return fmt.Errorf("Node providerID %v format error. ", endpointPrId[1])
+						}
+						endpointPrIds = append(endpointPrIds, endpointPrId[1])
+						found = true
+						break
+					}
+				}
+				if !found {
+					return fmt.Errorf("Fail to find node: %s in Endpoint vgroup backend. ", *endpoint.NodeName)
+				}
+			}
+			sort.SliceStable(
+				backends,
+				func(i, j int) bool {
+					if backends[i].ServerId < backends[j].ServerId {
+						return true
+					}
+					return false
+				},
+			)
+
+			sort.SliceStable(
+				endpointPrIds,
+				func(i, j int) bool {
+					if endpointPrIds[i] < endpointPrIds[j] {
+						return true
+					}
+					return false
+				},
+			)
+			for k, v := range backends {
+				if v.ServerId != endpointPrIds[k] {
+					return fmt.Errorf("backend %v not equal Endpoint %v", v.ServerId, endpointPrIds[k])
+				}
+			}
+
 		} else {
 			f.Nodes = filterOutMaster(f.Nodes)
 			if !f.hasAnnotation(ServiceAnnotationLoadBalancerBackendLabel) && len(backends) != len(f.Nodes) {
@@ -450,7 +501,7 @@ func ExpectExistAndEqual(f *FrameWork) error {
 				nodes = tpms
 			}
 			if len(backends) > len(nodes) {
-				return fmt.Errorf("backend node not equal")
+				return fmt.Errorf("backend:%v= node:%v not equal", len(backends), len(nodes))
 			}
 			for k, v := range backends {
 				_, ida, err := nodeFromProviderID(nodes[k].Spec.ProviderID)
@@ -556,14 +607,12 @@ func (f *FrameWork) ListenerEqual(id string, p v1.ServicePort, proto string) err
 		cookie             = ""
 		persistenceTimeout = 0
 
-		privateZoneName       = ""
-		privateZoneId         = ""
-		privateZoneRecordName = ""
-		privateZoneRecordTTL  = ""
-		aclStatus             = ""
-		aclId                 = ""
-		aclType               = ""
-		scheduler             = ""
+		privateZoneRecordTTL = 0
+
+		aclStatus = ""
+		aclId     = ""
+		aclType   = ""
+		scheduler = ""
 	)
 	defd, _ := ExtractAnnotationRequest(f.SVC)
 	switch proto {
@@ -574,7 +623,7 @@ func (f *FrameWork) ListenerEqual(id string, p v1.ServicePort, proto string) err
 		}
 		if resp.BackendServerPort == 0 ||
 			(!isEniBackend(f.SVC) && resp.BackendServerPort != int(p.NodePort)) ||
-			(isEniBackend(f.SVC) && resp.BackendServerPort != int(p.Port)) {
+			(isEniBackend(f.SVC) && resp.BackendServerPort != int(p.TargetPort.IntVal)) {
 			return fmt.Errorf("TCPBackendServerPortNotEqual")
 		}
 
@@ -600,7 +649,7 @@ func (f *FrameWork) ListenerEqual(id string, p v1.ServicePort, proto string) err
 		}
 		if resp.BackendServerPort == 0 ||
 			(!isEniBackend(f.SVC) && resp.BackendServerPort != int(p.NodePort)) ||
-			(isEniBackend(f.SVC) && resp.BackendServerPort != int(p.Port)) {
+			(isEniBackend(f.SVC) && resp.BackendServerPort != int(p.TargetPort.IntVal)) {
 			return fmt.Errorf("UDPBackendServerPortNotEqual")
 		}
 
@@ -621,8 +670,8 @@ func (f *FrameWork) ListenerEqual(id string, p v1.ServicePort, proto string) err
 		}
 		if resp.BackendServerPort == 0 ||
 			(!isEniBackend(f.SVC) && resp.BackendServerPort != int(p.NodePort)) ||
-			(isEniBackend(f.SVC) && resp.BackendServerPort != int(p.Port)) {
-			return fmt.Errorf("HTTPBackendServerPortNotEqual")
+			(isEniBackend(f.SVC) && resp.BackendServerPort != int(p.TargetPort.IntVal)) {
+			return fmt.Errorf("HTTPBackendServerPortNotEqual: %v, %v,%v", resp.BackendServerPort, p.NodePort, p.Port)
 		}
 
 		healthCheckTimeout = resp.HealthCheckTimeout
@@ -649,7 +698,7 @@ func (f *FrameWork) ListenerEqual(id string, p v1.ServicePort, proto string) err
 		}
 		if resp.BackendServerPort == 0 ||
 			(!isEniBackend(f.SVC) && resp.BackendServerPort != int(p.NodePort)) ||
-			(isEniBackend(f.SVC) && resp.BackendServerPort != int(p.Port)) {
+			(isEniBackend(f.SVC) && resp.BackendServerPort != int(p.TargetPort.IntVal)) {
 			return fmt.Errorf("HTTPSBackendServerPortNotEqual")
 		}
 		if resp.ServerCertificateId == "" ||
@@ -702,25 +751,30 @@ func (f *FrameWork) ListenerEqual(id string, p v1.ServicePort, proto string) err
 		}
 	}
 	// --------------------------- SessionStick ----------------------------
-	if f.hasAnnotation(ServiceAnnotationLoadBalancerSessionStick) {
+
+	if (proto == "http" || proto == "https") &&
+		f.hasAnnotation(ServiceAnnotationLoadBalancerSessionStick) {
 		if sessionStick != string(defd.StickySession) {
 			return fmt.Errorf("sticky session error")
 		}
 	}
 
-	if f.hasAnnotation(ServiceAnnotationLoadBalancerSessionStickType) {
+	if (proto == "http" || proto == "https") &&
+		f.hasAnnotation(ServiceAnnotationLoadBalancerSessionStickType) {
 		if sessionStickType != string(defd.StickySessionType) {
 			return fmt.Errorf("stick session type error")
 		}
 	}
 
-	if f.hasAnnotation(ServiceAnnotationLoadBalancerCookieTimeout) {
+	if (proto == "http" || proto == "https") &&
+		f.hasAnnotation(ServiceAnnotationLoadBalancerCookieTimeout) {
 		if cookieTimeout != defd.CookieTimeout {
 			return fmt.Errorf("cookie timeout error")
 		}
 	}
 
-	if f.hasAnnotation(ServiceAnnotationLoadBalancerCookie) {
+	if (proto == "http" || proto == "https") &&
+		f.hasAnnotation(ServiceAnnotationLoadBalancerCookie) {
 		if cookie != string(defd.Cookie) {
 			return fmt.Errorf("cookie error")
 		}
@@ -733,28 +787,62 @@ func (f *FrameWork) ListenerEqual(id string, p v1.ServicePort, proto string) err
 		}
 	}
 
-	// ++++++++++++++++++++++++++++ Private Zone +++++++++++++++++++++++++++++
-	if f.hasAnnotation(ServiceAnnotationLoadBalancerPrivateZoneName) {
-		if privateZoneName != string(defd.PrivateZoneName) {
-			return fmt.Errorf("private zone name error")
+	//++++++++++++++++++++++++++++ Private Zone +++++++++++++++++++++++++++++
+	if f.hasAnnotation(ServiceAnnotationLoadBalancerPrivateZoneId) {
+		pz, err := f.PVTZSDK().DescribeZoneInfo(
+			&pvtz.DescribeZoneInfoArgs{
+				ZoneId: defd.PrivateZoneId,
+			})
+		if err != nil {
+			return fmt.Errorf("get private zone info by zone id error: %s. ", err)
+		}
+
+		if pz.ZoneId != string(defd.PrivateZoneId) {
+			return fmt.Errorf("private zone id. set %s, get %s ",
+				defd.PrivateZoneId, pz.ZoneId)
 		}
 	}
 
-	if f.hasAnnotation(ServiceAnnotationLoadBalancerPrivateZoneId) {
-		if privateZoneId != string(defd.PrivateZoneId) {
-			return fmt.Errorf("private zone id error")
+	if f.hasAnnotation(ServiceAnnotationLoadBalancerPrivateZoneName) {
+		pz, err := f.PVTZSDK().DescribeZoneInfo(
+			&pvtz.DescribeZoneInfoArgs{
+				ZoneId: defd.PrivateZoneId,
+			})
+		if err != nil {
+			return fmt.Errorf("get private zone info by zone name error: %s. ", err)
+		}
+		if pz.ZoneName != defd.PrivateZoneName {
+			return fmt.Errorf("private zone name set %s, get %s ",
+				defd.PrivateZoneName, pz.ZoneName)
 		}
 	}
 
 	if f.hasAnnotation(ServiceAnnotationLoadBalancerPrivateZoneRecordName) {
-		if privateZoneRecordName != string(defd.PrivateZoneRecordName) {
+		pvrds, err := f.PVTZSDK().DescribeZoneRecords(
+			&pvtz.DescribeZoneRecordsArgs{
+				ZoneId: defd.PrivateZoneId,
+			},
+		)
+		if err != nil {
+			return fmt.Errorf("DescribeZoneRecords error: %s. ", err)
+		}
+		found := false
+		for _, record := range pvrds {
+			if record.Rr == defd.PrivateZoneRecordName {
+				privateZoneRecordTTL = record.Ttl
+				found = true
+				break
+			}
+		}
+		if !found {
 			return fmt.Errorf("private zone record name error")
 		}
 	}
 
 	if f.hasAnnotation(ServiceAnnotationLoadBalancerPrivateZoneRecordTTL) {
-		if privateZoneRecordTTL != string(defd.PrivateZoneRecordTTL) {
-			return fmt.Errorf("private zone record ttl error")
+		if privateZoneRecordTTL != defd.PrivateZoneRecordTTL {
+			return fmt.Errorf("error private zone ttl. set %v, get %v ",
+				defd.PrivateZoneRecordTTL, privateZoneRecordTTL)
 		}
 	}
 
@@ -765,32 +853,28 @@ func (f *FrameWork) ListenerEqual(id string, p v1.ServicePort, proto string) err
 			return fmt.Errorf("health check type error: %s,%s", healthCheckType, defd.HealthCheckType)
 		}
 	}
-	if f.hasAnnotation(ServiceAnnotationLoadBalancerHealthCheckURI) {
-		if healthCheckURI != string(defd.HealthCheckURI) {
-			return fmt.Errorf("health check URI error")
-		}
-	}
 
+	// Health checks with TCP type only work with listeners of the same protocol.
 	if f.hasAnnotation(ServiceAnnotationLoadBalancerHealthCheckConnectPort) {
-		if healthCheckConnectPort != defd.HealthCheckConnectPort {
+		if healthCheckType == proto && healthCheckConnectPort != defd.HealthCheckConnectPort {
 			return fmt.Errorf("health check connect port error")
 		}
 	}
 
 	if f.hasAnnotation(ServiceAnnotationLoadBalancerHealthCheckHealthyThreshold) {
-		if healthCheckHealthyThreshold != defd.HealthyThreshold {
+		if healthCheckType == proto && healthCheckHealthyThreshold != defd.HealthyThreshold {
 			return fmt.Errorf("health check health threshold error")
 		}
 	}
 
 	if f.hasAnnotation(ServiceAnnotationLoadBalancerHealthCheckUnhealthyThreshold) {
-		if healthCheckUnhealthyThreshold != defd.UnhealthyThreshold {
+		if healthCheckType == proto && healthCheckUnhealthyThreshold != defd.UnhealthyThreshold {
 			return fmt.Errorf("health check unhealthy threshold error")
 		}
 	}
 
 	if f.hasAnnotation(ServiceAnnotationLoadBalancerHealthCheckInterval) {
-		if healthCheckInterval != defd.HealthCheckInterval {
+		if healthCheckType == proto && healthCheckInterval != defd.HealthCheckInterval {
 			return fmt.Errorf("health check interval error")
 		}
 	}
@@ -805,6 +889,12 @@ func (f *FrameWork) ListenerEqual(id string, p v1.ServicePort, proto string) err
 	if f.hasAnnotation(ServiceAnnotationLoadBalancerHealthCheckTimeout) {
 		if healthCheckTimeout != defd.HealthCheckTimeout {
 			return fmt.Errorf("health check timeout error")
+		}
+	}
+
+	if f.hasAnnotation(ServiceAnnotationLoadBalancerHealthCheckURI) {
+		if healthCheckURI != string(defd.HealthCheckURI) {
+			return fmt.Errorf("health check URI error")
 		}
 	}
 
@@ -826,7 +916,6 @@ func (f *FrameWork) ListenerEqual(id string, p v1.ServicePort, proto string) err
 			return fmt.Errorf("health check flag error")
 		}
 	}
-	//=========================== Health Check Test ============================
 
 	return nil
 }

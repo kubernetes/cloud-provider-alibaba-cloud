@@ -24,10 +24,10 @@ func TestE2E(t *testing.T) {
 		framework.TestContext.LoadBalancerID = "lb-xxxx"
 	}
 	if framework.TestContext.MasterZoneID == "" {
-		framework.TestContext.MasterZoneID = "cn-beijing-g"
+		framework.TestContext.MasterZoneID = "x-xxx-x"
 	}
 	if framework.TestContext.SlaveZoneID == "" {
-		framework.TestContext.SlaveZoneID = "cn-beijing-f"
+		framework.TestContext.SlaveZoneID = "x-xxx-x"
 	}
 	if framework.TestContext.BackendLabel == "" {
 		framework.TestContext.BackendLabel = "failure-domain.beta.kubernetes.io/region=cn-beijing,cs-worker=3"
@@ -41,15 +41,41 @@ func TestE2E(t *testing.T) {
 	if framework.TestContext.CertID == "" {
 		framework.TestContext.CertID = "xxxxxx_xxxxxx_xxxxxx_xxxxxx"
 	}
-	for i := range framework.Frames {
-		fram := framework.Frames[i]
-		t.Logf("run action: %d", i)
-		err := fram(t)
-		if err != nil {
-			t.Logf("action fail: %s", err.Error())
-			t.Fail()
+	if framework.TestContext.PrivateZoneID == "" {
+		framework.TestContext.PrivateZoneID = "xxxxx"
+	}
+	if framework.TestContext.PrivateZoneName == "" {
+		framework.TestContext.PrivateZoneName = "xxxxx"
+	}
+	if framework.TestContext.PrivateZoneRecordName == "" {
+		framework.TestContext.PrivateZoneRecordName = "xxxxx"
+	}
+	if framework.TestContext.PrivateZoneRecordTTL == "" {
+		framework.TestContext.PrivateZoneRecordTTL = "0"
+	}
+
+	if framework.TestContext.TestLabel == "quick" {
+		for i := range framework.QuickFrames {
+			fram := framework.QuickFrames[i]
+			t.Logf("[QuickTest]run action: %d", i)
+			err := fram(t)
+			if err != nil {
+				t.Logf("[QuickTest]action fail: %s", err.Error())
+				t.Fail()
+			}
+		}
+	} else {
+		for i := range framework.AllFrames {
+			fram := framework.AllFrames[i]
+			t.Logf("[AllTest]run action: %d", i)
+			err := fram(t)
+			if err != nil {
+				t.Logf("[AllTest]action fail: %s", err.Error())
+				t.Fail()
+			}
 		}
 	}
+
 }
 
 // PrettyJson  pretty json output

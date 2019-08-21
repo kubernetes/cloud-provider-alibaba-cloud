@@ -60,7 +60,7 @@ func (s *PrivateZoneClient) findPrivateZoneById(id string) (bool, *pvtz.Describe
 			ZoneId: id,
 		},
 	)
-	if zone == nil {
+	if err != nil || zone == nil {
 		return false, nil, err
 	}
 

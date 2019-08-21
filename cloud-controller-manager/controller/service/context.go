@@ -8,6 +8,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"k8s.io/cloud-provider-alibaba-cloud/cloud-controller-manager/utils"
 )
 
 type Context struct{ ctx sync.Map }
@@ -41,7 +42,7 @@ func ServiceModeLocal(svc *v1.Service) bool {
 }
 
 func IsENIBackendType(svc *v1.Service) bool {
-	return svc.Annotations[BACKEND_TYPE_LABEL] == BACKEND_TYPE_ENI
+	return svc.Annotations[utils.BACKEND_TYPE_LABEL] == utils.BACKEND_TYPE_ENI
 }
 
 // NeedUpdate compare old and new service for possible changes

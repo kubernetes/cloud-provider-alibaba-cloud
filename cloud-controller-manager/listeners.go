@@ -22,7 +22,6 @@ import (
 	"github.com/denverdino/aliyungo/slb"
 	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
-	"k8s.io/cloud-provider-alibaba-cloud/cloud-controller-manager/controller/service"
 	"k8s.io/cloud-provider-alibaba-cloud/cloud-controller-manager/utils"
 	"sort"
 	"strconv"
@@ -469,7 +468,7 @@ func BuildActionsForListeners(svc *v1.Service, service, console Listeners) (List
 }
 
 func isEniBackend(svc *v1.Service) bool {
-	return svc.Annotations[service.BACKEND_TYPE_LABEL] == "eni"
+	return svc.Annotations[utils.BACKEND_TYPE_LABEL] == "eni"
 }
 
 // BuildListenersFromService Build expected listeners
@@ -502,7 +501,7 @@ func BuildListenersFromService(
 			LoadBalancerID:  lb.LoadBalancerId,
 		}
 		if isEniBackend(svc) {
-			n.NodePort = port.Port
+			n.NodePort = port.TargetPort.IntVal
 		}
 		n.Name = n.NamedKey.Key()
 		listeners = append(listeners, &n)

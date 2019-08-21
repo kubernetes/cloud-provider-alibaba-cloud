@@ -38,12 +38,6 @@ const (
 	// exclude from load balancers created by a cloud provider.
 	LabelNodeRoleExcludeBalancer = "alpha.service-controller.kubernetes.io/exclude-balancer"
 	CCM_CLASS                    = "service.beta.kubernetes.io/class"
-	BACKEND_TYPE_LABEL           = "service.beta.kubernetes.io/backend-type"
-)
-
-const (
-	BACKEND_TYPE_ENI = "eni"
-	BACKEND_TYPE_ECS = "ecs"
 )
 
 type EnsureENI interface {
@@ -214,7 +208,7 @@ func HandlerForNodesChange(
 					utils.Logf(svc, "node change: class not empty, skip process ")
 					return true
 				}
-				utils.Logf(svc, "node chenge: enque service")
+				utils.Logf(svc, "node change: enque service")
 				Enqueue(que, key(svc))
 				return true
 			},
@@ -437,7 +431,7 @@ func retry(
 		func() (bool, error) {
 			err := fun(svc)
 			if err != nil &&
-				strings.Contains(err.Error(), "retry") {
+				strings.Contains(err.Error(), "try again") {
 				glog.Errorf("retry with error: %s", err.Error())
 				return false, nil
 			}

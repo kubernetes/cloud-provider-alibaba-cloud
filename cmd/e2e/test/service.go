@@ -12,6 +12,7 @@ import (
 
 // 0:test basic ensure LB
 var _ = framework.Mark(
+	"all",
 	func(t *testing.T) error {
 		f := framework.NewFrameWork(
 			func(f *framework.FrameWorkE2E) {
@@ -20,11 +21,11 @@ var _ = framework.Mark(
 				f.Client = framework.NewClientOrDie()
 			},
 		)
+		defer f.Destroy()
 		err := f.SetUp()
 		if err != nil {
 			return fmt.Errorf("setup error: %s", err.Error())
 		}
-		defer f.Destroy()
 
 		return f.RunDefaultTest(
 			framework.NewDefaultAction(
@@ -39,6 +40,7 @@ var _ = framework.Mark(
 
 // 1:test LB with vpc
 var _ = framework.Mark(
+	"all",
 	func(t *testing.T) error {
 		f := framework.NewFrameWork(
 			func(f *framework.FrameWorkE2E) {
@@ -70,11 +72,11 @@ var _ = framework.Mark(
 				}
 			},
 		)
+		defer f.Destroy()
 		err := f.SetUp()
 		if err != nil {
 			return fmt.Errorf("setup error: %s", err.Error())
 		}
-		defer f.Destroy()
 
 		spec := &framework.TestUnit{
 			ExpectOK: alicloud.ExpectAddressTypeNotEqual,
@@ -96,6 +98,7 @@ var _ = framework.Mark(
 
 // 2:test LB protocol type
 var _ = framework.Mark(
+	"all",
 	func(t *testing.T) error {
 		f := framework.NewFrameWork(
 			func(f *framework.FrameWorkE2E) {
@@ -127,11 +130,12 @@ var _ = framework.Mark(
 				}
 			},
 		)
+		defer f.Destroy()
 		err := f.SetUp()
 		if err != nil {
 			return fmt.Errorf("setup error: %s", err.Error())
 		}
-		defer f.Destroy()
+
 		spec := &framework.TestUnit{
 			Mutator: func(service *v1.Service) error {
 				service.Annotations = map[string]string{
@@ -152,6 +156,7 @@ var _ = framework.Mark(
 
 // 3:test mutate LB Spec
 var _ = framework.Mark(
+	"all",
 	func(t *testing.T) error {
 		f := framework.NewFrameWork(
 			func(f *framework.FrameWorkE2E) {
@@ -161,11 +166,12 @@ var _ = framework.Mark(
 				// set f.InitService if needed
 			},
 		)
+		defer f.Destroy()
 		err := f.SetUp()
 		if err != nil {
 			return fmt.Errorf("setup error: %s", err.Error())
 		}
-		defer f.Destroy()
+
 		spec := &framework.TestUnit{
 			Mutator: func(service *v1.Service) error {
 				service.Annotations = map[string]string{
@@ -186,6 +192,7 @@ var _ = framework.Mark(
 
 // 4:test for reusing user defined LB
 var _ = framework.Mark(
+	"all",
 	func(t *testing.T) error {
 		f := framework.NewFrameWork(
 			func(f *framework.FrameWorkE2E) {
@@ -219,11 +226,11 @@ var _ = framework.Mark(
 				}
 			},
 		)
+		defer f.Destroy()
 		err := f.SetUp()
 		if err != nil {
 			return fmt.Errorf("setup error: %s", err.Error())
 		}
-		defer f.Destroy()
 
 		del := &framework.TestUnit{
 			Description: "user defined lb deletion. expect exist",
@@ -238,6 +245,7 @@ var _ = framework.Mark(
 
 // 5:test TCP session sticky
 var _ = framework.Mark(
+	"all",
 	func(t *testing.T) error {
 		f := framework.NewFrameWork(
 			func(f *framework.FrameWorkE2E) {
@@ -269,11 +277,11 @@ var _ = framework.Mark(
 				}
 			},
 		)
+		defer f.Destroy()
 		err := f.SetUp()
 		if err != nil {
 			return fmt.Errorf("setup error: %s", err.Error())
 		}
-		defer f.Destroy()
 
 		spec := &framework.TestUnit{
 			Mutator: func(service *v1.Service) error {
@@ -295,6 +303,7 @@ var _ = framework.Mark(
 
 // 6:test for changing LB scheduler
 var _ = framework.Mark(
+	"all",
 	func(t *testing.T) error {
 		f := framework.NewFrameWork(
 			func(f *framework.FrameWorkE2E) {
@@ -304,11 +313,12 @@ var _ = framework.Mark(
 				// set f.InitService if needed
 			},
 		)
+		defer f.Destroy()
 		err := f.SetUp()
 		if err != nil {
 			return fmt.Errorf("setup error: %s", err.Error())
 		}
-		defer f.Destroy()
+
 		spec := &framework.TestUnit{
 			Mutator: func(service *v1.Service) error {
 				service.Annotations = map[string]string{
@@ -329,6 +339,7 @@ var _ = framework.Mark(
 
 // 7:test master&slave zone
 var _ = framework.Mark(
+	"all",
 	func(t *testing.T) error {
 		f := framework.NewFrameWork(
 			func(f *framework.FrameWorkE2E) {
@@ -361,11 +372,11 @@ var _ = framework.Mark(
 				}
 			},
 		)
+		defer f.Destroy()
 		err := f.SetUp()
 		if err != nil {
 			return fmt.Errorf("setup error: %s", err.Error())
 		}
-		defer f.Destroy()
 
 		return f.RunDefaultTest(
 			framework.NewDefaultAction(&framework.TestUnit{Description: "default init"}),
@@ -374,12 +385,13 @@ var _ = framework.Mark(
 	},
 )
 
-// 8:test LB region
+// 8:test health check (TCP type)
 var _ = framework.Mark(
+	"all",
 	func(t *testing.T) error {
 		f := framework.NewFrameWork(
 			func(f *framework.FrameWorkE2E) {
-				f.Desribe = "TestLoadBalancerRegion"
+				f.Desribe = "TestTCPHealthCheck"
 				f.Test = t
 				f.Client = framework.NewClientOrDie()
 				f.InitService = &v1.Service{
@@ -387,53 +399,6 @@ var _ = framework.Mark(
 						Name:      "basic-service",
 						Namespace: framework.NameSpace,
 						Annotations: map[string]string{
-							alicloud.ServiceAnnotationLoadBalancerRegion: framework.TestContext.MasterZoneID,
-						},
-					},
-					Spec: v1.ServiceSpec{
-						Ports: []v1.ServicePort{
-							{
-								Port:       80,
-								TargetPort: intstr.FromInt(80),
-								Protocol:   v1.ProtocolTCP,
-							},
-						},
-						Type:            v1.ServiceTypeLoadBalancer,
-						SessionAffinity: v1.ServiceAffinityNone,
-						Selector: map[string]string{
-							"run": "nginx",
-						},
-					},
-				}
-			},
-		)
-		err := f.SetUp()
-		if err != nil {
-			return fmt.Errorf("setup error: %s", err.Error())
-		}
-		defer f.Destroy()
-
-		return f.RunDefaultTest(
-			framework.NewDefaultAction(&framework.TestUnit{Description: "default init"}),
-			framework.NewDeleteAction(&framework.TestUnit{Description: "default delete"}),
-		)
-	},
-)
-
-// 9:test health check (TCP type)
-var _ = framework.Mark(
-	func(t *testing.T) error {
-		f := framework.NewFrameWork(
-			func(f *framework.FrameWorkE2E) {
-				f.Desribe = "TestHealthCheck"
-				f.Test = t
-				f.Client = framework.NewClientOrDie()
-				f.InitService = &v1.Service{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "basic-service",
-						Namespace: framework.NameSpace,
-						Annotations: map[string]string{
-							alicloud.ServiceAnnotationLoadBalancerHealthCheckFlag:               "on",
 							alicloud.ServiceAnnotationLoadBalancerHealthCheckType:               "tcp",
 							alicloud.ServiceAnnotationLoadBalancerHealthCheckConnectPort:        "80",
 							alicloud.ServiceAnnotationLoadBalancerHealthCheckHealthyThreshold:   "4",
@@ -459,11 +424,11 @@ var _ = framework.Mark(
 				}
 			},
 		)
+		defer f.Destroy()
 		err := f.SetUp()
 		if err != nil {
 			return fmt.Errorf("setup error: %s", err.Error())
 		}
-		defer f.Destroy()
 
 		return f.RunDefaultTest(
 			framework.NewDefaultAction(&framework.TestUnit{Description: "default init"}),
@@ -472,8 +437,9 @@ var _ = framework.Mark(
 	},
 )
 
-// 10:test health check (HTTP type)
+// 9:test health check (HTTP type)
 var _ = framework.Mark(
+	"all",
 	func(t *testing.T) error {
 		f := framework.NewFrameWork(
 			func(f *framework.FrameWorkE2E) {
@@ -515,11 +481,11 @@ var _ = framework.Mark(
 				}
 			},
 		)
+		defer f.Destroy()
 		err := f.SetUp()
 		if err != nil {
 			return fmt.Errorf("setup error: %s", err.Error())
 		}
-		defer f.Destroy()
 
 		return f.RunDefaultTest(
 			framework.NewDefaultAction(&framework.TestUnit{Description: "default init"}),
@@ -528,8 +494,9 @@ var _ = framework.Mark(
 	},
 )
 
-// 11:test backend label
+// 10:test backend label
 var _ = framework.Mark(
+	"all",
 	func(t *testing.T) error {
 		f := framework.NewFrameWork(
 			func(f *framework.FrameWorkE2E) {
@@ -561,11 +528,11 @@ var _ = framework.Mark(
 				}
 			},
 		)
+		defer f.Destroy()
 		err := f.SetUp()
 		if err != nil {
 			return fmt.Errorf("setup error: %s", err.Error())
 		}
-		defer f.Destroy()
 
 		return f.RunDefaultTest(
 			framework.NewDefaultAction(&framework.TestUnit{Description: "default init"}),
@@ -574,8 +541,9 @@ var _ = framework.Mark(
 	},
 )
 
-// 12:test network type
+// 11:test network type
 var _ = framework.Mark(
+	"all",
 	func(t *testing.T) error {
 		f := framework.NewFrameWork(
 			func(f *framework.FrameWorkE2E) {
@@ -608,11 +576,11 @@ var _ = framework.Mark(
 				}
 			},
 		)
+		defer f.Destroy()
 		err := f.SetUp()
 		if err != nil {
 			return fmt.Errorf("setup error: %s", err.Error())
 		}
-		defer f.Destroy()
 
 		return f.RunDefaultTest(
 			framework.NewDefaultAction(&framework.TestUnit{Description: "default init"}),
@@ -621,8 +589,9 @@ var _ = framework.Mark(
 	},
 )
 
-// 13:test Access control
+// 12:test Access control
 var _ = framework.Mark(
+	"all",
 	func(t *testing.T) error {
 		f := framework.NewFrameWork(
 			func(f *framework.FrameWorkE2E) {
@@ -656,20 +625,22 @@ var _ = framework.Mark(
 				}
 			},
 		)
+		defer f.Destroy()
 		err := f.SetUp()
 		if err != nil {
 			return fmt.Errorf("setup error: %s", err.Error())
 		}
-		defer f.Destroy()
 
 		spec := &framework.TestUnit{
 			Mutator: func(service *v1.Service) error {
 				service.Annotations = map[string]string{
-					alicloud.ServiceAnnotationLoadBalancerAclStatus: "off",
+					alicloud.ServiceAnnotationLoadBalancerAclStatus: "on",
+					alicloud.ServiceAnnotationLoadBalancerAclID:     framework.TestContext.AclID,
+					alicloud.ServiceAnnotationLoadBalancerAclType:   "black",
 				}
 				return nil
 			},
-			Description: "disable acl",
+			Description: "mutate acl type to black",
 		}
 
 		return f.RunDefaultTest(
@@ -680,8 +651,9 @@ var _ = framework.Mark(
 	},
 )
 
-// 14:test forward port
+// 13:test forward port
 var _ = framework.Mark(
+	"all",
 	func(t *testing.T) error {
 		f := framework.NewFrameWork(
 			func(f *framework.FrameWorkE2E) {
@@ -722,11 +694,11 @@ var _ = framework.Mark(
 				}
 			},
 		)
+		defer f.Destroy()
 		err := f.SetUp()
 		if err != nil {
 			return fmt.Errorf("setup error: %s", err.Error())
 		}
-		defer f.Destroy()
 
 		return f.RunDefaultTest(
 			framework.NewDefaultAction(&framework.TestUnit{Description: "default init"}),
@@ -735,55 +707,10 @@ var _ = framework.Mark(
 	},
 )
 
-// 15:test IP version
-var _ = framework.Mark(
-	func(t *testing.T) error {
-		f := framework.NewFrameWork(
-			func(f *framework.FrameWorkE2E) {
-				f.Desribe = "TestForwardPort"
-				f.Test = t
-				f.Client = framework.NewClientOrDie()
-				f.InitService = &v1.Service{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "basic-service",
-						Namespace: framework.NameSpace,
-						Annotations: map[string]string{
-							alicloud.ServiceAnnotationLoadBalancerIPVersion: "ipv6",
-						},
-					},
-					Spec: v1.ServiceSpec{
-						Ports: []v1.ServicePort{
-							{
-								Port:       80,
-								TargetPort: intstr.FromInt(80),
-								Protocol:   v1.ProtocolTCP,
-							},
-						},
-						Type:            v1.ServiceTypeLoadBalancer,
-						SessionAffinity: v1.ServiceAffinityNone,
-						Selector: map[string]string{
-							"run": "nginx",
-						},
-					},
-				}
-			},
-		)
-		err := f.SetUp()
-		if err != nil {
-			return fmt.Errorf("setup error: %s", err.Error())
-		}
-		defer f.Destroy()
-
-		return f.RunDefaultTest(
-			framework.NewDefaultAction(&framework.TestUnit{Description: "default init"}),
-			framework.NewDeleteAction(&framework.TestUnit{Description: "default delete"}),
-		)
-	},
-)
-
-// 16:test VSwtich
+// 14:test VSwtich
 // Only the SLB of the intranet needs vswitchid
 var _ = framework.Mark(
+	"all",
 	func(t *testing.T) error {
 		f := framework.NewFrameWork(
 			func(f *framework.FrameWorkE2E) {
@@ -816,11 +743,11 @@ var _ = framework.Mark(
 				}
 			},
 		)
+		defer f.Destroy()
 		err := f.SetUp()
 		if err != nil {
 			return fmt.Errorf("setup error: %s", err.Error())
 		}
-		defer f.Destroy()
 
 		return f.RunDefaultTest(
 			framework.NewDefaultAction(&framework.TestUnit{Description: "default init"}),
@@ -829,8 +756,9 @@ var _ = framework.Mark(
 	},
 )
 
-// 17:test PayByBandWidth
+// 15:test PayByBandWidth
 var _ = framework.Mark(
+	"all",
 	func(t *testing.T) error {
 		f := framework.NewFrameWork(
 			func(f *framework.FrameWorkE2E) {
@@ -863,11 +791,12 @@ var _ = framework.Mark(
 				}
 			},
 		)
+		defer f.Destroy()
 		err := f.SetUp()
 		if err != nil {
 			return fmt.Errorf("setup error: %s", err.Error())
 		}
-		defer f.Destroy()
+
 		spec := &framework.TestUnit{
 			Mutator: func(service *v1.Service) error {
 				service.Annotations = map[string]string{
@@ -886,8 +815,9 @@ var _ = framework.Mark(
 	},
 )
 
-// 18:test additional resource tags
+// 16:test additional resource tags
 var _ = framework.Mark(
+	"all",
 	func(t *testing.T) error {
 		f := framework.NewFrameWork(
 			func(f *framework.FrameWorkE2E) {
@@ -919,11 +849,11 @@ var _ = framework.Mark(
 				}
 			},
 		)
+		defer f.Destroy()
 		err := f.SetUp()
 		if err != nil {
 			return fmt.Errorf("setup error: %s", err.Error())
 		}
-		defer f.Destroy()
 
 		return f.RunDefaultTest(
 			framework.NewDefaultAction(&framework.TestUnit{Description: "default init"}),
@@ -932,12 +862,13 @@ var _ = framework.Mark(
 	},
 )
 
-// 19: test slb with session sticky (insert cookie)
+// 17: test slb with session sticky (insert cookie)
 var _ = framework.Mark(
+	"all",
 	func(t *testing.T) error {
 		f := framework.NewFrameWork(
 			func(f *framework.FrameWorkE2E) {
-				f.Desribe = "TestSessionSticky-insert-cookie"
+				f.Desribe = "TestSessionSticky(insert-cookie)"
 				f.Test = t
 				f.Client = framework.NewClientOrDie()
 				f.InitService = &v1.Service{
@@ -968,11 +899,11 @@ var _ = framework.Mark(
 				}
 			},
 		)
+		defer f.Destroy()
 		err := f.SetUp()
 		if err != nil {
 			return fmt.Errorf("setup error: %s", err.Error())
 		}
-		defer f.Destroy()
 
 		return f.RunDefaultTest(
 			framework.NewDefaultAction(&framework.TestUnit{Description: "default init"}),
@@ -981,12 +912,13 @@ var _ = framework.Mark(
 	},
 )
 
-// 20: test slb with session sticky (server cookie)
+// 18: test slb with session sticky (server cookie)
 var _ = framework.Mark(
+	"all",
 	func(t *testing.T) error {
 		f := framework.NewFrameWork(
 			func(f *framework.FrameWorkE2E) {
-				f.Desribe = "TestSessionSticky-server-cookie"
+				f.Desribe = "TestSessionSticky(server-cookie)"
 				f.Test = t
 				f.Client = framework.NewClientOrDie()
 				f.InitService = &v1.Service{
@@ -1017,11 +949,155 @@ var _ = framework.Mark(
 				}
 			},
 		)
+		defer f.Destroy()
 		err := f.SetUp()
 		if err != nil {
 			return fmt.Errorf("setup error: %s", err.Error())
 		}
+
+		return f.RunDefaultTest(
+			framework.NewDefaultAction(&framework.TestUnit{Description: "default init"}),
+			framework.NewDeleteAction(&framework.TestUnit{Description: "default delete"}),
+		)
+	},
+)
+
+// 19:test local traffic policy
+var _ = framework.Mark(
+	"all",
+	func(t *testing.T) error {
+		f := framework.NewFrameWork(
+			func(f *framework.FrameWorkE2E) {
+				f.Desribe = "TestLocalTrafficPolicy"
+				f.Test = t
+				f.Client = framework.NewClientOrDie()
+				f.InitService = &v1.Service{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "basic-service",
+						Namespace: framework.NameSpace,
+					},
+					Spec: v1.ServiceSpec{
+						ExternalTrafficPolicy: "Local",
+						Ports: []v1.ServicePort{
+							{
+								Port:       80,
+								TargetPort: intstr.FromInt(80),
+								Protocol:   v1.ProtocolTCP,
+							},
+						},
+						Type:            v1.ServiceTypeLoadBalancer,
+						SessionAffinity: v1.ServiceAffinityNone,
+						Selector: map[string]string{
+							"run": "nginx",
+						},
+					},
+				}
+			},
+		)
 		defer f.Destroy()
+		err := f.SetUp()
+		if err != nil {
+			return fmt.Errorf("setup error: %s", err.Error())
+		}
+
+		return f.RunDefaultTest(
+			framework.NewDefaultAction(&framework.TestUnit{Description: "default init"}),
+			framework.NewDeleteAction(&framework.TestUnit{Description: "default delete"}),
+		)
+	},
+)
+
+// 20:test private zone
+var _ = framework.Mark(
+	"all",
+	func(t *testing.T) error {
+		f := framework.NewFrameWork(
+			func(f *framework.FrameWorkE2E) {
+				f.Desribe = "TestPrivateZone"
+				f.Test = t
+				f.Client = framework.NewClientOrDie()
+				f.InitService = &v1.Service{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "basic-service",
+						Namespace: framework.NameSpace,
+						Annotations: map[string]string{
+							alicloud.ServiceAnnotationLoadBalancerPrivateZoneId:         "c9615dd501089b5b2a5f60ccf42394af",
+							alicloud.ServiceAnnotationLoadBalancerPrivateZoneName:       "privatezone.com",
+							alicloud.ServiceAnnotationLoadBalancerPrivateZoneRecordName: "slave3",
+							alicloud.ServiceAnnotationLoadBalancerPrivateZoneRecordTTL:  "60",
+						},
+					},
+					Spec: v1.ServiceSpec{
+						Ports: []v1.ServicePort{
+
+							{
+								Port:       80,
+								TargetPort: intstr.FromInt(80),
+								Protocol:   v1.ProtocolTCP,
+							},
+						},
+						Type:            v1.ServiceTypeLoadBalancer,
+						SessionAffinity: v1.ServiceAffinityNone,
+						Selector: map[string]string{
+							"run": "nginx",
+						},
+					},
+				}
+			},
+		)
+		defer f.Destroy()
+		err := f.SetUp()
+		if err != nil {
+			return fmt.Errorf("setup error: %s", err.Error())
+		}
+
+		return f.RunDefaultTest(
+			framework.NewDefaultAction(&framework.TestUnit{Description: "default init"}),
+			framework.NewDeleteAction(&framework.TestUnit{Description: "default delete"}),
+		)
+	},
+)
+
+// 21:test eni backend
+var _ = framework.Mark(
+	"all",
+	func(t *testing.T) error {
+		f := framework.NewFrameWork(
+			func(f *framework.FrameWorkE2E) {
+				f.Desribe = "TestENIBackend"
+				f.Test = t
+				f.Client = framework.NewClientOrDie()
+				f.InitService = &v1.Service{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "basic-service",
+						Namespace: framework.NameSpace,
+						Annotations: map[string]string{
+							alicloud.ServiceAnnotationLoadBalancerBackendType: "eni",
+						},
+					},
+
+					Spec: v1.ServiceSpec{
+						Ports: []v1.ServicePort{
+							{
+								Port:       30080,
+								TargetPort: intstr.FromInt(80),
+								Protocol:   v1.ProtocolTCP,
+							},
+						},
+						Type:            v1.ServiceTypeLoadBalancer,
+						SessionAffinity: v1.ServiceAffinityNone,
+						Selector: map[string]string{
+							"run": "nginx",
+						},
+					},
+				}
+			},
+		)
+		defer f.Destroy()
+		err := f.SetUp()
+		if err != nil {
+			return fmt.Errorf("setup error: %s", err.Error())
+		}
 
 		return f.RunDefaultTest(
 			framework.NewDefaultAction(&framework.TestUnit{Description: "default init"}),
