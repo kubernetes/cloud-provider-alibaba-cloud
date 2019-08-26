@@ -407,17 +407,27 @@ func ExpectExistAndEqual(f *FrameWork) error {
 				}
 			}
 		} else if f.SVC.Spec.ExternalTrafficPolicy == "Local" {
+			if len(f.Endpoint.Subsets) == 0 {
+				return fmt.Errorf("Endpoint vgroup backend is 0. ")
+			}
 
-			if len(f.Endpoint.Subsets) == 0 ||
-				len(backends) != len(f.Endpoint.Subsets[0].Addresses) {
+			//If multiple pods are running on one node,
+			//there will be duplicate nodes in Endpoint.SubSets[0].Addresses.
+			//The duplicate nodes need to be filtered.
+			epNodeNameMap := make(map[string]string)
+			for _, endpoint := range f.Endpoint.Subsets[0].Addresses {
+				epNodeNameMap[*endpoint.NodeName] = *endpoint.NodeName
+			}
+
+			if len(backends) != len(epNodeNameMap) {
 				return fmt.Errorf("Endpoint vgroup backend is not equal. ")
 			}
 
 			var endpointPrIds []string
-			for _, endpoint := range f.Endpoint.Subsets[0].Addresses {
+			for _, epNodeName := range epNodeNameMap {
 				found := false
 				for _, node := range f.Nodes {
-					if *endpoint.NodeName == node.Name {
+					if epNodeName == node.Name {
 						endpointPrId := strings.Split(node.Spec.ProviderID, ".")
 						if len(endpointPrId) != 2 {
 							return fmt.Errorf("Node providerID %v format error. ", endpointPrId[1])
@@ -428,7 +438,7 @@ func ExpectExistAndEqual(f *FrameWork) error {
 					}
 				}
 				if !found {
-					return fmt.Errorf("Fail to find node: %s in Endpoint vgroup backend. ", *endpoint.NodeName)
+					return fmt.Errorf("Fail to find node: %s in Endpoint vgroup backend. ", epNodeName)
 				}
 			}
 			sort.SliceStable(

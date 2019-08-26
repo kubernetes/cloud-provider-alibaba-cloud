@@ -85,6 +85,8 @@ type AnnotationRequest struct {
 	PrivateZoneId         string
 	PrivateZoneRecordName string
 	PrivateZoneRecordTTL  int
+
+	RemoveUnscheduledBackend string
 }
 
 // TAGKEY Default tag key.

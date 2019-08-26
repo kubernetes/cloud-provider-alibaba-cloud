@@ -518,10 +518,19 @@ func ExtractAnnotationRequest(service *v1.Service) (*AnnotationRequest, *Annotat
 	backendType, ok := annotation[ServiceAnnotationLoadBalancerBackendType]
 	if ok {
 		request.BackendType = backendType
-		defaulted.BackendType = backendType
+		defaulted.BackendType = request.BackendType
 	} else {
 		defaulted.BackendType = utils.BACKEND_TYPE_ECS
 		request.BackendType = defaulted.BackendType
+	}
+
+	removeUnscheduledBackend, ok := annotation[utils.ServiceAnnotationLoadBalancerRemoveUnscheduledBackend]
+	if ok {
+		request.RemoveUnscheduledBackend = removeUnscheduledBackend
+		defaulted.RemoveUnscheduledBackend = request.RemoveUnscheduledBackend
+	} else {
+		defaulted.RemoveUnscheduledBackend = "off"
+		request.RemoveUnscheduledBackend = defaulted.RemoveUnscheduledBackend
 	}
 
 	return defaulted, request

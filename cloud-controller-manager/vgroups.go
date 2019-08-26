@@ -9,6 +9,7 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/kubernetes/staging/src/k8s.io/apimachinery/pkg/util/json"
 	"reflect"
+	"strconv"
 	"strings"
 )
 
@@ -118,8 +119,8 @@ func (v *vgroup) Update() error {
 		return fmt.Errorf("update: describe vserver group attribute error. %s", err.Error())
 	}
 	v.Logf("update: apis[%v], node[%v]", att.BackendServers.BackendServer, v.BackendServers)
-	add, del := v.diff(att.BackendServers.BackendServer, v.BackendServers)
-	if len(add) == 0 && len(del) == 0 {
+	add, del, update := v.diff(att.BackendServers.BackendServer, v.BackendServers)
+	if len(add) == 0 && len(del) == 0 && len(update) == 0 {
 		v.Logf("update: no backend need to be added for vgroupid [%s]", v.VGroupId)
 		return nil
 	}
@@ -141,12 +142,11 @@ func (v *vgroup) Update() error {
 					})
 				return err
 			}); err != nil {
-
 			return err
 		}
 	}
 	if len(del) > 0 {
-		return BatchProcess(del,
+		if err := BatchProcess(del,
 			func(list []slb.VBackendServerType) error {
 				deletions, err := json.Marshal(list)
 				if err != nil {
@@ -159,6 +159,26 @@ func (v *vgroup) Update() error {
 						VServerGroupId: v.VGroupId,
 						RegionId:       v.RegionId,
 						BackendServers: string(deletions),
+					})
+				return err
+			}); err != nil {
+			return err
+		}
+	}
+	if len(update) > 0 {
+		return BatchProcess(update,
+			func(list []slb.VBackendServerType) error {
+				updateJson, err := json.Marshal(list)
+				if err != nil {
+					return fmt.Errorf("error marshal backends: %s, %v", err.Error(), list)
+				}
+				v.Logf("update: try to update vserver group[%s],"+
+					" backend del[%s]", v.NamedKey.Key(), string(updateJson))
+				_, err = v.Client.SetVServerGroupAttribute(
+					&slb.SetVServerGroupAttributeArgs{
+						VServerGroupId: v.VGroupId,
+						RegionId:       v.RegionId,
+						BackendServers: string(updateJson),
 					})
 				return err
 			})
@@ -188,9 +208,14 @@ func BatchProcess(list []slb.VBackendServerType,
 }
 
 func (v *vgroup) diff(apis, nodes []slb.VBackendServerType) (
-	[]slb.VBackendServerType, []slb.VBackendServerType) {
+	[]slb.VBackendServerType, []slb.VBackendServerType, []slb.VBackendServerType) {
 
-	addition, deletions := []slb.VBackendServerType{}, []slb.VBackendServerType{}
+	var (
+		addition  []slb.VBackendServerType
+		deletions []slb.VBackendServerType
+		updates   []slb.VBackendServerType
+	)
+
 	for _, api := range apis {
 		found := false
 		for _, node := range nodes {
@@ -217,7 +242,16 @@ func (v *vgroup) diff(apis, nodes []slb.VBackendServerType) (
 			addition = append(addition, node)
 		}
 	}
-	return addition, deletions
+	for _, node := range nodes {
+		for _, api := range apis {
+			if node.ServerId == api.ServerId &&
+				node.Weight != api.Weight {
+				updates = append(updates, node)
+				break
+			}
+		}
+	}
+	return addition, deletions, updates
 }
 
 func Ensure(v *vgroup, nodes interface{}) error {
@@ -229,9 +263,15 @@ func Ensure(v *vgroup, nodes interface{}) error {
 			if err != nil {
 				return fmt.Errorf("ensure: error parse providerid. %s. expected: ${regionid}.${nodeid}", node.Spec.ProviderID)
 			}
+			nodeWeight, err := strconv.Atoi(node.Labels["weight"])
+			if err != nil {
+				nodeWeight = 100
+				v.Logf("Error:cannot get node weight warining: "+
+					"failed to get node %s weight. set node weight to 100. %s", node.Name, err.Error())
+			}
 			backend = append(backend, slb.VBackendServerType{
 				ServerId: string(id),
-				Weight:   100,
+				Weight:   nodeWeight,
 				Port:     int(v.NamedKey.Port),
 				Type:     "ecs",
 			})
