@@ -5,6 +5,7 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	v12 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/informers"
@@ -105,17 +106,17 @@ func NewController(
 			SERVICE_QUEUE: workqueue.NewNamedDelayingQueue(SERVICE_QUEUE),
 		},
 	}
-	HandlerForEndpointChange(
+	con.HandlerForEndpointChange(
 		con.local,
 		con.queues[NODE_QUEUE],
 		con.ifactory.Core().V1().Endpoints().Informer(),
 	)
-	HandlerForNodesChange(
+	con.HandlerForNodesChange(
 		con.local,
 		con.queues[NODE_QUEUE],
 		con.ifactory.Core().V1().Nodes().Informer(),
 	)
-	HandlerForServiceChange(
+	con.HandlerForServiceChange(
 		con.local,
 		con.queues[SERVICE_QUEUE],
 		con.ifactory.Core().V1().Services().Informer(),
@@ -184,7 +185,7 @@ func Enqueue(queue queue.DelayingInterface, k interface{}) {
 	queue.Add(k.(string))
 }
 
-func HandlerForNodesChange(
+func (con *Controller) HandlerForNodesChange(
 	ctx *Context,
 	que queue.DelayingInterface,
 	informer cache.SharedIndexInformer,
@@ -235,7 +236,7 @@ func HandlerForNodesChange(
 	)
 }
 
-func HandlerForEndpointChange(
+func (con *Controller) HandlerForEndpointChange(
 	context *Context,
 	que queue.DelayingInterface,
 	informer cache.SharedIndexInformer,
@@ -249,8 +250,13 @@ func HandlerForEndpointChange(
 		svc := context.Get(fmt.Sprintf("%s/%s", ep.Namespace, ep.Name))
 		if svc == nil {
 			glog.Infof("endpoint change: can not get cached service for "+
-				"endpoints[%s/%s], skip sync endpoint.\n", ep.Namespace, ep.Name)
-			return
+				"endpoints[%s/%s], enqueue for default endpoint.\n", ep.Namespace, ep.Name)
+			var err error
+			svc, err = con.client.CoreV1().Services(ep.Namespace).Get(ep.Name,v12.GetOptions{})
+			if err!=nil {
+				glog.Warningf("can not get service %s/%s. ",ep.Namespace,ep.Name)
+				return
+			}
 		}
 		if !isProcessNeeded(svc) {
 			utils.Logf(svc, "endpoint: class not empty, skip process ")
@@ -281,7 +287,7 @@ func HandlerForEndpointChange(
 	)
 }
 
-func HandlerForServiceChange(
+func (con *Controller) HandlerForServiceChange(
 	context *Context,
 	que queue.DelayingInterface,
 	informer cache.SharedIndexInformer,
@@ -351,7 +357,7 @@ func WorkerFunc(
 				glog.Infof("[%s] worker: queued sync for service", key)
 
 				if err := syncd(key.(string)); err != nil {
-					queue.AddAfter(key, 2*time.Second)
+					queue.AddAfter(key, 4*time.Second)
 					glog.Errorf("requeue: sync error for service %s %v", key, err)
 				}
 			}()
@@ -405,7 +411,7 @@ func (con *Controller) ServiceSyncTask(k string) error {
 		// catch unexpected service
 		if service == nil {
 			glog.Errorf("unexpected nil service for update, wait retry. %s", k)
-			return nil
+			return fmt.Errorf("retry unexpected nil service %s. ", k)
 		}
 		return con.update(cached, service)
 	}
