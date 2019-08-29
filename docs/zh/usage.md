@@ -34,7 +34,7 @@ image: registry-vpc.cn-hangzhou.aliyuncs.com/acs/cloud-controller-manager-amd64:
   - `spec.ExternalTraffic = Cluster`模式的Service，CCM默认会将所有节点挂载到SLB的后端（使用BackendLabel标签配置后端的除外）。由于SLB限制了每个ECS上能够attach的SLB的个数（quota），因此这种方式会快速的消耗该quota,当quota耗尽后，会造成Service Reconcile失败。解决的办法，可以使用Local模式的Service。
   - `spec.ExternalTraffic = Local`模式的Service，CCM默认只会讲Service对应的Pod所在的节点加入到SLB后端。这会明显降低quota的消耗速度。同时支持四层源IP保留。
   - 任何情况下CCM不会将Master节点作为SLB的后端。
-  - CCM会从SLB后端摘除被kubectl drain/cordon的节点。
+  - CCM默认不会从SLB后端摘除被kubectl drain/cordon的节点。如需移除节点，设置`service.beta.kubernetes.io/alibaba-cloud-loadbalancer-remove-unscheduled-backend`为"on"。
 
 ## 通过命令行操作
 
@@ -192,10 +192,12 @@ spec:
 
 - **使用已有的负载均衡**
 
-默认情况下，使用已有的负载均衡实例，不会覆盖监听，如要强制覆盖已有监听，请配置service.beta.kubernetes.io/alicloud-loadbalancer-force-override-listeners为true。<br />使用已有的负载均衡暂不支持添加额外标签（annotation: service.beta.kubernetes.io/alibaba-cloud-loadbalancer-additional-resource-tags）
-<br />复用已有的负载均衡默认不覆盖已有监听，出于以下两点原因：
-1）如果已有负载均衡的监听上绑定了业务，强制覆盖会引发业务中断
-2）由于CCM目前支持的后端配置有限，无法处理一些复杂配置。如果有复杂的后端配置需求，可以通过手动方式自行配置。
+默认情况下，使用已有的负载均衡实例，不会覆盖监听，如要强制覆盖已有监听，请配置`service.beta.kubernetes.io/alicloud-loadbalancer-force-override-listeners`为true。  
+使用已有的负载均衡暂不支持添加额外标签（annotation: service.beta.kubernetes.io/alibaba-cloud-loadbalancer-additional-resource-tags）  
+
+复用已有的负载均衡默认不覆盖已有监听，出于以下两点原因：  
+  1）如果已有负载均衡的监听上绑定了业务，强制覆盖会引发业务中断
+  2）由于CCM目前支持的后端配置有限，无法处理一些复杂配置。如果有复杂的后端配置需求，可以通过手动方式自行配置。
 
 如存在以上两种情况不建议强制覆盖监听，如果已有负载均衡的监听端口不在使用，则可以强制覆盖。
 
@@ -599,8 +601,48 @@ spec:
     run: nginx
   type: LoadBalancer
 ```
+
+- **移除slb后端不可调度节点**  
+ 默认不移除不可调度节点。  
+ 设置annotation`service.beta.kubernetes.io/alibaba-cloud-loadbalancer-remove-unscheduled-backend` 为on，会将不可调度节点从slb后端移除。
+ ```yaml
+apiVersion: v1
+kind: Service
+metadata:
+  annotations:
+    service.beta.kubernetes.io/alibaba-cloud-loadbalancer-remove-unscheduled-backend: "on"
+  name: nginx
+spec:
+  ports:
+  - name: http
+    port: 30080
+    protocol: TCP
+    targetPort: 80
+  selector:
+    app: nginx
+  type: LoadBalancer
+ ```
+ - **将pod ENI挂载到slb后端**  
+  在[terway](https://www.alibabacloud.com/help/zh/doc-detail/97467.html?spm=a2c5t.10695662.1996646101.searchclickresult.2304c302tiORcM)网络模式下,通过设定annotation `service.beta.kubernetes.io/backend-type`为eni，可将pod ENI直接挂载到slb后端，提升网络转发性能。
   
-  
+  ```yaml
+  apiVersion: v1
+  kind: Service
+  metadata:
+    annotations:
+      service.beta.kubernetes.io/backend-type: "eni"
+    name: nginx
+  spec:
+    ports:
+    - name: http
+      port: 30080
+      protocol: TCP
+      targetPort: 80
+    selector:
+      app: nginx
+    type: LoadBalancer
+  ```
+   
 **说明**：注解的内容是区分大小写的，所有注解值均为string类型。
 
 | 注释 | 类型 | 描述 | 默认值 |
@@ -641,3 +683,5 @@ spec:
 | service.beta.kubernetes.io/alibaba-cloud-loadbalancer-vswitch-id | string | 负载均衡实例所属的VSwitch ID。设置该参数时需同时设置addresstype为intranet。 | 无 |
 | service.beta.kubernetes.io/alibaba-cloud-loadbalancer-forward-port | string | 将HTTP请求转发至HTTPS指定端口。取值如80:443 | 无 |
 | service.beta.kubernetes.io/alibaba-cloud-loadbalancer-additional-resource-tags | string | 需要添加的Tag列表，多个标签用逗号分隔。如："k1=v1,k2=v2" | 无 |
+| service.beta.kubernetes.io/alibaba-cloud-loadbalancer-remove-unscheduled-backend|string| 从slb后端移除SchedulingDisabled Node。取值：on或off | off |
+| service.beta.kubernetes.io/backend-type | string| 支持在[terway](https://www.alibabacloud.com/help/zh/doc-detail/97467.html?spm=a2c5t.10695662.1996646101.searchclickresult.2304c302tiORcM)网络模式下,通过设定该参数为"eni"，将pod ENI挂载到slb后端，提升网络转发性能。取值：eni | 无 |

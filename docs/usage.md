@@ -644,9 +644,56 @@ spec:
 
 - Separate multiple tags with comma, e.g. "Key1=Value1,Key2=Value2".
 
+#### 23. Remove schedulingDisabled nodes from the slb backend
 
+ ```yaml
+apiVersion: v1
+kind: Service
+metadata:
+  annotations:
+    service.beta.kubernetes.io/alibaba-cloud-loadbalancer-remove-unscheduled-backend: "on"
+  name: nginx
+spec:
+  ports:
+  - name: http
+    port: 30080
+    protocol: TCP
+    targetPort: 80
+  selector:
+    app: nginx
+  type: LoadBalancer
+ ```
+ 
+>> **Note:**
 
-#### Annotation list
+- Scheduling disabled nodes are not removed by default.
+- Set the annotation `service.beta.kubernetes.io/alibaba-cloud-loadbalancer-remove-unscheduled-backend` to "on", which will remove scheduling disabled nodes from the slb backend.
+
+#### 24. Add pod eni to the slb backend in terway network mode
+
+```yaml
+apiVersion: v1
+kind: Service
+metadata:
+  annotations:
+    service.beta.kubernetes.io/backend-type: "eni"
+  name: nginx
+spec:
+  ports:
+  - name: http
+    port: 30080
+    protocol: TCP
+    targetPort: 80
+  selector:
+    app: nginx
+  type: LoadBalancer
+```
+  
+>> **Note:**
+
+- Attach Pods` ENI(Elastic Network Interface)` to SLB backends directly in [terway](https://www.alibabacloud.com/help/doc-detail/97467.html?spm=a2c5t.11065259.1996646101.searchclickresult.675f654a0FM6R7) network mode to achieve better network performance.
+ 
+ #### Annotation list
 | Annotation | Description | Default value |
 | --- | --- | --- |
 | service.beta.kubernetes.io/alicloud-loadbalancer-protocol-port | Use a commas (,) to separate two values, for example, https:443,http:80. | None |
@@ -685,5 +732,6 @@ spec:
 | service.beta.kubernetes.io/alibaba-cloud-loadbalancer-vswitch-id | VSwitch ID of the load balancer.<br />Note When setting VSwitch ID, the address-type parameter need to be "intranet". | None |
 | service.beta.kubernetes.io/alibaba-cloud-loadbalancer-forward-port | HTTP to HTTPS listening forwarding port. e.g. 80:443 | None |
 | service.beta.kubernetes.io/alibaba-cloud-loadbalancer-additional-resource-tags | A list of tags to add.<br />e.g. "k1=v1,k2=v2" | None |
-
+| service.beta.kubernetes.io/alibaba-cloud-loadbalancer-remove-unscheduled-backend | Remove scheduling disabled node from the slb backend。Valid values: on or off. | off |
+| service.beta.kubernetes.io/backend-type | Add pod eni to the slb backend in the [terway](https://www.alibabacloud.com/help/doc-detail/97467.html?spm=a2c5t.11065259.1996646101.searchclickresult.675f654a0FM6R7) network mode to achieve better network performance. Valid values: eni. | None |
 

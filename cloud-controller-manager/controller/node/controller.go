@@ -137,10 +137,10 @@ func HandlerForNode(
 		cache.ResourceEventHandlerFuncs{
 			AddFunc: func(obj interface{}) {
 				node := obj.(*v1.Node)
-				glog.V(4).Infof("receive node add event: %s",node.Name)
+				glog.V(4).Infof("receive node add event: %s", node.Name)
 				err := cnc.AddCloudNode(node)
 				if err != nil {
-					glog.Errorf("remove cloud node taints fail: %s",err.Error())
+					glog.Errorf("remove cloud node taints fail: %s", err.Error())
 				}
 			},
 		},
@@ -186,7 +186,7 @@ func (cnc *CloudNodeController) Run(stopCh <-chan struct{}) {
 				cnc.syncNodeAddress,
 			)
 			if err != nil {
-				glog.Errorf("periodically update address: %s",err.Error())
+				glog.Errorf("periodically update address: %s", err.Error())
 			}
 		},
 		cnc.statusFrequency,
@@ -207,7 +207,7 @@ func (cnc *CloudNodeController) Run(stopCh <-chan struct{}) {
 				cnc.syncCloudNodes,
 			)
 			if err != nil {
-				glog.Errorf("periodically try detect node existence: %s",err.Error())
+				glog.Errorf("periodically try detect node existence: %s", err.Error())
 			}
 		},
 		cnc.monitorPeriod,
@@ -225,20 +225,20 @@ func (cnc *CloudNodeController) Run(stopCh <-chan struct{}) {
 			for _, node := range nodes.Items {
 				err := cnc.AddCloudNode(&node)
 				if err != nil {
-					glog.Errorf("periodically remove cloud node %s taints: %s",node.Name, err.Error())
+					glog.Errorf("periodically remove cloud node %s taints: %s", node.Name, err.Error())
 				}
 			}
 		},
-		3 * time.Minute,
+		3*time.Minute,
 		wait.NeverStop,
 	)
 }
 
 func (cnc *CloudNodeController) AddCloudNode(node *v1.Node) error {
 	curNode, err := cnc.kclient.
-					CoreV1().
-					Nodes().
-					Get(node.Name, metav1.GetOptions{})
+		CoreV1().
+		Nodes().
+		Get(node.Name, metav1.GetOptions{})
 	if err != nil {
 		//retry
 		return fmt.Errorf("retrieve node error: %s", err.Error())
@@ -338,7 +338,7 @@ func (cnc *CloudNodeController) doAddCloudNode(node *v1.Node) error {
 		2*time.Second,
 		20*time.Second,
 		func() (done bool, err error) {
-			glog.V(5).Infof("try remove cloud taints for %s",node.Name)
+			glog.V(5).Infof("try remove cloud taints for %s", node.Name)
 			curNode, err := cnc.kclient.CoreV1().Nodes().Get(node.Name, metav1.GetOptions{})
 			if err != nil {
 				glog.Errorf("retrieve node error: %s", err.Error())
@@ -420,7 +420,7 @@ func (cnc *CloudNodeController) doAddCloudNode(node *v1.Node) error {
 				glog.Errorf("patch error: %s", err.Error())
 				return false, nil
 			}
-			glog.V(5).Infof("finished remove uninitialized cloud taints for %s",node.Name)
+			glog.V(5).Infof("finished remove uninitialized cloud taints for %s", node.Name)
 			// After adding, call UpdateNodeAddress to set the CloudProvider provided IPAddresses
 			// So that users do not see any significant delay in IP addresses being filled into the node
 			_ = cnc.syncNodeAddress([]v1.Node{*nnode})
