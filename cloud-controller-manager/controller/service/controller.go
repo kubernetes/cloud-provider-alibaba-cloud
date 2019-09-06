@@ -42,6 +42,8 @@ const (
 	CCM_CLASS                    = "service.beta.kubernetes.io/class"
 )
 
+const TRY_AGAIN="try again"
+
 type EnsureENI interface {
 	// EnsureLoadbalancerWithENI
 	// creates a new load balancer 'name', or updates the existing one. Returns the
@@ -437,7 +439,7 @@ func retry(
 		func() (bool, error) {
 			err := fun(svc)
 			if err != nil &&
-				strings.Contains(err.Error(), "try again") {
+				strings.Contains(err.Error(), TRY_AGAIN) {
 				glog.Errorf("retry with error: %s", err.Error())
 				return false, nil
 			}
@@ -545,7 +547,7 @@ func (con *Controller) updateStatus(svc *v1.Service, pre, newm *v1.LoadBalancerS
 
 		// Update the status on the copy
 		service.Status.LoadBalancer = *newm
-
+		utils.Logf(service,"status: [%v] [%v]",pre,newm)
 		return retry(
 			&wait.Backoff{
 				Duration: 1 * time.Second,
@@ -578,7 +580,7 @@ func (con *Controller) updateStatus(svc *v1.Service, pre, newm *v1.LoadBalancerS
 				}
 				glog.Warningf("failed to persist updated LoadBalancerStatus to "+
 					"service %s after creating its load balancer: %v", key(svc), err)
-				return fmt.Errorf("retry with %s", err.Error())
+				return fmt.Errorf("retry with %s, %s", err.Error(),TRY_AGAIN)
 			},
 			service,
 		)
@@ -606,7 +608,7 @@ func (con *Controller) delete(svc *v1.Service) error {
 			"Error deleting: %s",
 			err.Error(),
 		)
-		return fmt.Errorf("please retry")
+		return fmt.Errorf(TRY_AGAIN)
 	}
 	con.recorder.Eventf(
 		svc,
