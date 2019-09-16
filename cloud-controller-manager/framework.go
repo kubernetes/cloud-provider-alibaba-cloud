@@ -617,8 +617,6 @@ func (f *FrameWork) ListenerEqual(id string, p v1.ServicePort, proto string) err
 		cookie             = ""
 		persistenceTimeout = 0
 
-		privateZoneRecordTTL = 0
-
 		aclStatus = ""
 		aclId     = ""
 		aclType   = ""
@@ -824,35 +822,6 @@ func (f *FrameWork) ListenerEqual(id string, p v1.ServicePort, proto string) err
 		if pz.ZoneName != defd.PrivateZoneName {
 			return fmt.Errorf("private zone name set %s, get %s ",
 				defd.PrivateZoneName, pz.ZoneName)
-		}
-	}
-
-	if f.hasAnnotation(ServiceAnnotationLoadBalancerPrivateZoneRecordName) {
-		pvrds, err := f.PVTZSDK().DescribeZoneRecords(
-			&pvtz.DescribeZoneRecordsArgs{
-				ZoneId: defd.PrivateZoneId,
-			},
-		)
-		if err != nil {
-			return fmt.Errorf("DescribeZoneRecords error: %s. ", err)
-		}
-		found := false
-		for _, record := range pvrds {
-			if record.Rr == defd.PrivateZoneRecordName {
-				privateZoneRecordTTL = record.Ttl
-				found = true
-				break
-			}
-		}
-		if !found {
-			return fmt.Errorf("private zone record name error")
-		}
-	}
-
-	if f.hasAnnotation(ServiceAnnotationLoadBalancerPrivateZoneRecordTTL) {
-		if privateZoneRecordTTL != defd.PrivateZoneRecordTTL {
-			return fmt.Errorf("error private zone ttl. set %v, get %v ",
-				defd.PrivateZoneRecordTTL, privateZoneRecordTTL)
 		}
 	}
 
