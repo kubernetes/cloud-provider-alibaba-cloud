@@ -256,6 +256,7 @@ func (v *vgroup) diff(apis, nodes []slb.VBackendServerType) (
 
 func Ensure(v *vgroup, nodes interface{}) error {
 	var backend []slb.VBackendServerType
+	var nodeWeight int
 	switch nodes.(type) {
 	case []*v1.Node:
 		for _, node := range nodes.([]*v1.Node) {
@@ -263,11 +264,15 @@ func Ensure(v *vgroup, nodes interface{}) error {
 			if err != nil {
 				return fmt.Errorf("ensure: error parse providerid. %s. expected: ${regionid}.${nodeid}", node.Spec.ProviderID)
 			}
-			nodeWeight, err := strconv.Atoi(node.Labels["weight"])
-			if err != nil {
+			if _, ok := node.Labels["weight"]; !ok {
 				nodeWeight = 100
-				v.Logf("Error:cannot get node weight warining: "+
-					"failed to get node %s weight. set node weight to 100. %s", node.Name, err.Error())
+				v.Logf("Warning: cannot get node %s weight. So set the node weight to 100.", node.Name)
+			} else {
+				nodeWeight, err = strconv.Atoi(node.Labels["weight"])
+				if err != nil {
+					nodeWeight = 100
+					v.Logf("Error: fail to get weight from weight node %s label %s, so set the node weight to 100. %s", node.Name, node.Labels["weight"], err.Error())
+				}
 			}
 			backend = append(backend, slb.VBackendServerType{
 				ServerId: string(id),

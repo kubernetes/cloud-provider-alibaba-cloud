@@ -539,6 +539,62 @@ func ExpectExistAndEqual(f *FrameWork) error {
 		}
 	}
 
+	// 5. private zone
+	if f.hasAnnotation(ServiceAnnotationLoadBalancerPrivateZoneRecordName) {
+		var privateZoneRecordTTL int
+		var selectedZoneId string
+
+		if f.hasAnnotation(ServiceAnnotationLoadBalancerPrivateZoneId) {
+			selectedZoneId = defd.PrivateZoneId
+		} else if f.hasAnnotation(ServiceAnnotationLoadBalancerPrivateZoneName) {
+			zones, err := f.PVTZSDK().DescribeZones(
+				&pvtz.DescribeZonesArgs{
+					Lang:    DEFAULT_LANG,
+					Keyword: defd.PrivateZoneName,
+				},
+			)
+			if err != nil {
+				return fmt.Errorf("DescribeZones error: %s. ", err.Error())
+			}
+			if zones == nil || len(zones) == 0 {
+				return fmt.Errorf("can not find zone by zone name %s. error: %s ", defd.PrivateZoneName, err.Error())
+			}
+
+			for _, zone := range zones {
+				if zone.ZoneName == defd.PrivateZoneName {
+					selectedZoneId = zone.ZoneId
+					break
+				}
+			}
+		}
+
+		pvrds, err := f.PVTZSDK().DescribeZoneRecords(
+			&pvtz.DescribeZoneRecordsArgs{
+				ZoneId: selectedZoneId,
+			},
+		)
+		if err != nil {
+			return fmt.Errorf("DescribeZoneRecords error: %s. ", err.Error())
+		}
+		found := false
+		for _, record := range pvrds {
+			if record.Rr == defd.PrivateZoneRecordName {
+				privateZoneRecordTTL = record.Ttl
+				found = true
+				break
+			}
+		}
+		if !found {
+			return fmt.Errorf("can not find private zone record %s", defd.PrivateZoneRecordName)
+		}
+
+		if f.hasAnnotation(ServiceAnnotationLoadBalancerPrivateZoneRecordTTL) {
+			if privateZoneRecordTTL != defd.PrivateZoneRecordTTL {
+				return fmt.Errorf("private zone record ttl not equal. ")
+			}
+		}
+	}
+
 	return f.SLBSpecEqual(mlb)
 }
 
@@ -616,8 +672,6 @@ func (f *FrameWork) ListenerEqual(id string, p v1.ServicePort, proto string) err
 		cookieTimeout      = 0
 		cookie             = ""
 		persistenceTimeout = 0
-
-		privateZoneRecordTTL = 0
 
 		aclStatus = ""
 		aclId     = ""
@@ -732,7 +786,6 @@ func (f *FrameWork) ListenerEqual(id string, p v1.ServicePort, proto string) err
 		aclStatus = resp.AclStatus
 		aclType = resp.AclType
 		scheduler = string(resp.Scheduler)
-		//persistenceTimeout = res
 	default:
 		return fmt.Errorf("unknown proto: %s", proto)
 	}
@@ -794,65 +847,6 @@ func (f *FrameWork) ListenerEqual(id string, p v1.ServicePort, proto string) err
 		f.hasAnnotation(ServiceAnnotationLoadBalancerPersistenceTimeout) {
 		if persistenceTimeout != defd.PersistenceTimeout {
 			return fmt.Errorf("persistency timeout error: %d, %d", persistenceTimeout, defd.PersistenceTimeout)
-		}
-	}
-
-	//++++++++++++++++++++++++++++ Private Zone +++++++++++++++++++++++++++++
-	if f.hasAnnotation(ServiceAnnotationLoadBalancerPrivateZoneId) {
-		pz, err := f.PVTZSDK().DescribeZoneInfo(
-			&pvtz.DescribeZoneInfoArgs{
-				ZoneId: defd.PrivateZoneId,
-			})
-		if err != nil {
-			return fmt.Errorf("get private zone info by zone id error: %s. ", err)
-		}
-
-		if pz.ZoneId != string(defd.PrivateZoneId) {
-			return fmt.Errorf("private zone id. set %s, get %s ",
-				defd.PrivateZoneId, pz.ZoneId)
-		}
-	}
-
-	if f.hasAnnotation(ServiceAnnotationLoadBalancerPrivateZoneName) {
-		pz, err := f.PVTZSDK().DescribeZoneInfo(
-			&pvtz.DescribeZoneInfoArgs{
-				ZoneId: defd.PrivateZoneId,
-			})
-		if err != nil {
-			return fmt.Errorf("get private zone info by zone name error: %s. ", err)
-		}
-		if pz.ZoneName != defd.PrivateZoneName {
-			return fmt.Errorf("private zone name set %s, get %s ",
-				defd.PrivateZoneName, pz.ZoneName)
-		}
-	}
-
-	if f.hasAnnotation(ServiceAnnotationLoadBalancerPrivateZoneRecordName) {
-		pvrds, err := f.PVTZSDK().DescribeZoneRecords(
-			&pvtz.DescribeZoneRecordsArgs{
-				ZoneId: defd.PrivateZoneId,
-			},
-		)
-		if err != nil {
-			return fmt.Errorf("DescribeZoneRecords error: %s. ", err)
-		}
-		found := false
-		for _, record := range pvrds {
-			if record.Rr == defd.PrivateZoneRecordName {
-				privateZoneRecordTTL = record.Ttl
-				found = true
-				break
-			}
-		}
-		if !found {
-			return fmt.Errorf("private zone record name error")
-		}
-	}
-
-	if f.hasAnnotation(ServiceAnnotationLoadBalancerPrivateZoneRecordTTL) {
-		if privateZoneRecordTTL != defd.PrivateZoneRecordTTL {
-			return fmt.Errorf("error private zone ttl. set %v, get %v ",
-				defd.PrivateZoneRecordTTL, privateZoneRecordTTL)
 		}
 	}
 
