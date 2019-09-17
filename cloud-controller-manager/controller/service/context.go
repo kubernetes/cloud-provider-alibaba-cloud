@@ -8,6 +8,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"os"
 	"k8s.io/cloud-provider-alibaba-cloud/cloud-controller-manager/utils"
 )
 
@@ -42,6 +43,9 @@ func ServiceModeLocal(svc *v1.Service) bool {
 }
 
 func IsENIBackendType(svc *v1.Service) bool {
+	if os.Getenv("SERVICE_FORCE_BACKEND_ENI") == "true" {
+		return true
+	}
 	return svc.Annotations[utils.BACKEND_TYPE_LABEL] == utils.BACKEND_TYPE_ENI
 }
 
