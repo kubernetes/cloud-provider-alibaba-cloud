@@ -85,15 +85,24 @@ func (s *InstanceClient) filterOutByRegion(nodes []*v1.Node, region common.Regio
 }
 
 func (s *InstanceClient) filterOutByLabel(nodes []*v1.Node, labels string) ([]*v1.Node, error) {
+	result := []*v1.Node{}
 	if labels == "" {
 		// skip filter when label is empty
 		glog.V(2).Infof("alicloud: slb backend server label does not specified, skip filter nodes by label.")
-		return nodes, nil
+		for _, n := range nodes {
+			if !node.IsEdgeWorkerNode(n) {
+				result = append(result, n)
+			}
+		}
+		return result, nil
 	}
-	result := []*v1.Node{}
+
 	lbl := strings.Split(labels, ",")
 	records := []string{}
-	for _, node := range nodes {
+	for _, n := range nodes {
+		if node.IsEdgeWorkerNode(n) {
+			continue
+		}
 		found := true
 		for _, v := range lbl {
 			l := strings.Split(v, "=")
@@ -102,14 +111,14 @@ func (s *InstanceClient) filterOutByLabel(nodes []*v1.Node, labels string) ([]*v
 				glog.Errorf(msg)
 				return []*v1.Node{}, errors.New(msg)
 			}
-			if nv, exist := node.Labels[l[0]]; !exist || nv != l[1] {
+			if nv, exist := n.Labels[l[0]]; !exist || nv != l[1] {
 				found = false
 				break
 			}
 		}
 		if found {
-			result = append(result, node)
-			records = append(records, node.Name)
+			result = append(result, n)
+			records = append(records, n.Name)
 		}
 	}
 	glog.V(4).Infof("alicloud: accept nodes by service backend labels[%s], %v\n", labels, records)

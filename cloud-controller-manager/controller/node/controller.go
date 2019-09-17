@@ -38,6 +38,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/cloud-provider-alibaba-cloud/cloud-controller-manager/controller/route"
+	"k8s.io/cloud-provider-alibaba-cloud/cloud-controller-manager/utils"
 	nodeutilv1 "k8s.io/kubernetes/pkg/api/v1/node"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/controller"
@@ -235,6 +236,9 @@ func (cnc *CloudNodeController) Run(stopCh <-chan struct{}) {
 }
 
 func (cnc *CloudNodeController) AddCloudNode(node *v1.Node) error {
+	if IsEdgeWorkerNode(node) {
+		return nil
+	}
 	curNode, err := cnc.kclient.
 		CoreV1().
 		Nodes().
@@ -458,6 +462,9 @@ func batchAddressUpdate(
 func nodeids(nodes []v1.Node) []string {
 	var ids []string
 	for _, node := range nodes {
+		if IsEdgeWorkerNode(&node) {
+			continue
+		}
 		ids = append(ids, node.Spec.ProviderID)
 	}
 	return ids
@@ -696,4 +703,13 @@ func PatchNode(
 		CoreV1().
 		Nodes().
 		Patch(patched.Name, types.MergePatchType, data)
+}
+
+func IsEdgeWorkerNode(node *v1.Node) bool {
+	if isEdgeWorker, ok := node.Labels[utils.NodeLabelEdgeWorkerNode]; ok {
+		if isEdgeWorker == "true" {
+			return true
+		}
+	}
+	return false
 }
