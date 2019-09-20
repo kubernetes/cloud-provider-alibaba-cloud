@@ -76,6 +76,10 @@ const (
 
 	// MAX_BATCH_NUM batch process per loop.
 	MAX_BATCH_NUM = 50
+
+	// LabelNodeRoleExcludeNode specifies that the node should be
+	// exclude from load balancers created by a cloud provider.
+	LabelNodeRoleExcludeNode = "alpha.service-controller.kubernetes.io/exclude-node"
 )
 
 // CloudNodeAttribute node attribute from cloud instance
@@ -629,7 +633,15 @@ func removeCloudTaints(node *v1.Node) {
 }
 
 func nodeLists(kclient kubernetes.Interface) (*v1.NodeList, error) {
-	return kclient.CoreV1().Nodes().List(metav1.ListOptions{ResourceVersion: "0"})
+	allNodes, err := kclient.CoreV1().Nodes().List(metav1.ListOptions{ResourceVersion: "0"})
+	var nodes *v1.NodeList
+	for _, node := range allNodes.Items {
+		if _, exclude := node.Labels[LabelNodeRoleExcludeNode]; exclude {
+			continue
+		}
+		nodes.Items = append(nodes.Items, node)
+	}
+	return nodes, err
 }
 
 func isNodeAddressChanged(addr1, addr2 []v1.NodeAddress) bool {

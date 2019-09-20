@@ -15,6 +15,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	queue "k8s.io/client-go/util/workqueue"
+	nodecontroller "k8s.io/cloud-provider-alibaba-cloud/cloud-controller-manager/controller/node"
 	"k8s.io/cloud-provider-alibaba-cloud/cloud-controller-manager/utils"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/cloudprovider"
@@ -719,6 +720,10 @@ func NodeConditionPredicate(svc *v1.Service) (corelisters.NodeConditionPredicate
 		// it unschedulable. Recognize nodes labeled as master, and filter
 		// them also, as we were doing previously.
 		if _, isMaster := node.Labels[LabelNodeRoleMaster]; isMaster {
+			return false
+		}
+
+		if _, exclude := node.Labels[nodecontroller.LabelNodeRoleExcludeNode]; exclude {
 			return false
 		}
 
