@@ -317,12 +317,12 @@ func (s *LoadBalancerClient) EnsureLoadBalancer(service *v1.Service, nodes inter
 			os.Exit(1)
 		}
 		if isLoadbalancerOwnIngress(service) {
-			return nil, fmt.Errorf("alicloud: not able to find loadbalancer "+
+			return nil, fmt.Errorf("alicloud Message: not able to find loadbalancer "+
 				"named [%s] in openapi, but it's defined in service.loaderbalancer.ingress. "+
 				"this may happen when you removed loadbalancerid annotation.", service.Name)
 		}
 		if request.Loadbalancerid != "" {
-			return nil, fmt.Errorf("alicloud: user specified "+
+			return nil, fmt.Errorf("alicloud Message: user specified "+
 				"loadbalancer[%s] does not exist. pls check", request.Loadbalancerid)
 		}
 
@@ -374,19 +374,19 @@ func (s *LoadBalancerClient) EnsureLoadBalancer(service *v1.Service, nodes inter
 		}
 		if isLoadBalancerCreatedByKubernetes(tags) &&
 			isUserDefinedLoadBalancer(service) {
-			return origined, fmt.Errorf("alicloud: can not reuse loadbalancer created by kubernetes. %s", origined.LoadBalancerId)
+			return origined, fmt.Errorf("alicloud Message: can not reuse loadbalancer created by kubernetes. %s", origined.LoadBalancerId)
 		}
 		needUpdate, charge, bandwidth := false, origined.InternetChargeType, origined.Bandwidth
 		glog.V(5).Infof("alicloud: found "+
 			"an exist loadbalancer[%s], check to see whether update is needed.", origined.LoadBalancerId)
 		if request.MasterZoneID != "" && request.MasterZoneID != origined.MasterZoneId {
-			return nil, fmt.Errorf("alicloud: can not change LoadBalancer master zone id once created")
+			return nil, fmt.Errorf("alicloud Message: can not change LoadBalancer master zone id once created")
 		}
 		if request.SlaveZoneID != "" && request.SlaveZoneID != origined.SlaveZoneId {
-			return nil, fmt.Errorf("alicloud: can not change LoadBalancer slave zone id once created")
+			return nil, fmt.Errorf("alicloud Message: can not change LoadBalancer slave zone id once created")
 		}
 		if !equalsAddressIPVersion(request.AddressIPVersion, origined.AddressIPVersion) {
-			return nil, fmt.Errorf("alicloud: can not change LoadBalancer AddressIPVersion once created")
+			return nil, fmt.Errorf("alicloud Message: can not change LoadBalancer AddressIPVersion once created")
 		}
 		if request.ChargeType != "" && request.ChargeType != origined.InternetChargeType {
 			needUpdate = true
@@ -407,7 +407,7 @@ func (s *LoadBalancerClient) EnsureLoadBalancer(service *v1.Service, nodes inter
 			glog.Errorf("alicloud: warning! can not change "+
 				"loadbalancer address type after it has been created! please "+
 				"recreate the service.[%s]->[%s],[%s]", origined.AddressType, request.AddressType, origined.LoadBalancerName)
-			return nil, errors.New("alicloud: change loadbalancer " +
+			return nil, errors.New("alicloud Message: change loadbalancer " +
 				"address type after service has been created is not supported. delete and retry")
 		}
 		if needUpdate {
@@ -448,7 +448,7 @@ func (s *LoadBalancerClient) EnsureLoadBalancer(service *v1.Service, nodes inter
 
 	// Make sure virtual server backend group has been updated.
 	if err := EnsureVirtualGroups(vgs, nodes); err != nil {
-		return origined, fmt.Errorf("update backend servers: error %s", err.Error())
+		return origined, fmt.Errorf("Message: update backend servers error %s ", err.Error())
 	}
 	// Apply listener when
 	//   1. user does not assign loadbalancer id by themselves.
@@ -459,8 +459,7 @@ func (s *LoadBalancerClient) EnsureLoadBalancer(service *v1.Service, nodes inter
 		// If listener update is needed. Switch to vserver group immediately.
 		// No longer update default backend servers.
 		if err := EnsureListeners(s, service, origined, vgs); err != nil {
-
-			return origined, fmt.Errorf("ensure listener error: %s", err.Error())
+			return origined, fmt.Errorf("Message: ensure listener error: %s ", err.Error())
 		}
 	}
 	return origined, s.UpdateLoadBalancer(service, nodes, false)
@@ -483,12 +482,12 @@ func (s *LoadBalancerClient) UpdateLoadBalancer(service *v1.Service, nodes inter
 		return err
 	}
 	if !exists {
-		return fmt.Errorf("the loadbalance you specified by name [%s] does not exist", service.Name)
+		return fmt.Errorf("Message: the loadbalance you specified by name [%s] does not exist ", service.Name)
 	}
 	if withVgroup {
 		vgs := BuildVirturalGroupFromService(s, service, lb)
 		if err := EnsureVirtualGroups(vgs, nodes); err != nil {
-			return fmt.Errorf("update backend servers: error %s", err.Error())
+			return fmt.Errorf("Message: update backend servers: error %s ", err.Error())
 		}
 	}
 	if !needUpdateDefaultBackend(service, lb) {
@@ -687,8 +686,11 @@ func isOverrideListeners(svc *v1.Service) bool {
 
 // check if the service exists in service definition
 func isLoadbalancerOwnIngress(service *v1.Service) bool {
-	if service == nil ||
-		len(service.Status.LoadBalancer.Ingress) == 0 {
+	if service == nil {
+		utils.Logf(service, "service is nil")
+		return false
+	}
+	if len(service.Status.LoadBalancer.Ingress) == 0 {
 		utils.Logf(service, "service %s doesn't have ingresses", service.Name)
 		return false
 	}

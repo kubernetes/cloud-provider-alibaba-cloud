@@ -11,6 +11,7 @@ import (
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
+	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
@@ -22,6 +23,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/metrics"
 	"k8s.io/kubernetes/staging/src/k8s.io/client-go/util/workqueue"
 	"reflect"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -144,6 +146,13 @@ func (con *Controller) Run(stopCh <-chan struct{}, workers int) {
 	) {
 		glog.Error("service and nodes cache has not been syncd")
 		return
+	}
+
+	if con.caster != nil {
+		sink := &v1core.EventSinkImpl{
+			Interface: v1core.New(con.client.CoreV1().RESTClient()).Events(""),
+		}
+		con.caster.StartRecordingToSink(sink)
 	}
 
 	tasks := map[string]SyncTask{
@@ -453,6 +462,8 @@ func retry(
 	)
 }
 
+var re = regexp.MustCompile(".*(Message:.*)")
+
 func (con *Controller) update(cached, svc *v1.Service) error {
 
 	// Save the state so we can avoid a write if it doesn't change
@@ -494,6 +505,13 @@ func (con *Controller) update(cached, svc *v1.Service) error {
 			var eps *v1.Endpoints
 			eps, err = con.ifactory.Core().V1().Endpoints().Lister().Endpoints(svc.Namespace).Get(svc.Name)
 			if err != nil {
+				con.recorder.Eventf(
+					svc,
+					v1.EventTypeWarning,
+					"GetEndpointsFailed",
+					"Get available endpoints for service %s error, ServiceUpdate",
+					key(svc),
+				)
 				return fmt.Errorf("get available endpoints for eni: %s", err.Error())
 			}
 			newm, err = eni.EnsureLoadBalancerWithENI(con.clusterName, svc, eps)
@@ -501,6 +519,13 @@ func (con *Controller) update(cached, svc *v1.Service) error {
 			var nodes []*v1.Node
 			nodes, err = AvailableNodes(svc, con.ifactory)
 			if err != nil {
+				con.recorder.Eventf(
+					svc,
+					v1.EventTypeWarning,
+					"GetAvailableNodeFailed",
+					"Get available nodes for service %s error, ServiceUpdate",
+					key(svc),
+				)
 				return fmt.Errorf("error get available nodes %s", err.Error())
 			}
 			// Fire warning event if there are no available nodes
@@ -517,6 +542,19 @@ func (con *Controller) update(cached, svc *v1.Service) error {
 			newm, err = con.cloud.EnsureLoadBalancer(con.clusterName, svc, nodes)
 		}
 		if err != nil {
+			var message string
+			sub := re.FindSubmatch([]byte(err.Error()))
+			if len(sub) > 1 {
+				message = string(sub[1])
+			}
+			con.recorder.Eventf(
+				svc,
+				v1.EventTypeWarning,
+				"EnsuredLoadBalancerFailed",
+				"Error ensure loadbalancer %s, error %s",
+				key(svc),
+				message,
+			)
 			return fmt.Errorf("ensure loadbalancer error: %s", err)
 		}
 		con.recorder.Eventf(
@@ -528,6 +566,15 @@ func (con *Controller) update(cached, svc *v1.Service) error {
 		)
 	}
 	if err := con.updateStatus(svc, pre, newm); err != nil {
+		con.recorder.Eventf(
+			svc,
+			v1.EventTypeWarning,
+			"UpdateServiceStatusFailed",
+			"update service %s status %v to %v error.",
+			key(svc),
+			pre,
+			newm,
+		)
 		return fmt.Errorf("update service status: %s", err.Error())
 	}
 	// Always update the cache upon success.
@@ -537,6 +584,7 @@ func (con *Controller) update(cached, svc *v1.Service) error {
 	con.local.Set(key(svc), svc)
 	return nil
 }
+
 func (con *Controller) updateStatus(svc *v1.Service, pre, newm *v1.LoadBalancerStatus) error {
 	if newm == nil {
 		return fmt.Errorf("status not updated for nil status reason")
@@ -594,13 +642,8 @@ func (con *Controller) updateStatus(svc *v1.Service, pre, newm *v1.LoadBalancerS
 func (con *Controller) delete(svc *v1.Service) error {
 
 	// do not check for the neediness of loadbalancer, delete anyway.
-	con.recorder.Eventf(
-		svc,
-		v1.EventTypeNormal,
-		"DeletingLoadBalancer",
-		"for service: %s",
-		key(svc),
-	)
+	utils.Logf(svc, "deleting loadbalancer for service %s.", key(svc))
+
 	err := con.cloud.EnsureLoadBalancerDeleted(con.clusterName, svc)
 	if err != nil {
 		con.recorder.Eventf(

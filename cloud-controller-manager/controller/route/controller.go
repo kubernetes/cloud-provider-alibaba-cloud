@@ -356,6 +356,17 @@ func (rc *RouteController) updateNetworkingCondition(nodeName types.NodeName, ro
 		}
 		glog.V(4).Infof("Error updating node %s, retrying: %v", nodeName, err)
 	}
+	rc.recorder.Eventf(
+		&v1.ObjectReference{
+			Kind:      "Node",
+			Name:      string(nodeName),
+			Namespace: "",
+		},
+		v1.EventTypeWarning,
+		"UpdateNetworkConditionFailed",
+		"Error updating %s network condition",
+		nodeName,
+	)
 	glog.Errorf("Error updating node %s: %v", nodeName, err)
 	return err
 }

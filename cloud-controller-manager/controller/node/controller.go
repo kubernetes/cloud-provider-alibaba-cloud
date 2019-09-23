@@ -242,6 +242,13 @@ func (cnc *CloudNodeController) AddCloudNode(node *v1.Node) error {
 		Get(node.Name, metav1.GetOptions{})
 	if err != nil {
 		//retry
+		cnc.recorder.Eventf(
+			curNode,
+			v1.EventTypeWarning,
+			"RetrieveNodeError",
+			"retrieve node %s error.",
+			node.Name,
+		)
 		return fmt.Errorf("retrieve node error: %s", err.Error())
 	}
 	cloudTaint := findCloudTaint(curNode.Spec.Taints)
@@ -249,7 +256,17 @@ func (cnc *CloudNodeController) AddCloudNode(node *v1.Node) error {
 		glog.V(4).Infof("Node %s is registered without cloud taint. Will not process.", node.Name)
 		return nil
 	}
-	return cnc.doAddCloudNode(curNode)
+	err = cnc.doAddCloudNode(curNode)
+	if err != nil {
+		cnc.recorder.Eventf(
+			curNode,
+			v1.EventTypeWarning,
+			"AddCloudNodeFailed",
+			"Add cloud node %s error.",
+			node.Name,
+		)
+	}
+	return err
 }
 
 // syncNodeAddress updates the nodeAddress
@@ -285,6 +302,13 @@ func (cnc *CloudNodeController) syncNodeAddress(nodes []v1.Node) error {
 		}
 		err := tryPatchNodeAddress(cnc.kclient, node, cloudNode.Addresses)
 		if err != nil {
+			cnc.recorder.Eventf(
+				node,
+				v1.EventTypeWarning,
+				"PatchNodeAddressFailed",
+				"Patch %s node address error, wait for next retry.",
+				node.Name,
+			)
 			glog.Error("Wait for next retry, patch node address error: %s", err.Error())
 		}
 	}
