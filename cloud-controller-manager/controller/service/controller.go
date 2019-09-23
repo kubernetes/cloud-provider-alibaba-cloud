@@ -199,6 +199,10 @@ func (con *Controller) HandlerForNodesChange(
 			glog.Info("node change: node object is nil, skip")
 			return
 		}
+		if _, exclude := node.Labels[utils.LabelNodeRoleExcludeNode]; exclude {
+			glog.Infof("node change: node %s is excluded from CCM, skip", node.Name)
+			return
+		}
 		// node change may affect any service that concerns
 		// eg. Need LoadBalancer
 		ctx.Range(
@@ -719,6 +723,10 @@ func NodeConditionPredicate(svc *v1.Service) (corelisters.NodeConditionPredicate
 		// it unschedulable. Recognize nodes labeled as master, and filter
 		// them also, as we were doing previously.
 		if _, isMaster := node.Labels[LabelNodeRoleMaster]; isMaster {
+			return false
+		}
+
+		if _, exclude := node.Labels[utils.LabelNodeRoleExcludeNode]; exclude {
 			return false
 		}
 
