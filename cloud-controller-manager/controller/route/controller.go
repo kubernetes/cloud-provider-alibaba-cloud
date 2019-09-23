@@ -248,6 +248,10 @@ func (rc *RouteController) tryCreateRoute(table string,
 			err := rc.routes.CreateRoute(rc.clusterName, node.Name, table, route)
 			if err != nil {
 				lasterr = err
+				if strings.Contains(err.Error(), "not found") {
+					glog.Infof("not found route %s", err.Error())
+					return true, nil
+				}
 				glog.Errorf("Backoff creating route: %s", err.Error())
 				return false, nil
 			}

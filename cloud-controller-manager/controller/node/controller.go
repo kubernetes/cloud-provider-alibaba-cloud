@@ -631,14 +631,18 @@ func removeCloudTaints(node *v1.Node) {
 
 func nodeLists(kclient kubernetes.Interface) (*v1.NodeList, error) {
 	allNodes, err := kclient.CoreV1().Nodes().List(metav1.ListOptions{ResourceVersion: "0"})
-	var nodes *v1.NodeList
+	if allNodes == nil {
+		return nil, err
+	}
+	var nodes []v1.Node
 	for _, node := range allNodes.Items {
 		if _, exclude := node.Labels[utils.LabelNodeRoleExcludeNode]; exclude {
 			continue
 		}
-		nodes.Items = append(nodes.Items, node)
+		nodes = append(nodes, node)
 	}
-	return nodes, err
+	allNodes.Items = nodes
+	return allNodes, err
 }
 
 func isNodeAddressChanged(addr1, addr2 []v1.NodeAddress) bool {
