@@ -4,12 +4,12 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/cloud-provider-alibaba-cloud/cloud-controller-manager/utils"
 	"reflect"
 	"sort"
 	"strings"
 	"sync"
 	"os"
-	"k8s.io/cloud-provider-alibaba-cloud/cloud-controller-manager/utils"
 )
 
 type Context struct{ ctx sync.Map }
