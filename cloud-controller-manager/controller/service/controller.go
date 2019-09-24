@@ -487,7 +487,7 @@ func (con *Controller) update(cached, svc *v1.Service) error {
 		var (
 			err error
 		)
-		if IsENIBackendType(svc) {
+		if utils.IsENIBackendType(svc) {
 			// Ensure ENI type backend
 			eni, ok := con.cloud.(EnsureENI)
 			if !ok {
@@ -656,7 +656,7 @@ func (con *Controller) NodeSyncTask(k string) error {
 		}
 
 		defer utils.Logf(service, "finish sync backend for service\n\n")
-		if IsENIBackendType(service) {
+		if utils.IsENIBackendType(service) {
 			eni, ok := con.cloud.(EnsureENI)
 			if !ok {
 				return fmt.Errorf("cloud does not implement EnsureENI interface")

@@ -10,6 +10,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/controller/service"
+	"k8s.io/cloud-provider-alibaba-cloud/cloud-controller-manager/utils"
 	"sort"
 	"strconv"
 	"strings"
@@ -686,8 +687,8 @@ func (f *FrameWork) ListenerEqual(id string, p v1.ServicePort, proto string) err
 			return err
 		}
 		if resp.BackendServerPort == 0 ||
-			(!isEniBackend(f.SVC) && resp.BackendServerPort != int(p.NodePort)) ||
-			(isEniBackend(f.SVC) && resp.BackendServerPort != int(p.TargetPort.IntVal)) {
+			(!utils.IsENIBackendType(f.SVC) && resp.BackendServerPort != int(p.NodePort)) ||
+			(utils.IsENIBackendType(f.SVC) && resp.BackendServerPort != int(p.TargetPort.IntVal)) {
 			return fmt.Errorf("TCPBackendServerPortNotEqual")
 		}
 
@@ -712,8 +713,8 @@ func (f *FrameWork) ListenerEqual(id string, p v1.ServicePort, proto string) err
 			return err
 		}
 		if resp.BackendServerPort == 0 ||
-			(!isEniBackend(f.SVC) && resp.BackendServerPort != int(p.NodePort)) ||
-			(isEniBackend(f.SVC) && resp.BackendServerPort != int(p.TargetPort.IntVal)) {
+			(!utils.IsENIBackendType(f.SVC) && resp.BackendServerPort != int(p.NodePort)) ||
+			(utils.IsENIBackendType(f.SVC) && resp.BackendServerPort != int(p.TargetPort.IntVal)) {
 			return fmt.Errorf("UDPBackendServerPortNotEqual")
 		}
 
@@ -733,8 +734,8 @@ func (f *FrameWork) ListenerEqual(id string, p v1.ServicePort, proto string) err
 			return err
 		}
 		if resp.BackendServerPort == 0 ||
-			(!isEniBackend(f.SVC) && resp.BackendServerPort != int(p.NodePort)) ||
-			(isEniBackend(f.SVC) && resp.BackendServerPort != int(p.TargetPort.IntVal)) {
+			(!utils.IsENIBackendType(f.SVC) && resp.BackendServerPort != int(p.NodePort)) ||
+			(utils.IsENIBackendType(f.SVC) && resp.BackendServerPort != int(p.TargetPort.IntVal)) {
 			return fmt.Errorf("HTTPBackendServerPortNotEqual: %v, %v,%v", resp.BackendServerPort, p.NodePort, p.Port)
 		}
 
@@ -761,8 +762,8 @@ func (f *FrameWork) ListenerEqual(id string, p v1.ServicePort, proto string) err
 			return err
 		}
 		if resp.BackendServerPort == 0 ||
-			(!isEniBackend(f.SVC) && resp.BackendServerPort != int(p.NodePort)) ||
-			(isEniBackend(f.SVC) && resp.BackendServerPort != int(p.TargetPort.IntVal)) {
+			(!utils.IsENIBackendType(f.SVC) && resp.BackendServerPort != int(p.NodePort)) ||
+			(utils.IsENIBackendType(f.SVC) && resp.BackendServerPort != int(p.TargetPort.IntVal)) {
 			return fmt.Errorf("HTTPSBackendServerPortNotEqual")
 		}
 		if resp.ServerCertificateId == "" ||

@@ -8,6 +8,7 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
 	"k8s.io/kubernetes/staging/src/k8s.io/apimachinery/pkg/util/json"
+	"k8s.io/cloud-provider-alibaba-cloud/cloud-controller-manager/utils"
 	"reflect"
 	"strconv"
 	"strings"
@@ -426,7 +427,7 @@ func BuildVirturalGroupFromService(
 			InsClient:      client.ins,
 			VpcID:          client.vpcid,
 		}
-		if isEniBackend(service) {
+		if utils.IsENIBackendType(service) {
 			vg.NamedKey.Port = port.TargetPort.IntVal
 		}
 		vgrps = append(vgrps, vg)
