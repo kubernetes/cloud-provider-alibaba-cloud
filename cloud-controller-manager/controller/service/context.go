@@ -4,12 +4,10 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
 	"k8s.io/client-go/tools/record"
-	"k8s.io/cloud-provider-alibaba-cloud/cloud-controller-manager/utils"
 	"reflect"
 	"sort"
 	"strings"
 	"sync"
-	"os"
 )
 
 type Context struct{ ctx sync.Map }
@@ -40,13 +38,6 @@ func (c *Context) Remove(name string) { c.ctx.Delete(name) }
 
 func ServiceModeLocal(svc *v1.Service) bool {
 	return svc.Spec.ExternalTrafficPolicy == v1.ServiceExternalTrafficPolicyTypeLocal
-}
-
-func IsENIBackendType(svc *v1.Service) bool {
-	if os.Getenv("SERVICE_FORCE_BACKEND_ENI") == "true" {
-		return true
-	}
-	return svc.Annotations[utils.BACKEND_TYPE_LABEL] == utils.BACKEND_TYPE_ENI
 }
 
 // NeedUpdate compare old and new service for possible changes

@@ -467,10 +467,6 @@ func BuildActionsForListeners(svc *v1.Service, service, console Listeners) (List
 	return append(append(deletion, addition...), updation...), nil
 }
 
-func isEniBackend(svc *v1.Service) bool {
-	return svc.Annotations[utils.BACKEND_TYPE_LABEL] == "eni"
-}
-
 // BuildListenersFromService Build expected listeners
 func BuildListenersFromService(
 	svc *v1.Service,
@@ -500,7 +496,7 @@ func BuildListenersFromService(
 			VGroups:         vgrps,
 			LoadBalancerID:  lb.LoadBalancerId,
 		}
-		if isEniBackend(svc) {
+		if utils.IsENIBackendType(svc) {
 			n.NodePort = port.TargetPort.IntVal
 		}
 		n.Name = n.NamedKey.Key()
