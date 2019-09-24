@@ -22,3 +22,11 @@ func IsENIBackendType(svc *v1.Service) bool {
 	return svc.Annotations[BACKEND_TYPE_LABEL] == BACKEND_TYPE_ENI
 }
 
+
+func IsALBService(svc *v1.Service) bool {
+	if svc.Name == "alb-ingress-lb" && svc.Namespace == "kube-system" {
+		return true
+	}
+
+	return false
+}

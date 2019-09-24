@@ -493,10 +493,13 @@ func (con *Controller) update(cached, svc *v1.Service) error {
 			if !ok {
 				return fmt.Errorf("cloud does not implement EnsureENI interface")
 			}
-			var eps *v1.Endpoints
-			eps, err = con.ifactory.Core().V1().Endpoints().Lister().Endpoints(svc.Namespace).Get(svc.Name)
-			if err != nil {
-				return fmt.Errorf("get available endpoints for eni: %s", err.Error())
+			var eps *v1.Endpoints = new(v1.Endpoints)
+
+			if !utils.IsALBService(svc) {
+				eps, err = con.ifactory.Core().V1().Endpoints().Lister().Endpoints(svc.Namespace).Get(svc.Name)
+				if err != nil {
+					return fmt.Errorf("get available endpoints for eni: %s", err.Error())
+				}
 			}
 			newm, err = eni.EnsureLoadBalancerWithENI(con.clusterName, svc, eps)
 		} else {

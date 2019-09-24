@@ -263,6 +263,10 @@ func (n *Listener) Remove() error {
 }
 
 func (n *Listener) findVgroup(key string) string {
+	if n.VGroups == nil {
+		return ""
+	}
+
 	for _, v := range *n.VGroups {
 		if v.NamedKey.Key() == key {
 			glog.Infof("found: key=%s, groupid=%s, try use vserver group mode.", key, v.VGroupId)

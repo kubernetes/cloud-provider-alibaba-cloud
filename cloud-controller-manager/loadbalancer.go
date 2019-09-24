@@ -444,12 +444,18 @@ func (s *LoadBalancerClient) EnsureLoadBalancer(service *v1.Service, nodes inter
 		glog.Errorf("alicloud: can not get loadbalancer[%s] attribute. ", origined.LoadBalancerId)
 		return nil, err
 	}
-	vgs := BuildVirturalGroupFromService(s, service, origined)
 
-	// Make sure virtual server backend group has been updated.
-	if err := EnsureVirtualGroups(vgs, nodes); err != nil {
-		return origined, fmt.Errorf("update backend servers: error %s", err.Error())
+	var vgs *vgroups
+
+	if !utils.IsALBService(service) {
+		vgs = BuildVirturalGroupFromService(s, service, origined)
+
+		// Make sure virtual server backend group has been updated.
+		if err := EnsureVirtualGroups(vgs, nodes); err != nil {
+			return origined, fmt.Errorf("update backend servers: error %s", err.Error())
+		}
 	}
+
 	// Apply listener when
 	//   1. user does not assign loadbalancer id by themselves.
 	//   2. force-override-listener annotation is set.
@@ -459,10 +465,14 @@ func (s *LoadBalancerClient) EnsureLoadBalancer(service *v1.Service, nodes inter
 		// If listener update is needed. Switch to vserver group immediately.
 		// No longer update default backend servers.
 		if err := EnsureListeners(s, service, origined, vgs); err != nil {
-
 			return origined, fmt.Errorf("ensure listener error: %s", err.Error())
 		}
 	}
+
+	if utils.IsALBService(service) {
+		return origined, nil
+	}
+
 	return origined, s.UpdateLoadBalancer(service, nodes, false)
 }
 
@@ -477,6 +487,9 @@ func isLoadBalancerCreatedByKubernetes(tags []slb.TagItemType) bool {
 
 //UpdateLoadBalancer make sure slb backend is reconciled
 func (s *LoadBalancerClient) UpdateLoadBalancer(service *v1.Service, nodes interface{}, withVgroup bool) error {
+	if utils.IsALBService(service) {
+		return nil
+	}
 
 	exists, lb, err := s.findLoadBalancer(service)
 	if err != nil {
