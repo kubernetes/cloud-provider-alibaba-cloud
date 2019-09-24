@@ -775,6 +775,9 @@ func AvailableNodeModeLocal(nodes []*v1.Node, svc *v1.Service,
 	utils.Logf(svc, "endpoint has [%d] subsets. ", len(ep.Subsets))
 	for _, sub := range ep.Subsets {
 		for _, add := range sub.Addresses {
+			if add.NodeName == nil {
+				return nil, fmt.Errorf("NodeName is nil. Endpoint must have NodeName on local mode. ")
+			}
 			utils.Logf(svc, "prepare to add node [%s] for service backend", *add.NodeName)
 			if _, exist := availableNodesMap[*add.NodeName]; !exist {
 				availableNodesMap[*add.NodeName] = 1
