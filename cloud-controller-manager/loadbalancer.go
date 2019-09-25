@@ -304,7 +304,7 @@ func (s *LoadBalancerClient) EnsureLoadBalancer(service *v1.Service, nodes inter
 	if err != nil {
 		return nil, err
 	}
-	utils.Logf(service, "find loadbalancer with result, exist=%v\n %s\n", exists, PrettyJson(origined))
+	utils.Logf(service, "find loadbalancer with result, exist=%v, %s\n", exists, PrettyJson(origined))
 	_, request := ExtractAnnotationRequest(service)
 
 	var derr error

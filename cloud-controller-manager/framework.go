@@ -9,8 +9,8 @@ import (
 	"github.com/denverdino/aliyungo/slb"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/kubernetes/pkg/controller/service"
 	"k8s.io/cloud-provider-alibaba-cloud/cloud-controller-manager/utils"
+	"k8s.io/kubernetes/pkg/controller/service"
 	"sort"
 	"strconv"
 	"strings"
@@ -512,7 +512,7 @@ func ExpectExistAndEqual(f *FrameWork) error {
 				nodes = tpms
 			}
 			if len(backends) > len(nodes) {
-				return fmt.Errorf("backend:%v= node:%v not equal", len(backends), len(nodes))
+				return fmt.Errorf("backend:%v,node:%v not equal", len(backends), len(nodes))
 			}
 			for k, v := range backends {
 				_, ida, err := nodeFromProviderID(nodes[k].Spec.ProviderID)
