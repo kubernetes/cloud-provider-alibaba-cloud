@@ -31,7 +31,6 @@ const (
 	//SERVICE_SYNC_PERIOD Interval of synchronizing service status from apiserver
 	SERVICE_SYNC_PERIOD = 1 * time.Minute
 	SERVICE_QUEUE       = "service-queue"
-	NODE_QUEUE          = "node-queue"
 	SERVICE_CONTROLLER  = "service-controller"
 
 	LabelNodeRoleMaster = "node-role.kubernetes.io/master"
@@ -104,18 +103,17 @@ func NewController(
 		recorder:    recorder,
 		client:      client,
 		queues: map[string]queue.DelayingInterface{
-			NODE_QUEUE:    workqueue.NewNamedDelayingQueue(NODE_QUEUE),
 			SERVICE_QUEUE: workqueue.NewNamedDelayingQueue(SERVICE_QUEUE),
 		},
 	}
 	con.HandlerForEndpointChange(
 		con.local,
-		con.queues[NODE_QUEUE],
+		con.queues[SERVICE_QUEUE],
 		con.ifactory.Core().V1().Endpoints().Informer(),
 	)
 	con.HandlerForNodesChange(
 		con.local,
-		con.queues[NODE_QUEUE],
+		con.queues[SERVICE_QUEUE],
 		con.ifactory.Core().V1().Nodes().Informer(),
 	)
 	con.HandlerForServiceChange(
@@ -149,11 +147,11 @@ func (con *Controller) Run(stopCh <-chan struct{}, workers int) {
 	}
 
 	tasks := map[string]SyncTask{
-		NODE_QUEUE:    con.NodeSyncTask,
 		SERVICE_QUEUE: con.ServiceSyncTask,
 	}
 	for i := 0; i < workers; i++ {
-		// run service&node sync worker
+		// run service sync worker
+		glog.Infof("run service sync worker: %d", i)
 		for que, task := range tasks {
 			go wait.Until(
 				WorkerFunc(
@@ -623,66 +621,6 @@ func (con *Controller) delete(svc *v1.Service) error {
 	)
 	con.local.Remove(key(svc))
 	return nil
-}
-
-func (con *Controller) NodeSyncTask(k string) error {
-	glog.Infof("[%s] start sync backend for service.\n", k)
-
-	ns, name, err := cache.SplitMetaNamespaceKey(k)
-	if err != nil {
-		return fmt.Errorf("unexpected key format %s for syncing backends", k)
-	}
-
-	// service holds the latest service info from apiserver
-	service, err := con.
-		ifactory.
-		Core().
-		V1().
-		Services().
-		Lister().
-		Services(ns).
-		Get(name)
-	switch {
-	case errors.IsNotFound(err):
-		glog.Errorf("service %s not found for backend sync, finished", k)
-		return nil
-	case err != nil:
-		return fmt.Errorf("failed to load service from local context for backend: %s", err.Error())
-	default:
-		// catch unexpected service
-		if service == nil {
-			glog.Errorf("unexpected nil service for update, wait retry. %s", k)
-			return nil
-		}
-
-		defer utils.Logf(service, "finish sync backend for service\n\n")
-		if utils.IsENIBackendType(service) {
-			eni, ok := con.cloud.(EnsureENI)
-			if !ok {
-				return fmt.Errorf("cloud does not implement EnsureENI interface")
-			}
-			eps, err := con.ifactory.Core().V1().Endpoints().Lister().Endpoints(service.Namespace).Get(service.Name)
-			if err != nil {
-				return fmt.Errorf("get available endpoints for eni: %s", err.Error())
-			}
-			return eni.UpdateLoadBalancerWithENI(con.clusterName, service, eps)
-		}
-		nodes, err := AvailableNodes(service, con.ifactory)
-		if err != nil {
-			return fmt.Errorf("get available nodes: %s", err.Error())
-		}
-		// Warning for zero length nodes
-		if len(nodes) == 0 {
-			con.recorder.Eventf(
-				service,
-				v1.EventTypeWarning,
-				"UnAvailableLoadBalancer",
-				"There are no available nodes for LoadBalancer service %s, NodeSyncTask",
-				key(service),
-			)
-		}
-		return con.cloud.UpdateLoadBalancer(con.clusterName, service, nodes)
-	}
 }
 
 func AvailableNodes(
