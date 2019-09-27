@@ -15,8 +15,13 @@ const (
 )
 
 func IsENIBackendType(svc *v1.Service) bool {
+	if svc.Annotations[BACKEND_TYPE_LABEL] != "" {
+		return svc.Annotations[BACKEND_TYPE_LABEL] == BACKEND_TYPE_ENI
+	}
+
 	if os.Getenv("SERVICE_FORCE_BACKEND_ENI") == "true" {
 		return true
 	}
-	return svc.Annotations[BACKEND_TYPE_LABEL] == BACKEND_TYPE_ENI
+
+	return false
 }
