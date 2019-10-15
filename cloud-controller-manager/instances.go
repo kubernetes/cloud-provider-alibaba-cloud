@@ -207,7 +207,7 @@ func (s *InstanceClient) findInstanceByProviderID(providerID string) (*ecs.Insta
 		return nil, cloudprovider.InstanceNotFound
 	}
 	if len(ins) > 1 {
-		glog.Warningf("alicloud: multipul instance found by nodename=[%s], "+
+		glog.Warningf("alicloud: multiple instances found by nodename=[%s], "+
 			"the first one will be used, instanceid=[%s]\n", string(nodeid), ins[0].InstanceId)
 	}
 	return &ins[0], nil
