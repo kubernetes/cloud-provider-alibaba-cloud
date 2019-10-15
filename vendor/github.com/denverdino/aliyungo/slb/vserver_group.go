@@ -10,6 +10,7 @@ type VBackendServerType struct {
 	Port     int
 	Type     string
 	ServerIp string
+	Description string
 }
 
 type VServerGroup struct {
