@@ -639,6 +639,10 @@ func nodeLists(kclient kubernetes.Interface) (*v1.NodeList, error) {
 		if _, exclude := node.Labels[utils.LabelNodeRoleExcludeNode]; exclude {
 			continue
 		}
+		if node.Spec.ProviderID == "" {
+			glog.Warningf("ignore node[%s] without providerid", node.Name)
+			continue
+		}
 		nodes = append(nodes, node)
 	}
 	allNodes.Items = nodes
