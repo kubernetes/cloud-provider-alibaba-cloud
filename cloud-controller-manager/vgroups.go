@@ -246,7 +246,9 @@ func (v *vgroup) diff(apis, nodes []slb.VBackendServerType) (
 	for _, node := range nodes {
 		for _, api := range apis {
 			if node.ServerId == api.ServerId &&
-				node.Weight != api.Weight {
+				node.ServerIp == api.ServerIp &&
+				(node.Weight != api.Weight ||
+					api.Description != v.NamedKey.Key()) {
 				updates = append(updates, node)
 				break
 			}
@@ -267,7 +269,6 @@ func Ensure(v *vgroup, nodes interface{}) error {
 			}
 			if _, ok := node.Labels["weight"]; !ok {
 				nodeWeight = 100
-				glog.Infof("Warning: cannot get node %s weight. So set the node weight to 100.", node.Name)
 			} else {
 				nodeWeight, err = strconv.Atoi(node.Labels["weight"])
 				if err != nil {
@@ -279,10 +280,11 @@ func Ensure(v *vgroup, nodes interface{}) error {
 				}
 			}
 			backend = append(backend, slb.VBackendServerType{
-				ServerId: string(id),
-				Weight:   nodeWeight,
-				Port:     int(v.NamedKey.Port),
-				Type:     "ecs",
+				ServerId:    string(id),
+				Weight:      nodeWeight,
+				Port:        int(v.NamedKey.Port),
+				Type:        "ecs",
+				Description: v.NamedKey.Key(),
 			})
 		}
 	case *v1.Endpoints:
@@ -312,11 +314,12 @@ func Ensure(v *vgroup, nodes interface{}) error {
 			backend = append(
 				backend,
 				slb.VBackendServerType{
-					ServerId: eniid,
-					Weight:   100,
-					Type:     "eni",
-					Port:     int(v.NamedKey.Port),
-					ServerIp: addrIP,
+					ServerId:    eniid,
+					Weight:      100,
+					Type:        "eni",
+					Port:        int(v.NamedKey.Port),
+					ServerIp:    addrIP,
+					Description: v.NamedKey.Key(),
 				},
 			)
 		}
