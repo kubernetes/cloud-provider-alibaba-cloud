@@ -127,8 +127,8 @@ func (v *vgroup) Update() error {
 	}
 
 	if len(add) > 0 {
-		if err := BatchProcess(add,
-			func(list []slb.VBackendServerType) error {
+		if err := Batch(add, MAX_BACKEND_NUM,
+			func(list []interface{}) error {
 				additions, err := json.Marshal(list)
 				if err != nil {
 					return fmt.Errorf("error marshal backends: %s, %v", err.Error(), list)
@@ -147,8 +147,8 @@ func (v *vgroup) Update() error {
 		}
 	}
 	if len(del) > 0 {
-		if err := BatchProcess(del,
-			func(list []slb.VBackendServerType) error {
+		if err := Batch(del, MAX_BACKEND_NUM,
+			func(list []interface{}) error {
 				deletions, err := json.Marshal(list)
 				if err != nil {
 					return fmt.Errorf("error marshal backends: %s, %v", err.Error(), list)
@@ -167,8 +167,8 @@ func (v *vgroup) Update() error {
 		}
 	}
 	if len(update) > 0 {
-		return BatchProcess(update,
-			func(list []slb.VBackendServerType) error {
+		return Batch(update, MAX_BACKEND_NUM,
+			func(list []interface{}) error {
 				updateJson, err := json.Marshal(list)
 				if err != nil {
 					return fmt.Errorf("error marshal backends: %s, %v", err.Error(), list)
@@ -190,22 +190,39 @@ func (v *vgroup) Update() error {
 // MAX_BACKEND_NUM max batch backend num
 const MAX_BACKEND_NUM = 19
 
-//BatchProcess batch update backend.
-func BatchProcess(list []slb.VBackendServerType,
-	batch func(list []slb.VBackendServerType) error) error {
+type Func func([]interface{}) error
 
-	glog.Infof("batch process virtual server backend, length %d", len(list))
-	for len(list) > MAX_BACKEND_NUM {
-		if err := batch(list[0:MAX_BACKEND_NUM]); err != nil {
+// Batch batch process `object` m with func `func`
+// for general purpose
+func Batch(m interface{}, cnt int, batch Func) error {
+	if cnt <= 0 {
+		cnt = MAX_BACKEND_NUM
+	}
+	v := reflect.ValueOf(m)
+	if v.Kind() != reflect.Slice {
+		return fmt.Errorf("non-slice type for %v", m)
+	}
+
+	// need to convert interface to []interface
+	// see https://github.com/golang/go/wiki/InterfaceSlice
+	target := make([]interface{}, v.Len())
+	for i := 0; i < v.Len(); i++ {
+		target[i] = v.Index(i).Interface()
+	}
+	glog.Infof("batch process ,total length %d", len(target))
+	for len(target) > cnt {
+		if err := batch(target[0:cnt]); err != nil {
 
 			return err
 		}
-		list = list[MAX_BACKEND_NUM:]
+		target = target[cnt:]
 	}
-	if len(list) <= 0 {
+	if len(target) <= 0 {
 		return nil
 	}
-	return batch(list)
+
+	glog.Infof("batch process ,total length %d last section", len(target))
+	return batch(target)
 }
 
 func (v *vgroup) diff(apis, nodes []slb.VBackendServerType) (
@@ -294,34 +311,53 @@ func Ensure(v *vgroup, nodes interface{}) error {
 				privateIpAddress = append(privateIpAddress, addr.IP)
 			}
 		}
-		targs := &ecs.DescribeNetworkInterfacesArgs{
-			VpcID:            v.VpcID,
-			RegionId:         v.RegionId,
-			PrivateIpAddress: privateIpAddress,
-		}
-		resp, err := v.InsClient.DescribeNetworkInterfaces(targs)
+
+		err := Batch(
+			privateIpAddress, 40,
+			func(o []interface{}) error {
+				var ips []string
+				for _, i := range o {
+					ip, ok := i.(string)
+					if !ok {
+						return fmt.Errorf("not string: %v", i)
+					}
+					ips = append(ips, ip)
+				}
+				targs := &ecs.DescribeNetworkInterfacesArgs{
+					VpcID:            v.VpcID,
+					RegionId:         v.RegionId,
+					PrivateIpAddress: ips,
+					PageSize:         50,
+				}
+				resp, err := v.InsClient.DescribeNetworkInterfaces(targs)
+				if err != nil {
+					return fmt.Errorf("call DescribeNetworkInterfaces: %s", err.Error())
+				}
+				for _, ip := range ips {
+					eniid, err := findENIbyAddrIP(resp, ip)
+					if err != nil {
+						return err
+					}
+					if eniid == "" {
+						return fmt.Errorf("unexpected empty eni id found %s", ip)
+					}
+					backend = append(
+						backend,
+						slb.VBackendServerType{
+							ServerId: eniid,
+							Weight:   100,
+							Type:     "eni",
+							Port:     int(v.NamedKey.Port),
+							ServerIp: ip,
+							Description: v.NamedKey.Key(),
+						},
+					)
+				}
+				return nil
+			},
+		)
 		if err != nil {
-			return fmt.Errorf("call DescribeNetworkInterfaces: %s", err.Error())
-		}
-		for _, addrIP := range privateIpAddress {
-			eniid, err := findENIbyAddrIP(resp, addrIP)
-			if err != nil {
-				return err
-			}
-			if eniid == "" {
-				return fmt.Errorf("unexpected empty eni id found %s", addrIP)
-			}
-			backend = append(
-				backend,
-				slb.VBackendServerType{
-					ServerId:    eniid,
-					Weight:      100,
-					Type:        "eni",
-					Port:        int(v.NamedKey.Port),
-					ServerIp:    addrIP,
-					Description: v.NamedKey.Key(),
-				},
-			)
+			return fmt.Errorf("batch process eni fail: %s", err.Error())
 		}
 	default:
 		return fmt.Errorf("unknown backend type, %s", reflect.TypeOf(nodes))
