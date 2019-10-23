@@ -375,6 +375,10 @@ func ExpectExistAndEqual(f *FrameWork) error {
 			return fmt.Errorf("vserver group attribute error: %v", err)
 		}
 
+		if isUserManagedVBackendServer(vg.VServerGroupName, f.SVC) {
+			continue
+		}
+
 		backends := vg.BackendServers.BackendServer
 
 		if f.SVC.Annotations[ServiceAnnotationLoadBalancerBackendType] == "eni" {
@@ -558,7 +562,7 @@ func ExpectExistAndEqual(f *FrameWork) error {
 				return fmt.Errorf("DescribeZones error: %s. ", err.Error())
 			}
 			if zones == nil || len(zones) == 0 {
-				return fmt.Errorf("can not find zone by zone name %s. error: %s ", defd.PrivateZoneName, err.Error())
+				return fmt.Errorf("can not find zone by zone name %s. ", defd.PrivateZoneName)
 			}
 
 			for _, zone := range zones {
@@ -1004,4 +1008,26 @@ func ExpectAddressTypeNotEqual(f *FrameWork) error {
 		}
 	}
 	return nil
+}
+
+func isUserManagedVBackendServer(VServerGroupName string, service *v1.Service) bool {
+	for _, port := range service.Spec.Ports {
+		vg := &vgroup{
+			NamedKey: &NamedKey{
+				CID:         CLUSTER_ID,
+				Port:        port.NodePort,
+				Namespace:   service.Namespace,
+				ServiceName: service.Name,
+				Prefix:      DEFAULT_PREFIX,
+			},
+		}
+		if utils.IsENIBackendType(service) {
+			vg.NamedKey.Port = port.TargetPort.IntVal
+		}
+		if vg.NamedKey.Key() == VServerGroupName {
+			return false
+		}
+	}
+
+	return true
 }
