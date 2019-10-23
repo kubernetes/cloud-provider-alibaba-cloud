@@ -54,6 +54,28 @@ var (
 	nodeName                  = "iZuf694l8lw6xvdx6gh7tkZ"
 )
 
+func TestInterface2Slice(t *testing.T) {
+	am := []string{"a", "b"}
+
+	err := Batch(
+		am, 10,
+		func(o []interface{}) error {
+			for _, i := range o {
+				m, ok := i.(string)
+				if !ok {
+					return fmt.Errorf("not string")
+				}
+				fmt.Printf("i:::: %s", m)
+			}
+
+			return nil
+		},
+	)
+	if err != nil {
+		fmt.Printf("batch error: %s", err.Error())
+	}
+}
+
 // EnsureBasicLoadBalancer Configure
 func TestEnsureLoadBalancerBasic(t *testing.T) {
 
