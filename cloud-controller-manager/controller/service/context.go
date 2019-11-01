@@ -129,7 +129,7 @@ func NodeConditionChanged(a, b []v1.NodeCondition) bool {
 
 func NodeLabelsChanged(a, b map[string]string) bool {
 	if len(a) != len(b) {
-		return false
+		return true
 	}
 	for k, v := range a {
 		if b[k] != v {
