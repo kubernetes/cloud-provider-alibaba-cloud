@@ -167,10 +167,6 @@ func (s *InstanceClient) findAddressByInstance(instance *ecs.InstanceAttributesT
 		}
 	}
 
-	if instance.VpcAttributes.NatIpAddress != "" {
-		addrs = append(addrs, v1.NodeAddress{Type: v1.NodeInternalIP, Address: instance.VpcAttributes.NatIpAddress})
-	}
-
 	return addrs
 }
 
