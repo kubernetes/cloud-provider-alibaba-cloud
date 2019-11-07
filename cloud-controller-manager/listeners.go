@@ -224,11 +224,7 @@ func (n *Listener) Apply() error {
 	glog.Infof("apply %s listener for %v with trans protocol %s", n.Action, n.NamedKey, n.TransforedProto)
 	switch n.Action {
 	case ACTION_UPDATE:
-		err := n.Instance().Update()
-		if err != nil {
-			return err
-		}
-		return n.Start()
+		return n.Instance().Update()
 	case ACTION_ADD:
 		err := n.Instance().Add()
 		if err != nil {
@@ -689,7 +685,11 @@ func (t *tcp) Update() error {
 		if err != nil {
 			return err
 		}
-		return t.Client.CreateLoadBalancerTCPListener((*slb.CreateLoadBalancerTCPListenerArgs)(config))
+		err = t.Client.CreateLoadBalancerTCPListener((*slb.CreateLoadBalancerTCPListenerArgs)(config))
+		if err != nil {
+			return err
+		}
+		return t.Client.StartLoadBalancerListener(t.LoadBalancerID, int(t.Port))
 	}
 	if !needUpdate {
 		utils.Logf(t.Service, "tcp listener did not change, skip [update], port=[%d], nodeport=[%d]", t.Port, t.NodePort)
@@ -830,7 +830,11 @@ func (t *udp) Update() error {
 		if err != nil {
 			return err
 		}
-		return t.Client.CreateLoadBalancerUDPListener((*slb.CreateLoadBalancerUDPListenerArgs)(config))
+		err = t.Client.CreateLoadBalancerUDPListener((*slb.CreateLoadBalancerUDPListenerArgs)(config))
+		if err != nil {
+			return err
+		}
+		return t.Client.StartLoadBalancerListener(t.LoadBalancerID, int(t.Port))
 	}
 
 	if !needUpdate {
@@ -1070,7 +1074,11 @@ func (t *http) Update() error {
 		if err != nil {
 			return err
 		}
-		return t.Client.CreateLoadBalancerHTTPListener((*slb.CreateLoadBalancerHTTPListenerArgs)(config))
+		err = t.Client.CreateLoadBalancerHTTPListener((*slb.CreateLoadBalancerHTTPListenerArgs)(config))
+		if err != nil {
+			return err
+		}
+		return t.Client.StartLoadBalancerListener(t.LoadBalancerID, int(t.Port))
 	}
 
 	if !needUpdate {
@@ -1269,7 +1277,11 @@ func (t *https) Update() error {
 		if err != nil {
 			return err
 		}
-		return t.Client.CreateLoadBalancerHTTPSListener((*slb.CreateLoadBalancerHTTPSListenerArgs)(config))
+		err = t.Client.CreateLoadBalancerHTTPSListener((*slb.CreateLoadBalancerHTTPSListenerArgs)(config))
+		if err != nil {
+			return err
+		}
+		return t.Client.StartLoadBalancerListener(t.LoadBalancerID, int(t.Port))
 	}
 
 	if !needUpdate {
