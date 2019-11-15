@@ -55,7 +55,6 @@ const (
 
 // Routes is an abstract, pluggable interface for advanced routing rules.
 type Routes interface {
-
 	// RouteTables get all available route tables.
 	RouteTables(clusterName string) ([]string, error)
 	// ListRoutes lists all managed routes that belong to the specified clusterName
@@ -218,9 +217,16 @@ func (rc *RouteController) tryCreateRoute(table string,
 	node *v1.Node,
 	cache map[types.NodeName]*cloudprovider.Route) error {
 
+	_, condition := v1node.GetNodeCondition(&node.Status, v1.NodeReady);
+	if condition != nil && condition.Status == v1.ConditionUnknown {
+		glog.Infof("node %s is in unknown status.Skip creating route.", node.Name)
+		return nil
+	}
+
 	if node.Spec.PodCIDR == "" {
 		return rc.updateNetworkingCondition(types.NodeName(node.Name), false)
 	}
+
 	if node.Spec.ProviderID == "" {
 		glog.Warningf("node %s has no node.Spec.ProviderID, skip it", node.Name)
 		return nil
@@ -274,7 +280,7 @@ func (rc *RouteController) tryCreateRoute(table string,
 		return rc.updateNetworkingCondition(types.NodeName(node.Name), err == nil)
 	}
 	// Update condition only if it doesn't reflect the current state.
-	_, condition := v1node.GetNodeCondition(&node.Status, v1.NodeNetworkUnavailable)
+	_, condition = v1node.GetNodeCondition(&node.Status, v1.NodeNetworkUnavailable)
 	if condition != nil &&
 		condition.Status == v1.ConditionTrue {
 		return nil
