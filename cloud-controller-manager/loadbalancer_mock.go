@@ -63,14 +63,15 @@ func WithLoadBalancer() CloudDataMock {
 }
 
 type mockClientSLB struct {
-	describeLoadBalancers          func(args *slb.DescribeLoadBalancersArgs) (loadBalancers []slb.LoadBalancerType, err error)
-	createLoadBalancer             func(args *slb.CreateLoadBalancerArgs) (response *slb.CreateLoadBalancerResponse, err error)
-	deleteLoadBalancer             func(loadBalancerId string) (err error)
-	modifyLoadBalancerInternetSpec func(args *slb.ModifyLoadBalancerInternetSpecArgs) (err error)
-	modifyLoadBalancerInstanceSpec func(args *slb.ModifyLoadBalancerInstanceSpecArgs) (err error)
-	describeLoadBalancerAttribute  func(loadBalancerId string) (loadBalancer *slb.LoadBalancerType, err error)
-	removeBackendServers           func(loadBalancerId string, backendServers []string) (result []slb.BackendServerType, err error)
-	addBackendServers              func(loadBalancerId string, backendServers []slb.BackendServerType) (result []slb.BackendServerType, err error)
+	describeLoadBalancers           func(args *slb.DescribeLoadBalancersArgs) (loadBalancers []slb.LoadBalancerType, err error)
+	createLoadBalancer              func(args *slb.CreateLoadBalancerArgs) (response *slb.CreateLoadBalancerResponse, err error)
+	deleteLoadBalancer              func(loadBalancerId string) (err error)
+	setLoadBalancerDeleteProtection func(args *slb.SetLoadBalancerDeleteProtectionArgs) (err error)
+	modifyLoadBalancerInternetSpec  func(args *slb.ModifyLoadBalancerInternetSpecArgs) (err error)
+	modifyLoadBalancerInstanceSpec  func(args *slb.ModifyLoadBalancerInstanceSpecArgs) (err error)
+	describeLoadBalancerAttribute   func(loadBalancerId string) (loadBalancer *slb.LoadBalancerType, err error)
+	removeBackendServers            func(loadBalancerId string, backendServers []string) (result []slb.BackendServerType, err error)
+	addBackendServers               func(loadBalancerId string, backendServers []slb.BackendServerType) (result []slb.BackendServerType, err error)
 
 	stopLoadBalancerListener                   func(loadBalancerId string, port int) (err error)
 	startLoadBalancerListener                  func(loadBalancerId string, port int) (err error)
@@ -233,6 +234,28 @@ func (c *mockClientSLB) DeleteLoadBalancer(loadBalancerId string) (err error) {
 		return c.deleteLoadBalancer(loadBalancerId)
 	}
 	LOADBALANCER.loadbalancer.Delete(loadBalancerId)
+	return nil
+}
+
+func (c *mockClientSLB) SetLoadBalancerDeleteProtection(args *slb.SetLoadBalancerDeleteProtectionArgs) (err error) {
+	if c.setLoadBalancerDeleteProtection != nil {
+		return c.setLoadBalancerDeleteProtection(args)
+	}
+	if args.LoadBalancerId == "" {
+		return fmt.Errorf("loadbalancer id must not be empty")
+	}
+	v, ok := LOADBALANCER.loadbalancer.Load(args.LoadBalancerId)
+	if !ok {
+		return fmt.Errorf("loadbalancer not found by id %s", args.LoadBalancerId)
+	}
+	ins, ok := v.(slb.LoadBalancerType)
+	if !ok {
+		return fmt.Errorf("not slb.LoadBalancerType")
+	}
+	if args.DeleteProtection != "" {
+		ins.DeleteProtection = args.DeleteProtection
+	}
+	LOADBALANCER.loadbalancer.Store(ins.LoadBalancerId, ins)
 	return nil
 }
 
