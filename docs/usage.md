@@ -694,7 +694,30 @@ spec:
 >> **Note:**
 
 - Attaching Pods `ENI(Elastic Network Interface)` to SLB backend directly in [terway](https://www.alibabacloud.com/help/doc-detail/97467.html?spm=a2c5t.11065259.1996646101.searchclickresult.675f654a0FM6R7) network mode can achieve better network performance.
-   
+
+#### 25. Create IPv6 LoadBalancer 
+
+```yaml
+apiVersion: v1
+kind: Service
+metadata:
+  annotations:
+    service.beta.kubernetes.io/alibaba-cloud-loadbalancer-ip-version: "ipv6"
+  name: nginx
+spec:
+  ports:
+  - port: 80
+    protocol: TCP
+    targetPort: 80
+  selector:
+    app: nginx
+  type: LoadBalancer
+```
+
+>> **Note:**
+
+- Kube-proxy should run in IPVS mode.
+- The IP type cannot be changed after creation.
 
 #### Annotation list
 >> **Note**
@@ -743,5 +766,6 @@ spec:
 | service.beta.kubernetes.io/alibaba-cloud-loadbalancer-vswitch-id | VSwitch ID of the load balancer.<br />Note When setting VSwitch ID, the address-type parameter need to be "intranet". | None |
 | service.beta.kubernetes.io/alibaba-cloud-loadbalancer-forward-port | HTTP to HTTPS listening forwarding port. e.g. 80:443 | None |
 | service.beta.kubernetes.io/alibaba-cloud-loadbalancer-additional-resource-tags | A list of tags to add.<br />e.g. "k1=v1,k2=v2" | None |
-| service.beta.kubernetes.io/alibaba-cloud-loadbalancer-remove-unscheduled-backend | Remove scheduling disabled node from the slb backend。Valid values: on or off. | off |
+| service.beta.kubernetes.io/alibaba-cloud-loadbalancer-remove-unscheduled-backend | Remove scheduling disabled node from the slb backend. Valid values: on or off. | off |
 | service.beta.kubernetes.io/backend-type | Add pod eni to the slb backend in the [terway](https://www.alibabacloud.com/help/doc-detail/97467.html?spm=a2c5t.11065259.1996646101.searchclickresult.675f654a0FM6R7) network mode to achieve better network performance. Valid values: eni. | None |
+| service.beta.kubernetes.io/alibaba-cloud-loadbalancer-ip-version | IP version of the LoadBalancer instance. Valid values: ipv4 or ipv6 | ipv4 |

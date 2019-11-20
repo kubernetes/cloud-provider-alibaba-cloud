@@ -240,7 +240,7 @@ spec:
     targetPort: 443
   selector:
     run: nginx
-  type: LoadBalancere: LoadBalancer
+  type: LoadBalancer
 ```
 
 - **使用指定label的worker节点作为后端服务器**
@@ -664,6 +664,29 @@ spec:
     type: LoadBalancer
 ```
 
+- **创建IPv6类型的负载均衡**  
+
+  集群的kube-proxy代理模式需要是IPVS。  
+  生成的IPv6地址仅可在支持IPv6的环境中访问。  
+  创建后IP类型不可更改。  
+```yaml
+apiVersion: v1
+kind: Service
+metadata:
+  annotations:
+    service.beta.kubernetes.io/alibaba-cloud-loadbalancer-ip-version: "ipv6"
+  name: nginx
+spec:
+  ports:
+  - port: 80
+    protocol: TCP
+    targetPort: 80
+  selector:
+    app: nginx
+  type: LoadBalancer
+```
+
+
 **说明**
 
 - 注解的内容区分大小写。
@@ -713,5 +736,6 @@ spec:
 | service.beta.kubernetes.io/alibaba-cloud-loadbalancer-additional-resource-tags | string | 需要添加的Tag列表，多个标签用逗号分隔。如："k1=v1,k2=v2" | 无 | v1.9.3及以上版本 |
 | service.beta.kubernetes.io/alibaba-cloud-loadbalancer-remove-unscheduled-backend | string | 从slb后端移除SchedulingDisabled Node。取值：on或off | off | v1.9.3.164-g2105d2e-aliyun及以上版本 |
 | service.beta.kubernetes.io/backend-type | string | 支持在terway eni网络模式下,通过设定该参数为"eni"，可将pod直接挂载到slb后端，提升网络转发性能。取值：eni | 无 | v1.9.3.164-g2105d2e-aliyun及以上版本 |
+| service.beta.kubernetes.io/alibaba-cloud-loadbalancer-ip-version | string | 负载均衡实例的IP版本，取值：ipv4或ipv6 | ipv4 | v1.9.3.193-g6cddde4-aliyun及以上版本 |
 
 
