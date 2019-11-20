@@ -171,6 +171,9 @@ const (
 
 	// ServiceAnnotationLoadBalancerBackendType backend type
 	ServiceAnnotationLoadBalancerBackendType = utils.BACKEND_TYPE_LABEL
+
+	// ServiceAnnotationLoadBalancerDeleteProtection delete protection
+	ServiceAnnotationLoadBalancerDeleteProtection = ServiceAnnotationLoadBalancerPrefix + "delete-protection"
 )
 
 //compatible to old camel annotation
@@ -531,6 +534,14 @@ func ExtractAnnotationRequest(service *v1.Service) (*AnnotationRequest, *Annotat
 	} else {
 		defaulted.RemoveUnscheduledBackend = "off"
 		request.RemoveUnscheduledBackend = defaulted.RemoveUnscheduledBackend
+	}
+
+	delProtection, ok := annotation[ServiceAnnotationLoadBalancerDeleteProtection]
+	if ok {
+		defaulted.DeleteProtection = slb.FlagType(delProtection)
+		request.DeleteProtection = defaulted.DeleteProtection
+	} else {
+		defaulted.DeleteProtection = slb.OnFlag
 	}
 
 	return defaulted, request
