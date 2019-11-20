@@ -174,6 +174,9 @@ const (
 
 	// ServiceAnnotationLoadBalancerResourceGroupId resource group id
 	ServiceAnnotationLoadBalancerResourceGroupId = ServiceAnnotationLoadBalancerPrefix + "resource-group-id"
+
+	// ServiceAnnotationLoadBalancerDeleteProtection delete protection
+	ServiceAnnotationLoadBalancerDeleteProtection = ServiceAnnotationLoadBalancerPrefix + "delete-protection"
 )
 
 //compatible to old camel annotation
@@ -540,6 +543,14 @@ func ExtractAnnotationRequest(service *v1.Service) (*AnnotationRequest, *Annotat
 	if ok{
 		request.ResourceGroupId = resourceGroupId
 		defaulted.ResourceGroupId = request.ResourceGroupId
+	}
+
+	delProtection, ok := annotation[ServiceAnnotationLoadBalancerDeleteProtection]
+	if ok {
+		defaulted.DeleteProtection = slb.FlagType(delProtection)
+		request.DeleteProtection = defaulted.DeleteProtection
+	} else {
+		defaulted.DeleteProtection = slb.OnFlag
 	}
 
 	return defaulted, request

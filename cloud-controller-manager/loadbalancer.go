@@ -88,6 +88,8 @@ type AnnotationRequest struct {
 
 	RemoveUnscheduledBackend string
 	ResourceGroupId          string
+
+	DeleteProtection slb.FlagType
 }
 
 // TAGKEY Default tag key.
@@ -99,6 +101,7 @@ type ClientSLBSDK interface {
 	DescribeLoadBalancers(ctx context.Context, args *slb.DescribeLoadBalancersArgs) (loadBalancers []slb.LoadBalancerType, err error)
 	CreateLoadBalancer(ctx context.Context, args *slb.CreateLoadBalancerArgs) (response *slb.CreateLoadBalancerResponse, err error)
 	DeleteLoadBalancer(ctx context.Context, loadBalancerId string) (err error)
+	SetLoadBalancerDeleteProtection(ctx context.Context, args *slb.SetLoadBalancerDeleteProtectionArgs) (err error)
 	ModifyLoadBalancerInstanceSpec(ctx context.Context, args *slb.ModifyLoadBalancerInstanceSpecArgs) (err error)
 	ModifyLoadBalancerInternetSpec(ctx context.Context, args *slb.ModifyLoadBalancerInternetSpecArgs) (err error)
 	DescribeLoadBalancerAttribute(ctx context.Context, loadBalancerId string) (loadBalancer *slb.LoadBalancerType, err error)
@@ -419,6 +422,24 @@ func (s *LoadBalancerClient) EnsureLoadBalancer(ctx context.Context, service *v1
 				return nil, err
 			}
 		}
+
+		// update slb delete protection
+		if request.DeleteProtection != "" &&
+			request.DeleteProtection != origined.DeleteProtection {
+			utils.Logf(service, "delete protection changed from ([%d] -> [%d]), update [%s]",
+				origined.DeleteProtection, request.DeleteProtection, origined.LoadBalancerId)
+			if err := s.c.SetLoadBalancerDeleteProtection(
+				ctx,
+				&slb.SetLoadBalancerDeleteProtectionArgs{
+					RegionId:         origined.RegionId,
+					LoadBalancerId:   origined.LoadBalancerId,
+					DeleteProtection: request.DeleteProtection,
+				},
+			); err != nil {
+				return nil, err
+			}
+		}
+
 		origined, derr = s.c.DescribeLoadBalancerAttribute(ctx, origined.LoadBalancerId)
 	}
 	if derr != nil {
@@ -532,6 +553,20 @@ func (s *LoadBalancerClient) EnsureLoadBalanceDeleted(ctx context.Context, servi
 		return EnsureListenersDeleted(ctx, s.c, service, lb, BuildVirturalGroupFromService(s, service, lb))
 	}
 
+	// set delete protection off
+	if lb.DeleteProtection == slb.OnFlag {
+		if err := s.c.SetLoadBalancerDeleteProtection(
+			ctx,
+			&slb.SetLoadBalancerDeleteProtectionArgs{
+				RegionId:         lb.RegionId,
+				LoadBalancerId:   lb.LoadBalancerId,
+				DeleteProtection: slb.OffFlag,
+			},
+		); err != nil {
+			return fmt.Errorf("error to set slb id [%s] delete protection off, svc [%s], err: %s", lb.LoadBalancerId, service.Name, err.Error())
+		}
+	}
+
 	return s.c.DeleteLoadBalancer(ctx, lb.LoadBalancerId)
 }
 
@@ -545,6 +580,7 @@ func (s *LoadBalancerClient) getLoadBalancerOpts(service *v1.Service, vswitchid 
 		MasterZoneId:       ar.MasterZoneID,
 		SlaveZoneId:        ar.SlaveZoneID,
 		AddressIPVersion:   ar.AddressIPVersion,
+		DeleteProtection:   ar.DeleteProtection,
 		ResourceGroupId:    ar.ResourceGroupId,
 	}
 	// paybybandwidth need a default bandwidth args, while paybytraffic doesnt.
