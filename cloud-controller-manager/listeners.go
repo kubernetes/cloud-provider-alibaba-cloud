@@ -574,6 +574,7 @@ func (t *tcp) Update() error {
 	if err != nil {
 		return fmt.Errorf("update tcp listener: %s", err.Error())
 	}
+	utils.Logf(t.Service, "tcp listener %d status is %s.", t.Port, response.Status)
 	if response.Status == slb.Stopped {
 		if err = t.Client.StartLoadBalancerListener(t.LoadBalancerID, int(t.Port)); err != nil {
 			return fmt.Errorf("start tcp listener error: %s", err.Error())
@@ -747,6 +748,7 @@ func (t *udp) Update() error {
 	if err != nil {
 		return err
 	}
+	utils.Logf(t.Service, "udp listener %d status is %s.", t.Port, response.Status)
 	if response.Status == slb.Stopped {
 		if err = t.Client.StartLoadBalancerListener(t.LoadBalancerID, int(t.Port)); err != nil {
 			return fmt.Errorf("start udp listener error: %s", err.Error())
@@ -941,6 +943,7 @@ func (t *http) Update() error {
 	if err != nil {
 		return err
 	}
+	utils.Logf(t.Service, "http listener %d status is %s.", t.Port, response.Status)
 	if response.Status == slb.Stopped {
 		if err = t.Client.StartLoadBalancerListener(t.LoadBalancerID, int(t.Port)); err != nil {
 			return fmt.Errorf("start http listener error: %s", err.Error())
@@ -1155,6 +1158,7 @@ func (t *https) Update() error {
 	if err != nil {
 		return err
 	}
+	utils.Logf(t.Service, "https listener %d status is %s.", t.Port, response.Status)
 	if response.Status == slb.Stopped {
 		if err = t.Client.StartLoadBalancerListener(t.LoadBalancerID, int(t.Port)); err != nil {
 			return fmt.Errorf("start https listener error: %s", err.Error())

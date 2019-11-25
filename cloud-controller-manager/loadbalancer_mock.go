@@ -185,6 +185,40 @@ func (c *mockClientSLB) StopLoadBalancerListener(loadBalancerId string, port int
 	if c.stopLoadBalancerListener != nil {
 		return c.stopLoadBalancerListener(loadBalancerId, port)
 	}
+	key := listenerKey(loadBalancerId, port)
+	listenerObj, ok := LOADBALANCER.listeners.Load(key)
+	if !ok || listenerObj == nil {
+		return fmt.Errorf("not found listener: %s %d ", loadBalancerId, port)
+	}
+	switch listenerObj.(type) {
+	case *slb.DescribeLoadBalancerTCPListenerAttributeResponse:
+		if listener, ok := listenerObj.(*slb.DescribeLoadBalancerTCPListenerAttributeResponse); ok {
+			listener.DescribeLoadBalancerListenerAttributeResponse.Status = slb.Stopped
+			LOADBALANCER.listeners.Store(key, listener)
+		}
+		break
+	case *slb.DescribeLoadBalancerUDPListenerAttributeResponse:
+		if listener, ok := listenerObj.(*slb.DescribeLoadBalancerUDPListenerAttributeResponse); ok {
+			listener.DescribeLoadBalancerListenerAttributeResponse.Status = slb.Stopped
+			LOADBALANCER.listeners.Store(key, listener)
+		}
+		break
+	case *slb.DescribeLoadBalancerHTTPListenerAttributeResponse:
+		if listener, ok := listenerObj.(*slb.DescribeLoadBalancerHTTPListenerAttributeResponse); ok {
+			listener.DescribeLoadBalancerListenerAttributeResponse.Status = slb.Stopped
+			LOADBALANCER.listeners.Store(key, listener)
+		}
+		break
+	case *slb.DescribeLoadBalancerHTTPSListenerAttributeResponse:
+		if listener, ok := listenerObj.(*slb.DescribeLoadBalancerHTTPSListenerAttributeResponse); ok {
+			listener.DescribeLoadBalancerListenerAttributeResponse.Status = slb.Stopped
+			LOADBALANCER.listeners.Store(key, listener)
+		}
+		break
+	default:
+		return fmt.Errorf("StopLoadBalancerListener() listener type error")
+	}
+
 	// return nil indicate no stop success
 	return nil
 }
@@ -428,6 +462,39 @@ func listenerKey(id string, port int) string {
 func (c *mockClientSLB) StartLoadBalancerListener(loadBalancerId string, port int) (err error) {
 	if c.startLoadBalancerListener != nil {
 		return c.startLoadBalancerListener(loadBalancerId, port)
+	}
+	key := listenerKey(loadBalancerId, port)
+	listenerObj, ok := LOADBALANCER.listeners.Load(key)
+	if !ok {
+		return fmt.Errorf("not found listener: %s %d ", loadBalancerId, port)
+	}
+	switch listenerObj.(type) {
+	case *slb.DescribeLoadBalancerTCPListenerAttributeResponse:
+		if listener, ok := listenerObj.(*slb.DescribeLoadBalancerTCPListenerAttributeResponse); ok {
+			listener.DescribeLoadBalancerListenerAttributeResponse.Status = slb.Running
+			LOADBALANCER.listeners.Store(key, listener)
+		}
+		break
+	case *slb.DescribeLoadBalancerUDPListenerAttributeResponse:
+		if listener, ok := listenerObj.(*slb.DescribeLoadBalancerUDPListenerAttributeResponse); ok {
+			listener.DescribeLoadBalancerListenerAttributeResponse.Status = slb.Running
+			LOADBALANCER.listeners.Store(key, listener)
+		}
+		break
+	case *slb.DescribeLoadBalancerHTTPListenerAttributeResponse:
+		if listener, ok := listenerObj.(*slb.DescribeLoadBalancerHTTPListenerAttributeResponse); ok {
+			listener.DescribeLoadBalancerListenerAttributeResponse.Status = slb.Running
+			LOADBALANCER.listeners.Store(key, listener)
+		}
+		break
+	case *slb.DescribeLoadBalancerHTTPSListenerAttributeResponse:
+		if listener, ok := listenerObj.(*slb.DescribeLoadBalancerHTTPSListenerAttributeResponse); ok {
+			listener.DescribeLoadBalancerListenerAttributeResponse.Status = slb.Running
+			LOADBALANCER.listeners.Store(key, listener)
+		}
+		break
+	default:
+		return fmt.Errorf("StartLoadBalancerListener() listener type error")
 	}
 	return nil
 }
