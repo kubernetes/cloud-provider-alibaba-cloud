@@ -283,7 +283,7 @@ func (s *PrivateZoneClient) EnsurePrivateZoneRecord(service *v1.Service, ip stri
 // EnsurePrivateZoneRecordDeleted make sure private zone record is deleted.
 func (s *PrivateZoneClient) EnsurePrivateZoneRecordDeleted(service *v1.Service, ip string, ipVersion slb.AddressIPVersionType) error {
 	// need to save the resource version when deleted event
-	err := keepResourceVesion(service)
+	err := keepResourceVersion(service)
 	if err != nil {
 		glog.Warningf("failed to save "+
 			"deleted service resourceVersion, [%s] due to [%s] ", service.Name, err.Error())

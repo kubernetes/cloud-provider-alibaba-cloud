@@ -221,7 +221,7 @@ func (rc *RouteController) tryCreateRoute(table string,
 	node *v1.Node,
 	cache map[types.NodeName]*cloudprovider.Route) error {
 
-	_, condition := v1node.GetNodeCondition(&node.Status, v1.NodeReady);
+	_, condition := v1node.GetNodeCondition(&node.Status, v1.NodeReady)
 	if condition != nil && condition.Status == v1.ConditionUnknown {
 		glog.Infof("node %s is in unknown status.Skip creating route.", node.Name)
 		return nil

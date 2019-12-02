@@ -105,7 +105,7 @@ func TestEnsureLoadBalancerBasic(t *testing.T) {
 			},
 		},
 		// initial node based on your definition.
-		// backend of the created loadbalaner
+		// backend of the created loadbalancer
 		[]*v1.Node{
 			{
 				ObjectMeta: metav1.ObjectMeta{Name: prid},
@@ -193,7 +193,7 @@ func TestEnsureLoadBalancerAnnotation(t *testing.T) {
 			},
 		},
 		// initial node based on your definition.
-		// backend of the created loadbalaner
+		// backend of the created loadbalancer
 		[]*v1.Node{
 			{
 				ObjectMeta: metav1.ObjectMeta{Name: prid},
@@ -232,7 +232,7 @@ func TestEnsureLoadBalancerSpec(t *testing.T) {
 			},
 		},
 		// initial node based on your definition.
-		// backend of the created loadbalaner
+		// backend of the created loadbalancer
 		[]*v1.Node{
 			{
 				ObjectMeta: metav1.ObjectMeta{Name: prid},
@@ -272,7 +272,7 @@ func TestEnsureLoadBalancerVswitchID(t *testing.T) {
 			},
 		},
 		// initial node based on your definition.
-		// backend of the created loadbalaner
+		// backend of the created loadbalancer
 		[]*v1.Node{
 			{
 				ObjectMeta: metav1.ObjectMeta{Name: prid},
@@ -315,7 +315,7 @@ func TestEnsureLoadBalancerBackendLable(t *testing.T) {
 			},
 		},
 		// initial node based on your definition.
-		// backend of the created loadbalaner
+		// backend of the created loadbalancer
 		[]*v1.Node{
 			{
 				ObjectMeta: metav1.ObjectMeta{
@@ -360,7 +360,7 @@ func TestEnsureLoadBalancerHTTP(t *testing.T) {
 			},
 		},
 		// initial node based on your definition.
-		// backend of the created loadbalaner
+		// backend of the created loadbalancer
 		[]*v1.Node{
 			{
 				ObjectMeta: metav1.ObjectMeta{Name: prid},
@@ -399,7 +399,7 @@ func TestEnsureLoadBalancerHTTPS(t *testing.T) {
 			},
 		},
 		// initial node based on your definition.
-		// backend of the created loadbalaner
+		// backend of the created loadbalancer
 		[]*v1.Node{
 			{
 				ObjectMeta: metav1.ObjectMeta{Name: prid},
@@ -438,7 +438,7 @@ func TestHTTPSFromHttp(t *testing.T) {
 			},
 		},
 		// initial node based on your definition.
-		// backend of the created loadbalaner
+		// backend of the created loadbalancer
 		[]*v1.Node{
 			{
 				ObjectMeta: metav1.ObjectMeta{Name: prid},
@@ -484,7 +484,7 @@ func TestEnsureLoadBalancerHTTPSHealthCheck(t *testing.T) {
 			},
 		},
 		// initial node based on your definition.
-		// backend of the created loadbalaner
+		// backend of the created loadbalancer
 		[]*v1.Node{
 			{
 				ObjectMeta: metav1.ObjectMeta{Name: prid},
@@ -564,7 +564,7 @@ func TestEnsureLoadbalancerDeleted(t *testing.T) {
 			},
 		},
 		// initial node based on your definition.
-		// backend of the created loadbalaner
+		// backend of the created loadbalancer
 		[]*v1.Node{
 			{
 				ObjectMeta: metav1.ObjectMeta{Name: prid},
@@ -618,7 +618,7 @@ func TestEnsureLoadBalancerDeleteWithUserDefined(t *testing.T) {
 			},
 		},
 		// initial node based on your definition.
-		// backend of the created loadbalaner
+		// backend of the created loadbalancer
 		[]*v1.Node{
 			{
 				ObjectMeta: metav1.ObjectMeta{Name: prid},

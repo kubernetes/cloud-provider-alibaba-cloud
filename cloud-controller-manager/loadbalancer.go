@@ -531,7 +531,7 @@ func hasPort(svc *v1.Service, port int32) bool {
 // EnsureLoadBalanceDeleted make sure slb is deleted
 func (s *LoadBalancerClient) EnsureLoadBalanceDeleted(service *v1.Service) error {
 	// need to save the resource version when deleted event
-	err := keepResourceVesion(service)
+	err := keepResourceVersion(service)
 	if err != nil {
 		utils.Logf(service, "Warning: failed to save deleted service resourceVersion,due to [%s] ", err.Error())
 	}
@@ -716,7 +716,7 @@ func isServiceDeleted(service *v1.Service) bool {
 }
 
 // save the deleted service's uid
-func keepResourceVesion(service *v1.Service) error {
+func keepResourceVersion(service *v1.Service) error {
 	if service == nil {
 		return fmt.Errorf("alicloud: failed to save deleted service resource version , for service is nil")
 	}
