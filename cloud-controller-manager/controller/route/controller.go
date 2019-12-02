@@ -18,6 +18,7 @@ package route
 
 import (
 	"fmt"
+	"k8s.io/cloud-provider-alibaba-cloud/cloud-controller-manager/utils"
 	"net"
 	"time"
 
@@ -187,6 +188,9 @@ func (rc *RouteController) sync(table string, nodes []*v1.Node, routes []*cloudp
 	// try create desired routes
 	for _, node := range nodes {
 
+		if _, exclude := node.Labels[utils.LabelNodeRoleExcludeNode]; exclude {
+			continue
+		}
 		if node.Spec.PodCIDR == "" {
 			rc.updateNetworkingCondition(types.NodeName(node.Name), false)
 			continue
