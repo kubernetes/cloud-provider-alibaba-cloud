@@ -280,7 +280,7 @@ func (cnc *CloudNodeController) syncNodeAddress(nodes []v1.Node) error {
 				glog.Errorf("User has specified Node IP in kubelet but it is not found in cloudprovider")
 				continue
 			}
-			// override addresss
+			// override addresses
 			cloudNode.Addresses = []v1.NodeAddress{*nodeIP}
 		}
 		err := tryPatchNodeAddress(cnc.kclient, node, cloudNode.Addresses)

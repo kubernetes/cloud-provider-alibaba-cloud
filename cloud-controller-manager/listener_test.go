@@ -42,7 +42,7 @@ func TestUpdateListenerPorts(t *testing.T) {
 			},
 		},
 		// initial node based on your definition.
-		// backend of the created loadbalaner
+		// backend of the created loadbalancer
 		[]*v1.Node{
 			{
 				ObjectMeta: metav1.ObjectMeta{Name: prid},
@@ -83,7 +83,7 @@ func TestUpdateListenerBackendPorts(t *testing.T) {
 			},
 		},
 		// initial node based on your definition.
-		// backend of the created loadbalaner
+		// backend of the created loadbalancer
 		[]*v1.Node{
 			{
 				ObjectMeta: metav1.ObjectMeta{Name: prid},

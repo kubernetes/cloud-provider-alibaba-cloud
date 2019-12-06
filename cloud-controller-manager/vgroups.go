@@ -351,11 +351,11 @@ func Ensure(v *vgroup, nodes interface{}) error {
 					backend = append(
 						backend,
 						slb.VBackendServerType{
-							ServerId: eniid,
-							Weight:   100,
-							Type:     "eni",
-							Port:     int(v.NamedKey.Port),
-							ServerIp: ip,
+							ServerId:    eniid,
+							Weight:      100,
+							Type:        "eni",
+							Port:        int(v.NamedKey.Port),
+							ServerIp:    ip,
 							Description: v.NamedKey.Key(),
 						},
 					)

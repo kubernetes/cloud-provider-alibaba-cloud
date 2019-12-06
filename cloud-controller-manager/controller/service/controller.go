@@ -727,7 +727,7 @@ func AvailableNodeModeLocal(nodes []*v1.Node, svc *v1.Service,
 
 	for _, node := range nodes {
 		if _, exist := availableNodesMap[node.Name]; exist {
-			availNode := node.DeepCopy();
+			availNode := node.DeepCopy()
 			availableNodes = append(availableNodes, availNode)
 			podNum += availableNodesMap[availNode.Name]
 			records = append(records, availNode.Name)
