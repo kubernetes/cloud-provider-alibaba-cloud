@@ -347,6 +347,21 @@ func EnsureListenersDeleted(
 	}
 	remote := BuildListenersFromAPI(service, lb, client, vgs)
 
+	// make http come first.
+	// ensure http listeners to be removed before https
+	sort.SliceStable(
+		local,
+		func(i, j int) bool {
+			// 1. http comes first.
+			if strings.ToUpper(
+				local[i].TransforedProto,
+			) == "HTTP" {
+				return true
+			}
+			return false
+		},
+	)
+
 	for _, loc := range local {
 		for _, rem := range remote {
 			if !isManagedByMyService(service, rem) {
@@ -471,6 +486,7 @@ func BuildListenersFromService(
 	vgrps *vgroups,
 ) (Listeners, error) {
 	listeners := Listeners{}
+
 	for _, port := range svc.Spec.Ports {
 		proto, err := Protocol(serviceAnnotation(svc, ServiceAnnotationLoadBalancerProtocolPort), port)
 		if err != nil {
@@ -977,7 +993,7 @@ func (t *http) Update() error {
 		HealthCheckInterval:    response.HealthCheckInterval,
 	}
 	needUpdate := false
-	needRecrete := false
+	needRecreate := false
 	/*
 		if request.Bandwidth != 0 &&
 			request.Bandwidth != response.Bandwidth {
@@ -1071,23 +1087,30 @@ func (t *http) Update() error {
 	forward := forwardPort(def.ForwardPort, t.Port)
 	if forward != 0 {
 		if response.ListenerForward != slb.OnFlag {
-			needRecrete = true
+			needRecreate = true
 			config.ListenerForward = slb.OnFlag
 		}
 	} else {
 		if response.ListenerForward != slb.OffFlag {
-			needRecrete = true
+			needRecreate = true
 			config.ListenerForward = slb.OffFlag
 		}
 	}
 	config.ForwardPort = int(forward)
+
 	// backend server port has changed.
-	if needRecrete ||
-		int(t.NodePort) != response.BackendServerPort {
+	if int(t.NodePort) != response.BackendServerPort {
+		// listener with listenerforward status on, no need to reRecreate
+		if response.ListenerForward == slb.OffFlag {
+			needRecreate = true
+		}
+	}
+
+	if needRecreate {
 
 		config.BackendServerPort = int(t.NodePort)
 		utils.Logf(t.Service, "HTTP listener checker [BackendServerPort]"+
-			" changed, request=%d. response=%d", t.NodePort, response.BackendServerPort)
+			" changed, request=%d. response=%d. Recreate http listener.", t.NodePort, response.BackendServerPort)
 		err := t.Client.DeleteLoadBalancerListener(t.LoadBalancerID, int(t.Port))
 		if err != nil {
 			return err
@@ -1097,6 +1120,12 @@ func (t *http) Update() error {
 			return err
 		}
 		return t.Client.StartLoadBalancerListener(t.LoadBalancerID, int(t.Port))
+	}
+
+	if response.ListenerForward == slb.OnFlag {
+		utils.Logf(t.Service, "%d ListenerForward is on, cannot update listener", t.Port)
+		// no update needed.  skip
+		return nil
 	}
 
 	if !needUpdate {

@@ -140,7 +140,7 @@ func TestStartLoadBalancerListener(t *testing.T) {
 	f.RunDefault(t, "With TCP Listener")
 
 	_, lb, _ := f.LoadBalancer().findLoadBalancer(f.SVC)
-	slbClient := f.Cloud.climgr.loadbalancer.c
+	slbClient := f.SLBSDK()
 	res, err := slbClient.DescribeLoadBalancerTCPListenerAttribute(lb.LoadBalancerId, int(listenPort1))
 	if err != nil {
 		t.Fatalf("DescribeLoadBalancerTCPListenerAttribute error: %s", err.Error())
@@ -183,8 +183,7 @@ func TestStopLoadBalancerListener(t *testing.T) {
 
 	f.RunDefault(t, "With TCP Listener")
 
-	slbClient := f.Cloud.climgr.loadbalancer.c
-
+	slbClient := f.SLBSDK()
 	err := slbClient.StopLoadBalancerListener(LOADBALANCER_ID, int(listenPort1))
 	if err != nil {
 		t.Fatalf("StopLoadBalancerListener error: %s", err.Error())

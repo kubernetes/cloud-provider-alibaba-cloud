@@ -335,3 +335,90 @@ var _ = framework.Mark(
 		)
 	},
 )
+
+var _ = framework.Mark(
+	"quick",
+	func(t *testing.T) error {
+		f := framework.NewFrameWork(
+			func(f *framework.FrameWorkE2E) {
+				f.Desribe = "TestUserDefinedLBCombinationWithHttpForward"
+				f.Test = t
+				f.Client = framework.NewClientOrDie()
+				f.InitService = &v1.Service{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "basic-service",
+						Namespace: framework.NameSpace,
+						Annotations: map[string]string{
+							alicloud.ServiceAnnotationLoadBalancerId:               framework.TestContext.LoadBalancerID,
+							alicloud.ServiceAnnotationLoadBalancerOverrideListener: "true",
+							alicloud.ServiceAnnotationLoadBalancerBackendLabel:     framework.TestContext.BackendLabel,
+							alicloud.ServiceAnnotationLoadBalancerAclStatus:        "on",
+							alicloud.ServiceAnnotationLoadBalancerAclID:            framework.TestContext.AclID,
+							alicloud.ServiceAnnotationLoadBalancerAclType:          "white",
+							alicloud.ServiceAnnotationLoadBalancerSessionStick:     "on",
+							alicloud.ServiceAnnotationLoadBalancerSessionStickType: "insert",
+							alicloud.ServiceAnnotationLoadBalancerCookieTimeout:    "1800",
+							alicloud.ServiceAnnotationLoadBalancerProtocolPort:     "http:80",
+						},
+					},
+					Spec: v1.ServiceSpec{
+						Ports: []v1.ServicePort{
+							{
+								Name:       "https",
+								Port:       443,
+								TargetPort: intstr.FromInt(443),
+								Protocol:   v1.ProtocolTCP,
+							},
+							{
+								Name:       "http",
+								Port:       80,
+								TargetPort: intstr.FromInt(80),
+								Protocol:   v1.ProtocolTCP,
+							},
+						},
+						Type:            v1.ServiceTypeLoadBalancer,
+						SessionAffinity: v1.ServiceAffinityNone,
+						Selector: map[string]string{
+							"run": "nginx",
+						},
+					},
+				}
+			},
+		)
+		defer f.Destroy()
+		err := f.SetUp()
+		if err != nil {
+			return fmt.Errorf("setup error: %s", err.Error())
+		}
+
+		spec := &framework.TestUnit{
+			Mutator: func(service *v1.Service) error {
+				service.Annotations = map[string]string{
+					alicloud.ServiceAnnotationLoadBalancerId:               framework.TestContext.LoadBalancerID,
+					alicloud.ServiceAnnotationLoadBalancerOverrideListener: "true",
+					alicloud.ServiceAnnotationLoadBalancerBackendLabel:     framework.TestContext.BackendLabel,
+					alicloud.ServiceAnnotationLoadBalancerSessionStick:     "on",
+					alicloud.ServiceAnnotationLoadBalancerSessionStickType: "server",
+					alicloud.ServiceAnnotationLoadBalancerCookie:           "your_cookie-1",
+					alicloud.ServiceAnnotationLoadBalancerProtocolPort:     "http:80,https:443",
+					alicloud.ServiceAnnotationLoadBalancerCertID:           framework.TestContext.CertID,
+					alicloud.ServiceAnnotationLoadBalancerForwardPort:      "80:443",
+				}
+
+				return nil
+			},
+			Description: "remove acl; mutate session type to server cookie;  add forward port http:80 https:443",
+		}
+
+		del := &framework.TestUnit{
+			Description: "user defined lb deletion. expect exist",
+			ExpectOK:    alicloud.ExpectExist,
+		}
+
+		return f.RunDefaultTest(
+			framework.NewDefaultAction(&framework.TestUnit{Description: "default init"}),
+			framework.NewDefaultAction(spec),
+			framework.NewDeleteAction(del),
+		)
+	},
+)
