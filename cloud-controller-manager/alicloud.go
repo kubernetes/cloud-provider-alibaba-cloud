@@ -559,16 +559,17 @@ func (c *Cloud) CreateRoute(clusterName string, nameHint string, tableid string,
 // Route should be as returned by ListRoutes
 func (c *Cloud) DeleteRoute(clusterName string, tableid string, route *cloudprovider.Route) error {
 	glog.V(2).Infof("Alicloud.DeleteRoute(\"%s, %+v\")", clusterName, route)
-	ins, err := c.climgr.Instances().findInstanceByProviderID(string(route.TargetNode))
+
+	region,instid, err := nodeFromProviderID(string(route.TargetNode))
 	if err != nil {
-		return err
+		return fmt.Errorf("route TargetNode[%s] error: %s",route.TargetNode, err.Error())
 	}
 	cRoute := &cloudprovider.Route{
 		Name:            route.Name,
 		DestinationCIDR: route.DestinationCIDR,
-		TargetNode:      types.NodeName(ins.InstanceId),
+		TargetNode:      types.NodeName(instid),
 	}
-	return c.climgr.Routes().DeleteRoute(tableid, cRoute, ins.RegionId, ins.VpcAttributes.VpcId)
+	return c.climgr.Routes().DeleteRoute(tableid, cRoute, region)
 }
 
 // GetZone returns the Zone containing the current failure zone and locality region that the program is running in

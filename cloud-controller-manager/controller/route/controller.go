@@ -19,7 +19,10 @@ package route
 import (
 	"fmt"
 	"k8s.io/cloud-provider-alibaba-cloud/cloud-controller-manager/utils"
+	queue "k8s.io/client-go/util/workqueue"
+	"k8s.io/kubernetes/staging/src/k8s.io/client-go/util/workqueue"
 	"net"
+	"reflect"
 	"time"
 
 	"strings"
@@ -79,7 +82,19 @@ type RouteController struct {
 	nodeListerSynced cache.InformerSynced
 	broadcaster      record.EventBroadcaster
 	recorder         record.EventRecorder
+	// Package workqueue provides a simple queue that supports the following
+	// features:
+	//  * Fair: items processed in the order in which they are added.
+	//  * Stingy: a single item will not be processed multiple times concurrently,
+	//      and if an item is added multiple times before it can be processed, it
+	//      will only be processed once.
+	//  * Multiple consumers and producers. In particular, it is allowed for an
+	//      item to be reenqueued while it is being processed.
+	//  * Shutdown notifications.
+	queues map[string]queue.DelayingInterface
 }
+
+const NODE_QUEUE = "node.queue"
 
 // New new route controller
 func New(routes Routes,
@@ -88,7 +103,13 @@ func New(routes Routes,
 	clusterName string, clusterCIDR *net.IPNet) (*RouteController, error) {
 
 	if kubeClient != nil && kubeClient.CoreV1().RESTClient().GetRateLimiter() != nil {
-		metrics.RegisterMetricAndTrackRateLimiterUsage(ROUTE_CONTROLLER, kubeClient.CoreV1().RESTClient().GetRateLimiter())
+		err := metrics.RegisterMetricAndTrackRateLimiterUsage(
+			ROUTE_CONTROLLER,
+			kubeClient.CoreV1().RESTClient().GetRateLimiter(),
+		)
+		if err != nil {
+			glog.Warningf("metrics initialized fail. %s",err.Error())
+		}
 	}
 
 	if clusterCIDR == nil {
@@ -97,7 +118,7 @@ func New(routes Routes,
 
 	eventer, caster := broadcaster()
 
-	return &RouteController{
+	rc := &RouteController{
 		routes:           routes,
 		kubeClient:       kubeClient,
 		clusterName:      clusterName,
@@ -106,7 +127,36 @@ func New(routes Routes,
 		nodeListerSynced: nodeInformer.Informer().HasSynced,
 		broadcaster:      caster,
 		recorder:         eventer,
-	}, nil
+		queues: map[string]queue.DelayingInterface{
+			NODE_QUEUE: workqueue.NewNamedDelayingQueue(NODE_QUEUE),
+		},
+	}
+
+	rc.HandlerForNodeDeletion(
+		rc.queues[NODE_QUEUE],
+		nodeInformer.Informer(),
+	)
+
+	return rc, nil
+}
+
+func (rc *RouteController) HandlerForNodeDeletion(
+	que queue.DelayingInterface,
+	informer cache.SharedIndexInformer,
+) {
+	informer.AddEventHandler(
+		cache.ResourceEventHandlerFuncs{
+			DeleteFunc: func(nodec interface{}) {
+				node,ok := nodec.(*v1.Node)
+				if !ok {
+					glog.Infof("not node type: %s\n", reflect.TypeOf(nodec))
+					return
+				}
+				que.Add(node)
+				glog.Infof("node deletion event: %s, %s",node.Name, node.Spec.ProviderID)
+			},
+		},
+	)
 }
 
 // Run start route controller
@@ -138,7 +188,59 @@ func (rc *RouteController) Run(stopCh <-chan struct{}, syncPeriod time.Duration)
 		}
 	}, syncPeriod, stopCh)
 
+	go wait.Until(
+		func() {
+			que := rc.queues[NODE_QUEUE]
+			for {
+				func() {
+					// Workerqueue ensures that a single key would not be process
+					// by two worker concurrently, so multiple workers is safe here.
+					key, quit := que.Get()
+					if quit {
+						return
+					}
+					defer que.Done(key)
+					node, ok := key.(*v1.Node)
+					if !ok {
+						glog.Errorf("not type of *v1.Node, %s",reflect.TypeOf(key))
+						return
+					}
+					glog.Infof("[%s] worker: queued sync for node deletion with route", key)
+
+					if err := rc.syncd(node); err != nil {
+						que.AddAfter(key, 2*time.Minute)
+						glog.Errorf("requeue: sync error for service %s %v", key, err)
+					}
+				}()
+			}
+		},
+		2*time.Second,
+		stopCh,
+	)
 	<-stopCh
+}
+
+func(rc *RouteController) syncd(node *v1.Node) error {
+	tabs, err := rc.routes.RouteTables(rc.clusterName)
+	if err != nil {
+		return fmt.Errorf("RouteTables: %s", err.Error())
+	}
+	for _, table := range tabs {
+		route := &cloudprovider.Route{
+			Name:            node.Spec.ProviderID,
+			TargetNode: 	 types.NodeName(node.Spec.ProviderID),
+			DestinationCIDR: node.Spec.PodCIDR,
+		}
+		if err := rc.routes.DeleteRoute(
+				rc.clusterName, table, route,
+		   ); err != nil {
+			glog.Errorf(
+				"delete route %s %s from table %s, %s", route.Name, route.DestinationCIDR, table, err.Error())
+			return fmt.Errorf("node deletion, delete route error: %s",err.Error())
+		}
+		glog.Infof("node deletion: delete route %s %s from table %s SUCCESS.", route.Name, route.DestinationCIDR, table)
+	}
+	return nil
 }
 
 func (rc *RouteController) reconcile() error {
@@ -192,7 +294,10 @@ func (rc *RouteController) sync(table string, nodes []*v1.Node, routes []*cloudp
 			continue
 		}
 		if node.Spec.PodCIDR == "" {
-			rc.updateNetworkingCondition(types.NodeName(node.Name), false)
+			err := rc.updateNetworkingCondition(types.NodeName(node.Name), false)
+			if err != nil {
+				glog.Errorf("route, update network condition error: %s", err.Error())
+			}
 			continue
 		}
 		if node.Spec.ProviderID == "" {
@@ -200,7 +305,10 @@ func (rc *RouteController) sync(table string, nodes []*v1.Node, routes []*cloudp
 			continue
 		}
 		// ignore error return. Try it next time anyway.
-		rc.tryCreateRoute(table, node, cached)
+		err := rc.tryCreateRoute(table, node, cached)
+		if err != nil {
+			glog.Errorf("try create route error: %s",err.Error())
+		}
 	}
 	return nil
 }
