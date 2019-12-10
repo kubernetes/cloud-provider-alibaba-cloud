@@ -235,6 +235,10 @@ func (v *vgroup) diff(apis, nodes []slb.VBackendServerType) (
 	)
 
 	for _, api := range apis {
+		// skip nodes which does not belong to the cluster
+		if isUserManagedNode(api.Description, v.NamedKey.Key()) {
+			continue
+		}
 		found := false
 		for _, node := range nodes {
 			if node.Type == "eni" {
@@ -278,18 +282,19 @@ func (v *vgroup) diff(apis, nodes []slb.VBackendServerType) (
 	}
 	for _, node := range nodes {
 		for _, api := range apis {
+			if isUserManagedNode(api.Description, v.NamedKey.Key()) {
+				continue
+			}
 			if node.Type == "eni" {
 				if node.ServerId == api.ServerId &&
 					node.ServerIp == api.ServerIp &&
-					(node.Weight != api.Weight ||
-						api.Description != v.NamedKey.Key()) {
+					node.Weight != api.Weight {
 					updates = append(updates, node)
 					break
 				}
 			} else {
 				if node.ServerId == api.ServerId &&
-					(node.Weight != api.Weight ||
-						api.Description != v.NamedKey.Key()) {
+					node.Weight != api.Weight  {
 					updates = append(updates, node)
 					break
 				}
@@ -546,4 +551,13 @@ func findENIbyAddrIP(resp *ecs.DescribeNetworkInterfacesResponse, addrIP string)
 		}
 	}
 	return "", fmt.Errorf("private ip address not found in openapi %s", addrIP)
+}
+
+
+func isUserManagedNode(nodeDescription, vNameKey string) bool {
+	if nodeDescription != vNameKey {
+		return true
+	} else {
+		return false
+	}
 }
