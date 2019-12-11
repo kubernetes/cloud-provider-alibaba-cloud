@@ -185,7 +185,7 @@ func isRouteExists(routes []*cloudprovider.Route, route *cloudprovider.Route) bo
 
 // DeleteRoute deletes the specified managed route
 // Route should be as returned by ListRoutes
-func (r *RoutesClient) DeleteRoute(tabid string, route *cloudprovider.Route, region common.Region, vpcid string) error {
+func (r *RoutesClient) DeleteRoute(tabid string, route *cloudprovider.Route, region common.Region) error {
 	args := &ecs.DeleteRouteEntryArgs{
 		RouteTableId:         tabid,
 		DestinationCidrBlock: route.DestinationCIDR,
