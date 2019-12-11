@@ -251,3 +251,58 @@ func TestGetLoadBalancerAdditionalTags(t *testing.T) {
 		}
 	}
 }
+
+// anomaly test case
+func TestUpdateLoadBalancerWhenStartLoadBalancerFailed(t *testing.T) {
+	prid := nodeid(string(REGION), INSTANCEID)
+	f := NewDefaultFrameWork(
+		&v1.Service{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace:   "default",
+				Name:        "service-test",
+				UID:         types.UID(serviceUIDExist),
+				Annotations: map[string]string{},
+			},
+			Spec: v1.ServiceSpec{
+				Ports: []v1.ServicePort{
+					{Port: listenPort1, TargetPort: targetPort1, Protocol: v1.ProtocolTCP, NodePort: nodePort1},
+				},
+				Type:            v1.ServiceTypeLoadBalancer,
+				SessionAffinity: v1.ServiceAffinityNone,
+			},
+		},
+		[]*v1.Node{
+			{
+				ObjectMeta: metav1.ObjectMeta{Name: prid},
+				Spec: v1.NodeSpec{
+					ProviderID: prid,
+				},
+			},
+		},
+		nil,
+		nil,
+	)
+	// create service
+	f.RunDefault(t, "create test service")
+
+	// Simulate the failure of StartLoadBalancerListener()
+	slbClient := f.Cloud.climgr.loadbalancer.c
+	err := slbClient.StopLoadBalancerListener(LOADBALANCER_ID, int(listenPort1))
+	if err != nil {
+		t.Fatal(err.Error())
+	}
+
+	// update service
+	f.RunDefault(t,"update test service")
+
+	// check result
+	res, err := slbClient.DescribeLoadBalancerTCPListenerAttribute(LOADBALANCER_ID, int(listenPort1))
+	if err != nil {
+		t.Fatalf("DescribeLoadBalancerTCPListenerAttribute error: %s", err.Error())
+	}
+
+	if res.Status != slb.Running {
+		t.Fatalf("listener stop error.")
+	}
+
+}

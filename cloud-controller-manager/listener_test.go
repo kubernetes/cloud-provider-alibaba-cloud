@@ -17,6 +17,7 @@ limitations under the License.
 package alicloud
 
 import (
+	"github.com/denverdino/aliyungo/slb"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -103,4 +104,97 @@ func TestUpdateListenerBackendPorts(t *testing.T) {
 	}
 
 	f.RunDefault(t, "Change NodePort from 31000 to 32000")
+}
+
+func TestStartLoadBalancerListener(t *testing.T) {
+	prid := nodeid(string(REGION), INSTANCEID)
+	f := NewDefaultFrameWork(
+		// initial service based on your definition
+		&v1.Service{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "https-service",
+				UID:  types.UID(serviceUIDNoneExist),
+			},
+			Spec: v1.ServiceSpec{
+				Ports: []v1.ServicePort{
+					{Port: listenPort1, TargetPort: targetPort1, Protocol: v1.ProtocolTCP, NodePort: 31000},
+				},
+				Type:            v1.ServiceTypeLoadBalancer,
+				SessionAffinity: v1.ServiceAffinityNone,
+			},
+		},
+		// initial node based on your definition.
+		// backend of the created loadbalaner
+		[]*v1.Node{
+			{
+				ObjectMeta: metav1.ObjectMeta{Name: prid},
+				Spec: v1.NodeSpec{
+					ProviderID: prid,
+				},
+			},
+		},
+		nil,
+		nil,
+	)
+
+	f.RunDefault(t, "With TCP Listener")
+
+	_, lb, _ := f.LoadBalancer().findLoadBalancer(f.SVC)
+	slbClient := f.SLBSDK()
+	res, err := slbClient.DescribeLoadBalancerTCPListenerAttribute(lb.LoadBalancerId, int(listenPort1))
+	if err != nil {
+		t.Fatalf("DescribeLoadBalancerTCPListenerAttribute error: %s", err.Error())
+	}
+	if res.Status != slb.Running {
+		t.Fatalf("listener start error.")
+	}
+}
+
+func TestStopLoadBalancerListener(t *testing.T) {
+	prid := nodeid(string(REGION), INSTANCEID)
+	f := NewDefaultFrameWork(
+		// initial service based on your definition
+		&v1.Service{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "https-service",
+				UID:  types.UID(serviceUIDNoneExist),
+			},
+			Spec: v1.ServiceSpec{
+				Ports: []v1.ServicePort{
+					{Port: listenPort1, TargetPort: targetPort1, Protocol: v1.ProtocolTCP, NodePort: 31000},
+				},
+				Type:            v1.ServiceTypeLoadBalancer,
+				SessionAffinity: v1.ServiceAffinityNone,
+			},
+		},
+		// initial node based on your definition.
+		// backend of the created loadbalaner
+		[]*v1.Node{
+			{
+				ObjectMeta: metav1.ObjectMeta{Name: prid},
+				Spec: v1.NodeSpec{
+					ProviderID: prid,
+				},
+			},
+		},
+		nil,
+		nil,
+	)
+
+	f.RunDefault(t, "With TCP Listener")
+
+	slbClient := f.SLBSDK()
+	err := slbClient.StopLoadBalancerListener(LOADBALANCER_ID, int(listenPort1))
+	if err != nil {
+		t.Fatalf("StopLoadBalancerListener error: %s", err.Error())
+	}
+
+	res, err := slbClient.DescribeLoadBalancerTCPListenerAttribute(LOADBALANCER_ID, int(listenPort1))
+	if err != nil {
+		t.Fatalf("DescribeLoadBalancerTCPListenerAttribute error: %s", err.Error())
+	}
+
+	if res.Status != slb.Stopped {
+		t.Fatalf("listener stop error.")
+	}
 }

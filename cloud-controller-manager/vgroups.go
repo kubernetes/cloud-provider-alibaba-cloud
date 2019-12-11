@@ -237,11 +237,19 @@ func (v *vgroup) diff(apis, nodes []slb.VBackendServerType) (
 	for _, api := range apis {
 		found := false
 		for _, node := range nodes {
-			if api.ServerId == node.ServerId &&
-				api.ServerIp == node.ServerIp {
-				found = true
-				break
+			if node.Type == "eni" {
+				if api.ServerId == node.ServerId &&
+					api.ServerIp == node.ServerIp {
+					found = true
+					break
+				}
+			} else {
+				if api.ServerId == node.ServerId {
+					found = true
+					break
+				}
 			}
+
 		}
 		if !found {
 			deletions = append(deletions, api)
@@ -250,11 +258,19 @@ func (v *vgroup) diff(apis, nodes []slb.VBackendServerType) (
 	for _, node := range nodes {
 		found := false
 		for _, api := range apis {
-			if api.ServerId == node.ServerId &&
-				api.ServerIp == node.ServerIp {
-				found = true
-				break
+			if node.Type == "eni" {
+				if api.ServerId == node.ServerId &&
+					api.ServerIp == node.ServerIp {
+					found = true
+					break
+				}
+			} else {
+				if api.ServerId == node.ServerId {
+					found = true
+					break
+				}
 			}
+
 		}
 		if !found {
 			addition = append(addition, node)
@@ -262,12 +278,21 @@ func (v *vgroup) diff(apis, nodes []slb.VBackendServerType) (
 	}
 	for _, node := range nodes {
 		for _, api := range apis {
-			if node.ServerId == api.ServerId &&
-				node.ServerIp == api.ServerIp &&
-				(node.Weight != api.Weight ||
-					api.Description != v.NamedKey.Key()) {
-				updates = append(updates, node)
-				break
+			if node.Type == "eni" {
+				if node.ServerId == api.ServerId &&
+					node.ServerIp == api.ServerIp &&
+					(node.Weight != api.Weight ||
+						api.Description != v.NamedKey.Key()) {
+					updates = append(updates, node)
+					break
+				}
+			} else {
+				if node.ServerId == api.ServerId &&
+					(node.Weight != api.Weight ||
+						api.Description != v.NamedKey.Key()) {
+					updates = append(updates, node)
+					break
+				}
 			}
 		}
 	}
