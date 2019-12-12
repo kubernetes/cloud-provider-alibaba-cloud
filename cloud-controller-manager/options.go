@@ -425,7 +425,7 @@ func ExtractAnnotationRequest(service *v1.Service) (*AnnotationRequest, *Annotat
 		defaulted.Scheduler = scheduler
 		request.Scheduler = defaulted.Scheduler
 	} else {
-		defaulted.Scheduler = "rr"
+		defaulted.Scheduler = "wrr"
 	}
 
 	// stick session
