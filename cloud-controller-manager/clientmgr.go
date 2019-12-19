@@ -381,7 +381,8 @@ func (m *fakeMetaData) VswitchID() (string, error) {
 		if len(vs) != 2 {
 			return "", fmt.Errorf("cloud-config vswitch format error: %s", cfg.Global.VswitchID)
 		}
-		if vs[0] == mzone {
+		// ask doesn't have zoneid
+		if vs[0] == "" || vs[0] == mzone {
 			return vs[1], nil
 		}
 	}
