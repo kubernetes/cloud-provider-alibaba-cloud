@@ -139,7 +139,7 @@ func getProductRegionEndpoint(region Region, serviceCode string) string {
 }
 
 func setProductRegionEndpoint(region Region, serviceCode string, endpoint string) {
-	endpoints[region] = map[string]string{
+	endpoints[region] = sync.Map{
 		serviceCode: endpoint,
 	}
 }
