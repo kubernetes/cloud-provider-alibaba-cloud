@@ -21,23 +21,48 @@ image: registry-vpc.cn-hangzhou.aliyuncs.com/acs/cloud-controller-manager-amd64:
 
 - Cloud Controller Manager（简称CCM）会为`Type=LoadBalancer`类型的Service创建或配置阿里云负载均衡（SLB），包含**SLB**、**监听**、**虚拟服务器组**等资源。
 - 对于非LoadBalancer类型的service则不会为其配置负载均衡，这包含如下场景：当用户将`Type=LoadBalancer`的service变更为`Type!=LoadBalancer`时，CCM也会删除其原先为该Service创建的SLB（用户通过`service.beta.kubernetes.io/alibaba-cloud-loadbalancer-id annotation`指定的已有SLB除外）。
-- 自动刷新配置：CCM使用声明式API，会在一定条件下自动根据service的配置刷新阿里云负载均衡配置，所有用户自行在SLB控制台上修改的配置均存在被覆盖的风险（使用已有SLB同时不覆盖监听的场景除外），因此不能在SLB控制台手动修改Kubernetes创建并维护的SLB的任何配置，否则有配置丢失的风险。
-- 同时支持为serivce指定一个已有的负载均衡，或者让CCM自行创建新的负载均衡。但两种方式在SLB的管理方面存在一些差异：指定已有SLB
+- **自动刷新配置**  
+  CCM使用声明式API，会在一定条件下自动根据service的配置刷新阿里云负载均衡配置，所有用户自行在SLB控制台上修改的配置均存在被覆盖的风险（使用已有SLB同时不覆盖监听的场景除外），因此不能在SLB控制台手动修改Kubernetes创建并维护的SLB的任何配置，否则有配置丢失的风险。
+- 同时支持为serivce指定一个已有的负载均衡，或者让CCM自行创建新的负载均衡。但两种方式在SLB的管理方面存在一些差异。
+  **指定已有SLB**  
+  - 仅支持复用负载均衡控制台创建的SLB，不支持复用CCM创建的SLB。
   - 需要为Service设置`service.beta.kubernetes.io/alibaba-cloud-loadbalancer-id` annotation。
-  - SLB配置：此时CCM会使用该SLB做为Service的SLB，并根据其他annotation配置SLB，并且自动的为SLB创建多个虚拟服务器组（当集群节点变化的时候，也会同步更新虚拟服务器组里面的节点）。
-  - 监听配置：是否配置监听取决于`service.beta.kubernetes.io/alibaba-cloud-loadbalancer-force-override-listeners: `是否设置为true。 如果设置为false，那么CCM不会为SLB管理任何监听配置。如果设置为true，那么CCM会尝试为SLB更新监听，此时CCM会根据监听名称判断SLB上的监听是否为k8s维护的监听（名字的格式为k8s/Port/ServiceName/Namespace/ClusterID），若Service声明的监听与用户自己管理的监听端口冲突，那么CCM会报错。
-  - SLB的删除： 当Service删除的时候CCM不会删除用户通过id指定的已有SLB。
-- CCM管理的SLB  
+  - SLB配置  
+    此时CCM会使用该SLB做为Service的SLB，并根据其他annotation配置SLB，并且自动的为SLB创建多个虚拟服务器组（当集群节点变化的时候，也会同步更新虚拟服务器组里面的节点）。
+  - 监听配置  
+    是否配置监听取决于`service.beta.kubernetes.io/alibaba-cloud-loadbalancer-force-override-listeners: `是否设置为true。 如果设置为false，那么CCM不会为SLB管理任何监听配置。如果设置为true，那么CCM会尝试为SLB更新监听，此时CCM会根据监听名称判断SLB上的监听是否为k8s维护的监听（名字的格式为k8s/Port/ServiceName/Namespace/ClusterID），若Service声明的监听与用户自己管理的监听端口冲突，那么CCM会报错。
+  - SLB的删除  
+    当Service删除的时候CCM不会删除用户通过id指定的已有SLB。
+- **CCM管理的SLB**  
   - CCM会根据service的配置自动的创建配置**SLB**、**监听**、**虚拟服务器组**等资源，所有资源归CCM管理，因此用户不得手动在SLB控制台更改以上资源的配置，否则CCM在下次Reconcile的时候将配置刷回service所声明的配置，造成非用户预期的结果。
-  - SLB的删除：当Service删除的时候CCM会删除该SLB。
-- 后端服务器更新
+  - SLB的删除
+    当Service删除的时候CCM会删除该SLB。
+- **后端服务器更新**
   - CCM会自动的为该Service对应的SLB刷新后端虚拟服务器组。当Service对应的后端Endpoint发生变化的时候或者集群节点变化的时候都会自动的更新SLB的后端Server。
   - `spec.ExternalTraffic = Cluster`模式的Service，CCM默认会将所有节点挂载到SLB的后端（使用BackendLabel标签配置后端的除外）。由于SLB限制了每个ECS上能够attach的SLB的个数（quota），因此这种方式会快速的消耗该quota,当quota耗尽后，会造成Service Reconcile失败。解决的办法，可以使用Local模式的Service。
-  - `spec.ExternalTraffic = Local`模式的Service，CCM默认只会讲Service对应的Pod所在的节点加入到SLB后端。这会明显降低quota的消耗速度。同时支持四层源IP保留。
+  - `spec.ExternalTraffic = Local`模式的Service，CCM默认只会将Service对应的Pod所在的节点加入到SLB后端。这会明显降低quota的消耗速度。同时支持四层源IP保留。
   - 任何情况下CCM不会将Master节点作为SLB的后端。
   - CCM默认不会从SLB后端移除被kubectl drain/cordon的节点。如需移除节点，请设置service.beta.kubernetes.io/alibaba-cloud-loadbalancer-remove-unscheduled-backend为on。
   >> 说明 
-     如果是v1.9.3.164-g2105d2e-aliyun之前的版本，CCM默认会从SLB后端移除被kubectl drain/cordon的节点。
+     如果是v1.9.3.164-g2105d2e-aliyun之前的版本，CCM默认会从SLB后端移除被kubectl drain/cordon的节点。  
+- **VPC路由**  
+  - 集群中一个节点对应一条路由表项，VPC默认情况下仅支持48条路由表项，如果集群节点数目多于48个，请提工单给VPC产品。 
+  >> 说明 您可以在提交工单时，说明需要修改vpc_quota_route_entrys_num参数，用于提升单个路由表可创建的自定义路由条目的数量。 
+  - 更多VPC使用限制请参见[使用限制](https://help.aliyun.com/document_detail/27750.html#concept_dyx_jkx_5db)  
+  - 专有网络VPC配额查询请参见[专有网络VPC配额管理](https://vpc.console.aliyun.com/quota)  
+  
+  
+- **SLB使用限制**  
+  - CCM会为Type=LoadBalancer类型的Service创建SLB。默认情况下一个用户可以保留60个SLB实例，如果需要创建的SLB数量大于60，请提交工单给SLB产品。
+  >> 说明 您可以在提交工单时，说明需要修改slb_quota_instances_num参数，用于提高用户可保有的slb实例个数。
+  - CCM会根据Service将ECS挂载到SLB后端服务器组中。默认情况下一个ECS实例可挂载的后端服务器组的数量为50个，如果一台ECS需要挂载到更多的后端服务器组中，请提交工单给SLB产品。
+  >> 说明 您可以在提交工单时，说明需要修改slb_quota_backendservers_num参数，用于提高同一台服务器可以重复添加为SLB后端服务器的次数。
+  - 默认情况下一个SLB实例可以挂载200个后端服务器，如果需要挂载更多的后端服务器，请提交工单给SLB产品。
+  >> 说明 您可以在提交工单时，说明需要修改slb_quota_backendservers_num参数，提高每个SLB实例可以挂载的服务器数量。
+  - CCM会根据Service中定义的端口创建SLB监听。默认情况下一个SLB实例可以添加50个监听，如需添加更多监听，请提交工单给SLB产品。
+  >> 说明 您可以在提交工单时，说明需要修改slb_quota_listeners_num参数，用于提高每个实例可以保有的监听数量。
+  - 更多SLB使用限制请参见[使用限制](https://help.aliyun.com/document_detail/32459.html?spm=a2c4g.11174283.3.2.28581192X1CXYW)  
+  - 负载均衡SLB配额查询请参见[负载均衡SLB配额管理](https://slbnew.console.aliyun.com/slb/quota)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    >
   
 ## 通过命令行操作
 
@@ -370,11 +395,14 @@ spec:
 
   默认externalTrafficPolicy为Cluster模式，会将集群中所有节点挂载到后端服务器。  
   Local模式（即设置externalTrafficPolicy: Local）仅将Pod所在节点作为后端服务器。
+  Local模式需要设置调度策略为加权轮询wrr。
 
 ```yaml
 apiVersion: v1
 kind: Service
 metadata:
+  annotations:
+    service.beta.kubernetes.io/alibaba-cloud-loadbalancer-scheduler: "wrr"
   name: nginx
   namespace: default
 spec:
@@ -493,9 +521,10 @@ spec:
 
 - **为负载均衡设置调度算法**
 
-  **wrr**（默认值）：权重值越高的后端服务器，被轮询到的次数（概率）也越高。  
+  **rr**（默认值）：按照访问顺序依次将外部请求依序分发到后端服务器。
+  **wrr**：权重值越高的后端服务器，被轮询到的次数（概率）也越高。  
   **wlc**：除了根据每台后端服务器设定的权重值来进行轮询，同时还考虑后端服务器的实际负载（即连接数）。当权重值相同时，当前连接数越小的后端服务器被轮询到的次数（概率）也越高。  
-  **rr**：按照访问顺序依次将外部请求依序分发到后端服务器。
+  
 
 ```yaml
 apiVersion: v1
@@ -727,7 +756,7 @@ spec:
 | service.beta.kubernetes.io/alibaba-cloud-loadbalancer-health-check-timeout | string | 接收来自运行状况检查的响应需要等待的时间，适用于HTTP模式。如果后端ECS在指定的时间内没有正确响应，则判定为健康检查失败。取值：1-300（秒）  **说明：** 如果 service.beta.kubernetes.io/alibaba-cloud-loadbalancer-health-check-timeout的值小于service.beta.kubernetes.io/alibaba-cloud-loadbalancer-health-check-interval的值，则 service.beta.kubernetes.io/alibaba-cloud-loadbalancer-health-check-timeout无效，超时时间为 service.beta.kubernetes.io/alibaba-cloud-loadbalancer-health-check-interval的值。  可参考：[CreateLoadBalancerHTTPListener](https://help.aliyun.com/document_detail/27592.html?spm=a2c4g.11186623.2.24.16bb609awRQFbk#slb-api-CreateLoadBalancerHTTPListener)   | 5 | v1.9.3及以上版本 |
 | service.beta.kubernetes.io/alibaba-cloud-loadbalancer-health-check-domain | string | 用于健康检查的域名。  **$_ip**： 后端服务器的私网IP。当指定了IP或该参数未指定时，负载均衡会使用各后端服务器的私网IP当做健康检查使用的域名。  **domain**：域名长度为1-80，只能包含字母、数字、点号（.）和连字符（-）。 | 无 | v1.9.3及以上版本 |
 | service.beta.kubernetes.io/alibaba-cloud-loadbalancer-health-check-httpcode | string | 健康检查正常的HTTP状态码，多个状态码用逗号（,）分割。  取值：http_2xx（默认值）或http_3xx或http_4xx或http_5xx。 | http_2xx | v1.9.3及以上版本 |
-| service.beta.kubernetes.io/alibaba-cloud-loadbalancer-scheduler | string | 调度算法。取值 wrr或wlc或rr。  **wrr**（默认值）：权重值越高的后端服务器，被轮询到的次数（概率）也越高。  **wlc**：除了根据每台后端服务器设定的权重值来进行轮询，同时还考虑后端服务器的实际负载（即连接数）。当权重值相同时，当前连接数越小的后端服务器被轮询到的次数（概率）也越高。  **rr**：按照访问顺序依次将外部请求依序分发到后端服务器。 | wrr | v1.9.3及以上版本 |
+| service.beta.kubernetes.io/alibaba-cloud-loadbalancer-scheduler | string | 调度算法。取值 wrr或wlc或rr。  **wrr**：权重值越高的后端服务器，被轮询到的次数（概率）也越高。  **wlc**：除了根据每台后端服务器设定的权重值来进行轮询，同时还考虑后端服务器的实际负载（即连接数）。当权重值相同时，当前连接数越小的后端服务器被轮询到的次数（概率）也越高。  **rr**（默认值）：按照访问顺序依次将外部请求依序分发到后端服务器。 | rr | v1.9.3及以上版本 |
 | service.beta.kubernetes.io/alibaba-cloud-loadbalancer-acl-status | string | 是否开启访问控制功能。取值：on或off | off | v1.9.3.164-g2105d2e-aliyun及以上版本 |
 | service.beta.kubernetes.io/alibaba-cloud-loadbalancer-acl-id | string | 监听绑定的访问策略组ID。当AclStatus参数的值为on时，该参数必选。 | 无 | v1.9.3.164-g2105d2e-aliyun及以上版本 |
 | service.beta.kubernetes.io/alibaba-cloud-loadbalancer-acl-type | string | 访问控制类型。  取值：white或black。  **white**： 仅转发来自所选访问控制策略组中设置的IP地址或地址段的请求，白名单适用于应用只允许特定IP访问的场景。设置白名单存在一定业务风险。一旦设名单，就只有白名单中的IP可以访问负载均衡监听。如果开启了白名单访问，但访问策略组中没有添加任何IP，则负载均衡监听会转发全部请求。  **black**： 来自所选访问控制策略组中设置的IP地址或地址段的所有请求都不会转发，黑名单适用于应用只限制某些特定IP访问的场景。如果开启了黑名单访问，但访问策略组中没有添加任何IP，则负载均衡监听会转发全部请求。当AclStatus参数的值为on时，该参数必选。 | 无 | v1.9.3.164-g2105d2e-aliyun及以上版本 |
@@ -736,6 +765,6 @@ spec:
 | service.beta.kubernetes.io/alibaba-cloud-loadbalancer-additional-resource-tags | string | 需要添加的Tag列表，多个标签用逗号分隔。如："k1=v1,k2=v2" | 无 | v1.9.3及以上版本 |
 | service.beta.kubernetes.io/alibaba-cloud-loadbalancer-remove-unscheduled-backend | string | 从slb后端移除SchedulingDisabled Node。取值：on或off | off | v1.9.3.164-g2105d2e-aliyun及以上版本 |
 | service.beta.kubernetes.io/backend-type | string | 支持在terway eni网络模式下,通过设定该参数为"eni"，可将pod直接挂载到slb后端，提升网络转发性能。取值：eni | 无 | v1.9.3.164-g2105d2e-aliyun及以上版本 |
-| service.beta.kubernetes.io/alibaba-cloud-loadbalancer-ip-version | string | 负载均衡实例的IP版本，取值：ipv4或ipv6 | ipv4 | v1.9.3.193-g6cddde4-aliyun及以上版本 |
+| service.beta.kubernetes.io/alibaba-cloud-loadbalancer-ip-version | string | 负载均衡实例的IP版本，取值：ipv4或ipv6 | ipv4 | v1.9.3.220-g24b1885-aliyun-及以上版本 |
 
 
