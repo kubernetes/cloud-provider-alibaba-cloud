@@ -348,6 +348,9 @@ func WorkerFunc(
 ) func() {
 
 	return func() {
+		// requeue exponential in case of throttle error.
+		// for each worker function
+		back := NewBackoff(5*time.Second, 1.5)
 		for {
 			func() {
 				// Workerqueue ensures that a single key would not be process
@@ -361,12 +364,71 @@ func WorkerFunc(
 				glog.Infof("[%s] worker: queued sync for service", key)
 
 				if err := syncd(key.(string)); err != nil {
-					queue.AddAfter(key, 4*time.Second)
+					if strings.Contains(err.Error(), "Throttling") {
+						next := back.Next()
+						queue.AddAfter(key, next)
+						glog.Warningf("request was throttled: %s, retry in next %d ns", key, next)
+					} else {
+						queue.AddAfter(key, 5*time.Second)
+					}
 					glog.Errorf("requeue: sync error for service %s %v", key, err)
 				}
 			}()
 		}
 	}
+}
+
+func NewBackoff(
+	next time.Duration,
+	factor float64,
+) *RequeueBackoff {
+	r := &RequeueBackoff{
+		last:   time.Now(),
+		next:   next,
+		factor: factor,
+	}
+	r.reset()
+	return r
+}
+
+type RequeueBackoff struct {
+	last   time.Time
+	next   time.Duration
+	factor float64 // next is multiplied by factor each iteration
+}
+
+func (b *RequeueBackoff) reset() {
+
+	go wait.Until(
+		func() {
+			tick := time.Tick(20 * time.Second)
+			for {
+				// reset next retry interval when throttle ended.
+				select {
+				case <-tick:
+					if time.Now().After(
+						b.last.Add(1 * time.Minute),
+					) {
+						// throttle was last seen 1 minute ago.
+						// reset next to 4 seconds
+						b.next = 5 * time.Second
+					}
+				}
+			}
+		},
+		2*time.Second,
+		make(chan struct{}),
+	)
+}
+
+func (b *RequeueBackoff) Next() time.Duration {
+	b.last = time.Now()
+	b.next = time.Duration(float64(b.next) * b.factor)
+	if b.next > 120*time.Second {
+		// reset base to 30 seconds when throttle continued
+		b.next = 30 * time.Second
+	}
+	return b.next
 }
 
 type SyncTask func(key string) error
