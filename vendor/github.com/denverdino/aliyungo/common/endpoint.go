@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -19,7 +20,7 @@ const (
 )
 
 var (
-	endpoints = make(map[Region]map[string]string)
+	endpoints = make(map[Region]*sync.Map)
 
 	SpecailEnpoints = map[Region]map[string]string{
 		APNorthEast1: {
@@ -130,8 +131,8 @@ func (client *LocationClient) DescribeEndpoints(args *DescribeEndpointsArgs) (*D
 
 func getProductRegionEndpoint(region Region, serviceCode string) string {
 	if sp, ok := endpoints[region]; ok {
-		if endpoint, ok := sp[serviceCode]; ok {
-			return endpoint
+		if endpoint, ok := sp.Load(serviceCode); ok {
+			return endpoint.(string)
 		}
 	}
 
@@ -139,9 +140,9 @@ func getProductRegionEndpoint(region Region, serviceCode string) string {
 }
 
 func setProductRegionEndpoint(region Region, serviceCode string, endpoint string) {
-	endpoints[region] = map[string]string{
-		serviceCode: endpoint,
-	}
+
+	endpoints[region].Store(serviceCode, endpoint)
+
 }
 
 func (client *LocationClient) DescribeOpenAPIEndpoint(region Region, serviceCode string) string {
