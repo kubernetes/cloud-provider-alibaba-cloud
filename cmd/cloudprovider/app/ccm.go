@@ -66,7 +66,7 @@ func NewServerCCM() *ServerCCM {
 		KubeControllerManagerConfiguration: ccfg.KubeControllerManagerConfiguration{
 			Port:                      ports.CloudControllerManagerPort,
 			Address:                   "0.0.0.0",
-			ConcurrentServiceSyncs:    5,
+			ConcurrentServiceSyncs:    2,
 			MinResyncPeriod:           metav1.Duration{Duration: 5 * time.Minute},
 			NodeMonitorPeriod:         metav1.Duration{Duration: 5 * time.Second},
 			ClusterName:               "kubernetes",
