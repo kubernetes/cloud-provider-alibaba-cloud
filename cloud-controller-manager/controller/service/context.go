@@ -56,34 +56,26 @@ func NeedUpdate(old, newm *v1.Service, record record.EventRecorder) bool {
 	}
 
 	if !reflect.DeepEqual(old.Annotations, newm.Annotations) {
+		klog.Infof("AnnotationChanged: %v -> %v", old.Annotations, newm.Annotations)
 		record.Eventf(
 			newm,
 			v1.EventTypeNormal,
 			"AnnotationChanged",
-			"with count %v -> %v",
-			len(old.Annotations),
-			len(newm.Annotations),
+			"The service will be updated because the annotations has been changed.",
 		)
 		return true
 	}
 	if old.UID != newm.UID {
-		record.Eventf(
-			newm,
-			v1.EventTypeNormal,
-			"UIDChanged",
-			"%v -> %v",
-			old.UID, newm.UID,
-		)
+		klog.Infof("UIDChanged: %v -> %v", old.UID, newm.UID)
 		return true
 	}
 	if !reflect.DeepEqual(old.Spec, newm.Spec) {
+		klog.Infof("ServiceSpecChanged: %v -> %v", old.Spec, newm.Spec)
 		record.Eventf(
 			newm,
 			v1.EventTypeNormal,
 			"ServiceSpecChanged",
-			"%v -> %v",
-			old.Spec,
-			newm.Spec,
+			"The service will be updated because the spec has been changed.",
 		)
 		return true
 	}
@@ -120,6 +112,7 @@ func NodeSpecChanged(a, b *v1.Node) bool {
 
 func NodeConditionChanged(name string, a, b []v1.NodeCondition) bool {
 	if len(a) != len(b) {
+		klog.Infof("Node Change: node condition changed, before %v, after %v", a, b)
 		return true
 	}
 
@@ -135,7 +128,7 @@ func NodeConditionChanged(name string, a, b []v1.NodeCondition) bool {
 		if a[i].Type != b[i].Type ||
 			a[i].Status != b[i].Status {
 			klog.Infof(
-				"ndoe condition changed: %s, type(%s,%s) | status(%s,%s)",
+				"node condition changed: %s, type(%s,%s) | status(%s,%s)",
 				name, a[i].Type, b[i].Type, a[i].Status, b[i].Status,
 			)
 			return true
@@ -146,10 +139,12 @@ func NodeConditionChanged(name string, a, b []v1.NodeCondition) bool {
 
 func NodeLabelsChanged(a, b map[string]string) bool {
 	if len(a) != len(b) {
+		klog.Infof("Node Change: the number of labels on the node are changed, before %v, after %v", a, b)
 		return true
 	}
 	for k, v := range a {
 		if b[k] != v {
+			klog.Infof("Node Change: the %v label on the node are changed, before %v, after %v", k, a[k], b[k])
 			return true
 		}
 	}
