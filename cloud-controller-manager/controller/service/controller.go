@@ -11,6 +11,7 @@ import (
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
+	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
@@ -22,6 +23,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/metrics"
 	"k8s.io/kubernetes/staging/src/k8s.io/client-go/util/workqueue"
 	"reflect"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -86,7 +88,7 @@ func NewController(
 	clusterName string,
 ) (*Controller, error) {
 
-	recorder, caster := broadcaster()
+	recorder, caster := broadcaster(client)
 	rate := client.CoreV1().RESTClient().GetRateLimiter()
 	if client != nil && rate != nil {
 		if err := metrics.RegisterMetricAndTrackRateLimiterUsage("service_controller", rate); err != nil {
@@ -169,9 +171,15 @@ func (con *Controller) Run(stopCh <-chan struct{}, workers int) {
 	<-stopCh
 }
 
-func broadcaster() (record.EventRecorder, record.EventBroadcaster) {
+func broadcaster(client clientset.Interface) (record.EventRecorder, record.EventBroadcaster) {
 	caster := record.NewBroadcaster()
 	caster.StartLogging(glog.Infof)
+	if client != nil {
+		sink := &v1core.EventSinkImpl{
+			Interface: v1core.New(client.CoreV1().RESTClient()).Events(""),
+		}
+		caster.StartRecordingToSink(sink)
+	}
 	source := v1.EventSource{Component: SERVICE_CONTROLLER}
 	return caster.NewRecorder(scheme.Scheme, source), caster
 }
@@ -313,7 +321,7 @@ func (con *Controller) HandlerForServiceChange(
 					utils.Logf(svc, "add: not type service %s, skip", reflect.TypeOf(add))
 					return
 				}
-				utils.Logf(svc, "service addiontion event received %s", reflect.TypeOf(svc))
+				utils.Logf(svc, "service addition event received %s", reflect.TypeOf(svc))
 				syncService(svc)
 			},
 			UpdateFunc: func(old, cur interface{}) {
@@ -556,6 +564,13 @@ func (con *Controller) update(cached, svc *v1.Service) error {
 			var eps *v1.Endpoints
 			eps, err = con.ifactory.Core().V1().Endpoints().Lister().Endpoints(svc.Namespace).Get(svc.Name)
 			if err != nil {
+				con.recorder.Eventf(
+					svc,
+					v1.EventTypeWarning,
+					"GetEndpointsFailed",
+					"Get available endpoints for service %s error, ServiceUpdate",
+					key(svc),
+				)
 				return fmt.Errorf("get available endpoints for eni: %s", err.Error())
 			}
 			newm, err = eni.EnsureLoadBalancerWithENI(con.clusterName, svc, eps)
@@ -563,6 +578,13 @@ func (con *Controller) update(cached, svc *v1.Service) error {
 			var nodes []*v1.Node
 			nodes, err = AvailableNodes(svc, con.ifactory)
 			if err != nil {
+				con.recorder.Eventf(
+					svc,
+					v1.EventTypeWarning,
+					"GetAvailableNodeFailed",
+					"Get available nodes for service %s error, ServiceUpdate",
+					key(svc),
+				)
 				return fmt.Errorf("error get available nodes %s", err.Error())
 			}
 			// Fire warning event if there are no available nodes
@@ -579,6 +601,15 @@ func (con *Controller) update(cached, svc *v1.Service) error {
 			newm, err = con.cloud.EnsureLoadBalancer(con.clusterName, svc, nodes)
 		}
 		if err != nil {
+			message := getLogMessage(err)
+			con.recorder.Eventf(
+				svc,
+				v1.EventTypeWarning,
+				"EnsuredLoadBalancerFailed",
+				"Error ensure loadbalancer %s, error %s",
+				key(svc),
+				message,
+			)
 			return fmt.Errorf("ensure loadbalancer error: %s", err)
 		}
 		con.recorder.Eventf(
@@ -656,21 +687,16 @@ func (con *Controller) updateStatus(svc *v1.Service, pre, newm *v1.LoadBalancerS
 func (con *Controller) delete(svc *v1.Service) error {
 
 	// do not check for the neediness of loadbalancer, delete anyway.
-	con.recorder.Eventf(
-		svc,
-		v1.EventTypeNormal,
-		"DeletingLoadBalancer",
-		"for service: %s",
-		key(svc),
-	)
+	utils.Logf(svc, "DeletingLoadBalancer for service %s", key(svc))
 	err := con.cloud.EnsureLoadBalancerDeleted(con.clusterName, svc)
 	if err != nil {
+		message := getLogMessage(err)
 		con.recorder.Eventf(
 			svc,
 			v1.EventTypeWarning,
 			"DeletingLoadBalancerFailed",
 			"Error deleting: %s",
-			err.Error(),
+			message,
 		)
 		return fmt.Errorf(TRY_AGAIN)
 	}
@@ -802,4 +828,17 @@ func AvailableNodeModeLocal(nodes []*v1.Node, svc *v1.Service,
 		node.Labels["weight"] = strconv.Itoa(int(availableNodesMap[node.Name] / podNum * 100.0))
 	}
 	return availableNodes, nil
+}
+
+var re = regexp.MustCompile(".*(Message:.*)")
+
+func getLogMessage(err error) string {
+	var message string
+	sub := re.FindSubmatch([]byte(err.Error()))
+	if len(sub) > 1 {
+		message = string(sub[1])
+	} else {
+		message = err.Error()
+	}
+	return message
 }
