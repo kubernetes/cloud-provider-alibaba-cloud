@@ -50,6 +50,7 @@ type RouteSDK interface {
 	DeleteRouteEntry(args *ecs.DeleteRouteEntryArgs) error
 	CreateRouteEntry(args *ecs.CreateRouteEntryArgs) error
 	WaitForAllRouteEntriesAvailable(vrouterId string, routeTableId string, timeout int) error
+	DescribeRouteEntryList(args *ecs.DescribeRouteEntryListArgs) (response *ecs.DescribeRouteEntryListResponse, err error)
 }
 
 //WithVPC set vpc id and and route table ids.
@@ -78,48 +79,61 @@ func (r *RoutesClient) WithVPC(vpcid string, tableids string) error {
 }
 
 // ListRoutes lists all managed routes that belong to the specified clusterName
-func (r *RoutesClient) ListRoutes(tableid string) ([]*cloudprovider.Route, error) {
+func (r *RoutesClient) ListRoutes(tableid string) (routes []*cloudprovider.Route, err error) {
 
 	glog.Infof("ListRoutes: for route table %s", tableid)
-	return r.getRouteEntries(tableid)
-}
-
-func (r *RoutesClient) getRouteEntries(tableid string) ([]*cloudprovider.Route, error) {
-	args := &ecs.DescribeRouteTablesArgs{
-		RouteTableId: tableid,
-		VRouterId:    r.vpc.vrouterid,
-	}
-	tables, _, err := r.client.DescribeRouteTables(args)
+	err = r.getRouteEntryBatch(tableid, "", routes)
 	if err != nil {
-		return []*cloudprovider.Route{}, err
-	}
-	if len(tables) <= 0 {
 		return []*cloudprovider.Route{},
-			fmt.Errorf("alicloud: cannot find route table, cloud returned zero items, [%s]", tableid)
+			fmt.Errorf("table %s get route entries error ,err %s", tableid, err.Error())
+	} else {
+		return routes, nil
 	}
-	return routeEntry(tables[0], r.region), nil
 }
 
-func routeEntry(table ecs.RouteTableSetType, region string) []*cloudprovider.Route {
-	var routes []*cloudprovider.Route
-	for _, e := range table.RouteEntrys.RouteEntry {
+func (r *RoutesClient) getRouteEntryBatch(tableid string, nextToken string, routes []*cloudprovider.Route) error {
+
+	args := &ecs.DescribeRouteEntryListArgs{
+		RegionId:       r.region,
+		RouteTableId:   tableid,
+		RouteEntryType: "Custom",
+		NextToken:      nextToken,
+	}
+	response, err := r.client.DescribeRouteEntryList(args)
+	if err != nil || response == nil {
+		return fmt.Errorf("describe route entry list error, err %s", err)
+	}
+
+	routeEntries := response.RouteEntrys.RouteEntry
+	if len(routeEntries) <= 0 {
+		return fmt.Errorf("alicloud: cannot find route table, cloud returned zero items, [%s]", tableid)
+	}
+
+	for _, e := range routeEntries {
+
 		//skip none custom route
-		if e.Type != ecs.RouteTableCustom ||
+		if e.Type != string(ecs.RouteTableCustom) ||
+			// skip next hop not equals 1
+			len(e.NextHops.NextHop) != 1 ||
 			// skip none Instance route
-			strings.ToLower(e.NextHopType) != "instance" ||
+			strings.ToLower(e.NextHops.NextHop[0].NextHopType) != "instance" ||
 			// skip DNAT route
 			e.DestinationCidrBlock == "0.0.0.0/0" {
 			continue
 		}
 
 		route := &cloudprovider.Route{
-			Name:            nodeid(region, e.InstanceId),
+			Name:            nodeid(r.region, e.NextHops.NextHop[0].NextHopId),
 			DestinationCIDR: e.DestinationCidrBlock,
-			TargetNode:      types.NodeName(nodeid(region, e.InstanceId)),
+			TargetNode:      types.NodeName(nodeid(r.region, e.NextHops.NextHop[0].NextHopId)),
 		}
 		routes = append(routes, route)
 	}
-	return routes
+	// get next batch
+	if response.NextToken != "" {
+		return r.getRouteEntryBatch(tableid, response.NextToken, routes)
+	}
+	return nil
 }
 
 //RouteTables return all the tables in the vpc network.
@@ -151,13 +165,20 @@ func (r *RoutesClient) RouteTables() ([]string, error) {
 // route.Name will be ignored, although the cloud-provider may use nameHint
 // to create a more user-meaningful name.
 func (r *RoutesClient) CreateRoute(tabid string, route *cloudprovider.Route, region common.Region, vpcid string) error {
-
-	entries, err := r.getRouteEntries(tabid)
-	if err != nil {
-		return fmt.Errorf("CreateRoute:[%s] find route entry error, %s", tabid, err.Error())
+	describeRouteEntryListArgs := &ecs.DescribeRouteEntryListArgs{
+		RegionId:             r.region,
+		RouteTableId:         tabid,
+		RouteEntryType:       "Custom",
+		DestinationCidrBlock: route.DestinationCIDR,
+		NextHopId:            string(route.TargetNode),
+	}
+	response, err := r.client.DescribeRouteEntryList(describeRouteEntryListArgs)
+	if err != nil || response == nil {
+		return fmt.Errorf("describe table %s RouteEntry list error, %s", tabid, err)
 	}
 
-	if isRouteExists(entries, route) {
+	if len(response.RouteEntrys.RouteEntry) > 0 {
+		glog.Infof("CreateRoute: skip exist route, %s -> %s", route.DestinationCIDR, route.TargetNode)
 		return nil
 	}
 
@@ -170,17 +191,6 @@ func (r *RoutesClient) CreateRoute(tabid string, route *cloudprovider.Route, reg
 	}
 	glog.Infof("CreateRoute:[%s] start to create route, %s -> %s", tabid, route.DestinationCIDR, route.TargetNode)
 	return WaitCreate(r, tabid, args)
-}
-
-func isRouteExists(routes []*cloudprovider.Route, route *cloudprovider.Route) bool {
-	for _, r := range routes {
-		if r.DestinationCIDR == route.DestinationCIDR &&
-			strings.Contains(string(r.TargetNode), string(route.TargetNode)) {
-			glog.Infof("CreateRoute: skip exist route, %s -> %s", route.DestinationCIDR, route.TargetNode)
-			return true
-		}
-	}
-	return false
 }
 
 // DeleteRoute deletes the specified managed route
