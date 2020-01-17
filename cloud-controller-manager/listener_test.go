@@ -27,12 +27,14 @@ import (
 
 func TestUpdateListenerPorts(t *testing.T) {
 	prid := nodeid(string(REGION), INSTANCEID)
-	f := NewDefaultFrameWork(
+	f := NewDefaultFrameWork(nil)
+	f.WithService(
 		// initial service based on your definition
 		&v1.Service{
 			ObjectMeta: metav1.ObjectMeta{
-				Name: "https-service",
-				UID:  types.UID(serviceUIDNoneExist),
+				Name:      "my-service",
+				Namespace: "default",
+				UID:       types.UID(serviceUIDNoneExist),
 			},
 			Spec: v1.ServiceSpec{
 				Ports: []v1.ServicePort{
@@ -42,18 +44,15 @@ func TestUpdateListenerPorts(t *testing.T) {
 				SessionAffinity: v1.ServiceAffinityNone,
 			},
 		},
+	).WithNodes(
 		// initial node based on your definition.
 		// backend of the created loadbalancer
 		[]*v1.Node{
 			{
 				ObjectMeta: metav1.ObjectMeta{Name: prid},
-				Spec: v1.NodeSpec{
-					ProviderID: prid,
-				},
+				Spec:       v1.NodeSpec{ProviderID: prid},
 			},
 		},
-		nil,
-		nil,
 	)
 
 	f.RunDefault(t, "With TCP Listener")
@@ -68,12 +67,14 @@ func TestUpdateListenerPorts(t *testing.T) {
 
 func TestUpdateListenerBackendPorts(t *testing.T) {
 	prid := nodeid(string(REGION), INSTANCEID)
-	f := NewDefaultFrameWork(
+	f := NewDefaultFrameWork(nil)
+	f.WithService(
 		// initial service based on your definition
 		&v1.Service{
 			ObjectMeta: metav1.ObjectMeta{
-				Name: "https-service",
-				UID:  types.UID(serviceUIDNoneExist),
+				Name:      "my-service",
+				Namespace: "default",
+				UID:       types.UID(serviceUIDNoneExist),
 			},
 			Spec: v1.ServiceSpec{
 				Ports: []v1.ServicePort{
@@ -83,18 +84,15 @@ func TestUpdateListenerBackendPorts(t *testing.T) {
 				SessionAffinity: v1.ServiceAffinityNone,
 			},
 		},
+	).WithNodes(
 		// initial node based on your definition.
 		// backend of the created loadbalancer
 		[]*v1.Node{
 			{
 				ObjectMeta: metav1.ObjectMeta{Name: prid},
-				Spec: v1.NodeSpec{
-					ProviderID: prid,
-				},
+				Spec:       v1.NodeSpec{ProviderID: prid},
 			},
 		},
-		nil,
-		nil,
 	)
 
 	f.RunDefault(t, "With TCP Listener")
@@ -108,12 +106,14 @@ func TestUpdateListenerBackendPorts(t *testing.T) {
 
 func TestStartLoadBalancerListener(t *testing.T) {
 	prid := nodeid(string(REGION), INSTANCEID)
-	f := NewDefaultFrameWork(
+	f := NewDefaultFrameWork(nil)
+	f.WithService(
 		// initial service based on your definition
 		&v1.Service{
 			ObjectMeta: metav1.ObjectMeta{
-				Name: "https-service",
-				UID:  types.UID(serviceUIDNoneExist),
+				Name:      "my-service",
+				Namespace: "default",
+				UID:       types.UID(serviceUIDNoneExist),
 			},
 			Spec: v1.ServiceSpec{
 				Ports: []v1.ServicePort{
@@ -123,18 +123,15 @@ func TestStartLoadBalancerListener(t *testing.T) {
 				SessionAffinity: v1.ServiceAffinityNone,
 			},
 		},
+	).WithNodes(
 		// initial node based on your definition.
 		// backend of the created loadbalaner
 		[]*v1.Node{
 			{
 				ObjectMeta: metav1.ObjectMeta{Name: prid},
-				Spec: v1.NodeSpec{
-					ProviderID: prid,
-				},
+				Spec:       v1.NodeSpec{ProviderID: prid},
 			},
 		},
-		nil,
-		nil,
 	)
 
 	f.RunDefault(t, "With TCP Listener")
@@ -152,12 +149,14 @@ func TestStartLoadBalancerListener(t *testing.T) {
 
 func TestStopLoadBalancerListener(t *testing.T) {
 	prid := nodeid(string(REGION), INSTANCEID)
-	f := NewDefaultFrameWork(
+	f := NewDefaultFrameWork(nil)
+	f.WithService(
 		// initial service based on your definition
 		&v1.Service{
 			ObjectMeta: metav1.ObjectMeta{
-				Name: "https-service",
-				UID:  types.UID(serviceUIDNoneExist),
+				Name:      "my-service",
+				Namespace: "default",
+				UID:       types.UID(serviceUIDNoneExist),
 			},
 			Spec: v1.ServiceSpec{
 				Ports: []v1.ServicePort{
@@ -167,6 +166,7 @@ func TestStopLoadBalancerListener(t *testing.T) {
 				SessionAffinity: v1.ServiceAffinityNone,
 			},
 		},
+	).WithNodes(
 		// initial node based on your definition.
 		// backend of the created loadbalaner
 		[]*v1.Node{
@@ -177,8 +177,6 @@ func TestStopLoadBalancerListener(t *testing.T) {
 				},
 			},
 		},
-		nil,
-		nil,
 	)
 
 	f.RunDefault(t, "With TCP Listener")

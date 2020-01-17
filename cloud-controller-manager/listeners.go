@@ -111,6 +111,14 @@ type NamedKey struct {
 	Namespace   string
 	ServiceName string
 	Port        int32
+	TargetPort  int32
+}
+
+func (n *NamedKey) String() string {
+	if n == nil {
+		return ""
+	}
+	return n.Key()
 }
 
 // Key key of NamedKey

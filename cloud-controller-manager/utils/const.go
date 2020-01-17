@@ -12,6 +12,10 @@ const (
 	ServiceAnnotationLoadBalancerRemoveUnscheduledBackend = "service.beta.kubernetes.io/alibaba-cloud-loadbalancer-remove-unscheduled-backend"
 	// LabelNodeRoleExcludeNode specifies that the node should be exclude from CCM
 	LabelNodeRoleExcludeNode = "service.beta.kubernetes.io/exclude-node"
+	// LabelNodeRoleExcludeBalancer specifies that the node should be
+	// exclude from loadbalancers created by a cloud provider.
+	LabelNodeRoleExcludeBalancer = "alpha.service-controller.kubernetes.io/exclude-balancer"
+	ECINodeLabel                 = "virtual-kubelet"
 )
 
 func IsENIBackendType(svc *v1.Service) bool {

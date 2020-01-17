@@ -21,24 +21,23 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
-	"k8s.io/cloud-provider-alibaba-cloud/cloud-controller-manager/utils"
-	"os"
-
 	"github.com/denverdino/aliyungo/common"
 	"github.com/denverdino/aliyungo/slb"
 	"github.com/golang/glog"
+	"io"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/informers"
 	"k8s.io/cloud-provider-alibaba-cloud/cloud-controller-manager/controller/node"
 	"k8s.io/cloud-provider-alibaba-cloud/cloud-controller-manager/controller/route"
+	"k8s.io/cloud-provider-alibaba-cloud/cloud-controller-manager/utils"
 	"k8s.io/kubernetes/pkg/cloudprovider"
+	"k8s.io/kubernetes/pkg/controller"
 	ctrlclient "k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/version"
 	"math/rand"
 	"net"
+	"os"
 	"strings"
 	"time"
 )
@@ -56,10 +55,11 @@ var KUBERNETES_ALICLOUD_IDENTITY = fmt.Sprintf("Kubernetes.Alicloud/%s", version
 type Cloud struct {
 	climgr *ClientMgr
 
-	cfg    *CloudConfig
-	region common.Region
-	vpcID  string
-	cid    string
+	cfg      *CloudConfig
+	region   common.Region
+	vpcID    string
+	cid      string
+	ifactory informers.SharedInformerFactory
 }
 
 var (
@@ -236,9 +236,15 @@ func (c *Cloud) Initialize(builder ctrlclient.ControllerClientBuilder) {
 		)
 		go nctrl.Run(stop)
 	}()
-
-	time.Sleep(wait.Jitter(route.Options.ControllerStartInterval.Duration, 1.0))
+	inform := shared.Core().V1().Endpoints().Informer()
 	shared.Start(stop)
+	if !controller.WaitForCacheSync(
+		"service", nil,inform.HasSynced,
+	) {
+		glog.Error("endpoints cache has not been syncd")
+		return
+	}
+	c.ifactory = shared
 }
 
 func syncPeriod() time.Duration {
@@ -274,7 +280,11 @@ func (c *Cloud) GetLoadBalancer(clusterName string, service *v1.Service) (status
 // Implementations must treat the *v1.svc and *v1.Node
 // parameters as read-only and not modify them.
 // Parameter 'clusterName' is the name of the cluster as presented to kube-controller-manager
-func (c *Cloud) EnsureLoadBalancer(clusterName string, service *v1.Service, nodes []*v1.Node) (*v1.LoadBalancerStatus, error) {
+func (c *Cloud) EnsureLoadBalancer(
+	clusterName string,
+	service *v1.Service,
+	nodes []*v1.Node,
+) (*v1.LoadBalancerStatus, error) {
 
 	glog.V(2).Infof("Alicloud.EnsureLoadBalancer(%v, %s/%s, %v, %v)",
 		clusterName, service.Namespace, service.Name, c.region, NodeList(nodes))
@@ -304,65 +314,44 @@ func (c *Cloud) EnsureLoadBalancer(clusterName string, service *v1.Service, node
 			glog.Warningf("vswitch id not found, vpc intranet slb creation would fail")
 		}
 	}
-
-	utils.Logf(service, "using vswitch id=%s", vswitchid)
-
-	lb, err := c.climgr.LoadBalancers().EnsureLoadBalancer(service, ns, vswitchid)
+	// set up endpoints
+	eps, err := c.ifactory.
+		Core().V1().
+		Endpoints().
+		Lister().
+		Endpoints(
+			service.Namespace,
+		).Get(service.Name)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("get available endpoints: %s", err.Error())
 	}
-
-	pz, pzr, err := c.climgr.PrivateZones().EnsurePrivateZoneRecord(service, lb.Address, defaulted.AddressIPVersion)
-	if err != nil {
-		return nil, err
-	}
-
-	return &v1.LoadBalancerStatus{
-		Ingress: []v1.LoadBalancerIngress{
-			{
-				IP:       lb.Address,
-				Hostname: getHostName(pz, pzr),
-			},
-		},
-	}, nil
-}
-
-func (c *Cloud) EnsureLoadBalancerWithENI(name string, service *v1.Service, endpoint *v1.Endpoints) (*v1.LoadBalancerStatus, error) {
-
-	glog.V(2).Infof("Alicloud.EnsureLoadBalancerWithENI(%v, %s/%s, %v, %v)",
-		name, service.Namespace, service.Name, c.region, EndpointIpsList(endpoint))
-	defaulted, _ := ExtractAnnotationRequest(service)
-	if defaulted.AddressType == slb.InternetAddressType {
-		if c.cfg != nil && c.cfg.Global.DisablePublicSLB {
-			return nil, fmt.Errorf("public address SLB is Not allowed")
-		}
-	}
-
-	if len(service.Spec.Ports) == 0 {
-		return nil, fmt.Errorf("requested load balancer with no ports")
-	}
-	vswitchid := defaulted.VswitchID
-	if vswitchid == "" {
-		var err error
-		vswitchid, err = c.climgr.MetaData().VswitchID()
-		if err != nil {
-			return nil, fmt.Errorf("can not obtain vswitchid %s", err)
-		}
-		if vswitchid == "" {
-			glog.Warningf("vswitch id not found, vpc intranet slb creation would fail")
-		}
+	backends := &EndpointWithENI{
+		LocalMode:      ServiceModeLocal(service),
+		Endpoints:      eps,
+		Nodes:          ns,
+		BackendTypeENI: utils.IsENIBackendType(service),
 	}
 
 	utils.Logf(service, "using vswitch id=%s", vswitchid)
 
-	lb, err := c.climgr.LoadBalancers().EnsureLoadBalancer(service, endpoint, vswitchid)
+	// EnsureLoadBalancer with EndpointWithENI
+	lb, err := c.climgr.
+		LoadBalancers().
+		EnsureLoadBalancer(
+			service, backends, vswitchid,
+		)
 	if err != nil {
-		return nil, fmt.Errorf("ensure loadbalancer: %s", err.Error())
+		return nil, err
 	}
 
-	pz, pzr, err := c.climgr.PrivateZones().EnsurePrivateZoneRecord(service, lb.Address, defaulted.AddressIPVersion)
+	// EnsurePrivateZoneRecord
+	pz, pzr, err := c.climgr.
+		PrivateZones().
+		EnsurePrivateZoneRecord(
+			service, lb.Address, defaulted.AddressIPVersion,
+		)
 	if err != nil {
-		return nil, fmt.Errorf("ensure pvtz: %s", err.Error())
+		return nil, err
 	}
 
 	status := &v1.LoadBalancerStatus{
@@ -387,14 +376,24 @@ func (c *Cloud) UpdateLoadBalancer(clusterName string, service *v1.Service, node
 	if err != nil {
 		return err
 	}
-	return c.climgr.LoadBalancers().UpdateLoadBalancer(service, ns, true)
-}
-
-func (c *Cloud) UpdateLoadBalancerWithENI(name string, service *v1.Service, endpoint *v1.Endpoints) error {
-	glog.V(2).Infof("Alicloud.UpdateLoadBalancerWithENI(%v, %v, %v, %v, %v, %v, %v)",
-		name, service.Namespace, service.Name, c.region, service.Spec.LoadBalancerIP, service.Spec.Ports, EndpointIpsList(endpoint))
-
-	return c.climgr.LoadBalancers().UpdateLoadBalancer(service, endpoint, true)
+	// set up endpoints
+	eps, err := c.ifactory.
+		Core().V1().
+		Endpoints().
+		Lister().
+		Endpoints(
+			service.Namespace,
+		).Get(service.Name)
+	if err != nil {
+		return fmt.Errorf("get available endpoints for eni: %s", err.Error())
+	}
+	backends := &EndpointWithENI{
+		LocalMode:      ServiceModeLocal(service),
+		Endpoints:      eps,
+		Nodes:          ns,
+		BackendTypeENI: utils.IsENIBackendType(service),
+	}
+	return c.climgr.LoadBalancers().UpdateLoadBalancer(service, backends, true)
 }
 
 // EnsureLoadBalancerDeleted deletes the specified load balancer if it
@@ -560,9 +559,9 @@ func (c *Cloud) CreateRoute(clusterName string, nameHint string, tableid string,
 func (c *Cloud) DeleteRoute(clusterName string, tableid string, route *cloudprovider.Route) error {
 	glog.V(2).Infof("Alicloud.DeleteRoute(\"%s, %+v\")", clusterName, route)
 
-	region,instid, err := nodeFromProviderID(string(route.TargetNode))
+	region, instid, err := nodeFromProviderID(string(route.TargetNode))
 	if err != nil {
-		return fmt.Errorf("route TargetNode[%s] error: %s",route.TargetNode, err.Error())
+		return fmt.Errorf("route TargetNode[%s] error: %s", route.TargetNode, err.Error())
 	}
 	cRoute := &cloudprovider.Route{
 		Name:            route.Name,
