@@ -108,7 +108,7 @@ func New(routes Routes,
 			kubeClient.CoreV1().RESTClient().GetRateLimiter(),
 		)
 		if err != nil {
-			glog.Warningf("metrics initialized fail. %s",err.Error())
+			glog.Warningf("metrics initialized fail. %s", err.Error())
 		}
 	}
 
@@ -147,13 +147,13 @@ func (rc *RouteController) HandlerForNodeDeletion(
 	informer.AddEventHandler(
 		cache.ResourceEventHandlerFuncs{
 			DeleteFunc: func(nodec interface{}) {
-				node,ok := nodec.(*v1.Node)
+				node, ok := nodec.(*v1.Node)
 				if !ok {
 					glog.Infof("not node type: %s\n", reflect.TypeOf(nodec))
 					return
 				}
 				que.Add(node)
-				glog.Infof("node deletion event: %s, %s",node.Name, node.Spec.ProviderID)
+				glog.Infof("node deletion event: %s, %s", node.Name, node.Spec.ProviderID)
 			},
 		},
 	)
@@ -202,7 +202,7 @@ func (rc *RouteController) Run(stopCh <-chan struct{}, syncPeriod time.Duration)
 					defer que.Done(key)
 					node, ok := key.(*v1.Node)
 					if !ok {
-						glog.Errorf("not type of *v1.Node, %s",reflect.TypeOf(key))
+						glog.Errorf("not type of *v1.Node, %s", reflect.TypeOf(key))
 						return
 					}
 					glog.Infof("[%s] worker: queued sync for node deletion with route", key)
@@ -220,7 +220,7 @@ func (rc *RouteController) Run(stopCh <-chan struct{}, syncPeriod time.Duration)
 	<-stopCh
 }
 
-func(rc *RouteController) syncd(node *v1.Node) error {
+func (rc *RouteController) syncd(node *v1.Node) error {
 	tabs, err := rc.routes.RouteTables(rc.clusterName)
 	if err != nil {
 		return fmt.Errorf("RouteTables: %s", err.Error())
@@ -228,15 +228,15 @@ func(rc *RouteController) syncd(node *v1.Node) error {
 	for _, table := range tabs {
 		route := &cloudprovider.Route{
 			Name:            node.Spec.ProviderID,
-			TargetNode: 	 types.NodeName(node.Spec.ProviderID),
+			TargetNode:      types.NodeName(node.Spec.ProviderID),
 			DestinationCIDR: node.Spec.PodCIDR,
 		}
 		if err := rc.routes.DeleteRoute(
-				rc.clusterName, table, route,
-		   ); err != nil {
+			rc.clusterName, table, route,
+		); err != nil {
 			glog.Errorf(
 				"delete route %s %s from table %s, %s", route.Name, route.DestinationCIDR, table, err.Error())
-			return fmt.Errorf("node deletion, delete route error: %s",err.Error())
+			return fmt.Errorf("node deletion, delete route error: %s", err.Error())
 		}
 		glog.Infof("node deletion: delete route %s %s from table %s SUCCESS.", route.Name, route.DestinationCIDR, table)
 	}
@@ -307,19 +307,20 @@ func (rc *RouteController) sync(table string, nodes []*v1.Node, routes []*cloudp
 		// ignore error return. Try it next time anyway.
 		err := rc.tryCreateRoute(table, node, cached)
 		if err != nil {
-			glog.Errorf("try create route error: %s",err.Error())
+			glog.Errorf("try create route error: %s", err.Error())
 		}
 	}
 	return nil
 }
 
 // RouteCacheMap return cached map for routes
-func RouteCacheMap(routes []*cloudprovider.Route) map[types.NodeName]*cloudprovider.Route {
-	// routeMap maps routeTargetNode->route
-	routeMap := make(map[types.NodeName]*cloudprovider.Route)
+func RouteCacheMap(routes []*cloudprovider.Route) map[string]*cloudprovider.Route {
+	// routeMap maps routeTargetNode+routeDestinationCIDR->route
+	routeMap := make(map[string]*cloudprovider.Route)
 	for _, route := range routes {
-		if route.TargetNode != "" {
-			routeMap[route.TargetNode] = route
+		if route.TargetNode != "" && route.DestinationCIDR != "" {
+			routeKey := fmt.Sprintf("%s-%s", route.TargetNode, route.DestinationCIDR)
+			routeMap[routeKey] = route
 		}
 	}
 	return routeMap
@@ -327,7 +328,7 @@ func RouteCacheMap(routes []*cloudprovider.Route) map[types.NodeName]*cloudprovi
 
 func (rc *RouteController) tryCreateRoute(table string,
 	node *v1.Node,
-	cache map[types.NodeName]*cloudprovider.Route) error {
+	cache map[string]*cloudprovider.Route) error {
 
 	_, condition := v1node.GetNodeCondition(&node.Status, v1.NodeReady)
 	if condition != nil && condition.Status == v1.ConditionUnknown {
@@ -343,13 +344,15 @@ func (rc *RouteController) tryCreateRoute(table string,
 		glog.Warningf("node %s has no node.Spec.ProviderID, skip it", node.Name)
 		return nil
 	}
-	providerID := types.NodeName(node.Spec.ProviderID)
+	providerID := node.Spec.ProviderID
+	destinationCIDR := node.Spec.PodCIDR
 	// Check if we have a route for this node w/ the correct CIDR.
-	r := cache[providerID]
+	routeKey := fmt.Sprintf("%s-%s", providerID, destinationCIDR)
+	r := cache[routeKey]
 	if r == nil || r.DestinationCIDR != node.Spec.PodCIDR {
 		// If not, create the route.
 		route := &cloudprovider.Route{
-			TargetNode:      providerID,
+			TargetNode:      types.NodeName(providerID),
 			DestinationCIDR: node.Spec.PodCIDR,
 		}
 
