@@ -582,9 +582,11 @@ func (v *EndpointWithENI) doBackendBuild(g *vgroup) ([]slb.VBackendServerType, e
 			for _, add := range sub.Addresses {
 				node := findNodeByNodeName(v.Nodes, *add.NodeName)
 				if node == nil {
+					glog.Warningf("can not find correspond node %s for endpoint %s", *add.NodeName, add.IP)
 					continue
 				}
 				if isExcludeNode(node) {
+					// filter vk node
 					continue
 				}
 				_, id, err := nodeFromProviderID(node.Spec.ProviderID)
