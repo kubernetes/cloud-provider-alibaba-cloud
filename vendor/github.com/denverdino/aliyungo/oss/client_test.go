@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"strconv"
 	"sync"
+
 	//"net/http"
 	"testing"
 	"time"
@@ -90,7 +91,7 @@ func TestGetReader(t *testing.T) {
 	}
 }
 
-func aTestGetNotFound(t *testing.T) {
+func TestGetNotFound(t *testing.T) {
 
 	b := client.Bucket("non-existent-bucket")
 	_, err := b.Get("non-existent")
@@ -291,7 +292,7 @@ func TestCopyLargeFile(t *testing.T) {
 		t.Fatalf("Failed for Get file: %v", err)
 	}
 
-	if bytes.Compare(bytes1, bytes2) != 0 {
+	if !bytes.Equal(bytes1, bytes2) {
 		t.Fatal("The result should be equal")
 	}
 }
@@ -327,7 +328,7 @@ func TestCopyLargeFileInParallel(t *testing.T) {
 		t.Fatalf("Failed for Get file: %v", err)
 	}
 
-	if bytes.Compare(bytes1, bytes2) != 0 {
+	if !bytes.Equal(bytes1, bytes2) {
 		t.Fatal("The result should be equal")
 	}
 }
@@ -391,9 +392,9 @@ func TestDelMultiObjects(t *testing.T) {
 
 	b := client.Bucket(TestBucket)
 	objects := []oss.Object{
-		oss.Object{Key: "newname"},
-		oss.Object{Key: "name-sse"},
-		oss.Object{Key: "newname-sse"},
+		{Key: "newname"},
+		{Key: "name-sse"},
+		{Key: "newname-sse"},
 	}
 	err := b.DelMulti(oss.Delete{
 		Quiet:   false,

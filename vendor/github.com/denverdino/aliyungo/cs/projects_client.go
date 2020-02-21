@@ -67,6 +67,14 @@ func (client *ProjectClient) SetUserAgent(userAgent string) {
 	client.userAgent = userAgent
 }
 
+// SetTransport sets transport to the http client
+func (client *ProjectClient) SetTransport(transport http.RoundTripper) {
+	if client.httpClient == nil {
+		client.httpClient = &http.Client{}
+	}
+	client.httpClient.Transport = transport
+}
+
 func (client *ProjectClient) ClusterId() string {
 	return client.clusterId
 }
@@ -135,7 +143,7 @@ func (client *ProjectClient) Invoke(method string, path string, query url.Values
 	if client.debug {
 		var prettyJSON bytes.Buffer
 		err = json.Indent(&prettyJSON, body, "", "    ")
-		log.Println(string(prettyJSON.Bytes()))
+		log.Println(prettyJSON.String())
 	}
 
 	if statusCode >= 400 && statusCode <= 599 {

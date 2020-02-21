@@ -71,6 +71,16 @@ func (client *Client) NewInit(endpoint, version, accessKeyId, accessKeySecret, s
 	client.regionID = regionID
 }
 
+// Initialize properties of a client instance including regionID
+//only for hz regional Domain
+func (client *Client) NewInit4RegionalDomain(endpoint, version, accessKeyId, accessKeySecret, serviceCode string, regionID Region) {
+	client.Init(endpoint, version, accessKeyId, accessKeySecret)
+	client.serviceCode = serviceCode
+	client.regionID = regionID
+
+	client.setEndpoint4RegionalDomain(client.regionID, client.serviceCode, client.AccessKeyId, client.AccessKeySecret, client.securityToken)
+}
+
 // Intialize client object when all properties are ready
 func (client *Client) InitClient() *Client {
 	client.debug = false
@@ -88,6 +98,26 @@ func (client *Client) InitClient() *Client {
 	return client
 }
 
+// Intialize client object when all properties are ready
+//only for regional domain hz
+func (client *Client) InitClient4RegionalDomain() *Client {
+	client.debug = false
+	handshakeTimeout, err := strconv.Atoi(os.Getenv("TLSHandshakeTimeout"))
+	if err != nil {
+		handshakeTimeout = 0
+	}
+	if handshakeTimeout == 0 {
+		client.httpClient = &http.Client{}
+	} else {
+		t := &http.Transport{
+			TLSHandshakeTimeout: time.Duration(handshakeTimeout) * time.Second}
+		client.httpClient = &http.Client{Transport: t}
+	}
+	//set endpoint
+	client.setEndpoint4RegionalDomain(client.regionID, client.serviceCode, client.AccessKeyId, client.AccessKeySecret, client.securityToken)
+	return client
+}
+
 func (client *Client) NewInitForAssumeRole(endpoint, version, accessKeyId, accessKeySecret, serviceCode string, regionID Region, securityToken string) {
 	client.NewInit(endpoint, version, accessKeyId, accessKeySecret, serviceCode, regionID)
 	client.securityToken = securityToken
@@ -96,18 +126,40 @@ func (client *Client) NewInitForAssumeRole(endpoint, version, accessKeyId, acces
 //getLocationEndpoint
 func (client *Client) getEndpointByLocation() string {
 	locationClient := NewLocationClient(client.AccessKeyId, client.AccessKeySecret, client.securityToken)
-	locationClient.SetDebug(false)
+	locationClient.SetDebug(true)
 	return locationClient.DescribeOpenAPIEndpoint(client.regionID, client.serviceCode)
 }
 
 //NewClient using location service
 func (client *Client) setEndpointByLocation(region Region, serviceCode, accessKeyId, accessKeySecret, securityToken string) {
 	locationClient := NewLocationClient(accessKeyId, accessKeySecret, securityToken)
-	locationClient.SetDebug(false)
+	locationClient.SetDebug(true)
 	ep := locationClient.DescribeOpenAPIEndpoint(region, serviceCode)
-	if ep == "" {
-		ep = loadEndpointFromFile(region, serviceCode)
+
+	if ep != "" {
+		client.endpoint = ep
 	}
+}
+
+//only for HangZhou Regional Domain, ecs.cn-hangzhou.aliyuncs.com
+func (client *Client) setEndpoint4RegionalDomain(region Region, serviceCode, accessKeyId, accessKeySecret, securityToken string) {
+	// Unit deployed products, return Regional-Domain directly
+	if regionConfig, ok := SpecialDeployedProducts[serviceCode]; ok {
+		if _, ok := regionConfig[region]; ok {
+			client.endpoint = fmt.Sprintf("https://%s.%s.aliyuncs.com", serviceCode, region)
+			return
+		}
+	}
+
+	for _, service := range RegionalDomainServices {
+		if _, ok := UnitRegions[region]; ok && service == serviceCode {
+			client.endpoint = fmt.Sprintf("https://%s.%s.aliyuncs.com", serviceCode, region)
+			return
+		}
+	}
+	locationClient := NewLocationClient(accessKeyId, accessKeySecret, securityToken)
+	locationClient.SetDebug(true)
+	ep := locationClient.DescribeOpenAPIEndpoint(region, serviceCode)
 
 	if ep != "" {
 		client.endpoint = ep
@@ -257,6 +309,14 @@ func (client *Client) SetSecurityToken(securityToken string) {
 	client.securityToken = securityToken
 }
 
+// SetTransport sets transport to the http client
+func (client *Client) SetTransport(transport http.RoundTripper) {
+	if client.httpClient == nil {
+		client.httpClient = &http.Client{}
+	}
+	client.httpClient.Transport = transport
+}
+
 func (client *Client) initEndpoint() error {
 	// if set any value to "CUSTOMIZED_ENDPOINT" could skip location service.
 	// example: export CUSTOMIZED_ENDPOINT=true
@@ -281,9 +341,9 @@ func (client *Client) Invoke(action string, args interface{}, response interface
 	}
 
 	//init endpoint
-	if err := client.initEndpoint(); err != nil {
-		return err
-	}
+	//if err := client.initEndpoint(); err != nil {
+	//	return err
+	//}
 
 	request := Request{}
 	request.init(client.version, action, client.AccessKeyId, client.securityToken, client.regionID)
@@ -330,12 +390,19 @@ func (client *Client) Invoke(action string, args interface{}, response interface
 	if client.debug {
 		var prettyJSON bytes.Buffer
 		err = json.Indent(&prettyJSON, body, "", "    ")
-		log.Println(string(prettyJSON.Bytes()))
+		if err != nil {
+			log.Printf("Failed in json.Indent: %v\n", err)
+		} else {
+			log.Printf("JSON body: %s\n", prettyJSON.String())
+		}
 	}
 
 	if statusCode >= 400 && statusCode <= 599 {
 		errorResponse := ErrorResponse{}
 		err = json.Unmarshal(body, &errorResponse)
+		if err != nil {
+			log.Printf("Failed in json.Unmarshal: %v\n", err)
+		}
 		ecsError := &Error{
 			ErrorResponse: errorResponse,
 			StatusCode:    statusCode,
@@ -409,12 +476,18 @@ func (client *Client) InvokeByFlattenMethod(action string, args interface{}, res
 	if client.debug {
 		var prettyJSON bytes.Buffer
 		err = json.Indent(&prettyJSON, body, "", "    ")
-		log.Println(string(prettyJSON.Bytes()))
+		if err != nil {
+			log.Printf("Failed in json.Indent: %v\n", err)
+		}
+		log.Println(prettyJSON.String())
 	}
 
 	if statusCode >= 400 && statusCode <= 599 {
 		errorResponse := ErrorResponse{}
 		err = json.Unmarshal(body, &errorResponse)
+		if err != nil {
+			log.Printf("Failed in json.Unmarshal: %v\n", err)
+		}
 		ecsError := &Error{
 			ErrorResponse: errorResponse,
 			StatusCode:    statusCode,
@@ -440,9 +513,9 @@ func (client *Client) InvokeByAnyMethod(method, action, path string, args interf
 	}
 
 	//init endpoint
-	if err := client.initEndpoint(); err != nil {
-		return err
-	}
+	//if err := client.initEndpoint(); err != nil {
+	//	return err
+	//}
 
 	request := Request{}
 	request.init(client.version, action, client.AccessKeyId, client.securityToken, client.regionID)
@@ -498,7 +571,7 @@ func (client *Client) InvokeByAnyMethod(method, action, path string, args interf
 	if client.debug {
 		var prettyJSON bytes.Buffer
 		err = json.Indent(&prettyJSON, body, "", "    ")
-		log.Println(string(prettyJSON.Bytes()))
+		log.Println(prettyJSON.String())
 	}
 
 	if statusCode >= 400 && statusCode <= 599 {

@@ -43,7 +43,7 @@ func TestAddZone(t *testing.T) {
 	err = client.BindZoneVpc(&BindZoneVpcArgs{
 		ZoneId: zoneId,
 		Vpcs: []VPCType{
-			VPCType{
+			{
 				RegionId: common.Beijing,
 				VpcId:    TestVPCId,
 			},
@@ -115,7 +115,7 @@ func testDescribeZoneRecords(t *testing.T, zoneId string) {
 }
 
 func TestDescribeChangeLogs(t *testing.T) {
-	client := NewTestClient()
+	client := NewTestLocationClientForDebug()
 
 	changeLogs, err := client.DescribeChangeLogs(&DescribeChangeLogsArgs{})
 

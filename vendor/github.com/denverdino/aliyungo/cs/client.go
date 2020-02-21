@@ -81,6 +81,14 @@ func (client *Client) SetEndpoint(endpoint string) {
 	client.endpoint = endpoint
 }
 
+// SetTransport sets transport to the http client
+func (client *Client) SetTransport(transport http.RoundTripper) {
+	if client.httpClient == nil {
+		client.httpClient = &http.Client{}
+	}
+	client.httpClient.Transport = transport
+}
+
 type Request struct {
 	Method          string
 	URL             string
@@ -179,7 +187,7 @@ func (client *Client) Invoke(region common.Region, method string, path string, q
 	if client.debug {
 		var prettyJSON bytes.Buffer
 		err = json.Indent(&prettyJSON, body, "", "    ")
-		log.Println(string(prettyJSON.Bytes()))
+		log.Println(prettyJSON.String())
 	}
 
 	if statusCode >= 400 && statusCode <= 599 {
@@ -192,7 +200,7 @@ func (client *Client) Invoke(region common.Region, method string, path string, q
 		return ecsError
 	}
 
-	if response != nil {
+	if response != nil && len(body) > 0 {
 		err = json.Unmarshal(body, response)
 		//log.Printf("%++v", response)
 		if err != nil {

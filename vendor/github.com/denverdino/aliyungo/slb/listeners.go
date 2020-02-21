@@ -109,9 +109,8 @@ type HTTPListenerType struct {
 	XForwardedFor_SLBIP    FlagType
 	XForwardedFor_proto    FlagType
 	Description            string
-
-	AclId 				   string
-	AclStatus			   string
+	AclId                  string
+	AclStatus              string
 	AclType                string
 }
 type CreateLoadBalancerHTTPListenerArgs HTTPListenerType
@@ -168,8 +167,8 @@ type TCPListenerType struct {
 	VServerGroup              FlagType
 	VServerGroupId            string
 	Description               string
-	AclId 					  string
-	AclStatus				  string
+	AclId                     string
+	AclStatus                 string
 	AclType                   string
 }
 
@@ -201,9 +200,9 @@ type UDPListenerType struct {
 	VServerGroupId            string
 	Description               string
 
-	AclId 					  string
-	AclStatus				  string
-	AclType                   string
+	AclId     string
+	AclStatus string
+	AclType   string
 }
 type CreateLoadBalancerUDPListenerArgs UDPListenerType
 

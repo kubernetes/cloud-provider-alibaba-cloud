@@ -187,7 +187,7 @@ func (r *RoutesClient) CreateRoute(tabid string, route *cloudprovider.Route, reg
 		ClientToken:          "",
 		RouteTableId:         tabid,
 		DestinationCidrBlock: route.DestinationCIDR,
-		NextHopType:          ecs.NextHopIntance,
+		NextHopType:          ecs.NextHopInstance,
 		NextHopId:            string(route.TargetNode),
 	}
 	glog.Infof("CreateRoute:[%s] start to create route, %s -> %s", tabid, route.DestinationCIDR, route.TargetNode)
