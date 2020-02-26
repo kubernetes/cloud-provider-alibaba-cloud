@@ -9,7 +9,7 @@ import (
 func Logf(svc *v1.Service, format string, args ...interface{}) {
 	prefix := ""
 	if svc != nil {
-		prefix = fmt.Sprintf("[%s/%s]", svc.Namespace, svc.Name)
+		prefix = fmt.Sprintf("[%s/%s] ", svc.Namespace, svc.Name)
 	}
 	glog.Infof(prefix+format, args...)
 }

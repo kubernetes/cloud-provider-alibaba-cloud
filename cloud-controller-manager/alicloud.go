@@ -190,7 +190,7 @@ func (c *Cloud) Initialize(builder ctrlclient.ControllerClientBuilder) {
 	if route.Options.ConfigCloudRoutes {
 		cidr := route.Options.ClusterCIDR
 		if len(strings.TrimSpace(cidr)) == 0 {
-			panic(fmt.Sprintf("ivalid cluster CIDR %s", cidr))
+			panic(fmt.Sprintf("invalid cluster CIDR %s", cidr))
 		}
 		_, cidrc, err := net.ParseCIDR(cidr)
 		if err != nil {
@@ -560,9 +560,9 @@ func (c *Cloud) CreateRoute(clusterName string, nameHint string, tableid string,
 func (c *Cloud) DeleteRoute(clusterName string, tableid string, route *cloudprovider.Route) error {
 	glog.V(2).Infof("Alicloud.DeleteRoute(\"%s, %+v\")", clusterName, route)
 
-	region,instid, err := nodeFromProviderID(string(route.TargetNode))
+	region, instid, err := nodeFromProviderID(string(route.TargetNode))
 	if err != nil {
-		return fmt.Errorf("route TargetNode[%s] error: %s",route.TargetNode, err.Error())
+		return fmt.Errorf("route TargetNode[%s] error: %s", route.TargetNode, err.Error())
 	}
 	cRoute := &cloudprovider.Route{
 		Name:            route.Name,

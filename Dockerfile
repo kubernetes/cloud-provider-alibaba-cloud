@@ -13,4 +13,4 @@ RUN apk add --no-cache --update ca-certificates
 
 COPY --from=builder /go/bin/cloudprovider /cloud-controller-manager
 
-ENTRYPOINT  ["/cloud-controller-manager"]
+ENTRYPOINT ["/cloud-controller-manager"]

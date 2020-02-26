@@ -85,8 +85,12 @@ e2etest:
             --cloud-config /root/.kube/config.cloud'
 
 
-image: cloud-controller-manager-$(ARCH)
-	docker build -t $(REGISTRY):$(TAG) .
+image: pre-requisite
+	docker build --build-arg tag=$(TAG) -t $(REGISTRY):$(TAG) .
+
+cross-image: cloud-controller-manager-$(ARCH)
+	mv build/cloud-controller-manager-$(ARCH) build/cloud-controller-manager
+	docker build -f Dockerfile.cross -t $(REGISTRY):$(TAG) build/
 
 docker-push:
 	docker push $(REGISTRY):$(TAG)

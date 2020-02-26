@@ -210,10 +210,10 @@ func (con *Controller) HandlerForNodesChange(
 					return true
 				}
 				if !isProcessNeeded(svc) {
-					utils.Logf(svc, "node change: class not empty, skip process ")
+					utils.Logf(svc, "node change: class not empty, skip process")
 					return true
 				}
-				utils.Logf(svc, "node change: enque service")
+				utils.Logf(svc, "node change: enqueue service")
 				Enqueue(que, key(svc))
 				return true
 			},
@@ -263,7 +263,7 @@ func (con *Controller) HandlerForEndpointChange(
 			}
 		}
 		if !isProcessNeeded(svc) {
-			utils.Logf(svc, "endpoint: class not empty, skip process ")
+			utils.Logf(svc, "endpoint: class not empty, skip process")
 			return
 		}
 		if !NeedLoadBalancer(svc) {
@@ -297,9 +297,14 @@ func (con *Controller) HandlerForServiceChange(
 	informer cache.SharedIndexInformer,
 	record record.EventRecorder,
 ) {
-	syncService := func(svc *v1.Service) {
+	syncService := func(svc *v1.Service, checkNeed bool) {
 		if !isProcessNeeded(svc) {
 			utils.Logf(svc, "class not empty, skip process")
+			return
+		}
+		if checkNeed && !NeedLoadBalancer(svc) {
+			// we are safe here to skip process.
+			utils.Logf(svc, "service change: loadBalancer is not needed, skip")
 			return
 		}
 		Enqueue(que, key(svc))
@@ -314,7 +319,7 @@ func (con *Controller) HandlerForServiceChange(
 					return
 				}
 				utils.Logf(svc, "service addiontion event received %s", reflect.TypeOf(svc))
-				syncService(svc)
+				syncService(svc, true)
 			},
 			UpdateFunc: func(old, cur interface{}) {
 				oldd, ok1 := old.(*v1.Service)
@@ -322,7 +327,8 @@ func (con *Controller) HandlerForServiceChange(
 				if ok1 && ok2 &&
 					NeedUpdate(oldd, curr, record) {
 					utils.Logf(curr, "service update event")
-					syncService(curr)
+					// if service type changed, we will need to create or delete loadBalancer
+					syncService(curr, false)
 				}
 			},
 			DeleteFunc: func(cur interface{}) {
@@ -334,7 +340,7 @@ func (con *Controller) HandlerForServiceChange(
 				utils.Logf(svc, "controller: service deletion received, %s", utils.PrettyJson(svc))
 				// recorder service in local context
 				context.Set(key(svc), svc)
-				syncService(svc)
+				syncService(svc, true)
 			},
 		},
 		SERVICE_SYNC_PERIOD,

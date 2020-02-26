@@ -28,7 +28,7 @@ type vgroup struct {
 func (v *vgroup) Logf(format string, args ...interface{}) {
 	prefix := ""
 	if v.NamedKey != nil {
-		prefix = fmt.Sprintf("[%s/%s]", v.NamedKey.Namespace, v.NamedKey.ServiceName)
+		prefix = fmt.Sprintf("[%s/%s] ", v.NamedKey.Namespace, v.NamedKey.ServiceName)
 	}
 	glog.Infof(prefix+format, args...)
 }

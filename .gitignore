@@ -1,5 +1,6 @@
+.DS_Store
 .idea
-./build/alicloud-controller-manager
+/build/
 projectFilesBackup/
 
 alicloud-controller-manager

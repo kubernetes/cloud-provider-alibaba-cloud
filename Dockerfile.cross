@@ -1,0 +1,8 @@
+############# cloud controller manager #############
+FROM alpine:3.10
+
+RUN apk add --no-cache --update ca-certificates
+
+COPY cloud-controller-manager /cloud-controller-manager
+
+ENTRYPOINT ["/cloud-controller-manager"]
