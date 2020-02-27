@@ -580,6 +580,9 @@ func (v *EndpointWithENI) doBackendBuild(g *vgroup) ([]slb.VBackendServerType, e
 		// 1. add duplicate ecs backends
 		for _, sub := range v.Endpoints.Subsets {
 			for _, add := range sub.Addresses {
+				if add.NodeName == nil {
+					return nil, fmt.Errorf("NodeName is nil. Endpoint must have NodeName on local mode. ")
+				}
 				node := findNodeByNodeName(v.Nodes, *add.NodeName)
 				if node == nil {
 					glog.Warningf("can not find correspond node %s for endpoint %s", *add.NodeName, add.IP)
