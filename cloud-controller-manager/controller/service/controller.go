@@ -22,7 +22,6 @@ import (
 	"k8s.io/kubernetes/pkg/util/metrics"
 	"k8s.io/kubernetes/staging/src/k8s.io/client-go/util/workqueue"
 	"reflect"
-	"strconv"
 	"strings"
 	"time"
 )
@@ -35,28 +34,10 @@ const (
 
 	LabelNodeRoleMaster = "node-role.kubernetes.io/master"
 
-	// LabelNodeRoleExcludeBalancer specifies that the node should be
-	// exclude from load balancers created by a cloud provider.
-	LabelNodeRoleExcludeBalancer = "alpha.service-controller.kubernetes.io/exclude-balancer"
-	CCM_CLASS                    = "service.beta.kubernetes.io/class"
+	CCM_CLASS = "service.beta.kubernetes.io/class"
 )
 
 const TRY_AGAIN = "try again"
-
-type EnsureENI interface {
-	// EnsureLoadbalancerWithENI
-	// creates a new load balancer 'name', or updates the existing one. Returns the
-	// status of the balancer. Implementations must treat the *v1.svc and *v1.Endpoints
-	// parameters as read-only and not modify them.
-	// Parameter 'name' is the name of the cluster as presented to kube-controller-manager
-	EnsureLoadBalancerWithENI(name string, svc *v1.Service, endpoint *v1.Endpoints) (*v1.LoadBalancerStatus, error)
-
-	// UpdateLoadBalancerWithENI updates hosts under the specified load balancer.
-	// Implementations must treat the *v1.Service and *v1.Enodpoints
-	// parameters as read-only and not modify them.
-	// Parameter 'name' is the name of the cluster as presented to kube-controller-manager
-	UpdateLoadBalancerWithENI(name string, service *v1.Service, endpoint *v1.Endpoints) error
-}
 
 type Controller struct {
 	cloud       cloudprovider.LoadBalancer
@@ -542,42 +523,25 @@ func (con *Controller) update(cached, svc *v1.Service) error {
 		// continue for updating service status.
 		newm = &v1.LoadBalancerStatus{}
 	} else {
-
 		utils.Logf(svc, "start to ensure loadbalancer")
-		var (
-			err error
-		)
-		if utils.IsENIBackendType(svc) {
-			// Ensure ENI type backend
-			eni, ok := con.cloud.(EnsureENI)
-			if !ok {
-				return fmt.Errorf("cloud does not implement EnsureENI interface")
-			}
-			var eps *v1.Endpoints
-			eps, err = con.ifactory.Core().V1().Endpoints().Lister().Endpoints(svc.Namespace).Get(svc.Name)
-			if err != nil {
-				return fmt.Errorf("get available endpoints for eni: %s", err.Error())
-			}
-			newm, err = eni.EnsureLoadBalancerWithENI(con.clusterName, svc, eps)
-		} else {
-			var nodes []*v1.Node
-			nodes, err = AvailableNodes(svc, con.ifactory)
-			if err != nil {
-				return fmt.Errorf("error get available nodes %s", err.Error())
-			}
-			// Fire warning event if there are no available nodes
-			// for loadbalancer service
-			if len(nodes) == 0 {
-				con.recorder.Eventf(
-					svc,
-					v1.EventTypeWarning,
-					"UnAvailableLoadBalancer",
-					"There are no available backend loadbalancer nodes for service %s",
-					key(svc),
-				)
-			}
-			newm, err = con.cloud.EnsureLoadBalancer(con.clusterName, svc, nodes)
+
+		nodes, err := AvailableNodes(svc, con.ifactory)
+		if err != nil {
+			return fmt.Errorf("error get available nodes %s", err.Error())
 		}
+		// Fire warning event if there are no available nodes
+		// for loadbalancer service
+		if len(nodes) == 0 {
+			con.recorder.Eventf(
+				svc,
+				v1.EventTypeWarning,
+				"UnAvailableLoadBalancer",
+				"There are no available backend loadbalancer nodes for service %s",
+				key(svc),
+			)
+		}
+		newm, err = con.cloud.EnsureLoadBalancer(con.clusterName, svc, nodes)
+
 		if err != nil {
 			return fmt.Errorf("ensure loadbalancer error: %s", err)
 		}
@@ -693,19 +657,12 @@ func AvailableNodes(
 	if err != nil {
 		return nil, fmt.Errorf("error get predicate: %s", err.Error())
 	}
-	nodes, err := ifactory.
+	return ifactory.
 		Core().
 		V1().
 		Nodes().
 		Lister().
 		ListWithPredicate(predicate)
-	if err != nil {
-		return nodes, err
-	}
-	if ServiceModeLocal(svc) {
-		nodes, err = AvailableNodeModeLocal(nodes, svc, ifactory)
-	}
-	return nodes, err
 }
 
 func NodeConditionPredicate(svc *v1.Service) (corelisters.NodeConditionPredicate, error) {
@@ -723,15 +680,6 @@ func NodeConditionPredicate(svc *v1.Service) (corelisters.NodeConditionPredicate
 		// it unschedulable. Recognize nodes labeled as master, and filter
 		// them also, as we were doing previously.
 		if _, isMaster := node.Labels[LabelNodeRoleMaster]; isMaster {
-			return false
-		}
-
-		if _, exclude := node.Labels[utils.LabelNodeRoleExcludeNode]; exclude {
-			return false
-		}
-
-		if _, exclude := node.Labels[LabelNodeRoleExcludeBalancer]; exclude {
-			utils.Logf(svc, "ignore node with exclude label %s", node.Name)
 			return false
 		}
 
@@ -754,52 +702,4 @@ func NodeConditionPredicate(svc *v1.Service) (corelisters.NodeConditionPredicate
 	}
 
 	return predicate, nil
-}
-
-func AvailableNodeModeLocal(nodes []*v1.Node, svc *v1.Service,
-	ifactory informers.SharedInformerFactory) ([]*v1.Node, error) {
-	var (
-		availableNodes    []*v1.Node
-		records           []string
-		availableNodesMap = make(map[string]float64)
-		endpoints         = ifactory.Core().V1().Endpoints().Lister()
-		podNum            = 0.0
-	)
-
-	ep, err := endpoints.Endpoints(svc.Namespace).Get(svc.Name)
-	if err != nil {
-		return nil, fmt.Errorf("find endpoints for service "+
-			"[%s] with error [%s]", key(svc), err.Error())
-	}
-
-	utils.Logf(svc, "endpoint has [%d] subsets. ", len(ep.Subsets))
-	for _, sub := range ep.Subsets {
-		for _, add := range sub.Addresses {
-			if add.NodeName == nil {
-				return nil, fmt.Errorf("NodeName is nil. Endpoint must have NodeName on local mode. ")
-			}
-			utils.Logf(svc, "prepare to add node [%s] for service backend", *add.NodeName)
-			if _, exist := availableNodesMap[*add.NodeName]; !exist {
-				availableNodesMap[*add.NodeName] = 1
-			} else {
-				availableNodesMap[*add.NodeName] += 1
-			}
-		}
-	}
-
-	for _, node := range nodes {
-		if _, exist := availableNodesMap[node.Name]; exist {
-			availNode := node.DeepCopy()
-			availableNodes = append(availableNodes, availNode)
-			podNum += availableNodesMap[availNode.Name]
-			records = append(records, availNode.Name)
-		}
-	}
-
-	utils.Logf(svc, "predicate: local mode service should accept node %v for service\n", records)
-
-	for _, node := range availableNodes {
-		node.Labels["weight"] = strconv.Itoa(int(availableNodesMap[node.Name] / podNum * 100.0))
-	}
-	return availableNodes, nil
 }

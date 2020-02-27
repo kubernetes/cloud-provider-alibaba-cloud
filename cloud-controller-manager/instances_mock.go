@@ -24,17 +24,18 @@ func WithNewInstanceStore() CloudDataMock {
 }
 
 const (
-	ENI_ID     = "eni-abcdef1122344"
+	ENI_ID_1   = "eni-19216801"
 	ENI_ADDR_1 = "192.168.0.1"
+	ENI_ID_2   = "eni-19216802"
 	ENI_ADDR_2 = "192.168.0.2"
 )
 
 func WithENI() CloudDataMock {
 	return func() {
 		INSTANCE.enis.Store(
-			fmt.Sprintf("%s/%s/%s", VPCID, ENI_ID, ENI_ADDR_1),
+			fmt.Sprintf("%s/%s/%s", VPCID, ENI_ID_1, ENI_ADDR_1),
 			ecs.NetworkInterfaceType{
-				NetworkInterfaceId: ENI_ID,
+				NetworkInterfaceId: ENI_ID_1,
 				PrivateIpSets: struct {
 					PrivateIpSet []ecs.PrivateIpType
 				}{
@@ -48,9 +49,9 @@ func WithENI() CloudDataMock {
 			},
 		)
 		INSTANCE.enis.Store(
-			fmt.Sprintf("%s/%s/%s", VPCID, ENI_ID, ENI_ADDR_2),
+			fmt.Sprintf("%s/%s/%s", VPCID, ENI_ID_2, ENI_ADDR_2),
 			ecs.NetworkInterfaceType{
-				NetworkInterfaceId: ENI_ID,
+				NetworkInterfaceId: ENI_ID_2,
 				PrivateIpSets: struct {
 					PrivateIpSet []ecs.PrivateIpType
 				}{

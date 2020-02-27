@@ -1,12 +1,12 @@
 package slb
 
 import (
-	"testing"
 	"encoding/json"
+	"testing"
+
+	"fmt"
 
 	"github.com/denverdino/aliyungo/common"
-	"fmt"
-	"github.com/denverdino/aliyungo/util"
 )
 
 var client = NewClient("your accessId", "your accessId secret")
@@ -59,16 +59,16 @@ func TestCreateVServerGroup(t *testing.T) {
 
 func TestDescribeVServerGroups(t *testing.T) {
 	arg := &DescribeVServerGroupsArgs{
-		LoadBalancerId:loadBalancerId,
-		RegionId:	region,
+		LoadBalancerId:  loadBalancerId,
+		RegionId:        region,
 		IncludeListener: true,
-		IncludeRule: true,
+		IncludeRule:     true,
 	}
 	response, err := client.DescribeVServerGroups(arg)
 	if err != nil {
 		t.Error(err)
 	} else {
-		fmt.Printf(util.PrettyJson(response))
+		fmt.Println(PrettyJson(response))
 	}
 }
 

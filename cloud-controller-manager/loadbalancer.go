@@ -297,7 +297,7 @@ func equalsAddressIPVersion(request, origined slb.AddressIPVersionType) bool {
 }
 
 // EnsureLoadBalancer make sure slb is reconciled nodes []*v1.Node
-func (s *LoadBalancerClient) EnsureLoadBalancer(service *v1.Service, nodes interface{}, vswitchid string) (*slb.LoadBalancerType, error) {
+func (s *LoadBalancerClient) EnsureLoadBalancer(service *v1.Service, nodes *EndpointWithENI, vswitchid string) (*slb.LoadBalancerType, error) {
 	utils.Logf(service, "ensure loadbalancer with service details, \n%+v", PrettyJson(service))
 
 	exists, origined, err := s.findLoadBalancer(service)
@@ -319,7 +319,7 @@ func (s *LoadBalancerClient) EnsureLoadBalancer(service *v1.Service, nodes inter
 		if isLoadbalancerOwnIngress(service) {
 			return nil, fmt.Errorf("alicloud: not able to find loadbalancer "+
 				"named [%s] in openapi, but it's defined in service.loaderbalancer.ingress. "+
-				"this may happen when you removed loadbalancerid annotation.", service.Name)
+				"this may happen when you removed loadbalancerid annotation", service.Name)
 		}
 		if request.Loadbalancerid != "" {
 			return nil, fmt.Errorf("alicloud: user specified "+
@@ -441,7 +441,7 @@ func (s *LoadBalancerClient) EnsureLoadBalancer(service *v1.Service, nodes inter
 		origined, derr = s.c.DescribeLoadBalancerAttribute(origined.LoadBalancerId)
 	}
 	if derr != nil {
-		glog.Errorf("alicloud: can not get loadbalancer[%s] attribute. ", origined.LoadBalancerId)
+		utils.Logf(service, "alicloud: can not get loadbalancer attribute. ")
 		return nil, err
 	}
 	vgs := BuildVirturalGroupFromService(s, service, origined)
@@ -476,7 +476,7 @@ func isLoadBalancerCreatedByKubernetes(tags []slb.TagItemType) bool {
 }
 
 //UpdateLoadBalancer make sure slb backend is reconciled
-func (s *LoadBalancerClient) UpdateLoadBalancer(service *v1.Service, nodes interface{}, withVgroup bool) error {
+func (s *LoadBalancerClient) UpdateLoadBalancer(service *v1.Service, nodes *EndpointWithENI, withVgroup bool) error {
 
 	exists, lb, err := s.findLoadBalancer(service)
 	if err != nil {

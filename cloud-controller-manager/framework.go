@@ -8,8 +8,14 @@ import (
 	"github.com/denverdino/aliyungo/pvtz"
 	"github.com/denverdino/aliyungo/slb"
 	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/client-go/informers"
+	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/cloud-provider-alibaba-cloud/cloud-controller-manager/utils"
+	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/service"
 	"sort"
 	"strconv"
@@ -51,6 +57,7 @@ func PreSetCloudData(sets ...CloudDataMock) {
 var (
 	INSTANCEID  = "i-xlakjbidlslkcdxxxx"
 	INSTANCEID2 = "i-xlakjbidlslkcdxxxx2"
+	ADDRESS     = "192.168.1.1"
 )
 
 var (
@@ -166,9 +173,6 @@ func newMockCloudWithSDK(
 }
 
 func NewDefaultFrameWork(
-	svc *v1.Service,
-	nodes []*v1.Node,
-	endpoint *v1.Endpoints,
 	preset func(),
 ) *FrameWork {
 	if preset == nil {
@@ -179,7 +183,7 @@ func NewDefaultFrameWork(
 	if err != nil {
 		panic(err)
 	}
-	return NewFrameWork(cloud, svc, nodes, endpoint, nil)
+	return NewFrameWork(cloud, nil, nil, nil, nil)
 }
 
 func NewFrameWork(
@@ -191,6 +195,55 @@ func NewFrameWork(
 ) *FrameWork {
 	if preset != nil {
 		preset()
+	}
+	// set default service
+	if svc == nil {
+		svc = &v1.Service{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "my-service",
+				Namespace: "default",
+				UID:       types.UID("UID-1234567890-0987654321-1234556"),
+			},
+			Spec: v1.ServiceSpec{
+				Ports: []v1.ServicePort{
+					{Port: 80, TargetPort: intstr.FromInt(8080), Protocol: v1.ProtocolTCP, NodePort: 8080},
+				},
+				Type:            v1.ServiceTypeLoadBalancer,
+				SessionAffinity: v1.ServiceAffinityNone,
+			},
+		}
+	}
+
+	prid := nodeid(string(REGION), INSTANCEID)
+	// set default nodes
+	if nodes == nil {
+		nodes = []*v1.Node{
+			{
+				ObjectMeta: metav1.ObjectMeta{Name: prid},
+				Spec: v1.NodeSpec{
+					ProviderID: prid,
+				},
+			},
+		}
+	}
+	// set default endpoint
+	if endpoint == nil {
+		endpoint = &v1.Endpoints{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "my-service",
+				Namespace: "default",
+			},
+			Subsets: []v1.EndpointSubset{
+				{
+					Addresses: []v1.EndpointAddress{
+						{
+							IP:       ADDRESS,
+							NodeName: &prid,
+						},
+					},
+				},
+			},
+		}
 	}
 	return &FrameWork{
 		Cloud:    cloud,
@@ -218,6 +271,12 @@ type FrameWork struct {
 	CloudDataMock func()
 }
 
+func (f *FrameWork) WithNodes(node []*v1.Node) *FrameWork { f.Nodes = node; return f }
+
+func (f *FrameWork) WithEndpoints(endp *v1.Endpoints) *FrameWork { f.Endpoint = endp; return f }
+
+func (f *FrameWork) WithService(svc *v1.Service) *FrameWork { f.SVC = svc; return f }
+
 func (f *FrameWork) CloudImpl() *Cloud                 { return f.Cloud }
 func (f *FrameWork) Instance() *InstanceClient         { return f.Cloud.climgr.Instances() }
 func (f *FrameWork) Route() *RoutesClient              { return f.Cloud.climgr.Routes() }
@@ -234,48 +293,102 @@ func (f *FrameWork) RunDefault(
 	t *testing.T,
 	describe string,
 ) {
-	f.Run(t, describe, "ecs", nil)
-}
 
-func (f *FrameWork) RunWithENI(
-	t *testing.T,
-	describe string,
-) {
-	f.Run(t, describe, "eni", nil)
-}
-
-func (f *FrameWork) Run(
-	t *testing.T,
-	describe string,
-	ntype string,
-	run func(),
-) {
-	t.Log(describe)
-	if run == nil {
-		run = func() {
-			var (
-				err    error
-				status *v1.LoadBalancerStatus
-			)
-			switch ntype {
-			case "eni":
-				status, err = f.Cloud.EnsureLoadBalancerWithENI(CLUSTER_ID, f.SVC, f.Endpoint)
-			case "ecs":
-				status, err = f.Cloud.EnsureLoadBalancer(CLUSTER_ID, f.SVC, f.Nodes)
-			}
-			if err != nil {
-				t.Fatalf("EnsureLoadBalancer error: %s\n", err.Error())
-			}
-			if err := ExpectExistAndEqual(f); err != nil {
-				t.Fatalf("test fail, expect equal, %s", err.Error())
-			}
-
-			if status == nil || len(status.Ingress) <= 0 {
-				t.Fatalf("status nil")
-			}
-		}
+	t.Log(fmt.Sprintf("RunDefault: %s, start", describe))
+	err := f.Run(nil)
+	if err != nil {
+		t.Fatalf("RunDefault: %s, %s", describe, err.Error())
 	}
-	run()
+}
+
+func (f *FrameWork) RunCustomized(
+	t *testing.T,
+	describe string,
+	custom CustomizedTest,
+) {
+
+	t.Log(describe)
+	err := f.Run(custom)
+	if err != nil {
+		t.Fatalf("RunCustomized: %s, %s", describe, err.Error())
+	}
+}
+
+func (f *FrameWork) Run(run CustomizedTest) error {
+	//
+	// initialize shared informer factory before run any test.
+	f.Cloud.ifactory = informers.NewSharedInformerFactory(
+		fake.NewSimpleClientset(f.Endpoint, f.SVC), 0,
+	)
+	// set informer
+	inform := f.Cloud.ifactory.Core().V1().Endpoints().Informer()
+	f.Cloud.ifactory.Start(nil)
+
+	if !controller.WaitForCacheSync(
+		"service", nil, inform.HasSynced,
+	) {
+		return fmt.Errorf("unable to initialize endpoint informer")
+	}
+
+	err := debug(f.Cloud.ifactory, f.SVC.Name, false)
+	if err != nil {
+		fmt.Printf("debug: %s\n", err.Error())
+	}
+
+	// override run if user defined specific test method
+	if run != nil {
+		// run customized testing
+		// see DefaultTesting for more details.
+		// usually,  call sequence:
+		// 		EnsureLoadBalancer -> ExpectExistAndEqual -> Assert
+		return run(f)
+	}
+	return DefaultTesting(f)
+}
+
+type CustomizedTest func(f *FrameWork) error
+
+func DefaultTesting(f *FrameWork) error {
+	status, err := f.CloudImpl().
+		EnsureLoadBalancer(CLUSTER_ID, f.SVC, f.Nodes)
+	if err != nil {
+		return fmt.Errorf("EnsureLoadBalancer error: %s", err.Error())
+	}
+	if err := ExpectExistAndEqual(f); err != nil {
+		return fmt.Errorf("test fail, expect equal, %s", err.Error())
+	}
+
+	if status == nil || len(status.Ingress) <= 0 {
+		return fmt.Errorf("ingress status should not be nil: %v", status)
+	}
+	return nil
+}
+
+func debug(ifactory informers.SharedInformerFactory, name string, do bool) error {
+	if !do {
+		return nil
+	}
+	all, err := ifactory.
+		Core().V1().
+		Endpoints().
+		Lister().
+		Endpoints("default").
+		List(labels.NewSelector())
+	//if err != nil {
+	//	return fmt.Errorf("list: %s",err.Error())
+	//}
+	fmt.Printf("AllObject: %v\n", utils.PrettyJson(all))
+	endp, err := ifactory.
+		Core().V1().
+		Endpoints().
+		Lister().
+		Endpoints("default").
+		Get(name)
+	if err != nil {
+		return fmt.Errorf("list: %s", err.Error())
+	}
+	fmt.Printf("GetObejct: %v\n", utils.PrettyJson(endp))
+	return nil
 }
 
 // service & Cloud data must be consistent
@@ -284,7 +397,7 @@ func ExpectExistAndEqual(f *FrameWork) error {
 	exist, mlb, err := f.LoadBalancer().findLoadBalancer(f.SVC)
 	// 1. slb must exist
 	if err != nil || !exist {
-		return fmt.Errorf("slb not found, %v, %v", exist, err)
+		return fmt.Errorf("slb must exist: %v, %v", exist, err)
 	}
 
 	// 1. port length equal
@@ -991,7 +1104,7 @@ func ExpectNotExist(f *FrameWork) error {
 func ExpectExist(f *FrameWork) error {
 	exist, _, err := f.LoadBalancer().findLoadBalancer(f.SVC)
 	if err != nil || !exist {
-		return fmt.Errorf("slb should exist: %v, %t", err, exist)
+		return fmt.Errorf("ExpectExist: slb should exist, %v, %t", err, exist)
 	}
 	return nil
 }
@@ -999,7 +1112,7 @@ func ExpectExist(f *FrameWork) error {
 func ExpectAddressTypeNotEqual(f *FrameWork) error {
 	exist, mlb, err := f.LoadBalancer().findLoadBalancer(f.SVC)
 	if err != nil || !exist {
-		return fmt.Errorf("slb not found, %v, %v", exist, err)
+		return fmt.Errorf("ExpectAddressTypeNotEqual: slb should exist, isExist=%v, %v", exist, err)
 	}
 	defd, _ := ExtractAnnotationRequest(f.SVC)
 	if f.hasAnnotation(ServiceAnnotationLoadBalancerAddressType) {

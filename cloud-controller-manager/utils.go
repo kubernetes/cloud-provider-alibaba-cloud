@@ -129,3 +129,7 @@ func Contains(list []int, x int) bool {
 func newid() string {
 	return fmt.Sprintf("lb-%s", strings.ToLower(uuid.Generate().String())[0:15])
 }
+
+func ServiceModeLocal(svc *v1.Service) bool {
+	return svc.Spec.ExternalTrafficPolicy == v1.ServiceExternalTrafficPolicyTypeLocal
+}

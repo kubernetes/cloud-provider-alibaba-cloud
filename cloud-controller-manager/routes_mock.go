@@ -32,6 +32,7 @@ type mockRouteSDK struct {
 	deleteRouteEntry                func(args *ecs.DeleteRouteEntryArgs) error
 	createRouteEntry                func(args *ecs.CreateRouteEntryArgs) error
 	waitForAllRouteEntriesAvailable func(vrouterId string, routeTableId string, timeout int) error
+	describeRouteEntryList          func(args *ecs.DescribeRouteEntryListArgs) (response *ecs.DescribeRouteEntryListResponse, err error)
 }
 
 func WithNewRouteStore() CloudDataMock {
@@ -221,4 +222,46 @@ func (m *mockRouteSDK) WaitForAllRouteEntriesAvailable(vrouterId string, routeTa
 		return m.waitForAllRouteEntriesAvailable(vrouterId, routeTableId, timeout)
 	}
 	return nil
+}
+
+func (m *mockRouteSDK) DescribeRouteEntryList(args *ecs.DescribeRouteEntryListArgs) (response *ecs.DescribeRouteEntryListResponse, err error) {
+	if m.describeRouteEntryList != nil {
+		return m.describeRouteEntryList(args)
+	}
+	response = &ecs.DescribeRouteEntryListResponse{}
+	if args.RouteTableId == "" {
+		return nil, fmt.Errorf("no routetalbeid specified")
+	}
+	vrouter, ok := ROUTES.tables.Load(args.RouteTableId)
+	if !ok {
+		return response, nil
+	}
+	result, ok := vrouter.(ecs.RouteTableSetType)
+	if !ok {
+		return response, fmt.Errorf("not type ecs.RouteTableSetType %s", reflect.TypeOf(vrouter))
+	}
+
+	for _, e := range result.RouteEntrys.RouteEntry {
+		routeEntry := ecs.RouteEntry{
+			DestinationCidrBlock: e.DestinationCidrBlock,
+			IpVersion:            "",
+			RouteEntryId:         "",
+			RouteEntryName:       "",
+			RouteTableId:         e.RouteTableId,
+			Status:               string(e.Status),
+			Type:                 string(e.Type),
+			NextHops: struct {
+				NextHop []ecs.NextHop
+			}{
+				NextHop: []ecs.NextHop{
+					{
+						NextHopId:   e.InstanceId,
+						NextHopType: e.NextHopType,
+					},
+				},
+			},
+		}
+		response.RouteEntrys.RouteEntry = append(response.RouteEntrys.RouteEntry, routeEntry)
+	}
+	return response, nil
 }

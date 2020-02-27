@@ -60,7 +60,8 @@ func NewMockClientMgr(client ClientSLBSDK) (*ClientMgr, error) {
 
 func TestFindLoadBalancer(t *testing.T) {
 	prid := nodeid(string(REGION), INSTANCEID)
-	f := NewDefaultFrameWork(
+	f := NewDefaultFrameWork(nil)
+	f.WithService(
 		// initial service based on your definition
 		&v1.Service{
 			ObjectMeta: metav1.ObjectMeta{
@@ -73,24 +74,20 @@ func TestFindLoadBalancer(t *testing.T) {
 				Type: "LoadBalancer",
 			},
 		},
+	).WithNodes(
 		// initial node based on your definition.
 		// backend of the created loadbalancer
 		[]*v1.Node{
 			{
 				ObjectMeta: metav1.ObjectMeta{Name: prid},
-				Spec: v1.NodeSpec{
-					ProviderID: prid,
-				},
+				Spec:       v1.NodeSpec{ProviderID: prid},
 			},
 		},
-		nil,
-		nil,
 	)
 
-	f.Run(
-		t,
-		"Create Loadbalancer With SPEC", "ecs",
-		func() {
+	f.RunCustomized(
+		t, "Create Loadbalancer With SPEC",
+		func(f *FrameWork) error {
 
 			// ==================================================================================
 			// 1. No LOADBALANCER_ID specified, Exist.
@@ -147,6 +144,7 @@ func TestFindLoadBalancer(t *testing.T) {
 				t.Logf("   user need to use an exist loadbalancer through annotations")
 				t.Fail()
 			}
+			return nil
 		},
 	)
 }
@@ -255,11 +253,12 @@ func TestGetLoadBalancerAdditionalTags(t *testing.T) {
 // anomaly test case
 func TestUpdateLoadBalancerWhenStartLoadBalancerFailed(t *testing.T) {
 	prid := nodeid(string(REGION), INSTANCEID)
-	f := NewDefaultFrameWork(
+	f := NewDefaultFrameWork(nil)
+	f.WithService(
 		&v1.Service{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace:   "default",
-				Name:        "service-test",
+				Name:        "my-service",
 				UID:         types.UID(serviceUIDExist),
 				Annotations: map[string]string{},
 			},
@@ -271,29 +270,25 @@ func TestUpdateLoadBalancerWhenStartLoadBalancerFailed(t *testing.T) {
 				SessionAffinity: v1.ServiceAffinityNone,
 			},
 		},
+	).WithNodes(
 		[]*v1.Node{
 			{
 				ObjectMeta: metav1.ObjectMeta{Name: prid},
-				Spec: v1.NodeSpec{
-					ProviderID: prid,
-				},
+				Spec:       v1.NodeSpec{ProviderID: prid},
 			},
 		},
-		nil,
-		nil,
 	)
 	// create service
 	f.RunDefault(t, "create test service")
 
 	// Simulate the failure of StartLoadBalancerListener()
-	slbClient := f.Cloud.climgr.loadbalancer.c
+	slbClient := f.LoadBalancer().c
 	err := slbClient.StopLoadBalancerListener(LOADBALANCER_ID, int(listenPort1))
 	if err != nil {
 		t.Fatal(err.Error())
 	}
-
 	// update service
-	f.RunDefault(t,"update test service")
+	f.RunDefault(t, "update test service")
 
 	// check result
 	res, err := slbClient.DescribeLoadBalancerTCPListenerAttribute(LOADBALANCER_ID, int(listenPort1))
@@ -304,5 +299,4 @@ func TestUpdateLoadBalancerWhenStartLoadBalancerFailed(t *testing.T) {
 	if res.Status != slb.Running {
 		t.Fatalf("listener stop error.")
 	}
-
 }

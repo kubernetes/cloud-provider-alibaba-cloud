@@ -16,6 +16,7 @@ var (
 	TestVServerGroupID  = "MY_VSERVER_GROUPID"
 	TestListenerPort    = 9000
 	TestInstanceId      = "MY_INSTANCE_ID"
+	TestENIId           = "MY_ENI_ID"
 	TestRegionID        = common.Region(os.Getenv("RegionId"))
 	TestIAmRich         = false
 	TestQuick           = false
@@ -44,7 +45,7 @@ var testDebugNewSLBClient *Client
 
 func NewTestNewSLBClientForDebug() *Client {
 	if testDebugNewSLBClient == nil {
-		testDebugNewSLBClient = NewSLBClientWithSecurityToken(TestAccessKeyId, TestAccessKeySecret, TestSecurityToken, TestRegionID)
+		testDebugNewSLBClient = NewSLBClientWithSecurityToken4RegionalDomain(TestAccessKeyId, TestAccessKeySecret, TestSecurityToken, TestRegionID)
 		testDebugNewSLBClient.SetDebug(true)
 	}
 	return testDebugNewSLBClient

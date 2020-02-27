@@ -10,7 +10,6 @@ import (
 	"k8s.io/cloud-provider-alibaba-cloud/cloud-controller-manager/utils"
 	"k8s.io/kubernetes/staging/src/k8s.io/apimachinery/pkg/util/json"
 	"reflect"
-	"strconv"
 	"strings"
 )
 
@@ -299,93 +298,10 @@ func (v *vgroup) diff(apis, nodes []slb.VBackendServerType) (
 	return addition, deletions, updates
 }
 
-func Ensure(v *vgroup, nodes interface{}) error {
-	var backend []slb.VBackendServerType
-	var nodeWeight int
-	switch nodes.(type) {
-	case []*v1.Node:
-		for _, node := range nodes.([]*v1.Node) {
-			_, id, err := nodeFromProviderID(node.Spec.ProviderID)
-			if err != nil {
-				return fmt.Errorf("ensure: error parse providerid. %s. expected: ${regionid}.${nodeid}", node.Spec.ProviderID)
-			}
-			if _, ok := node.Labels["weight"]; !ok {
-				nodeWeight = 100
-			} else {
-				nodeWeight, err = strconv.Atoi(node.Labels["weight"])
-				if err != nil {
-					nodeWeight = 100
-					v.Logf("Error: fail to get weight from %s label %s. set the node weight to 100. %s", node.Name, node.Labels["weight"], err.Error())
-				}
-				if nodeWeight < 1 {
-					nodeWeight = 1
-				}
-			}
-			backend = append(backend, slb.VBackendServerType{
-				ServerId:    string(id),
-				Weight:      nodeWeight,
-				Port:        int(v.NamedKey.Port),
-				Type:        "ecs",
-				Description: v.NamedKey.Key(),
-			})
-		}
-	case *v1.Endpoints:
-		var privateIpAddress []string
-		for _, ep := range nodes.(*v1.Endpoints).Subsets {
-			for _, addr := range ep.Addresses {
-				privateIpAddress = append(privateIpAddress, addr.IP)
-			}
-		}
-
-		err := Batch(
-			privateIpAddress, 40,
-			func(o []interface{}) error {
-				var ips []string
-				for _, i := range o {
-					ip, ok := i.(string)
-					if !ok {
-						return fmt.Errorf("not string: %v", i)
-					}
-					ips = append(ips, ip)
-				}
-				targs := &ecs.DescribeNetworkInterfacesArgs{
-					VpcID:            v.VpcID,
-					RegionId:         v.RegionId,
-					PrivateIpAddress: ips,
-					PageSize:         50,
-				}
-				resp, err := v.InsClient.DescribeNetworkInterfaces(targs)
-				if err != nil {
-					return fmt.Errorf("call DescribeNetworkInterfaces: %s", err.Error())
-				}
-				for _, ip := range ips {
-					eniid, err := findENIbyAddrIP(resp, ip)
-					if err != nil {
-						return err
-					}
-					if eniid == "" {
-						return fmt.Errorf("unexpected empty eni id found %s", ip)
-					}
-					backend = append(
-						backend,
-						slb.VBackendServerType{
-							ServerId:    eniid,
-							Weight:      100,
-							Type:        "eni",
-							Port:        int(v.NamedKey.Port),
-							ServerIp:    ip,
-							Description: v.NamedKey.Key(),
-						},
-					)
-				}
-				return nil
-			},
-		)
-		if err != nil {
-			return fmt.Errorf("batch process eni fail: %s", err.Error())
-		}
-	default:
-		return fmt.Errorf("unknown backend type, %s", reflect.TypeOf(nodes))
+func Ensure(v *vgroup, nodes *EndpointWithENI) error {
+	backend, err := nodes.BuildBackend(v)
+	if err != nil {
+		return fmt.Errorf("build backend: %s, %s", err.Error(), v.NamedKey)
 	}
 	v.BackendServers = backend
 	return v.Update()
@@ -393,7 +309,7 @@ func Ensure(v *vgroup, nodes interface{}) error {
 
 type vgroups []*vgroup
 
-func EnsureVirtualGroups(vgrps *vgroups, nodes interface{}) error {
+func EnsureVirtualGroups(vgrps *vgroups, nodes *EndpointWithENI) error {
 	glog.Infof("ensure vserver group: %d vgroup need to be processed.", len(*vgrps))
 	for _, v := range *vgrps {
 		if v == nil {
@@ -481,6 +397,7 @@ func BuildVirturalGroupFromService(
 			NamedKey: &NamedKey{
 				CID:         CLUSTER_ID,
 				Port:        port.NodePort,
+				TargetPort:  port.TargetPort.IntVal,
 				Namespace:   service.Namespace,
 				ServiceName: service.Name,
 				Prefix:      DEFAULT_PREFIX,
@@ -546,4 +463,252 @@ func findENIbyAddrIP(resp *ecs.DescribeNetworkInterfacesResponse, addrIP string)
 		}
 	}
 	return "", fmt.Errorf("private ip address not found in openapi %s", addrIP)
+}
+
+func findNodeByNodeName(nodes []*v1.Node, nodeName string) *v1.Node {
+	for _, n := range nodes {
+		if n.Name == nodeName {
+			return n
+		}
+	}
+	glog.Infof("node %s not found ", nodeName)
+	return nil
+}
+
+// EndpointWithENI
+// Currently, EndpointWithENI accept two kind of backend
+// normal nodes of type []*v1.Node, and endpoints of type *v1.Endpoints
+type EndpointWithENI struct {
+	// LocalMode externalTraffic=Local
+	LocalMode bool
+	// BackendTypeENI
+	// whether it is an eni backend
+	BackendTypeENI bool
+	// Nodes
+	// contains all the candidate nodes consider of LoadBalance Backends.
+	// Cloud implementation has the right to make any filter on it.
+	Nodes []*v1.Node
+
+	// Endpoints
+	// It is the direct pod location information which cloud implementation
+	// may needed for some kind of filtering. eg. direct ENI attach.
+	Endpoints *v1.Endpoints
+}
+
+// build backend function
+func (v *EndpointWithENI) buildFunc(
+	backend *[]slb.VBackendServerType,
+	g *vgroup,
+) func(o []interface{}) error {
+
+	// backend build function
+	return func(o []interface{}) error {
+		var ips []string
+		for _, i := range o {
+			ip, ok := i.(string)
+			if !ok {
+				return fmt.Errorf("not string: %v", i)
+			}
+			ips = append(ips, ip)
+		}
+		targs := &ecs.DescribeNetworkInterfacesArgs{
+			VpcID:            g.VpcID,
+			RegionId:         g.RegionId,
+			PrivateIpAddress: ips,
+			PageSize:         50,
+		}
+		resp, err := g.InsClient.DescribeNetworkInterfaces(targs)
+		if err != nil {
+			return fmt.Errorf("call DescribeNetworkInterfaces: %s", err.Error())
+		}
+		for _, ip := range ips {
+			eniid, err := findENIbyAddrIP(resp, ip)
+			if err != nil {
+				return err
+			}
+			*backend = append(
+				*backend,
+				slb.VBackendServerType{
+					ServerId:    eniid,
+					Weight:      DEFAULT_SERVER_WEIGHT,
+					Type:        "eni",
+					Port:        int(g.NamedKey.TargetPort),
+					ServerIp:    ip,
+					Description: g.NamedKey.Key(),
+				},
+			)
+		}
+		return nil
+	}
+}
+
+func (v *EndpointWithENI) BuildBackend(g *vgroup) ([]slb.VBackendServerType, error) {
+	backend, err := v.doBackendBuild(g)
+	if err != nil {
+		return backend, fmt.Errorf("build backend: %s", err.Error())
+	}
+	return v.nodeWeightWithMerge(backend)
+}
+
+func (v *EndpointWithENI) doBackendBuild(g *vgroup) ([]slb.VBackendServerType, error) {
+	// backend would be modified by buildFunc
+	var backend []slb.VBackendServerType
+
+	// ENI Mode
+	if v.BackendTypeENI {
+		glog.Infof("[ENI] mode service: %s", g.NamedKey)
+		var privateIpAddress []string
+		for _, ep := range v.Endpoints.Subsets {
+			for _, addr := range ep.Addresses {
+				privateIpAddress = append(privateIpAddress, addr.IP)
+			}
+		}
+		err := Batch(privateIpAddress, 40, v.buildFunc(&backend, g))
+		if err != nil {
+			return backend, fmt.Errorf("batch process eni fail: %s", err.Error())
+		}
+		return backend, nil
+	}
+
+	// Local Mode
+	// When ecs and eci are deployed in a cluster, add ecs first and then add eci
+	if v.LocalMode {
+		glog.Infof("[Local] mode service: %s", g.NamedKey)
+		if v.Endpoints == nil {
+			return backend, fmt.Errorf("enpoint should not be nil")
+		}
+		// 1. add duplicate ecs backends
+		for _, sub := range v.Endpoints.Subsets {
+			for _, add := range sub.Addresses {
+				node := findNodeByNodeName(v.Nodes, *add.NodeName)
+				if node == nil {
+					glog.Warningf("can not find correspond node %s for endpoint %s", *add.NodeName, add.IP)
+					continue
+				}
+				if isExcludeNode(node) {
+					// filter vk node
+					continue
+				}
+				_, id, err := nodeFromProviderID(node.Spec.ProviderID)
+				if err != nil {
+					return backend, fmt.Errorf("parse providerid: %s. "+
+						"expected: ${regionid}.${nodeid}, %s", node.Spec.ProviderID, err.Error())
+				}
+				backend = append(
+					backend,
+					slb.VBackendServerType{
+						ServerId:    string(id),
+						Weight:      DEFAULT_SERVER_WEIGHT,
+						Port:        int(g.NamedKey.Port),
+						Type:        "ecs",
+						Description: g.NamedKey.Key(),
+					},
+				)
+			}
+		}
+		// 2. add eci backends
+		return v.addECIBackends(backend, g)
+	}
+
+	//Cluster Mode
+	// When ecs and eci are deployed in a cluster, add ecs first and then add eci
+	glog.Infof("[Cluster] mode service: %s", g.NamedKey)
+	// 1. add ecs backends
+	for _, node := range v.Nodes {
+		if isExcludeNode(node) {
+			continue
+		}
+		_, id, err := nodeFromProviderID(node.Spec.ProviderID)
+		if err != nil {
+			return backend, fmt.Errorf("normal parse providerid: %s. "+
+				"expected: ${regionid}.${nodeid}, %s", node.Spec.ProviderID, err.Error())
+		}
+
+		backend = append(
+			backend,
+			slb.VBackendServerType{
+				ServerId:    string(id),
+				Weight:      DEFAULT_SERVER_WEIGHT,
+				Port:        int(g.NamedKey.Port),
+				Type:        "ecs",
+				Description: g.NamedKey.Key(),
+			},
+		)
+	}
+	// 2. add eci backends
+	return v.addECIBackends(backend, g)
+}
+
+func (v *EndpointWithENI) nodeWeightWithMerge(backends []slb.VBackendServerType) ([]slb.VBackendServerType, error) {
+
+	if !v.LocalMode {
+		// only local mode should be merged
+		return backends, nil
+	}
+
+	if len(backends) == 0 {
+		return backends, nil
+	}
+
+	mergedNode := make(map[string]slb.VBackendServerType)
+	for _, b := range backends {
+		if _, exist := mergedNode[b.ServerId]; exist {
+			updateBackend := mergedNode[b.ServerId]
+			updateBackend.Weight += 1
+			mergedNode[b.ServerId] = updateBackend
+		} else {
+			b.Weight = 1
+			mergedNode[b.ServerId] = b
+		}
+	}
+
+	var mergedBackends []slb.VBackendServerType
+	for _, v := range mergedNode {
+		v.Weight = int(float64(v.Weight) / float64(len(backends)) * DEFAULT_SERVER_WEIGHT)
+		if v.Weight < 1 {
+			v.Weight = 1
+		}
+		mergedBackends = append(mergedBackends, v)
+	}
+	return mergedBackends, nil
+}
+
+func (v *EndpointWithENI) addECIBackends(backend []slb.VBackendServerType, g *vgroup) ([]slb.VBackendServerType, error) {
+	var privateIpAddress []string
+	// filter ECI nodes
+	for _, sub := range v.Endpoints.Subsets {
+		for _, add := range sub.Addresses {
+			node := findNodeByNodeName(v.Nodes, *add.NodeName)
+			if node == nil {
+				continue
+			}
+			// check if the node is ECI
+			if node.Labels["type"] == utils.ECINodeLabel {
+				glog.Infof("hybrid: %s not an ecs, use eni object as backend", add.IP)
+				privateIpAddress = append(privateIpAddress, add.IP)
+			}
+		}
+	}
+
+	// add ENI backends
+	if len(privateIpAddress) > 0 {
+		err := Batch(privateIpAddress, 40, v.buildFunc(&backend, g))
+		if err != nil {
+			return backend, fmt.Errorf("batch process eni fail: %s", err.Error())
+		}
+	}
+
+	return backend, nil
+}
+
+func isExcludeNode(node *v1.Node) bool {
+	if _, exclude := node.Labels[utils.LabelNodeRoleExcludeNode]; exclude {
+		glog.Infof("ignore node with exclude node label %s", node.Name)
+		return true
+	}
+	if _, exclude := node.Labels[utils.LabelNodeRoleExcludeBalancer]; exclude {
+		glog.Infof("ignore node with exclude balancer label %s", node.Name)
+		return true
+	}
+	return false
 }

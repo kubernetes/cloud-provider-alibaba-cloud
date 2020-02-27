@@ -1,9 +1,8 @@
 package ecs
 
 import (
-	"os"
-
 	"github.com/denverdino/aliyungo/common"
+	"os"
 )
 
 //Modify with your Access Key Id and Access Key Secret
@@ -59,7 +58,7 @@ var testLocationClient *Client
 
 func NetTestLocationClientForDebug() *Client {
 	if testLocationClient == nil {
-		testLocationClient = NewECSClient(TestAccessKeyId, TestAccessKeySecret, TestRegionID)
+		testLocationClient = NewECSClientWithSecurityToken4RegionalDomain(TestAccessKeyId, TestAccessKeySecret, TestSecurityToken, TestRegionID)
 		testLocationClient.SetDebug(true)
 	}
 

@@ -36,10 +36,6 @@ func (c *Context) Range(f func(key string, value *v1.Service) bool) {
 }
 func (c *Context) Remove(name string) { c.ctx.Delete(name) }
 
-func ServiceModeLocal(svc *v1.Service) bool {
-	return svc.Spec.ExternalTrafficPolicy == v1.ServiceExternalTrafficPolicyTypeLocal
-}
-
 // NeedUpdate compare old and new service for possible changes
 func NeedUpdate(old, newm *v1.Service, record record.EventRecorder) bool {
 	if !NeedLoadBalancer(old) &&
