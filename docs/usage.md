@@ -2,7 +2,7 @@
 
 ## Alibaba Cloud Provider introduction
 
-**CloudProvider** provides the Cloud Provider interface implementation as an out-of-tree cloud-controller-manager. It allows Kubernetes clusters to leverage the infrastructure services of Alibaba Cloud .<br />It is original open sourced project is [https://github.com/AliyunContainerService/alibaba-cloud-controller-manager](https://github.com/AliyunContainerService/alicloud-controller-manager)<br />[See ReleaseNotes](https://yq.aliyun.com/articles/608575)<br />**Basic usage** cloudprovider use service annotation to control service creation behavior. Here is a basic annotation example:
+**CloudProvider** provides the Cloud Provider interface implementation as an out-of-tree cloud-controller-manager. It allows Kubernetes clusters to leverage the infrastructure services of Alibaba Cloud .<br />It is original open sourced project is [https://github.com/AliyunContainerService/alicloud-controller-manager)<br />[See ReleaseNotes](https://yq.aliyun.com/articles/608575)<br />**Basic usage** cloudprovider use service annotation to control service creation behavior. Here is a basic annotation example:
 
 ```
 apiVersion: v1
