@@ -581,7 +581,7 @@ func (v *EndpointWithENI) doBackendBuild(g *vgroup) ([]slb.VBackendServerType, e
 		for _, sub := range v.Endpoints.Subsets {
 			for _, add := range sub.Addresses {
 				if add.NodeName == nil {
-					return nil, fmt.Errorf("NodeName is nil. Endpoint must have NodeName on local mode. ")
+					return nil, fmt.Errorf("add ecs backends for service[%s] error, NodeName is nil for ip %s ", g.NamedKey.String(), add.IP)
 				}
 				node := findNodeByNodeName(v.Nodes, *add.NodeName)
 				if node == nil {
@@ -681,6 +681,9 @@ func (v *EndpointWithENI) addECIBackends(backend []slb.VBackendServerType, g *vg
 	// filter ECI nodes
 	for _, sub := range v.Endpoints.Subsets {
 		for _, add := range sub.Addresses {
+			if add.NodeName == nil {
+				return nil, fmt.Errorf("add eci backends for service[%s] error, NodeName is nil for ip %s ", g.NamedKey.String(), add.IP)
+			}
 			node := findNodeByNodeName(v.Nodes, *add.NodeName)
 			if node == nil {
 				continue
