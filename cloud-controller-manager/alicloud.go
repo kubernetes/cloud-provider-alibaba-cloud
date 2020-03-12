@@ -239,7 +239,7 @@ func (c *Cloud) Initialize(builder ctrlclient.ControllerClientBuilder) {
 	inform := shared.Core().V1().Endpoints().Informer()
 	shared.Start(stop)
 	if !controller.WaitForCacheSync(
-		"service", nil,inform.HasSynced,
+		"service", nil, inform.HasSynced,
 	) {
 		glog.Error("endpoints cache has not been syncd")
 		return
@@ -323,7 +323,13 @@ func (c *Cloud) EnsureLoadBalancer(
 			service.Namespace,
 		).Get(service.Name)
 	if err != nil {
-		return nil, fmt.Errorf("get available endpoints: %s", err.Error())
+		if strings.Contains(err.Error(), "not found") {
+			// compatible with nil endpoint
+			glog.Warningf("get available endpoints when EnsureLoadBalancer: %s", err.Error())
+		} else {
+			// avoid removing existing backends of SLB when getting endpoint error
+			return nil, fmt.Errorf("get available endpoints when EnsureLoadBalancer: %s", err.Error())
+		}
 	}
 	backends := &EndpointWithENI{
 		LocalMode:      ServiceModeLocal(service),
@@ -385,7 +391,13 @@ func (c *Cloud) UpdateLoadBalancer(clusterName string, service *v1.Service, node
 			service.Namespace,
 		).Get(service.Name)
 	if err != nil {
-		return fmt.Errorf("get available endpoints for eni: %s", err.Error())
+		if strings.Contains(err.Error(), "not found") {
+			// compatible with nil endpoint
+			glog.Warningf("get available endpoints when UpdateLoadBalancer: %s", err.Error())
+		} else {
+			// avoid removing existing backends of SLB when getting endpoint error
+			return fmt.Errorf("get available endpoints when UpdateLoadBalancer: %s", err.Error())
+		}
 	}
 	backends := &EndpointWithENI{
 		LocalMode:      ServiceModeLocal(service),

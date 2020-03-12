@@ -557,6 +557,10 @@ func (v *EndpointWithENI) doBackendBuild(g *vgroup) ([]slb.VBackendServerType, e
 	// ENI Mode
 	if v.BackendTypeENI {
 		glog.Infof("[ENI] mode service: %s", g.NamedKey)
+		if v.Endpoints == nil {
+			glog.Warningf("%s endpoint is nil in eni mode", g.NamedKey)
+			return backend, nil
+		}
 		var privateIpAddress []string
 		for _, ep := range v.Endpoints.Subsets {
 			for _, addr := range ep.Addresses {
@@ -575,7 +579,8 @@ func (v *EndpointWithENI) doBackendBuild(g *vgroup) ([]slb.VBackendServerType, e
 	if v.LocalMode {
 		glog.Infof("[Local] mode service: %s", g.NamedKey)
 		if v.Endpoints == nil {
-			return backend, fmt.Errorf("enpoint should not be nil")
+			glog.Warningf("%s endpoint is nil in local mode", g.NamedKey)
+			return backend, nil
 		}
 		// 1. add duplicate ecs backends
 		for _, sub := range v.Endpoints.Subsets {
@@ -679,6 +684,10 @@ func (v *EndpointWithENI) nodeWeightWithMerge(backends []slb.VBackendServerType)
 func (v *EndpointWithENI) addECIBackends(backend []slb.VBackendServerType, g *vgroup) ([]slb.VBackendServerType, error) {
 	var privateIpAddress []string
 	// filter ECI nodes
+	if v.Endpoints == nil {
+		glog.Warningf("%s endpoint is nil in eci mode", g.NamedKey)
+		return backend, nil
+	}
 	for _, sub := range v.Endpoints.Subsets {
 		for _, add := range sub.Addresses {
 			if add.NodeName == nil {
