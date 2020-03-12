@@ -644,7 +644,7 @@ func (v *EndpointWithENI) doBackendBuild(g *vgroup) ([]slb.VBackendServerType, e
 
 func (v *EndpointWithENI) nodeWeightWithMerge(backends []slb.VBackendServerType) ([]slb.VBackendServerType, error) {
 
-	if !v.LocalMode {
+	if !v.LocalMode || v.BackendTypeENI {
 		// only local mode should be merged
 		return backends, nil
 	}
