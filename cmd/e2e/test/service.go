@@ -1105,3 +1105,94 @@ var _ = framework.Mark(
 		)
 	},
 )
+
+//22:test svc with null endpoint
+var _ = framework.Mark(
+	"all",
+	func(t *testing.T) error {
+		f := framework.NewFrameWork(
+			func(f *framework.FrameWorkE2E) {
+				f.Desribe = "TestNullEndpoint"
+				f.Test = t
+				f.Client = framework.NewClientOrDie()
+				f.InitService = &v1.Service{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "basic-service",
+						Namespace: framework.NameSpace,
+						Annotations: map[string]string{
+							alicloud.ServiceAnnotationLoadBalancerBackendType: "ecs",
+						},
+					},
+
+					Spec: v1.ServiceSpec{
+						Ports: []v1.ServicePort{
+							{
+								Port:       80,
+								TargetPort: intstr.FromInt(80),
+								Protocol:   v1.ProtocolTCP,
+							},
+						},
+						Type:            v1.ServiceTypeLoadBalancer,
+						SessionAffinity: v1.ServiceAffinityNone,
+					},
+				}
+			},
+		)
+		defer f.Destroy()
+		err := f.SetUp()
+		if err != nil {
+			return fmt.Errorf("setup error: %s", err.Error())
+		}
+
+		return f.RunDefaultTest(
+			framework.NewDefaultAction(&framework.TestUnit{Description: "default init"}),
+			framework.NewDeleteAction(&framework.TestUnit{Description: "default delete"}),
+		)
+	},
+)
+
+//23:test slb backends mount ecs and eni
+//need deployment run in the virtual node
+var _ = framework.Mark(
+	"all",
+	func(t *testing.T) error {
+		f := framework.NewFrameWork(
+			func(f *framework.FrameWorkE2E) {
+				f.Desribe = "TestENIBackend"
+				f.Test = t
+				f.Client = framework.NewClientOrDie()
+				f.InitService = &v1.Service{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "basic-service",
+						Namespace: framework.NameSpace,
+					},
+
+					Spec: v1.ServiceSpec{
+						Ports: []v1.ServicePort{
+							{
+								Port:       30080,
+								TargetPort: intstr.FromInt(80),
+								Protocol:   v1.ProtocolTCP,
+							},
+						},
+						Type:            v1.ServiceTypeLoadBalancer,
+						SessionAffinity: v1.ServiceAffinityNone,
+						Selector: map[string]string{
+							"run": "nginx",
+						},
+					},
+				}
+			},
+		)
+		defer f.Destroy()
+		err := f.SetUp()
+		if err != nil {
+			return fmt.Errorf("setup error: %s", err.Error())
+		}
+
+		return f.RunDefaultTest(
+			framework.NewDefaultAction(&framework.TestUnit{Description: "default init"}),
+			framework.NewDeleteAction(&framework.TestUnit{Description: "default delete"}),
+		)
+	},
+)

@@ -8,6 +8,7 @@ import (
 	"github.com/denverdino/aliyungo/metadata"
 	"github.com/denverdino/aliyungo/pvtz"
 	"github.com/denverdino/aliyungo/slb"
+	"github.com/golang/glog"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -461,24 +462,6 @@ func ExpectExistAndEqual(f *FrameWork) error {
 		return fmt.Errorf("vserver group count less than service: %d, %d", len(res.VServerGroups.VServerGroup), len(f.SVC.Spec.Ports))
 	}
 
-	sort.SliceStable(
-		f.Nodes,
-		func(i, j int) bool {
-			_, ida, err := nodeFromProviderID(f.Nodes[i].Spec.ProviderID)
-			if err != nil {
-				panic("unexpected provider id")
-			}
-			_, idb, err := nodeFromProviderID(f.Nodes[j].Spec.ProviderID)
-			if err != nil {
-				panic("unexpected provider id")
-			}
-			if ida > idb {
-				return true
-			}
-			return false
-		},
-	)
-
 	defd, _ := ExtractAnnotationRequest(f.SVC)
 	for _, v := range res.VServerGroups.VServerGroup {
 		vg, err := f.SLBSDK().DescribeVServerGroupAttribute(
@@ -495,10 +478,14 @@ func ExpectExistAndEqual(f *FrameWork) error {
 			continue
 		}
 
+		if f.Endpoint == nil {
+			fmt.Println(f.Endpoint)
+			return nil
+		}
+
 		backends := vg.BackendServers.BackendServer
 
 		if f.SVC.Annotations[ServiceAnnotationLoadBalancerBackendType] == "eni" {
-
 			if len(backends) != len(f.Endpoint.Subsets[0].Addresses) {
 				return fmt.Errorf("Endpoint vgroup backend server must be %d", len(f.Nodes))
 			}
@@ -531,41 +518,42 @@ func ExpectExistAndEqual(f *FrameWork) error {
 			if len(f.Endpoint.Subsets) == 0 {
 				return fmt.Errorf("Endpoint vgroup backend is 0. ")
 			}
-
-			//If multiple pods are running on one node,
-			//there will be duplicate nodes in Endpoint.SubSets[0].Addresses.
-			//The duplicate nodes need to be filtered.
-			epNodeNameMap := make(map[string]string)
-			for _, endpoint := range f.Endpoint.Subsets[0].Addresses {
-				epNodeNameMap[*endpoint.NodeName] = *endpoint.NodeName
-			}
-
-			if len(backends) != len(epNodeNameMap) {
-				return fmt.Errorf("Endpoint vgroup backend is not equal. ")
-			}
-
-			var endpointPrIds []string
-			for _, epNodeName := range epNodeNameMap {
-				found := false
-				for _, node := range f.Nodes {
-					if epNodeName == node.Name {
-						endpointPrId := strings.Split(node.Spec.ProviderID, ".")
-						if len(endpointPrId) != 2 {
-							return fmt.Errorf("Node providerID %v format error. ", endpointPrId[1])
-						}
-						endpointPrIds = append(endpointPrIds, endpointPrId[1])
-						found = true
-						break
+			// local node
+			var endpointECSs []string
+			for _, sub := range f.Endpoint.Subsets {
+				for _, add := range sub.Addresses {
+					if add.NodeName == nil {
+						return fmt.Errorf("nodeName is nil for ip %s ", add.IP)
 					}
-				}
-				if !found {
-					return fmt.Errorf("Fail to find node: %s in Endpoint vgroup backend. ", epNodeName)
+					node := findNodeByNodeName(f.Nodes, *add.NodeName)
+					if node == nil {
+						glog.Warningf("can not find correspond node %s for endpoint %s", *add.NodeName, add.IP)
+						continue
+					}
+
+					if isExcludeNode(node) {
+						// filter vk node
+						continue
+					}
+					_, id, err := nodeFromProviderID(node.Spec.ProviderID)
+					if err != nil {
+						return fmt.Errorf("Node providerID %v format error. ", node.Spec.ProviderID)
+					}
+					endpointECSs = append(endpointECSs, id)
 				}
 			}
+
+			var backendECSs []string
+			for _, backend := range backends {
+				if backend.Type == "ecs" {
+					backendECSs = append(backendECSs, backend.ServerId)
+				}
+			}
+
 			sort.SliceStable(
-				backends,
+				backendECSs,
 				func(i, j int) bool {
-					if backends[i].ServerId < backends[j].ServerId {
+					if backendECSs[i] < backendECSs[j] {
 						return true
 					}
 					return false
@@ -573,77 +561,92 @@ func ExpectExistAndEqual(f *FrameWork) error {
 			)
 
 			sort.SliceStable(
-				endpointPrIds,
+				endpointECSs,
 				func(i, j int) bool {
-					if endpointPrIds[i] < endpointPrIds[j] {
+					if endpointECSs[i] < endpointECSs[j] {
 						return true
 					}
 					return false
 				},
 			)
-			for k, v := range backends {
-				if v.ServerId != endpointPrIds[k] {
-					return fmt.Errorf("backend %v not equal Endpoint %v", v.ServerId, endpointPrIds[k])
+			for k, v := range endpointECSs {
+				if v != endpointECSs[k] {
+					return fmt.Errorf("backend %v not equal Endpoint %v", v, endpointECSs[k])
 				}
 			}
+
+			return eciBackendsEqual(f, backends)
 
 		} else {
+			var endpointECSs []string
+
+			// filter Master
 			f.Nodes = filterOutMaster(f.Nodes)
-			if !f.hasAnnotation(ServiceAnnotationLoadBalancerBackendLabel) && len(backends) != len(f.Nodes) {
-				return fmt.Errorf("node vgroup backend server must be %d", len(f.Nodes))
-			}
-			sort.SliceStable(
-				backends,
-				func(i, j int) bool {
-					if backends[i].ServerId < backends[j].ServerId {
-						return true
-					}
-					return false
-				},
-			)
-			sort.SliceStable(
-				f.Nodes,
-				func(i, j int) bool {
-					_, ida, err := nodeFromProviderID(f.Nodes[i].Spec.ProviderID)
-					if err != nil {
-						panic("xnode id error")
-					}
-					_, idb, err := nodeFromProviderID(f.Nodes[j].Spec.ProviderID)
-					if err != nil {
-						panic("ynode id error")
-					}
-					if ida < idb {
-						return true
-					}
-					return false
-				},
-			)
-			nodes := f.Nodes
+
+			// filter node by label
 			if f.hasAnnotation(ServiceAnnotationLoadBalancerBackendLabel) {
-				var tpms []*v1.Node
+				var nodes []*v1.Node
 				for _, v := range f.Nodes {
 					if containsLabel(
 						v,
 						strings.Split(defd.BackendLabel, ","),
 					) {
-						tpms = append(tpms, v)
+						nodes = append(nodes, v)
 					}
 				}
-				nodes = tpms
+				f.Nodes = nodes
 			}
-			if len(backends) > len(nodes) {
-				return fmt.Errorf("backend:%v,node:%v not equal", len(backends), len(nodes))
-			}
-			for k, v := range backends {
-				_, ida, err := nodeFromProviderID(nodes[k].Spec.ProviderID)
-				if err != nil {
-					return fmt.Errorf("unexpected provider id")
+
+			// filter VK
+			for _, node := range f.Nodes {
+				if isExcludeNode(node) {
+					continue
 				}
-				if v.ServerId != ida {
-					return fmt.Errorf("backend not equal")
+				_, id, err := nodeFromProviderID(node.Spec.ProviderID)
+				if err != nil {
+					return fmt.Errorf("normal parse providerid: %s. "+
+						"expected: ${regionid}.${nodeid}, %s", node.Spec.ProviderID, err.Error())
+				}
+				endpointECSs = append(endpointECSs, id)
+			}
+
+			var backendECSs []string
+			for _, backend := range backends {
+				if backend.Type == "ecs" {
+					backendECSs = append(backendECSs, backend.ServerId)
 				}
 			}
 
+			if !f.hasAnnotation(ServiceAnnotationLoadBalancerBackendLabel) && len(backendECSs) != len(endpointECSs) {
+				return fmt.Errorf("node vgroup backend server must be %d", len(f.Nodes))
+			}
+
+			sort.SliceStable(
+				backendECSs,
+				func(i, j int) bool {
+					if backendECSs[i] < backendECSs[j] {
+						return true
+					}
+					return false
+				},
+			)
+			sort.SliceStable(
+				endpointECSs,
+				func(i, j int) bool {
+					if endpointECSs[i] < endpointECSs[j] {
+						return true
+					}
+					return false
+				},
+			)
+
+			for k, v := range backendECSs {
+				if v != endpointECSs[k] {
+					return fmt.Errorf("backend %v not equal Endpoint %v", v, endpointECSs[k])
+				}
+			}
+
+			return eciBackendsEqual(f, backends)
 		}
 	}
 
@@ -1153,4 +1156,58 @@ func isUserManagedVBackendServer(VServerGroupName string, service *v1.Service) b
 	}
 
 	return true
+}
+
+func eciBackendsEqual(f *FrameWork, backends []slb.VBackendServerType) error {
+	var endpointENIs []string
+	// filter ECI nodes
+	for _, sub := range f.Endpoint.Subsets {
+		for _, add := range sub.Addresses {
+			if add.NodeName == nil {
+				return nil
+			}
+			node := findNodeByNodeName(f.Nodes, *add.NodeName)
+			if node == nil {
+				continue
+			}
+			// check if the node is ECI
+			if node.Labels["type"] == utils.ECINodeLabel {
+				glog.Infof("hybrid: %s not an ecs, use eni object as backend", add.IP)
+				endpointENIs = append(endpointENIs, add.IP)
+			}
+		}
+	}
+
+	var backendENIs []string
+	for _, backend := range backends {
+		if backend.Type == "eni" {
+			backendENIs = append(backendENIs, backend.ServerIp)
+		}
+	}
+
+	sort.SliceStable(
+		backendENIs,
+		func(i, j int) bool {
+			if backendENIs[i] < backendENIs[j] {
+				return true
+			}
+			return false
+		},
+	)
+
+	sort.SliceStable(
+		endpointENIs,
+		func(i, j int) bool {
+			if endpointENIs[i] < endpointENIs[j] {
+				return true
+			}
+			return false
+		},
+	)
+	for k, v := range endpointENIs {
+		if v != endpointENIs[k] {
+			return fmt.Errorf("ENI backend %v not equal Endpoint %v", v, endpointENIs[k])
+		}
+	}
+	return nil
 }
