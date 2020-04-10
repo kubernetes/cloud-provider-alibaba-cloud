@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"k8s.io/cloud-provider-alibaba-cloud/cloud-controller-manager/utils"
+	"k8s.io/klog"
 	"os"
 	"reflect"
 	"strings"
@@ -28,9 +29,7 @@ import (
 
 	"github.com/denverdino/aliyungo/common"
 	"github.com/denverdino/aliyungo/slb"
-	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
-	"k8s.io/kubernetes/pkg/cloudprovider"
 )
 
 // AnnotationRequest annotated parameters.
@@ -100,7 +99,7 @@ type ClientSLBSDK interface {
 	ModifyLoadBalancerInstanceSpec(args *slb.ModifyLoadBalancerInstanceSpecArgs) (err error)
 	ModifyLoadBalancerInternetSpec(args *slb.ModifyLoadBalancerInternetSpecArgs) (err error)
 	DescribeLoadBalancerAttribute(loadBalancerId string) (loadBalancer *slb.LoadBalancerType, err error)
-	RemoveBackendServers(loadBalancerId string, backendServers []string) (result []slb.BackendServerType, err error)
+	RemoveBackendServers(loadBalancerId string, backendServers []slb.BackendServerType) (result []slb.BackendServerType, err error)
 	AddBackendServers(loadBalancerId string, backendServers []slb.BackendServerType) (result []slb.BackendServerType, err error)
 
 	StopLoadBalancerListener(loadBalancerId string, port int) (err error)
@@ -147,11 +146,11 @@ func (s *LoadBalancerClient) findLoadBalancer(service *v1.Service) (bool, *slb.L
 	def, _ := ExtractAnnotationRequest(service)
 
 	//loadbalancer := service.Status.LoadBalancer
-	//glog.V(4).Infof("alicloud: find loadbalancer [%v] with user defined annotations [%v]\n",loadbalancer,def)
+	//klog.V(4).Infof("alicloud: find loadbalancer [%v] with user defined annotations [%v]\n",loadbalancer,def)
 	//if len(loadbalancer.Ingress) > 0 {
 	//	if lbid := fromLoadBalancerStatus(service); lbid != "" {
 	//		if def.Loadbalancerid != "" && def.Loadbalancerid != lbid {
-	//			glog.Errorf("alicloud: changing loadbalancer id was not allowed after loadbalancer"+
+	//			klog.Errorf("alicloud: changing loadbalancer id was not allowed after loadbalancer"+
 	//				" was already created ! please remove service annotation: [%s]\n", ServiceAnnotationLoadBalancerId)
 	//			return false, nil, fmt.Errorf("alicloud: change loadbalancer id after service " +
 	//				"has been created is not supported. remove service annotation[%s] and retry!", ServiceAnnotationLoadBalancerId)
@@ -178,7 +177,7 @@ func (s *LoadBalancerClient) findLoadBalancerByID(lbid string) (bool, *slb.LoadB
 			LoadBalancerId: lbid,
 		},
 	)
-	glog.Infof("find loadbalancer with id [%s], %d found.", lbid, len(lbs))
+	klog.Infof("find loadbalancer with id [%s], %d found.", lbid, len(lbs))
 	if err != nil {
 		return false, nil, err
 	}
@@ -187,7 +186,7 @@ func (s *LoadBalancerClient) findLoadBalancerByID(lbid string) (bool, *slb.LoadB
 		return false, nil, nil
 	}
 	if len(lbs) > 1 {
-		glog.Warningf("multiple loadbalancer returned with id [%s], using the first one with IP=%s", lbid, lbs[0].Address)
+		klog.Warningf("multiple loadbalancer returned with id [%s], using the first one with IP=%s", lbid, lbs[0].Address)
 	}
 	lb, err := s.c.DescribeLoadBalancerAttribute(lbs[0].LoadBalancerId)
 	return err == nil, lb, err
@@ -197,7 +196,7 @@ func (s *LoadBalancerClient) findLoadBalancerByTags(service *v1.Service) (bool, 
 	if service.UID == "" {
 		return false, nil, fmt.Errorf("unexpected empty service uid")
 	}
-	lbn := cloudprovider.GetLoadBalancerName(service)
+	lbn := GetLoadBalancerName(service)
 	items, err := json.Marshal(
 		[]slb.TagItem{
 			{
@@ -240,7 +239,7 @@ func (s *LoadBalancerClient) findLoadBalancerByName(name string) (bool, *slb.Loa
 			LoadBalancerName: name,
 		},
 	)
-	glog.V(2).Infof("fallback to find loadbalancer by name [%s]", name)
+	klog.V(2).Infof("fallback to find loadbalancer by name [%s]", name)
 	if err != nil {
 		return false, nil, err
 	}
@@ -249,7 +248,7 @@ func (s *LoadBalancerClient) findLoadBalancerByName(name string) (bool, *slb.Loa
 		return false, nil, nil
 	}
 	if len(lbs) > 1 {
-		glog.Warningf("alicloud: multiple loadbalancer returned with name [%s], "+
+		klog.Warningf("alicloud: multiple loadbalancer returned with name [%s], "+
 			"using the first one with IP=%s", name, lbs[0].Address)
 	}
 	lb, err := s.c.DescribeLoadBalancerAttribute(lbs[0].LoadBalancerId)
@@ -312,7 +311,7 @@ func (s *LoadBalancerClient) EnsureLoadBalancer(service *v1.Service, nodes *Endp
 	if !exists {
 		// If need created, double check if the resource id has been deleted
 		if isServiceDeleted(service) {
-			glog.V(2).Infof("alicloud: isServiceDeleted report that this service has been " +
+			klog.V(2).Infof("alicloud: isServiceDeleted report that this service has been " +
 				"deleted before. see issue: https://github.com/kubernetes/kubernetes/issues/59084")
 			os.Exit(1)
 		}
@@ -327,7 +326,7 @@ func (s *LoadBalancerClient) EnsureLoadBalancer(service *v1.Service, nodes *Endp
 		}
 
 		// From here, we need to create a new loadbalancer
-		glog.V(5).Infof("alicloud: can not find a "+
+		klog.V(5).Infof("alicloud: can not find a "+
 			"loadbalancer with service name [%s/%s], creating a new one", service.Namespace, service.Name)
 		opts := s.getLoadBalancerOpts(service, vswitchid)
 		lbr, err := s.c.CreateLoadBalancer(opts)
@@ -337,7 +336,7 @@ func (s *LoadBalancerClient) EnsureLoadBalancer(service *v1.Service, nodes *Endp
 
 		//deal with loadBalancer tags
 		tags := getLoadBalancerAdditionalTags(getBackwardsCompatibleAnnotation(service.Annotations))
-		loadbalancerName := cloudprovider.GetLoadBalancerName(service)
+		loadbalancerName := GetLoadBalancerName(service)
 		// Add default tags
 		tags[TAGKEY] = loadbalancerName
 
@@ -377,7 +376,7 @@ func (s *LoadBalancerClient) EnsureLoadBalancer(service *v1.Service, nodes *Endp
 			return origined, fmt.Errorf("alicloud: can not reuse loadbalancer created by kubernetes. %s", origined.LoadBalancerId)
 		}
 		needUpdate, charge, bandwidth := false, origined.InternetChargeType, origined.Bandwidth
-		glog.V(5).Infof("alicloud: found "+
+		klog.V(5).Infof("alicloud: found "+
 			"an exist loadbalancer[%s], check to see whether update is needed.", origined.LoadBalancerId)
 		if request.MasterZoneID != "" && request.MasterZoneID != origined.MasterZoneId {
 			return nil, fmt.Errorf("alicloud: can not change LoadBalancer master zone id once created")
@@ -404,7 +403,7 @@ func (s *LoadBalancerClient) EnsureLoadBalancer(service *v1.Service, nodes *Endp
 			utils.Logf(service, "bandwidth changed from ([%d] -> [%d]), update [%s]", origined.Bandwidth, request.Bandwidth, origined.LoadBalancerId)
 		}
 		if request.AddressType != "" && request.AddressType != origined.AddressType {
-			glog.Errorf("alicloud: warning! can not change "+
+			klog.Errorf("alicloud: warning! can not change "+
 				"loadbalancer address type after it has been created! please "+
 				"recreate the service.[%s]->[%s],[%s]", origined.AddressType, request.AddressType, origined.LoadBalancerName)
 			return nil, errors.New("alicloud: change loadbalancer " +
@@ -428,7 +427,7 @@ func (s *LoadBalancerClient) EnsureLoadBalancer(service *v1.Service, nodes *Endp
 
 		// update instance spec
 		if request.LoadBalancerSpec != "" && request.LoadBalancerSpec != origined.LoadBalancerSpec {
-			glog.Infof("alicloud: loadbalancerspec([%s] -> [%s]) changed, update loadbalancer [%s]",
+			klog.Infof("alicloud: loadbalancerspec([%s] -> [%s]) changed, update loadbalancer [%s]",
 				origined.LoadBalancerSpec, request.LoadBalancerSpec, origined.LoadBalancerName)
 			if err := s.c.ModifyLoadBalancerInstanceSpec(&slb.ModifyLoadBalancerInstanceSpecArgs{
 				RegionId:         origined.RegionId,
@@ -565,7 +564,7 @@ func (s *LoadBalancerClient) getLoadBalancerOpts(service *v1.Service, vswitchid 
 	// paybybandwidth need a default bandwidth args, while paybytraffic doesnt.
 	if ar.ChargeType == slb.PayByBandwidth ||
 		(ar.ChargeType == slb.PayByTraffic && req.Bandwidth != 0) {
-		glog.V(5).Infof("alicloud: %s, set bandwidth to %d", ar.ChargeType, ar.Bandwidth)
+		klog.V(5).Infof("alicloud: %s, set bandwidth to %d", ar.ChargeType, ar.Bandwidth)
 		args.Bandwidth = ar.Bandwidth
 	}
 	if ar.SLBNetworkType != "classic" &&
@@ -575,7 +574,7 @@ func (s *LoadBalancerClient) getLoadBalancerOpts(service *v1.Service, vswitchid 
 			"loadbalancer will be created. address type=%s, switchid=%s", ar.AddressType, vswitchid)
 		args.VSwitchId = vswitchid
 	}
-	args.LoadBalancerName = cloudprovider.GetLoadBalancerName(service)
+	args.LoadBalancerName = GetLoadBalancerName(service)
 	return
 }
 
@@ -586,18 +585,18 @@ const DEFAULT_SERVER_WEIGHT = 100
 func (s *LoadBalancerClient) UpdateDefaultServerGroup(backends interface{}, lb *slb.LoadBalancerType) error {
 	nodes, ok := backends.([]*v1.Node)
 	if !ok {
-		glog.Infof("skip default server group update for type %s", reflect.TypeOf(backends))
+		klog.Infof("skip default server group update for type %s", reflect.TypeOf(backends))
 		return nil
 	}
 	additions, deletions := []slb.BackendServerType{}, []string{}
-	glog.V(5).Infof("alicloud: try to update loadbalancer backend servers. [%s]", lb.LoadBalancerId)
+	klog.V(5).Infof("alicloud: try to update loadbalancer backend servers. [%s]", lb.LoadBalancerId)
 	// checkout for newly added servers
 	for _, n1 := range nodes {
 		found := false
 		_, id, err := nodeFromProviderID(n1.Spec.ProviderID)
 		for _, n2 := range lb.BackendServers.BackendServer {
 			if err != nil {
-				glog.Errorf("alicloud: node providerid=%s is not"+
+				klog.Errorf("alicloud: node providerid=%s is not"+
 					" in the correct form, expect regionid.instanceid. skip add op", n1.Spec.ProviderID)
 				continue
 			}
@@ -611,18 +610,18 @@ func (s *LoadBalancerClient) UpdateDefaultServerGroup(backends interface{}, lb *
 		}
 	}
 	if len(additions) > 0 {
-		glog.V(5).Infof("alicloud: add loadbalancer backend for [%s] \n %s\n", lb.LoadBalancerId, PrettyJson(additions))
+		klog.V(5).Infof("alicloud: add loadbalancer backend for [%s] \n %s\n", lb.LoadBalancerId, PrettyJson(additions))
 		// only 20 backend servers is accepted per delete.
 		for len(additions) > 0 {
 			var target []slb.BackendServerType
 			if len(additions) > MAX_LOADBALANCER_BACKEND {
 				target = additions[0:MAX_LOADBALANCER_BACKEND]
 				additions = additions[MAX_LOADBALANCER_BACKEND:]
-				glog.V(5).Infof("alicloud: batch add backend servers, %v", target)
+				klog.V(5).Infof("alicloud: batch add backend servers, %v", target)
 			} else {
 				target = additions
 				additions = []slb.BackendServerType{}
-				glog.V(5).Infof("alicloud: batch add backend servers, else %v", target)
+				klog.V(5).Infof("alicloud: batch add backend servers, else %v", target)
 			}
 			if _, err := s.c.AddBackendServers(lb.LoadBalancerId, target); err != nil {
 				return err
@@ -636,7 +635,7 @@ func (s *LoadBalancerClient) UpdateDefaultServerGroup(backends interface{}, lb *
 		for _, n2 := range nodes {
 			_, id, err := nodeFromProviderID(n2.Spec.ProviderID)
 			if err != nil {
-				glog.Errorf("alicloud: node providerid=%s is not "+
+				klog.Errorf("alicloud: node providerid=%s is not "+
 					"in the correct form, expect regionid.instanceid.. skip delete op... [%s]", n2.Spec.ProviderID, err.Error())
 				continue
 			}
@@ -650,29 +649,34 @@ func (s *LoadBalancerClient) UpdateDefaultServerGroup(backends interface{}, lb *
 		}
 	}
 	if len(deletions) > 0 {
-		glog.V(5).Infof("alicloud: delete loadbalancer backend for [%s] %v", lb.LoadBalancerId, deletions)
+		klog.V(5).Infof("alicloud: delete loadbalancer backend for [%s] %v", lb.LoadBalancerId, deletions)
 		// only 20 backend servers is accepted per delete.
 		for len(deletions) > 0 {
 			var target []string
 			if len(deletions) > MAX_LOADBALANCER_BACKEND {
 				target = deletions[0:MAX_LOADBALANCER_BACKEND]
 				deletions = deletions[MAX_LOADBALANCER_BACKEND:]
-				glog.V(5).Infof("alicloud: batch delete backend servers, %s", target)
+				klog.V(5).Infof("alicloud: batch delete backend servers, %s", target)
 			} else {
 				target = deletions
 				deletions = []string{}
-				glog.V(5).Infof("alicloud: batch delete backend servers else, %s", target)
+				klog.V(5).Infof("alicloud: batch delete backend servers else, %s", target)
 			}
-			if _, err := s.c.RemoveBackendServers(lb.LoadBalancerId, target); err != nil {
+			var mdelete []slb.BackendServerType
+			for _, del := range target {
+				mdelete = append(mdelete, slb.BackendServerType{ServerId: del})
+			}
+			_, err := s.c.RemoveBackendServers(lb.LoadBalancerId, mdelete)
+			if err != nil {
 				return err
 			}
 		}
 	}
 	if len(additions) <= 0 && len(deletions) <= 0 {
-		glog.V(5).Infof("alicloud: no backend servers need to be updated.[%s]", lb.LoadBalancerId)
+		klog.V(5).Infof("alicloud: no backend servers need to be updated.[%s]", lb.LoadBalancerId)
 		return nil
 	}
-	glog.V(5).Infof("alicloud: update loadbalancer`s backend servers finished! [%s]", lb.LoadBalancerId)
+	klog.V(5).Infof("alicloud: update loadbalancer`s backend servers finished! [%s]", lb.LoadBalancerId)
 	return nil
 }
 

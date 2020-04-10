@@ -5,10 +5,10 @@ import (
 	"github.com/denverdino/aliyungo/common"
 	"github.com/denverdino/aliyungo/ecs"
 	"github.com/denverdino/aliyungo/slb"
-	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/cloud-provider-alibaba-cloud/cloud-controller-manager/utils"
-	"k8s.io/kubernetes/staging/src/k8s.io/apimachinery/pkg/util/json"
+	"k8s.io/klog"
 	"reflect"
 	"strings"
 )
@@ -29,7 +29,7 @@ func (v *vgroup) Logf(format string, args ...interface{}) {
 	if v.NamedKey != nil {
 		prefix = fmt.Sprintf("[%s/%s]", v.NamedKey.Namespace, v.NamedKey.ServiceName)
 	}
-	glog.Infof(prefix+format, args...)
+	klog.Infof(prefix+format, args...)
 }
 
 func (v *vgroup) Describe() error {
@@ -208,7 +208,7 @@ func Batch(m interface{}, cnt int, batch Func) error {
 	for i := 0; i < v.Len(); i++ {
 		target[i] = v.Index(i).Interface()
 	}
-	glog.Infof("batch process ,total length %d", len(target))
+	klog.Infof("batch process ,total length %d", len(target))
 	for len(target) > cnt {
 		if err := batch(target[0:cnt]); err != nil {
 
@@ -220,7 +220,7 @@ func Batch(m interface{}, cnt int, batch Func) error {
 		return nil
 	}
 
-	glog.Infof("batch process ,total length %d last section", len(target))
+	klog.Infof("batch process ,total length %d last section", len(target))
 	return batch(target)
 }
 
@@ -310,7 +310,7 @@ func Ensure(v *vgroup, nodes *EndpointWithENI) error {
 type vgroups []*vgroup
 
 func EnsureVirtualGroups(vgrps *vgroups, nodes *EndpointWithENI) error {
-	glog.Infof("ensure vserver group: %d vgroup need to be processed.", len(*vgrps))
+	klog.Infof("ensure vserver group: %d vgroup need to be processed.", len(*vgrps))
 	for _, v := range *vgrps {
 		if v == nil {
 			return fmt.Errorf("unexpected nil vgroup ")
@@ -433,7 +433,7 @@ func BuildVirtualGroupFromRemoteAPI(
 	for _, val := range vgrp.VServerGroups.VServerGroup {
 		key, err := LoadNamedKey(val.VServerGroupName)
 		if err != nil {
-			glog.Warningf("we just en-counted an "+
+			klog.Warningf("we just en-counted an "+
 				"unexpected vserver group name: [%s]. Assume user managed "+
 				"vserver group, It is ok to skip this vgroup.", val.VServerGroupName)
 			continue
@@ -471,7 +471,7 @@ func findNodeByNodeName(nodes []*v1.Node, nodeName string) *v1.Node {
 			return n
 		}
 	}
-	glog.Infof("node %s not found ", nodeName)
+	klog.Infof("node %s not found ", nodeName)
 	return nil
 }
 
@@ -556,11 +556,11 @@ func (v *EndpointWithENI) doBackendBuild(g *vgroup) ([]slb.VBackendServerType, e
 
 	// ENI Mode
 	if v.BackendTypeENI {
-		glog.Infof("[ENI] mode service: %s", g.NamedKey)
 		if v.Endpoints == nil {
-			glog.Warningf("%s endpoint is nil in eni mode", g.NamedKey)
+			klog.Warningf("%s endpoint is nil in eni mode", g.NamedKey)
 			return backend, nil
 		}
+		klog.Infof("[ENI] mode service: %s, endpoint subsets length: %d", g.NamedKey,len(v.Endpoints.Subsets))
 		var privateIpAddress []string
 		for _, ep := range v.Endpoints.Subsets {
 			for _, addr := range ep.Addresses {
@@ -577,11 +577,11 @@ func (v *EndpointWithENI) doBackendBuild(g *vgroup) ([]slb.VBackendServerType, e
 	// Local Mode
 	// When ecs and eci are deployed in a cluster, add ecs first and then add eci
 	if v.LocalMode {
-		glog.Infof("[Local] mode service: %s", g.NamedKey)
 		if v.Endpoints == nil {
-			glog.Warningf("%s endpoint is nil in local mode", g.NamedKey)
+			klog.Warningf("%s endpoint is nil in local mode", g.NamedKey)
 			return backend, nil
 		}
+		klog.Infof("[Local] mode service: %s,  endpoint subsets length: %d", g.NamedKey,len(v.Endpoints.Subsets))
 		// 1. add duplicate ecs backends
 		for _, sub := range v.Endpoints.Subsets {
 			for _, add := range sub.Addresses {
@@ -590,7 +590,7 @@ func (v *EndpointWithENI) doBackendBuild(g *vgroup) ([]slb.VBackendServerType, e
 				}
 				node := findNodeByNodeName(v.Nodes, *add.NodeName)
 				if node == nil {
-					glog.Warningf("can not find correspond node %s for endpoint %s", *add.NodeName, add.IP)
+					klog.Warningf("can not find correspond node %s for endpoint %s", *add.NodeName, add.IP)
 					continue
 				}
 				if isExcludeNode(node) {
@@ -620,7 +620,7 @@ func (v *EndpointWithENI) doBackendBuild(g *vgroup) ([]slb.VBackendServerType, e
 
 	//Cluster Mode
 	// When ecs and eci are deployed in a cluster, add ecs first and then add eci
-	glog.Infof("[Cluster] mode service: %s", g.NamedKey)
+	klog.Infof("[Cluster] mode service: %s", g.NamedKey)
 	// 1. add ecs backends
 	for _, node := range v.Nodes {
 		if isExcludeNode(node) {
@@ -685,7 +685,7 @@ func (v *EndpointWithENI) addECIBackends(backend []slb.VBackendServerType, g *vg
 	var privateIpAddress []string
 	// filter ECI nodes
 	if v.Endpoints == nil {
-		glog.Warningf("%s endpoint is nil in eci mode", g.NamedKey)
+		klog.Warningf("%s endpoint is nil in eci mode", g.NamedKey)
 		return backend, nil
 	}
 	for _, sub := range v.Endpoints.Subsets {
@@ -699,7 +699,7 @@ func (v *EndpointWithENI) addECIBackends(backend []slb.VBackendServerType, g *vg
 			}
 			// check if the node is ECI
 			if node.Labels["type"] == utils.ECINodeLabel {
-				glog.Infof("hybrid: %s not an ecs, use eni object as backend", add.IP)
+				klog.Infof("hybrid: %s not an ecs, use eni object as backend", add.IP)
 				privateIpAddress = append(privateIpAddress, add.IP)
 			}
 		}
@@ -718,11 +718,11 @@ func (v *EndpointWithENI) addECIBackends(backend []slb.VBackendServerType, g *vg
 
 func isExcludeNode(node *v1.Node) bool {
 	if _, exclude := node.Labels[utils.LabelNodeRoleExcludeNode]; exclude {
-		glog.Infof("ignore node with exclude node label %s", node.Name)
+		klog.Infof("ignore node with exclude node label %s", node.Name)
 		return true
 	}
 	if _, exclude := node.Labels[utils.LabelNodeRoleExcludeBalancer]; exclude {
-		glog.Infof("ignore node with exclude balancer label %s", node.Name)
+		klog.Infof("ignore node with exclude balancer label %s", node.Name)
 		return true
 	}
 	return false

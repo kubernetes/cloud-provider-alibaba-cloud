@@ -19,17 +19,17 @@ package alicloud
 import (
 	"errors"
 	"fmt"
+	"k8s.io/klog"
 	"strings"
 	"sync"
 
 	"encoding/json"
 	"github.com/denverdino/aliyungo/common"
 	"github.com/denverdino/aliyungo/ecs"
-	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/cloud-provider"
 	"k8s.io/cloud-provider-alibaba-cloud/cloud-controller-manager/controller/node"
-	"k8s.io/kubernetes/pkg/cloudprovider"
 )
 
 // InstanceClient wrap for instance sdk
@@ -72,7 +72,7 @@ func (s *InstanceClient) filterOutByRegion(nodes []*v1.Node, region common.Regio
 	for _, node := range nodes {
 		v, err := s.findInstanceByProviderID(node.Spec.ProviderID)
 		if err != nil {
-			glog.Errorf("alicloud: error find instance by node, retrieve nodes [%s]\n", err.Error())
+			klog.Errorf("alicloud: error find instance by node, retrieve nodes [%s]\n", err.Error())
 			return []*v1.Node{}, err
 		}
 		if v != nil && v.VpcAttributes.VpcId == key {
@@ -80,14 +80,14 @@ func (s *InstanceClient) filterOutByRegion(nodes []*v1.Node, region common.Regio
 			records = append(records, node.Name)
 		}
 	}
-	glog.V(4).Infof("alicloud: accept nodes by region id=[%v], records=%v\n", region, records)
+	klog.V(4).Infof("alicloud: accept nodes by region id=[%v], records=%v\n", region, records)
 	return result, nil
 }
 
 func (s *InstanceClient) filterOutByLabel(nodes []*v1.Node, labels string) ([]*v1.Node, error) {
 	if labels == "" {
 		// skip filter when label is empty
-		glog.V(2).Infof("alicloud: slb backend server label does not specified, skip filter nodes by label.")
+		klog.V(2).Infof("alicloud: slb backend server label does not specified, skip filter nodes by label.")
 		return nodes, nil
 	}
 	result := []*v1.Node{}
@@ -99,7 +99,7 @@ func (s *InstanceClient) filterOutByLabel(nodes []*v1.Node, labels string) ([]*v
 			l := strings.Split(v, "=")
 			if len(l) < 2 {
 				msg := fmt.Sprintf("alicloud: error parse backend label with value [%s], must be key value like [k1=v1,k2=v2]\n", v)
-				glog.Errorf(msg)
+				klog.Errorf(msg)
 				return []*v1.Node{}, errors.New(msg)
 			}
 			if nv, exist := node.Labels[l[0]]; !exist || nv != l[1] {
@@ -112,7 +112,7 @@ func (s *InstanceClient) filterOutByLabel(nodes []*v1.Node, labels string) ([]*v
 			records = append(records, node.Name)
 		}
 	}
-	glog.V(4).Infof("alicloud: accept nodes by service backend labels[%s], %v\n", labels, records)
+	klog.V(4).Infof("alicloud: accept nodes by service backend labels[%s], %v\n", labels, records)
 	return result, nil
 }
 
@@ -135,7 +135,7 @@ func nodeid(region, nodename string) string {
 func (s *InstanceClient) findAddressByNodeName(nodeName types.NodeName) ([]v1.NodeAddress, error) {
 	instance, err := s.findInstanceByNodeName(nodeName)
 	if err != nil {
-		glog.Errorf("alicloud: error getting instance by nodeName. providerID='%s', message=[%s]\n", nodeName, err.Error())
+		klog.Errorf("alicloud: error getting instance by nodeName. providerID='%s', message=[%s]\n", nodeName, err.Error())
 		return nil, err
 	}
 
@@ -175,7 +175,7 @@ func (s *InstanceClient) findAddressByProviderID(providerID string) ([]v1.NodeAd
 
 	instance, err := s.findInstanceByProviderID(providerID)
 	if err != nil {
-		glog.Errorf("alicloud: error getting instance by providerID. providerID='%s', message=[%s]\n", providerID, err.Error())
+		klog.Errorf("alicloud: error getting instance by providerID. providerID='%s', message=[%s]\n", providerID, err.Error())
 		return nil, err
 	}
 
@@ -194,16 +194,16 @@ func (s *InstanceClient) findInstanceByProviderID(providerID string) (*ecs.Insta
 	}
 	ins, err := s.getInstances([]string{nodeid}, region)
 	if err != nil {
-		glog.Errorf("alicloud: InstanceInspectError, instanceid=[%s.%s]. message=[%s]\n", region, nodeid, err.Error())
+		klog.Errorf("alicloud: InstanceInspectError, instanceid=[%s.%s]. message=[%s]\n", region, nodeid, err.Error())
 		return nil, err
 	}
 
 	if len(ins) == 0 {
-		glog.Infof("alicloud: InstanceNotFound, instanceid=[%s.%s]. It is likely to be deleted.\n", region, nodeid)
+		klog.Infof("alicloud: InstanceNotFound, instanceid=[%s.%s]. It is likely to be deleted.\n", region, nodeid)
 		return nil, cloudprovider.InstanceNotFound
 	}
 	if len(ins) > 1 {
-		glog.Warningf("alicloud: multiple instances found by nodename=[%s], "+
+		klog.Warningf("alicloud: multiple instances found by nodename=[%s], "+
 			"the first one will be used, instanceid=[%s]\n", string(nodeid), ins[0].InstanceId)
 	}
 	return &ins[0], nil
@@ -256,7 +256,7 @@ func (s *InstanceClient) getInstances(ids []string, region common.Region) ([]ecs
 
 	instances, _, err := s.c.DescribeInstances(&args)
 	if err != nil {
-		glog.Errorf("alicloud: calling DescribeInstances error. region=%s, "+
+		klog.Errorf("alicloud: calling DescribeInstances error. region=%s, "+
 			"instancename=%s, message=[%s].\n", args.RegionId, args.InstanceName, err.Error())
 		return nil, err
 	}

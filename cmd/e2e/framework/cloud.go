@@ -2,8 +2,8 @@ package framework
 
 import (
 	"fmt"
+	"k8s.io/cloud-provider"
 	cloud "k8s.io/cloud-provider-alibaba-cloud/cloud-controller-manager"
-	"k8s.io/kubernetes/pkg/cloudprovider"
 )
 
 func NewAlibabaCloudOrDie(configpath string) *cloud.Cloud {

@@ -69,7 +69,7 @@ type mockClientSLB struct {
 	modifyLoadBalancerInternetSpec func(args *slb.ModifyLoadBalancerInternetSpecArgs) (err error)
 	modifyLoadBalancerInstanceSpec func(args *slb.ModifyLoadBalancerInstanceSpecArgs) (err error)
 	describeLoadBalancerAttribute  func(loadBalancerId string) (loadBalancer *slb.LoadBalancerType, err error)
-	removeBackendServers           func(loadBalancerId string, backendServers []string) (result []slb.BackendServerType, err error)
+	removeBackendServers           func(loadBalancerId string, backendServers []slb.BackendServerType) (result []slb.BackendServerType, err error)
 	addBackendServers              func(loadBalancerId string, backendServers []slb.BackendServerType) (result []slb.BackendServerType, err error)
 
 	stopLoadBalancerListener                   func(loadBalancerId string, port int) (err error)
@@ -381,7 +381,7 @@ func (c *mockClientSLB) DescribeLoadBalancerAttribute(loadBalancerId string) (lo
 	return &ins, nil
 }
 
-func (c *mockClientSLB) RemoveBackendServers(loadBalancerId string, backendServers []string) (result []slb.BackendServerType, err error) {
+func (c *mockClientSLB) RemoveBackendServers(loadBalancerId string, backendServers []slb.BackendServerType) (result []slb.BackendServerType, err error) {
 	if c.removeBackendServers != nil {
 		return c.removeBackendServers(loadBalancerId, backendServers)
 	}
@@ -398,7 +398,7 @@ func (c *mockClientSLB) RemoveBackendServers(loadBalancerId string, backendServe
 	for _, bc := range ins.BackendServers.BackendServer {
 		found := false
 		for _, del := range backendServers {
-			if bc.ServerId == del {
+			if bc.ServerId == del.ServerId {
 				found = true
 			}
 		}
@@ -410,13 +410,13 @@ func (c *mockClientSLB) RemoveBackendServers(loadBalancerId string, backendServe
 	return backend(backendServers), nil
 }
 
-func backend(bc []string) []slb.BackendServerType {
+func backend(bc []slb.BackendServerType) []slb.BackendServerType {
 	var result []slb.BackendServerType
 	for _, back := range bc {
 		server := slb.BackendServerType{
 			Weight:   100,
 			Type:     "ecs",
-			ServerId: back,
+			ServerId: back.ServerId,
 		}
 		result = append(result, server)
 	}

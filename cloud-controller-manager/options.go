@@ -18,6 +18,7 @@ package alicloud
 
 import (
 	"k8s.io/cloud-provider-alibaba-cloud/cloud-controller-manager/utils"
+	"k8s.io/klog"
 	"strconv"
 	"strings"
 	"unicode"
@@ -26,7 +27,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"github.com/denverdino/aliyungo/slb"
-	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
 )
 
@@ -194,7 +194,7 @@ func ExtractAnnotationRequest(service *v1.Service) (*AnnotationRequest, *Annotat
 			request.Bandwidth = i
 			defaulted.Bandwidth = i
 		} else {
-			glog.Warningf("annotation service.beta.kubernetes.io/alicloud-loadbalancer-bandwidth"+
+			klog.Warningf("annotation service.beta.kubernetes.io/alicloud-loadbalancer-bandwidth"+
 				" must be integer, but got [%s], default with no limit. message=[%s]\n",
 				bandwidth, err.Error())
 			defaulted.Bandwidth = DEFAULT_BANDWIDTH
@@ -320,7 +320,7 @@ func ExtractAnnotationRequest(service *v1.Service) (*AnnotationRequest, *Annotat
 	if ok {
 		port, err := strconv.Atoi(healthCheckConnectPort)
 		if err != nil {
-			glog.Warningf("annotation service.beta.kubernetes.io/alicloud-"+
+			klog.Warningf("annotation service.beta.kubernetes.io/alicloud-"+
 				"loadbalancer-health-check-connect-port must be integer, but got [%s]. message=[%s]\n",
 				healthCheckConnectPort, err.Error())
 			//defaulted.HealthCheckConnectPort = MagicHealthCheckConnectPort
@@ -334,7 +334,7 @@ func ExtractAnnotationRequest(service *v1.Service) (*AnnotationRequest, *Annotat
 	if ok {
 		thresh, err := strconv.Atoi(healthCheckHealthyThreshold)
 		if err != nil {
-			glog.Warningf("annotation service.beta.kubernetes.io/alicloud-loadbalancer-"+
+			klog.Warningf("annotation service.beta.kubernetes.io/alicloud-loadbalancer-"+
 				"health-check-healthy-threshold must be integer, but got [%s], use default number 3. message=[%s]\n",
 				healthCheckHealthyThreshold, err.Error())
 			//defaulted.HealthyThreshold = 3
@@ -348,7 +348,7 @@ func ExtractAnnotationRequest(service *v1.Service) (*AnnotationRequest, *Annotat
 	if ok {
 		unThresh, err := strconv.Atoi(healthCheckUnhealthyThreshold)
 		if err != nil {
-			glog.Warningf("annotation service.beta.kubernetes.io/alicloud-loadbalancer-"+
+			klog.Warningf("annotation service.beta.kubernetes.io/alicloud-loadbalancer-"+
 				"health-check-unhealthy-threshold must be integer, but got [%s], use default number 3. message=[%s]\n",
 				healthCheckUnhealthyThreshold, err.Error())
 			//defaulted.UnhealthyThreshold = 3
@@ -362,7 +362,7 @@ func ExtractAnnotationRequest(service *v1.Service) (*AnnotationRequest, *Annotat
 	if ok {
 		interval, err := strconv.Atoi(healthCheckInterval)
 		if err != nil {
-			glog.Warningf("annotation service.beta.kubernetes.io/alicloud-loadbalancer-"+
+			klog.Warningf("annotation service.beta.kubernetes.io/alicloud-loadbalancer-"+
 				"health-check-interval must be integer, but got [%s], use default number 2. message=[%s]\n",
 				healthCheckInterval, err.Error())
 			//defaulted.HealthCheckInterval = 2
@@ -376,7 +376,7 @@ func ExtractAnnotationRequest(service *v1.Service) (*AnnotationRequest, *Annotat
 	if ok {
 		connout, err := strconv.Atoi(healthCheckConnectTimeout)
 		if err != nil {
-			glog.Warningf("annotation service.beta.kubernetes.io/alicloud-loadbalancer-"+
+			klog.Warningf("annotation service.beta.kubernetes.io/alicloud-loadbalancer-"+
 				"health-check-connect-timeout must be integer, but got [%s], use default number 5. message=[%s]\n",
 				healthCheckConnectTimeout, err.Error())
 			//defaulted.HealthCheckConnectTimeout = 5
@@ -390,7 +390,7 @@ func ExtractAnnotationRequest(service *v1.Service) (*AnnotationRequest, *Annotat
 	if ok {
 		hout, err := strconv.Atoi(healthCheckTimeout)
 		if err != nil {
-			glog.Warningf("annotation service.beta.kubernetes.io/alicloud-loadbalancer-health-"+
+			klog.Warningf("annotation service.beta.kubernetes.io/alicloud-loadbalancer-health-"+
 				"check-timeout must be integer, but got [%s], use default number 5. message=[%s]\n",
 				healthCheckConnectTimeout, err.Error())
 			//defaulted.HealthCheckTimeout = 5
@@ -450,7 +450,7 @@ func ExtractAnnotationRequest(service *v1.Service) (*AnnotationRequest, *Annotat
 	if ok {
 		timeout, err := strconv.Atoi(persistenceTimeout)
 		if err != nil {
-			glog.Warningf("annotation persistence timeout must be integer, but got [%s]. message=[%s]\n",
+			klog.Warningf("annotation persistence timeout must be integer, but got [%s]. message=[%s]\n",
 				persistenceTimeout, err.Error())
 			//defaulted.PersistenceTimeout = 0
 		} else {
@@ -462,7 +462,7 @@ func ExtractAnnotationRequest(service *v1.Service) (*AnnotationRequest, *Annotat
 	if ok {
 		timeout, err := strconv.Atoi(cookieTimeout)
 		if err != nil {
-			glog.Warningf("annotation persistence timeout must be integer, but got [%s]. message=[%s]\n",
+			klog.Warningf("annotation persistence timeout must be integer, but got [%s]. message=[%s]\n",
 				cookieTimeout, err.Error())
 			//defaulted.CookieTimeout = 0
 		} else {
@@ -505,7 +505,7 @@ func ExtractAnnotationRequest(service *v1.Service) (*AnnotationRequest, *Annotat
 	if ok {
 		ttl, err := strconv.Atoi(privateZoneRecordTTL)
 		if err != nil {
-			glog.Warningf("annotation "+ServiceAnnotationLoadBalancerPrivateZoneRecordTTL+
+			klog.Warningf("annotation "+ServiceAnnotationLoadBalancerPrivateZoneRecordTTL+
 				" must be integer, but got [%s], use default number 60. message=[%s]\n",
 				privateZoneRecordTTL, err.Error())
 			defaulted.PrivateZoneRecordTTL = 60
@@ -619,13 +619,13 @@ func PrettyJson(obj interface{}) string {
 	pretty := bytes.Buffer{}
 	data, err := json.Marshal(obj)
 	if err != nil {
-		glog.Errorf("PrettyJson, mashal error: %s\n", err.Error())
+		klog.Errorf("PrettyJson, mashal error: %s\n", err.Error())
 		return ""
 	}
 	err = json.Indent(&pretty, data, "", "    ")
 
 	if err != nil {
-		glog.Errorf("PrettyJson, indent error: %s\n", err.Error())
+		klog.Errorf("PrettyJson, indent error: %s\n", err.Error())
 		return ""
 	}
 	return pretty.String()

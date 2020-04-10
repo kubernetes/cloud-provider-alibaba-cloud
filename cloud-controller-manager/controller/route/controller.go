@@ -18,16 +18,16 @@ package route
 
 import (
 	"fmt"
-	"k8s.io/cloud-provider-alibaba-cloud/cloud-controller-manager/utils"
+	"k8s.io/client-go/util/workqueue"
 	queue "k8s.io/client-go/util/workqueue"
-	"k8s.io/kubernetes/staging/src/k8s.io/client-go/util/workqueue"
+	"k8s.io/cloud-provider-alibaba-cloud/cloud-controller-manager/utils"
+	"k8s.io/klog"
 	"net"
 	"reflect"
 	"time"
 
 	"strings"
 
-	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -42,10 +42,11 @@ import (
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
-	v1node "k8s.io/kubernetes/pkg/api/v1/node"
-	"k8s.io/kubernetes/pkg/cloudprovider"
-	"k8s.io/kubernetes/pkg/controller"
-	"k8s.io/kubernetes/pkg/util/metrics"
+	//v1node "k8s.io/kubernetes/pkg/api/v1/node"
+	"k8s.io/cloud-provider"
+	"k8s.io/cloud-provider/node/helpers"
+	metrics "k8s.io/component-base/metrics/prometheus/ratelimiter"
+	controller "k8s.io/kube-aggregator/pkg/controllers"
 	nodeutil "k8s.io/kubernetes/pkg/util/node"
 )
 
@@ -108,7 +109,7 @@ func New(routes Routes,
 			kubeClient.CoreV1().RESTClient().GetRateLimiter(),
 		)
 		if err != nil {
-			glog.Warningf("metrics initialized fail. %s", err.Error())
+			klog.Warningf("metrics initialized fail. %s", err.Error())
 		}
 	}
 
@@ -149,11 +150,11 @@ func (rc *RouteController) HandlerForNodeDeletion(
 			DeleteFunc: func(nodec interface{}) {
 				node, ok := nodec.(*v1.Node)
 				if !ok {
-					glog.Infof("not node type: %s\n", reflect.TypeOf(nodec))
+					klog.Infof("not node type: %s\n", reflect.TypeOf(nodec))
 					return
 				}
 				que.Add(node)
-				glog.Infof("node deletion event: %s, %s", node.Name, node.Spec.ProviderID)
+				klog.Infof("node deletion event: %s, %s", node.Name, node.Spec.ProviderID)
 			},
 		},
 	)
@@ -163,8 +164,8 @@ func (rc *RouteController) HandlerForNodeDeletion(
 func (rc *RouteController) Run(stopCh <-chan struct{}, syncPeriod time.Duration) {
 	defer utilruntime.HandleCrash()
 
-	glog.Info("starting route controller")
-	defer glog.Info("shutting down route controller")
+	klog.Info("starting route controller")
+	defer klog.Info("shutting down route controller")
 
 	if !controller.WaitForCacheSync(ROUTE_CONTROLLER, stopCh, rc.nodeListerSynced) {
 		return
@@ -184,7 +185,7 @@ func (rc *RouteController) Run(stopCh <-chan struct{}, syncPeriod time.Duration)
 	// trigger reconciliation for that node.
 	go wait.NonSlidingUntil(func() {
 		if err := rc.reconcile(); err != nil {
-			glog.Errorf("Couldn't reconcile node routes: %v", err)
+			klog.Errorf("Couldn't reconcile node routes: %v", err)
 		}
 	}, syncPeriod, stopCh)
 
@@ -202,14 +203,14 @@ func (rc *RouteController) Run(stopCh <-chan struct{}, syncPeriod time.Duration)
 					defer que.Done(key)
 					node, ok := key.(*v1.Node)
 					if !ok {
-						glog.Errorf("not type of *v1.Node, %s", reflect.TypeOf(key))
+						klog.Errorf("not type of *v1.Node, %s", reflect.TypeOf(key))
 						return
 					}
-					glog.Infof("[%s] worker: queued sync for node deletion with route", key)
+					klog.Infof("[%s] worker: queued sync for node deletion with route", key)
 
 					if err := rc.syncd(node); err != nil {
 						que.AddAfter(key, 2*time.Minute)
-						glog.Errorf("requeue: sync error for service %s %v", key, err)
+						klog.Errorf("requeue: sync error for service %s %v", key, err)
 					}
 				}()
 			}
@@ -234,11 +235,11 @@ func (rc *RouteController) syncd(node *v1.Node) error {
 		if err := rc.routes.DeleteRoute(
 			rc.clusterName, table, route,
 		); err != nil {
-			glog.Errorf(
+			klog.Errorf(
 				"delete route %s %s from table %s, %s", route.Name, route.DestinationCIDR, table, err.Error())
 			return fmt.Errorf("node deletion, delete route error: %s", err.Error())
 		}
-		glog.Infof("node deletion: delete route %s %s from table %s SUCCESS.", route.Name, route.DestinationCIDR, table)
+		klog.Infof("node deletion: delete route %s %s from table %s SUCCESS.", route.Name, route.DestinationCIDR, table)
 	}
 	return nil
 }
@@ -278,12 +279,12 @@ func (rc *RouteController) sync(table string, nodes []*v1.Node, routes []*cloudp
 		if route.Blackhole || rc.isRouteConflicted(nodes, route) {
 
 			// Aoxn: Alibaba cloud does not support concurrent route operation
-			glog.Infof("Deleting route %s %s", route.Name, route.DestinationCIDR)
+			klog.Infof("Deleting route %s %s", route.Name, route.DestinationCIDR)
 			if err := rc.routes.DeleteRoute(rc.clusterName, table, route); err != nil {
-				glog.Errorf("Could not delete route %s %s from table %s, %s", route.Name, route.DestinationCIDR, table, err.Error())
+				klog.Errorf("Could not delete route %s %s from table %s, %s", route.Name, route.DestinationCIDR, table, err.Error())
 				continue
 			}
-			glog.Infof("Delete route %s %s from table %s SUCCESS.", route.Name, route.DestinationCIDR, table)
+			klog.Infof("Delete route %s %s from table %s SUCCESS.", route.Name, route.DestinationCIDR, table)
 		}
 	}
 	cached := RouteCacheMap(routes)
@@ -296,18 +297,18 @@ func (rc *RouteController) sync(table string, nodes []*v1.Node, routes []*cloudp
 		if node.Spec.PodCIDR == "" {
 			err := rc.updateNetworkingCondition(types.NodeName(node.Name), false)
 			if err != nil {
-				glog.Errorf("route, update network condition error: %s", err.Error())
+				klog.Errorf("route, update network condition error: %s", err.Error())
 			}
 			continue
 		}
 		if node.Spec.ProviderID == "" {
-			glog.Errorf("Node %s has no Provider ID, skip it", node.Name)
+			klog.Errorf("Node %s has no Provider ID, skip it", node.Name)
 			continue
 		}
 		// ignore error return. Try it next time anyway.
 		err := rc.tryCreateRoute(table, node, cached)
 		if err != nil {
-			glog.Errorf("try create route error: %s", err.Error())
+			klog.Errorf("try create route error: %s", err.Error())
 		}
 	}
 	return nil
@@ -330,9 +331,9 @@ func (rc *RouteController) tryCreateRoute(table string,
 	node *v1.Node,
 	cache map[string]*cloudprovider.Route) error {
 
-	_, condition := v1node.GetNodeCondition(&node.Status, v1.NodeReady)
+	_, condition := helpers.GetNodeCondition(&node.Status, v1.NodeReady)
 	if condition != nil && condition.Status == v1.ConditionUnknown {
-		glog.Infof("node %s is in unknown status.Skip creating route.", node.Name)
+		klog.Infof("node %s is in unknown status.Skip creating route.", node.Name)
 		return nil
 	}
 
@@ -341,7 +342,7 @@ func (rc *RouteController) tryCreateRoute(table string,
 	}
 
 	if node.Spec.ProviderID == "" {
-		glog.Warningf("node %s has no node.Spec.ProviderID, skip it", node.Name)
+		klog.Warningf("node %s has no node.Spec.ProviderID, skip it", node.Name)
 		return nil
 	}
 	providerID := node.Spec.ProviderID
@@ -365,15 +366,15 @@ func (rc *RouteController) tryCreateRoute(table string,
 		var lasterr error
 		err := wait.ExponentialBackoff(backoff, func() (bool, error) {
 
-			glog.Infof("Creating route for node %s %s with hint %s", node.Name, route.DestinationCIDR, node.Name)
+			klog.Infof("Creating route for node %s %s with hint %s", node.Name, route.DestinationCIDR, node.Name)
 			err := rc.routes.CreateRoute(rc.clusterName, node.Name, table, route)
 			if err != nil {
 				lasterr = err
 				if strings.Contains(err.Error(), "not found") {
-					glog.Infof("not found route %s", err.Error())
+					klog.Infof("not found route %s", err.Error())
 					return true, nil
 				}
-				glog.Errorf("Backoff creating route: %s", err.Error())
+				klog.Errorf("Backoff creating route: %s", err.Error())
 				return false, nil
 			}
 			return true, nil
@@ -389,13 +390,13 @@ func (rc *RouteController) tryCreateRoute(table string,
 						Namespace: "",
 					}, v1.EventTypeWarning, "FailedToCreateRoute", msg)
 			}
-			glog.Error(msg)
+			klog.Error(msg)
 		}
-		glog.Infof("Created route for %s with %s -> %s", table, node.Name, node.Spec.PodCIDR)
+		klog.Infof("Created route for %s with %s -> %s", table, node.Name, node.Spec.PodCIDR)
 		return rc.updateNetworkingCondition(types.NodeName(node.Name), err == nil)
 	}
 	// Update condition only if it doesn't reflect the current state.
-	_, condition = v1node.GetNodeCondition(&node.Status, v1.NodeNetworkUnavailable)
+	_, condition = helpers.GetNodeCondition(&node.Status, v1.NodeNetworkUnavailable)
 	if condition != nil &&
 		condition.Status == v1.ConditionTrue {
 		return nil
@@ -429,7 +430,7 @@ func (rc *RouteController) isRouteConflicted(nodes []*v1.Node, route *cloudprovi
 						Namespace: "",
 					}, v1.EventTypeWarning, "FailedToCreateRoute", msg)
 			}
-			glog.Error(msg)
+			klog.Error(msg)
 			return false
 		}
 		if contains {
@@ -466,19 +467,19 @@ func (rc *RouteController) updateNetworkingCondition(nodeName types.NodeName, ro
 			return nil
 		}
 		if !errors.IsConflict(err) {
-			glog.Errorf("Error updating node %s: %v", nodeName, err)
+			klog.Errorf("Error updating node %s: %v", nodeName, err)
 			return err
 		}
-		glog.V(4).Infof("Error updating node %s, retrying: %v", nodeName, err)
+		klog.V(4).Infof("Error updating node %s, retrying: %v", nodeName, err)
 	}
-	glog.Errorf("Error updating node %s: %v", nodeName, err)
+	klog.Errorf("Error updating node %s: %v", nodeName, err)
 	return err
 }
 
 func (rc *RouteController) isResponsibleForRoute(route *cloudprovider.Route) bool {
 	_, cidr, err := net.ParseCIDR(route.DestinationCIDR)
 	if err != nil {
-		glog.Errorf("Ignoring route %s, unparsable CIDR: %v", route.Name, err)
+		klog.Errorf("Ignoring route %s, unparsable CIDR: %v", route.Name, err)
 		return false
 	}
 	// Not responsible if this route's CIDR is not within our clusterCIDR
@@ -494,7 +495,7 @@ func (rc *RouteController) isResponsibleForRoute(route *cloudprovider.Route) boo
 
 func broadcaster() (record.EventRecorder, record.EventBroadcaster) {
 	caster := record.NewBroadcaster()
-	caster.StartLogging(glog.Infof)
+	caster.StartLogging(klog.Infof)
 	source := v1.EventSource{Component: ROUTE_CONTROLLER}
 	return caster.NewRecorder(scheme.Scheme, source), caster
 }

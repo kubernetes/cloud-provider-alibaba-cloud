@@ -16,13 +16,13 @@ limitations under the License.
 package node
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
+	"k8s.io/klog"
 	"time"
 
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
-
-	"github.com/golang/glog"
 
 	"strings"
 
@@ -32,6 +32,7 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	coreinformers "k8s.io/client-go/informers/core/v1"
+	"k8s.io/client-go/kubernetes"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
@@ -39,14 +40,14 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/cloud-provider-alibaba-cloud/cloud-controller-manager/controller/route"
 	"k8s.io/cloud-provider-alibaba-cloud/cloud-controller-manager/utils"
-	nodeutilv1 "k8s.io/kubernetes/pkg/api/v1/node"
-	"k8s.io/kubernetes/pkg/cloudprovider"
-	"k8s.io/kubernetes/pkg/controller"
+	//nodeutilv1 "k8s.io/kubernetes/pkg/api/v1/node"
+	"k8s.io/cloud-provider"
+	"k8s.io/cloud-provider/api"
+	"k8s.io/cloud-provider/node/helpers"
+	metrics "k8s.io/component-base/metrics/prometheus/ratelimiter"
+	controller "k8s.io/kube-aggregator/pkg/controllers"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
-	"k8s.io/kubernetes/pkg/util/metrics"
 	nodeutil "k8s.io/kubernetes/pkg/util/node"
-	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
-	"k8s.io/kubernetes/staging/src/k8s.io/client-go/kubernetes"
 )
 
 type CloudNodeController struct {
@@ -109,9 +110,9 @@ func NewCloudNodeController(
 	if kubeClient != nil && kubeClient.CoreV1().RESTClient().GetRateLimiter() != nil {
 		limitor := kubeClient.CoreV1().RESTClient().GetRateLimiter()
 		_ = metrics.RegisterMetricAndTrackRateLimiterUsage(NODE_CONTROLLER, limitor)
-		glog.Infof("start sending events to api server.")
+		klog.Infof("start sending events to api server.")
 	} else {
-		glog.Infof("no api server defined - no events will be sent to API server.")
+		klog.Infof("no api server defined - no events will be sent to API server.")
 	}
 
 	cnc := &CloudNodeController{
@@ -138,10 +139,10 @@ func HandlerForNode(
 		cache.ResourceEventHandlerFuncs{
 			AddFunc: func(obj interface{}) {
 				node := obj.(*v1.Node)
-				glog.V(4).Infof("receive node add event: %s", node.Name)
+				klog.V(4).Infof("receive node add event: %s", node.Name)
 				err := cnc.AddCloudNode(node)
 				if err != nil {
-					glog.Errorf("remove cloud node taints fail: %s", err.Error())
+					klog.Errorf("remove cloud node taints fail: %s", err.Error())
 				}
 			},
 		},
@@ -152,7 +153,7 @@ func HandlerForNode(
 // and the node is gone from the cloud provider.
 func (cnc *CloudNodeController) Run(stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
-	glog.Info("starting node controller")
+	klog.Info("starting node controller")
 
 	if !controller.WaitForCacheSync(
 		NODE_CONTROLLER,
@@ -177,7 +178,7 @@ func (cnc *CloudNodeController) Run(stopCh <-chan struct{}) {
 		func() {
 			nodes, err := nodeLists(cnc.kclient)
 			if err != nil {
-				glog.Errorf("Error monitoring node status: %v", err)
+				klog.Errorf("Error monitoring node status: %v", err)
 				return
 			}
 
@@ -187,7 +188,7 @@ func (cnc *CloudNodeController) Run(stopCh <-chan struct{}) {
 				cnc.syncNodeAddress,
 			)
 			if err != nil {
-				glog.Errorf("periodically update address: %s", err.Error())
+				klog.Errorf("periodically update address: %s", err.Error())
 			}
 		},
 		cnc.statusFrequency,
@@ -199,7 +200,7 @@ func (cnc *CloudNodeController) Run(stopCh <-chan struct{}) {
 		func() {
 			nodes, err := nodeLists(cnc.kclient)
 			if err != nil {
-				glog.Errorf("Error monitoring node status: %v", err)
+				klog.Errorf("Error monitoring node status: %v", err)
 				return
 			}
 			// ignore return value, retry on error
@@ -208,7 +209,7 @@ func (cnc *CloudNodeController) Run(stopCh <-chan struct{}) {
 				cnc.syncCloudNodes,
 			)
 			if err != nil {
-				glog.Errorf("periodically try detect node existence: %s", err.Error())
+				klog.Errorf("periodically try detect node existence: %s", err.Error())
 			}
 		},
 		cnc.monitorPeriod,
@@ -220,13 +221,13 @@ func (cnc *CloudNodeController) Run(stopCh <-chan struct{}) {
 		func() {
 			nodes, err := nodeLists(cnc.kclient)
 			if err != nil {
-				glog.Errorf("Error monitoring node status: %v", err)
+				klog.Errorf("Error monitoring node status: %v", err)
 				return
 			}
 			for _, node := range nodes.Items {
 				err := cnc.AddCloudNode(&node)
 				if err != nil {
-					glog.Errorf("periodically remove cloud node %s taints: %s", node.Name, err.Error())
+					klog.Errorf("periodically remove cloud node %s taints: %s", node.Name, err.Error())
 				}
 			}
 		},
@@ -239,14 +240,14 @@ func (cnc *CloudNodeController) AddCloudNode(node *v1.Node) error {
 	curNode, err := cnc.kclient.
 		CoreV1().
 		Nodes().
-		Get(node.Name, metav1.GetOptions{})
+		Get(context.Background(),node.Name, metav1.GetOptions{})
 	if err != nil {
 		//retry
 		return fmt.Errorf("retrieve node error: %s", err.Error())
 	}
 	cloudTaint := findCloudTaint(curNode.Spec.Taints)
 	if cloudTaint == nil {
-		glog.V(4).Infof("Node %s is registered without cloud taint. Will not process.", node.Name)
+		klog.V(4).Infof("Node %s is registered without cloud taint. Will not process.", node.Name)
 		return nil
 	}
 	return cnc.doAddCloudNode(curNode)
@@ -268,7 +269,7 @@ func (cnc *CloudNodeController) syncNodeAddress(nodes []v1.Node) error {
 		node := &nodes[i]
 		cloudNode := instances[node.Spec.ProviderID]
 		if cloudNode == nil {
-			glog.Infof("node %s not found, skip update node address", node.Spec.ProviderID)
+			klog.Infof("node %s not found, skip update node address", node.Spec.ProviderID)
 			continue
 		}
 		cloudNode.Addresses = setHostnameAddress(node, cloudNode.Addresses)
@@ -277,7 +278,7 @@ func (cnc *CloudNodeController) syncNodeAddress(nodes []v1.Node) error {
 		nodeIP, ok := isProvidedAddrExist(node, cloudNode.Addresses)
 		if ok {
 			if nodeIP == nil {
-				glog.Errorf("User has specified Node IP in kubelet but it is not found in cloudprovider")
+				klog.Errorf("User has specified Node IP in kubelet but it is not found in cloudprovider")
 				continue
 			}
 			// override addresses
@@ -285,7 +286,7 @@ func (cnc *CloudNodeController) syncNodeAddress(nodes []v1.Node) error {
 		}
 		err := tryPatchNodeAddress(cnc.kclient, node, cloudNode.Addresses)
 		if err != nil {
-			glog.Error("Wait for next retry, patch node address error: %s", err.Error())
+			klog.Error("Wait for next retry, patch node address error: %s", err.Error())
 		}
 	}
 	return nil
@@ -306,7 +307,7 @@ func (cnc *CloudNodeController) syncCloudNodes(nodes []v1.Node) error {
 
 		condition := nodeConditionReady(cnc.kclient, node)
 		if condition == nil {
-			glog.Infof("node condition not ready, wait for next retry", node.Spec.ProviderID)
+			klog.Infof("node condition not ready, wait for next retry", node.Spec.ProviderID)
 			continue
 		}
 
@@ -320,7 +321,7 @@ func (cnc *CloudNodeController) syncCloudNodes(nodes []v1.Node) error {
 			continue
 		}
 
-		glog.Infof("node %s not found, start to delete from meta", node.Spec.ProviderID)
+		klog.Infof("node %s not found, start to delete from meta", node.Spec.ProviderID)
 		// try delete node and ignore error, retry next loop
 		deleteNode(cnc, node)
 	}
@@ -339,10 +340,10 @@ func (cnc *CloudNodeController) doAddCloudNode(node *v1.Node) error {
 		2*time.Second,
 		20*time.Second,
 		func() (done bool, err error) {
-			glog.V(5).Infof("try remove cloud taints for %s", node.Name)
-			curNode, err := cnc.kclient.CoreV1().Nodes().Get(node.Name, metav1.GetOptions{})
+			klog.V(5).Infof("try remove cloud taints for %s", node.Name)
+			curNode, err := cnc.kclient.CoreV1().Nodes().Get(context.Background(),node.Name, metav1.GetOptions{})
 			if err != nil {
-				glog.Errorf("retrieve node error: %s", err.Error())
+				klog.Errorf("retrieve node error: %s", err.Error())
 				//retry
 				return false, nil
 			}
@@ -351,7 +352,7 @@ func (cnc *CloudNodeController) doAddCloudNode(node *v1.Node) error {
 
 			nodes, err := ins.ListInstances([]string{curNode.Spec.ProviderID})
 			if err != nil {
-				glog.Errorf("cloud instance api fail, %s", err.Error())
+				klog.Errorf("cloud instance api fail, %s", err.Error())
 				//retry
 				return false, nil
 			}
@@ -364,14 +365,18 @@ func (cnc *CloudNodeController) doAddCloudNode(node *v1.Node) error {
 			// in the cloud provider before removing the taint on the node
 			nodeIP, ok := isProvidedAddrExist(curNode, cloudins.Addresses)
 			if ok && nodeIP == nil {
-				glog.Errorf("failed to get specified nodeIP in cloudprovider, fail fast")
+				klog.Errorf("failed to get specified nodeIP in cloudprovider, fail fast")
 				return true, nil
 			}
 
 			if cloudins.InstanceType != "" {
-				glog.Infof("Adding node label from cloud "+
-					"provider: %s=%s", kubeletapis.LabelInstanceType, cloudins.InstanceType)
-				curNode.ObjectMeta.Labels[kubeletapis.LabelInstanceType] = cloudins.InstanceType
+				klog.Infof(
+					"Adding node label from cloud provider: %s=%s, %s=%s",
+					v1.LabelInstanceType, cloudins.InstanceType,
+					v1.LabelInstanceTypeStable, cloudins.InstanceType,
+				)
+				curNode.ObjectMeta.Labels[v1.LabelInstanceType] = cloudins.InstanceType
+				curNode.ObjectMeta.Labels[v1.LabelInstanceTypeStable] = cloudins.InstanceType
 			}
 
 			// TODO(wlan0): Move this logic to the route controller using the node taint instead of condition
@@ -393,7 +398,7 @@ func (cnc *CloudNodeController) doAddCloudNode(node *v1.Node) error {
 			}
 
 			if err = setFailureZones(cnc.cloud, curNode); err != nil {
-				glog.Errorf("set failed zone error: %s", err.Error())
+				klog.Errorf("set failed zone error: %s", err.Error())
 				//retry
 				return false, nil
 			}
@@ -408,7 +413,7 @@ func (cnc *CloudNodeController) doAddCloudNode(node *v1.Node) error {
 			)
 			if err != nil {
 				if !strings.Contains(err.Error(), "Forbidden.RAM") {
-					glog.Errorf("tag instance %s error: %s", cloudins.InstanceID, err.Error())
+					klog.Errorf("tag instance %s error: %s", cloudins.InstanceID, err.Error())
 					//retry
 					return false, nil
 				}
@@ -418,10 +423,10 @@ func (cnc *CloudNodeController) doAddCloudNode(node *v1.Node) error {
 
 			nnode, err := PatchNode(cnc.kclient, orignode, curNode)
 			if err != nil {
-				glog.Errorf("patch error: %s", err.Error())
+				klog.Errorf("patch error: %s", err.Error())
 				return false, nil
 			}
-			glog.V(5).Infof("finished remove uninitialized cloud taints for %s", node.Name)
+			klog.V(5).Infof("finished remove uninitialized cloud taints for %s", node.Name)
 			// After adding, call UpdateNodeAddress to set the CloudProvider provided IPAddresses
 			// So that users do not see any significant delay in IP addresses being filled into the node
 			_ = cnc.syncNodeAddress([]v1.Node{*nnode})
@@ -429,11 +434,11 @@ func (cnc *CloudNodeController) doAddCloudNode(node *v1.Node) error {
 		},
 	)
 	if err != nil {
-		glog.Errorf("doAddCloudNode error: %s", err.Error())
+		klog.Errorf("doAddCloudNode error: %s", err.Error())
 		utilruntime.HandleError(err)
 		return err
 	}
-	glog.Infof("Successfully initialized node %s with cloud provider", node.Name)
+	klog.Infof("Successfully initialized node %s with cloud provider", node.Name)
 	return nil
 }
 
@@ -442,10 +447,10 @@ func batchAddressUpdate(
 	batch func([]v1.Node) error,
 ) error {
 
-	glog.Infof("batch process update node address, length %d", len(nodes))
+	klog.Infof("batch process update node address, length %d", len(nodes))
 	for len(nodes) > MAX_BATCH_NUM {
 		if err := batch(nodes[0:MAX_BATCH_NUM]); err != nil {
-			glog.Errorf("batch process func error: %s", err.Error())
+			klog.Errorf("batch process func error: %s", err.Error())
 			return err
 		}
 		nodes = nodes[MAX_BATCH_NUM:]
@@ -499,8 +504,8 @@ func tryPatchNodeAddress(
 	) {
 		return nil
 	}
-	glog.Infof("try patch node address for %s", node.Spec.ProviderID)
-	_, err := nodeutil.PatchNodeStatus(
+	klog.Infof("try patch node address for %s", node.Spec.ProviderID)
+	_, _, err := nodeutil.PatchNodeStatus(
 		kclient.CoreV1(),
 		types.NodeName(node.Name),
 		node,
@@ -517,7 +522,7 @@ func deleteNode(cnc *CloudNodeController, node *v1.Node) {
 		UID:       types.UID(node.UID),
 		Namespace: "",
 	}
-	glog.V(2).Infof("recording %s event message for node %s", "DeletingNode", node.Name)
+	klog.V(2).Infof("recording %s event message for node %s", "DeletingNode", node.Name)
 
 	msg := fmt.Sprintf("Deleting Node %v because it's not present according to cloud provider", node.Name)
 
@@ -532,8 +537,11 @@ func deleteNode(cnc *CloudNodeController, node *v1.Node) {
 
 	go func(nodeName string) {
 		defer utilruntime.HandleCrash()
-		if err := cnc.kclient.CoreV1().Nodes().Delete(nodeName, nil); err != nil {
-			glog.Errorf("unable to delete node %q: %v", nodeName, err)
+		if err := cnc.kclient.CoreV1().
+					Nodes().Delete(
+						context.Background(), nodeName, metav1.DeleteOptions{},
+					); err != nil {
+			klog.Errorf("unable to delete node %q: %v", nodeName, err)
 		}
 	}(node.Name)
 }
@@ -544,14 +552,14 @@ func nodeConditionReady(kclient kubernetes.Interface, node *v1.Node) *v1.NodeCon
 	// In this case, process next node
 	var err error
 	for rep := 0; rep < RETRY_COUNT; rep++ {
-		_, ccondition := nodeutilv1.GetNodeCondition(&node.Status, v1.NodeReady)
+		_, ccondition := helpers.GetNodeCondition(&node.Status, v1.NodeReady)
 		if ccondition != nil {
 			return ccondition
 		}
 		name := node.Name
-		node, err = kclient.CoreV1().Nodes().Get(name, metav1.GetOptions{})
+		node, err = kclient.CoreV1().Nodes().Get(context.Background(),name, metav1.GetOptions{})
 		if err != nil {
-			glog.Errorf("Failed while getting a Node to retry updating "+
+			klog.Errorf("Failed while getting a Node to retry updating "+
 				"NodeStatus. Probably Node %s was deleted.", name)
 			break
 		}
@@ -565,14 +573,14 @@ func setDefaultProviderID(cnc *CloudNodeController, node *v1.Node) {
 	if node.Spec.ProviderID != "" {
 		return
 	}
-	id, err := cloudprovider.GetInstanceProviderID(cnc.cloud, types.NodeName(node.Name))
+	id, err := cloudprovider.GetInstanceProviderID(context.Background(),cnc.cloud, types.NodeName(node.Name))
 	if err == nil {
 		node.Spec.ProviderID = id
 	} else {
 		// we should attempt to set providerID on curNode, but
 		// we can continue if we fail since we will attempt to set
 		// node addresses given the node name in getNodeAddressesByProviderIDOrName
-		glog.Errorf("failed to set node provider id: %v", err)
+		klog.Errorf("failed to set node provider id: %v", err)
 	}
 }
 
@@ -581,26 +589,34 @@ func setFailureZones(cloud cloudprovider.Interface, node *v1.Node) error {
 	if !ok {
 		return nil
 	}
-	zone, err := zones.GetZoneByProviderID(node.Spec.ProviderID)
+	zone, err := zones.GetZoneByProviderID(context.Background(), node.Spec.ProviderID)
 	if err != nil {
 		return fmt.Errorf("failed to get zone from cloud provider: %v", err)
 	}
 	if zone.FailureDomain != "" {
-		glog.Infof("Adding node label from cloud "+
-			"provider: %s=%s", kubeletapis.LabelZoneFailureDomain, zone.FailureDomain)
-		node.ObjectMeta.Labels[kubeletapis.LabelZoneFailureDomain] = zone.FailureDomain
+		klog.Infof(
+			"Adding node label from cloud provider: %s=%s, %s=%s",
+			v1.LabelZoneFailureDomain, zone.FailureDomain,
+			v1.LabelZoneFailureDomainStable, zone.FailureDomain,
+		)
+		node.ObjectMeta.Labels[v1.LabelZoneFailureDomain] = zone.FailureDomain
+		node.ObjectMeta.Labels[v1.LabelZoneFailureDomainStable] = zone.FailureDomain
 	}
 	if zone.Region != "" {
-		glog.Infof("Adding node label from cloud "+
-			"provider: %s=%s", kubeletapis.LabelZoneRegion, zone.Region)
-		node.ObjectMeta.Labels[kubeletapis.LabelZoneRegion] = zone.Region
+		klog.Infof(
+			"Adding node label from cloud provider: %s=%s, %s=%s",
+			v1.LabelZoneRegion, zone.Region,
+			v1.LabelZoneRegionStable, zone.Region,
+		)
+		node.ObjectMeta.Labels[v1.LabelZoneRegion] = zone.Region
+		node.ObjectMeta.Labels[v1.LabelZoneRegionStable] = zone.Region
 	}
 	return nil
 }
 
 func findCloudTaint(taints []v1.Taint) *v1.Taint {
 	for _, taint := range taints {
-		if taint.Key == algorithm.TaintExternalCloudProvider {
+		if taint.Key == api.TaintExternalCloudProvider {
 			return &taint
 		}
 	}
@@ -622,7 +638,7 @@ func removeCloudTaints(node *v1.Node) {
 	// make sure only cloud node is processed
 	cloudTaint := findCloudTaint(node.Spec.Taints)
 	if cloudTaint == nil {
-		glog.Infof("RemoveCloudTaints, Node %s is registered without "+
+		klog.Infof("RemoveCloudTaints, Node %s is registered without "+
 			"cloud taint. Will not process.", node.Name)
 		return
 	}
@@ -630,7 +646,7 @@ func removeCloudTaints(node *v1.Node) {
 }
 
 func nodeLists(kclient kubernetes.Interface) (*v1.NodeList, error) {
-	allNodes, err := kclient.CoreV1().Nodes().List(metav1.ListOptions{ResourceVersion: "0"})
+	allNodes, err := kclient.CoreV1().Nodes().List(context.Background(),metav1.ListOptions{ResourceVersion: "0"})
 	if allNodes == nil {
 		return nil, err
 	}
@@ -640,7 +656,7 @@ func nodeLists(kclient kubernetes.Interface) (*v1.NodeList, error) {
 			continue
 		}
 		if node.Spec.ProviderID == "" {
-			glog.Warningf("ignore node[%s] without providerid", node.Name)
+			klog.Warningf("ignore node[%s] without providerid", node.Name)
 			continue
 		}
 		nodes = append(nodes, node)
@@ -687,7 +703,7 @@ func isProvidedAddrExist(node *v1.Node, nodeAddresses []v1.NodeAddress) (*v1.Nod
 
 func broadcaster() (record.EventRecorder, record.EventBroadcaster) {
 	caster := record.NewBroadcaster()
-	caster.StartLogging(glog.Infof)
+	caster.StartLogging(klog.Infof)
 	source := v1.EventSource{Component: "node-controller"}
 	return caster.NewRecorder(scheme.Scheme, source), caster
 }
@@ -712,5 +728,5 @@ func PatchNode(
 	return kdm.
 		CoreV1().
 		Nodes().
-		Patch(patched.Name, types.MergePatchType, data)
+		Patch(context.Background(),patched.Name, types.MergePatchType, data,metav1.PatchOptions{})
 }

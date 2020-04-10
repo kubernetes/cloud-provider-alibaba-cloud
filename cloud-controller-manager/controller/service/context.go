@@ -1,9 +1,9 @@
 package service
 
 import (
-	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/klog"
 	"reflect"
 	"sort"
 	"strings"
@@ -19,7 +19,7 @@ func (c *Context) Get(name string) *v1.Service {
 	}
 	val, ok := v.(*v1.Service)
 	if !ok {
-		glog.Errorf("not type of v1.svc: [%s]", reflect.TypeOf(v))
+		klog.Errorf("not type of v1.svc: [%s]", reflect.TypeOf(v))
 		return nil
 	}
 	return val

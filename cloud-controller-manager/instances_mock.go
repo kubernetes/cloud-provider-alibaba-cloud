@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"github.com/denverdino/aliyungo/common"
 	"github.com/denverdino/aliyungo/ecs"
-	"github.com/golang/glog"
+	"k8s.io/klog"
 	"reflect"
 	"strings"
 	"sync"
@@ -107,7 +107,7 @@ func (m *mockClientInstanceSDK) DescribeInstances(args *ecs.DescribeInstancesArg
 		func(key, value interface{}) bool {
 			v, ok := value.(ecs.InstanceAttributesType)
 			if !ok {
-				glog.Info("API: DescribeInstances, "+
+				klog.Info("API: DescribeInstances, "+
 					"unexpected type %s, not slb.InstanceAttributesType", reflect.TypeOf(value))
 				return true
 			}

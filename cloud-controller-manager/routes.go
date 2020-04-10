@@ -17,12 +17,12 @@ limitations under the License.
 package alicloud
 
 import (
-	"k8s.io/kubernetes/pkg/cloudprovider"
+	"k8s.io/cloud-provider"
+	"k8s.io/klog"
 
 	"fmt"
 	"github.com/denverdino/aliyungo/common"
 	"github.com/denverdino/aliyungo/ecs"
-	"github.com/golang/glog"
 	"k8s.io/apimachinery/pkg/types"
 	"strings"
 )
@@ -73,7 +73,7 @@ func (r *RoutesClient) WithVPC(vpcid string, tableids string) error {
 		for _, s := range strings.Split(tableids, ",") {
 			r.vpc.tableids = append(r.vpc.tableids, strings.TrimSpace(s))
 		}
-		glog.Infof("using user customized route table ids (%v)", r.vpc.tableids)
+		klog.Infof("using user customized route table ids (%v)", r.vpc.tableids)
 	}
 	return nil
 }
@@ -81,7 +81,7 @@ func (r *RoutesClient) WithVPC(vpcid string, tableids string) error {
 // ListRoutes lists all managed routes that belong to the specified clusterName
 func (r *RoutesClient) ListRoutes(tableid string) (routes []*cloudprovider.Route, err error) {
 
-	glog.Infof("ListRoutes: for route table %s", tableid)
+	klog.Infof("ListRoutes: for route table %s", tableid)
 	// route will be overwritten by getRouteEntryBatch
 	err = r.getRouteEntryBatch(tableid, "", &routes)
 	if err != nil {
@@ -107,7 +107,7 @@ func (r *RoutesClient) getRouteEntryBatch(tableid string, nextToken string, rout
 
 	routeEntries := response.RouteEntrys.RouteEntry
 	if len(routeEntries) <= 0 {
-		glog.Warningf("alicloud: table [%s] has 0 route entry.", tableid)
+		klog.Warningf("alicloud: table [%s] has 0 route entry.", tableid)
 	}
 
 	for _, e := range routeEntries {
@@ -179,7 +179,7 @@ func (r *RoutesClient) CreateRoute(tabid string, route *cloudprovider.Route, reg
 	}
 
 	if len(response.RouteEntrys.RouteEntry) > 0 {
-		glog.Infof("CreateRoute: skip exist route, %s -> %s", route.DestinationCIDR, route.TargetNode)
+		klog.Infof("CreateRoute: skip exist route, %s -> %s", route.DestinationCIDR, route.TargetNode)
 		return nil
 	}
 
@@ -190,7 +190,7 @@ func (r *RoutesClient) CreateRoute(tabid string, route *cloudprovider.Route, reg
 		NextHopType:          ecs.NextHopInstance,
 		NextHopId:            string(route.TargetNode),
 	}
-	glog.Infof("CreateRoute:[%s] start to create route, %s -> %s", tabid, route.DestinationCIDR, route.TargetNode)
+	klog.Infof("CreateRoute:[%s] start to create route, %s -> %s", tabid, route.DestinationCIDR, route.TargetNode)
 	return WaitCreate(r, tabid, args)
 }
 
@@ -198,7 +198,7 @@ func isRouteExists(routes []*cloudprovider.Route, route *cloudprovider.Route) bo
 	for _, r := range routes {
 		if r.DestinationCIDR == route.DestinationCIDR &&
 			strings.Contains(string(r.TargetNode), string(route.TargetNode)) {
-			glog.Infof("CreateRoute: skip exist route, %s -> %s", route.DestinationCIDR, route.TargetNode)
+			klog.Infof("CreateRoute: skip exist route, %s -> %s", route.DestinationCIDR, route.TargetNode)
 			return true
 		}
 	}
@@ -229,7 +229,7 @@ func WaitCreate(rc *RoutesClient, tableid string, route *ecs.CreateRouteEntryArg
 func WaitDelete(rc *RoutesClient, tableid string, route *ecs.DeleteRouteEntryArgs) error {
 	if err := rc.client.DeleteRouteEntry(route); err != nil {
 		if strings.Contains(err.Error(), "InvalidRouteEntry.NotFound") {
-			glog.Warningf("WaitDelete:[%s] route not found %s -> %s", tableid, route.DestinationCidrBlock, route.NextHopId)
+			klog.Warningf("WaitDelete:[%s] route not found %s -> %s", tableid, route.DestinationCidrBlock, route.NextHopId)
 			return nil
 		}
 		return fmt.Errorf("WaitDelete:[%s] delete route entry error: %s", tableid, err.Error())

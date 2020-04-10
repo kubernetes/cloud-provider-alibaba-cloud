@@ -18,6 +18,7 @@ package alicloud
 
 import (
 	"encoding/json"
+	"k8s.io/klog"
 	"path/filepath"
 	"time"
 
@@ -28,7 +29,6 @@ import (
 	"github.com/denverdino/aliyungo/pvtz"
 	"github.com/denverdino/aliyungo/slb"
 	"github.com/go-cmd/cmd"
-	"github.com/golang/glog"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"strings"
 )
@@ -88,7 +88,7 @@ func NewClientMgr(key, secret string) (*ClientMgr, error) {
 	}
 
 	if key == "" || secret == "" {
-		glog.Infof("alicloud: use ramrole token mode without ak.")
+		klog.Infof("alicloud: use ramrole token mode without ak.")
 		mgr.token = &RamRoleToken{meta: m}
 	} else {
 		inittoken := &Token{
@@ -97,10 +97,10 @@ func NewClientMgr(key, secret string) (*ClientMgr, error) {
 			UID:          cfg.Global.UID,
 		}
 		if inittoken.UID == "" {
-			glog.Infof("alicloud: ak mode to authenticate user. without token and role assume")
+			klog.Infof("alicloud: ak mode to authenticate user. without token and role assume")
 			mgr.token = &AkAuthToken{ak: inittoken}
 		} else {
-			glog.Infof("alicloud: service account auth mode")
+			klog.Infof("alicloud: service account auth mode")
 			mgr.token = &ServiceToken{svcak: inittoken}
 		}
 	}
@@ -113,12 +113,12 @@ func (mgr *ClientMgr) Start(settoken func(mgr *ClientMgr, token *Token) error) e
 		// refresh client token periodically
 		token, err := mgr.token.NextToken()
 		if err != nil {
-			glog.Errorf("token retrieve: %s", err.Error())
+			klog.Errorf("token retrieve: %s", err.Error())
 			return
 		}
 		err = settoken(mgr, token)
 		if err != nil {
-			glog.Errorf("set token: %s", err.Error())
+			klog.Errorf("set token: %s", err.Error())
 			return
 		}
 		initialized = true
@@ -137,7 +137,7 @@ func (mgr *ClientMgr) Start(settoken func(mgr *ClientMgr, token *Token) error) e
 			Factor:   2,
 		}, func() (done bool, err error) {
 			tokenfunc()
-			glog.Infof("wait for token ready")
+			klog.Infof("wait for token ready")
 			return initialized, nil
 		},
 	)
@@ -275,7 +275,7 @@ type IMetaData interface {
 func NewMetaData() IMetaData {
 	if cfg.Global.VpcID != "" &&
 		cfg.Global.VswitchID != "" {
-		glog.V(2).Infof("use mocked metadata server.")
+		klog.V(2).Infof("use mocked metadata server.")
 		return &fakeMetaData{base: metadata.NewMetaData(nil)}
 	}
 	return metadata.NewMetaData(nil)
@@ -366,10 +366,10 @@ func (m *fakeMetaData) VswitchID() (string, error) {
 	if len(zlist) == 1 {
 		vSwitchs := strings.Split(cfg.Global.VswitchID, ":")
 		if len(vSwitchs) == 2 {
-			glog.Infof("only one vswitchid mode, %s", vSwitchs[1])
+			klog.Infof("only one vswitchid mode, %s", vSwitchs[1])
 			return vSwitchs[1], nil
 		}
-		glog.Infof("simple vswitchid mode, %s", cfg.Global.VswitchID)
+		klog.Infof("simple vswitchid mode, %s", cfg.Global.VswitchID)
 		return cfg.Global.VswitchID, nil
 	}
 	mzone, err := m.Zone()
@@ -385,7 +385,7 @@ func (m *fakeMetaData) VswitchID() (string, error) {
 			return vs[1], nil
 		}
 	}
-	glog.Infof("zone[%s] match failed, fallback with simple vswitch id mode, [%s]", mzone, cfg.Global.VswitchID)
+	klog.Infof("zone[%s] match failed, fallback with simple vswitch id mode, [%s]", mzone, cfg.Global.VswitchID)
 	return cfg.Global.VswitchID, nil
 }
 

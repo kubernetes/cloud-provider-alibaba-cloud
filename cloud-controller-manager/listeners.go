@@ -20,9 +20,9 @@ import (
 	//"errors"
 	"fmt"
 	"github.com/denverdino/aliyungo/slb"
-	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
 	"k8s.io/cloud-provider-alibaba-cloud/cloud-controller-manager/utils"
+	"k8s.io/klog"
 	"sort"
 	"strconv"
 	"strings"
@@ -60,7 +60,7 @@ var DEFAULT_LISTENER_BANDWIDTH = -1
 func Protocol(annotation string, port v1.ServicePort) (string, error) {
 
 	if annotation == "" {
-		glog.Infof("transfor protocol, empty annotation %d/%s", port.Port, port.Protocol)
+		klog.Infof("transfor protocol, empty annotation %d/%s", port.Port, port.Protocol)
 		return strings.ToLower(string(port.Protocol)), nil
 	}
 	for _, v := range strings.Split(annotation, ",") {
@@ -79,7 +79,7 @@ func Protocol(annotation string, port v1.ServicePort) (string, error) {
 		}
 
 		if pp[1] == fmt.Sprintf("%d", port.Port) {
-			glog.Infof("transfor protocol from %s to %s", string(port.Protocol), pp[0])
+			klog.Infof("transfor protocol from %s to %s", string(port.Protocol), pp[0])
 			return pp[0], nil
 		}
 	}
@@ -229,7 +229,7 @@ func (n *Listener) Instance() IListener {
 
 // Apply apply listener operate . add/update/delete etc.
 func (n *Listener) Apply() error {
-	glog.Infof("apply %s listener for %v with trans protocol %s", n.Action, n.NamedKey, n.TransforedProto)
+	klog.Infof("apply %s listener for %v with trans protocol %s", n.Action, n.NamedKey, n.TransforedProto)
 	switch n.Action {
 	case ACTION_UPDATE:
 		return n.Instance().Update()
@@ -269,11 +269,11 @@ func (n *Listener) Remove() error {
 func (n *Listener) findVgroup(key string) string {
 	for _, v := range *n.VGroups {
 		if v.NamedKey.Key() == key {
-			glog.Infof("found: key=%s, groupid=%s, try use vserver group mode.", key, v.VGroupId)
+			klog.Infof("found: key=%s, groupid=%s, try use vserver group mode.", key, v.VGroupId)
 			return v.VGroupId
 		}
 	}
-	glog.Infof("find: vserver group [%s] does not found. use default backend group.", key)
+	klog.Infof("find: vserver group [%s] does not found. use default backend group.", key)
 	return STRINGS_EMPTY
 }
 
@@ -536,7 +536,7 @@ func BuildListenersFromAPI(
 	for _, port := range ports {
 		key, err := LoadNamedKey(port.Description)
 		if err != nil {
-			glog.Warningf("alicloud: error parse listener description[%s]. %s", port.Description, err.Error())
+			klog.Warningf("alicloud: error parse listener description[%s]. %s", port.Description, err.Error())
 		}
 		proto := port.ListenerProtocol
 		if strings.ToUpper(proto) == "HTTP" ||
@@ -635,7 +635,7 @@ func (t *tcp) Update() error {
 			def.Bandwidth != response.Bandwidth {
 			needUpdate = true
 			config.Bandwidth = def.Bandwidth
-			glog.V(2).Infof("TCP listener checker [bandwidth] changed, request=%d. response=%d", def.Bandwidth, response.Bandwidth)
+			klog.V(2).Infof("TCP listener checker [bandwidth] changed, request=%d. response=%d", def.Bandwidth, response.Bandwidth)
 		}
 	*/
 
@@ -710,7 +710,7 @@ func (t *tcp) Update() error {
 	// backend server port has changed.
 	if int(t.NodePort) != response.BackendServerPort {
 		config.BackendServerPort = int(t.NodePort)
-		glog.V(2).Infof("tcp listener [BackendServerPort] changed, request=%d. response=%d, recreate.", t.NodePort, response.BackendServerPort)
+		klog.V(2).Infof("tcp listener [BackendServerPort] changed, request=%d. response=%d, recreate.", t.NodePort, response.BackendServerPort)
 		err := t.Client.DeleteLoadBalancerListener(t.LoadBalancerID, int(t.Port))
 		if err != nil {
 			return err
@@ -727,8 +727,8 @@ func (t *tcp) Update() error {
 		return nil
 	}
 	utils.Logf(t.Service, "TCP listener checker changed, request update listener attribute [%s]", t.LoadBalancerID)
-	glog.V(5).Infof(PrettyJson(def))
-	glog.V(5).Infof(PrettyJson(response))
+	klog.V(5).Infof(PrettyJson(def))
+	klog.V(5).Infof(PrettyJson(response))
 	return t.Client.SetLoadBalancerTCPListenerAttribute(config)
 }
 
@@ -806,7 +806,7 @@ func (t *udp) Update() error {
 			request.Bandwidth != response.Bandwidth {
 			needUpdate = true
 			config.Bandwidth = request.Bandwidth
-			glog.V(2).Infof("UDP listener checker [bandwidth] changed, request=%d. response=%d", request.Bandwidth, response.Bandwidth)
+			klog.V(2).Infof("UDP listener checker [bandwidth] changed, request=%d. response=%d", request.Bandwidth, response.Bandwidth)
 		}
 	*/
 	if def.AclStatus != response.AclStatus {
@@ -880,8 +880,8 @@ func (t *udp) Update() error {
 		return nil
 	}
 	utils.Logf(t.Service, "UDP listener checker changed, request recreate [%s]\n", t.LoadBalancerID)
-	glog.V(5).Infof(PrettyJson(request))
-	glog.V(5).Infof(PrettyJson(response))
+	klog.V(5).Infof(PrettyJson(request))
+	klog.V(5).Infof(PrettyJson(response))
 	return t.Client.SetLoadBalancerUDPListenerAttribute(config)
 }
 
@@ -940,7 +940,7 @@ func forwardPort(port string, target int32) int32 {
 	for _, v := range tmps {
 		ports := strings.Split(v, ":")
 		if len(ports) != 2 {
-			glog.Infof("forward-port format error: %s, expect 80:443,88:6443", port)
+			klog.Infof("forward-port format error: %s, expect 80:443,88:6443", port)
 			continue
 		}
 		if ports[0] == strconv.Itoa(int(target)) {
@@ -951,10 +951,10 @@ func forwardPort(port string, target int32) int32 {
 	if forwarded != "" {
 		forward, err := strconv.Atoi(forwarded)
 		if err != nil {
-			glog.Errorf("forward port is not an integer, %s", forwarded)
+			klog.Errorf("forward port is not an integer, %s", forwarded)
 			return 0
 		}
-		glog.Infof("forward http port %d to %d", target, forward)
+		klog.Infof("forward http port %d to %d", target, forward)
 		return int32(forward)
 	}
 	return 0
@@ -1007,7 +1007,7 @@ func (t *http) Update() error {
 			request.Bandwidth != response.Bandwidth {
 			needUpdate = true
 			config.Bandwidth = request.Bandwidth
-			glog.V(2).Infof("HTTP listener checker [bandwidth] changed, request=%d. response=%d", request.Bandwidth, response.Bandwidth)
+			klog.V(2).Infof("HTTP listener checker [bandwidth] changed, request=%d. response=%d", request.Bandwidth, response.Bandwidth)
 		}
 	*/
 	if def.AclStatus != response.AclStatus {
@@ -1142,8 +1142,8 @@ func (t *http) Update() error {
 		return nil
 	}
 	utils.Logf(t.Service, "http listener checker changed, request update [%s]\n", t.LoadBalancerID)
-	glog.V(5).Infof(PrettyJson(request))
-	glog.V(5).Infof(PrettyJson(response))
+	klog.V(5).Infof(PrettyJson(request))
+	klog.V(5).Infof(PrettyJson(response))
 	return t.Client.SetLoadBalancerHTTPListenerAttribute(config)
 }
 
@@ -1238,7 +1238,7 @@ func (t *https) Update() error {
 			request.Bandwidth != response.Bandwidth {
 			needUpdate = true
 			config.Bandwidth = request.Bandwidth
-			glog.Infof("HTTPS listener checker [bandwidth] changed, request=%d. response=%d", request.Bandwidth, response.Bandwidth)
+			klog.Infof("HTTPS listener checker [bandwidth] changed, request=%d. response=%d", request.Bandwidth, response.Bandwidth)
 		}
 	*/
 	// todo: perform healthcheck update.
@@ -1351,7 +1351,7 @@ func (t *https) Update() error {
 		return nil
 	}
 	utils.Logf(t.Service, "https listener checker changed, request recreate [%s]\n", t.LoadBalancerID)
-	glog.V(5).Infof(PrettyJson(request))
-	glog.V(5).Infof(PrettyJson(response))
+	klog.V(5).Infof(PrettyJson(request))
+	klog.V(5).Infof(PrettyJson(response))
 	return t.Client.SetLoadBalancerHTTPSListenerAttribute(config)
 }

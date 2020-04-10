@@ -3,9 +3,9 @@ package e2e
 import (
 	"bytes"
 	"encoding/json"
-	"github.com/golang/glog"
 	"k8s.io/cloud-provider-alibaba-cloud/cmd/e2e/framework"
 	_ "k8s.io/cloud-provider-alibaba-cloud/cmd/e2e/test"
+	"k8s.io/klog"
 	"testing"
 )
 
@@ -83,13 +83,13 @@ func PrettyJson(obj interface{}) string {
 	pretty := bytes.Buffer{}
 	data, err := json.Marshal(obj)
 	if err != nil {
-		glog.Errorf("PrettyJson, mashal error: %s\n", err.Error())
+		klog.Errorf("PrettyJson, mashal error: %s\n", err.Error())
 		return ""
 	}
 	err = json.Indent(&pretty, data, "", "    ")
 
 	if err != nil {
-		glog.Errorf("PrettyJson, indent error: %s\n", err.Error())
+		klog.Errorf("PrettyJson, indent error: %s\n", err.Error())
 		return ""
 	}
 	return pretty.String()

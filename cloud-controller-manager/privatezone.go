@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"github.com/denverdino/aliyungo/pvtz"
 	"github.com/denverdino/aliyungo/slb"
-	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
 	"k8s.io/cloud-provider-alibaba-cloud/cloud-controller-manager/utils"
+	"k8s.io/klog"
 )
 
 // DEFAULT_LANG default lang
@@ -95,14 +95,14 @@ func (s *PrivateZoneClient) findPrivateZoneByName(name string) (bool, *pvtz.Desc
 		}
 
 		if selectedZoneId == "" {
-			glog.Warningf("multiple private zone returned with name [%s], "+
+			klog.Warningf("multiple private zone returned with name [%s], "+
 				"and we can't find one which matches to name perfectly,"+
 				"using the first one with ID=%s", name, zones[0].ZoneId)
 			selectedZoneId = zones[0].ZoneId
 		}
 	} else {
 		if zones[0].ZoneName != name {
-			glog.Warningf("just one private zone returned with name [%s], "+
+			klog.Warningf("just one private zone returned with name [%s], "+
 				"but this private zone can't match to name perfectly,"+
 				"found private zone ID=%s", name, zones[0].ZoneId)
 		}
@@ -208,7 +208,7 @@ func (s *PrivateZoneClient) updateRecordCache(service *v1.Service, zone *pvtz.De
 
 // EnsurePrivateZoneRecord make sure private zone record is reconciled
 func (s *PrivateZoneClient) EnsurePrivateZoneRecord(service *v1.Service, ip string, ipVersion slb.AddressIPVersionType) (zone *pvtz.DescribeZoneInfoResponse, record *pvtz.ZoneRecordType, err error) {
-	glog.V(4).Infof("alicloud: ensure private zone record for ip(%s) with service details, \n%+v", ip, PrettyJson(service))
+	klog.V(4).Infof("alicloud: ensure private zone record for ip(%s) with service details, \n%+v", ip, PrettyJson(service))
 
 	// update record cache after ensure
 	defer func() {
@@ -285,7 +285,7 @@ func (s *PrivateZoneClient) EnsurePrivateZoneRecordDeleted(service *v1.Service, 
 	// need to save the resource version when deleted event
 	err := keepResourceVersion(service)
 	if err != nil {
-		glog.Warningf("failed to save "+
+		klog.Warningf("failed to save "+
 			"deleted service resourceVersion, [%s] due to [%s] ", service.Name, err.Error())
 	}
 

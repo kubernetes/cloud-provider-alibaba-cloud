@@ -2,8 +2,8 @@ package utils
 
 import (
 	"fmt"
-	"github.com/golang/glog"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/klog"
 )
 
 func Logf(svc *v1.Service, format string, args ...interface{}) {
@@ -11,5 +11,5 @@ func Logf(svc *v1.Service, format string, args ...interface{}) {
 	if svc != nil {
 		prefix = fmt.Sprintf("[%s/%s]", svc.Namespace, svc.Name)
 	}
-	glog.Infof(prefix+format, args...)
+	klog.Infof(prefix+format, args...)
 }

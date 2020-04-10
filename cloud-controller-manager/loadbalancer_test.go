@@ -27,7 +27,6 @@ import (
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/kubernetes/pkg/cloudprovider"
 	"strings"
 	"testing"
 )
@@ -98,7 +97,7 @@ func TestFindLoadBalancer(t *testing.T) {
 			if err != nil || !exist {
 				t.Fatal("Test findLoadBalancer fail. user need to create new loadbalancer. did not specify any exist loadbalancer.")
 			}
-			if lb.LoadBalancerName != cloudprovider.GetLoadBalancerName(f.SVC) {
+			if lb.LoadBalancerName != GetLoadBalancerName(f.SVC) {
 				t.Fatal("find loadbalancer fail. suppose to find by name.")
 			}
 

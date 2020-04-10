@@ -1,6 +1,7 @@
 package alicloud
 
 import (
+	"context"
 	"fmt"
 	"github.com/denverdino/aliyungo/common"
 	"github.com/denverdino/aliyungo/ecs"
@@ -15,8 +16,7 @@ import (
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/cloud-provider-alibaba-cloud/cloud-controller-manager/utils"
-	"k8s.io/kubernetes/pkg/controller"
-	"k8s.io/kubernetes/pkg/controller/service"
+	controller "k8s.io/kube-aggregator/pkg/controllers"
 	"sort"
 	"strconv"
 	"strings"
@@ -350,7 +350,7 @@ type CustomizedTest func(f *FrameWork) error
 
 func DefaultTesting(f *FrameWork) error {
 	status, err := f.CloudImpl().
-		EnsureLoadBalancer(CLUSTER_ID, f.SVC, f.Nodes)
+		EnsureLoadBalancer(context.Background(), CLUSTER_ID, f.SVC, f.Nodes)
 	if err != nil {
 		return fmt.Errorf("EnsureLoadBalancer error: %s", err.Error())
 	}
@@ -1077,12 +1077,14 @@ func tagsEqual(tags string, items []slb.TagItemType) bool {
 	return true
 }
 
+const labelNodeRoleMaster = "node-role.kubernetes.io/master"
+
 func filterOutMaster(nodes []*v1.Node) []*v1.Node {
 	var result []*v1.Node
 	for _, node := range nodes {
 		found := false
-		for k, _ := range node.Labels {
-			if k == service.LabelNodeRoleMaster {
+		for k := range node.Labels {
+			if k == labelNodeRoleMaster {
 				found = true
 			}
 		}
