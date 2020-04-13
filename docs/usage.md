@@ -175,6 +175,8 @@ spec:
 >> **Note：**
 
 - Specification of the SLB instance. For more information , see [CreateLoadBalancer](https://www.alibabacloud.com/help/doc-detail/27577.htm?#SLB-api-CreateLoadBalancer).
+- With this annotation, you can create a specific specification SLB, or update the specification of an existing SLB.  
+- Note: If you modify the specification of a SLB through the SLB console, there will be a risk of being overwritten by CCM.  
 
 #### 7. Attach an exist LoadBalancer to the service with id `${YOUR_LOADBALANCER_ID}`
 
@@ -587,6 +589,7 @@ spec:
 >> **Note:**
 
 - First get the switch ID through the Alibaba Cloud onsole, and then use the above annotations to create a LoadBalancer with specific vswitchid.
+- The vswitch must belong to the same VPC as the Kubernetes cluster.  
 - The above annotations are mandatory.
 
 
@@ -717,11 +720,29 @@ spec:
     app: nginx
   type: LoadBalancer
 ```
+#### 26. Mount ECS nodes and ENIs to the backend of the SLB instance 
 
->> **Note:**
+  ```yaml
+  apiVersion: v1
+  kind: Service
+  metadata:
+    name: nginx
+  spec:
+    ports:
+    - port: 80
+      protocol: TCP
+      targetPort: 80
+    selector:
+      app: nginx
+    type: LoadBalancer
+  ```
 
-- Kube-proxy should run in IPVS mode.
-- The IP type cannot be changed after creation.
+>> **Note:**  
+
+- Install virtual nodes in the cluster, see details[Install the ack-virtual-node addon](https://www.alibabacloud.com/help/doc-detail/118970.htm).    
+- Pods run on ECS and virtual nodes at the same time, see details[Create a pod on a virtual node](https://www.alibabacloud.com/help/doc-detail/118970.htm).   
+- After the SLB is created, you can see both the ECS nodes and the ENIs at the backend of the SLB.   
+
 
 #### Annotation list
 >> **Note**

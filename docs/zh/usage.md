@@ -199,7 +199,9 @@ spec:
 - **指定负载均衡规格**
 
   负载均衡规格可参考[文档](https://help.aliyun.com/document_detail/27577.html?spm=a2c4g.11186623.2.22.6be5609abM821g#SLB-api-CreateLoadBalancer)。
-
+  通过该参数可以创建指定规格的SLB，或者更新已有SLB的规格。  
+  注意：如果您通过SLB控制台修改SLB规格，将会存在被CCM修改回原规格的风险，请谨慎操作。    
+  
 ```yaml
 apiVersion: v1
 kind: Service
@@ -573,6 +575,7 @@ spec:
 - **为负载均衡指定虚拟交换机**
 
   通过阿里云[专有网络控制台](https://vpc.console.aliyun.com)查询交换机ID，然后使用如下的annotation为负载均衡实例指定虚拟交换机。   
+  虚拟交换机必须与Kubernetes集群属于同一个VPC。  
   为负载均衡指定虚拟交换机，以下两项annotation必选。
 
 ```yaml
@@ -714,6 +717,26 @@ spec:
     app: nginx
   type: LoadBalancer
 ```
+- **SLB后端混合挂载ECS和弹性网卡ENI** 
+
+  集群中部署虚拟节点，详情请参见[在ACK集群中部署虚拟节点Addon](https://help.aliyun.com/document_detail/118970.html?spm=a2c4g.11186623.6.873.507e76fbzlrvZ5)。  
+  应用Pod同时运行在ECS和虚拟节点上，详情请参见[调度Pod到虚拟节点](https://help.aliyun.com/document_detail/118970.html?spm=a2c4g.11186623.6.873.507e76fbzlrvZ5)。   
+  SLB创建成功后，可在SLB后端同时看到ECS和弹性网卡ENI。  
+  ```yaml
+  apiVersion: v1
+  kind: Service
+  metadata:
+    name: nginx
+  spec:
+    ports:
+    - port: 80
+      protocol: TCP
+      targetPort: 80
+    selector:
+      app: nginx
+    type: LoadBalancer
+  ```
+  
 
 
 **说明**

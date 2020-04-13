@@ -749,3 +749,8 @@ func keepResourceVersion(service *v1.Service) error {
 	// keeper.set(serviceUIDNoneExist, currentVersion)
 	return nil
 }
+
+// TODO
+//func (s *LoadBalancerClient) checkAvailableResource(args *slb.Describe) error {
+//
+//}
