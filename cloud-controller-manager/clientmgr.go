@@ -18,16 +18,12 @@ package alicloud
 
 import (
 	"encoding/json"
+	"github.com/denverdino/aliyungo/metadata"
 	"k8s.io/klog"
 	"path/filepath"
 	"time"
 
 	"fmt"
-	"github.com/denverdino/aliyungo/common"
-	"github.com/denverdino/aliyungo/ecs"
-	"github.com/denverdino/aliyungo/metadata"
-	"github.com/denverdino/aliyungo/pvtz"
-	"github.com/denverdino/aliyungo/slb"
 	"github.com/go-cmd/cmd"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"strings"
@@ -66,7 +62,7 @@ func NewClientMgr(key, secret string) (*ClientMgr, error) {
 	if err != nil {
 		return nil, fmt.Errorf("can not determin vpcid: %s", err.Error())
 	}
-	ecsclient := ecs.NewECSClientWithSecurityToken4RegionalDomain(key, secret, "", common.Region(region))
+	ecsclient := NewContextedClientINS(key, secret, region)
 	mgr := &ClientMgr{
 		stop: make(<-chan struct{}, 1),
 		meta: m,
@@ -76,13 +72,13 @@ func NewClientMgr(key, secret string) (*ClientMgr, error) {
 		loadbalancer: &LoadBalancerClient{
 			vpcid: vpcid,
 			ins:   ecsclient,
-			c:     slb.NewSLBClientWithSecurityToken4RegionalDomain(key, secret, "", common.Region(region)),
+			c:     NewContextedClientSLB(key, secret, region),
 		},
 		privateZone: &PrivateZoneClient{
-			c: pvtz.NewPVTZClientWithSecurityToken4RegionalDomain(key, secret, "", common.Region("cn-hangzhou")),
+			c: NewContextedClientPVTZ(key, secret, "cn-hangzhou"),
 		},
 		routes: &RoutesClient{
-			client: ecs.NewVPCClientWithSecurityToken4RegionalDomain(key, secret, "", common.Region(region)),
+			client: NewContextedClientRoute(key, secret, region),
 			region: region,
 		},
 	}
@@ -144,27 +140,27 @@ func (mgr *ClientMgr) Start(settoken func(mgr *ClientMgr, token *Token) error) e
 }
 
 func RefreshToken(mgr *ClientMgr, token *Token) error {
-	ecsclient := mgr.instance.c.(*ecs.Client)
-	slbclient := mgr.loadbalancer.c.(*slb.Client)
-	pvtzclient := mgr.privateZone.c.(*pvtz.Client)
-	vpcclient := mgr.routes.client.(*ecs.Client)
-	ecsclient.WithSecurityToken(token.Token).
+	ecsclient := mgr.instance.c.(*ContextedClientINS)
+	slbclient := mgr.loadbalancer.c.(*ContextedClientSLB)
+	pvtzclient := mgr.privateZone.c.(*ContextedClientPVTZ)
+	vpcclient := mgr.routes.client.(*ContextedClientRoute)
+	ecsclient.ecs.WithSecurityToken(token.Token).
 		WithAccessKeyId(token.AccessKey).
 		WithAccessKeySecret(token.AccessSecret)
-	slbclient.WithSecurityToken(token.Token).
+	slbclient.slb.WithSecurityToken(token.Token).
 		WithAccessKeyId(token.AccessKey).
 		WithAccessKeySecret(token.AccessSecret)
-	pvtzclient.WithSecurityToken(token.Token).
+	pvtzclient.pvtz.WithSecurityToken(token.Token).
 		WithAccessKeyId(token.AccessKey).
 		WithAccessKeySecret(token.AccessSecret)
-	vpcclient.WithSecurityToken(token.Token).
+	vpcclient.ecs.WithSecurityToken(token.Token).
 		WithAccessKeyId(token.AccessKey).
 		WithAccessKeySecret(token.AccessSecret)
 
-	ecsclient.SetUserAgent(KUBERNETES_ALICLOUD_IDENTITY)
-	slbclient.SetUserAgent(KUBERNETES_ALICLOUD_IDENTITY)
-	pvtzclient.SetUserAgent(KUBERNETES_ALICLOUD_IDENTITY)
-	vpcclient.SetUserAgent(KUBERNETES_ALICLOUD_IDENTITY)
+	ecsclient.ecs.SetUserAgent(KUBERNETES_ALICLOUD_IDENTITY)
+	slbclient.slb.SetUserAgent(KUBERNETES_ALICLOUD_IDENTITY)
+	pvtzclient.pvtz.SetUserAgent(KUBERNETES_ALICLOUD_IDENTITY)
+	vpcclient.ecs.SetUserAgent(KUBERNETES_ALICLOUD_IDENTITY)
 	return nil
 }
 

@@ -1,8 +1,8 @@
 package service
 
 import (
-	ctx "context"
 	"fmt"
+	"golang.org/x/net/context"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -224,7 +224,7 @@ func (con *Controller) HandlerForNodesChange(
 }
 
 func (con *Controller) HandlerForEndpointChange(
-	context *Context,
+	ctx *Context,
 	que queue.DelayingInterface,
 	informer cache.SharedIndexInformer,
 ) {
@@ -234,12 +234,12 @@ func (con *Controller) HandlerForEndpointChange(
 			klog.Info("endpoints change: endpoint object is nil, skip")
 			return
 		}
-		svc := context.Get(fmt.Sprintf("%s/%s", ep.Namespace, ep.Name))
+		svc := ctx.Get(fmt.Sprintf("%s/%s", ep.Namespace, ep.Name))
 		if svc == nil {
 			klog.Infof("endpoint change: can not get cached service for "+
 				"endpoints[%s/%s], enqueue for default endpoint.\n", ep.Namespace, ep.Name)
 			var err error
-			svc, err = con.client.CoreV1().Services(ep.Namespace).Get(ctx.Background(),ep.Name, v12.GetOptions{})
+			svc, err = con.client.CoreV1().Services(ep.Namespace).Get(context.Background(), ep.Name, v12.GetOptions{})
 			if err != nil {
 				klog.Warningf("can not get service %s/%s. ", ep.Namespace, ep.Name)
 				return
@@ -514,6 +514,7 @@ func (con *Controller) update(cached, svc *v1.Service) error {
 		)
 		return retry(nil, con.delete, svc)
 	}
+	ctx := context.Background()
 	var newm *v1.LoadBalancerStatus
 	if !NeedLoadBalancer(svc) {
 		// delete loadbalancer which is no longer needed
@@ -542,7 +543,8 @@ func (con *Controller) update(cached, svc *v1.Service) error {
 				key(svc),
 			)
 		}
-		newm, err = con.cloud.EnsureLoadBalancer(ctx.Background(),con.clusterName, svc, nodes)
+		ctx = context.WithValue(ctx, utils.ContextService, svc)
+		newm, err = con.cloud.EnsureLoadBalancer(ctx, con.clusterName, svc, nodes)
 
 		if err != nil {
 			return fmt.Errorf("ensure loadbalancer error: %s", err)
@@ -590,7 +592,7 @@ func (con *Controller) updateStatus(svc *v1.Service, pre, newm *v1.LoadBalancerS
 					client.
 					CoreV1().
 					Services(service.Namespace).
-					UpdateStatus(ctx.Background(),service,metav1.UpdateOptions{})
+					UpdateStatus(context.Background(), service, metav1.UpdateOptions{})
 				if err == nil {
 					return nil
 				}
@@ -620,7 +622,8 @@ func (con *Controller) updateStatus(svc *v1.Service, pre, newm *v1.LoadBalancerS
 }
 
 func (con *Controller) delete(svc *v1.Service) error {
-
+	ctx := context.Background()
+	ctx = context.WithValue(ctx, utils.ContextService, svc)
 	// do not check for the neediness of loadbalancer, delete anyway.
 	con.recorder.Eventf(
 		svc,
@@ -629,7 +632,7 @@ func (con *Controller) delete(svc *v1.Service) error {
 		"for service: %s",
 		key(svc),
 	)
-	err := con.cloud.EnsureLoadBalancerDeleted(ctx.Background(),con.clusterName, svc)
+	err := con.cloud.EnsureLoadBalancerDeleted(ctx, con.clusterName, svc)
 	if err != nil {
 		con.recorder.Eventf(
 			svc,
@@ -659,7 +662,7 @@ func AvailableNodes(
 	if err != nil {
 		return nil, fmt.Errorf("error get predicate: %s", err.Error())
 	}
-	nodes,err := ifactory.
+	nodes, err := ifactory.
 		Core().V1().Nodes().
 		Lister().List(labels.Everything())
 	if err != nil {

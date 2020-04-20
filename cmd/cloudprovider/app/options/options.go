@@ -18,8 +18,8 @@ package options
 
 import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/kubernetes/pkg/util/flag"
 	"k8s.io/kubernetes/pkg/client/leaderelectionconfig"
+	"k8s.io/kubernetes/pkg/util/flag"
 	// add the kubernetes feature gates
 	_ "k8s.io/kubernetes/pkg/features"
 

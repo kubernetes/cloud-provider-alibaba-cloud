@@ -17,6 +17,7 @@ limitations under the License.
 package route
 
 import (
+	"context"
 	"fmt"
 	"k8s.io/client-go/util/workqueue"
 	queue "k8s.io/client-go/util/workqueue"
@@ -61,16 +62,16 @@ const (
 // Routes is an abstract, pluggable interface for advanced routing rules.
 type Routes interface {
 	// RouteTables get all available route tables.
-	RouteTables(clusterName string) ([]string, error)
+	RouteTables(ctx context.Context, clusterName string) ([]string, error)
 	// ListRoutes lists all managed routes that belong to the specified clusterName
-	ListRoutes(clusterName string, table string) ([]*cloudprovider.Route, error)
+	ListRoutes(ctx context.Context, clusterName string, table string) ([]*cloudprovider.Route, error)
 	// CreateRoute creates the described managed route
 	// route.Name will be ignored, although the cloud-provider may use nameHint
 	// to create a more user-meaningful name.
-	CreateRoute(clusterName string, nameHint string, table string, route *cloudprovider.Route) error
+	CreateRoute(ctx context.Context, clusterName string, nameHint string, table string, route *cloudprovider.Route) error
 	// DeleteRoute deletes the specified managed route
 	// Route should be as returned by ListRoutes
-	DeleteRoute(clusterName string, table string, route *cloudprovider.Route) error
+	DeleteRoute(ctx context.Context, clusterName string, table string, route *cloudprovider.Route) error
 }
 
 // RouteController response for route reconcile
@@ -222,7 +223,8 @@ func (rc *RouteController) Run(stopCh <-chan struct{}, syncPeriod time.Duration)
 }
 
 func (rc *RouteController) syncd(node *v1.Node) error {
-	tabs, err := rc.routes.RouteTables(rc.clusterName)
+	ctx := context.Background()
+	tabs, err := rc.routes.RouteTables(ctx, rc.clusterName)
 	if err != nil {
 		return fmt.Errorf("RouteTables: %s", err.Error())
 	}
@@ -233,7 +235,7 @@ func (rc *RouteController) syncd(node *v1.Node) error {
 			DestinationCIDR: node.Spec.PodCIDR,
 		}
 		if err := rc.routes.DeleteRoute(
-			rc.clusterName, table, route,
+			ctx, rc.clusterName, table, route,
 		); err != nil {
 			klog.Errorf(
 				"delete route %s %s from table %s, %s", route.Name, route.DestinationCIDR, table, err.Error())
@@ -245,21 +247,22 @@ func (rc *RouteController) syncd(node *v1.Node) error {
 }
 
 func (rc *RouteController) reconcile() error {
+	ctx := context.Background()
 	nodes, err := rc.nodeLister.List(labels.Everything())
 	if err != nil {
 		return fmt.Errorf("error listing nodes: %v", err)
 	}
-	tabs, err := rc.routes.RouteTables(rc.clusterName)
+	tabs, err := rc.routes.RouteTables(ctx, rc.clusterName)
 	if err != nil {
 		return fmt.Errorf("RouteTables: %s", err.Error())
 	}
 	for _, table := range tabs {
 		//ListRoutes & Sync
-		routeList, err := rc.routes.ListRoutes(rc.clusterName, table)
+		routeList, err := rc.routes.ListRoutes(ctx, rc.clusterName, table)
 		if err != nil {
 			return fmt.Errorf("error listing routes: %v", err)
 		}
-		if err := rc.sync(table, nodes, routeList); err != nil {
+		if err := rc.sync(ctx, table, nodes, routeList); err != nil {
 			return fmt.Errorf("reconcile route for table [%s] error: %s", table, err.Error())
 		}
 	}
@@ -267,7 +270,7 @@ func (rc *RouteController) reconcile() error {
 }
 
 // Aoxn: Alibaba cloud does not support concurrent route operation
-func (rc *RouteController) sync(table string, nodes []*v1.Node, routes []*cloudprovider.Route) error {
+func (rc *RouteController) sync(ctx context.Context, table string, nodes []*v1.Node, routes []*cloudprovider.Route) error {
 
 	//try delete conflicted route from vpc route table.
 	for _, route := range routes {
@@ -280,7 +283,7 @@ func (rc *RouteController) sync(table string, nodes []*v1.Node, routes []*cloudp
 
 			// Aoxn: Alibaba cloud does not support concurrent route operation
 			klog.Infof("Deleting route %s %s", route.Name, route.DestinationCIDR)
-			if err := rc.routes.DeleteRoute(rc.clusterName, table, route); err != nil {
+			if err := rc.routes.DeleteRoute(ctx, rc.clusterName, table, route); err != nil {
 				klog.Errorf("Could not delete route %s %s from table %s, %s", route.Name, route.DestinationCIDR, table, err.Error())
 				continue
 			}
@@ -306,7 +309,7 @@ func (rc *RouteController) sync(table string, nodes []*v1.Node, routes []*cloudp
 			continue
 		}
 		// ignore error return. Try it next time anyway.
-		err := rc.tryCreateRoute(table, node, cached)
+		err := rc.tryCreateRoute(ctx, table, node, cached)
 		if err != nil {
 			klog.Errorf("try create route error: %s", err.Error())
 		}
@@ -327,9 +330,12 @@ func RouteCacheMap(routes []*cloudprovider.Route) map[string]*cloudprovider.Rout
 	return routeMap
 }
 
-func (rc *RouteController) tryCreateRoute(table string,
+func (rc *RouteController) tryCreateRoute(
+	ctx context.Context,
+	table string,
 	node *v1.Node,
-	cache map[string]*cloudprovider.Route) error {
+	cache map[string]*cloudprovider.Route,
+) error {
 
 	_, condition := helpers.GetNodeCondition(&node.Status, v1.NodeReady)
 	if condition != nil && condition.Status == v1.ConditionUnknown {
@@ -367,7 +373,7 @@ func (rc *RouteController) tryCreateRoute(table string,
 		err := wait.ExponentialBackoff(backoff, func() (bool, error) {
 
 			klog.Infof("Creating route for node %s %s with hint %s", node.Name, route.DestinationCIDR, node.Name)
-			err := rc.routes.CreateRoute(rc.clusterName, node.Name, table, route)
+			err := rc.routes.CreateRoute(ctx, rc.clusterName, node.Name, table, route)
 			if err != nil {
 				lasterr = err
 				if strings.Contains(err.Error(), "not found") {

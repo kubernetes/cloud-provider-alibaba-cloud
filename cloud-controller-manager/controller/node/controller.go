@@ -240,7 +240,7 @@ func (cnc *CloudNodeController) AddCloudNode(node *v1.Node) error {
 	curNode, err := cnc.kclient.
 		CoreV1().
 		Nodes().
-		Get(context.Background(),node.Name, metav1.GetOptions{})
+		Get(context.Background(), node.Name, metav1.GetOptions{})
 	if err != nil {
 		//retry
 		return fmt.Errorf("retrieve node error: %s", err.Error())
@@ -341,7 +341,7 @@ func (cnc *CloudNodeController) doAddCloudNode(node *v1.Node) error {
 		20*time.Second,
 		func() (done bool, err error) {
 			klog.V(5).Infof("try remove cloud taints for %s", node.Name)
-			curNode, err := cnc.kclient.CoreV1().Nodes().Get(context.Background(),node.Name, metav1.GetOptions{})
+			curNode, err := cnc.kclient.CoreV1().Nodes().Get(context.Background(), node.Name, metav1.GetOptions{})
 			if err != nil {
 				klog.Errorf("retrieve node error: %s", err.Error())
 				//retry
@@ -538,9 +538,9 @@ func deleteNode(cnc *CloudNodeController, node *v1.Node) {
 	go func(nodeName string) {
 		defer utilruntime.HandleCrash()
 		if err := cnc.kclient.CoreV1().
-					Nodes().Delete(
-						context.Background(), nodeName, metav1.DeleteOptions{},
-					); err != nil {
+			Nodes().Delete(
+			context.Background(), nodeName, metav1.DeleteOptions{},
+		); err != nil {
 			klog.Errorf("unable to delete node %q: %v", nodeName, err)
 		}
 	}(node.Name)
@@ -557,7 +557,7 @@ func nodeConditionReady(kclient kubernetes.Interface, node *v1.Node) *v1.NodeCon
 			return ccondition
 		}
 		name := node.Name
-		node, err = kclient.CoreV1().Nodes().Get(context.Background(),name, metav1.GetOptions{})
+		node, err = kclient.CoreV1().Nodes().Get(context.Background(), name, metav1.GetOptions{})
 		if err != nil {
 			klog.Errorf("Failed while getting a Node to retry updating "+
 				"NodeStatus. Probably Node %s was deleted.", name)
@@ -573,7 +573,7 @@ func setDefaultProviderID(cnc *CloudNodeController, node *v1.Node) {
 	if node.Spec.ProviderID != "" {
 		return
 	}
-	id, err := cloudprovider.GetInstanceProviderID(context.Background(),cnc.cloud, types.NodeName(node.Name))
+	id, err := cloudprovider.GetInstanceProviderID(context.Background(), cnc.cloud, types.NodeName(node.Name))
 	if err == nil {
 		node.Spec.ProviderID = id
 	} else {
@@ -646,7 +646,7 @@ func removeCloudTaints(node *v1.Node) {
 }
 
 func nodeLists(kclient kubernetes.Interface) (*v1.NodeList, error) {
-	allNodes, err := kclient.CoreV1().Nodes().List(context.Background(),metav1.ListOptions{ResourceVersion: "0"})
+	allNodes, err := kclient.CoreV1().Nodes().List(context.Background(), metav1.ListOptions{ResourceVersion: "0"})
 	if allNodes == nil {
 		return nil, err
 	}
@@ -728,5 +728,5 @@ func PatchNode(
 	return kdm.
 		CoreV1().
 		Nodes().
-		Patch(context.Background(),patched.Name, types.MergePatchType, data,metav1.PatchOptions{})
+		Patch(context.Background(), patched.Name, types.MergePatchType, data, metav1.PatchOptions{})
 }

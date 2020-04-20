@@ -68,22 +68,22 @@ func NewServerCCM() *ServerCCM {
 		// Please keep them in sync when doing update.
 		CloudControllerManagerConfiguration: ccfg.CloudControllerManagerConfiguration{
 			Generic: kubectrlmgrconfig.GenericControllerManagerConfiguration{
-				Port:                      ports.CloudControllerManagerPort,
-				Address:                   "0.0.0.0",
-				MinResyncPeriod:           metav1.Duration{Duration: 5 * time.Minute},
-				ClientConnection:          componentbaseconfig.ClientConnectionConfiguration{
-					ContentType:           "application/vnd.kubernetes.protobuf",
-					QPS:                   20.0,
-					Burst:                 30,
+				Port:            ports.CloudControllerManagerPort,
+				Address:         "0.0.0.0",
+				MinResyncPeriod: metav1.Duration{Duration: 5 * time.Minute},
+				ClientConnection: componentbaseconfig.ClientConnectionConfiguration{
+					ContentType: "application/vnd.kubernetes.protobuf",
+					QPS:         20.0,
+					Burst:       30,
 				},
-				LeaderElection:            componentbaseconfig.LeaderElectionConfiguration{
+				LeaderElection: componentbaseconfig.LeaderElectionConfiguration{
 					LeaderElect:   false,
 					LeaseDuration: metav1.Duration{Duration: 15 * time.Second},
 					RenewDeadline: metav1.Duration{Duration: 10 * time.Second},
 					RetryPeriod:   metav1.Duration{Duration: 2 * time.Second},
 					ResourceLock:  resourcelock.EndpointsResourceLock,
 				},
-				ControllerStartInterval:   metav1.Duration{Duration: 0 * time.Second},
+				ControllerStartInterval: metav1.Duration{Duration: 0 * time.Second},
 			},
 			KubeCloudShared: kubectrlmgrconfig.KubeCloudSharedConfiguration{
 				NodeMonitorPeriod:         metav1.Duration{Duration: 5 * time.Second},
@@ -92,7 +92,7 @@ func NewServerCCM() *ServerCCM {
 				RouteReconciliationPeriod: metav1.Duration{Duration: 10 * time.Second},
 			},
 			ServiceController: serviceconfig.ServiceControllerConfiguration{
-				ConcurrentServiceSyncs:    2,
+				ConcurrentServiceSyncs: 2,
 			},
 		},
 		NodeStatusUpdateFrequency: metav1.Duration{Duration: 5 * time.Minute},
@@ -149,8 +149,8 @@ func (ccm *ServerCCM) initialization() error {
 	}
 
 	cloud, err := cloudprovider.InitCloudProvider(
-			ccm.KubeCloudShared.CloudProvider.Name,
-			ccm.KubeCloudShared.CloudProvider.CloudConfigFile,
+		ccm.KubeCloudShared.CloudProvider.Name,
+		ccm.KubeCloudShared.CloudProvider.CloudConfigFile,
 	)
 	if err != nil {
 		return fmt.Errorf("cloud provider could not be initialized: %v", err)
@@ -295,7 +295,7 @@ func RunControllers(
 
 	if ccm.cloud != nil {
 		// Initialize the cloud provider with a reference to the clientBuilder
-		ccm.cloud.Initialize(clientBuilder,stop)
+		ccm.cloud.Initialize(clientBuilder, stop)
 	}
 	client := clientBuilder.ClientOrDie("shared-informers")
 
@@ -315,7 +315,7 @@ func RunControllers(
 	// If apiserver is not running we should wait for some time and fail
 	// only then. This is particularly important when we start apiserver
 	// and controller manager at the same time.
-	err := genericcontrollermanager.WaitForAPIServer(ccm.client,10*time.Second)
+	err := genericcontrollermanager.WaitForAPIServer(ccm.client, 10*time.Second)
 	if err != nil {
 		return fmt.Errorf("failed to get api versions from server: %v", err)
 	}

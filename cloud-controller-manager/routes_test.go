@@ -17,6 +17,7 @@ limitations under the License.
 package alicloud
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"testing"
@@ -32,7 +33,7 @@ func NewMockRouteMgr(tables string) (*ClientMgr, error) {
 			region: string(REGION),
 		},
 	}
-	mgr.routes.WithVPC(VPCID, "")
+	mgr.routes.WithVPC(context.Background(), VPCID, "")
 	return mgr, nil
 }
 
@@ -52,7 +53,7 @@ func TestListRoutes(t *testing.T) {
 		WithVRouter(),
 	)
 
-	route, err := cmgr.Routes().ListRoutes(ROUTE_TABLE_ID)
+	route, err := cmgr.Routes().ListRoutes(context.Background(), ROUTE_TABLE_ID)
 	if err != nil {
 		t.Fatal(fmt.Sprintf("failed to list routes, %v", err))
 	}

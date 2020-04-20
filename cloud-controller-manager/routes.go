@@ -17,6 +17,7 @@ limitations under the License.
 package alicloud
 
 import (
+	"context"
 	"k8s.io/cloud-provider"
 	"k8s.io/klog"
 
@@ -44,22 +45,22 @@ var index = 1
 
 //RouteSDK define route sdk interface
 type RouteSDK interface {
-	DescribeVpcs(args *ecs.DescribeVpcsArgs) (vpcs []ecs.VpcSetType, pagination *common.PaginationResult, err error)
-	DescribeVRouters(args *ecs.DescribeVRoutersArgs) (vrouters []ecs.VRouterSetType, pagination *common.PaginationResult, err error)
-	DescribeRouteTables(args *ecs.DescribeRouteTablesArgs) (routeTables []ecs.RouteTableSetType, pagination *common.PaginationResult, err error)
-	DeleteRouteEntry(args *ecs.DeleteRouteEntryArgs) error
-	CreateRouteEntry(args *ecs.CreateRouteEntryArgs) error
-	WaitForAllRouteEntriesAvailable(vrouterId string, routeTableId string, timeout int) error
-	DescribeRouteEntryList(args *ecs.DescribeRouteEntryListArgs) (response *ecs.DescribeRouteEntryListResponse, err error)
+	DescribeVpcs(ctx context.Context, args *ecs.DescribeVpcsArgs) (vpcs []ecs.VpcSetType, pagination *common.PaginationResult, err error)
+	DescribeVRouters(ctx context.Context, args *ecs.DescribeVRoutersArgs) (vrouters []ecs.VRouterSetType, pagination *common.PaginationResult, err error)
+	DescribeRouteTables(ctx context.Context, args *ecs.DescribeRouteTablesArgs) (routeTables []ecs.RouteTableSetType, pagination *common.PaginationResult, err error)
+	DeleteRouteEntry(ctx context.Context, args *ecs.DeleteRouteEntryArgs) error
+	CreateRouteEntry(ctx context.Context, args *ecs.CreateRouteEntryArgs) error
+	WaitForAllRouteEntriesAvailable(ctx context.Context, vrouterId string, routeTableId string, timeout int) error
+	DescribeRouteEntryList(ctx context.Context, args *ecs.DescribeRouteEntryListArgs) (response *ecs.DescribeRouteEntryListResponse, err error)
 }
 
 //WithVPC set vpc id and and route table ids.
-func (r *RoutesClient) WithVPC(vpcid string, tableids string) error {
+func (r *RoutesClient) WithVPC(ctx context.Context, vpcid string, tableids string) error {
 	args := &ecs.DescribeVpcsArgs{
 		VpcId:    vpcid,
 		RegionId: common.Region(r.region),
 	}
-	vpcs, _, err := r.client.DescribeVpcs(args)
+	vpcs, _, err := r.client.DescribeVpcs(ctx, args)
 	if err != nil {
 		return fmt.Errorf("withvpc error: %s", err)
 	}
@@ -79,11 +80,11 @@ func (r *RoutesClient) WithVPC(vpcid string, tableids string) error {
 }
 
 // ListRoutes lists all managed routes that belong to the specified clusterName
-func (r *RoutesClient) ListRoutes(tableid string) (routes []*cloudprovider.Route, err error) {
+func (r *RoutesClient) ListRoutes(ctx context.Context, tableid string) (routes []*cloudprovider.Route, err error) {
 
 	klog.Infof("ListRoutes: for route table %s", tableid)
 	// route will be overwritten by getRouteEntryBatch
-	err = r.getRouteEntryBatch(tableid, "", &routes)
+	err = r.getRouteEntryBatch(ctx, tableid, "", &routes)
 	if err != nil {
 		return []*cloudprovider.Route{},
 			fmt.Errorf("table %s get route entries error ,err %s", tableid, err.Error())
@@ -92,7 +93,7 @@ func (r *RoutesClient) ListRoutes(tableid string) (routes []*cloudprovider.Route
 	}
 }
 
-func (r *RoutesClient) getRouteEntryBatch(tableid string, nextToken string, routes *[]*cloudprovider.Route) error {
+func (r *RoutesClient) getRouteEntryBatch(ctx context.Context, tableid string, nextToken string, routes *[]*cloudprovider.Route) error {
 
 	args := &ecs.DescribeRouteEntryListArgs{
 		RegionId:       r.region,
@@ -100,7 +101,7 @@ func (r *RoutesClient) getRouteEntryBatch(tableid string, nextToken string, rout
 		RouteEntryType: "Custom",
 		NextToken:      nextToken,
 	}
-	response, err := r.client.DescribeRouteEntryList(args)
+	response, err := r.client.DescribeRouteEntryList(ctx, args)
 	if err != nil || response == nil {
 		return fmt.Errorf("describe route entry list error, err %v", err)
 	}
@@ -132,13 +133,13 @@ func (r *RoutesClient) getRouteEntryBatch(tableid string, nextToken string, rout
 	}
 	// get next batch
 	if response.NextToken != "" {
-		return r.getRouteEntryBatch(tableid, response.NextToken, routes)
+		return r.getRouteEntryBatch(ctx, tableid, response.NextToken, routes)
 	}
 	return nil
 }
 
 //RouteTables return all the tables in the vpc network.
-func (r *RoutesClient) RouteTables() ([]string, error) {
+func (r *RoutesClient) RouteTables(ctx context.Context) ([]string, error) {
 	if len(r.vpc.tableids) != 0 {
 		return r.vpc.tableids, nil
 	}
@@ -147,7 +148,7 @@ func (r *RoutesClient) RouteTables() ([]string, error) {
 		VpcId:    r.vpc.vpcid,
 		RegionId: common.Region(r.region),
 	}
-	vpcs, _, err := r.client.DescribeVpcs(args)
+	vpcs, _, err := r.client.DescribeVpcs(ctx, args)
 	if err != nil {
 		return []string{}, err
 	}
@@ -165,7 +166,7 @@ func (r *RoutesClient) RouteTables() ([]string, error) {
 // CreateRoute creates the described managed route
 // route.Name will be ignored, although the cloud-provider may use nameHint
 // to create a more user-meaningful name.
-func (r *RoutesClient) CreateRoute(tabid string, route *cloudprovider.Route, region common.Region, vpcid string) error {
+func (r *RoutesClient) CreateRoute(ctx context.Context, tabid string, route *cloudprovider.Route, region common.Region, vpcid string) error {
 	describeRouteEntryListArgs := &ecs.DescribeRouteEntryListArgs{
 		RegionId:             r.region,
 		RouteTableId:         tabid,
@@ -173,7 +174,7 @@ func (r *RoutesClient) CreateRoute(tabid string, route *cloudprovider.Route, reg
 		DestinationCidrBlock: route.DestinationCIDR,
 		NextHopId:            string(route.TargetNode),
 	}
-	response, err := r.client.DescribeRouteEntryList(describeRouteEntryListArgs)
+	response, err := r.client.DescribeRouteEntryList(ctx, describeRouteEntryListArgs)
 	if err != nil || response == nil {
 		return fmt.Errorf("describe table %s RouteEntry list error, %v", tabid, err)
 	}
@@ -191,7 +192,7 @@ func (r *RoutesClient) CreateRoute(tabid string, route *cloudprovider.Route, reg
 		NextHopId:            string(route.TargetNode),
 	}
 	klog.Infof("CreateRoute:[%s] start to create route, %s -> %s", tabid, route.DestinationCIDR, route.TargetNode)
-	return WaitCreate(r, tabid, args)
+	return WaitCreate(ctx, r, tabid, args)
 }
 
 func isRouteExists(routes []*cloudprovider.Route, route *cloudprovider.Route) bool {
@@ -207,34 +208,34 @@ func isRouteExists(routes []*cloudprovider.Route, route *cloudprovider.Route) bo
 
 // DeleteRoute deletes the specified managed route
 // Route should be as returned by ListRoutes
-func (r *RoutesClient) DeleteRoute(tabid string, route *cloudprovider.Route, region common.Region) error {
+func (r *RoutesClient) DeleteRoute(ctx context.Context, tabid string, route *cloudprovider.Route, region common.Region) error {
 	args := &ecs.DeleteRouteEntryArgs{
 		RouteTableId:         tabid,
 		DestinationCidrBlock: route.DestinationCIDR,
 		NextHopId:            string(route.TargetNode),
 	}
-	return WaitDelete(r, tabid, args)
+	return WaitDelete(ctx, r, tabid, args)
 }
 
 // WaitCreate create route and wait for route ready
-func WaitCreate(rc *RoutesClient, tableid string, route *ecs.CreateRouteEntryArgs) error {
-	err := rc.client.CreateRouteEntry(route)
+func WaitCreate(ctx context.Context, rc *RoutesClient, tableid string, route *ecs.CreateRouteEntryArgs) error {
+	err := rc.client.CreateRouteEntry(ctx, route)
 	if err != nil {
 		return fmt.Errorf("WaitCreate: ceate route for table %s error, %s", tableid, err.Error())
 	}
-	return WaitForRouteEntryAvailable(rc.client, rc.vpc.vrouterid, tableid)
+	return WaitForRouteEntryAvailable(ctx, rc.client, rc.vpc.vrouterid, tableid)
 }
 
 // WaitDelete delete route and wait for route ready
-func WaitDelete(rc *RoutesClient, tableid string, route *ecs.DeleteRouteEntryArgs) error {
-	if err := rc.client.DeleteRouteEntry(route); err != nil {
+func WaitDelete(ctx context.Context, rc *RoutesClient, tableid string, route *ecs.DeleteRouteEntryArgs) error {
+	if err := rc.client.DeleteRouteEntry(ctx, route); err != nil {
 		if strings.Contains(err.Error(), "InvalidRouteEntry.NotFound") {
 			klog.Warningf("WaitDelete:[%s] route not found %s -> %s", tableid, route.DestinationCidrBlock, route.NextHopId)
 			return nil
 		}
 		return fmt.Errorf("WaitDelete:[%s] delete route entry error: %s", tableid, err.Error())
 	}
-	return WaitForRouteEntryAvailable(rc.client, rc.vpc.vrouterid, tableid)
+	return WaitForRouteEntryAvailable(ctx, rc.client, rc.vpc.vrouterid, tableid)
 }
 
 // Error implement error
@@ -246,6 +247,6 @@ func (r *RoutesClient) Error(e error) string {
 }
 
 // WaitForRouteEntryAvailable wait for route entry available
-func WaitForRouteEntryAvailable(client RouteSDK, routeid, tableid string) error {
-	return client.WaitForAllRouteEntriesAvailable(routeid, tableid, 60)
+func WaitForRouteEntryAvailable(ctx context.Context, client RouteSDK, routeid, tableid string) error {
+	return client.WaitForAllRouteEntriesAvailable(ctx, routeid, tableid, 60)
 }

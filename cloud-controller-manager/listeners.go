@@ -17,6 +17,7 @@ limitations under the License.
 package alicloud
 
 import (
+	"context"
 	//"errors"
 	"fmt"
 	"github.com/denverdino/aliyungo/slb"
@@ -88,10 +89,10 @@ func Protocol(annotation string, port v1.ServicePort) (string, error) {
 
 // IListener listener interface
 type IListener interface {
-	Describe() error
-	Add() error
-	Remove() error
-	Update() error
+	Describe(ctx context.Context) error
+	Add(ctx context.Context) error
+	Remove(ctx context.Context) error
+	Update(ctx context.Context) error
 }
 
 // FORMAT_ERROR format error message
@@ -228,42 +229,43 @@ func (n *Listener) Instance() IListener {
 }
 
 // Apply apply listener operate . add/update/delete etc.
-func (n *Listener) Apply() error {
+func (n *Listener) Apply(ctx context.Context) error {
 	klog.Infof("apply %s listener for %v with trans protocol %s", n.Action, n.NamedKey, n.TransforedProto)
 	switch n.Action {
 	case ACTION_UPDATE:
-		return n.Instance().Update()
+		return n.Instance().Update(ctx)
 	case ACTION_ADD:
-		err := n.Instance().Add()
+		err := n.Instance().Add(ctx)
 		if err != nil {
 			return err
 		}
-		return n.Start()
+		return n.Start(ctx)
 	case ACTION_DELETE:
-		return n.Instance().Remove()
+		return n.Instance().Remove(ctx)
 	}
 	return fmt.Errorf("UnKnownAction: %s, %s/%s", n.Action, n.Service.Namespace, n.Service.Name)
 }
 
 // Start start listener
-func (n *Listener) Start() error {
+func (n *Listener) Start(ctx context.Context) error {
 	return n.Client.StartLoadBalancerListener(
-		n.LoadBalancerID, int(n.Port))
+		ctx, n.LoadBalancerID, int(n.Port),
+	)
 }
 
 // Describe describe listener
-func (n *Listener) Describe() error {
+func (n *Listener) Describe(ctx context.Context) error {
 
 	return fmt.Errorf("unimplemented")
 }
 
 // Remove remove Listener
-func (n *Listener) Remove() error {
-	err := n.Client.StopLoadBalancerListener(n.LoadBalancerID, int(n.Port))
+func (n *Listener) Remove(ctx context.Context) error {
+	err := n.Client.StopLoadBalancerListener(ctx, n.LoadBalancerID, int(n.Port))
 	if err != nil {
 		return err
 	}
-	return n.Client.DeleteLoadBalancerListener(n.LoadBalancerID, int(n.Port))
+	return n.Client.DeleteLoadBalancerListener(ctx, n.LoadBalancerID, int(n.Port))
 }
 
 func (n *Listener) findVgroup(key string) string {
@@ -289,6 +291,7 @@ type Listeners []*Listener
 // 3. Third, Merge the up two listeners to decide whether add/update/remove is needed.
 // 4. Do update.  Clean unused vserver group.
 func EnsureListeners(
+	ctx context.Context,
 	slbins *LoadBalancerClient,
 	service *v1.Service,
 	lb *slb.LoadBalancerType,
@@ -330,19 +333,20 @@ func EnsureListeners(
 	)
 	// do update/add/delete
 	for _, up := range updates {
-		err := up.Apply()
+		err := up.Apply(ctx)
 		if err != nil {
 			return fmt.Errorf("ensure listener: %s", err.Error())
 		}
 	}
 
-	return CleanUPVGroupMerged(slbins, service, lb, vgs)
+	return CleanUPVGroupMerged(ctx, slbins, service, lb, vgs)
 }
 
 func isDeleteAction(action string) bool { return action == ACTION_DELETE }
 
 // EnsureListenersDeleted Only listener which owned by my service was deleted.
 func EnsureListenersDeleted(
+	ctx context.Context,
 	client ClientSLBSDK,
 	service *v1.Service,
 	lb *slb.LoadBalancerType,
@@ -376,7 +380,7 @@ func EnsureListenersDeleted(
 				continue
 			}
 			if loc.Port == rem.Port {
-				err := loc.Remove()
+				err := loc.Remove(ctx)
 				if err != nil {
 					return fmt.Errorf("ensure listener: %s", err.Error())
 				}
@@ -384,7 +388,7 @@ func EnsureListenersDeleted(
 		}
 	}
 
-	return CleanUPVGroupDirect(vgs)
+	return CleanUPVGroupDirect(ctx, vgs)
 }
 
 func isManagedByMyService(svc *v1.Service, remote *Listener) bool {
@@ -561,9 +565,10 @@ func BuildListenersFromAPI(
 
 type tcp struct{ *Listener }
 
-func (t *tcp) Add() error {
+func (t *tcp) Add(ctx context.Context) error {
 	def, _ := ExtractAnnotationRequest(t.Service)
 	return t.Client.CreateLoadBalancerTCPListener(
+		ctx,
 		&slb.CreateLoadBalancerTCPListenerArgs{
 			LoadBalancerId:    t.LoadBalancerID,
 			ListenerPort:      int(t.Port),
@@ -591,16 +596,16 @@ func (t *tcp) Add() error {
 		})
 }
 
-func (t *tcp) Update() error {
+func (t *tcp) Update(ctx context.Context) error {
 	def, request := ExtractAnnotationRequest(t.Service)
 
-	response, err := t.Client.DescribeLoadBalancerTCPListenerAttribute(t.LoadBalancerID, int(t.Port))
+	response, err := t.Client.DescribeLoadBalancerTCPListenerAttribute(ctx, t.LoadBalancerID, int(t.Port))
 	if err != nil {
 		return fmt.Errorf("update tcp listener: %s", err.Error())
 	}
 	utils.Logf(t.Service, "tcp listener %d status is %s.", t.Port, response.Status)
 	if response.Status == slb.Stopped {
-		if err = t.Client.StartLoadBalancerListener(t.LoadBalancerID, int(t.Port)); err != nil {
+		if err = t.Client.StartLoadBalancerListener(ctx, t.LoadBalancerID, int(t.Port)); err != nil {
 			return fmt.Errorf("start tcp listener error: %s", err.Error())
 		}
 	}
@@ -711,15 +716,15 @@ func (t *tcp) Update() error {
 	if int(t.NodePort) != response.BackendServerPort {
 		config.BackendServerPort = int(t.NodePort)
 		klog.V(2).Infof("tcp listener [BackendServerPort] changed, request=%d. response=%d, recreate.", t.NodePort, response.BackendServerPort)
-		err := t.Client.DeleteLoadBalancerListener(t.LoadBalancerID, int(t.Port))
+		err := t.Client.DeleteLoadBalancerListener(ctx, t.LoadBalancerID, int(t.Port))
 		if err != nil {
 			return err
 		}
-		err = t.Client.CreateLoadBalancerTCPListener((*slb.CreateLoadBalancerTCPListenerArgs)(config))
+		err = t.Client.CreateLoadBalancerTCPListener(ctx, (*slb.CreateLoadBalancerTCPListenerArgs)(config))
 		if err != nil {
 			return err
 		}
-		return t.Client.StartLoadBalancerListener(t.LoadBalancerID, int(t.Port))
+		return t.Client.StartLoadBalancerListener(ctx, t.LoadBalancerID, int(t.Port))
 	}
 	if !needUpdate {
 		utils.Logf(t.Service, "tcp listener did not change, skip [update], port=[%d], nodeport=[%d]", t.Port, t.NodePort)
@@ -729,17 +734,18 @@ func (t *tcp) Update() error {
 	utils.Logf(t.Service, "TCP listener checker changed, request update listener attribute [%s]", t.LoadBalancerID)
 	klog.V(5).Infof(PrettyJson(def))
 	klog.V(5).Infof(PrettyJson(response))
-	return t.Client.SetLoadBalancerTCPListenerAttribute(config)
+	return t.Client.SetLoadBalancerTCPListenerAttribute(ctx, config)
 }
 
 type udp struct{ *Listener }
 
-func (t *udp) Describe() error {
+func (t *udp) Describe(ctx context.Context) error {
 	return fmt.Errorf("unimplemented")
 }
-func (t *udp) Add() error {
+func (t *udp) Add(ctx context.Context) error {
 	def, _ := ExtractAnnotationRequest(t.Service)
 	return t.Client.CreateLoadBalancerUDPListener(
+		ctx,
 		&slb.CreateLoadBalancerUDPListenerArgs{
 			LoadBalancerId:    t.LoadBalancerID,
 			ListenerPort:      int(t.Port),
@@ -766,15 +772,15 @@ func (t *udp) Add() error {
 	)
 }
 
-func (t *udp) Update() error {
+func (t *udp) Update(ctx context.Context) error {
 	def, request := ExtractAnnotationRequest(t.Service)
-	response, err := t.Client.DescribeLoadBalancerUDPListenerAttribute(t.LoadBalancerID, int(t.Port))
+	response, err := t.Client.DescribeLoadBalancerUDPListenerAttribute(ctx, t.LoadBalancerID, int(t.Port))
 	if err != nil {
 		return err
 	}
 	utils.Logf(t.Service, "udp listener %d status is %s.", t.Port, response.Status)
 	if response.Status == slb.Stopped {
-		if err = t.Client.StartLoadBalancerListener(t.LoadBalancerID, int(t.Port)); err != nil {
+		if err = t.Client.StartLoadBalancerListener(ctx, t.LoadBalancerID, int(t.Port)); err != nil {
 			return fmt.Errorf("start udp listener error: %s", err.Error())
 		}
 	}
@@ -862,15 +868,15 @@ func (t *udp) Update() error {
 		config.BackendServerPort = int(t.NodePort)
 		utils.Logf(t.Service, "udp listener checker [BackendServerPort] changed, "+
 			"request=%d. response=%d", t.NodePort, response.BackendServerPort)
-		err := t.Client.DeleteLoadBalancerListener(t.LoadBalancerID, int(t.Port))
+		err := t.Client.DeleteLoadBalancerListener(ctx, t.LoadBalancerID, int(t.Port))
 		if err != nil {
 			return err
 		}
-		err = t.Client.CreateLoadBalancerUDPListener((*slb.CreateLoadBalancerUDPListenerArgs)(config))
+		err = t.Client.CreateLoadBalancerUDPListener(ctx, (*slb.CreateLoadBalancerUDPListenerArgs)(config))
 		if err != nil {
 			return err
 		}
-		return t.Client.StartLoadBalancerListener(t.LoadBalancerID, int(t.Port))
+		return t.Client.StartLoadBalancerListener(ctx, t.LoadBalancerID, int(t.Port))
 	}
 
 	if !needUpdate {
@@ -882,15 +888,15 @@ func (t *udp) Update() error {
 	utils.Logf(t.Service, "UDP listener checker changed, request recreate [%s]\n", t.LoadBalancerID)
 	klog.V(5).Infof(PrettyJson(request))
 	klog.V(5).Infof(PrettyJson(response))
-	return t.Client.SetLoadBalancerUDPListenerAttribute(config)
+	return t.Client.SetLoadBalancerUDPListenerAttribute(ctx, config)
 }
 
 type http struct{ *Listener }
 
-func (t *http) Describe() error {
+func (t *http) Describe(ctx context.Context) error {
 	return fmt.Errorf("unimplemented")
 }
-func (t *http) Add() error {
+func (t *http) Add(ctx context.Context) error {
 	def, request := ExtractAnnotationRequest(t.Service)
 	httpc := &slb.CreateLoadBalancerHTTPListenerArgs{
 		LoadBalancerId:    t.LoadBalancerID,
@@ -928,7 +934,7 @@ func (t *http) Add() error {
 		httpc.ListenerForward = slb.OffFlag
 	}
 	httpc.ForwardPort = int(forward)
-	return t.Client.CreateLoadBalancerHTTPListener(httpc)
+	return t.Client.CreateLoadBalancerHTTPListener(ctx, httpc)
 }
 
 func forwardPort(port string, target int32) int32 {
@@ -960,16 +966,16 @@ func forwardPort(port string, target int32) int32 {
 	return 0
 }
 
-func (t *http) Update() error {
+func (t *http) Update(ctx context.Context) error {
 
 	def, request := ExtractAnnotationRequest(t.Service)
-	response, err := t.Client.DescribeLoadBalancerHTTPListenerAttribute(t.LoadBalancerID, int(t.Port))
+	response, err := t.Client.DescribeLoadBalancerHTTPListenerAttribute(ctx, t.LoadBalancerID, int(t.Port))
 	if err != nil {
 		return err
 	}
 	utils.Logf(t.Service, "http listener %d status is %s.", t.Port, response.Status)
 	if response.Status == slb.Stopped {
-		if err = t.Client.StartLoadBalancerListener(t.LoadBalancerID, int(t.Port)); err != nil {
+		if err = t.Client.StartLoadBalancerListener(ctx, t.LoadBalancerID, int(t.Port)); err != nil {
 			return fmt.Errorf("start http listener error: %s", err.Error())
 		}
 	}
@@ -1119,15 +1125,15 @@ func (t *http) Update() error {
 		config.BackendServerPort = int(t.NodePort)
 		utils.Logf(t.Service, "HTTP listener checker [BackendServerPort]"+
 			" changed, request=%d. response=%d. Recreate http listener.", t.NodePort, response.BackendServerPort)
-		err := t.Client.DeleteLoadBalancerListener(t.LoadBalancerID, int(t.Port))
+		err := t.Client.DeleteLoadBalancerListener(ctx, t.LoadBalancerID, int(t.Port))
 		if err != nil {
 			return err
 		}
-		err = t.Client.CreateLoadBalancerHTTPListener((*slb.CreateLoadBalancerHTTPListenerArgs)(config))
+		err = t.Client.CreateLoadBalancerHTTPListener(ctx, (*slb.CreateLoadBalancerHTTPListenerArgs)(config))
 		if err != nil {
 			return err
 		}
-		return t.Client.StartLoadBalancerListener(t.LoadBalancerID, int(t.Port))
+		return t.Client.StartLoadBalancerListener(ctx, t.LoadBalancerID, int(t.Port))
 	}
 
 	if response.ListenerForward == slb.OnFlag {
@@ -1144,18 +1150,19 @@ func (t *http) Update() error {
 	utils.Logf(t.Service, "http listener checker changed, request update [%s]\n", t.LoadBalancerID)
 	klog.V(5).Infof(PrettyJson(request))
 	klog.V(5).Infof(PrettyJson(response))
-	return t.Client.SetLoadBalancerHTTPListenerAttribute(config)
+	return t.Client.SetLoadBalancerHTTPListenerAttribute(ctx, config)
 }
 
 type https struct{ *Listener }
 
-func (t *https) Describe() error {
+func (t *https) Describe(ctx context.Context) error {
 	return fmt.Errorf("unimplemented")
 }
-func (t *https) Add() error {
+func (t *https) Add(ctx context.Context) error {
 
 	def, request := ExtractAnnotationRequest(t.Service)
 	return t.Client.CreateLoadBalancerHTTPSListener(
+		ctx,
 		&slb.CreateLoadBalancerHTTPSListenerArgs{
 			HTTPListenerType: slb.HTTPListenerType{
 				LoadBalancerId:    t.LoadBalancerID,
@@ -1189,15 +1196,15 @@ func (t *https) Add() error {
 	)
 }
 
-func (t *https) Update() error {
+func (t *https) Update(ctx context.Context) error {
 	def, request := ExtractAnnotationRequest(t.Service)
-	response, err := t.Client.DescribeLoadBalancerHTTPSListenerAttribute(t.LoadBalancerID, int(t.Port))
+	response, err := t.Client.DescribeLoadBalancerHTTPSListenerAttribute(ctx, t.LoadBalancerID, int(t.Port))
 	if err != nil {
 		return err
 	}
 	utils.Logf(t.Service, "https listener %d status is %s.", t.Port, response.Status)
 	if response.Status == slb.Stopped {
-		if err = t.Client.StartLoadBalancerListener(t.LoadBalancerID, int(t.Port)); err != nil {
+		if err = t.Client.StartLoadBalancerListener(ctx, t.LoadBalancerID, int(t.Port)); err != nil {
 			return fmt.Errorf("start https listener error: %s", err.Error())
 		}
 	}
@@ -1334,15 +1341,15 @@ func (t *https) Update() error {
 		needUpdate = true
 		config.BackendServerPort = int(t.NodePort)
 		utils.Logf(t.Service, "listener checker [BackendServerPort] changed, request=%d. response=%d", t.NodePort, response.BackendServerPort)
-		err := t.Client.DeleteLoadBalancerListener(t.LoadBalancerID, int(t.Port))
+		err := t.Client.DeleteLoadBalancerListener(ctx, t.LoadBalancerID, int(t.Port))
 		if err != nil {
 			return err
 		}
-		err = t.Client.CreateLoadBalancerHTTPSListener((*slb.CreateLoadBalancerHTTPSListenerArgs)(config))
+		err = t.Client.CreateLoadBalancerHTTPSListener(ctx, (*slb.CreateLoadBalancerHTTPSListenerArgs)(config))
 		if err != nil {
 			return err
 		}
-		return t.Client.StartLoadBalancerListener(t.LoadBalancerID, int(t.Port))
+		return t.Client.StartLoadBalancerListener(ctx, t.LoadBalancerID, int(t.Port))
 	}
 
 	if !needUpdate {
@@ -1353,5 +1360,5 @@ func (t *https) Update() error {
 	utils.Logf(t.Service, "https listener checker changed, request recreate [%s]\n", t.LoadBalancerID)
 	klog.V(5).Infof(PrettyJson(request))
 	klog.V(5).Infof(PrettyJson(response))
-	return t.Client.SetLoadBalancerHTTPSListenerAttribute(config)
+	return t.Client.SetLoadBalancerHTTPSListenerAttribute(ctx, config)
 }

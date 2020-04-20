@@ -134,7 +134,6 @@ func ServiceModeLocal(svc *v1.Service) bool {
 	return svc.Spec.ExternalTrafficPolicy == v1.ServiceExternalTrafficPolicyTypeLocal
 }
 
-
 func GetLoadBalancerName(service *v1.Service) string {
 	//GCE requires that the name of a load balancer starts with a lower case letter.
 	ret := "a" + string(service.UID)

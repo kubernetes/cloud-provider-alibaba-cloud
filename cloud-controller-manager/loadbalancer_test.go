@@ -18,6 +18,7 @@ package alicloud
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -83,6 +84,7 @@ func TestFindLoadBalancer(t *testing.T) {
 			},
 		},
 	)
+	ctx := context.Background()
 
 	f.RunCustomized(
 		t, "Create Loadbalancer With SPEC",
@@ -92,10 +94,10 @@ func TestFindLoadBalancer(t *testing.T) {
 			// 1. No LOADBALANCER_ID specified, Exist.
 			//    user need to create new loadbalancer. did not specify any exist loadbalancer.
 			//	  Expected fallback to use service UID to generate slb .
-			t.Logf("1. findLoadBalancer: No LOADBALANCER_ID specified, Expect:Exist")
-			exist, lb, err := f.LoadBalancer().findLoadBalancer(f.SVC)
+			t.Logf("1. FindLoadBalancer: No LOADBALANCER_ID specified, Expect:Exist")
+			exist, lb, err := f.LoadBalancer().FindLoadBalancer(ctx, f.SVC)
 			if err != nil || !exist {
-				t.Fatal("Test findLoadBalancer fail. user need to create new loadbalancer. did not specify any exist loadbalancer.")
+				t.Fatal("Test FindLoadBalancer fail. user need to create new loadbalancer. did not specify any exist loadbalancer.")
 			}
 			if lb.LoadBalancerName != GetLoadBalancerName(f.SVC) {
 				t.Fatal("find loadbalancer fail. suppose to find by name.")
@@ -105,11 +107,11 @@ func TestFindLoadBalancer(t *testing.T) {
 			// 2. No LOADBALANCER_ID specified, None-Exist.
 			//    user need to create new loadbalancer. did not specify any exist loadbalancer.
 			//	  Expected fallback to use service UID to generate slb .
-			t.Logf("2. findLoadBalancer: No LOADBALANCER_ID specified, Expect:Non-Exist")
+			t.Logf("2. FindLoadBalancer: No LOADBALANCER_ID specified, Expect:Non-Exist")
 			f.SVC.UID = types.UID("xxxxxxxxxxxxxxxxxxx-new")
-			exist, _, err = f.LoadBalancer().findLoadBalancer(f.SVC)
+			exist, _, err = f.LoadBalancer().FindLoadBalancer(ctx, f.SVC)
 			if err != nil {
-				t.Fatal("Test findLoadBalancer fail.", err.Error())
+				t.Fatal("Test FindLoadBalancer fail.", err.Error())
 			}
 			if exist {
 				t.Fatal(fmt.Sprintf("loadbalancer should not exist, %s", f.SVC.UID))
@@ -118,11 +120,11 @@ func TestFindLoadBalancer(t *testing.T) {
 			// ==================================================================================
 			// 3. Loadbalancer id was specified, Expect: Exist
 			// user need to use an exist loadbalancer through annotations
-			t.Logf("3. findLoadBalancer: Loadbalancer id was specified, Expect:Exist")
+			t.Logf("3. FindLoadBalancer: Loadbalancer id was specified, Expect:Exist")
 			f.SVC.Annotations[ServiceAnnotationLoadBalancerId] = LOADBALANCER_ID
-			exist, lb, err = f.LoadBalancer().findLoadBalancer(f.SVC)
+			exist, lb, err = f.LoadBalancer().FindLoadBalancer(ctx, f.SVC)
 			if err != nil || !exist {
-				t.Fatal("3. findLoadBalancer: Loadbalancer id was specified, Expect:Exist")
+				t.Fatal("3. FindLoadBalancer: Loadbalancer id was specified, Expect:Exist")
 			}
 			if lb.LoadBalancerId != LOADBALANCER_ID {
 				t.Fatal("find loadbalancer fail. suppose to find by exist loadbalancerid.")
@@ -131,15 +133,15 @@ func TestFindLoadBalancer(t *testing.T) {
 			// ==================================================================================
 			// 4. Loadbalancer id was specified, Expect: NonExist
 			// user need to use an exist loadbalancer through annotations
-			t.Logf("4. findLoadBalancer: Loadbalancer id was specified, Expect:NonExist")
+			t.Logf("4. FindLoadBalancer: Loadbalancer id was specified, Expect:NonExist")
 			f.SVC.Annotations[ServiceAnnotationLoadBalancerId] = LOADBALANCER_ID + "-new"
-			exist, lb, err = f.LoadBalancer().findLoadBalancer(f.SVC)
+			exist, lb, err = f.LoadBalancer().FindLoadBalancer(ctx, f.SVC)
 			if err != nil {
 				t.Logf("4. error: %s", err.Error())
 				t.Fail()
 			}
 			if exist {
-				t.Logf("4. findLoadBalancer: Loadbalancer id was specified, Expect:NonExist")
+				t.Logf("4. FindLoadBalancer: Loadbalancer id was specified, Expect:NonExist")
 				t.Logf("   user need to use an exist loadbalancer through annotations")
 				t.Fail()
 			}
@@ -251,6 +253,7 @@ func TestGetLoadBalancerAdditionalTags(t *testing.T) {
 
 // anomaly test case
 func TestUpdateLoadBalancerWhenStartLoadBalancerFailed(t *testing.T) {
+	ctx := context.Background()
 	prid := nodeid(string(REGION), INSTANCEID)
 	f := NewDefaultFrameWork(nil)
 	f.WithService(
@@ -282,7 +285,7 @@ func TestUpdateLoadBalancerWhenStartLoadBalancerFailed(t *testing.T) {
 
 	// Simulate the failure of StartLoadBalancerListener()
 	slbClient := f.LoadBalancer().c
-	err := slbClient.StopLoadBalancerListener(LOADBALANCER_ID, int(listenPort1))
+	err := slbClient.StopLoadBalancerListener(ctx, LOADBALANCER_ID, int(listenPort1))
 	if err != nil {
 		t.Fatal(err.Error())
 	}
@@ -290,7 +293,7 @@ func TestUpdateLoadBalancerWhenStartLoadBalancerFailed(t *testing.T) {
 	f.RunDefault(t, "update test service")
 
 	// check result
-	res, err := slbClient.DescribeLoadBalancerTCPListenerAttribute(LOADBALANCER_ID, int(listenPort1))
+	res, err := slbClient.DescribeLoadBalancerTCPListenerAttribute(ctx, LOADBALANCER_ID, int(listenPort1))
 	if err != nil {
 		t.Fatalf("DescribeLoadBalancerTCPListenerAttribute error: %s", err.Error())
 	}

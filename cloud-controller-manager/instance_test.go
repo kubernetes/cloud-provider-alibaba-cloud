@@ -17,6 +17,7 @@ limitations under the License.
 package alicloud
 
 import (
+	"context"
 	"fmt"
 	"testing"
 
@@ -59,6 +60,7 @@ func realInsClient(keyid, keysec string) {
 
 func TestInstanceRefeshInstance(t *testing.T) {
 
+	ctx := context.Background()
 	mgr, err := NewMockClientInstanceMgr()
 	if err != nil {
 		t.Fatal(fmt.Sprintf("create client manager fail. [%s]\n", err.Error()))
@@ -69,7 +71,7 @@ func TestInstanceRefeshInstance(t *testing.T) {
 		WithInstance(),
 	)
 
-	ins, err := mgr.Instances().getInstances([]string{INSTANCEID}, REGION)
+	ins, err := mgr.Instances().getInstances(ctx, []string{INSTANCEID}, REGION)
 	if err != nil {
 		t.Errorf("TestInstanceRefeshInstance error: %s\n", err.Error())
 	}
@@ -80,7 +82,7 @@ func TestInstanceRefeshInstance(t *testing.T) {
 	if ins[0].InstanceId != INSTANCEID {
 		t.Fatal("refresh instance error.")
 	}
-	insa, err := mgr.Instances().findInstanceByProviderID(fmt.Sprintf("%s.%s", REGION, INSTANCEID))
+	insa, err := mgr.Instances().findInstanceByProviderID(ctx, fmt.Sprintf("%s.%s", REGION, INSTANCEID))
 	if err != nil {
 		t.Fatal(fmt.Sprintf("findInstanceByNode error: %s\n", err.Error()))
 	}

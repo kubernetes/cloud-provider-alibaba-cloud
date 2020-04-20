@@ -11,6 +11,7 @@ require (
 	github.com/googleapis/gnostic v0.2.0 // indirect
 	github.com/prometheus/client_golang v1.0.0
 	github.com/spf13/pflag v1.0.5
+	golang.org/x/net v0.0.0-20191004110552-13f9640d40b9
 	gopkg.in/square/go-jose.v2 v2.4.1 // indirect
 	k8s.io/api v0.18.1
 	k8s.io/apimachinery v0.18.1

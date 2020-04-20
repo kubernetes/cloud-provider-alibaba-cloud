@@ -17,6 +17,7 @@ limitations under the License.
 package alicloud
 
 import (
+	"context"
 	"github.com/denverdino/aliyungo/slb"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -135,10 +136,10 @@ func TestStartLoadBalancerListener(t *testing.T) {
 	)
 
 	f.RunDefault(t, "With TCP Listener")
-
-	_, lb, _ := f.LoadBalancer().findLoadBalancer(f.SVC)
+	ctx := context.Background()
+	_, lb, _ := f.LoadBalancer().FindLoadBalancer(ctx, f.SVC)
 	slbClient := f.SLBSDK()
-	res, err := slbClient.DescribeLoadBalancerTCPListenerAttribute(lb.LoadBalancerId, int(listenPort1))
+	res, err := slbClient.DescribeLoadBalancerTCPListenerAttribute(ctx, lb.LoadBalancerId, int(listenPort1))
 	if err != nil {
 		t.Fatalf("DescribeLoadBalancerTCPListenerAttribute error: %s", err.Error())
 	}
@@ -148,6 +149,7 @@ func TestStartLoadBalancerListener(t *testing.T) {
 }
 
 func TestStopLoadBalancerListener(t *testing.T) {
+	ctx := context.Background()
 	prid := nodeid(string(REGION), INSTANCEID)
 	f := NewDefaultFrameWork(nil)
 	f.WithService(
@@ -182,12 +184,12 @@ func TestStopLoadBalancerListener(t *testing.T) {
 	f.RunDefault(t, "With TCP Listener")
 
 	slbClient := f.SLBSDK()
-	err := slbClient.StopLoadBalancerListener(LOADBALANCER_ID, int(listenPort1))
+	err := slbClient.StopLoadBalancerListener(ctx, LOADBALANCER_ID, int(listenPort1))
 	if err != nil {
 		t.Fatalf("StopLoadBalancerListener error: %s", err.Error())
 	}
 
-	res, err := slbClient.DescribeLoadBalancerTCPListenerAttribute(LOADBALANCER_ID, int(listenPort1))
+	res, err := slbClient.DescribeLoadBalancerTCPListenerAttribute(ctx, LOADBALANCER_ID, int(listenPort1))
 	if err != nil {
 		t.Fatalf("DescribeLoadBalancerTCPListenerAttribute error: %s", err.Error())
 	}

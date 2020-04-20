@@ -17,6 +17,7 @@ limitations under the License.
 package alicloud
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"k8s.io/cloud-provider-alibaba-cloud/cloud-controller-manager/utils"
@@ -93,44 +94,44 @@ const TAGKEY = "kubernetes.do.not.delete"
 
 // ClientSLBSDK client sdk for slb
 type ClientSLBSDK interface {
-	DescribeLoadBalancers(args *slb.DescribeLoadBalancersArgs) (loadBalancers []slb.LoadBalancerType, err error)
-	CreateLoadBalancer(args *slb.CreateLoadBalancerArgs) (response *slb.CreateLoadBalancerResponse, err error)
-	DeleteLoadBalancer(loadBalancerId string) (err error)
-	ModifyLoadBalancerInstanceSpec(args *slb.ModifyLoadBalancerInstanceSpecArgs) (err error)
-	ModifyLoadBalancerInternetSpec(args *slb.ModifyLoadBalancerInternetSpecArgs) (err error)
-	DescribeLoadBalancerAttribute(loadBalancerId string) (loadBalancer *slb.LoadBalancerType, err error)
-	RemoveBackendServers(loadBalancerId string, backendServers []slb.BackendServerType) (result []slb.BackendServerType, err error)
-	AddBackendServers(loadBalancerId string, backendServers []slb.BackendServerType) (result []slb.BackendServerType, err error)
+	DescribeLoadBalancers(ctx context.Context, args *slb.DescribeLoadBalancersArgs) (loadBalancers []slb.LoadBalancerType, err error)
+	CreateLoadBalancer(ctx context.Context, args *slb.CreateLoadBalancerArgs) (response *slb.CreateLoadBalancerResponse, err error)
+	DeleteLoadBalancer(ctx context.Context, loadBalancerId string) (err error)
+	ModifyLoadBalancerInstanceSpec(ctx context.Context, args *slb.ModifyLoadBalancerInstanceSpecArgs) (err error)
+	ModifyLoadBalancerInternetSpec(ctx context.Context, args *slb.ModifyLoadBalancerInternetSpecArgs) (err error)
+	DescribeLoadBalancerAttribute(ctx context.Context, loadBalancerId string) (loadBalancer *slb.LoadBalancerType, err error)
+	RemoveBackendServers(ctx context.Context, loadBalancerId string, backendServers []slb.BackendServerType) (result []slb.BackendServerType, err error)
+	AddBackendServers(ctx context.Context, loadBalancerId string, backendServers []slb.BackendServerType) (result []slb.BackendServerType, err error)
 
-	StopLoadBalancerListener(loadBalancerId string, port int) (err error)
-	StartLoadBalancerListener(loadBalancerId string, port int) (err error)
-	CreateLoadBalancerTCPListener(args *slb.CreateLoadBalancerTCPListenerArgs) (err error)
-	CreateLoadBalancerUDPListener(args *slb.CreateLoadBalancerUDPListenerArgs) (err error)
-	DeleteLoadBalancerListener(loadBalancerId string, port int) (err error)
-	CreateLoadBalancerHTTPSListener(args *slb.CreateLoadBalancerHTTPSListenerArgs) (err error)
-	CreateLoadBalancerHTTPListener(args *slb.CreateLoadBalancerHTTPListenerArgs) (err error)
-	DescribeLoadBalancerHTTPSListenerAttribute(loadBalancerId string, port int) (response *slb.DescribeLoadBalancerHTTPSListenerAttributeResponse, err error)
-	DescribeLoadBalancerTCPListenerAttribute(loadBalancerId string, port int) (response *slb.DescribeLoadBalancerTCPListenerAttributeResponse, err error)
-	DescribeLoadBalancerUDPListenerAttribute(loadBalancerId string, port int) (response *slb.DescribeLoadBalancerUDPListenerAttributeResponse, err error)
-	DescribeLoadBalancerHTTPListenerAttribute(loadBalancerId string, port int) (response *slb.DescribeLoadBalancerHTTPListenerAttributeResponse, err error)
+	StopLoadBalancerListener(ctx context.Context, loadBalancerId string, port int) (err error)
+	StartLoadBalancerListener(ctx context.Context, loadBalancerId string, port int) (err error)
+	CreateLoadBalancerTCPListener(ctx context.Context, args *slb.CreateLoadBalancerTCPListenerArgs) (err error)
+	CreateLoadBalancerUDPListener(ctx context.Context, args *slb.CreateLoadBalancerUDPListenerArgs) (err error)
+	DeleteLoadBalancerListener(ctx context.Context, loadBalancerId string, port int) (err error)
+	CreateLoadBalancerHTTPSListener(ctx context.Context, args *slb.CreateLoadBalancerHTTPSListenerArgs) (err error)
+	CreateLoadBalancerHTTPListener(ctx context.Context, args *slb.CreateLoadBalancerHTTPListenerArgs) (err error)
+	DescribeLoadBalancerHTTPSListenerAttribute(ctx context.Context, loadBalancerId string, port int) (response *slb.DescribeLoadBalancerHTTPSListenerAttributeResponse, err error)
+	DescribeLoadBalancerTCPListenerAttribute(ctx context.Context, loadBalancerId string, port int) (response *slb.DescribeLoadBalancerTCPListenerAttributeResponse, err error)
+	DescribeLoadBalancerUDPListenerAttribute(ctx context.Context, loadBalancerId string, port int) (response *slb.DescribeLoadBalancerUDPListenerAttributeResponse, err error)
+	DescribeLoadBalancerHTTPListenerAttribute(ctx context.Context, loadBalancerId string, port int) (response *slb.DescribeLoadBalancerHTTPListenerAttributeResponse, err error)
 
-	SetLoadBalancerHTTPListenerAttribute(args *slb.SetLoadBalancerHTTPListenerAttributeArgs) (err error)
-	SetLoadBalancerHTTPSListenerAttribute(args *slb.SetLoadBalancerHTTPSListenerAttributeArgs) (err error)
-	SetLoadBalancerTCPListenerAttribute(args *slb.SetLoadBalancerTCPListenerAttributeArgs) (err error)
-	SetLoadBalancerUDPListenerAttribute(args *slb.SetLoadBalancerUDPListenerAttributeArgs) (err error)
+	SetLoadBalancerHTTPListenerAttribute(ctx context.Context, args *slb.SetLoadBalancerHTTPListenerAttributeArgs) (err error)
+	SetLoadBalancerHTTPSListenerAttribute(ctx context.Context, args *slb.SetLoadBalancerHTTPSListenerAttributeArgs) (err error)
+	SetLoadBalancerTCPListenerAttribute(ctx context.Context, args *slb.SetLoadBalancerTCPListenerAttributeArgs) (err error)
+	SetLoadBalancerUDPListenerAttribute(ctx context.Context, args *slb.SetLoadBalancerUDPListenerAttributeArgs) (err error)
 
-	RemoveTags(args *slb.RemoveTagsArgs) error
-	DescribeTags(args *slb.DescribeTagsArgs) (tags []slb.TagItemType, pagination *common.PaginationResult, err error)
-	AddTags(args *slb.AddTagsArgs) error
+	RemoveTags(ctx context.Context, args *slb.RemoveTagsArgs) error
+	DescribeTags(ctx context.Context, args *slb.DescribeTagsArgs) (tags []slb.TagItemType, pagination *common.PaginationResult, err error)
+	AddTags(ctx context.Context, args *slb.AddTagsArgs) error
 
-	CreateVServerGroup(args *slb.CreateVServerGroupArgs) (response *slb.CreateVServerGroupResponse, err error)
-	DescribeVServerGroups(args *slb.DescribeVServerGroupsArgs) (response *slb.DescribeVServerGroupsResponse, err error)
-	DeleteVServerGroup(args *slb.DeleteVServerGroupArgs) (response *slb.DeleteVServerGroupResponse, err error)
-	SetVServerGroupAttribute(args *slb.SetVServerGroupAttributeArgs) (response *slb.SetVServerGroupAttributeResponse, err error)
-	DescribeVServerGroupAttribute(args *slb.DescribeVServerGroupAttributeArgs) (response *slb.DescribeVServerGroupAttributeResponse, err error)
-	ModifyVServerGroupBackendServers(args *slb.ModifyVServerGroupBackendServersArgs) (response *slb.ModifyVServerGroupBackendServersResponse, err error)
-	AddVServerGroupBackendServers(args *slb.AddVServerGroupBackendServersArgs) (response *slb.AddVServerGroupBackendServersResponse, err error)
-	RemoveVServerGroupBackendServers(args *slb.RemoveVServerGroupBackendServersArgs) (response *slb.RemoveVServerGroupBackendServersResponse, err error)
+	CreateVServerGroup(ctx context.Context, args *slb.CreateVServerGroupArgs) (response *slb.CreateVServerGroupResponse, err error)
+	DescribeVServerGroups(ctx context.Context, args *slb.DescribeVServerGroupsArgs) (response *slb.DescribeVServerGroupsResponse, err error)
+	DeleteVServerGroup(ctx context.Context, args *slb.DeleteVServerGroupArgs) (response *slb.DeleteVServerGroupResponse, err error)
+	SetVServerGroupAttribute(ctx context.Context, args *slb.SetVServerGroupAttributeArgs) (response *slb.SetVServerGroupAttributeResponse, err error)
+	DescribeVServerGroupAttribute(ctx context.Context, args *slb.DescribeVServerGroupAttributeArgs) (response *slb.DescribeVServerGroupAttributeResponse, err error)
+	ModifyVServerGroupBackendServers(ctx context.Context, args *slb.ModifyVServerGroupBackendServersArgs) (response *slb.ModifyVServerGroupBackendServersResponse, err error)
+	AddVServerGroupBackendServers(ctx context.Context, args *slb.AddVServerGroupBackendServersArgs) (response *slb.AddVServerGroupBackendServersResponse, err error)
+	RemoveVServerGroupBackendServers(ctx context.Context, args *slb.RemoveVServerGroupBackendServersArgs) (response *slb.RemoveVServerGroupBackendServersResponse, err error)
 }
 
 // LoadBalancerClient slb client wrapper
@@ -142,7 +143,7 @@ type LoadBalancerClient struct {
 	ins ClientInstanceSDK
 }
 
-func (s *LoadBalancerClient) findLoadBalancer(service *v1.Service) (bool, *slb.LoadBalancerType, error) {
+func (s *LoadBalancerClient) FindLoadBalancer(ctx context.Context, service *v1.Service) (bool, *slb.LoadBalancerType, error) {
 	def, _ := ExtractAnnotationRequest(service)
 
 	//loadbalancer := service.Status.LoadBalancer
@@ -157,21 +158,22 @@ func (s *LoadBalancerClient) findLoadBalancer(service *v1.Service) (bool, *slb.L
 	//		}
 	//		// found loadbalancer id in service ingress status.
 	//		// this id was set previously when loadbalancer was created.
-	//		return s.findLoadBalancerByID(lbid)
+	//		return s.FindLoadBalancerByID(lbid)
 	//	}
 	//}
 
 	// User assigned lobadbalancer id go first.
 	if def.Loadbalancerid != "" {
-		return s.findLoadBalancerByID(def.Loadbalancerid)
+		return s.FindLoadBalancerByID(ctx, def.Loadbalancerid)
 	}
 	// if not, find by slb tags
-	return s.findLoadBalancerByTags(service)
+	return s.FindLoadBalancerByTags(ctx, service)
 }
 
-func (s *LoadBalancerClient) findLoadBalancerByID(lbid string) (bool, *slb.LoadBalancerType, error) {
+func (s *LoadBalancerClient) FindLoadBalancerByID(ctx context.Context, lbid string) (bool, *slb.LoadBalancerType, error) {
 
 	lbs, err := s.c.DescribeLoadBalancers(
+		ctx,
 		&slb.DescribeLoadBalancersArgs{
 			RegionId:       DEFAULT_REGION,
 			LoadBalancerId: lbid,
@@ -188,11 +190,11 @@ func (s *LoadBalancerClient) findLoadBalancerByID(lbid string) (bool, *slb.LoadB
 	if len(lbs) > 1 {
 		klog.Warningf("multiple loadbalancer returned with id [%s], using the first one with IP=%s", lbid, lbs[0].Address)
 	}
-	lb, err := s.c.DescribeLoadBalancerAttribute(lbs[0].LoadBalancerId)
+	lb, err := s.c.DescribeLoadBalancerAttribute(ctx, lbs[0].LoadBalancerId)
 	return err == nil, lb, err
 }
 
-func (s *LoadBalancerClient) findLoadBalancerByTags(service *v1.Service) (bool, *slb.LoadBalancerType, error) {
+func (s *LoadBalancerClient) FindLoadBalancerByTags(ctx context.Context, service *v1.Service) (bool, *slb.LoadBalancerType, error) {
 	if service.UID == "" {
 		return false, nil, fmt.Errorf("unexpected empty service uid")
 	}
@@ -209,9 +211,10 @@ func (s *LoadBalancerClient) findLoadBalancerByTags(service *v1.Service) (bool, 
 		return false, nil, err
 	}
 	lbs, err := s.c.DescribeLoadBalancers(
+		ctx,
 		&slb.DescribeLoadBalancersArgs{
-			RegionId: DEFAULT_REGION,
 			Tags:     string(items),
+			RegionId: DEFAULT_REGION,
 		},
 	)
 	utils.Logf(service, "alicloud: fallback to find loadbalancer by tags [%s]", string(items))
@@ -222,18 +225,19 @@ func (s *LoadBalancerClient) findLoadBalancerByTags(service *v1.Service) (bool, 
 	if lbs == nil || len(lbs) == 0 {
 		// here we need to fallback on finding by name for compatible reason
 		// the old service slb may not have a tag.
-		return s.findLoadBalancerByName(lbn)
+		return s.FindLoadBalancerByName(ctx, lbn)
 	}
 	if len(lbs) > 1 {
 		utils.Logf(service, "Warning: multiple loadbalancer returned with tags [%s], "+
 			"using the first one with IP=%s", string(items), lbs[0].Address)
 	}
-	lb, err := s.c.DescribeLoadBalancerAttribute(lbs[0].LoadBalancerId)
+	lb, err := s.c.DescribeLoadBalancerAttribute(ctx, lbs[0].LoadBalancerId)
 	return err == nil, lb, err
 }
 
-func (s *LoadBalancerClient) findLoadBalancerByName(name string) (bool, *slb.LoadBalancerType, error) {
+func (s *LoadBalancerClient) FindLoadBalancerByName(ctx context.Context, name string) (bool, *slb.LoadBalancerType, error) {
 	lbs, err := s.c.DescribeLoadBalancers(
+		ctx,
 		&slb.DescribeLoadBalancersArgs{
 			RegionId:         DEFAULT_REGION,
 			LoadBalancerName: name,
@@ -251,7 +255,7 @@ func (s *LoadBalancerClient) findLoadBalancerByName(name string) (bool, *slb.Loa
 		klog.Warningf("alicloud: multiple loadbalancer returned with name [%s], "+
 			"using the first one with IP=%s", name, lbs[0].Address)
 	}
-	lb, err := s.c.DescribeLoadBalancerAttribute(lbs[0].LoadBalancerId)
+	lb, err := s.c.DescribeLoadBalancerAttribute(ctx, lbs[0].LoadBalancerId)
 	return err == nil, lb, err
 }
 
@@ -296,10 +300,10 @@ func equalsAddressIPVersion(request, origined slb.AddressIPVersionType) bool {
 }
 
 // EnsureLoadBalancer make sure slb is reconciled nodes []*v1.Node
-func (s *LoadBalancerClient) EnsureLoadBalancer(service *v1.Service, nodes *EndpointWithENI, vswitchid string) (*slb.LoadBalancerType, error) {
+func (s *LoadBalancerClient) EnsureLoadBalancer(ctx context.Context, service *v1.Service, nodes *EndpointWithENI, vswitchid string) (*slb.LoadBalancerType, error) {
 	utils.Logf(service, "ensure loadbalancer with service details, \n%+v", PrettyJson(service))
 
-	exists, origined, err := s.findLoadBalancer(service)
+	exists, origined, err := s.FindLoadBalancer(ctx, service)
 	if err != nil {
 		return nil, err
 	}
@@ -329,7 +333,7 @@ func (s *LoadBalancerClient) EnsureLoadBalancer(service *v1.Service, nodes *Endp
 		klog.V(5).Infof("alicloud: can not find a "+
 			"loadbalancer with service name [%s/%s], creating a new one", service.Namespace, service.Name)
 		opts := s.getLoadBalancerOpts(service, vswitchid)
-		lbr, err := s.c.CreateLoadBalancer(opts)
+		lbr, err := s.c.CreateLoadBalancer(ctx, opts)
 		if err != nil {
 			return nil, err
 		}
@@ -351,19 +355,23 @@ func (s *LoadBalancerClient) EnsureLoadBalancer(service *v1.Service, nodes *Endp
 		if err != nil {
 			return nil, err
 		}
-		if err := s.c.AddTags(&slb.AddTagsArgs{
-			RegionId:       opts.RegionId,
-			LoadBalancerID: lbr.LoadBalancerId,
-			Tags:           string(tagItems),
-		}); err != nil {
+		if err := s.c.AddTags(
+			ctx,
+			&slb.AddTagsArgs{
+				RegionId:       opts.RegionId,
+				LoadBalancerID: lbr.LoadBalancerId,
+				Tags:           string(tagItems),
+			},
+		); err != nil {
 			return nil, err
 		}
 
-		origined, derr = s.c.DescribeLoadBalancerAttribute(lbr.LoadBalancerId)
+		origined, derr = s.c.DescribeLoadBalancerAttribute(ctx, lbr.LoadBalancerId)
 	} else {
 		// Need to verify loadbalancer.
 		// Reuse SLB is not allowed when the SLB is created by k8s service.
 		tags, _, err := s.c.DescribeTags(
+			ctx,
 			&slb.DescribeTagsArgs{
 				RegionId:       origined.RegionId,
 				LoadBalancerID: origined.LoadBalancerId,
@@ -413,6 +421,7 @@ func (s *LoadBalancerClient) EnsureLoadBalancer(service *v1.Service, nodes *Endp
 			if origined.AddressType == slb.InternetAddressType {
 				utils.Logf(service, "modify loadbalancer: chargetype=%s, bandwidth=%d", charge, bandwidth)
 				if err := s.c.ModifyLoadBalancerInternetSpec(
+					ctx,
 					&slb.ModifyLoadBalancerInternetSpecArgs{
 						LoadBalancerId:     origined.LoadBalancerId,
 						InternetChargeType: charge,
@@ -429,15 +438,18 @@ func (s *LoadBalancerClient) EnsureLoadBalancer(service *v1.Service, nodes *Endp
 		if request.LoadBalancerSpec != "" && request.LoadBalancerSpec != origined.LoadBalancerSpec {
 			klog.Infof("alicloud: loadbalancerspec([%s] -> [%s]) changed, update loadbalancer [%s]",
 				origined.LoadBalancerSpec, request.LoadBalancerSpec, origined.LoadBalancerName)
-			if err := s.c.ModifyLoadBalancerInstanceSpec(&slb.ModifyLoadBalancerInstanceSpecArgs{
-				RegionId:         origined.RegionId,
-				LoadBalancerId:   origined.LoadBalancerId,
-				LoadBalancerSpec: request.LoadBalancerSpec,
-			}); err != nil {
+			if err := s.c.ModifyLoadBalancerInstanceSpec(
+				ctx,
+				&slb.ModifyLoadBalancerInstanceSpecArgs{
+					RegionId:         origined.RegionId,
+					LoadBalancerId:   origined.LoadBalancerId,
+					LoadBalancerSpec: request.LoadBalancerSpec,
+				},
+			); err != nil {
 				return nil, err
 			}
 		}
-		origined, derr = s.c.DescribeLoadBalancerAttribute(origined.LoadBalancerId)
+		origined, derr = s.c.DescribeLoadBalancerAttribute(ctx, origined.LoadBalancerId)
 	}
 	if derr != nil {
 		utils.Logf(service, "alicloud: can not get loadbalancer attribute. ")
@@ -446,7 +458,7 @@ func (s *LoadBalancerClient) EnsureLoadBalancer(service *v1.Service, nodes *Endp
 	vgs := BuildVirturalGroupFromService(s, service, origined)
 
 	// Make sure virtual server backend group has been updated.
-	if err := EnsureVirtualGroups(vgs, nodes); err != nil {
+	if err := EnsureVirtualGroups(ctx, vgs, nodes); err != nil {
 		return origined, fmt.Errorf("update backend servers: error %s", err.Error())
 	}
 	// Apply listener when
@@ -457,12 +469,12 @@ func (s *LoadBalancerClient) EnsureLoadBalancer(service *v1.Service, nodes *Endp
 		utils.Logf(service, "not user defined loadbalancer[%s], start to apply listener.", origined.LoadBalancerId)
 		// If listener update is needed. Switch to vserver group immediately.
 		// No longer update default backend servers.
-		if err := EnsureListeners(s, service, origined, vgs); err != nil {
+		if err := EnsureListeners(ctx, s, service, origined, vgs); err != nil {
 
 			return origined, fmt.Errorf("ensure listener error: %s", err.Error())
 		}
 	}
-	return origined, s.UpdateLoadBalancer(service, nodes, false)
+	return origined, s.UpdateLoadBalancer(ctx, service, nodes, false)
 }
 
 func isLoadBalancerCreatedByKubernetes(tags []slb.TagItemType) bool {
@@ -475,9 +487,9 @@ func isLoadBalancerCreatedByKubernetes(tags []slb.TagItemType) bool {
 }
 
 //UpdateLoadBalancer make sure slb backend is reconciled
-func (s *LoadBalancerClient) UpdateLoadBalancer(service *v1.Service, nodes *EndpointWithENI, withVgroup bool) error {
+func (s *LoadBalancerClient) UpdateLoadBalancer(ctx context.Context, service *v1.Service, nodes *EndpointWithENI, withVgroup bool) error {
 
-	exists, lb, err := s.findLoadBalancer(service)
+	exists, lb, err := s.FindLoadBalancer(ctx, service)
 	if err != nil {
 		return err
 	}
@@ -486,7 +498,7 @@ func (s *LoadBalancerClient) UpdateLoadBalancer(service *v1.Service, nodes *Endp
 	}
 	if withVgroup {
 		vgs := BuildVirturalGroupFromService(s, service, lb)
-		if err := EnsureVirtualGroups(vgs, nodes); err != nil {
+		if err := EnsureVirtualGroups(ctx, vgs, nodes); err != nil {
 			return fmt.Errorf("update backend servers: error %s", err.Error())
 		}
 	}
@@ -494,7 +506,7 @@ func (s *LoadBalancerClient) UpdateLoadBalancer(service *v1.Service, nodes *Endp
 		return nil
 	}
 	utils.Logf(service, "update default backend server group")
-	return s.UpdateDefaultServerGroup(nodes, lb)
+	return s.UpdateDefaultServerGroup(ctx, nodes, lb)
 }
 
 // needUpdateDefaultBackend when listeners have legacy listener.
@@ -528,13 +540,13 @@ func hasPort(svc *v1.Service, port int32) bool {
 }
 
 // EnsureLoadBalanceDeleted make sure slb is deleted
-func (s *LoadBalancerClient) EnsureLoadBalanceDeleted(service *v1.Service) error {
+func (s *LoadBalancerClient) EnsureLoadBalanceDeleted(ctx context.Context, service *v1.Service) error {
 	// need to save the resource version when deleted event
 	err := keepResourceVersion(service)
 	if err != nil {
 		utils.Logf(service, "Warning: failed to save deleted service resourceVersion,due to [%s] ", err.Error())
 	}
-	exists, lb, err := s.findLoadBalancer(service)
+	exists, lb, err := s.FindLoadBalancer(ctx, service)
 	if err != nil {
 		return err
 	}
@@ -544,10 +556,10 @@ func (s *LoadBalancerClient) EnsureLoadBalanceDeleted(service *v1.Service) error
 	// skip delete user defined loadbalancer
 	if isUserDefinedLoadBalancer(service) {
 		utils.Logf(service, "user managed loadbalancer will not be deleted by cloudprovider.")
-		return EnsureListenersDeleted(s.c, service, lb, BuildVirturalGroupFromService(s, service, lb))
+		return EnsureListenersDeleted(ctx, s.c, service, lb, BuildVirturalGroupFromService(s, service, lb))
 	}
 
-	return s.c.DeleteLoadBalancer(lb.LoadBalancerId)
+	return s.c.DeleteLoadBalancer(ctx, lb.LoadBalancerId)
 }
 
 func (s *LoadBalancerClient) getLoadBalancerOpts(service *v1.Service, vswitchid string) (args *slb.CreateLoadBalancerArgs) {
@@ -582,7 +594,7 @@ func (s *LoadBalancerClient) getLoadBalancerOpts(service *v1.Service, vswitchid 
 const DEFAULT_SERVER_WEIGHT = 100
 
 // UpdateDefaultServerGroup update default server group
-func (s *LoadBalancerClient) UpdateDefaultServerGroup(backends interface{}, lb *slb.LoadBalancerType) error {
+func (s *LoadBalancerClient) UpdateDefaultServerGroup(ctx context.Context, backends interface{}, lb *slb.LoadBalancerType) error {
 	nodes, ok := backends.([]*v1.Node)
 	if !ok {
 		klog.Infof("skip default server group update for type %s", reflect.TypeOf(backends))
@@ -623,7 +635,7 @@ func (s *LoadBalancerClient) UpdateDefaultServerGroup(backends interface{}, lb *
 				additions = []slb.BackendServerType{}
 				klog.V(5).Infof("alicloud: batch add backend servers, else %v", target)
 			}
-			if _, err := s.c.AddBackendServers(lb.LoadBalancerId, target); err != nil {
+			if _, err := s.c.AddBackendServers(ctx, lb.LoadBalancerId, target); err != nil {
 				return err
 			}
 		}
@@ -666,7 +678,7 @@ func (s *LoadBalancerClient) UpdateDefaultServerGroup(backends interface{}, lb *
 			for _, del := range target {
 				mdelete = append(mdelete, slb.BackendServerType{ServerId: del})
 			}
-			_, err := s.c.RemoveBackendServers(lb.LoadBalancerId, mdelete)
+			_, err := s.c.RemoveBackendServers(ctx, lb.LoadBalancerId, mdelete)
 			if err != nil {
 				return err
 			}

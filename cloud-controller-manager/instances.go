@@ -17,6 +17,7 @@ limitations under the License.
 package alicloud
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"k8s.io/klog"
@@ -41,19 +42,19 @@ type InstanceClient struct {
 
 // ClientInstanceSDK instance sdk
 type ClientInstanceSDK interface {
-	AddTags(args *ecs.AddTagsArgs) error
-	DescribeInstances(args *ecs.DescribeInstancesArgs) (instances []ecs.InstanceAttributesType, pagination *common.PaginationResult, err error)
-	DescribeNetworkInterfaces(args *ecs.DescribeNetworkInterfacesArgs) (resp *ecs.DescribeNetworkInterfacesResponse, err error)
+	AddTags(ctx context.Context, args *ecs.AddTagsArgs) error
+	DescribeInstances(ctx context.Context, args *ecs.DescribeInstancesArgs) (instances []ecs.InstanceAttributesType, pagination *common.PaginationResult, err error)
+	DescribeNetworkInterfaces(ctx context.Context, args *ecs.DescribeNetworkInterfacesArgs) (resp *ecs.DescribeNetworkInterfacesResponse, err error)
 }
 
 // filterOutByRegion Used for multi-region or multi-vpc. works for single region or vpc too.
 // SLB only support Backends within the same vpc in the same region. so we need to remove the other backends which not in
 // the same region vpc with the SLB. Keep the most backends
-func (s *InstanceClient) filterOutByRegion(nodes []*v1.Node, region common.Region) ([]*v1.Node, error) {
+func (s *InstanceClient) filterOutByRegion(ctx context.Context, nodes []*v1.Node, region common.Region) ([]*v1.Node, error) {
 	result := []*v1.Node{}
 	mvpc := make(map[string]int)
 	for _, node := range nodes {
-		v, err := s.findInstanceByProviderID(node.Spec.ProviderID)
+		v, err := s.findInstanceByProviderID(ctx, node.Spec.ProviderID)
 		if err != nil {
 			return []*v1.Node{}, err
 		}
@@ -70,7 +71,7 @@ func (s *InstanceClient) filterOutByRegion(nodes []*v1.Node, region common.Regio
 	}
 	records := []string{}
 	for _, node := range nodes {
-		v, err := s.findInstanceByProviderID(node.Spec.ProviderID)
+		v, err := s.findInstanceByProviderID(ctx, node.Spec.ProviderID)
 		if err != nil {
 			klog.Errorf("alicloud: error find instance by node, retrieve nodes [%s]\n", err.Error())
 			return []*v1.Node{}, err
@@ -132,8 +133,8 @@ func nodeid(region, nodename string) string {
 }
 
 // findAddressByNodeName returns an address slice by it's host name.
-func (s *InstanceClient) findAddressByNodeName(nodeName types.NodeName) ([]v1.NodeAddress, error) {
-	instance, err := s.findInstanceByNodeName(nodeName)
+func (s *InstanceClient) findAddressByNodeName(ctx context.Context, nodeName types.NodeName) ([]v1.NodeAddress, error) {
+	instance, err := s.findInstanceByNodeName(ctx, nodeName)
 	if err != nil {
 		klog.Errorf("alicloud: error getting instance by nodeName. providerID='%s', message=[%s]\n", nodeName, err.Error())
 		return nil, err
@@ -171,9 +172,9 @@ func (s *InstanceClient) findAddressByInstance(instance *ecs.InstanceAttributesT
 }
 
 // findAddressByProviderID returns an address slice by it's providerID.
-func (s *InstanceClient) findAddressByProviderID(providerID string) ([]v1.NodeAddress, error) {
+func (s *InstanceClient) findAddressByProviderID(ctx context.Context, providerID string) ([]v1.NodeAddress, error) {
 
-	instance, err := s.findInstanceByProviderID(providerID)
+	instance, err := s.findInstanceByProviderID(ctx, providerID)
 	if err != nil {
 		klog.Errorf("alicloud: error getting instance by providerID. providerID='%s', message=[%s]\n", providerID, err.Error())
 		return nil, err
@@ -183,16 +184,16 @@ func (s *InstanceClient) findAddressByProviderID(providerID string) ([]v1.NodeAd
 }
 
 // Returns instance information. Currently, we had a constraint that the name should has the same as provider id for compatibility concern.
-func (s *InstanceClient) findInstanceByNodeName(nodeName types.NodeName) (*ecs.InstanceAttributesType, error) {
-	return s.findInstanceByProviderID(string(nodeName))
+func (s *InstanceClient) findInstanceByNodeName(ctx context.Context, nodeName types.NodeName) (*ecs.InstanceAttributesType, error) {
+	return s.findInstanceByProviderID(ctx, string(nodeName))
 }
 
-func (s *InstanceClient) findInstanceByProviderID(providerID string) (*ecs.InstanceAttributesType, error) {
+func (s *InstanceClient) findInstanceByProviderID(ctx context.Context, providerID string) (*ecs.InstanceAttributesType, error) {
 	region, nodeid, err := nodeFromProviderID(providerID)
 	if err != nil {
 		return nil, err
 	}
-	ins, err := s.getInstances([]string{nodeid}, region)
+	ins, err := s.getInstances(ctx, []string{nodeid}, region)
 	if err != nil {
 		klog.Errorf("alicloud: InstanceInspectError, instanceid=[%s.%s]. message=[%s]\n", region, nodeid, err.Error())
 		return nil, err
@@ -209,7 +210,7 @@ func (s *InstanceClient) findInstanceByProviderID(providerID string) (*ecs.Insta
 	return &ins[0], nil
 }
 
-func (s *InstanceClient) ListInstances(ids []string) (map[string]*node.CloudNodeAttribute, error) {
+func (s *InstanceClient) ListInstances(ctx context.Context, ids []string) (map[string]*node.CloudNodeAttribute, error) {
 	var (
 		idsp   []string
 		region common.Region
@@ -222,7 +223,7 @@ func (s *InstanceClient) ListInstances(ids []string) (map[string]*node.CloudNode
 		idsp = append(idsp, nodeid)
 		region = regionid
 	}
-	ins, err := s.getInstances(idsp, region)
+	ins, err := s.getInstances(ctx, idsp, region)
 	if err != nil {
 		return nil, err
 	}
@@ -243,7 +244,7 @@ func (s *InstanceClient) ListInstances(ids []string) (map[string]*node.CloudNode
 	return mins, nil
 }
 
-func (s *InstanceClient) getInstances(ids []string, region common.Region) ([]ecs.InstanceAttributesType, error) {
+func (s *InstanceClient) getInstances(ctx context.Context, ids []string, region common.Region) ([]ecs.InstanceAttributesType, error) {
 	bids, err := json.Marshal(ids)
 	if err != nil {
 		return nil, fmt.Errorf("get instances error: %s", err.Error())
@@ -254,7 +255,7 @@ func (s *InstanceClient) getInstances(ids []string, region common.Region) ([]ecs
 		Pagination:  common.Pagination{PageSize: 50},
 	}
 
-	instances, _, err := s.c.DescribeInstances(&args)
+	instances, _, err := s.c.DescribeInstances(ctx, &args)
 	if err != nil {
 		klog.Errorf("alicloud: calling DescribeInstances error. region=%s, "+
 			"instancename=%s, message=[%s].\n", args.RegionId, args.InstanceName, err.Error())
@@ -263,12 +264,12 @@ func (s *InstanceClient) getInstances(ids []string, region common.Region) ([]ecs
 	return instances, nil
 }
 
-func (s *InstanceClient) AddCloudTags(id string, tags map[string]string, region common.Region) error {
+func (s *InstanceClient) AddCloudTags(ctx context.Context, id string, tags map[string]string, region common.Region) error {
 	args := &ecs.AddTagsArgs{
 		ResourceId:   id,
 		Tag:          tags,
 		RegionId:     region,
 		ResourceType: ecs.TagResourceInstance,
 	}
-	return s.c.AddTags(args)
+	return s.c.AddTags(ctx, args)
 }

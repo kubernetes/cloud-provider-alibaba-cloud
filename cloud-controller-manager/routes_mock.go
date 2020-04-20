@@ -1,6 +1,7 @@
 package alicloud
 
 import (
+	"context"
 	"fmt"
 	"github.com/denverdino/aliyungo/common"
 	"github.com/denverdino/aliyungo/ecs"
@@ -101,7 +102,7 @@ func WithRouteTableEntrySet() CloudDataMock {
 	}
 }
 
-func (m *mockRouteSDK) DescribeVpcs(args *ecs.DescribeVpcsArgs) (vpcs []ecs.VpcSetType, pagination *common.PaginationResult, err error) {
+func (m *mockRouteSDK) DescribeVpcs(ctx context.Context, args *ecs.DescribeVpcsArgs) (vpcs []ecs.VpcSetType, pagination *common.PaginationResult, err error) {
 	if m.describeVpcs != nil {
 		return m.describeVpcs(args)
 	}
@@ -119,7 +120,7 @@ func (m *mockRouteSDK) DescribeVpcs(args *ecs.DescribeVpcsArgs) (vpcs []ecs.VpcS
 	return []ecs.VpcSetType{result}, nil, nil
 }
 
-func (m *mockRouteSDK) DescribeVRouters(args *ecs.DescribeVRoutersArgs) (vrouters []ecs.VRouterSetType, pagination *common.PaginationResult, err error) {
+func (m *mockRouteSDK) DescribeVRouters(ctx context.Context, args *ecs.DescribeVRoutersArgs) (vrouters []ecs.VRouterSetType, pagination *common.PaginationResult, err error) {
 	if m.describeVRouters != nil {
 		return m.describeVRouters(args)
 	}
@@ -137,7 +138,7 @@ func (m *mockRouteSDK) DescribeVRouters(args *ecs.DescribeVRoutersArgs) (vrouter
 	return []ecs.VRouterSetType{result}, nil, nil
 }
 
-func (m *mockRouteSDK) DescribeRouteTables(args *ecs.DescribeRouteTablesArgs) (routeTables []ecs.RouteTableSetType, pagination *common.PaginationResult, err error) {
+func (m *mockRouteSDK) DescribeRouteTables(ctx context.Context, args *ecs.DescribeRouteTablesArgs) (routeTables []ecs.RouteTableSetType, pagination *common.PaginationResult, err error) {
 	if m.describeRouteTables != nil {
 		return m.describeRouteTables(args)
 	}
@@ -155,7 +156,7 @@ func (m *mockRouteSDK) DescribeRouteTables(args *ecs.DescribeRouteTablesArgs) (r
 	return []ecs.RouteTableSetType{result}, nil, nil
 }
 
-func (m *mockRouteSDK) DeleteRouteEntry(args *ecs.DeleteRouteEntryArgs) error {
+func (m *mockRouteSDK) DeleteRouteEntry(ctx context.Context, args *ecs.DeleteRouteEntryArgs) error {
 	if m.deleteRouteEntry != nil {
 		return m.deleteRouteEntry(args)
 	}
@@ -181,7 +182,7 @@ func (m *mockRouteSDK) DeleteRouteEntry(args *ecs.DeleteRouteEntryArgs) error {
 	ROUTES.tables.Store(args.RouteTableId, result)
 	return nil
 }
-func (m *mockRouteSDK) CreateRouteEntry(args *ecs.CreateRouteEntryArgs) error {
+func (m *mockRouteSDK) CreateRouteEntry(ctx context.Context, args *ecs.CreateRouteEntryArgs) error {
 	if m.createRouteEntry != nil {
 		return m.createRouteEntry(args)
 	}
@@ -217,14 +218,14 @@ func (m *mockRouteSDK) CreateRouteEntry(args *ecs.CreateRouteEntryArgs) error {
 	ROUTES.tables.Store(args.RouteTableId, result)
 	return nil
 }
-func (m *mockRouteSDK) WaitForAllRouteEntriesAvailable(vrouterId string, routeTableId string, timeout int) error {
+func (m *mockRouteSDK) WaitForAllRouteEntriesAvailable(ctx context.Context, vrouterId string, routeTableId string, timeout int) error {
 	if m.waitForAllRouteEntriesAvailable != nil {
 		return m.waitForAllRouteEntriesAvailable(vrouterId, routeTableId, timeout)
 	}
 	return nil
 }
 
-func (m *mockRouteSDK) DescribeRouteEntryList(args *ecs.DescribeRouteEntryListArgs) (response *ecs.DescribeRouteEntryListResponse, err error) {
+func (m *mockRouteSDK) DescribeRouteEntryList(ctx context.Context, args *ecs.DescribeRouteEntryListArgs) (response *ecs.DescribeRouteEntryListResponse, err error) {
 	if m.describeRouteEntryList != nil {
 		return m.describeRouteEntryList(args)
 	}

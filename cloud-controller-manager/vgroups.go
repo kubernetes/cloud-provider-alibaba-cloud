@@ -1,6 +1,7 @@
 package alicloud
 
 import (
+	"context"
 	"fmt"
 	"github.com/denverdino/aliyungo/common"
 	"github.com/denverdino/aliyungo/ecs"
@@ -32,7 +33,7 @@ func (v *vgroup) Logf(format string, args ...interface{}) {
 	klog.Infof(prefix+format, args...)
 }
 
-func (v *vgroup) Describe() error {
+func (v *vgroup) Describe(ctx context.Context) error {
 	if v.NamedKey == nil {
 		return fmt.Errorf("describe: format error of vgroup name")
 	}
@@ -40,7 +41,7 @@ func (v *vgroup) Describe() error {
 		RegionId:       v.RegionId,
 		LoadBalancerId: v.LoadBalancerId,
 	}
-	vgrp, err := v.Client.DescribeVServerGroups(&vargs)
+	vgrp, err := v.Client.DescribeVServerGroups(ctx, &vargs)
 	if err != nil {
 		return fmt.Errorf("describe: vgroup error, %s", err.Error())
 	}
@@ -55,7 +56,7 @@ func (v *vgroup) Describe() error {
 	}
 	return fmt.Errorf("vgroup not found, %s", v.NamedKey.Key())
 }
-func (v *vgroup) Add() error {
+func (v *vgroup) Add(ctx context.Context) error {
 	if v.VGroupId != "" {
 		return fmt.Errorf("vgroupid already exists")
 	}
@@ -76,7 +77,7 @@ func (v *vgroup) Add() error {
 		}
 		vgp.BackendServers = string(backend)
 	}
-	gp, err := v.Client.CreateVServerGroup(&vgp)
+	gp, err := v.Client.CreateVServerGroup(ctx, &vgp)
 	if err != nil {
 		return fmt.Errorf("CreateVServerGroup. %s", err.Error())
 	}
@@ -85,7 +86,7 @@ func (v *vgroup) Add() error {
 	v.VGroupId = gp.VServerGroupId
 	return nil
 }
-func (v *vgroup) Remove() error {
+func (v *vgroup) Remove(ctx context.Context) error {
 	if v.LoadBalancerId == "" || v.VGroupId == "" {
 		return fmt.Errorf("can not delete vserver group. LoadBalancerId or vgroup id should not be empty")
 	}
@@ -93,17 +94,17 @@ func (v *vgroup) Remove() error {
 		VServerGroupId: v.VGroupId,
 		RegionId:       v.RegionId,
 	}
-	_, err := v.Client.DeleteVServerGroup(&vdel)
+	_, err := v.Client.DeleteVServerGroup(ctx, &vdel)
 	return err
 }
-func (v *vgroup) Update() error {
+func (v *vgroup) Update(ctx context.Context) error {
 	if v.VGroupId == "" {
-		err := v.Describe()
+		err := v.Describe(ctx)
 		if err != nil {
 			if !strings.Contains(err.Error(), "not found") {
 				return fmt.Errorf("update: vserver group error, %s", err.Error())
 			}
-			if err := v.Add(); err != nil {
+			if err := v.Add(ctx); err != nil {
 				return err
 			}
 		}
@@ -114,7 +115,7 @@ func (v *vgroup) Update() error {
 		VServerGroupId: v.VGroupId,
 		RegionId:       v.RegionId,
 	}
-	att, err := v.Client.DescribeVServerGroupAttribute(dsc)
+	att, err := v.Client.DescribeVServerGroupAttribute(ctx, dsc)
 	if err != nil {
 		return fmt.Errorf("update: describe vserver group attribute error. %s", err.Error())
 	}
@@ -135,6 +136,7 @@ func (v *vgroup) Update() error {
 				v.Logf("update: try to update vserver group[%s],"+
 					" backend add[%s]", v.NamedKey.Key(), string(additions))
 				_, err = v.Client.AddVServerGroupBackendServers(
+					ctx,
 					&slb.AddVServerGroupBackendServersArgs{
 						VServerGroupId: v.VGroupId,
 						RegionId:       v.RegionId,
@@ -155,6 +157,7 @@ func (v *vgroup) Update() error {
 				v.Logf("update: try to update vserver group[%s],"+
 					" backend del[%s]", v.NamedKey.Key(), string(deletions))
 				_, err = v.Client.RemoveVServerGroupBackendServers(
+					ctx,
 					&slb.RemoveVServerGroupBackendServersArgs{
 						VServerGroupId: v.VGroupId,
 						RegionId:       v.RegionId,
@@ -175,6 +178,7 @@ func (v *vgroup) Update() error {
 				v.Logf("update: try to update vserver group[%s],"+
 					" backend del[%s]", v.NamedKey.Key(), string(updateJson))
 				_, err = v.Client.SetVServerGroupAttribute(
+					ctx,
 					&slb.SetVServerGroupAttributeArgs{
 						VServerGroupId: v.VGroupId,
 						RegionId:       v.RegionId,
@@ -298,24 +302,24 @@ func (v *vgroup) diff(apis, nodes []slb.VBackendServerType) (
 	return addition, deletions, updates
 }
 
-func Ensure(v *vgroup, nodes *EndpointWithENI) error {
-	backend, err := nodes.BuildBackend(v)
+func Ensure(ctx context.Context, v *vgroup, nodes *EndpointWithENI) error {
+	backend, err := nodes.BuildBackend(ctx, v)
 	if err != nil {
 		return fmt.Errorf("build backend: %s, %s", err.Error(), v.NamedKey)
 	}
 	v.BackendServers = backend
-	return v.Update()
+	return v.Update(ctx)
 }
 
 type vgroups []*vgroup
 
-func EnsureVirtualGroups(vgrps *vgroups, nodes *EndpointWithENI) error {
+func EnsureVirtualGroups(ctx context.Context, vgrps *vgroups, nodes *EndpointWithENI) error {
 	klog.Infof("ensure vserver group: %d vgroup need to be processed.", len(*vgrps))
 	for _, v := range *vgrps {
 		if v == nil {
 			return fmt.Errorf("unexpected nil vgroup ")
 		}
-		if err := Ensure(v, nodes); err != nil {
+		if err := Ensure(ctx, v, nodes); err != nil {
 			return fmt.Errorf("ensure vgroup: %s. %s", err.Error(), v.NamedKey.Key())
 		}
 		v.Logf("EnsureGroup: id=[%s], Name:[%s], LoadBalancerId:[%s]", v.VGroupId, v.NamedKey.Key(), v.LoadBalancerId)
@@ -325,13 +329,14 @@ func EnsureVirtualGroups(vgrps *vgroups, nodes *EndpointWithENI) error {
 
 //CleanUPVGroupMerged Merge with service port and do clean vserver group
 func CleanUPVGroupMerged(
+	ctx context.Context,
 	slbins *LoadBalancerClient,
 	service *v1.Service,
 	lb *slb.LoadBalancerType,
 	local *vgroups,
 ) error {
 
-	remote, err := BuildVirtualGroupFromRemoteAPI(lb, slbins)
+	remote, err := BuildVirtualGroupFromRemoteAPI(ctx, lb, slbins)
 	if err != nil {
 		return fmt.Errorf("build vserver group from remote: %s", err.Error())
 	}
@@ -351,7 +356,7 @@ func CleanUPVGroupMerged(
 		}
 		if !found {
 			rem.Logf("try to remove unused vserver group, [%s][%s]", rem.NamedKey.Key(), rem.VGroupId)
-			err := rem.Remove()
+			err := rem.Remove(ctx)
 			if err != nil {
 				rem.Logf("Error: cleanup vgroup warining: "+
 					"failed to remove vgroup[%s]. wait for next try. %s", rem.NamedKey.Key(), err.Error())
@@ -363,10 +368,10 @@ func CleanUPVGroupMerged(
 }
 
 //CleanUPVGroupDirect do clean vserver group
-func CleanUPVGroupDirect(local *vgroups) error {
+func CleanUPVGroupDirect(ctx context.Context, local *vgroups) error {
 	for _, vg := range *local {
 		if vg.VGroupId == "" {
-			err := vg.Describe()
+			err := vg.Describe(ctx)
 			if err != nil {
 				if strings.Contains(err.Error(), "not found") {
 					// skip none exist vgroup
@@ -376,7 +381,7 @@ func CleanUPVGroupDirect(local *vgroups) error {
 				return err
 			}
 		}
-		err := vg.Remove()
+		err := vg.Remove(ctx)
 		if err != nil {
 			vg.Logf("Error: cleanup vgroup warining: "+
 				"failed to remove vgroup[%s] directly. wait for next try. %s", vg.NamedKey.Key(), err.Error())
@@ -418,6 +423,7 @@ func BuildVirturalGroupFromService(
 }
 
 func BuildVirtualGroupFromRemoteAPI(
+	ctx context.Context,
 	lb *slb.LoadBalancerType,
 	slbins *LoadBalancerClient,
 ) (vgroups, error) {
@@ -426,7 +432,7 @@ func BuildVirtualGroupFromRemoteAPI(
 		RegionId:       common.Region(slbins.region),
 		LoadBalancerId: lb.LoadBalancerId,
 	}
-	vgrp, err := slbins.c.DescribeVServerGroups(&vargs)
+	vgrp, err := slbins.c.DescribeVServerGroups(ctx, &vargs)
 	if err != nil {
 		return vgrps, fmt.Errorf("list: vgroup error, %s", err.Error())
 	}
@@ -497,6 +503,7 @@ type EndpointWithENI struct {
 
 // build backend function
 func (v *EndpointWithENI) buildFunc(
+	ctx context.Context,
 	backend *[]slb.VBackendServerType,
 	g *vgroup,
 ) func(o []interface{}) error {
@@ -517,7 +524,7 @@ func (v *EndpointWithENI) buildFunc(
 			PrivateIpAddress: ips,
 			PageSize:         50,
 		}
-		resp, err := g.InsClient.DescribeNetworkInterfaces(targs)
+		resp, err := g.InsClient.DescribeNetworkInterfaces(ctx, targs)
 		if err != nil {
 			return fmt.Errorf("call DescribeNetworkInterfaces: %s", err.Error())
 		}
@@ -542,15 +549,15 @@ func (v *EndpointWithENI) buildFunc(
 	}
 }
 
-func (v *EndpointWithENI) BuildBackend(g *vgroup) ([]slb.VBackendServerType, error) {
-	backend, err := v.doBackendBuild(g)
+func (v *EndpointWithENI) BuildBackend(ctx context.Context, g *vgroup) ([]slb.VBackendServerType, error) {
+	backend, err := v.doBackendBuild(ctx, g)
 	if err != nil {
 		return backend, fmt.Errorf("build backend: %s", err.Error())
 	}
 	return v.nodeWeightWithMerge(backend)
 }
 
-func (v *EndpointWithENI) doBackendBuild(g *vgroup) ([]slb.VBackendServerType, error) {
+func (v *EndpointWithENI) doBackendBuild(ctx context.Context, g *vgroup) ([]slb.VBackendServerType, error) {
 	// backend would be modified by buildFunc
 	var backend []slb.VBackendServerType
 
@@ -560,14 +567,14 @@ func (v *EndpointWithENI) doBackendBuild(g *vgroup) ([]slb.VBackendServerType, e
 			klog.Warningf("%s endpoint is nil in eni mode", g.NamedKey)
 			return backend, nil
 		}
-		klog.Infof("[ENI] mode service: %s, endpoint subsets length: %d", g.NamedKey,len(v.Endpoints.Subsets))
+		klog.Infof("[ENI] mode service: %s, endpoint subsets length: %d", g.NamedKey, len(v.Endpoints.Subsets))
 		var privateIpAddress []string
 		for _, ep := range v.Endpoints.Subsets {
 			for _, addr := range ep.Addresses {
 				privateIpAddress = append(privateIpAddress, addr.IP)
 			}
 		}
-		err := Batch(privateIpAddress, 40, v.buildFunc(&backend, g))
+		err := Batch(privateIpAddress, 40, v.buildFunc(ctx, &backend, g))
 		if err != nil {
 			return backend, fmt.Errorf("batch process eni fail: %s", err.Error())
 		}
@@ -581,7 +588,7 @@ func (v *EndpointWithENI) doBackendBuild(g *vgroup) ([]slb.VBackendServerType, e
 			klog.Warningf("%s endpoint is nil in local mode", g.NamedKey)
 			return backend, nil
 		}
-		klog.Infof("[Local] mode service: %s,  endpoint subsets length: %d", g.NamedKey,len(v.Endpoints.Subsets))
+		klog.Infof("[Local] mode service: %s,  endpoint subsets length: %d", g.NamedKey, len(v.Endpoints.Subsets))
 		// 1. add duplicate ecs backends
 		for _, sub := range v.Endpoints.Subsets {
 			for _, add := range sub.Addresses {
@@ -615,7 +622,7 @@ func (v *EndpointWithENI) doBackendBuild(g *vgroup) ([]slb.VBackendServerType, e
 			}
 		}
 		// 2. add eci backends
-		return v.addECIBackends(backend, g)
+		return v.addECIBackends(ctx, backend, g)
 	}
 
 	//Cluster Mode
@@ -644,7 +651,7 @@ func (v *EndpointWithENI) doBackendBuild(g *vgroup) ([]slb.VBackendServerType, e
 		)
 	}
 	// 2. add eci backends
-	return v.addECIBackends(backend, g)
+	return v.addECIBackends(ctx, backend, g)
 }
 
 func (v *EndpointWithENI) nodeWeightWithMerge(backends []slb.VBackendServerType) ([]slb.VBackendServerType, error) {
@@ -681,7 +688,11 @@ func (v *EndpointWithENI) nodeWeightWithMerge(backends []slb.VBackendServerType)
 	return mergedBackends, nil
 }
 
-func (v *EndpointWithENI) addECIBackends(backend []slb.VBackendServerType, g *vgroup) ([]slb.VBackendServerType, error) {
+func (v *EndpointWithENI) addECIBackends(
+	ctx context.Context,
+	backend []slb.VBackendServerType,
+	g *vgroup,
+) ([]slb.VBackendServerType, error) {
 	var privateIpAddress []string
 	// filter ECI nodes
 	if v.Endpoints == nil {
@@ -707,7 +718,7 @@ func (v *EndpointWithENI) addECIBackends(backend []slb.VBackendServerType, g *vg
 
 	// add ENI backends
 	if len(privateIpAddress) > 0 {
-		err := Batch(privateIpAddress, 40, v.buildFunc(&backend, g))
+		err := Batch(privateIpAddress, 40, v.buildFunc(ctx, &backend, g))
 		if err != nil {
 			return backend, fmt.Errorf("batch process eni fail: %s", err.Error())
 		}
