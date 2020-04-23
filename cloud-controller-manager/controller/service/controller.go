@@ -2,25 +2,27 @@ package service
 
 import (
 	"fmt"
-	"github.com/golang/glog"
+	"golang.org/x/net/context"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	v12 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
-	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/util/workqueue"
 	queue "k8s.io/client-go/util/workqueue"
+	"k8s.io/cloud-provider"
 	"k8s.io/cloud-provider-alibaba-cloud/cloud-controller-manager/utils"
+	metrics "k8s.io/component-base/metrics/prometheus/ratelimiter"
+	"k8s.io/klog"
+	controller "k8s.io/kube-aggregator/pkg/controllers"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
-	"k8s.io/kubernetes/pkg/cloudprovider"
-	"k8s.io/kubernetes/pkg/controller"
-	"k8s.io/kubernetes/pkg/util/metrics"
-	"k8s.io/kubernetes/staging/src/k8s.io/client-go/util/workqueue"
 	"reflect"
 	"strings"
 	"time"
@@ -114,8 +116,8 @@ func (con *Controller) Run(stopCh <-chan struct{}, workers int) {
 		}
 	}()
 
-	glog.Info("starting service controller")
-	defer glog.Info("shutting down service controller")
+	klog.Info("starting service controller")
+	defer klog.Info("shutting down service controller")
 
 	if !controller.WaitForCacheSync(
 		"service",
@@ -123,7 +125,7 @@ func (con *Controller) Run(stopCh <-chan struct{}, workers int) {
 		con.ifactory.Core().V1().Services().Informer().HasSynced,
 		con.ifactory.Core().V1().Nodes().Informer().HasSynced,
 	) {
-		glog.Error("service and nodes cache has not been syncd")
+		klog.Error("service and nodes cache has not been syncd")
 		return
 	}
 
@@ -132,7 +134,7 @@ func (con *Controller) Run(stopCh <-chan struct{}, workers int) {
 	}
 	for i := 0; i < workers; i++ {
 		// run service sync worker
-		glog.Infof("run service sync worker: %d", i)
+		klog.Infof("run service sync worker: %d", i)
 		for que, task := range tasks {
 			go wait.Until(
 				WorkerFunc(
@@ -146,13 +148,13 @@ func (con *Controller) Run(stopCh <-chan struct{}, workers int) {
 		}
 	}
 
-	glog.Info("service controller started")
+	klog.Info("service controller started")
 	<-stopCh
 }
 
 func broadcaster() (record.EventRecorder, record.EventBroadcaster) {
 	caster := record.NewBroadcaster()
-	caster.StartLogging(glog.Infof)
+	caster.StartLogging(klog.Infof)
 	source := v1.EventSource{Component: SERVICE_CONTROLLER}
 	return caster.NewRecorder(scheme.Scheme, source), caster
 }
@@ -162,7 +164,7 @@ func key(svc *v1.Service) string {
 }
 
 func Enqueue(queue queue.DelayingInterface, k interface{}) {
-	glog.Infof("controller: enqueue object %s for service", k.(string))
+	klog.Infof("controller: enqueue object %s for service", k.(string))
 	queue.Add(k.(string))
 }
 
@@ -175,11 +177,11 @@ func (con *Controller) HandlerForNodesChange(
 	syncNodes := func(object interface{}) {
 		node, ok := object.(*v1.Node)
 		if !ok || node == nil {
-			glog.Info("node change: node object is nil, skip")
+			klog.Info("node change: node object is nil, skip")
 			return
 		}
 		if _, exclude := node.Labels[utils.LabelNodeRoleExcludeNode]; exclude {
-			glog.Infof("node change: node %s is excluded from CCM, skip", node.Name)
+			klog.Infof("node change: node %s is excluded from CCM, skip", node.Name)
 			return
 		}
 		// node change may affect any service that concerns
@@ -211,7 +213,7 @@ func (con *Controller) HandlerForNodesChange(
 					NodeSpecChanged(node1, node2) {
 					// label and schedulable changed .
 					// status healthy should be considered
-					glog.Infof("controller: node[%s/%s] update event", node1.Namespace, node1.Name)
+					klog.Infof("controller: node[%s/%s] update event", node1.Namespace, node1.Name)
 					syncNodes(node1)
 				}
 			},
@@ -222,24 +224,24 @@ func (con *Controller) HandlerForNodesChange(
 }
 
 func (con *Controller) HandlerForEndpointChange(
-	context *Context,
+	ctx *Context,
 	que queue.DelayingInterface,
 	informer cache.SharedIndexInformer,
 ) {
 	syncEndpoints := func(epd interface{}) {
 		ep, ok := epd.(*v1.Endpoints)
 		if !ok || ep == nil {
-			glog.Info("endpoints change: endpoint object is nil, skip")
+			klog.Info("endpoints change: endpoint object is nil, skip")
 			return
 		}
-		svc := context.Get(fmt.Sprintf("%s/%s", ep.Namespace, ep.Name))
+		svc := ctx.Get(fmt.Sprintf("%s/%s", ep.Namespace, ep.Name))
 		if svc == nil {
-			glog.Infof("endpoint change: can not get cached service for "+
+			klog.Infof("endpoint change: can not get cached service for "+
 				"endpoints[%s/%s], enqueue for default endpoint.\n", ep.Namespace, ep.Name)
 			var err error
-			svc, err = con.client.CoreV1().Services(ep.Namespace).Get(ep.Name, v12.GetOptions{})
+			svc, err = con.client.CoreV1().Services(ep.Namespace).Get(context.Background(), ep.Name, v12.GetOptions{})
 			if err != nil {
-				glog.Warningf("can not get service %s/%s. ", ep.Namespace, ep.Name)
+				klog.Warningf("can not get service %s/%s. ", ep.Namespace, ep.Name)
 				return
 			}
 		}
@@ -262,7 +264,7 @@ func (con *Controller) HandlerForEndpointChange(
 				ep1, ok1 := obja.(*v1.Endpoints)
 				ep2, ok2 := objb.(*v1.Endpoints)
 				if ok1 && ok2 && !reflect.DeepEqual(ep1.Subsets, ep2.Subsets) {
-					glog.Infof("controller: endpoints update event, endpoints [%s/%s]\n", ep1.Namespace, ep1.Name)
+					klog.Infof("controller: endpoints update event, endpoints [%s/%s]\n", ep1.Namespace, ep1.Name)
 					syncEndpoints(ep1)
 				}
 			},
@@ -342,17 +344,17 @@ func WorkerFunc(
 				}
 				defer queue.Done(key)
 
-				glog.Infof("[%s] worker: queued sync for service", key)
+				klog.Infof("[%s] worker: queued sync for service", key)
 
 				if err := syncd(key.(string)); err != nil {
 					if strings.Contains(err.Error(), "Throttling") {
 						next := back.Next()
 						queue.AddAfter(key, next)
-						glog.Warningf("request was throttled: %s, retry in next %d ns", key, next)
+						klog.Warningf("request was throttled: %s, retry in next %d ns", key, next)
 					} else {
 						queue.AddAfter(key, 5*time.Second)
 					}
-					glog.Errorf("requeue: sync error for service %s %v", key, err)
+					klog.Errorf("requeue: sync error for service %s %v", key, err)
 				}
 			}()
 		}
@@ -429,7 +431,7 @@ func (con *Controller) ServiceSyncTask(k string) error {
 	cached := con.local.Get(k)
 
 	defer func() {
-		glog.Infof("[%s] finished syncing service (%v)", k, time.Now().Sub(startTime))
+		klog.Infof("[%s] finished syncing service (%v)", k, time.Now().Sub(startTime))
 	}()
 
 	// service holds the latest service info from apiserver
@@ -445,7 +447,7 @@ func (con *Controller) ServiceSyncTask(k string) error {
 	case errors.IsNotFound(err):
 
 		if cached == nil {
-			glog.Errorf("unexpected nil cached service for deletion, wait retry %s", k)
+			klog.Errorf("unexpected nil cached service for deletion, wait retry %s", k)
 			return nil
 		}
 		// service absence in store means watcher caught the deletion, ensure LB
@@ -457,7 +459,7 @@ func (con *Controller) ServiceSyncTask(k string) error {
 	default:
 		// catch unexpected service
 		if service == nil {
-			glog.Errorf("unexpected nil service for update, wait retry. %s", k)
+			klog.Errorf("unexpected nil service for update, wait retry. %s", k)
 			return fmt.Errorf("retry unexpected nil service %s. ", k)
 		}
 		return con.update(cached, service)
@@ -485,11 +487,11 @@ func retry(
 			err := fun(svc)
 			if err != nil &&
 				strings.Contains(err.Error(), TRY_AGAIN) {
-				glog.Errorf("retry with error: %s", err.Error())
+				klog.Errorf("retry with error: %s", err.Error())
 				return false, nil
 			}
 			if err != nil {
-				glog.Errorf("retry error: NotRetry, %s", err.Error())
+				klog.Errorf("retry error: NotRetry, %s", err.Error())
 			}
 			return true, nil
 		},
@@ -499,7 +501,7 @@ func retry(
 func (con *Controller) update(cached, svc *v1.Service) error {
 
 	// Save the state so we can avoid a write if it doesn't change
-	pre := v1helper.LoadBalancerStatusDeepCopy(&svc.Status.LoadBalancer)
+	pre := svc.Status.LoadBalancer.DeepCopy()
 	if cached != nil &&
 		cached.UID != svc.UID {
 		con.recorder.Eventf(
@@ -512,6 +514,7 @@ func (con *Controller) update(cached, svc *v1.Service) error {
 		)
 		return retry(nil, con.delete, svc)
 	}
+	ctx := context.Background()
 	var newm *v1.LoadBalancerStatus
 	if !NeedLoadBalancer(svc) {
 		// delete loadbalancer which is no longer needed
@@ -540,7 +543,8 @@ func (con *Controller) update(cached, svc *v1.Service) error {
 				key(svc),
 			)
 		}
-		newm, err = con.cloud.EnsureLoadBalancer(con.clusterName, svc, nodes)
+		ctx = context.WithValue(ctx, utils.ContextService, svc)
+		newm, err = con.cloud.EnsureLoadBalancer(ctx, con.clusterName, svc, nodes)
 
 		if err != nil {
 			return fmt.Errorf("ensure loadbalancer error: %s", err)
@@ -588,7 +592,7 @@ func (con *Controller) updateStatus(svc *v1.Service, pre, newm *v1.LoadBalancerS
 					client.
 					CoreV1().
 					Services(service.Namespace).
-					UpdateStatus(service)
+					UpdateStatus(context.Background(), service, metav1.UpdateOptions{})
 				if err == nil {
 					return nil
 				}
@@ -606,7 +610,7 @@ func (con *Controller) updateStatus(svc *v1.Service, pre, newm *v1.LoadBalancerS
 					return fmt.Errorf("not persisting update to service %s that "+
 						"has been changed since we received it: %v", key(svc), err)
 				}
-				glog.Warningf("failed to persist updated LoadBalancerStatus to "+
+				klog.Warningf("failed to persist updated LoadBalancerStatus to "+
 					"service %s after creating its load balancer: %v", key(svc), err)
 				return fmt.Errorf("retry with %s, %s", err.Error(), TRY_AGAIN)
 			},
@@ -618,7 +622,8 @@ func (con *Controller) updateStatus(svc *v1.Service, pre, newm *v1.LoadBalancerS
 }
 
 func (con *Controller) delete(svc *v1.Service) error {
-
+	ctx := context.Background()
+	ctx = context.WithValue(ctx, utils.ContextService, svc)
 	// do not check for the neediness of loadbalancer, delete anyway.
 	con.recorder.Eventf(
 		svc,
@@ -627,7 +632,7 @@ func (con *Controller) delete(svc *v1.Service) error {
 		"for service: %s",
 		key(svc),
 	)
-	err := con.cloud.EnsureLoadBalancerDeleted(con.clusterName, svc)
+	err := con.cloud.EnsureLoadBalancerDeleted(ctx, con.clusterName, svc)
 	if err != nil {
 		con.recorder.Eventf(
 			svc,
@@ -657,15 +662,26 @@ func AvailableNodes(
 	if err != nil {
 		return nil, fmt.Errorf("error get predicate: %s", err.Error())
 	}
-	return ifactory.
-		Core().
-		V1().
-		Nodes().
-		Lister().
-		ListWithPredicate(predicate)
+	nodes, err := ifactory.
+		Core().V1().Nodes().
+		Lister().List(labels.Everything())
+	if err != nil {
+		return nil, err
+	}
+
+	var filtered []*v1.Node
+	for i := range nodes {
+		if predicate(nodes[i]) {
+			filtered = append(filtered, nodes[i])
+		}
+	}
+
+	return filtered, nil
 }
 
-func NodeConditionPredicate(svc *v1.Service) (corelisters.NodeConditionPredicate, error) {
+type NodeConditionPredicateFunc func(node *v1.Node) bool
+
+func NodeConditionPredicate(svc *v1.Service) (NodeConditionPredicateFunc, error) {
 
 	predicate := func(node *v1.Node) bool {
 		// Filter unschedulable node.

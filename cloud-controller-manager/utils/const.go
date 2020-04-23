@@ -16,6 +16,7 @@ const (
 	// exclude from loadbalancers created by a cloud provider.
 	LabelNodeRoleExcludeBalancer = "alpha.service-controller.kubernetes.io/exclude-balancer"
 	ECINodeLabel                 = "virtual-kubelet"
+	ContextService               = "request.service"
 )
 
 func IsENIBackendType(svc *v1.Service) bool {

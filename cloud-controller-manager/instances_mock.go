@@ -1,10 +1,11 @@
 package alicloud
 
 import (
+	"context"
 	"fmt"
 	"github.com/denverdino/aliyungo/common"
 	"github.com/denverdino/aliyungo/ecs"
-	"github.com/golang/glog"
+	"k8s.io/klog"
 	"reflect"
 	"strings"
 	"sync"
@@ -98,7 +99,7 @@ type mockClientInstanceSDK struct {
 	describeNetworkInterfaces func(args *ecs.DescribeNetworkInterfacesArgs) (resp *ecs.DescribeNetworkInterfacesResponse, err error)
 }
 
-func (m *mockClientInstanceSDK) DescribeInstances(args *ecs.DescribeInstancesArgs) (instances []ecs.InstanceAttributesType, pagination *common.PaginationResult, err error) {
+func (m *mockClientInstanceSDK) DescribeInstances(ctx context.Context, args *ecs.DescribeInstancesArgs) (instances []ecs.InstanceAttributesType, pagination *common.PaginationResult, err error) {
 	if m.describeInstances != nil {
 		return m.describeInstances(args)
 	}
@@ -107,7 +108,7 @@ func (m *mockClientInstanceSDK) DescribeInstances(args *ecs.DescribeInstancesArg
 		func(key, value interface{}) bool {
 			v, ok := value.(ecs.InstanceAttributesType)
 			if !ok {
-				glog.Info("API: DescribeInstances, "+
+				klog.Info("API: DescribeInstances, "+
 					"unexpected type %s, not slb.InstanceAttributesType", reflect.TypeOf(value))
 				return true
 			}
@@ -128,9 +129,9 @@ func (m *mockClientInstanceSDK) DescribeInstances(args *ecs.DescribeInstancesArg
 	return results, nil, nil
 }
 
-func (m *mockClientInstanceSDK) AddTags(args *ecs.AddTagsArgs) error { return nil }
+func (m *mockClientInstanceSDK) AddTags(ctx context.Context, args *ecs.AddTagsArgs) error { return nil }
 
-func (m *mockClientInstanceSDK) DescribeNetworkInterfaces(args *ecs.DescribeNetworkInterfacesArgs) (resp *ecs.DescribeNetworkInterfacesResponse, err error) {
+func (m *mockClientInstanceSDK) DescribeNetworkInterfaces(ctx context.Context, args *ecs.DescribeNetworkInterfacesArgs) (resp *ecs.DescribeNetworkInterfacesResponse, err error) {
 	if m.describeNetworkInterfaces != nil {
 		return m.describeNetworkInterfaces(args)
 	}

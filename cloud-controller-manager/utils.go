@@ -133,3 +133,14 @@ func newid() string {
 func ServiceModeLocal(svc *v1.Service) bool {
 	return svc.Spec.ExternalTrafficPolicy == v1.ServiceExternalTrafficPolicyTypeLocal
 }
+
+func GetLoadBalancerName(service *v1.Service) string {
+	//GCE requires that the name of a load balancer starts with a lower case letter.
+	ret := "a" + string(service.UID)
+	ret = strings.Replace(ret, "-", "", -1)
+	//AWS requires that the name of a load balancer is shorter than 32 bytes.
+	if len(ret) > 32 {
+		ret = ret[:32]
+	}
+	return ret
+}

@@ -17,6 +17,7 @@ limitations under the License.
 package alicloud
 
 import (
+	"context"
 	b64 "encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -600,15 +601,15 @@ func TestEnsureLoadbalancerDeleted(t *testing.T) {
 	f.RunCustomized(
 		t, "Delete Loadbalancer",
 		func(f *FrameWork) error {
-			_, err := f.Cloud.EnsureLoadBalancer(CLUSTER_ID, f.SVC, f.Nodes)
+			_, err := f.Cloud.EnsureLoadBalancer(context.Background(), CLUSTER_ID, f.SVC, f.Nodes)
 			if err != nil {
 				t.Fatalf("delete loadbalancer error: create %s", err.Error())
 			}
-			err = f.Cloud.EnsureLoadBalancerDeleted(CLUSTER_ID, f.SVC)
+			err = f.Cloud.EnsureLoadBalancerDeleted(context.Background(), CLUSTER_ID, f.SVC)
 			if err != nil {
 				t.Fatalf("ensure loadbalancer delete error, %s", err.Error())
 			}
-			exist, _, err := f.LoadBalancer().findLoadBalancer(f.SVC)
+			exist, _, err := f.LoadBalancer().FindLoadBalancer(context.Background(), f.SVC)
 			if err != nil || exist {
 				t.Fatalf("Delete LoadBalancer error: %v, %t", err, exist)
 			}
@@ -653,11 +654,11 @@ func TestEnsureLoadBalancerDeleteWithUserDefined(t *testing.T) {
 	f.RunCustomized(
 		t, "Delete User Defined Loadbalancer",
 		func(f *FrameWork) error {
-			err := f.Cloud.EnsureLoadBalancerDeleted(CLUSTER_ID, f.SVC)
+			err := f.Cloud.EnsureLoadBalancerDeleted(context.Background(), CLUSTER_ID, f.SVC)
 			if err != nil {
 				t.Fatalf("ensure loadbalancer delete error, %s", err.Error())
 			}
-			exist, _, err := f.LoadBalancer().findLoadBalancer(f.SVC)
+			exist, _, err := f.LoadBalancer().FindLoadBalancer(context.Background(), f.SVC)
 			if err != nil || !exist {
 				t.Fatalf("Delete LoadBalancer error: %v, %t", err, exist)
 			}
@@ -692,7 +693,7 @@ func TestNodeAddressAndInstanceID(t *testing.T) {
 	}
 	prid := nodeid(string(REGION), INSTANCEID)
 
-	n, e := cloud.NodeAddresses(types.NodeName(prid))
+	n, e := cloud.NodeAddresses(context.Background(), types.NodeName(prid))
 	if e != nil {
 		t.Errorf("TestNodeAddressAndInstanceID error: node address %s\n", e.Error())
 	}
@@ -705,7 +706,7 @@ func TestNodeAddressAndInstanceID(t *testing.T) {
 		t.Fatal("TestNodeAddressAndInstanceID error: node address must equal to 192.168.211.130 InternalIP")
 	}
 
-	n, e = cloud.NodeAddressesByProviderID(prid)
+	n, e = cloud.NodeAddressesByProviderID(context.Background(), prid)
 	if e != nil {
 		t.Errorf("TestNodeAddressAndInstanceID error: node address %s\n", e.Error())
 	}
@@ -716,7 +717,7 @@ func TestNodeAddressAndInstanceID(t *testing.T) {
 		t.Fatal("TestNodeAddressAndInstanceID error: node address must equal to 192.168.211.130 InternalIP")
 	}
 
-	id, err := cloud.InstanceID(types.NodeName(prid))
+	id, err := cloud.InstanceID(context.Background(), types.NodeName(prid))
 	if err != nil {
 		t.Errorf("TestNodeAddressAndInstanceID error: instanceid %s\n", err.Error())
 	}
@@ -724,7 +725,7 @@ func TestNodeAddressAndInstanceID(t *testing.T) {
 	if id != INSTANCEID {
 		t.Fatalf("TestNodeAddressAndInstanceID error: instance id must equal to %s" + node1)
 	}
-	iType, err := cloud.InstanceTypeByProviderID(prid)
+	iType, err := cloud.InstanceTypeByProviderID(context.Background(), prid)
 	if err != nil {
 		t.Fatal(err)
 	}

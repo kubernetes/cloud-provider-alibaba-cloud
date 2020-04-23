@@ -1,6 +1,7 @@
 package framework
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	v12 "k8s.io/api/apps/v1"
@@ -132,7 +133,7 @@ func (f *FrameWorkE2E) SetUp() error {
 				Client.
 				CoreV1().
 				Namespaces().
-				Create(ns)
+				Create(context.Background(), ns, metav1.CreateOptions{})
 			if err != nil {
 				if !strings.Contains(err.Error(), "exist") {
 					f.Logf("retry initialize namespace: %s", err.Error())
@@ -158,7 +159,7 @@ func (f *FrameWorkE2E) Destroy() error {
 			result, err := f.Client.
 				CoreV1().
 				Namespaces().
-				Get(NameSpace, metav1.GetOptions{})
+				Get(context.Background(), NameSpace, metav1.GetOptions{})
 			if err != nil && strings.Contains(err.Error(), "not found") {
 				f.Logf("[namespace] %s deleted ", NameSpace)
 				return true, nil
@@ -171,7 +172,7 @@ func (f *FrameWorkE2E) Destroy() error {
 				err := f.Client.
 					CoreV1().
 					Namespaces().
-					Delete(NameSpace, &metav1.DeleteOptions{})
+					Delete(context.Background(), NameSpace, metav1.DeleteOptions{})
 				f.Logf("delete namespace, try again from error %v", err)
 				return false, nil
 			}
@@ -222,7 +223,7 @@ func CreateOrUpdate(
 	svc *v1.Service,
 	mutate ServiceMutator,
 ) (*v1.Service, error) {
-	o, err := client.CoreV1().Services(svc.Namespace).Get(svc.Name, metav1.GetOptions{})
+	o, err := client.CoreV1().Services(svc.Namespace).Get(context.Background(), svc.Name, metav1.GetOptions{})
 	if err != nil {
 		if strings.Contains(err.Error(), "not found") {
 			if mutate != nil {
@@ -231,7 +232,7 @@ func CreateOrUpdate(
 					return nil, fmt.Errorf("mutate: %s", err.Error())
 				}
 			}
-			m, err := client.CoreV1().Services(svc.Namespace).Create(svc)
+			m, err := client.CoreV1().Services(svc.Namespace).Create(context.Background(), svc, metav1.CreateOptions{})
 			if err != nil {
 				return nil, fmt.Errorf("create service: NotFound %s", err.Error())
 			}
@@ -259,7 +260,7 @@ func CreateOrUpdate(
 	if err != nil {
 		return nil, fmt.Errorf("create patch: %s", err.Error())
 	}
-	m, err := client.CoreV1().Services(svc.Namespace).Patch(svc.Name, types.MergePatchType, patch)
+	m, err := client.CoreV1().Services(svc.Namespace).Patch(context.Background(), svc.Name, types.MergePatchType, patch, metav1.PatchOptions{})
 	return m, err
 }
 
@@ -342,7 +343,7 @@ func RunNginxDeployment(
 		},
 	}
 
-	_, err := client.AppsV1().Deployments(nginx.Namespace).Create(nginx)
+	_, err := client.AppsV1().Deployments(nginx.Namespace).Create(context.Background(), nginx, metav1.CreateOptions{})
 	if err != nil {
 		if !strings.Contains(err.Error(), "exists") {
 			return fmt.Errorf("run nginx: %s", err.Error())
@@ -353,7 +354,7 @@ func RunNginxDeployment(
 		1*time.Second,
 		20*time.Second,
 		func() (done bool, err error) {
-			pods, err := client.CoreV1().Pods(nginx.Namespace).List(metav1.ListOptions{LabelSelector: "run=nginx"})
+			pods, err := client.CoreV1().Pods(nginx.Namespace).List(context.Background(), metav1.ListOptions{LabelSelector: "run=nginx"})
 			if err != nil {
 				t.Logf("wait for nginx pod ready: %s", err.Error())
 				return false, nil

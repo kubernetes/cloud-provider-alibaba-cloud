@@ -1,6 +1,7 @@
 package alicloud
 
 import (
+	"context"
 	"fmt"
 	"github.com/denverdino/aliyungo/common"
 	"github.com/denverdino/aliyungo/ecs"
@@ -15,8 +16,7 @@ import (
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/cloud-provider-alibaba-cloud/cloud-controller-manager/utils"
-	"k8s.io/kubernetes/pkg/controller"
-	"k8s.io/kubernetes/pkg/controller/service"
+	controller "k8s.io/kube-aggregator/pkg/controllers"
 	"sort"
 	"strconv"
 	"strings"
@@ -350,7 +350,7 @@ type CustomizedTest func(f *FrameWork) error
 
 func DefaultTesting(f *FrameWork) error {
 	status, err := f.CloudImpl().
-		EnsureLoadBalancer(CLUSTER_ID, f.SVC, f.Nodes)
+		EnsureLoadBalancer(context.Background(), CLUSTER_ID, f.SVC, f.Nodes)
 	if err != nil {
 		return fmt.Errorf("EnsureLoadBalancer error: %s", err.Error())
 	}
@@ -394,7 +394,8 @@ func debug(ifactory informers.SharedInformerFactory, name string, do bool) error
 // service & Cloud data must be consistent
 func ExpectExistAndEqual(f *FrameWork) error {
 
-	exist, mlb, err := f.LoadBalancer().findLoadBalancer(f.SVC)
+	ctx := context.WithValue(context.Background(), utils.ContextService, f.SVC)
+	exist, mlb, err := f.LoadBalancer().FindLoadBalancer(ctx, f.SVC)
 	// 1. slb must exist
 	if err != nil || !exist {
 		return fmt.Errorf("slb must exist: %v, %v", exist, err)
@@ -429,7 +430,7 @@ func ExpectExistAndEqual(f *FrameWork) error {
 			} else {
 				if p.Port == int32(v.ListenerPort) &&
 					proto == v.ListenerProtocol {
-					if err := f.ListenerEqual(mlb.LoadBalancerId, p, proto); err != nil {
+					if err := f.ListenerEqual(ctx, mlb.LoadBalancerId, p, proto); err != nil {
 						return fmt.Errorf(fmt.Sprintf("listener configuration not equal, %s", err.Error()))
 					}
 					found = true
@@ -444,6 +445,7 @@ func ExpectExistAndEqual(f *FrameWork) error {
 
 	// 3. backend server
 	res, err := f.SLBSDK().DescribeVServerGroups(
+		ctx,
 		&slb.DescribeVServerGroupsArgs{
 			LoadBalancerId: mlb.LoadBalancerId,
 		},
@@ -480,6 +482,7 @@ func ExpectExistAndEqual(f *FrameWork) error {
 	defd, _ := ExtractAnnotationRequest(f.SVC)
 	for _, v := range res.VServerGroups.VServerGroup {
 		vg, err := f.SLBSDK().DescribeVServerGroupAttribute(
+			ctx,
 			&slb.DescribeVServerGroupAttributeArgs{
 				VServerGroupId: v.VServerGroupId,
 			},
@@ -647,7 +650,7 @@ func ExpectExistAndEqual(f *FrameWork) error {
 	// 4. describe tags
 	if f.hasAnnotation(ServiceAnnotationLoadBalancerAdditionalTags) {
 		arg := &slb.DescribeTagsArgs{LoadBalancerID: mlb.LoadBalancerId}
-		tags, _, err := f.SLBSDK().DescribeTags(arg)
+		tags, _, err := f.SLBSDK().DescribeTags(ctx, arg)
 		if err != nil {
 			return fmt.Errorf("describe tags:%s", err.Error())
 		}
@@ -666,6 +669,7 @@ func ExpectExistAndEqual(f *FrameWork) error {
 			selectedZoneId = defd.PrivateZoneId
 		} else if f.hasAnnotation(ServiceAnnotationLoadBalancerPrivateZoneName) {
 			zones, err := f.PVTZSDK().DescribeZones(
+				ctx,
 				&pvtz.DescribeZonesArgs{
 					Lang:    DEFAULT_LANG,
 					Keyword: defd.PrivateZoneName,
@@ -687,6 +691,7 @@ func ExpectExistAndEqual(f *FrameWork) error {
 		}
 
 		pvrds, err := f.PVTZSDK().DescribeZoneRecords(
+			ctx,
 			&pvtz.DescribeZoneRecordsArgs{
 				ZoneId: selectedZoneId,
 			},
@@ -770,7 +775,7 @@ func (f *FrameWork) SLBSpecEqual(mlb *slb.LoadBalancerType) error {
 	return nil
 }
 
-func (f *FrameWork) ListenerEqual(id string, p v1.ServicePort, proto string) error {
+func (f *FrameWork) ListenerEqual(ctx context.Context, id string, p v1.ServicePort, proto string) error {
 	var (
 		// Health check
 		healthCheckInterval           = 0
@@ -799,7 +804,7 @@ func (f *FrameWork) ListenerEqual(id string, p v1.ServicePort, proto string) err
 	defd, _ := ExtractAnnotationRequest(f.SVC)
 	switch proto {
 	case "tcp":
-		resp, err := f.SLBSDK().DescribeLoadBalancerTCPListenerAttribute(id, int(p.Port))
+		resp, err := f.SLBSDK().DescribeLoadBalancerTCPListenerAttribute(ctx, id, int(p.Port))
 		if err != nil {
 			return err
 		}
@@ -825,7 +830,7 @@ func (f *FrameWork) ListenerEqual(id string, p v1.ServicePort, proto string) err
 		aclType = resp.AclType
 		scheduler = string(resp.Scheduler)
 	case "udp":
-		resp, err := f.SLBSDK().DescribeLoadBalancerUDPListenerAttribute(id, int(p.Port))
+		resp, err := f.SLBSDK().DescribeLoadBalancerUDPListenerAttribute(ctx, id, int(p.Port))
 		if err != nil {
 			return err
 		}
@@ -846,7 +851,7 @@ func (f *FrameWork) ListenerEqual(id string, p v1.ServicePort, proto string) err
 		aclType = resp.AclType
 		scheduler = string(resp.Scheduler)
 	case "http":
-		resp, err := f.SLBSDK().DescribeLoadBalancerHTTPListenerAttribute(id, int(p.Port))
+		resp, err := f.SLBSDK().DescribeLoadBalancerHTTPListenerAttribute(ctx, id, int(p.Port))
 		if err != nil {
 			return err
 		}
@@ -874,7 +879,7 @@ func (f *FrameWork) ListenerEqual(id string, p v1.ServicePort, proto string) err
 		aclType = resp.AclType
 		scheduler = string(resp.Scheduler)
 	case "https":
-		resp, err := f.SLBSDK().DescribeLoadBalancerHTTPSListenerAttribute(id, int(p.Port))
+		resp, err := f.SLBSDK().DescribeLoadBalancerHTTPSListenerAttribute(ctx, id, int(p.Port))
 		if err != nil {
 			return err
 		}
@@ -1077,12 +1082,14 @@ func tagsEqual(tags string, items []slb.TagItemType) bool {
 	return true
 }
 
+const labelNodeRoleMaster = "node-role.kubernetes.io/master"
+
 func filterOutMaster(nodes []*v1.Node) []*v1.Node {
 	var result []*v1.Node
 	for _, node := range nodes {
 		found := false
-		for k, _ := range node.Labels {
-			if k == service.LabelNodeRoleMaster {
+		for k := range node.Labels {
+			if k == labelNodeRoleMaster {
 				found = true
 			}
 		}
@@ -1094,7 +1101,8 @@ func filterOutMaster(nodes []*v1.Node) []*v1.Node {
 }
 
 func ExpectNotExist(f *FrameWork) error {
-	exist, _, err := f.LoadBalancer().findLoadBalancer(f.SVC)
+	ctx := context.WithValue(context.Background(), utils.ContextService, f.SVC)
+	exist, _, err := f.LoadBalancer().FindLoadBalancer(ctx, f.SVC)
 	if err != nil || exist {
 		return fmt.Errorf("slb should not exist: %v, %t", err, exist)
 	}
@@ -1102,7 +1110,8 @@ func ExpectNotExist(f *FrameWork) error {
 }
 
 func ExpectExist(f *FrameWork) error {
-	exist, _, err := f.LoadBalancer().findLoadBalancer(f.SVC)
+	ctx := context.WithValue(context.Background(), utils.ContextService, f.SVC)
+	exist, _, err := f.LoadBalancer().FindLoadBalancer(ctx, f.SVC)
 	if err != nil || !exist {
 		return fmt.Errorf("ExpectExist: slb should exist, %v, %t", err, exist)
 	}
@@ -1110,7 +1119,8 @@ func ExpectExist(f *FrameWork) error {
 }
 
 func ExpectAddressTypeNotEqual(f *FrameWork) error {
-	exist, mlb, err := f.LoadBalancer().findLoadBalancer(f.SVC)
+	ctx := context.WithValue(context.Background(), utils.ContextService, f.SVC)
+	exist, mlb, err := f.LoadBalancer().FindLoadBalancer(ctx, f.SVC)
 	if err != nil || !exist {
 		return fmt.Errorf("ExpectAddressTypeNotEqual: slb should exist, isExist=%v, %v", exist, err)
 	}

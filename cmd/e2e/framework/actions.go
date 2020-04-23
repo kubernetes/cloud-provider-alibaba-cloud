@@ -1,6 +1,7 @@
 package framework
 
 import (
+	"context"
 	"fmt"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -34,7 +35,7 @@ func (u *DefaultAction) RunAction(f *FrameWorkE2E) error {
 			fa.Cloud = NewAlibabaCloudOrDie(TestContext.CloudConfig)
 		},
 	)
-	nodes, err := f.Client.CoreV1().Nodes().List(metav1.ListOptions{})
+	nodes, err := f.Client.CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
 	if err != nil {
 		return fmt.Errorf("get node: %s", err.Error())
 	}
@@ -42,7 +43,7 @@ func (u *DefaultAction) RunAction(f *FrameWorkE2E) error {
 		Client.
 		CoreV1().
 		Services(f.InitService.Namespace).
-		Get(f.InitService.Name, metav1.GetOptions{})
+		Get(context.Background(), f.InitService.Name, metav1.GetOptions{})
 	if err != nil {
 		return fmt.Errorf("get service: %s", err.Error())
 	}
@@ -53,7 +54,7 @@ func (u *DefaultAction) RunAction(f *FrameWorkE2E) error {
 		Client.
 		CoreV1().
 		Endpoints(f.InitService.Namespace).
-		Get(f.InitService.Name, metav1.GetOptions{})
+		Get(context.Background(), f.InitService.Name, metav1.GetOptions{})
 	if err != nil {
 		return fmt.Errorf("get endpoints: %s", err.Error())
 	}
@@ -77,7 +78,7 @@ func (u *DeleteAction) RunAction(f *FrameWorkE2E) error {
 		Client.
 		CoreV1().
 		Services(f.InitService.Namespace).
-		Get(f.InitService.Name, metav1.GetOptions{})
+		Get(context.Background(), f.InitService.Name, metav1.GetOptions{})
 	if err != nil {
 		if strings.Contains(err.Error(), "not found") {
 			f.Logf("service not found, expected")
@@ -89,7 +90,7 @@ func (u *DeleteAction) RunAction(f *FrameWorkE2E) error {
 		Client.
 		CoreV1().
 		Services(f.InitService.Namespace).
-		Delete(f.InitService.Name, &metav1.DeleteOptions{})
+		Delete(context.Background(), f.InitService.Name, metav1.DeleteOptions{})
 	if err != nil {
 		return fmt.Errorf("delete service: %s", err.Error())
 	}

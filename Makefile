@@ -27,8 +27,12 @@ KUBE_CROSS_TAG=v1.12.0-1
 IPTABLES_VERSION=1.4.21
 
 cloud-controller-manager: $(shell find . -type f  -name '*.go')
-		CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o cloud-controller-manager-alicloud -ldflags "-X k8s.io/cloud-provider-alibaba-cloud/version.Version=$(TAG)" \
-		cmd/cloudprovider/cloudprovider-alibaba-cloud.go
+		CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
+		go build \
+		    -mod readonly \
+		    -o alibaba-cloud-ccm \
+		    -ldflags "-X k8s.io/cloud-provider-alibaba-cloud/version.Version=$(TAG)" \
+		    cmd/cloudprovider/cloudprovider-alibaba-cloud.go
 
 
 # Throw an error if gofmt finds problems.
@@ -51,7 +55,7 @@ pre-requisite:
 	@echo "Warning: Tag your branch before make. or makefile can not autodetect image tag."
 
 unit-test:
-	go test -v -race -coverprofile=coverage.txt -covermode=atomic \
+	GO111MODULE=on go test -mod readonly -v -race -coverprofile=coverage.txt -covermode=atomic \
 		k8s.io/cloud-provider-alibaba-cloud/cloud-controller-manager \
 		k8s.io/cloud-provider-alibaba-cloud/cloud-controller-manager/controller/route
 
@@ -59,26 +63,26 @@ check:
 	gometalinter --disable-all --skip vendor -E ineffassign -E misspell -d ./...
 
 test:
-	#go test -v k8s.io/cloud-provider-alibaba-cloud/cloud-controller-manager/alicloud
-	docker run -e CC=$(CC) -e GOARM=$(GOARM) -e GOARCH=$(ARCH) -e CGO_ENABLED=1 \
+	docker run \
+	    -e CC=$(CC) -e GOARM=$(GOARM) -e GOARCH=$(ARCH) -e CGO_ENABLED=1 \
 		-v $(SOURCE):/go/src/k8s.io/cloud-provider-alibaba-cloud \
-		-v $(SOURCE)/build:/go/src/k8s.io/cloud-provider-alibaba-cloud/build \
-		registry.cn-hangzhou.aliyuncs.com/acs/kube-cross:$(KUBE_CROSS_TAG) /bin/bash -c '\
+		-v $(HOME)/mod:/go/pkg/mod \
+		golang:1.14.1 /bin/bash -c '\
 		cd /go/src/k8s.io/cloud-provider-alibaba-cloud && \
-		go test -v -race -coverprofile=coverage.txt -covermode=atomic \
+		go test -mod readonly -v -race -coverprofile=coverage.txt -covermode=atomic \
         		k8s.io/cloud-provider-alibaba-cloud/cloud-controller-manager \
         		k8s.io/cloud-provider-alibaba-cloud/cloud-controller-manager/controller/route'
 
 e2etest:
-	#go test -v k8s.io/cloud-provider-alibaba-cloud/cloud-controller-manager/alicloud
-	docker run -e CC=$(CC) -e GOARM=$(GOARM) -e GOARCH=$(ARCH) -e CGO_ENABLED=$(CGO_ENABLED) \
+	docker run \
+	    -e CC=$(CC) -e GOARM=$(GOARM) -e GOARCH=$(ARCH) -e CGO_ENABLED=$(CGO_ENABLED) \
 		-v $(SOURCE):/go/src/k8s.io/cloud-provider-alibaba-cloud \
-		-v $(SOURCE)/build:/go/src/k8s.io/cloud-provider-alibaba-cloud/build \
+		-v $(HOME)/mod:/go/pkg/mod \
 		-v /root/.kube/config:/root/.kube/config \
 		-v /root/.kube/config.cloud:/root/.kube/config.cloud \
-		registry.cn-hangzhou.aliyuncs.com/acs/kube-cross:$(KUBE_CROSS_TAG) /bin/bash -c '\
+		golang:1.14.1 /bin/bash -c '\
 		cd /go/src/k8s.io/cloud-provider-alibaba-cloud && \
-		go test -v \
+		go test -mod readonly -v \
             k8s.io/cloud-provider-alibaba-cloud/cmd/e2e \
             -test.run ^TestE2E$ \
             --kubeconfig /root/.kube/config \
@@ -86,7 +90,7 @@ e2etest:
 
 
 image: cloud-controller-manager-$(ARCH)
-	docker build -t $(REGISTRY):$(TAG) .
+	docker build -t $(REGISTRY):$(TAG) -f Dockerfile .
 
 docker-push:
 	docker push $(REGISTRY):$(TAG)
@@ -105,9 +109,7 @@ cloud-controller-manager-$(ARCH): pre-requisite
 
 	docker run -e CC=$(CC) -e GOARM=$(GOARM) -e GOARCH=$(ARCH) -e CGO_ENABLED=$(CGO_ENABLED) \
 		-v $(SOURCE):/go/src/k8s.io/cloud-provider-alibaba-cloud \
-		-v $(SOURCE)/build:/go/src/k8s.io/cloud-provider-alibaba-cloud/build \
-		registry.cn-hangzhou.aliyuncs.com/acs/kube-cross:$(KUBE_CROSS_TAG) /bin/bash -c '\
+		-v $(HOME)/mod:/go/pkg/mod \
+		golang:1.14.1 /bin/bash -c '\
 		cd /go/src/k8s.io/cloud-provider-alibaba-cloud && \
-		TAG=$(TAG) make -e cloud-controller-manager && \
-		mv cloud-controller-manager-alicloud build/cloud-controller-manager-$(ARCH) && \
-		file build/cloud-controller-manager-$(ARCH)'
+		TAG=$(TAG) make -e cloud-controller-manager'

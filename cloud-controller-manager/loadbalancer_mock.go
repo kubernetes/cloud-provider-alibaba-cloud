@@ -1,6 +1,7 @@
 package alicloud
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"github.com/denverdino/aliyungo/common"
@@ -69,7 +70,7 @@ type mockClientSLB struct {
 	modifyLoadBalancerInternetSpec func(args *slb.ModifyLoadBalancerInternetSpecArgs) (err error)
 	modifyLoadBalancerInstanceSpec func(args *slb.ModifyLoadBalancerInstanceSpecArgs) (err error)
 	describeLoadBalancerAttribute  func(loadBalancerId string) (loadBalancer *slb.LoadBalancerType, err error)
-	removeBackendServers           func(loadBalancerId string, backendServers []string) (result []slb.BackendServerType, err error)
+	removeBackendServers           func(loadBalancerId string, backendServers []slb.BackendServerType) (result []slb.BackendServerType, err error)
 	addBackendServers              func(loadBalancerId string, backendServers []slb.BackendServerType) (result []slb.BackendServerType, err error)
 
 	stopLoadBalancerListener                   func(loadBalancerId string, port int) (err error)
@@ -135,7 +136,7 @@ func newBaseLoadbalancer() []*slb.LoadBalancerType {
 	}
 }
 
-func (c *mockClientSLB) DescribeLoadBalancers(args *slb.DescribeLoadBalancersArgs) (loadBalancers []slb.LoadBalancerType, err error) {
+func (c *mockClientSLB) DescribeLoadBalancers(ctx context.Context, args *slb.DescribeLoadBalancersArgs) (loadBalancers []slb.LoadBalancerType, err error) {
 	if c.describeLoadBalancers != nil {
 		return c.describeLoadBalancers(args)
 	}
@@ -169,7 +170,7 @@ func (c *mockClientSLB) DescribeLoadBalancers(args *slb.DescribeLoadBalancersArg
 					LoadBalancerID: args.LoadBalancerId,
 					Tags:           args.Tags,
 				}
-				tag, _, _ := c.DescribeTags(bytag)
+				tag, _, _ := c.DescribeTags(ctx, bytag)
 				if len(tag) <= 0 {
 					return true
 				}
@@ -181,7 +182,7 @@ func (c *mockClientSLB) DescribeLoadBalancers(args *slb.DescribeLoadBalancersArg
 	return results, nil
 }
 
-func (c *mockClientSLB) StopLoadBalancerListener(loadBalancerId string, port int) (err error) {
+func (c *mockClientSLB) StopLoadBalancerListener(ctx context.Context, loadBalancerId string, port int) (err error) {
 	if c.stopLoadBalancerListener != nil {
 		return c.stopLoadBalancerListener(loadBalancerId, port)
 	}
@@ -223,7 +224,7 @@ func (c *mockClientSLB) StopLoadBalancerListener(loadBalancerId string, port int
 	return nil
 }
 
-func (c *mockClientSLB) CreateLoadBalancer(args *slb.CreateLoadBalancerArgs) (response *slb.CreateLoadBalancerResponse, err error) {
+func (c *mockClientSLB) CreateLoadBalancer(ctx context.Context, args *slb.CreateLoadBalancerArgs) (response *slb.CreateLoadBalancerResponse, err error) {
 	if c.createLoadBalancer != nil {
 		return c.createLoadBalancer(args)
 	}
@@ -262,7 +263,7 @@ func (c *mockClientSLB) CreateLoadBalancer(args *slb.CreateLoadBalancerArgs) (re
 	}, nil
 }
 
-func (c *mockClientSLB) DeleteLoadBalancer(loadBalancerId string) (err error) {
+func (c *mockClientSLB) DeleteLoadBalancer(ctx context.Context, loadBalancerId string) (err error) {
 	if c.deleteLoadBalancer != nil {
 		return c.deleteLoadBalancer(loadBalancerId)
 	}
@@ -270,7 +271,7 @@ func (c *mockClientSLB) DeleteLoadBalancer(loadBalancerId string) (err error) {
 	return nil
 }
 
-func (c *mockClientSLB) ModifyLoadBalancerInternetSpec(args *slb.ModifyLoadBalancerInternetSpecArgs) (err error) {
+func (c *mockClientSLB) ModifyLoadBalancerInternetSpec(ctx context.Context, args *slb.ModifyLoadBalancerInternetSpecArgs) (err error) {
 	if c.modifyLoadBalancerInternetSpec != nil {
 		return c.modifyLoadBalancerInternetSpec(args)
 	}
@@ -295,7 +296,7 @@ func (c *mockClientSLB) ModifyLoadBalancerInternetSpec(args *slb.ModifyLoadBalan
 	return nil
 }
 
-func (c *mockClientSLB) ModifyLoadBalancerInstanceSpec(args *slb.ModifyLoadBalancerInstanceSpecArgs) (err error) {
+func (c *mockClientSLB) ModifyLoadBalancerInstanceSpec(ctx context.Context, args *slb.ModifyLoadBalancerInstanceSpecArgs) (err error) {
 	if c.modifyLoadBalancerInstanceSpec != nil {
 		return c.modifyLoadBalancerInstanceSpec(args)
 	}
@@ -317,7 +318,7 @@ func (c *mockClientSLB) ModifyLoadBalancerInstanceSpec(args *slb.ModifyLoadBalan
 	return nil
 }
 
-func (c *mockClientSLB) DescribeLoadBalancerAttribute(loadBalancerId string) (loadBalancer *slb.LoadBalancerType, err error) {
+func (c *mockClientSLB) DescribeLoadBalancerAttribute(ctx context.Context, loadBalancerId string) (loadBalancer *slb.LoadBalancerType, err error) {
 	if c.describeLoadBalancerAttribute != nil {
 		return c.describeLoadBalancerAttribute(loadBalancerId)
 	}
@@ -381,7 +382,7 @@ func (c *mockClientSLB) DescribeLoadBalancerAttribute(loadBalancerId string) (lo
 	return &ins, nil
 }
 
-func (c *mockClientSLB) RemoveBackendServers(loadBalancerId string, backendServers []string) (result []slb.BackendServerType, err error) {
+func (c *mockClientSLB) RemoveBackendServers(ctx context.Context, loadBalancerId string, backendServers []slb.BackendServerType) (result []slb.BackendServerType, err error) {
 	if c.removeBackendServers != nil {
 		return c.removeBackendServers(loadBalancerId, backendServers)
 	}
@@ -398,7 +399,7 @@ func (c *mockClientSLB) RemoveBackendServers(loadBalancerId string, backendServe
 	for _, bc := range ins.BackendServers.BackendServer {
 		found := false
 		for _, del := range backendServers {
-			if bc.ServerId == del {
+			if bc.ServerId == del.ServerId {
 				found = true
 			}
 		}
@@ -410,20 +411,20 @@ func (c *mockClientSLB) RemoveBackendServers(loadBalancerId string, backendServe
 	return backend(backendServers), nil
 }
 
-func backend(bc []string) []slb.BackendServerType {
+func backend(bc []slb.BackendServerType) []slb.BackendServerType {
 	var result []slb.BackendServerType
 	for _, back := range bc {
 		server := slb.BackendServerType{
 			Weight:   100,
 			Type:     "ecs",
-			ServerId: back,
+			ServerId: back.ServerId,
 		}
 		result = append(result, server)
 	}
 	return result
 }
 
-func (c *mockClientSLB) AddBackendServers(loadBalancerId string, backendServers []slb.BackendServerType) (result []slb.BackendServerType, err error) {
+func (c *mockClientSLB) AddBackendServers(ctx context.Context, loadBalancerId string, backendServers []slb.BackendServerType) (result []slb.BackendServerType, err error) {
 	if c.addBackendServers != nil {
 		return c.addBackendServers(loadBalancerId, backendServers)
 	}
@@ -459,7 +460,7 @@ func listenerKey(id string, port int) string {
 	return fmt.Sprintf("%s/%d", id, port)
 }
 
-func (c *mockClientSLB) StartLoadBalancerListener(loadBalancerId string, port int) (err error) {
+func (c *mockClientSLB) StartLoadBalancerListener(ctx context.Context, loadBalancerId string, port int) (err error) {
 	if c.startLoadBalancerListener != nil {
 		return c.startLoadBalancerListener(loadBalancerId, port)
 	}
@@ -498,7 +499,7 @@ func (c *mockClientSLB) StartLoadBalancerListener(loadBalancerId string, port in
 	}
 	return nil
 }
-func (c *mockClientSLB) CreateLoadBalancerTCPListener(args *slb.CreateLoadBalancerTCPListenerArgs) (err error) {
+func (c *mockClientSLB) CreateLoadBalancerTCPListener(ctx context.Context, args *slb.CreateLoadBalancerTCPListenerArgs) (err error) {
 	if c.createLoadBalancerTCPListener != nil {
 		return c.createLoadBalancerTCPListener(args)
 	}
@@ -538,7 +539,7 @@ func (c *mockClientSLB) CreateLoadBalancerTCPListener(args *slb.CreateLoadBalanc
 	return nil
 }
 
-func (c *mockClientSLB) CreateLoadBalancerUDPListener(args *slb.CreateLoadBalancerUDPListenerArgs) (err error) {
+func (c *mockClientSLB) CreateLoadBalancerUDPListener(ctx context.Context, args *slb.CreateLoadBalancerUDPListenerArgs) (err error) {
 	if c.createLoadBalancerUDPListener != nil {
 		return c.createLoadBalancerUDPListener(args)
 	}
@@ -574,14 +575,14 @@ func (c *mockClientSLB) CreateLoadBalancerUDPListener(args *slb.CreateLoadBalanc
 	LOADBALANCER.listeners.Store(key, listener)
 	return nil
 }
-func (c *mockClientSLB) DeleteLoadBalancerListener(loadBalancerId string, port int) (err error) {
+func (c *mockClientSLB) DeleteLoadBalancerListener(ctx context.Context, loadBalancerId string, port int) (err error) {
 	if c.deleteLoadBalancerListener != nil {
 		return c.deleteLoadBalancerListener(loadBalancerId, port)
 	}
 	LOADBALANCER.listeners.Delete(listenerKey(loadBalancerId, port))
 	return nil
 }
-func (c *mockClientSLB) CreateLoadBalancerHTTPSListener(args *slb.CreateLoadBalancerHTTPSListenerArgs) (err error) {
+func (c *mockClientSLB) CreateLoadBalancerHTTPSListener(ctx context.Context, args *slb.CreateLoadBalancerHTTPSListenerArgs) (err error) {
 	if c.createLoadBalancerHTTPSListener != nil {
 		return c.createLoadBalancerHTTPSListener(args)
 	}
@@ -627,7 +628,7 @@ func (c *mockClientSLB) CreateLoadBalancerHTTPSListener(args *slb.CreateLoadBala
 
 	return nil
 }
-func (c *mockClientSLB) CreateLoadBalancerHTTPListener(args *slb.CreateLoadBalancerHTTPListenerArgs) (err error) {
+func (c *mockClientSLB) CreateLoadBalancerHTTPListener(ctx context.Context, args *slb.CreateLoadBalancerHTTPListenerArgs) (err error) {
 	if c.createLoadBalancerHTTPListener != nil {
 		return c.createLoadBalancerHTTPListener(args)
 	}
@@ -668,7 +669,7 @@ func (c *mockClientSLB) CreateLoadBalancerHTTPListener(args *slb.CreateLoadBalan
 	LOADBALANCER.listeners.Store(key, listener)
 	return nil
 }
-func (c *mockClientSLB) DescribeLoadBalancerHTTPSListenerAttribute(loadBalancerId string, port int) (response *slb.DescribeLoadBalancerHTTPSListenerAttributeResponse, err error) {
+func (c *mockClientSLB) DescribeLoadBalancerHTTPSListenerAttribute(ctx context.Context, loadBalancerId string, port int) (response *slb.DescribeLoadBalancerHTTPSListenerAttributeResponse, err error) {
 	if c.describeLoadBalancerHTTPSListenerAttribute != nil {
 		return c.describeLoadBalancerHTTPSListenerAttribute(loadBalancerId, port)
 	}
@@ -684,7 +685,7 @@ func (c *mockClientSLB) DescribeLoadBalancerHTTPSListenerAttribute(loadBalancerI
 	return result, nil
 }
 
-func (c *mockClientSLB) DescribeLoadBalancerTCPListenerAttribute(loadBalancerId string, port int) (response *slb.DescribeLoadBalancerTCPListenerAttributeResponse, err error) {
+func (c *mockClientSLB) DescribeLoadBalancerTCPListenerAttribute(ctx context.Context, loadBalancerId string, port int) (response *slb.DescribeLoadBalancerTCPListenerAttributeResponse, err error) {
 	if c.describeLoadBalancerTCPListenerAttribute != nil {
 		return c.describeLoadBalancerTCPListenerAttribute(loadBalancerId, port)
 	}
@@ -700,7 +701,7 @@ func (c *mockClientSLB) DescribeLoadBalancerTCPListenerAttribute(loadBalancerId 
 	return result, nil
 }
 
-func (c *mockClientSLB) DescribeLoadBalancerUDPListenerAttribute(loadBalancerId string, port int) (response *slb.DescribeLoadBalancerUDPListenerAttributeResponse, err error) {
+func (c *mockClientSLB) DescribeLoadBalancerUDPListenerAttribute(ctx context.Context, loadBalancerId string, port int) (response *slb.DescribeLoadBalancerUDPListenerAttributeResponse, err error) {
 	if c.describeLoadBalancerUDPListenerAttribute != nil {
 		return c.describeLoadBalancerUDPListenerAttribute(loadBalancerId, port)
 	}
@@ -716,7 +717,7 @@ func (c *mockClientSLB) DescribeLoadBalancerUDPListenerAttribute(loadBalancerId 
 	return result, nil
 }
 
-func (c *mockClientSLB) DescribeLoadBalancerHTTPListenerAttribute(loadBalancerId string, port int) (response *slb.DescribeLoadBalancerHTTPListenerAttributeResponse, err error) {
+func (c *mockClientSLB) DescribeLoadBalancerHTTPListenerAttribute(ctx context.Context, loadBalancerId string, port int) (response *slb.DescribeLoadBalancerHTTPListenerAttributeResponse, err error) {
 	if c.describeLoadBalancerHTTPListenerAttribute != nil {
 		return c.describeLoadBalancerHTTPListenerAttribute(loadBalancerId, port)
 	}
@@ -732,11 +733,11 @@ func (c *mockClientSLB) DescribeLoadBalancerHTTPListenerAttribute(loadBalancerId
 	return result, nil
 }
 
-func (c *mockClientSLB) SetLoadBalancerHTTPListenerAttribute(args *slb.SetLoadBalancerHTTPListenerAttributeArgs) (err error) {
+func (c *mockClientSLB) SetLoadBalancerHTTPListenerAttribute(ctx context.Context, args *slb.SetLoadBalancerHTTPListenerAttributeArgs) (err error) {
 	if c.setLoadBalancerHTTPListenerAttribute != nil {
 		return c.setLoadBalancerHTTPListenerAttribute(args)
 	}
-	lb, err := c.DescribeLoadBalancerHTTPListenerAttribute(args.LoadBalancerId, args.ListenerPort)
+	lb, err := c.DescribeLoadBalancerHTTPListenerAttribute(ctx, args.LoadBalancerId, args.ListenerPort)
 	if err != nil {
 		return err
 	}
@@ -767,11 +768,11 @@ func (c *mockClientSLB) SetLoadBalancerHTTPListenerAttribute(args *slb.SetLoadBa
 	return nil
 }
 
-func (c *mockClientSLB) SetLoadBalancerHTTPSListenerAttribute(args *slb.SetLoadBalancerHTTPSListenerAttributeArgs) (err error) {
+func (c *mockClientSLB) SetLoadBalancerHTTPSListenerAttribute(ctx context.Context, args *slb.SetLoadBalancerHTTPSListenerAttributeArgs) (err error) {
 	if c.setLoadBalancerHTTPSListenerAttribute != nil {
 		return c.setLoadBalancerHTTPSListenerAttribute(args)
 	}
-	lb, err := c.DescribeLoadBalancerHTTPSListenerAttribute(args.LoadBalancerId, args.ListenerPort)
+	lb, err := c.DescribeLoadBalancerHTTPSListenerAttribute(ctx, args.LoadBalancerId, args.ListenerPort)
 	if err != nil {
 		return err
 	}
@@ -802,12 +803,12 @@ func (c *mockClientSLB) SetLoadBalancerHTTPSListenerAttribute(args *slb.SetLoadB
 	return nil
 }
 
-func (c *mockClientSLB) SetLoadBalancerTCPListenerAttribute(args *slb.SetLoadBalancerTCPListenerAttributeArgs) (err error) {
+func (c *mockClientSLB) SetLoadBalancerTCPListenerAttribute(ctx context.Context, args *slb.SetLoadBalancerTCPListenerAttributeArgs) (err error) {
 	if c.setLoadBalancerTCPListenerAttribute != nil {
 		return c.setLoadBalancerTCPListenerAttribute(args)
 	}
 
-	lb, err := c.DescribeLoadBalancerTCPListenerAttribute(args.LoadBalancerId, args.ListenerPort)
+	lb, err := c.DescribeLoadBalancerTCPListenerAttribute(ctx, args.LoadBalancerId, args.ListenerPort)
 	if err != nil {
 		return err
 	}
@@ -835,12 +836,12 @@ func (c *mockClientSLB) SetLoadBalancerTCPListenerAttribute(args *slb.SetLoadBal
 	return nil
 }
 
-func (c *mockClientSLB) SetLoadBalancerUDPListenerAttribute(args *slb.SetLoadBalancerUDPListenerAttributeArgs) (err error) {
+func (c *mockClientSLB) SetLoadBalancerUDPListenerAttribute(ctx context.Context, args *slb.SetLoadBalancerUDPListenerAttributeArgs) (err error) {
 	if c.setLoadBalancerUDPListenerAttribute != nil {
 		return c.setLoadBalancerUDPListenerAttribute(args)
 	}
 
-	lb, err := c.DescribeLoadBalancerUDPListenerAttribute(args.LoadBalancerId, args.ListenerPort)
+	lb, err := c.DescribeLoadBalancerUDPListenerAttribute(ctx, args.LoadBalancerId, args.ListenerPort)
 	if err != nil {
 		return err
 	}
@@ -865,7 +866,7 @@ func (c *mockClientSLB) SetLoadBalancerUDPListenerAttribute(args *slb.SetLoadBal
 	return nil
 }
 
-func (c *mockClientSLB) RemoveTags(args *slb.RemoveTagsArgs) error {
+func (c *mockClientSLB) RemoveTags(ctx context.Context, args *slb.RemoveTagsArgs) error {
 	if c.removeTags != nil {
 		return c.removeTags(args)
 	}
@@ -901,7 +902,7 @@ func (c *mockClientSLB) RemoveTags(args *slb.RemoveTagsArgs) error {
 	return nil
 }
 
-func (c *mockClientSLB) DescribeTags(args *slb.DescribeTagsArgs) (tags []slb.TagItemType, pagination *common.PaginationResult, err error) {
+func (c *mockClientSLB) DescribeTags(ctx context.Context, args *slb.DescribeTagsArgs) (tags []slb.TagItemType, pagination *common.PaginationResult, err error) {
 	if c.describeTags != nil {
 		return c.describeTags(args)
 	}
@@ -916,7 +917,7 @@ func (c *mockClientSLB) DescribeTags(args *slb.DescribeTagsArgs) (tags []slb.Tag
 
 	return ins, nil, nil
 }
-func (c *mockClientSLB) AddTags(args *slb.AddTagsArgs) error {
+func (c *mockClientSLB) AddTags(ctx context.Context, args *slb.AddTagsArgs) error {
 	if c.addTags != nil {
 		return c.addTags(args)
 	}
@@ -960,7 +961,7 @@ func vgroupKey(id, vgroupid string) string {
 	return fmt.Sprintf("%s/%s", id, vgroupid)
 }
 
-func (c *mockClientSLB) CreateVServerGroup(args *slb.CreateVServerGroupArgs) (response *slb.CreateVServerGroupResponse, err error) {
+func (c *mockClientSLB) CreateVServerGroup(ctx context.Context, args *slb.CreateVServerGroupArgs) (response *slb.CreateVServerGroupResponse, err error) {
 	if c.createVServerGroup != nil {
 		return c.createVServerGroup(args)
 	}
@@ -972,7 +973,7 @@ func (c *mockClientSLB) CreateVServerGroup(args *slb.CreateVServerGroupArgs) (re
 	return &vgroup, nil
 }
 
-func (c *mockClientSLB) DescribeVServerGroups(args *slb.DescribeVServerGroupsArgs) (response *slb.DescribeVServerGroupsResponse, err error) {
+func (c *mockClientSLB) DescribeVServerGroups(ctx context.Context, args *slb.DescribeVServerGroupsArgs) (response *slb.DescribeVServerGroupsResponse, err error) {
 
 	if c.describeVServerGroups != nil {
 		return c.describeVServerGroups(args)
@@ -998,7 +999,7 @@ func (c *mockClientSLB) DescribeVServerGroups(args *slb.DescribeVServerGroupsArg
 	}, nil
 }
 
-func (c *mockClientSLB) DeleteVServerGroup(args *slb.DeleteVServerGroupArgs) (response *slb.DeleteVServerGroupResponse, err error) {
+func (c *mockClientSLB) DeleteVServerGroup(ctx context.Context, args *slb.DeleteVServerGroupArgs) (response *slb.DeleteVServerGroupResponse, err error) {
 	if c.deleteVServerGroup != nil {
 		return c.deleteVServerGroup(args)
 	}
@@ -1017,14 +1018,14 @@ func (c *mockClientSLB) DeleteVServerGroup(args *slb.DeleteVServerGroupArgs) (re
 	return nil, nil
 }
 
-func (c *mockClientSLB) SetVServerGroupAttribute(args *slb.SetVServerGroupAttributeArgs) (response *slb.SetVServerGroupAttributeResponse, err error) {
+func (c *mockClientSLB) SetVServerGroupAttribute(ctx context.Context, args *slb.SetVServerGroupAttributeArgs) (response *slb.SetVServerGroupAttributeResponse, err error) {
 	if c.setVServerGroupAttribute != nil {
 		return c.setVServerGroupAttribute(args)
 	}
 	return nil, nil
 }
 
-func (c *mockClientSLB) DescribeVServerGroupAttribute(args *slb.DescribeVServerGroupAttributeArgs) (response *slb.DescribeVServerGroupAttributeResponse, err error) {
+func (c *mockClientSLB) DescribeVServerGroupAttribute(ctx context.Context, args *slb.DescribeVServerGroupAttributeArgs) (response *slb.DescribeVServerGroupAttributeResponse, err error) {
 	if c.describeVServerGroupAttribute != nil {
 		return c.describeVServerGroupAttribute(args)
 	}
@@ -1053,13 +1054,13 @@ func (c *mockClientSLB) DescribeVServerGroupAttribute(args *slb.DescribeVServerG
 	}, nil
 }
 
-func (c *mockClientSLB) ModifyVServerGroupBackendServers(args *slb.ModifyVServerGroupBackendServersArgs) (response *slb.ModifyVServerGroupBackendServersResponse, err error) {
+func (c *mockClientSLB) ModifyVServerGroupBackendServers(ctx context.Context, args *slb.ModifyVServerGroupBackendServersArgs) (response *slb.ModifyVServerGroupBackendServersResponse, err error) {
 	if c.modifyVServerGroupBackendServers != nil {
 		return c.modifyVServerGroupBackendServers(args)
 	}
 	return nil, nil
 }
-func (c *mockClientSLB) AddVServerGroupBackendServers(args *slb.AddVServerGroupBackendServersArgs) (response *slb.AddVServerGroupBackendServersResponse, err error) {
+func (c *mockClientSLB) AddVServerGroupBackendServers(ctx context.Context, args *slb.AddVServerGroupBackendServersArgs) (response *slb.AddVServerGroupBackendServersResponse, err error) {
 	if c.addVServerGroupBackendServers != nil {
 		return c.addVServerGroupBackendServers(args)
 	}
@@ -1106,7 +1107,7 @@ func (c *mockClientSLB) AddVServerGroupBackendServers(args *slb.AddVServerGroupB
 	}, nil
 }
 
-func (c *mockClientSLB) RemoveVServerGroupBackendServers(args *slb.RemoveVServerGroupBackendServersArgs) (response *slb.RemoveVServerGroupBackendServersResponse, err error) {
+func (c *mockClientSLB) RemoveVServerGroupBackendServers(ctx context.Context, args *slb.RemoveVServerGroupBackendServersArgs) (response *slb.RemoveVServerGroupBackendServersResponse, err error) {
 	if c.removeVServerGroupBackendServers != nil {
 		return c.removeVServerGroupBackendServers(args)
 	}

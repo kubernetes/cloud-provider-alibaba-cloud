@@ -18,17 +18,13 @@ package alicloud
 
 import (
 	"encoding/json"
+	"github.com/denverdino/aliyungo/metadata"
+	"k8s.io/klog"
 	"path/filepath"
 	"time"
 
 	"fmt"
-	"github.com/denverdino/aliyungo/common"
-	"github.com/denverdino/aliyungo/ecs"
-	"github.com/denverdino/aliyungo/metadata"
-	"github.com/denverdino/aliyungo/pvtz"
-	"github.com/denverdino/aliyungo/slb"
 	"github.com/go-cmd/cmd"
-	"github.com/golang/glog"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"strings"
 )
@@ -66,7 +62,7 @@ func NewClientMgr(key, secret string) (*ClientMgr, error) {
 	if err != nil {
 		return nil, fmt.Errorf("can not determin vpcid: %s", err.Error())
 	}
-	ecsclient := ecs.NewECSClientWithSecurityToken4RegionalDomain(key, secret, "", common.Region(region))
+	ecsclient := NewContextedClientINS(key, secret, region)
 	mgr := &ClientMgr{
 		stop: make(<-chan struct{}, 1),
 		meta: m,
@@ -76,19 +72,19 @@ func NewClientMgr(key, secret string) (*ClientMgr, error) {
 		loadbalancer: &LoadBalancerClient{
 			vpcid: vpcid,
 			ins:   ecsclient,
-			c:     slb.NewSLBClientWithSecurityToken4RegionalDomain(key, secret, "", common.Region(region)),
+			c:     NewContextedClientSLB(key, secret, region),
 		},
 		privateZone: &PrivateZoneClient{
-			c: pvtz.NewPVTZClientWithSecurityToken4RegionalDomain(key, secret, "", common.Region("cn-hangzhou")),
+			c: NewContextedClientPVTZ(key, secret, "cn-hangzhou"),
 		},
 		routes: &RoutesClient{
-			client: ecs.NewVPCClientWithSecurityToken4RegionalDomain(key, secret, "", common.Region(region)),
+			client: NewContextedClientRoute(key, secret, region),
 			region: region,
 		},
 	}
 
 	if key == "" || secret == "" {
-		glog.Infof("alicloud: use ramrole token mode without ak.")
+		klog.Infof("alicloud: use ramrole token mode without ak.")
 		mgr.token = &RamRoleToken{meta: m}
 	} else {
 		inittoken := &Token{
@@ -97,10 +93,10 @@ func NewClientMgr(key, secret string) (*ClientMgr, error) {
 			UID:          cfg.Global.UID,
 		}
 		if inittoken.UID == "" {
-			glog.Infof("alicloud: ak mode to authenticate user. without token and role assume")
+			klog.Infof("alicloud: ak mode to authenticate user. without token and role assume")
 			mgr.token = &AkAuthToken{ak: inittoken}
 		} else {
-			glog.Infof("alicloud: service account auth mode")
+			klog.Infof("alicloud: service account auth mode")
 			mgr.token = &ServiceToken{svcak: inittoken}
 		}
 	}
@@ -113,12 +109,12 @@ func (mgr *ClientMgr) Start(settoken func(mgr *ClientMgr, token *Token) error) e
 		// refresh client token periodically
 		token, err := mgr.token.NextToken()
 		if err != nil {
-			glog.Errorf("token retrieve: %s", err.Error())
+			klog.Errorf("token retrieve: %s", err.Error())
 			return
 		}
 		err = settoken(mgr, token)
 		if err != nil {
-			glog.Errorf("set token: %s", err.Error())
+			klog.Errorf("set token: %s", err.Error())
 			return
 		}
 		initialized = true
@@ -137,34 +133,34 @@ func (mgr *ClientMgr) Start(settoken func(mgr *ClientMgr, token *Token) error) e
 			Factor:   2,
 		}, func() (done bool, err error) {
 			tokenfunc()
-			glog.Infof("wait for token ready")
+			klog.Infof("wait for token ready")
 			return initialized, nil
 		},
 	)
 }
 
 func RefreshToken(mgr *ClientMgr, token *Token) error {
-	ecsclient := mgr.instance.c.(*ecs.Client)
-	slbclient := mgr.loadbalancer.c.(*slb.Client)
-	pvtzclient := mgr.privateZone.c.(*pvtz.Client)
-	vpcclient := mgr.routes.client.(*ecs.Client)
-	ecsclient.WithSecurityToken(token.Token).
+	ecsclient := mgr.instance.c.(*ContextedClientINS)
+	slbclient := mgr.loadbalancer.c.(*ContextedClientSLB)
+	pvtzclient := mgr.privateZone.c.(*ContextedClientPVTZ)
+	vpcclient := mgr.routes.client.(*ContextedClientRoute)
+	ecsclient.ecs.WithSecurityToken(token.Token).
 		WithAccessKeyId(token.AccessKey).
 		WithAccessKeySecret(token.AccessSecret)
-	slbclient.WithSecurityToken(token.Token).
+	slbclient.slb.WithSecurityToken(token.Token).
 		WithAccessKeyId(token.AccessKey).
 		WithAccessKeySecret(token.AccessSecret)
-	pvtzclient.WithSecurityToken(token.Token).
+	pvtzclient.pvtz.WithSecurityToken(token.Token).
 		WithAccessKeyId(token.AccessKey).
 		WithAccessKeySecret(token.AccessSecret)
-	vpcclient.WithSecurityToken(token.Token).
+	vpcclient.ecs.WithSecurityToken(token.Token).
 		WithAccessKeyId(token.AccessKey).
 		WithAccessKeySecret(token.AccessSecret)
 
-	ecsclient.SetUserAgent(KUBERNETES_ALICLOUD_IDENTITY)
-	slbclient.SetUserAgent(KUBERNETES_ALICLOUD_IDENTITY)
-	pvtzclient.SetUserAgent(KUBERNETES_ALICLOUD_IDENTITY)
-	vpcclient.SetUserAgent(KUBERNETES_ALICLOUD_IDENTITY)
+	ecsclient.ecs.SetUserAgent(KUBERNETES_ALICLOUD_IDENTITY)
+	slbclient.slb.SetUserAgent(KUBERNETES_ALICLOUD_IDENTITY)
+	pvtzclient.pvtz.SetUserAgent(KUBERNETES_ALICLOUD_IDENTITY)
+	vpcclient.ecs.SetUserAgent(KUBERNETES_ALICLOUD_IDENTITY)
 	return nil
 }
 
@@ -275,7 +271,7 @@ type IMetaData interface {
 func NewMetaData() IMetaData {
 	if cfg.Global.VpcID != "" &&
 		cfg.Global.VswitchID != "" {
-		glog.V(2).Infof("use mocked metadata server.")
+		klog.V(2).Infof("use mocked metadata server.")
 		return &fakeMetaData{base: metadata.NewMetaData(nil)}
 	}
 	return metadata.NewMetaData(nil)
@@ -366,10 +362,10 @@ func (m *fakeMetaData) VswitchID() (string, error) {
 	if len(zlist) == 1 {
 		vSwitchs := strings.Split(cfg.Global.VswitchID, ":")
 		if len(vSwitchs) == 2 {
-			glog.Infof("only one vswitchid mode, %s", vSwitchs[1])
+			klog.Infof("only one vswitchid mode, %s", vSwitchs[1])
 			return vSwitchs[1], nil
 		}
-		glog.Infof("simple vswitchid mode, %s", cfg.Global.VswitchID)
+		klog.Infof("simple vswitchid mode, %s", cfg.Global.VswitchID)
 		return cfg.Global.VswitchID, nil
 	}
 	mzone, err := m.Zone()
@@ -385,7 +381,7 @@ func (m *fakeMetaData) VswitchID() (string, error) {
 			return vs[1], nil
 		}
 	}
-	glog.Infof("zone[%s] match failed, fallback with simple vswitch id mode, [%s]", mzone, cfg.Global.VswitchID)
+	klog.Infof("zone[%s] match failed, fallback with simple vswitch id mode, [%s]", mzone, cfg.Global.VswitchID)
 	return cfg.Global.VswitchID, nil
 }
 
