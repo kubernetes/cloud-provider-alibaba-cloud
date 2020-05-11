@@ -254,7 +254,19 @@ func (con *Controller) HandlerForEndpointChange(
 			utils.Logf(svc, "endpoint change: loadBalancer is not needed, skip")
 			return
 		}
-		utils.Logf(svc, "enqueue endpoint")
+
+		var epMsg []string
+		for _, sub := range ep.Subsets {
+			for _, add := range sub.Addresses {
+				nodeName := ""
+				if add.NodeName != nil {
+					nodeName = *add.NodeName
+				}
+				epMsg = append(epMsg, fmt.Sprintf("ip: %s, nodeName: %s", add.IP, nodeName))
+			}
+		}
+		utils.Logf(svc, "enqueue endpoint: %v", epMsg)
+
 		Enqueue(que, key(svc))
 	}
 	informer.AddEventHandlerWithResyncPeriod(
