@@ -96,12 +96,29 @@ func NeedLoadBalancer(service *v1.Service) bool {
 }
 
 func NodeSpecChanged(a, b *v1.Node) bool {
-	return NodeLabelsChanged(a.Labels, b.Labels) ||
-		a.Spec.Unschedulable != b.Spec.Unschedulable ||
-		NodeConditionChanged(a.Status.Conditions, b.Status.Conditions)
+	if NodeLabelsChanged(a.Labels, b.Labels) {
+		// log node label details for debug convenience
+		klog.Infof("node label changed: %s, from=%v, to=%v", a.Name, a.Labels, b.Labels)
+		return true
+	}
+	if a.Spec.Unschedulable != b.Spec.Unschedulable {
+		klog.Infof(
+			"spec.Unscheduleable changed: %s, from=%s, to=%s",
+			a.Name, a.Spec.Unschedulable, b.Spec.Unschedulable,
+		)
+		return true
+	}
+	if NodeConditionChanged(a.Name, a.Status.Conditions, b.Status.Conditions) {
+		klog.Infof(
+			"node condition changed: %s, from=%s, to=%s",
+			a.Name, len(a.Status.Conditions), len(b.Status.Conditions),
+		)
+		return true
+	}
+	return false
 }
 
-func NodeConditionChanged(a, b []v1.NodeCondition) bool {
+func NodeConditionChanged(name string, a, b []v1.NodeCondition) bool {
 	if len(a) != len(b) {
 		return true
 	}
@@ -117,6 +134,10 @@ func NodeConditionChanged(a, b []v1.NodeCondition) bool {
 	for i := range a {
 		if a[i].Type != b[i].Type ||
 			a[i].Status != b[i].Status {
+			klog.Infof(
+				"ndoe condition changed: %s, type(%s,%s) | status(%s,%s)",
+				name, a[i].Type, b[i].Type, a[i].Status, b[i].Status,
+			)
 			return true
 		}
 	}
