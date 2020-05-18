@@ -21,6 +21,8 @@ import (
 	b64 "encoding/base64"
 	"encoding/json"
 	"fmt"
+	cloudprovider "k8s.io/cloud-provider"
+	"k8s.io/cloud-provider-alibaba-cloud/cloud-controller-manager/controller/node"
 	"strings"
 	"testing"
 
@@ -55,6 +57,14 @@ var (
 	nodeName                  = "iZuf694l8lw6xvdx6gh7tkZ"
 )
 
+func TestImplements(t *testing.T) {
+	var cloud cloudprovider.Interface
+	cloud = &Cloud{}
+	_ ,ok := cloud.(node.CloudInstance)
+	if !ok {
+		t.Fatalf("not implemented")
+	}
+}
 func TestInterface2Slice(t *testing.T) {
 	am := []string{"a", "b"}
 

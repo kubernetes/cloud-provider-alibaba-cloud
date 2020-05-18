@@ -26,7 +26,7 @@ require (
 )
 
 replace (
-	github.com/denverdino/aliyungo v0.0.0 => github.com/denverdino/aliyungo v0.0.0-20200327235253-d59c209c7e93
+	github.com/denverdino/aliyungo v0.0.0 => github.com/denverdino/aliyungo v0.0.0-20200518031524-d1b1bec9ae5a
 	k8s.io/api v0.0.0 => k8s.io/kubernetes/staging/src/k8s.io/api v0.0.0-20200325144952-9e991415386e
 	k8s.io/apiextensions-apiserver v0.0.0 => k8s.io/kubernetes/staging/src/k8s.io/apiextensions-apiserver v0.0.0-20200325144952-9e991415386e
 	k8s.io/apimachinery v0.0.0 => k8s.io/kubernetes/staging/src/k8s.io/apimachinery v0.0.0-20200325144952-9e991415386e
