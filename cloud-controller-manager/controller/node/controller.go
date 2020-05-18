@@ -90,10 +90,10 @@ type CloudNodeAttribute struct {
 // CloudInstance is an interface to interact with cloud api
 type CloudInstance interface {
 	// SetInstanceTags set instance tags for instance id
-	SetInstanceTags(insid string, tags map[string]string) error
+	SetInstanceTags(ctx context.Context, insid string, tags map[string]string) error
 
 	// ListInstances list instance by given ids.
-	ListInstances(ids []string) (map[string]*CloudNodeAttribute, error)
+	ListInstances(ctx context.Context, ids []string) (map[string]*CloudNodeAttribute, error)
 }
 
 // NewCloudNodeController creates a CloudNodeController object
@@ -260,7 +260,7 @@ func (cnc *CloudNodeController) syncNodeAddress(nodes []v1.Node) error {
 	if !ok {
 		return fmt.Errorf("cloud instance not implemented")
 	}
-	instances, err := ins.ListInstances(nodeids(nodes))
+	instances, err := ins.ListInstances(context.Background(), nodeids(nodes))
 	if err != nil {
 		return fmt.Errorf("syncNodeAddress, retrieve instances from api error: %s", err.Error())
 	}
@@ -297,7 +297,7 @@ func (cnc *CloudNodeController) syncCloudNodes(nodes []v1.Node) error {
 	if !ok {
 		return fmt.Errorf("cloud instance not implemented")
 	}
-	instances, err := ins.ListInstances(nodeids(nodes))
+	instances, err := ins.ListInstances(context.Background(), nodeids(nodes))
 	if err != nil {
 		return fmt.Errorf("syncCloudNodes, retrieve instances from api error: %s", err.Error())
 	}
@@ -330,7 +330,7 @@ func (cnc *CloudNodeController) syncCloudNodes(nodes []v1.Node) error {
 
 // This processes nodes that were added into the cluster, and cloud initialize them if appropriate
 func (cnc *CloudNodeController) doAddCloudNode(node *v1.Node) error {
-
+	ctx := context.Background()
 	ins, ok := cnc.cloud.(CloudInstance)
 	if !ok {
 		utilruntime.HandleError(fmt.Errorf("failed to get ins from cloud provider"))
@@ -350,7 +350,7 @@ func (cnc *CloudNodeController) doAddCloudNode(node *v1.Node) error {
 			orignode := curNode.DeepCopy()
 			setDefaultProviderID(cnc, curNode)
 
-			nodes, err := ins.ListInstances([]string{curNode.Spec.ProviderID})
+			nodes, err := ins.ListInstances(ctx, []string{curNode.Spec.ProviderID})
 			if err != nil {
 				klog.Errorf("cloud instance api fail, %s", err.Error())
 				//retry
@@ -405,6 +405,7 @@ func (cnc *CloudNodeController) doAddCloudNode(node *v1.Node) error {
 			removeCloudTaints(curNode)
 
 			err = ins.SetInstanceTags(
+				ctx,
 				cloudins.InstanceID,
 				map[string]string{
 					"k8s.aliyun.com": "true",
