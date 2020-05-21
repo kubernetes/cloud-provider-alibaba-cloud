@@ -19,6 +19,7 @@ import (
 	queue "k8s.io/client-go/util/workqueue"
 	"k8s.io/cloud-provider"
 	"k8s.io/cloud-provider-alibaba-cloud/cloud-controller-manager/utils"
+	"k8s.io/cloud-provider-alibaba-cloud/cloud-controller-manager/utils/metric"
 	metrics "k8s.io/component-base/metrics/prometheus/ratelimiter"
 	"k8s.io/klog"
 	controller "k8s.io/kube-aggregator/pkg/controllers"
@@ -443,6 +444,7 @@ func (con *Controller) ServiceSyncTask(k string) error {
 	cached := con.local.Get(k)
 
 	defer func() {
+		metric.SLBLatency.WithLabelValues("reconcile").Observe(metric.MsSince(startTime))
 		klog.Infof("[%s] finished syncing service (%v)", k, time.Now().Sub(startTime))
 	}()
 
@@ -539,7 +541,7 @@ func (con *Controller) update(cached, svc *v1.Service) error {
 		newm = &v1.LoadBalancerStatus{}
 	} else {
 		utils.Logf(svc, "start to ensure loadbalancer")
-
+		start := time.Now()
 		nodes, err := AvailableNodes(svc, con.ifactory)
 		if err != nil {
 			return fmt.Errorf("error get available nodes %s", err.Error())
@@ -558,6 +560,7 @@ func (con *Controller) update(cached, svc *v1.Service) error {
 		ctx = context.WithValue(ctx, utils.ContextService, svc)
 		newm, err = con.cloud.EnsureLoadBalancer(ctx, con.clusterName, svc, nodes)
 
+		metric.SLBLatency.WithLabelValues("create").Observe(metric.MsSince(start))
 		if err != nil {
 			return fmt.Errorf("ensure loadbalancer error: %s", err)
 		}
@@ -644,6 +647,7 @@ func (con *Controller) delete(svc *v1.Service) error {
 		"for service: %s",
 		key(svc),
 	)
+	start := time.Now()
 	err := con.cloud.EnsureLoadBalancerDeleted(ctx, con.clusterName, svc)
 	if err != nil {
 		con.recorder.Eventf(
@@ -655,6 +659,7 @@ func (con *Controller) delete(svc *v1.Service) error {
 		)
 		return fmt.Errorf(TRY_AGAIN)
 	}
+	metric.SLBLatency.WithLabelValues("delete").Observe(metric.MsSince(start))
 	con.recorder.Eventf(
 		svc,
 		v1.EventTypeNormal,
