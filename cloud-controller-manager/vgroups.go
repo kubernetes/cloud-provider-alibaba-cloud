@@ -522,7 +522,7 @@ func (v *EndpointWithENI) buildFunc(
 			VpcID:            g.VpcID,
 			RegionId:         g.RegionId,
 			PrivateIpAddress: ips,
-			PageSize:         50,
+			PageSize:         100,
 		}
 		resp, err := g.InsClient.DescribeNetworkInterfaces(ctx, targs)
 		if err != nil {
