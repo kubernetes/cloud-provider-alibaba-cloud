@@ -91,6 +91,7 @@ type AnnotationRequest struct {
 
 // TAGKEY Default tag key.
 const TAGKEY = "kubernetes.do.not.delete"
+const ACKKEY = "ack.aliyun.com"
 
 // ClientSLBSDK client sdk for slb
 type ClientSLBSDK interface {
@@ -379,9 +380,8 @@ func (s *LoadBalancerClient) EnsureLoadBalancer(ctx context.Context, service *v1
 		if err != nil {
 			return origined, err
 		}
-		if isLoadBalancerCreatedByKubernetes(tags) &&
-			isUserDefinedLoadBalancer(service) {
-			return origined, fmt.Errorf("alicloud: can not reuse loadbalancer created by kubernetes. %s", origined.LoadBalancerId)
+		if ok, reason := isLoadBalancerNonReusable(tags, service); ok {
+			return origined, fmt.Errorf("alicloud: the loadbalancer %s can not be reused, %s", origined.LoadBalancerId, reason)
 		}
 		needUpdate, charge, bandwidth := false, origined.InternetChargeType, origined.Bandwidth
 		klog.V(5).Infof("alicloud: found "+
@@ -477,13 +477,16 @@ func (s *LoadBalancerClient) EnsureLoadBalancer(ctx context.Context, service *v1
 	return origined, s.UpdateLoadBalancer(ctx, service, nodes, false)
 }
 
-func isLoadBalancerCreatedByKubernetes(tags []slb.TagItemType) bool {
+func isLoadBalancerNonReusable(tags []slb.TagItemType, service *v1.Service) (bool, string) {
 	for _, tag := range tags {
-		if tag.TagKey == TAGKEY {
-			return true
+		if tag.TagKey == TAGKEY && isUserDefinedLoadBalancer(service) {
+			return true, "can not reuse loadbalancer created by kubernetes."
+		}
+		if tag.TagKey == ACKKEY {
+			return true, "can not reuse loadbalancer managed by ack."
 		}
 	}
-	return false
+	return false, ""
 }
 
 //UpdateLoadBalancer make sure slb backend is reconciled
