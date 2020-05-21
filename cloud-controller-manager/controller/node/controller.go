@@ -19,6 +19,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"k8s.io/cloud-provider-alibaba-cloud/cloud-controller-manager/utils/metric"
 	"k8s.io/klog"
 	"time"
 
@@ -140,10 +141,12 @@ func HandlerForNode(
 			AddFunc: func(obj interface{}) {
 				node := obj.(*v1.Node)
 				klog.V(4).Infof("receive node add event: %s", node.Name)
+				start := time.Now()
 				err := cnc.AddCloudNode(node)
 				if err != nil {
 					klog.Errorf("remove cloud node taints fail: %s", err.Error())
 				}
+				metric.NodeLatency.WithLabelValues("remove_taint").Observe(metric.MsSince(start))
 			},
 		},
 	)

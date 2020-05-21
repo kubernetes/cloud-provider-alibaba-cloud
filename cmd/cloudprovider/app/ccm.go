@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/cloud-provider-alibaba-cloud/cloud-controller-manager/utils/metric"
 	componentbaseconfig "k8s.io/component-base/config"
 	"k8s.io/klog"
 	ccfg "k8s.io/kubernetes/cmd/cloud-controller-manager/app/apis/config"
@@ -200,6 +201,7 @@ func (ccm *ServerCCM) Start() error {
 			}
 		}
 		configz.InstallHandler(mux)
+		metric.RegisterPrometheus()
 		mux.Handle("/metrics", promhttp.Handler())
 		server := &http.Server{
 			Addr:    net.JoinHostPort(ccm.Generic.Address, strconv.Itoa(int(ccm.Generic.Port))),

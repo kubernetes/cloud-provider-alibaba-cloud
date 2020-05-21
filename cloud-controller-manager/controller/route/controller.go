@@ -22,6 +22,7 @@ import (
 	"k8s.io/client-go/util/workqueue"
 	queue "k8s.io/client-go/util/workqueue"
 	"k8s.io/cloud-provider-alibaba-cloud/cloud-controller-manager/utils"
+	"k8s.io/cloud-provider-alibaba-cloud/cloud-controller-manager/utils/metric"
 	"k8s.io/klog"
 	"net"
 	"reflect"
@@ -208,11 +209,12 @@ func (rc *RouteController) Run(stopCh <-chan struct{}, syncPeriod time.Duration)
 						return
 					}
 					klog.Infof("[%s] worker: queued sync for node deletion with route", key)
-
+					start := time.Now()
 					if err := rc.syncd(node); err != nil {
 						que.AddAfter(key, 2*time.Minute)
 						klog.Errorf("requeue: sync error for service %s %v", key, err)
 					}
+					metric.RouteLatency.WithLabelValues("delete").Observe(metric.MsSince(start))
 				}()
 			}
 		},
@@ -248,6 +250,7 @@ func (rc *RouteController) syncd(node *v1.Node) error {
 
 func (rc *RouteController) reconcile() error {
 	ctx := context.Background()
+	start := time.Now()
 	nodes, err := rc.nodeLister.List(labels.Everything())
 	if err != nil {
 		return fmt.Errorf("error listing nodes: %v", err)
@@ -266,6 +269,7 @@ func (rc *RouteController) reconcile() error {
 			return fmt.Errorf("reconcile route for table [%s] error: %s", table, err.Error())
 		}
 	}
+	metric.RouteLatency.WithLabelValues("reconcile").Observe(metric.MsSince(start))
 	return nil
 }
 
@@ -357,6 +361,7 @@ func (rc *RouteController) tryCreateRoute(
 	routeKey := fmt.Sprintf("%s-%s", providerID, destinationCIDR)
 	r := cache[routeKey]
 	if r == nil || r.DestinationCIDR != node.Spec.PodCIDR {
+		start := time.Now()
 		// If not, create the route.
 		route := &cloudprovider.Route{
 			TargetNode:      types.NodeName(providerID),
@@ -398,6 +403,7 @@ func (rc *RouteController) tryCreateRoute(
 			}
 			klog.Error(msg)
 		}
+		metric.RouteLatency.WithLabelValues("create").Observe(metric.MsSince(start))
 		klog.Infof("Created route for %s with %s -> %s", table, node.Name, node.Spec.PodCIDR)
 		return rc.updateNetworkingCondition(types.NodeName(node.Name), err == nil)
 	}
