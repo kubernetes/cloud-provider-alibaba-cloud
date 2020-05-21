@@ -679,9 +679,8 @@ func (v *EndpointWithENI) nodeWeightWithMerge(backends []slb.VBackendServerType)
 
 	var mergedBackends []slb.VBackendServerType
 	for _, v := range mergedNode {
-		v.Weight = int(float64(v.Weight) / float64(len(backends)) * DEFAULT_SERVER_WEIGHT)
-		if v.Weight < 1 {
-			v.Weight = 1
+		if v.Weight > 100 {
+			v.Weight = 100
 		}
 		mergedBackends = append(mergedBackends, v)
 	}
