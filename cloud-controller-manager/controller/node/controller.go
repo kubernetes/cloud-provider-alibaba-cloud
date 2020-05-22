@@ -437,12 +437,35 @@ func (cnc *CloudNodeController) doAddCloudNode(node *v1.Node) error {
 			return true, nil
 		},
 	)
+
+	ref := &v1.ObjectReference{
+		Kind:      "Node",
+		Name:      node.Name,
+		UID:       types.UID(node.UID),
+		Namespace: "",
+	}
+
 	if err != nil {
-		klog.Errorf("doAddCloudNode error: %s", err.Error())
+		klog.Errorf("doAddCloudNode %s error: %s", node.Name, err.Error())
+		cnc.recorder.Eventf(
+			ref,
+			v1.EventTypeWarning,
+			"Failed",
+			"Fail to add node, error: %s",
+			err.Error(),
+		)
 		utilruntime.HandleError(err)
 		return err
 	}
+
 	klog.Infof("Successfully initialized node %s with cloud provider", node.Name)
+
+	cnc.recorder.Eventf(
+		ref,
+		v1.EventTypeNormal,
+		"SuccessfulInitialize",
+		"Initialize node with cloud provider successfully",
+	)
 	return nil
 }
 
@@ -528,17 +551,6 @@ func deleteNode(cnc *CloudNodeController, node *v1.Node) {
 	}
 	klog.V(2).Infof("recording %s event message for node %s", "DeletingNode", node.Name)
 
-	msg := fmt.Sprintf("Deleting Node %v because it's not present according to cloud provider", node.Name)
-
-	cnc.recorder.Eventf(
-		ref,
-		v1.EventTypeNormal,
-		msg,
-		"Node %s event: %s",
-		node.Name,
-		"DeletingNode",
-	)
-
 	go func(nodeName string) {
 		defer utilruntime.HandleCrash()
 		if err := cnc.kclient.CoreV1().
@@ -546,6 +558,20 @@ func deleteNode(cnc *CloudNodeController, node *v1.Node) {
 			context.Background(), nodeName, metav1.DeleteOptions{},
 		); err != nil {
 			klog.Errorf("unable to delete node %q: %v", nodeName, err)
+			cnc.recorder.Eventf(
+				ref,
+				v1.EventTypeWarning,
+				"Failed",
+				"Fail to delete node, error: %s",
+				err.Error(),
+			)
+		} else {
+			cnc.recorder.Eventf(
+				ref,
+				v1.EventTypeNormal,
+				"SuccessfulDelete",
+				"Delete node successfully",
+			)
 		}
 	}(node.Name)
 }

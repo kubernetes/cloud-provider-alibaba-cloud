@@ -390,18 +390,30 @@ func (rc *RouteController) tryCreateRoute(
 			}
 			return true, nil
 		})
+
+		ref := &v1.ObjectReference{
+			Kind:      "Node",
+			Name:      node.Name,
+			UID:       node.UID,
+			Namespace: "",
+		}
 		if err != nil {
-			msg := fmt.Sprintf("could not create route %s for node %s: %v -> %v", route.DestinationCIDR, node.Name, err, lasterr)
-			if rc.recorder != nil {
-				rc.recorder.Eventf(
-					&v1.ObjectReference{
-						Kind:      "Node",
-						Name:      node.Name,
-						UID:       node.UID,
-						Namespace: "",
-					}, v1.EventTypeWarning, "FailedToCreateRoute", msg)
-			}
-			klog.Error(msg)
+			rc.recorder.Eventf(
+				ref,
+				v1.EventTypeWarning,
+				"Failed",
+				"Fail to create route, error: %s",
+				err.Error())
+			klog.Errorf("could not create route %s for node %s: %v -> %v", route.DestinationCIDR, node.Name, err, lasterr)
+		} else {
+			rc.recorder.Eventf(
+				ref,
+				v1.EventTypeNormal,
+				"SuccessfulCreate",
+				"Created route for %s with %s -> %s successfully",
+				table, node.Name, node.Spec.PodCIDR,
+			)
+			klog.Infof("Created route for %s with %s -> %s", table, node.Name, node.Spec.PodCIDR)
 		}
 		metric.RouteLatency.WithLabelValues("create").Observe(metric.MsSince(start))
 		klog.Infof("Created route for %s with %s -> %s", table, node.Name, node.Spec.PodCIDR)
@@ -431,8 +443,6 @@ func (rc *RouteController) isRouteConflicted(nodes []*v1.Node, route *cloudprovi
 		contains, err := RealContainsCidr(node.Spec.PodCIDR, route.DestinationCIDR)
 		if err != nil {
 			// record event an error out.
-			msg := fmt.Sprintf("isRouteConflicted: node.Spec.PodCIDR=%s -> "+
-				"route.CIDR=%s, %s", node.Spec.PodCIDR, route.DestinationCIDR, err.Error())
 			if rc.recorder != nil {
 				rc.recorder.Eventf(
 					&v1.ObjectReference{
@@ -440,9 +450,15 @@ func (rc *RouteController) isRouteConflicted(nodes []*v1.Node, route *cloudprovi
 						Name:      node.Name,
 						UID:       node.UID,
 						Namespace: "",
-					}, v1.EventTypeWarning, "FailedToCreateRoute", msg)
+					},
+					v1.EventTypeWarning,
+					"Failed",
+					"Fail to reconcile route, route conflict error:  %s",
+					err.Error(),
+				)
 			}
-			klog.Error(msg)
+			klog.Errorf("route conflicted: node.Spec.PodCIDR=%s -> "+
+				"route.CIDR=%s, %s", node.Spec.PodCIDR, route.DestinationCIDR, err.Error())
 			return false
 		}
 		if contains {
