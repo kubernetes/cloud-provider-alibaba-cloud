@@ -78,7 +78,6 @@ func NewClientMgr(key, secret string) (*ClientMgr, error) {
 			c: NewContextedClientPVTZ(key, secret, "cn-hangzhou"),
 		},
 		routes: &RoutesClient{
-			cen:    NewContextedClientCEN(key, secret, region),
 			client: NewContextedClientRoute(key, secret, region),
 			region: region,
 		},
@@ -145,7 +144,6 @@ func RefreshToken(mgr *ClientMgr, token *Token) error {
 	slbclient := mgr.loadbalancer.c.(*ContextedClientSLB)
 	pvtzclient := mgr.privateZone.c.(*ContextedClientPVTZ)
 	vpcclient := mgr.routes.client.(*ContextedClientRoute)
-	cen := mgr.routes.cen.(*ContextedClientCEN)
 	ecsclient.ecs.WithSecurityToken(token.Token).
 		WithAccessKeyId(token.AccessKey).
 		WithAccessKeySecret(token.AccessSecret)
@@ -158,15 +156,11 @@ func RefreshToken(mgr *ClientMgr, token *Token) error {
 	vpcclient.ecs.WithSecurityToken(token.Token).
 		WithAccessKeyId(token.AccessKey).
 		WithAccessKeySecret(token.AccessSecret)
-	cen.cen.WithSecurityToken(token.Token).
-		WithAccessKeyId(token.AccessKey).
-		WithAccessKeySecret(token.AccessSecret)
 
 	ecsclient.ecs.SetUserAgent(KUBERNETES_ALICLOUD_IDENTITY)
 	slbclient.slb.SetUserAgent(KUBERNETES_ALICLOUD_IDENTITY)
 	pvtzclient.pvtz.SetUserAgent(KUBERNETES_ALICLOUD_IDENTITY)
 	vpcclient.ecs.SetUserAgent(KUBERNETES_ALICLOUD_IDENTITY)
-	cen.cen.SetUserAgent(KUBERNETES_ALICLOUD_IDENTITY)
 	return nil
 }
 
