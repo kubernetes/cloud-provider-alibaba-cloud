@@ -60,7 +60,7 @@ var (
 func TestImplements(t *testing.T) {
 	var cloud cloudprovider.Interface
 	cloud = &Cloud{}
-	_ ,ok := cloud.(node.CloudInstance)
+	_, ok := cloud.(node.CloudInstance)
 	if !ok {
 		t.Fatalf("not implemented")
 	}

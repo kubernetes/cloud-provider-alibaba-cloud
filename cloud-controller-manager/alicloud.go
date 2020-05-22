@@ -22,6 +22,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/denverdino/aliyungo/cen"
 	"github.com/denverdino/aliyungo/common"
 	"github.com/denverdino/aliyungo/slb"
 	"io"
@@ -94,6 +95,7 @@ type CloudConfig struct {
 		VswitchID            string `json:"vswitchid"`
 		ClusterID            string `json:"clusterID"`
 		RouteTableIDS        string `json:"routeTableIDs"`
+		CenID                string `json:"cenid"`
 
 		DisablePublicSLB bool `json:"disablePublicSLB"`
 
@@ -174,6 +176,7 @@ func newAliCloud(mgr *ClientMgr, rtableids string) (*Cloud, error) {
 	if err != nil {
 		return nil, fmt.Errorf("set vpc info error: %s", err.Error())
 	}
+	mgr.Routes().WithCEN(cfg.Global.CenID)
 	return &Cloud{
 		climgr: mgr,
 		region: common.Region(region),
@@ -201,10 +204,11 @@ func (c *Cloud) Initialize(builder cloudprovider.ControllerClientBuilder, stop <
 			clusterid = c.cfg.Global.KubernetesClusterTag
 		}
 
-		ctrl, err := route.New(c,
-			builder.ClientOrDie(route.ROUTE_CONTROLLER),
+		ctrl, err := route.New(
+			c, builder.ClientOrDie(route.ROUTE_CONTROLLER),
 			shared.Core().V1().Nodes(),
-			clusterid, cidrc)
+			clusterid, cidrc, c.cfg.Global.CenID,
+		)
 		if err != nil {
 			panic(fmt.Sprintf("unable to initialize route controller, %s", err.Error()))
 		}
@@ -602,6 +606,76 @@ func (c *Cloud) DeleteRoute(ctx context.Context, clusterName string, tableid str
 		TargetNode:      types.NodeName(instid),
 	}
 	return c.climgr.Routes().DeleteRoute(ctx, tableid, cRoute, region)
+}
+
+func (c *Cloud) PublishRoute(
+	ctx context.Context,
+	clusterName string,
+	tableid string,
+	route *cloudprovider.Route,
+) error {
+	return c.climgr.Routes().cen.PublishRouteEntries(
+		ctx,
+		&cen.PublishRouteEntriesArgs{
+			CenId:                     c.cfg.Global.CenID,
+			ChildInstanceId:           c.vpcID,
+			ChildInstanceRegionId:     string(c.region),
+			ChildInstanceType:         "VPC",
+			ChildInstanceRouteTableId: tableid,
+			DestinationCidrBlock:      route.DestinationCIDR,
+		},
+	)
+}
+
+func (c *Cloud) ListPublishedRoutes(
+	ctx context.Context,
+	clusterName string,
+	tableid string,
+) ([]*cloudprovider.Route, error) {
+
+	args := &cen.DescribePublishedRouteEntriesArgs{
+		CenId:                     c.cfg.Global.CenID,
+		ChildInstanceId:           c.vpcID,
+		ChildInstanceType:         "VPC",
+		ChildInstanceRegionId:     string(c.region),
+		ChildInstanceRouteTableId: tableid,
+	}
+	var routes []*cloudprovider.Route
+	for i := 1; ; i++ {
+		page := common.Pagination{
+			PageNumber: i,
+			PageSize:   50,
+		}
+		res, err := c.climgr.Routes().cen.
+			DescribePublishedRouteEntries(ctx, args)
+		if err != nil {
+			return nil, fmt.Errorf("list published route error: %s", err.Error())
+		}
+		if res == nil {
+			klog.Warningf("published routes not found: %s", tableid)
+			return routes, nil
+		}
+		for _, ens := range res.PublishedRouteEntries.PublishedRouteEntry {
+			if ens.RouteType != "Custom" ||
+				ens.PublishStatus != "Published" ||
+				ens.NextHopType != "Instance" {
+				continue
+			}
+			routes = append(
+				routes,
+				&cloudprovider.Route{
+					TargetNode:      types.NodeName(ens.NextHopId),
+					DestinationCIDR: ens.DestinationCidrBlock,
+				},
+			)
+		}
+		if res.TotalCount < page.PageSize {
+			break
+		}
+		klog.Infof("continue to list paged published routes: %s", tableid)
+	}
+
+	return routes, nil
 }
 
 // GetZone returns the Zone containing the current failure zone and locality region that the program is running in
