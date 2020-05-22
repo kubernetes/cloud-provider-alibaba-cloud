@@ -147,22 +147,6 @@ type LoadBalancerClient struct {
 func (s *LoadBalancerClient) FindLoadBalancer(ctx context.Context, service *v1.Service) (bool, *slb.LoadBalancerType, error) {
 	def, _ := ExtractAnnotationRequest(service)
 
-	//loadbalancer := service.Status.LoadBalancer
-	//klog.V(4).Infof("alicloud: find loadbalancer [%v] with user defined annotations [%v]\n",loadbalancer,def)
-	//if len(loadbalancer.Ingress) > 0 {
-	//	if lbid := fromLoadBalancerStatus(service); lbid != "" {
-	//		if def.Loadbalancerid != "" && def.Loadbalancerid != lbid {
-	//			klog.Errorf("alicloud: changing loadbalancer id was not allowed after loadbalancer"+
-	//				" was already created ! please remove service annotation: [%s]\n", ServiceAnnotationLoadBalancerId)
-	//			return false, nil, fmt.Errorf("alicloud: change loadbalancer id after service " +
-	//				"has been created is not supported. remove service annotation[%s] and retry!", ServiceAnnotationLoadBalancerId)
-	//		}
-	//		// found loadbalancer id in service ingress status.
-	//		// this id was set previously when loadbalancer was created.
-	//		return s.FindLoadBalancerByID(lbid)
-	//	}
-	//}
-
 	// User assigned lobadbalancer id go first.
 	if def.Loadbalancerid != "" {
 		return s.FindLoadBalancerByID(ctx, def.Loadbalancerid)
@@ -173,25 +157,10 @@ func (s *LoadBalancerClient) FindLoadBalancer(ctx context.Context, service *v1.S
 
 func (s *LoadBalancerClient) FindLoadBalancerByID(ctx context.Context, lbid string) (bool, *slb.LoadBalancerType, error) {
 
-	lbs, err := s.c.DescribeLoadBalancers(
-		ctx,
-		&slb.DescribeLoadBalancersArgs{
-			RegionId:       DEFAULT_REGION,
-			LoadBalancerId: lbid,
-		},
-	)
-	klog.Infof("find loadbalancer with id [%s], %d found.", lbid, len(lbs))
-	if err != nil {
-		return false, nil, err
-	}
-
-	if lbs == nil || len(lbs) == 0 {
+	lb, err := s.c.DescribeLoadBalancerAttribute(ctx, lbid)
+	if err != nil && strings.Contains(err.Error(), "InvalidLoadBalancerId.NotFound") {
 		return false, nil, nil
 	}
-	if len(lbs) > 1 {
-		klog.Warningf("multiple loadbalancer returned with id [%s], using the first one with IP=%s", lbid, lbs[0].Address)
-	}
-	lb, err := s.c.DescribeLoadBalancerAttribute(ctx, lbs[0].LoadBalancerId)
 	return err == nil, lb, err
 }
 

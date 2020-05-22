@@ -329,7 +329,7 @@ func (c *mockClientSLB) DescribeLoadBalancerAttribute(ctx context.Context, loadB
 
 	v, ok := LOADBALANCER.loadbalancer.Load(loadBalancerId)
 	if !ok {
-		return nil, fmt.Errorf("loadbalancer not found by id %s", loadBalancerId)
+		return nil, fmt.Errorf("InvalidLoadBalancerId.NotFound, loadbalancer not found by id %s", loadBalancerId)
 	}
 	ins, ok := v.(slb.LoadBalancerType)
 	if !ok {
