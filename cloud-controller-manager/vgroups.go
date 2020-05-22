@@ -11,7 +11,6 @@ import (
 	"k8s.io/cloud-provider-alibaba-cloud/cloud-controller-manager/utils"
 	"k8s.io/klog"
 	"reflect"
-	"strings"
 )
 
 type vgroup struct {
@@ -99,14 +98,8 @@ func (v *vgroup) Remove(ctx context.Context) error {
 }
 func (v *vgroup) Update(ctx context.Context) error {
 	if v.VGroupId == "" {
-		err := v.Describe(ctx)
-		if err != nil {
-			if !strings.Contains(err.Error(), "not found") {
-				return fmt.Errorf("update: vserver group error, %s", err.Error())
-			}
-			if err := v.Add(ctx); err != nil {
-				return err
-			}
+		if err := v.Add(ctx); err != nil {
+			return err
 		}
 	}
 
@@ -371,15 +364,7 @@ func CleanUPVGroupMerged(
 func CleanUPVGroupDirect(ctx context.Context, local *vgroups) error {
 	for _, vg := range *local {
 		if vg.VGroupId == "" {
-			err := vg.Describe(ctx)
-			if err != nil {
-				if strings.Contains(err.Error(), "not found") {
-					// skip none exist vgroup
-					vg.Logf("skip none exist vgroup. %s", vg.LoadBalancerId)
-					continue
-				}
-				return err
-			}
+			continue
 		}
 		err := vg.Remove(ctx)
 		if err != nil {

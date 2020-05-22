@@ -156,7 +156,7 @@ type LoadBalancerClient struct {
 func (s *LoadBalancerClient) FindLoadBalancer(ctx context.Context, service *v1.Service) (bool, *slb.LoadBalancerType, error) {
 	def, _ := ExtractAnnotationRequest(service)
 
-	// User assigned lobadbalancer id go first.
+	// User assigned loadbalancer id go first.
 	if def.Loadbalancerid != "" {
 		return s.FindLoadBalancerByID(ctx, def.Loadbalancerid)
 	}
@@ -477,10 +477,16 @@ func (s *LoadBalancerClient) EnsureLoadBalancer(ctx context.Context, service *v1
 		utils.Logf(service, "alicloud: can not get loadbalancer attribute. ")
 		return nil, err
 	}
-	vgs := BuildVirturalGroupFromService(s, service, origined)
+
+	localVgs := BuildVirturalGroupFromService(s, service, origined)
+	remoteVgs, err := BuildVirtualGroupFromRemoteAPI(ctx, origined, s)
+	if err != nil {
+		return origined, fmt.Errorf("build virtual group from remote api: error %s", err.Error())
+	}
+	updateLocalVGroupsByRemoteVGroups(localVgs, remoteVgs)
 
 	// Make sure virtual server backend group has been updated.
-	if err := EnsureVirtualGroups(ctx, vgs, nodes); err != nil {
+	if err := EnsureVirtualGroups(ctx, localVgs, nodes); err != nil {
 		return origined, fmt.Errorf("update backend servers: error %s", err.Error())
 	}
 	// Apply listener when
@@ -491,12 +497,12 @@ func (s *LoadBalancerClient) EnsureLoadBalancer(ctx context.Context, service *v1
 		utils.Logf(service, "not user defined loadbalancer[%s], start to apply listener.", origined.LoadBalancerId)
 		// If listener update is needed. Switch to vserver group immediately.
 		// No longer update default backend servers.
-		if err := EnsureListeners(ctx, s, service, origined, vgs); err != nil {
+		if err := EnsureListeners(ctx, s, service, origined, localVgs); err != nil {
 
 			return origined, fmt.Errorf("ensure listener error: %s", err.Error())
 		}
 	}
-	return origined, s.UpdateLoadBalancer(ctx, service, nodes, false)
+	return origined, s.UpdateLoadBalancer(ctx, service, nodes, false, origined)
 }
 
 func isLoadBalancerNonReusable(tags []slb.TagItemType, service *v1.Service) (bool, string) {
@@ -519,14 +525,19 @@ func isLoadBalancerHasTag(tags []slb.TagItemType) (bool) {
 }
 
 //UpdateLoadBalancer make sure slb backend is reconciled
-func (s *LoadBalancerClient) UpdateLoadBalancer(ctx context.Context, service *v1.Service, nodes *EndpointWithENI, withVgroup bool) error {
-
-	exists, lb, err := s.FindLoadBalancer(ctx, service)
-	if err != nil {
-		return err
-	}
-	if !exists {
-		return fmt.Errorf("the loadbalance you specified by name [%s] does not exist", service.Name)
+func (s *LoadBalancerClient) UpdateLoadBalancer(ctx context.Context, service *v1.Service, nodes *EndpointWithENI, withVgroup bool, lb *slb.LoadBalancerType) error {
+	if lb == nil {
+		var (
+			exists bool
+			err    error
+		)
+		exists, lb, err = s.FindLoadBalancer(ctx, service)
+		if err != nil {
+			return err
+		}
+		if !exists {
+			return fmt.Errorf("the loadbalance you specified by name [%s] does not exist", service.Name)
+		}
 	}
 	if withVgroup {
 		vgs := BuildVirturalGroupFromService(s, service, lb)
@@ -588,7 +599,14 @@ func (s *LoadBalancerClient) EnsureLoadBalanceDeleted(ctx context.Context, servi
 	// skip delete user defined loadbalancer
 	if isUserDefinedLoadBalancer(service) {
 		utils.Logf(service, "user managed loadbalancer will not be deleted by cloudprovider.")
-		return EnsureListenersDeleted(ctx, s.c, service, lb, BuildVirturalGroupFromService(s, service, lb))
+		localVgs := BuildVirturalGroupFromService(s, service, lb)
+		remoteVgs, err := BuildVirtualGroupFromRemoteAPI(ctx, lb, s)
+		if err != nil {
+			return fmt.Errorf("build virtual group from remote api: error %s", err.Error())
+		}
+		updateLocalVGroupsByRemoteVGroups(localVgs, remoteVgs)
+
+		return EnsureListenersDeleted(ctx, s.c, service, lb, localVgs)
 	}
 
 	// set delete protection off
@@ -802,4 +820,15 @@ func keepResourceVersion(service *v1.Service) error {
 	}
 	// keeper.set(serviceUIDNoneExist, currentVersion)
 	return nil
+}
+
+func updateLocalVGroupsByRemoteVGroups(localVgs *vgroups, remoteVgs vgroups) {
+	for _, vg := range *localVgs {
+		for _, remote := range remoteVgs {
+			if remote.NamedKey.Key() == vg.NamedKey.Key() {
+				vg.VGroupId = remote.VGroupId
+				break
+			}
+		}
+	}
 }

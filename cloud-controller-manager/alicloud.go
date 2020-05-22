@@ -418,7 +418,7 @@ func (c *Cloud) UpdateLoadBalancer(
 		Nodes:          ns,
 		BackendTypeENI: utils.IsENIBackendType(service),
 	}
-	return c.climgr.LoadBalancers().UpdateLoadBalancer(ctx, service, backends, true)
+	return c.climgr.LoadBalancers().UpdateLoadBalancer(ctx, service, backends, true, nil)
 }
 
 // EnsureLoadBalancerDeleted deletes the specified load balancer if it
