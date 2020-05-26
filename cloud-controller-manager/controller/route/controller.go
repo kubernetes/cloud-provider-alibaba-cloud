@@ -155,6 +155,10 @@ func (rc *RouteController) HandlerForNodeDeletion(
 					klog.Infof("not node type: %s\n", reflect.TypeOf(nodec))
 					return
 				}
+				if _, exclude := node.Labels[utils.LabelNodeRoleExcludeNode]; exclude {
+					klog.Infof("ignore node with exclude node label %s", node.Name)
+					return
+				}
 				que.Add(node)
 				klog.Infof("node deletion event: %s, %s", node.Name, node.Spec.ProviderID)
 			},
@@ -208,11 +212,11 @@ func (rc *RouteController) Run(stopCh <-chan struct{}, syncPeriod time.Duration)
 						klog.Errorf("not type of *v1.Node, %s", reflect.TypeOf(key))
 						return
 					}
-					klog.Infof("[%s] worker: queued sync for node deletion with route", key)
+					klog.Infof("worker: queued sync for [%s] node deletion with route", node.Name)
 					start := time.Now()
 					if err := rc.syncd(node); err != nil {
 						que.AddAfter(key, 2*time.Minute)
-						klog.Errorf("requeue: sync error for service %s %v", key, err)
+						klog.Errorf("requeue: sync route for node %s, error %v", node.Name, err)
 					}
 					metric.RouteLatency.WithLabelValues("delete").Observe(metric.MsSince(start))
 				}()
