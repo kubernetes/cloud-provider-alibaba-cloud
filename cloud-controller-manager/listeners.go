@@ -644,15 +644,18 @@ func (t *tcp) Update(ctx context.Context) error {
 		}
 	*/
 
-	if def.AclStatus != response.AclStatus {
+	if request.AclStatus != "" &&
+		def.AclStatus != response.AclStatus {
 		needUpdate = true
 		config.AclStatus = def.AclStatus
 	}
-	if def.AclID != response.AclId {
+	if request.AclID != "" &&
+		def.AclID != response.AclId {
 		needUpdate = true
 		config.AclId = def.AclID
 	}
-	if def.AclType != response.AclType {
+	if request.AclType != "" &&
+		def.AclType != response.AclType {
 		needUpdate = true
 		config.AclType = def.AclType
 	}
@@ -664,7 +667,8 @@ func (t *tcp) Update(ctx context.Context) error {
 	}
 
 	// todo: perform healthcheck update.
-	if def.HealthCheckType != response.HealthCheckType {
+	if request.HealthCheckType != "" &&
+		def.HealthCheckType != response.HealthCheckType {
 		needUpdate = true
 		config.HealthCheckType = def.HealthCheckType
 	}
@@ -698,7 +702,8 @@ func (t *tcp) Update(ctx context.Context) error {
 		needUpdate = true
 		config.HealthCheckInterval = def.HealthCheckInterval
 	}
-	if def.PersistenceTimeout != response.PersistenceTimeout {
+	if request.PersistenceTimeout != nil &&
+		*def.PersistenceTimeout != *response.PersistenceTimeout {
 		needUpdate = true
 		config.PersistenceTimeout = def.PersistenceTimeout
 	}
@@ -815,15 +820,18 @@ func (t *udp) Update(ctx context.Context) error {
 			klog.V(2).Infof("UDP listener checker [bandwidth] changed, request=%d. response=%d", request.Bandwidth, response.Bandwidth)
 		}
 	*/
-	if def.AclStatus != response.AclStatus {
+	if request.AclStatus != "" &&
+		def.AclStatus != response.AclStatus {
 		needUpdate = true
 		config.AclStatus = def.AclStatus
 	}
-	if def.AclID != response.AclId {
+	if request.AclID != "" &&
+		def.AclID != response.AclId {
 		needUpdate = true
 		config.AclId = def.AclID
 	}
-	if def.AclType != response.AclType {
+	if request.AclType != "" &&
+		def.AclType != response.AclType {
 		needUpdate = true
 		config.AclType = def.AclType
 	}
@@ -859,7 +867,8 @@ func (t *udp) Update(ctx context.Context) error {
 		needUpdate = true
 		config.HealthCheckInterval = def.HealthCheckInterval
 	}
-	if def.PersistenceTimeout != response.PersistenceTimeout {
+	if request.PersistenceTimeout != nil &&
+		*def.PersistenceTimeout != *response.PersistenceTimeout {
 		needUpdate = true
 		config.PersistenceTimeout = def.PersistenceTimeout
 	}
@@ -1016,15 +1025,18 @@ func (t *http) Update(ctx context.Context) error {
 			klog.V(2).Infof("HTTP listener checker [bandwidth] changed, request=%d. response=%d", request.Bandwidth, response.Bandwidth)
 		}
 	*/
-	if def.AclStatus != response.AclStatus {
+	if request.AclStatus != "" &&
+		def.AclStatus != response.AclStatus {
 		needUpdate = true
 		config.AclStatus = def.AclStatus
 	}
-	if def.AclID != response.AclId {
+	if request.AclID != "" &&
+		def.AclID != response.AclId {
 		needUpdate = true
 		config.AclId = def.AclID
 	}
-	if def.AclType != response.AclType {
+	if request.AclType != "" &&
+		def.AclType != response.AclType {
 		needUpdate = true
 		config.AclType = def.AclType
 	}
@@ -1034,7 +1046,8 @@ func (t *http) Update(ctx context.Context) error {
 		config.Scheduler = slb.SchedulerType(def.Scheduler)
 	}
 	// todo: perform healthcheck update.
-	if def.HealthCheck != response.HealthCheck {
+	if request.HealthCheck != "" &&
+		def.HealthCheck != response.HealthCheck {
 		needUpdate = true
 		config.HealthCheck = def.HealthCheck
 	}
@@ -1249,24 +1262,18 @@ func (t *https) Update(ctx context.Context) error {
 		}
 	*/
 	// todo: perform healthcheck update.
-	if def.HealthCheck != response.HealthCheck {
-		needUpdate = true
-		config.HealthCheck = def.HealthCheck
-	}
-	if request.HealthCheckURI != "" &&
-		def.HealthCheckURI != response.HealthCheckURI {
-		needUpdate = true
-		config.HealthCheckURI = def.HealthCheckURI
-	}
-	if def.AclStatus != response.AclStatus {
+	if request.AclStatus != "" &&
+		def.AclStatus != response.AclStatus {
 		needUpdate = true
 		config.AclStatus = def.AclStatus
 	}
-	if def.AclID != response.AclId {
+	if request.AclID != "" &&
+		def.AclID != response.AclId {
 		needUpdate = true
 		config.AclId = def.AclID
 	}
-	if def.AclType != response.AclType {
+	if request.AclType != "" &&
+		def.AclType != response.AclType {
 		needUpdate = true
 		config.AclType = def.AclType
 	}
@@ -1274,6 +1281,16 @@ func (t *https) Update(ctx context.Context) error {
 		def.Scheduler != string(response.Scheduler) {
 		needUpdate = true
 		config.Scheduler = slb.SchedulerType(def.Scheduler)
+	}
+	if request.HealthCheck != "" &&
+		def.HealthCheck != response.HealthCheck {
+		needUpdate = true
+		config.HealthCheck = def.HealthCheck
+	}
+	if request.HealthCheckURI != "" &&
+		def.HealthCheckURI != response.HealthCheckURI {
+		needUpdate = true
+		config.HealthCheckURI = def.HealthCheckURI
 	}
 	if request.HealthCheckConnectPort != 0 &&
 		def.HealthCheckConnectPort != response.HealthCheckConnectPort {

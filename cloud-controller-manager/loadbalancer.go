@@ -76,7 +76,7 @@ type AnnotationRequest struct {
 	StickySessionType  slb.StickySessionType
 	Cookie             string
 	CookieTimeout      int
-	PersistenceTimeout int
+	PersistenceTimeout *int
 	AddressIPVersion   slb.AddressIPVersionType
 
 	OverrideListeners string

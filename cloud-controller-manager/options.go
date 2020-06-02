@@ -454,7 +454,7 @@ func ExtractAnnotationRequest(service *v1.Service) (*AnnotationRequest, *Annotat
 				persistenceTimeout, err.Error())
 			//defaulted.PersistenceTimeout = 0
 		} else {
-			defaulted.PersistenceTimeout = timeout
+			defaulted.PersistenceTimeout = &timeout
 			request.PersistenceTimeout = defaulted.PersistenceTimeout
 		}
 	}
