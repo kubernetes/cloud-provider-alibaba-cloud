@@ -814,6 +814,10 @@ func (f *FrameWork) ListenerEqual(ctx context.Context, id string, p v1.ServicePo
 			return fmt.Errorf("TCPBackendServerPortNotEqual")
 		}
 
+		if resp.PersistenceTimeout != nil {
+			persistenceTimeout = *resp.PersistenceTimeout
+		}
+
 		healthCheckInterval = resp.HealthCheckInterval
 		healthCheckDomain = resp.HealthCheckDomain
 		healthCheckHTTPCode = string(resp.HealthCheckHttpCode)
@@ -824,7 +828,6 @@ func (f *FrameWork) ListenerEqual(ctx context.Context, id string, p v1.ServicePo
 		healthCheckHealthyThreshold = resp.HealthyThreshold
 		healthCheckUnhealthyThreshold = resp.UnhealthyThreshold
 		healthCheck = string(resp.HealthCheck)
-		persistenceTimeout = resp.PersistenceTimeout
 		aclId = resp.AclId
 		aclStatus = resp.AclStatus
 		aclType = resp.AclType
@@ -968,7 +971,7 @@ func (f *FrameWork) ListenerEqual(ctx context.Context, id string, p v1.ServicePo
 
 	if proto == "tcp" &&
 		f.hasAnnotation(ServiceAnnotationLoadBalancerPersistenceTimeout) {
-		if persistenceTimeout != defd.PersistenceTimeout {
+		if persistenceTimeout != *defd.PersistenceTimeout {
 			return fmt.Errorf("persistency timeout error: %d, %d", persistenceTimeout, defd.PersistenceTimeout)
 		}
 	}
