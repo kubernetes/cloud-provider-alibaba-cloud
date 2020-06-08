@@ -372,7 +372,7 @@ func (s *LoadBalancerClient) EnsureLoadBalancer(ctx context.Context, service *v1
 				string(origined.InternetChargeType), string(request.ChargeType), origined.LoadBalancerName)
 		}
 		if request.ChargeType == slb.PayByBandwidth &&
-			request.Bandwidth != DEFAULT_BANDWIDTH &&
+			request.Bandwidth != 0 &&
 			request.Bandwidth != origined.Bandwidth {
 
 			needUpdate = true
