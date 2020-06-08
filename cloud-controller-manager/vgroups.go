@@ -176,7 +176,7 @@ func (v *vgroup) Update(ctx context.Context) error {
 					return fmt.Errorf("error marshal backends: %s, %v", err.Error(), list)
 				}
 				v.Logf("update: try to update vserver group[%s],"+
-					" backend del[%s]", v.NamedKey.Key(), string(updateJson))
+					" backend update[%s]", v.NamedKey.Key(), string(updateJson))
 				_, err = v.Client.SetVServerGroupAttribute(
 					ctx,
 					&slb.SetVServerGroupAttributeArgs{
