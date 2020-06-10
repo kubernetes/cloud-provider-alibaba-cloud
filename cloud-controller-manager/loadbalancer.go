@@ -477,7 +477,7 @@ func (s *LoadBalancerClient) EnsureLoadBalancer(ctx context.Context, service *v1
 		utils.Logf(service, "alicloud: can not get loadbalancer attribute. ")
 		return nil, err
 	}
-	vgs := BuildVirturalGroupFromService(s, service, origined)
+	vgs := BuildVirtualGroupFromService(s, service, origined)
 
 	// Make sure virtual server backend group has been updated.
 	if err := EnsureVirtualGroups(ctx, vgs, nodes); err != nil {
@@ -531,7 +531,7 @@ func (s *LoadBalancerClient) UpdateLoadBalancer(ctx context.Context, service *v1
 		return fmt.Errorf("the loadbalance you specified by name [%s] does not exist", service.Name)
 	}
 	if withVgroup {
-		vgs := BuildVirturalGroupFromService(s, service, lb)
+		vgs := BuildVirtualGroupFromService(s, service, lb)
 		if err := EnsureVirtualGroups(ctx, vgs, nodes); err != nil {
 			return fmt.Errorf("update backend servers: error %s", err.Error())
 		}
@@ -590,7 +590,7 @@ func (s *LoadBalancerClient) EnsureLoadBalanceDeleted(ctx context.Context, servi
 	// skip delete user defined loadbalancer
 	if isUserDefinedLoadBalancer(service) {
 		utils.Logf(service, "user managed loadbalancer will not be deleted by cloudprovider.")
-		return EnsureListenersDeleted(ctx, s.c, service, lb, BuildVirturalGroupFromService(s, service, lb))
+		return EnsureListenersDeleted(ctx, s.c, service, lb, BuildVirtualGroupFromService(s, service, lb))
 	}
 
 	// set delete protection off
@@ -759,8 +759,11 @@ func isOverrideListeners(svc *v1.Service) bool {
 
 // check if the service exists in service definition
 func isLoadbalancerOwnIngress(service *v1.Service) bool {
-	if service == nil ||
-		len(service.Status.LoadBalancer.Ingress) == 0 {
+	if service == nil {
+		utils.Logf(service, "service is nil")
+		return false
+	}
+	if len(service.Status.LoadBalancer.Ingress) == 0 {
 		utils.Logf(service, "service %s doesn't have ingresses", service.Name)
 		return false
 	}

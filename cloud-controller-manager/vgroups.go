@@ -168,7 +168,7 @@ func (v *vgroup) removeUserManagedNodeFromVgBackends(ctx context.Context) (bool,
 
 	var removedBackends []slb.VBackendServerType
 	for _, backend := range remoteVg.BackendServers.BackendServer {
-		if isUserManagedNode(backend.Description, v.NamedKey.Key()) {
+		if isUserManagedNode(backend.Description) {
 			hasUserManagedNode = true
 		} else {
 			removedBackends = append(removedBackends, backend)
@@ -294,7 +294,7 @@ func (v *vgroup) diff(apis, nodes []slb.VBackendServerType) (
 
 	for _, api := range apis {
 		// skip nodes which does not belong to the cluster
-		if isUserManagedNode(api.Description, v.NamedKey.Key()) {
+		if isUserManagedNode(api.Description) {
 			continue
 		}
 		found := false
@@ -340,7 +340,7 @@ func (v *vgroup) diff(apis, nodes []slb.VBackendServerType) (
 	}
 	for _, node := range nodes {
 		for _, api := range apis {
-			if isUserManagedNode(api.Description, v.NamedKey.Key()) {
+			if isUserManagedNode(api.Description) {
 				continue
 			}
 			if node.Type == "eni" {
@@ -451,7 +451,7 @@ func CleanUPVGroupDirect(ctx context.Context, local *vgroups) error {
 	return nil
 }
 
-func BuildVirturalGroupFromService(
+func BuildVirtualGroupFromService(
 	client *LoadBalancerClient,
 	service *v1.Service,
 	slbins *slb.LoadBalancerType,
@@ -800,10 +800,10 @@ func isExcludeNode(node *v1.Node) bool {
 	return false
 }
 
-func isUserManagedNode(nodeDescription, vNameKey string) bool {
-	if nodeDescription != vNameKey {
+func isUserManagedNode(nodeDescription string) bool {
+	metas := strings.Split(nodeDescription, "/")
+	if len(metas) != 5 || metas[0] != DEFAULT_PREFIX {
 		return true
-	} else {
-		return false
 	}
+	return false
 }

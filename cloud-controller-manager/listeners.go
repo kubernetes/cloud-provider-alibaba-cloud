@@ -200,6 +200,8 @@ type Listener struct {
 	Client ClientSLBSDK
 
 	VGroups *vgroups
+
+	VServerGroupId string
 }
 
 var (
@@ -304,7 +306,7 @@ func EnsureListeners(
 	}
 
 	// Merge listeners generate an listener list to be updated/deleted/added.
-	updates, err := BuildActionsForListeners(service, local, BuildListenersFromAPI(service, lb, slbins.c, vgs))
+	updates, err := BuildActionsForListeners(ctx, service, local, BuildListenersFromAPI(service, lb, slbins.c, vgs))
 	if err != nil {
 		return fmt.Errorf("merge listener: %s", err.Error())
 	}
@@ -376,6 +378,14 @@ func EnsureListenersDeleted(
 
 	for _, loc := range local {
 		for _, rem := range remote {
+			hasUserNode, err := rem.listenerHasUserManagedNode(ctx)
+			if err != nil {
+				return fmt.Errorf("ensure listener: %s", err.Error())
+			}
+			if hasUserNode {
+				klog.Infof("%s port %d vgroup has user managed node, skip", rem.NamedKey, rem.Port)
+				continue
+			}
 			if !isManagedByMyService(service, rem) {
 				continue
 			}
@@ -409,7 +419,7 @@ func isPortMatch(local, remote *Listener) bool {
 // 2. We assume listener with an empty name to be legacy version.
 // 3. We assume listener with an arbitrary name to be user managed listener.
 // 4. LoadBalancer created by kubernetes is not allowed to be reused.
-func BuildActionsForListeners(svc *v1.Service, service, console Listeners) (Listeners, error) {
+func BuildActionsForListeners(ctx context.Context, svc *v1.Service, service, console Listeners) (Listeners, error) {
 	override := isOverrideListeners(svc)
 	var (
 		addition = Listeners{}
@@ -454,6 +464,15 @@ func BuildActionsForListeners(svc *v1.Service, service, console Listeners) (List
 		// for safety. Only conflict case is taking care.
 		if !found {
 			if isManagedByMyService(svc, remote) {
+				// port has user managed nodes, do not delete
+				hasUserNode, err := remote.listenerHasUserManagedNode(ctx)
+				if err != nil {
+					return nil, err
+				}
+				if hasUserNode {
+					utils.Logf(svc, "svc %s do not delete port %d, because backends have user managed nodes", remote.NamedKey.Key(), remote.Port)
+					continue
+				}
 				remote.Action = ACTION_DELETE
 				deletion = append(deletion, remote)
 				utils.Logf(svc, "found listener[%s] which is no longer needed "+
@@ -743,11 +762,34 @@ func (t *tcp) Update(ctx context.Context) error {
 	return t.Client.SetLoadBalancerTCPListenerAttribute(ctx, config)
 }
 
+func (t *tcp) Describe(ctx context.Context) error {
+	response, err := t.Client.DescribeLoadBalancerTCPListenerAttribute(ctx, t.LoadBalancerID, int(t.Port))
+	if err != nil {
+		return fmt.Errorf("%s DescribeLoadBalancer tcp listener %d: %s", t.Name, t.Port, err.Error())
+	}
+	if response == nil {
+		return fmt.Errorf("%s DescribeLoadBalancer tcp listener %d: response is nil", t.Name, t.Port)
+	}
+	// other fields to be filled
+	t.VServerGroupId = response.VServerGroupId
+	return nil
+}
+
 type udp struct{ *Listener }
 
 func (t *udp) Describe(ctx context.Context) error {
-	return fmt.Errorf("unimplemented")
+	response, err := t.Client.DescribeLoadBalancerUDPListenerAttribute(ctx, t.LoadBalancerID, int(t.Port))
+	if err != nil {
+		return fmt.Errorf("%s DescribeLoadBalancer udp listener %d: %s", t.Name, t.Port, err.Error())
+	}
+	if response == nil {
+		return fmt.Errorf("%s DescribeLoadBalancer udp listener %d: response is nil", t.Name, t.Port)
+	}
+	// other fields to be filled
+	t.VServerGroupId = response.VServerGroupId
+	return nil
 }
+
 func (t *udp) Add(ctx context.Context) error {
 	def, _ := ExtractAnnotationRequest(t.Service)
 	return t.Client.CreateLoadBalancerUDPListener(
@@ -905,8 +947,18 @@ func (t *udp) Update(ctx context.Context) error {
 type http struct{ *Listener }
 
 func (t *http) Describe(ctx context.Context) error {
-	return fmt.Errorf("unimplemented")
+	response, err := t.Client.DescribeLoadBalancerHTTPListenerAttribute(ctx, t.LoadBalancerID, int(t.Port))
+	if err != nil {
+		return fmt.Errorf("%s DescribeLoadBalancer http listener %d: %s", t.Name, t.Port, err.Error())
+	}
+	if response == nil {
+		return fmt.Errorf(" %s DescribeLoadBalancer http listener %d: response is nil", t.Name, t.Port)
+	}
+	// other fields to be filled
+	t.VServerGroupId = response.VServerGroupId
+	return nil
 }
+
 func (t *http) Add(ctx context.Context) error {
 	def, request := ExtractAnnotationRequest(t.Service)
 	httpc := &slb.CreateLoadBalancerHTTPListenerArgs{
@@ -1172,8 +1224,18 @@ func (t *http) Update(ctx context.Context) error {
 type https struct{ *Listener }
 
 func (t *https) Describe(ctx context.Context) error {
-	return fmt.Errorf("unimplemented")
+	response, err := t.Client.DescribeLoadBalancerHTTPSListenerAttribute(ctx, t.LoadBalancerID, int(t.Port))
+	if err != nil {
+		return fmt.Errorf("%s DescribeLoadBalancer https listener %d: %s", t.Name, t.Port, err.Error())
+	}
+	if response == nil {
+		return fmt.Errorf("%s DescribeLoadBalancer https listener %d: response is nil", t.Name, t.Port)
+	}
+	// other fields to be filled
+	t.VServerGroupId = response.VServerGroupId
+	return nil
 }
+
 func (t *https) Add(ctx context.Context) error {
 
 	def, request := ExtractAnnotationRequest(t.Service)
@@ -1382,4 +1444,33 @@ func (t *https) Update(ctx context.Context) error {
 	klog.V(5).Infof(PrettyJson(request))
 	klog.V(5).Infof(PrettyJson(response))
 	return t.Client.SetLoadBalancerHTTPSListenerAttribute(ctx, config)
+}
+
+func (n *Listener) listenerHasUserManagedNode(ctx context.Context) (bool, error) {
+	err := n.Instance().Describe(ctx)
+	if err != nil {
+		return false, err
+	}
+
+	remoteVg, err := n.Client.DescribeVServerGroupAttribute(
+		ctx,
+		&slb.DescribeVServerGroupAttributeArgs{
+			VServerGroupId: n.VServerGroupId,
+		})
+	if err != nil {
+		return false, fmt.Errorf("DescribeVServerGroupAttribute: "+
+			"failed to DescribeVServerGroupAttribute vgroup id[%s], error: %s", n.VServerGroupId, err.Error())
+	}
+
+	for _, backend := range remoteVg.BackendServers.BackendServer {
+		klog.Infof("%s,%s", backend.Description, n.NamedKey.Reference(n.NodePort))
+		if isUserManagedNode(backend.Description) {
+			klog.Infof("%s vgroup %s has user managed node, node ip is %s, node id is %s",
+				n.NamedKey, n.VServerGroupId, backend.ServerIp, backend.ServerId)
+			return true, nil
+		}
+	}
+
+	return false, nil
+
 }

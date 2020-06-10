@@ -496,7 +496,7 @@ func ExpectExistAndEqual(f *FrameWork) error {
 		}
 
 		vgBackendServer := vg.BackendServers.BackendServer
-		backends := filterOutUserManagedBackends(vgBackendServer, vg.VServerGroupName)
+		backends := filterOutUserManagedBackends(vgBackendServer)
 
 		if f.SVC.Annotations[ServiceAnnotationLoadBalancerBackendType] == "eni" {
 
@@ -1137,10 +1137,10 @@ func ExpectAddressTypeNotEqual(f *FrameWork) error {
 	return nil
 }
 
-func filterOutUserManagedBackends(vg_backends []slb.VBackendServerType, VServerGroupName string) []slb.VBackendServerType {
+func filterOutUserManagedBackends(vg_backends []slb.VBackendServerType) []slb.VBackendServerType {
 	var backends []slb.VBackendServerType
 	for _, backend := range vg_backends {
-		if !isUserManagedNode(backend.Description, VServerGroupName) {
+		if !isUserManagedNode(backend.Description) {
 			backends = append(backends, backend)
 		}
 	}
