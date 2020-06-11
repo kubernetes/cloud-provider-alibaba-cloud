@@ -1130,14 +1130,11 @@ func isUserManagedVBackendServer(VServerGroupName string, service *v1.Service) b
 		vg := &vgroup{
 			NamedKey: &NamedKey{
 				CID:         CLUSTER_ID,
-				Port:        port.NodePort,
+				Port:        vgroupPort(service, port),
 				Namespace:   service.Namespace,
 				ServiceName: service.Name,
 				Prefix:      DEFAULT_PREFIX,
 			},
-		}
-		if utils.IsENIBackendType(service) {
-			vg.NamedKey.Port = port.TargetPort.IntVal
 		}
 		if vg.NamedKey.Key() == VServerGroupName {
 			return false

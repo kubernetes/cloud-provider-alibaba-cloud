@@ -23,6 +23,12 @@ type vgroup struct {
 	Client         ClientSLBSDK
 	InsClient      ClientInstanceSDK
 	BackendServers []slb.VBackendServerType
+	Port           v1.ServicePort
+}
+
+type backendAddress struct {
+	IP   string
+	Port int32
 }
 
 func (v *vgroup) Logf(format string, args ...interface{}) {
@@ -401,20 +407,17 @@ func BuildVirturalGroupFromService(
 		vg := &vgroup{
 			NamedKey: &NamedKey{
 				CID:         CLUSTER_ID,
-				Port:        port.NodePort,
-				TargetPort:  port.TargetPort.IntVal,
 				Namespace:   service.Namespace,
 				ServiceName: service.Name,
 				Prefix:      DEFAULT_PREFIX,
+				Port:        vgroupPort(service, port),
 			},
 			LoadBalancerId: slbins.LoadBalancerId,
 			Client:         client.c,
 			RegionId:       common.Region(client.region),
 			InsClient:      client.ins,
 			VpcID:          client.vpcid,
-		}
-		if utils.IsENIBackendType(service) {
-			vg.NamedKey.Port = port.TargetPort.IntVal
+			Port:           port,
 		}
 		vgrps = append(vgrps, vg)
 	}
@@ -511,12 +514,12 @@ func (v *EndpointWithENI) buildFunc(
 	// backend build function
 	return func(o []interface{}) error {
 		var ips []string
-		for _, i := range o {
-			ip, ok := i.(string)
+		for _, backendAddr := range o {
+			_, ok := backendAddr.(backendAddress)
 			if !ok {
-				return fmt.Errorf("not string: %v", i)
+				return fmt.Errorf("not backend address: %v", backendAddr)
 			}
-			ips = append(ips, ip)
+			ips = append(ips, backendAddr.(backendAddress).IP)
 		}
 		targs := &ecs.DescribeNetworkInterfacesArgs{
 			VpcID:            g.VpcID,
@@ -528,8 +531,8 @@ func (v *EndpointWithENI) buildFunc(
 		if err != nil {
 			return fmt.Errorf("call DescribeNetworkInterfaces: %s", err.Error())
 		}
-		for _, ip := range ips {
-			eniid, err := findENIbyAddrIP(resp, ip)
+		for _, backendAddr := range o {
+			eniid, err := findENIbyAddrIP(resp, backendAddr.(backendAddress).IP)
 			if err != nil {
 				return err
 			}
@@ -539,8 +542,8 @@ func (v *EndpointWithENI) buildFunc(
 					ServerId:    eniid,
 					Weight:      DEFAULT_SERVER_WEIGHT,
 					Type:        "eni",
-					Port:        int(g.NamedKey.TargetPort),
-					ServerIp:    ip,
+					Port:        int(backendAddr.(backendAddress).Port),
+					ServerIp:    backendAddr.(backendAddress).IP,
 					Description: g.NamedKey.Key(),
 				},
 			)
@@ -569,10 +572,21 @@ func (v *EndpointWithENI) doBackendBuild(ctx context.Context, g *vgroup) ([]slb.
 		}
 		klog.Infof("[ENI] mode service: %s", g.NamedKey)
 		LogSubsetInfo(v.Endpoints,"reconcile")
-		var privateIpAddress []string
+		var privateIpAddress []backendAddress
 		for _, ep := range v.Endpoints.Subsets {
+			var backendPort int32
+			for _, p := range ep.Ports {
+				if p.Name == "" || p.Name == g.Port.Name {
+					backendPort = p.Port
+					break
+				}
+			}
+
 			for _, addr := range ep.Addresses {
-				privateIpAddress = append(privateIpAddress, addr.IP)
+				privateIpAddress = append(privateIpAddress, backendAddress{
+					IP:   addr.IP,
+					Port: backendPort,
+				})
 			}
 		}
 		err := Batch(privateIpAddress, 40, v.buildFunc(ctx, &backend, g))
@@ -616,7 +630,7 @@ func (v *EndpointWithENI) doBackendBuild(ctx context.Context, g *vgroup) ([]slb.
 					slb.VBackendServerType{
 						ServerId:    string(id),
 						Weight:      DEFAULT_SERVER_WEIGHT,
-						Port:        int(g.NamedKey.Port),
+						Port:        int(g.Port.NodePort),
 						Type:        "ecs",
 						Description: g.NamedKey.Key(),
 					},
@@ -646,7 +660,7 @@ func (v *EndpointWithENI) doBackendBuild(ctx context.Context, g *vgroup) ([]slb.
 			slb.VBackendServerType{
 				ServerId:    string(id),
 				Weight:      DEFAULT_SERVER_WEIGHT,
-				Port:        int(g.NamedKey.Port),
+				Port:        int(g.Port.NodePort),
 				Type:        "ecs",
 				Description: g.NamedKey.Key(),
 			},
@@ -694,13 +708,21 @@ func (v *EndpointWithENI) addECIBackends(
 	backend []slb.VBackendServerType,
 	g *vgroup,
 ) ([]slb.VBackendServerType, error) {
-	var privateIpAddress []string
+	var privateIpAddress []backendAddress
 	// filter ECI nodes
 	if v.Endpoints == nil {
 		klog.Warningf("%s endpoint is nil in eci mode", g.NamedKey)
 		return backend, nil
 	}
 	for _, sub := range v.Endpoints.Subsets {
+		var backendPort int32
+		for _, p := range sub.Ports {
+			if p.Name == "" || p.Name == g.Port.Name {
+				backendPort = p.Port
+				break
+			}
+		}
+
 		for _, add := range sub.Addresses {
 			if add.NodeName == nil {
 				return nil, fmt.Errorf("add eci backends for service[%s] error, NodeName is nil for ip %s ", g.NamedKey.String(), add.IP)
@@ -712,7 +734,10 @@ func (v *EndpointWithENI) addECIBackends(
 			// check if the node is ECI
 			if node.Labels["type"] == utils.ECINodeLabel {
 				klog.Infof("hybrid: %s not an ecs, use eni object as backend", add.IP)
-				privateIpAddress = append(privateIpAddress, add.IP)
+				privateIpAddress = append(privateIpAddress, backendAddress{
+					IP:   add.IP,
+					Port: backendPort,
+				})
 			}
 		}
 	}
@@ -738,4 +763,16 @@ func isExcludeNode(node *v1.Node) bool {
 		return true
 	}
 	return false
+}
+
+func vgroupPort(service *v1.Service, port v1.ServicePort) string {
+	if utils.IsENIBackendType(service) {
+		if port.TargetPort.Type == 1 {
+			return port.TargetPort.StrVal
+		} else {
+			return fmt.Sprintf("%d", port.TargetPort.IntVal)
+		}
+	}
+
+	return fmt.Sprintf("%d", port.NodePort)
 }

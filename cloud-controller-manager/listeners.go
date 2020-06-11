@@ -111,8 +111,7 @@ type NamedKey struct {
 	CID         string
 	Namespace   string
 	ServiceName string
-	Port        int32
-	TargetPort  int32
+	Port        string
 }
 
 func (n *NamedKey) String() string {
@@ -127,7 +126,7 @@ func (n *NamedKey) Key() string {
 	if n.Prefix == "" {
 		n.Prefix = DEFAULT_PREFIX
 	}
-	return fmt.Sprintf("%s/%d/%s/%s/%s", n.Prefix, n.Port, n.ServiceName, n.Namespace, n.CID)
+	return fmt.Sprintf("%s/%s/%s/%s/%s", n.Prefix, n.Port, n.ServiceName, n.Namespace, n.CID)
 }
 
 //ServiceURI service URI for the NamedKey.
@@ -139,12 +138,19 @@ func (n *NamedKey) ServiceURI() string {
 }
 
 // Reference reference
-func (n *NamedKey) Reference(backport int32) string {
+func (n *NamedKey) Reference(svc *v1.Service, port int32) string {
+	var namedKeyPort string
+	for _, p := range svc.Spec.Ports {
+		if p.Port == port {
+			namedKeyPort = vgroupPort(svc, p)
+		}
+	}
+
 	return (&NamedKey{
 		Prefix:      n.Prefix,
 		Namespace:   n.Namespace,
 		CID:         n.CID,
-		Port:        backport,
+		Port:        namedKeyPort,
 		ServiceName: n.ServiceName}).Key()
 }
 
@@ -159,15 +165,11 @@ func LoadNamedKey(key string) (*NamedKey, error) {
 	if len(metas) != 5 || metas[0] != DEFAULT_PREFIX {
 		return nil, formatError{key: key}
 	}
-	port, err := strconv.Atoi(metas[1])
-	if err != nil {
-		return nil, err
-	}
 	return &NamedKey{
 		CID:         metas[4],
 		Namespace:   metas[3],
 		ServiceName: metas[2],
-		Port:        int32(port),
+		Port:        metas[1],
 		Prefix:      DEFAULT_PREFIX}, nil
 }
 
@@ -199,7 +201,7 @@ type Listener struct {
 
 	Client ClientSLBSDK
 
-	VGroups *vgroups
+	VServerGroupId string
 }
 
 var (
@@ -268,8 +270,8 @@ func (n *Listener) Remove(ctx context.Context) error {
 	return n.Client.DeleteLoadBalancerListener(ctx, n.LoadBalancerID, int(n.Port))
 }
 
-func (n *Listener) findVgroup(key string) string {
-	for _, v := range *n.VGroups {
+func (n *Listener) findVgroup(key string, vgrps *vgroups) string {
+	for _, v := range *vgrps {
 		if v.NamedKey.Key() == key {
 			klog.Infof("found: key=%s, groupid=%s, try use vserver group mode.", key, v.VGroupId)
 			return v.VGroupId
@@ -504,7 +506,7 @@ func BuildListenersFromService(
 				CID:         CLUSTER_ID,
 				Namespace:   svc.Namespace,
 				ServiceName: svc.Name,
-				Port:        port.Port,
+				Port:        fmt.Sprintf("%d", port.Port),
 				Prefix:      DEFAULT_PREFIX},
 			Port:            port.Port,
 			NodePort:        port.NodePort,
@@ -512,12 +514,9 @@ func BuildListenersFromService(
 			Service:         svc,
 			TransforedProto: proto,
 			Client:          client,
-			VGroups:         vgrps,
 			LoadBalancerID:  lb.LoadBalancerId,
 		}
-		if utils.IsENIBackendType(svc) {
-			n.NodePort = port.TargetPort.IntVal
-		}
+		n.VServerGroupId = n.findVgroup(n.NamedKey.Reference(svc, port.Port), vgrps)
 		n.Name = n.NamedKey.Key()
 		listeners = append(listeners, &n)
 	}
@@ -551,7 +550,6 @@ func BuildListenersFromAPI(
 			LoadBalancerID:  lb.LoadBalancerId,
 			Service:         service,
 			Client:          client,
-			VGroups:         vgrps,
 		}
 		listeners = append(listeners, &n)
 	}
@@ -574,7 +572,7 @@ func (t *tcp) Add(ctx context.Context) error {
 			PersistenceTimeout: def.PersistenceTimeout,
 			Description:        t.NamedKey.Key(),
 
-			VServerGroupId:            t.findVgroup(t.NamedKey.Reference(t.NodePort)),
+			VServerGroupId:            t.VServerGroupId,
 			AclType:                   def.AclType,
 			AclStatus:                 def.AclStatus,
 			AclId:                     def.AclID,
@@ -614,7 +612,7 @@ func (t *tcp) Update(ctx context.Context) error {
 		Bandwidth:          DEFAULT_LISTENER_BANDWIDTH,
 		PersistenceTimeout: response.PersistenceTimeout,
 		VServerGroup:       slb.OnFlag,
-		VServerGroupId:     t.findVgroup(t.NamedKey.Reference(t.NodePort)),
+		VServerGroupId:     t.VServerGroupId,
 
 		AclType:                   response.AclType,
 		AclStatus:                 response.AclStatus,
@@ -639,7 +637,12 @@ func (t *tcp) Update(ctx context.Context) error {
 			klog.V(2).Infof("TCP listener checker [bandwidth] changed, request=%d. response=%d", def.Bandwidth, response.Bandwidth)
 		}
 	*/
-
+	if response.VServerGroupId != "" &&
+		t.VServerGroupId != response.VServerGroupId {
+		needUpdate = true
+		config.VServerGroup = slb.OnFlag
+		config.VServerGroupId = t.VServerGroupId
+	}
 	if request.AclStatus != "" &&
 		def.AclStatus != response.AclStatus {
 		needUpdate = true
@@ -752,7 +755,7 @@ func (t *udp) Add(ctx context.Context) error {
 			ListenerPort:      int(t.Port),
 			BackendServerPort: int(t.NodePort),
 			Description:       t.NamedKey.Key(),
-			VServerGroupId:    t.findVgroup(t.NamedKey.Reference(t.NodePort)),
+			VServerGroupId:    t.VServerGroupId,
 			//Health Check
 			Scheduler:          slb.SchedulerType(def.Scheduler),
 			Bandwidth:          DEFAULT_LISTENER_BANDWIDTH,
@@ -791,7 +794,7 @@ func (t *udp) Update(ctx context.Context) error {
 		BackendServerPort: int(t.NodePort),
 		Description:       t.NamedKey.Key(),
 		VServerGroup:      slb.OnFlag,
-		VServerGroupId:    t.findVgroup(t.NamedKey.Reference(t.NodePort)),
+		VServerGroupId:    t.VServerGroupId,
 		AclType:           response.AclType,
 		AclStatus:         response.AclStatus,
 		AclId:             response.AclId,
@@ -817,6 +820,12 @@ func (t *udp) Update(ctx context.Context) error {
 			klog.V(2).Infof("UDP listener checker [bandwidth] changed, request=%d. response=%d", request.Bandwidth, response.Bandwidth)
 		}
 	*/
+	if response.VServerGroupId != "" &&
+		t.VServerGroupId != response.VServerGroupId {
+		needUpdate = true
+		config.VServerGroup = slb.OnFlag
+		config.VServerGroupId = t.VServerGroupId
+	}
 	if request.AclStatus != "" &&
 		def.AclStatus != response.AclStatus {
 		needUpdate = true
@@ -909,7 +918,7 @@ func (t *http) Add(ctx context.Context) error {
 		ListenerPort:      int(t.Port),
 		BackendServerPort: int(t.NodePort),
 		Description:       t.NamedKey.Key(),
-		VServerGroupId:    t.findVgroup(t.NamedKey.Reference(t.NodePort)),
+		VServerGroupId:    t.VServerGroupId,
 		//Health Check
 		Scheduler:         slb.SchedulerType(def.Scheduler),
 		Bandwidth:         DEFAULT_LISTENER_BANDWIDTH,
@@ -998,7 +1007,7 @@ func (t *http) Update(ctx context.Context) error {
 		Cookie:            response.Cookie,
 		Description:       t.NamedKey.Key(),
 		VServerGroup:      slb.OnFlag,
-		VServerGroupId:    t.findVgroup(t.NamedKey.Reference(t.NodePort)),
+		VServerGroupId:    t.VServerGroupId,
 
 		AclType:                response.AclType,
 		AclStatus:              response.AclStatus,
@@ -1023,6 +1032,12 @@ func (t *http) Update(ctx context.Context) error {
 			klog.V(2).Infof("HTTP listener checker [bandwidth] changed, request=%d. response=%d", request.Bandwidth, response.Bandwidth)
 		}
 	*/
+	if response.VServerGroupId != "" &&
+		t.VServerGroupId != response.VServerGroupId {
+		needUpdate = true
+		config.VServerGroup = slb.OnFlag
+		config.VServerGroupId = t.VServerGroupId
+	}
 	if request.AclStatus != "" &&
 		def.AclStatus != response.AclStatus {
 		needUpdate = true
@@ -1180,7 +1195,7 @@ func (t *https) Add(ctx context.Context) error {
 				ListenerPort:      int(t.Port),
 				BackendServerPort: int(t.NodePort),
 				Description:       t.NamedKey.Key(),
-				VServerGroupId:    t.findVgroup(t.NamedKey.Reference(t.NodePort)),
+				VServerGroupId:    t.VServerGroupId,
 				AclType:           def.AclType,
 				AclStatus:         def.AclStatus,
 				AclId:             def.AclID,
@@ -1226,7 +1241,7 @@ func (t *https) Update(ctx context.Context) error {
 			BackendServerPort: response.BackendServerPort,
 			Description:       t.NamedKey.Key(),
 			VServerGroup:      slb.OnFlag,
-			VServerGroupId:    t.findVgroup(t.NamedKey.Reference(t.NodePort)),
+			VServerGroupId:    t.VServerGroupId,
 			//Health Check
 			Scheduler:         slb.SchedulerType(response.Scheduler),
 			HealthCheck:       response.HealthCheck,
@@ -1260,7 +1275,12 @@ func (t *https) Update(ctx context.Context) error {
 			klog.Infof("HTTPS listener checker [bandwidth] changed, request=%d. response=%d", request.Bandwidth, response.Bandwidth)
 		}
 	*/
-	// todo: perform healthcheck update.
+	if response.VServerGroupId != "" &&
+		t.VServerGroupId != response.VServerGroupId {
+		needUpdate = true
+		config.VServerGroup = slb.OnFlag
+		config.VServerGroupId = t.VServerGroupId
+	}
 	if request.AclStatus != "" &&
 		def.AclStatus != response.AclStatus {
 		needUpdate = true
