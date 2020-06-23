@@ -183,6 +183,15 @@ const (
 
 	// ServiceAnnotationLoadBalancerModificationProtection modification type
 	ServiceAnnotationLoadBalancerModificationProtection = ServiceAnnotationLoadBalancerPrefix + "modification-protection"
+
+	// ServiceAnnotationLoadBalancerBackendType external ip type
+	ServiceAnnotationLoadBalancerExternalIPType = ServiceAnnotationLoadBalancerPrefix + "external-ip-type"
+)
+
+type ExternalIPType string
+
+const (
+	EIPExternalIPType = ExternalIPType("eip")
 )
 
 //compatible to old camel annotation
@@ -571,6 +580,12 @@ func ExtractAnnotationRequest(service *v1.Service) (*AnnotationRequest, *Annotat
 		defaulted.ModificationProtectionStatus = request.ModificationProtectionStatus
 	} else {
 		defaulted.ModificationProtectionStatus = slb.ConsoleProtection
+	}
+
+	externalIpType, ok := annotation[ServiceAnnotationLoadBalancerExternalIPType]
+	if ok {
+		request.ExternalIPType = externalIpType
+		defaulted.ExternalIPType = request.ExternalIPType
 	}
 
 	return defaulted, request

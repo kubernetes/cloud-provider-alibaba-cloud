@@ -97,6 +97,7 @@ func WithInstance() CloudDataMock {
 type mockClientInstanceSDK struct {
 	describeInstances         func(args *ecs.DescribeInstancesArgs) (instances []ecs.InstanceAttributesType, pagination *common.PaginationResult, err error)
 	describeNetworkInterfaces func(args *ecs.DescribeNetworkInterfacesArgs) (resp *ecs.DescribeNetworkInterfacesResponse, err error)
+	describeEipAddresses      func(args *ecs.DescribeEipAddressesArgs) (eipAddresses []ecs.EipAddressSetType, pagination *common.PaginationResult, err error)
 }
 
 func (m *mockClientInstanceSDK) DescribeInstances(ctx context.Context, args *ecs.DescribeInstancesArgs) (instances []ecs.InstanceAttributesType, pagination *common.PaginationResult, err error) {
@@ -153,4 +154,11 @@ func (m *mockClientInstanceSDK) DescribeNetworkInterfaces(ctx context.Context, a
 		},
 	}
 	return resp, nil
+}
+
+func (m *mockClientInstanceSDK) DescribeEipAddresses(ctx context.Context, args *ecs.DescribeEipAddressesArgs) (eipAddresses []ecs.EipAddressSetType, pagination *common.PaginationResult, err error) {
+	if m.describeEipAddresses != nil {
+		return m.describeEipAddresses(args)
+	}
+	return nil, nil, nil
 }

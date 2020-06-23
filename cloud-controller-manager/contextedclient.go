@@ -300,6 +300,13 @@ func (c *ContextedClientINS) DescribeNetworkInterfaces(
 	return c.ecs.DescribeNetworkInterfaces(args)
 }
 
+func (c *ContextedClientINS) DescribeEipAddresses(
+	ctx context.Context,
+	args *ecs.DescribeEipAddressesArgs,
+) (eipAddresses []ecs.EipAddressSetType, pagination *common.PaginationResult, err error) {
+	return c.ecs.DescribeEipAddresses(args)
+}
+
 // =====================================================================================================================
 func NewContextedClientPVTZ(key, secret, region string) *ContextedClientPVTZ {
 	return &ContextedClientPVTZ{

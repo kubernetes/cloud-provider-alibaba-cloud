@@ -568,23 +568,34 @@ func (con *Controller) update(cached, svc *v1.Service) error {
 		newm, err = con.cloud.EnsureLoadBalancer(ctx, con.clusterName, svc, nodes)
 
 		metric.SLBLatency.WithLabelValues("create").Observe(metric.MsSince(start))
-		if err != nil {
-			message := getLogMessage(err)
+		if err == nil {
 			con.recorder.Eventf(
 				svc,
-				v1.EventTypeWarning,
-				"Failed",
-				"Fail to ensure loadbalancer, error %s",
-				message,
+				v1.EventTypeNormal,
+				"SuccessfulEnsure",
+				"Ensure loadbalancer successfully",
 			)
-			return fmt.Errorf("ensure loadbalancer error: %s", err)
+		} else {
+			// If error msg contains "warning", just broadcast warning events, not retry to ensure loadbalancer
+			if strings.Contains(err.Error(), "warning") {
+				con.recorder.Eventf(
+					svc,
+					v1.EventTypeWarning,
+					"Failed",
+					err.Error(),
+				)
+			} else {
+				message := getLogMessage(err)
+				con.recorder.Eventf(
+					svc,
+					v1.EventTypeWarning,
+					"Failed",
+					"Fail to ensure loadbalancer, error %s",
+					message,
+				)
+				return fmt.Errorf("ensure loadbalancer error: %s", err)
+			}
 		}
-		con.recorder.Eventf(
-			svc,
-			v1.EventTypeNormal,
-			"SuccessfulEnsure",
-			"Ensure loadbalancer successfully",
-		)
 	}
 	if err := con.updateStatus(svc, pre, newm); err != nil {
 		return fmt.Errorf("update service status: %s", err.Error())

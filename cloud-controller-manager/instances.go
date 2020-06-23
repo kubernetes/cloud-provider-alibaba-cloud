@@ -43,6 +43,7 @@ type ClientInstanceSDK interface {
 	AddTags(ctx context.Context, args *ecs.AddTagsArgs) error
 	DescribeInstances(ctx context.Context, args *ecs.DescribeInstancesArgs) (instances []ecs.InstanceAttributesType, pagination *common.PaginationResult, err error)
 	DescribeNetworkInterfaces(ctx context.Context, args *ecs.DescribeNetworkInterfacesArgs) (resp *ecs.DescribeNetworkInterfacesResponse, err error)
+	DescribeEipAddresses(ctx context.Context, args *ecs.DescribeEipAddressesArgs) (eipAddresses []ecs.EipAddressSetType, pagination *common.PaginationResult, err error)
 }
 
 func (s *InstanceClient) filterOutByLabel(nodes []*v1.Node, labels string) ([]*v1.Node, error) {
@@ -244,4 +245,9 @@ func (s *InstanceClient) AddCloudTags(ctx context.Context, id string, tags map[s
 		ResourceType: ecs.TagResourceInstance,
 	}
 	return s.c.AddTags(ctx, args)
+}
+
+func (s *InstanceClient) DescribeEipAddresses(ctx context.Context, args *ecs.DescribeEipAddressesArgs) (eipAddresses []ecs.EipAddressSetType, pagination *common.PaginationResult, err error) {
+	return s.c.DescribeEipAddresses(ctx, args)
+
 }
