@@ -110,6 +110,8 @@ github.com/denverdino/aliyungo v0.0.0-20200518031524-d1b1bec9ae5a h1:OWBhDgIvp99
 github.com/denverdino/aliyungo v0.0.0-20200518031524-d1b1bec9ae5a/go.mod h1:dV8lFg6daOBZbT6/BDGIz6Y3WFGn8juu6G+CQ6LHtl0=
 github.com/denverdino/aliyungo v0.0.0-20200602122618-61481102ecbd h1:RyAcsUg4QLTWTNT5WJAYrCWotpxdHDk/T63bgvAKlyE=
 github.com/denverdino/aliyungo v0.0.0-20200602122618-61481102ecbd/go.mod h1:dV8lFg6daOBZbT6/BDGIz6Y3WFGn8juu6G+CQ6LHtl0=
+github.com/denverdino/aliyungo v0.0.0-20200701124158-2451fe6f9270 h1:X6ciUJkGH++9uq6fHOXHAB8YpzJ8j5XutbMUAR/ZclU=
+github.com/denverdino/aliyungo v0.0.0-20200701124158-2451fe6f9270/go.mod h1:dV8lFg6daOBZbT6/BDGIz6Y3WFGn8juu6G+CQ6LHtl0=
 github.com/dgrijalva/jwt-go v3.2.0+incompatible h1:7qlOGliEKZXTDg6OTjfoBKDXWrumCAMpl/TFQ4/5kLM=
 github.com/dgrijalva/jwt-go v3.2.0+incompatible/go.mod h1:E3ru+11k8xSBh+hMPgOLZmtrrCbhqsmaPHjLKYnJCaQ=
 github.com/dnaeon/go-vcr v1.0.1/go.mod h1:aBB1+wY4s93YsC3HHjMBMrwTj2R9FHDzUr9KyGc8n1E=
