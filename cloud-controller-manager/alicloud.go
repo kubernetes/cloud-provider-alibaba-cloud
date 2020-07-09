@@ -56,9 +56,9 @@ var KUBERNETES_ALICLOUD_IDENTITY = fmt.Sprintf("Kubernetes.Alicloud/%s", Version
 type Cloud struct {
 	climgr *ClientMgr
 
-	cfg      *CloudConfig
-	region   common.Region
-	vpcID    string
+	cfg    *CloudConfig
+	region common.Region
+	vpcID  string
 	//cid      string
 	ifactory informers.SharedInformerFactory
 }
@@ -337,7 +337,7 @@ func (c *Cloud) EnsureLoadBalancer(
 			return nil, fmt.Errorf("get available endpoints when EnsureLoadBalancer: %s", err.Error())
 		}
 	}
-	LogSubsetInfo(eps,"api")
+	LogSubsetInfo(eps, "api")
 
 	backends := &EndpointWithENI{
 		LocalMode:      ServiceModeLocal(service),

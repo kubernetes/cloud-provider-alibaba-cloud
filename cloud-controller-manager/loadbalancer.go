@@ -322,6 +322,7 @@ func (s *LoadBalancerClient) EnsureLoadBalancer(ctx context.Context, service *v1
 		loadbalancerName := GetLoadBalancerName(service)
 		// Add default tags
 		tags[TAGKEY] = loadbalancerName
+		tags[ACKKEY] = CLUSTER_ID
 
 		tagItemArr := make([]slb.TagItem, 0)
 		for key, value := range tags {
@@ -460,7 +461,6 @@ func (s *LoadBalancerClient) EnsureLoadBalancer(ctx context.Context, service *v1
 			}
 		}
 
-
 		// update slb name
 		// only user defined slb or slb which has "kubernetes.do.not.delete" tag can update name
 		if (isUserDefinedLoadBalancer(service) || isLoadBalancerHasTag(tags)) &&
@@ -501,11 +501,9 @@ func (s *LoadBalancerClient) EnsureLoadBalancer(ctx context.Context, service *v1
 
 func isLoadBalancerNonReusable(tags []slb.TagItemType, service *v1.Service) (bool, string) {
 	for _, tag := range tags {
-		if tag.TagKey == TAGKEY && isUserDefinedLoadBalancer(service) {
+		if isUserDefinedLoadBalancer(service) &&
+			(tag.TagKey == TAGKEY || tag.TagKey == ACKKEY) {
 			return true, "can not reuse loadbalancer created by kubernetes."
-		}
-		if tag.TagKey == ACKKEY {
-			return true, "can not reuse loadbalancer managed by ack."
 		}
 	}
 	return false, ""
