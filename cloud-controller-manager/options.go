@@ -171,6 +171,9 @@ const (
 
 	// ServiceAnnotationLoadBalancerBackendType backend type
 	ServiceAnnotationLoadBalancerBackendType = utils.BACKEND_TYPE_LABEL
+
+	// ServiceAnnotationLoadBalancerResourceGroupId resource group id
+	ServiceAnnotationLoadBalancerResourceGroupId = ServiceAnnotationLoadBalancerPrefix + "resource-group-id"
 )
 
 //compatible to old camel annotation
@@ -531,6 +534,12 @@ func ExtractAnnotationRequest(service *v1.Service) (*AnnotationRequest, *Annotat
 	} else {
 		defaulted.RemoveUnscheduledBackend = "off"
 		request.RemoveUnscheduledBackend = defaulted.RemoveUnscheduledBackend
+	}
+
+	resourceGroupId, ok := annotation[ServiceAnnotationLoadBalancerResourceGroupId]
+	if ok{
+		request.ResourceGroupId = resourceGroupId
+		defaulted.ResourceGroupId = request.ResourceGroupId
 	}
 
 	return defaulted, request
