@@ -191,7 +191,7 @@ func (v *vgroup) Update(ctx context.Context) error {
 }
 
 // MAX_BACKEND_NUM max batch backend num
-const MAX_BACKEND_NUM = 19
+const MAX_BACKEND_NUM = 39
 
 type Func func([]interface{}) error
 
