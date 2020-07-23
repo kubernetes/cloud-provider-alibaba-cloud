@@ -64,15 +64,16 @@ func WithLoadBalancer() CloudDataMock {
 }
 
 type mockClientSLB struct {
-	describeLoadBalancers           func(args *slb.DescribeLoadBalancersArgs) (loadBalancers []slb.LoadBalancerType, err error)
-	createLoadBalancer              func(args *slb.CreateLoadBalancerArgs) (response *slb.CreateLoadBalancerResponse, err error)
-	deleteLoadBalancer              func(loadBalancerId string) (err error)
-	setLoadBalancerDeleteProtection func(args *slb.SetLoadBalancerDeleteProtectionArgs) (err error)
-	modifyLoadBalancerInternetSpec  func(args *slb.ModifyLoadBalancerInternetSpecArgs) (err error)
-	modifyLoadBalancerInstanceSpec  func(args *slb.ModifyLoadBalancerInstanceSpecArgs) (err error)
-	describeLoadBalancerAttribute   func(loadBalancerId string) (loadBalancer *slb.LoadBalancerType, err error)
-	removeBackendServers            func(loadBalancerId string, backendServers []slb.BackendServerType) (result []slb.BackendServerType, err error)
-	addBackendServers               func(loadBalancerId string, backendServers []slb.BackendServerType) (result []slb.BackendServerType, err error)
+	describeLoadBalancers                 func(args *slb.DescribeLoadBalancersArgs) (loadBalancers []slb.LoadBalancerType, err error)
+	createLoadBalancer                    func(args *slb.CreateLoadBalancerArgs) (response *slb.CreateLoadBalancerResponse, err error)
+	deleteLoadBalancer                    func(loadBalancerId string) (err error)
+	setLoadBalancerDeleteProtection       func(args *slb.SetLoadBalancerDeleteProtectionArgs) (err error)
+	modifyLoadBalancerInternetSpec        func(args *slb.ModifyLoadBalancerInternetSpecArgs) (err error)
+	modifyLoadBalancerInstanceSpec        func(args *slb.ModifyLoadBalancerInstanceSpecArgs) (err error)
+	describeLoadBalancerAttribute         func(loadBalancerId string) (loadBalancer *slb.LoadBalancerType, err error)
+	removeBackendServers                  func(loadBalancerId string, backendServers []slb.BackendServerType) (result []slb.BackendServerType, err error)
+	addBackendServers                     func(loadBalancerId string, backendServers []slb.BackendServerType) (result []slb.BackendServerType, err error)
+	setLoadBalancerModificationProtection func(args *slb.SetLoadBalancerModificationProtectionArgs) (err error)
 
 	stopLoadBalancerListener                   func(loadBalancerId string, port int) (err error)
 	startLoadBalancerListener                  func(loadBalancerId string, port int) (err error)
@@ -241,19 +242,21 @@ func (c *mockClientSLB) CreateLoadBalancer(ctx context.Context, args *slb.Create
 		ipver = args.AddressIPVersion
 	}
 	ins := slb.LoadBalancerType{
-		LoadBalancerId:     newid(),
-		LoadBalancerName:   args.LoadBalancerName,
-		RegionId:           args.RegionId,
-		LoadBalancerSpec:   args.LoadBalancerSpec,
-		Bandwidth:          args.Bandwidth,
-		InternetChargeType: args.InternetChargeType,
-		Address:            LOADBALANCER_ADDRESS,
-		AddressType:        addrtype,
-		VSwitchId:          args.VSwitchId,
-		VpcId:              VPCID,
-		AddressIPVersion:   ipver,
-		MasterZoneId:       args.MasterZoneId,
-		SlaveZoneId:        args.SlaveZoneId,
+		LoadBalancerId:               newid(),
+		LoadBalancerName:             args.LoadBalancerName,
+		RegionId:                     args.RegionId,
+		LoadBalancerSpec:             args.LoadBalancerSpec,
+		Bandwidth:                    args.Bandwidth,
+		InternetChargeType:           args.InternetChargeType,
+		Address:                      LOADBALANCER_ADDRESS,
+		AddressType:                  addrtype,
+		VSwitchId:                    args.VSwitchId,
+		VpcId:                        VPCID,
+		AddressIPVersion:             ipver,
+		MasterZoneId:                 args.MasterZoneId,
+		SlaveZoneId:                  args.SlaveZoneId,
+		ModificationProtectionStatus: args.ModificationProtectionStatus,
+		ModificationProtectionReason: TAGKEY,
 	}
 	LOADBALANCER.loadbalancer.Store(ins.LoadBalancerId, ins)
 	return &slb.CreateLoadBalancerResponse{
@@ -1176,4 +1179,11 @@ func (c *mockClientSLB) RemoveVServerGroupBackendServers(ctx context.Context, ar
 		VServerGroupId:   vgr.VServerGroupId,
 		BackendServers:   vgr.BackendServers,
 	}, nil
+}
+
+func (c *mockClientSLB) SetLoadBalancerModificationProtection(ctx context.Context, args *slb.SetLoadBalancerModificationProtectionArgs) (err error) {
+	if c.setLoadBalancerModificationProtection != nil {
+		return c.setLoadBalancerModificationProtection(args)
+	}
+	return nil
 }

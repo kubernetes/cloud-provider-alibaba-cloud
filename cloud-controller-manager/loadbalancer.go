@@ -89,12 +89,14 @@ type AnnotationRequest struct {
 	RemoveUnscheduledBackend string
 	ResourceGroupId          string
 
-	DeleteProtection slb.FlagType
+	DeleteProtection             slb.FlagType
+	ModificationProtectionStatus slb.ModificationProtectionType
 }
 
 // TAGKEY Default tag key.
 const TAGKEY = "kubernetes.do.not.delete"
 const ACKKEY = "ack.aliyun.com"
+const MDSKEY = "managed.by.ack"
 
 // ClientSLBSDK client sdk for slb
 type ClientSLBSDK interface {
@@ -107,6 +109,7 @@ type ClientSLBSDK interface {
 	DescribeLoadBalancerAttribute(ctx context.Context, loadBalancerId string) (loadBalancer *slb.LoadBalancerType, err error)
 	RemoveBackendServers(ctx context.Context, loadBalancerId string, backendServers []slb.BackendServerType) (result []slb.BackendServerType, err error)
 	AddBackendServers(ctx context.Context, loadBalancerId string, backendServers []slb.BackendServerType) (result []slb.BackendServerType, err error)
+	SetLoadBalancerModificationProtection(ctx context.Context, args *slb.SetLoadBalancerModificationProtectionArgs) (err error)
 
 	StopLoadBalancerListener(ctx context.Context, loadBalancerId string, port int) (err error)
 	StartLoadBalancerListener(ctx context.Context, loadBalancerId string, port int) (err error)
@@ -440,6 +443,21 @@ func (s *LoadBalancerClient) EnsureLoadBalancer(ctx context.Context, service *v1
 			}
 		}
 
+		// update modification protection
+		if request.ModificationProtectionStatus != "" && request.ModificationProtectionStatus != origined.ModificationProtectionStatus {
+			klog.Infof("alicloud: loadbalancer modification protection([%s] -> [%s]) changed, update loadbalancer [%s]",
+				origined.ModificationProtectionStatus, request.ModificationProtectionStatus, origined.LoadBalancerName)
+			args := slb.SetLoadBalancerModificationProtectionArgs{
+				RegionId:                     origined.RegionId,
+				LoadBalancerId:               origined.LoadBalancerId,
+				ModificationProtectionStatus: request.ModificationProtectionStatus,
+				ModificationProtectionReason: MDSKEY,
+			}
+			if err := s.c.SetLoadBalancerModificationProtection(ctx, &args); err != nil {
+				return nil, err
+			}
+		}
+
 		origined, derr = s.c.DescribeLoadBalancerAttribute(ctx, origined.LoadBalancerId)
 	}
 	if derr != nil {
@@ -573,15 +591,17 @@ func (s *LoadBalancerClient) EnsureLoadBalanceDeleted(ctx context.Context, servi
 func (s *LoadBalancerClient) getLoadBalancerOpts(service *v1.Service, vswitchid string) (args *slb.CreateLoadBalancerArgs) {
 	ar, req := ExtractAnnotationRequest(service)
 	args = &slb.CreateLoadBalancerArgs{
-		AddressType:        ar.AddressType,
-		InternetChargeType: ar.ChargeType,
-		RegionId:           DEFAULT_REGION,
-		LoadBalancerSpec:   ar.LoadBalancerSpec,
-		MasterZoneId:       ar.MasterZoneID,
-		SlaveZoneId:        ar.SlaveZoneID,
-		AddressIPVersion:   ar.AddressIPVersion,
-		DeleteProtection:   ar.DeleteProtection,
-		ResourceGroupId:    ar.ResourceGroupId,
+		AddressType:                  ar.AddressType,
+		InternetChargeType:           ar.ChargeType,
+		RegionId:                     DEFAULT_REGION,
+		LoadBalancerSpec:             ar.LoadBalancerSpec,
+		MasterZoneId:                 ar.MasterZoneID,
+		SlaveZoneId:                  ar.SlaveZoneID,
+		AddressIPVersion:             ar.AddressIPVersion,
+		DeleteProtection:             ar.DeleteProtection,
+		ResourceGroupId:              ar.ResourceGroupId,
+		ModificationProtectionStatus: ar.ModificationProtectionStatus,
+		ModificationProtectionReason: MDSKEY,
 	}
 	// paybybandwidth need a default bandwidth args, while paybytraffic doesnt.
 	if ar.ChargeType == slb.PayByBandwidth ||
