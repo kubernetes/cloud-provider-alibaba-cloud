@@ -102,7 +102,7 @@ func NodeSpecChanged(a, b *v1.Node) bool {
 	}
 	if NodeConditionChanged(a.Name, a.Status.Conditions, b.Status.Conditions) {
 		klog.Infof(
-			"node condition changed: %s, from=%s, to=%s",
+			"node condition changed: %s, from=%d, to=%d",
 			a.Name, len(a.Status.Conditions), len(b.Status.Conditions),
 		)
 		return true
