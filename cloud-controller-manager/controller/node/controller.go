@@ -289,7 +289,7 @@ func (cnc *CloudNodeController) syncNodeAddress(nodes []v1.Node) error {
 		}
 		err := tryPatchNodeAddress(cnc.kclient, node, cloudNode.Addresses)
 		if err != nil {
-			klog.Error("Wait for next retry, patch node address error: %s", err.Error())
+			klog.Errorf("Wait for next retry, patch node address error: %s", err.Error())
 		}
 	}
 	return nil
@@ -310,7 +310,7 @@ func (cnc *CloudNodeController) syncCloudNodes(nodes []v1.Node) error {
 
 		condition := nodeConditionReady(cnc.kclient, node)
 		if condition == nil {
-			klog.Infof("node condition not ready, wait for next retry", node.Spec.ProviderID)
+			klog.Infof("node %s condition not ready, wait for next retry", node.Spec.ProviderID)
 			continue
 		}
 

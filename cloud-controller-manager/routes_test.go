@@ -21,8 +21,6 @@ import (
 	"fmt"
 	"strings"
 	"testing"
-
-	"github.com/denverdino/aliyungo/ecs"
 )
 
 func NewMockRouteMgr(tables string) (*ClientMgr, error) {
@@ -33,8 +31,7 @@ func NewMockRouteMgr(tables string) (*ClientMgr, error) {
 			region: string(REGION),
 		},
 	}
-	mgr.routes.WithVPC(context.Background(), VPCID, "")
-	return mgr, nil
+	return mgr, mgr.routes.WithVPC(context.Background(), VPCID, "")
 }
 
 func TestListRoutes(t *testing.T) {
@@ -123,20 +120,20 @@ func TestSep(t *testing.T) {
 	testCamel(t, "alicloud-loadbalancer-HealthCheckTimeout", "alicloud-loadbalancer-HealthCheckTimeout")
 }
 
-func RealClient(t *testing.T) {
-	realRouteClient(keyid, keysecret)
-}
-
-func realRouteClient(keyid, keysec string) {
-	if keyid == "" || keysec == "" {
-		return
-	}
-	cs := ecs.NewClient(keyid, keysec)
-
-	vpc, _, _ := cs.DescribeRouteTables(&ecs.DescribeRouteTablesArgs{
-		RouteTableId: "vtb-2zedne8cr43rp5oqsr9xg",
-		VRouterId:    "vrt-2zegcm0ty46mq243fmxoj",
-	})
-
-	fmt.Printf(PrettyJson(vpc))
-}
+//func RealClient(t *testing.T) {
+//	realRouteClient(keyid, keysecret)
+//}
+//
+//func realRouteClient(keyid, keysec string) {
+//	if keyid == "" || keysec == "" {
+//		return
+//	}
+//	cs := ecs.NewClient(keyid, keysec)
+//
+//	vpc, _, _ := cs.DescribeRouteTables(&ecs.DescribeRouteTablesArgs{
+//		RouteTableId: "vtb-2zedne8cr43rp5oqsr9xg",
+//		VRouterId:    "vrt-2zegcm0ty46mq243fmxoj",
+//	})
+//
+//	fmt.Print(PrettyJson(vpc))
+//}

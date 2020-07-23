@@ -18,25 +18,23 @@ package alicloud
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
-	"k8s.io/klog"
-	"strings"
-	"sync"
-
-	"encoding/json"
 	"github.com/denverdino/aliyungo/common"
 	"github.com/denverdino/aliyungo/ecs"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/cloud-provider"
 	"k8s.io/cloud-provider-alibaba-cloud/cloud-controller-manager/controller/node"
+	"k8s.io/klog"
+	"strings"
 )
 
 // InstanceClient wrap for instance sdk
 type InstanceClient struct {
-	c               ClientInstanceSDK
-	lock            sync.RWMutex
+	c ClientInstanceSDK
+	//lock            sync.RWMutex
 	CurrentNodeName types.NodeName
 }
 
@@ -45,44 +43,6 @@ type ClientInstanceSDK interface {
 	AddTags(ctx context.Context, args *ecs.AddTagsArgs) error
 	DescribeInstances(ctx context.Context, args *ecs.DescribeInstancesArgs) (instances []ecs.InstanceAttributesType, pagination *common.PaginationResult, err error)
 	DescribeNetworkInterfaces(ctx context.Context, args *ecs.DescribeNetworkInterfacesArgs) (resp *ecs.DescribeNetworkInterfacesResponse, err error)
-}
-
-// filterOutByRegion Used for multi-region or multi-vpc. works for single region or vpc too.
-// SLB only support Backends within the same vpc in the same region. so we need to remove the other backends which not in
-// the same region vpc with the SLB. Keep the most backends
-func (s *InstanceClient) filterOutByRegion(ctx context.Context, nodes []*v1.Node, region common.Region) ([]*v1.Node, error) {
-	result := []*v1.Node{}
-	mvpc := make(map[string]int)
-	for _, node := range nodes {
-		v, err := s.findInstanceByProviderID(ctx, node.Spec.ProviderID)
-		if err != nil {
-			return []*v1.Node{}, err
-		}
-		if v != nil {
-			mvpc[v.VpcAttributes.VpcId] = mvpc[v.VpcAttributes.VpcId] + 1
-		}
-	}
-	max, key := 0, ""
-	for k, v := range mvpc {
-		if v > max {
-			max = v
-			key = k
-		}
-	}
-	records := []string{}
-	for _, node := range nodes {
-		v, err := s.findInstanceByProviderID(ctx, node.Spec.ProviderID)
-		if err != nil {
-			klog.Errorf("alicloud: error find instance by node, retrieve nodes [%s]\n", err.Error())
-			return []*v1.Node{}, err
-		}
-		if v != nil && v.VpcAttributes.VpcId == key {
-			result = append(result, node)
-			records = append(records, node.Name)
-		}
-	}
-	klog.V(4).Infof("alicloud: accept nodes by region id=[%v], records=%v\n", region, records)
-	return result, nil
 }
 
 func (s *InstanceClient) filterOutByLabel(nodes []*v1.Node, labels string) ([]*v1.Node, error) {

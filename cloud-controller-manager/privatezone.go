@@ -81,7 +81,7 @@ func (s *PrivateZoneClient) findPrivateZoneByName(ctx context.Context, name stri
 		return false, nil, err
 	}
 
-	if zones == nil || len(zones) == 0 {
+	if  len(zones) == 0 {
 		return false, nil, nil
 	}
 

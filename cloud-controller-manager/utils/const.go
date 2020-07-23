@@ -5,6 +5,8 @@ import (
 	"os"
 )
 
+type contextKey string
+
 const (
 	BACKEND_TYPE_LABEL                                    = "service.beta.kubernetes.io/backend-type"
 	BACKEND_TYPE_ENI                                      = "eni"
@@ -14,9 +16,9 @@ const (
 	LabelNodeRoleExcludeNode = "service.beta.kubernetes.io/exclude-node"
 	// LabelNodeRoleExcludeBalancer specifies that the node should be
 	// exclude from loadbalancers created by a cloud provider.
-	LabelNodeRoleExcludeBalancer = "alpha.service-controller.kubernetes.io/exclude-balancer"
-	ECINodeLabel                 = "virtual-kubelet"
-	ContextService               = "request.service"
+	LabelNodeRoleExcludeBalancer            = "alpha.service-controller.kubernetes.io/exclude-balancer"
+	ECINodeLabel                            = "virtual-kubelet"
+	ContextService               contextKey = "request.service"
 )
 
 func IsENIBackendType(svc *v1.Service) bool {

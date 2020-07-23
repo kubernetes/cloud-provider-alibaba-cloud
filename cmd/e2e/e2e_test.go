@@ -1,11 +1,8 @@
 package e2e
 
 import (
-	"bytes"
-	"encoding/json"
 	"k8s.io/cloud-provider-alibaba-cloud/cmd/e2e/framework"
 	_ "k8s.io/cloud-provider-alibaba-cloud/cmd/e2e/test"
-	"k8s.io/klog"
 	"testing"
 )
 
@@ -76,21 +73,4 @@ func TestE2E(t *testing.T) {
 		}
 	}
 
-}
-
-// PrettyJson  pretty json output
-func PrettyJson(obj interface{}) string {
-	pretty := bytes.Buffer{}
-	data, err := json.Marshal(obj)
-	if err != nil {
-		klog.Errorf("PrettyJson, mashal error: %s\n", err.Error())
-		return ""
-	}
-	err = json.Indent(&pretty, data, "", "    ")
-
-	if err != nil {
-		klog.Errorf("PrettyJson, indent error: %s\n", err.Error())
-		return ""
-	}
-	return pretty.String()
 }

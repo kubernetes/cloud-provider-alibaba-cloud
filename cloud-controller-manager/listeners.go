@@ -365,12 +365,7 @@ func EnsureListenersDeleted(
 		local,
 		func(i, j int) bool {
 			// 1. http comes first.
-			if strings.ToUpper(
-				local[i].TransforedProto,
-			) == "HTTP" {
-				return true
-			}
-			return false
+			return strings.ToUpper(local[i].TransforedProto, ) == "HTTP"
 		},
 	)
 
@@ -1359,7 +1354,6 @@ func (t *https) Update(ctx context.Context) error {
 	}
 	// backend server port has changed.
 	if int(t.NodePort) != response.BackendServerPort {
-		needUpdate = true
 		config.BackendServerPort = int(t.NodePort)
 		utils.Logf(t.Service, "listener checker [BackendServerPort] changed, request=%d. response=%d", t.NodePort, response.BackendServerPort)
 		err := t.Client.DeleteLoadBalancerListener(ctx, t.LoadBalancerID, int(t.Port))

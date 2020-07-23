@@ -17,6 +17,7 @@ limitations under the License.
 package options
 
 import (
+	"github.com/golang/glog"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/client/leaderelectionconfig"
 	"k8s.io/kubernetes/pkg/util/flag"
@@ -34,14 +35,12 @@ func AddFlags(ccm *app.ServerCCM, fs *pflag.FlagSet) {
 	fs.StringVar(&ccm.KubeCloudShared.CloudProvider.Name, "cloud-provider", ccm.KubeCloudShared.CloudProvider.Name, "The provider of cloud services. Cannot be empty.")
 	fs.StringVar(&ccm.KubeCloudShared.CloudProvider.CloudConfigFile, "cloud-config", ccm.KubeCloudShared.CloudProvider.CloudConfigFile, "The path to the cloud provider configuration file. Empty string for no configuration file.")
 	fs.BoolVar(&ccm.KubeCloudShared.AllowUntaggedCloud, "allow-untagged-cloud", false, "Allow the cluster to run without the cluster-id on cloud instances. This is a legacy mode of operation and a cluster-id will be required in the future.")
-	fs.MarkDeprecated("allow-untagged-cloud", "This flag is deprecated and will be removed in a future release. A cluster-id will be required on cloud instances.")
 	fs.DurationVar(&ccm.Generic.MinResyncPeriod.Duration, "min-resync-period", ccm.Generic.MinResyncPeriod.Duration, "The resync period in reflectors will be random between MinResyncPeriod and 2*MinResyncPeriod.")
 	fs.DurationVar(&ccm.KubeCloudShared.NodeMonitorPeriod.Duration, "node-monitor-period", ccm.KubeCloudShared.NodeMonitorPeriod.Duration,
 		"The period for syncing NodeStatus in NodeController.")
 	fs.DurationVar(&ccm.NodeStatusUpdateFrequency.Duration, "node-status-update-frequency", ccm.NodeStatusUpdateFrequency.Duration, "Specifies how often the controller updates nodes' status.")
 	// TODO: remove --service-account-private-key-file 6 months after 1.8 is released (~1.10)
 	//fs.StringVar(&ccm.ServiceAccountKeyFile, "service-account-private-key-file", ccm.ServiceAccountKeyFile, "Filename containing a PEM-encoded private RSA or ECDSA key used to sign service account tokens.")
-	fs.MarkDeprecated("service-account-private-key-file", "This flag is currently no-op and will be deleted.")
 	fs.BoolVar(&ccm.KubeCloudShared.UseServiceAccountCredentials, "use-service-account-credentials", ccm.KubeCloudShared.UseServiceAccountCredentials, "If true, use individual service account credentials for each controller.")
 	fs.DurationVar(&ccm.KubeCloudShared.RouteReconciliationPeriod.Duration, "route-reconciliation-period", ccm.KubeCloudShared.RouteReconciliationPeriod.Duration, "The period for reconciling routes created for nodes by cloud provider.")
 	fs.BoolVar(&ccm.KubeCloudShared.ConfigureCloudRoutes, "configure-cloud-routes", true, "Should CIDRs allocated by allocate-node-cidrs be configured on the cloud provider.")
@@ -57,6 +56,14 @@ func AddFlags(ccm *app.ServerCCM, fs *pflag.FlagSet) {
 	fs.Int32Var(&ccm.Generic.ClientConnection.Burst, "kube-api-burst", ccm.Generic.ClientConnection.Burst, "Burst to use while talking with kubernetes apiserver.")
 	fs.DurationVar(&ccm.Generic.ControllerStartInterval.Duration, "controller-start-interval", ccm.Generic.ControllerStartInterval.Duration, "Interval between starting controller managers.")
 	fs.Int32Var(&ccm.ServiceController.ConcurrentServiceSyncs, "concurrent-service-syncs", ccm.ServiceController.ConcurrentServiceSyncs, "The number of services that are allowed to sync concurrently. Larger number = more responsive service management, but more CPU (and network) load")
+	err := fs.MarkDeprecated("allow-untagged-cloud", "This flag is deprecated and will be removed in a future release. A cluster-id will be required on cloud instances.")
+	if err != nil {
+		glog.Warningf("add flags error: %s", err.Error())
+	}
+	err = fs.MarkDeprecated("service-account-private-key-file", "This flag is currently no-op and will be deleted.")
+	if err != nil {
+		glog.Warningf("add flags error: %s", err.Error())
+	}
 	leaderelectionconfig.BindFlags(&ccm.Generic.LeaderElection, fs)
 
 	utilfeature.DefaultMutableFeatureGate.AddFlag(fs)

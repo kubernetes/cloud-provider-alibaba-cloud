@@ -407,18 +407,16 @@ func (b *RequeueBackoff) reset() {
 
 	go wait.Until(
 		func() {
-			tick := time.Tick(20 * time.Second)
+			tick := time.NewTicker(20 * time.Second)
 			for {
 				// reset next retry interval when throttle ended.
-				select {
-				case <-tick:
-					if time.Now().After(
-						b.last.Add(1 * time.Minute),
-					) {
-						// throttle was last seen 1 minute ago.
-						// reset next to 4 seconds
-						b.next = 5 * time.Second
-					}
+				<-tick.C
+				if time.Now().After(
+					b.last.Add(1 * time.Minute),
+				) {
+					// throttle was last seen 1 minute ago.
+					// reset next to 4 seconds
+					b.next = 5 * time.Second
 				}
 			}
 		},
@@ -455,7 +453,7 @@ func (con *Controller) ServiceSyncTask(k string) error {
 
 	defer func() {
 		metric.SLBLatency.WithLabelValues("reconcile").Observe(metric.MsSince(startTime))
-		klog.Infof("[%s] finished syncing service (%v)", k, time.Now().Sub(startTime))
+		klog.Infof("[%s] finished syncing service (%v)", k, time.Since(startTime))
 	}()
 
 	// service holds the latest service info from apiserver

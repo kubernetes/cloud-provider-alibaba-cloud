@@ -41,8 +41,6 @@ type RoutesClient struct {
 	client RouteSDK
 }
 
-var index = 1
-
 //RouteSDK define route sdk interface
 type RouteSDK interface {
 	DescribeVpcs(ctx context.Context, args *ecs.DescribeVpcsArgs) (vpcs []ecs.VpcSetType, pagination *common.PaginationResult, err error)
@@ -194,17 +192,6 @@ func (r *RoutesClient) CreateRoute(ctx context.Context, tabid string, route *clo
 	}
 	klog.Infof("CreateRoute:[%s] start to create route, %s -> %s", tabid, route.DestinationCIDR, route.TargetNode)
 	return WaitCreate(ctx, r, tabid, args)
-}
-
-func isRouteExists(routes []*cloudprovider.Route, route *cloudprovider.Route) bool {
-	for _, r := range routes {
-		if r.DestinationCIDR == route.DestinationCIDR &&
-			strings.Contains(string(r.TargetNode), string(route.TargetNode)) {
-			klog.Infof("CreateRoute: skip exist route, %s -> %s", route.DestinationCIDR, route.TargetNode)
-			return true
-		}
-	}
-	return false
 }
 
 // DeleteRoute deletes the specified managed route

@@ -17,12 +17,9 @@ limitations under the License.
 package alicloud
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/denverdino/aliyungo/common"
 	"github.com/denverdino/aliyungo/metadata"
 	"github.com/denverdino/aliyungo/slb"
 	"k8s.io/api/core/v1"
@@ -135,7 +132,7 @@ func TestFindLoadBalancer(t *testing.T) {
 			// user need to use an exist loadbalancer through annotations
 			t.Logf("4. FindLoadBalancer: Loadbalancer id was specified, Expect:NonExist")
 			f.SVC.Annotations[ServiceAnnotationLoadBalancerId] = LOADBALANCER_ID + "-new"
-			exist, lb, err = f.LoadBalancer().FindLoadBalancer(ctx, f.SVC)
+			exist, _, err = f.LoadBalancer().FindLoadBalancer(ctx, f.SVC)
 			if err != nil {
 				t.Logf("4. error: %s", err.Error())
 				t.Fail()
@@ -150,35 +147,35 @@ func TestFindLoadBalancer(t *testing.T) {
 	)
 }
 
-func realSlbClient(keyid, keysec string) {
-
-	slbclient := slb.NewClient(keyid, keysec)
-	slbclient.SetUserAgent(KUBERNETES_ALICLOUD_IDENTITY)
-	lb, err := slbclient.DescribeLoadBalancers(&slb.DescribeLoadBalancersArgs{
-		RegionId:       common.Hangzhou,
-		LoadBalancerId: "lb-bp1ids9hmq5924m6uk5w1",
-	})
-	if err == nil {
-		a, _ := json.Marshal(lb)
-		var prettyJSON bytes.Buffer
-		json.Indent(&prettyJSON, a, "", "    ")
-		fmt.Printf(string(prettyJSON.Bytes()))
-	}
-	lbs, err := slbclient.DescribeLoadBalancerAttribute(LOADBALANCER_ID)
-	if err == nil {
-		a, _ := json.Marshal(lbs)
-		var prettyJSON bytes.Buffer
-		json.Indent(&prettyJSON, a, "", "    ")
-		fmt.Printf(string(prettyJSON.Bytes()))
-	}
-	listener, err := slbclient.DescribeLoadBalancerTCPListenerAttribute(LOADBALANCER_ID, 80)
-	if err == nil {
-		a, _ := json.Marshal(listener)
-		var prettyJSON bytes.Buffer
-		json.Indent(&prettyJSON, a, "", "    ")
-		fmt.Printf(string(prettyJSON.Bytes()))
-	}
-}
+//func realSlbClient(keyid, keysec string) {
+//
+//	slbclient := slb.NewClient(keyid, keysec)
+//	slbclient.SetUserAgent(KUBERNETES_ALICLOUD_IDENTITY)
+//	lb, err := slbclient.DescribeLoadBalancers(&slb.DescribeLoadBalancersArgs{
+//		RegionId:       common.Hangzhou,
+//		LoadBalancerId: "lb-bp1ids9hmq5924m6uk5w1",
+//	})
+//	if err == nil {
+//		a, _ := json.Marshal(lb)
+//		var prettyJSON bytes.Buffer
+//		json.Indent(&prettyJSON, a, "", "    ")
+//		fmt.Printf(string(prettyJSON.Bytes()))
+//	}
+//	lbs, err := slbclient.DescribeLoadBalancerAttribute(LOADBALANCER_ID)
+//	if err == nil {
+//		a, _ := json.Marshal(lbs)
+//		var prettyJSON bytes.Buffer
+//		json.Indent(&prettyJSON, a, "", "    ")
+//		fmt.Printf(string(prettyJSON.Bytes()))
+//	}
+//	listener, err := slbclient.DescribeLoadBalancerTCPListenerAttribute(LOADBALANCER_ID, 80)
+//	if err == nil {
+//		a, _ := json.Marshal(listener)
+//		var prettyJSON bytes.Buffer
+//		json.Indent(&prettyJSON, a, "", "    ")
+//		fmt.Printf(string(prettyJSON.Bytes()))
+//	}
+//}
 
 func TestGetLoadBalancerAdditionalTags(t *testing.T) {
 	tagTests := []struct {

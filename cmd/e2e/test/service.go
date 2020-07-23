@@ -7,6 +7,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	alicloud "k8s.io/cloud-provider-alibaba-cloud/cloud-controller-manager"
 	"k8s.io/cloud-provider-alibaba-cloud/cmd/e2e/framework"
+	"k8s.io/klog"
 	"testing"
 )
 
@@ -21,7 +22,11 @@ var _ = framework.Mark(
 				f.Client = framework.NewClientOrDie()
 			},
 		)
-		defer f.Destroy()
+		defer func() {
+			if err := f.Destroy(); err != nil {
+				klog.Errorf("destroy error: %s", err.Error())
+			}
+		}()
 		err := f.SetUp()
 		if err != nil {
 			return fmt.Errorf("setup error: %s", err.Error())
@@ -72,7 +77,11 @@ var _ = framework.Mark(
 				}
 			},
 		)
-		defer f.Destroy()
+		defer func() {
+			if err := f.Destroy(); err != nil {
+				klog.Errorf("destroy error: %s", err.Error())
+			}
+		}()
 		err := f.SetUp()
 		if err != nil {
 			return fmt.Errorf("setup error: %s", err.Error())
@@ -130,7 +139,11 @@ var _ = framework.Mark(
 				}
 			},
 		)
-		defer f.Destroy()
+		defer func() {
+			if err := f.Destroy(); err != nil {
+				klog.Errorf("destroy error: %s", err.Error())
+			}
+		}()
 		err := f.SetUp()
 		if err != nil {
 			return fmt.Errorf("setup error: %s", err.Error())
@@ -166,7 +179,11 @@ var _ = framework.Mark(
 				// set f.InitService if needed
 			},
 		)
-		defer f.Destroy()
+		defer func() {
+			if err := f.Destroy(); err != nil {
+				klog.Errorf("destroy error: %s", err.Error())
+			}
+		}()
 		err := f.SetUp()
 		if err != nil {
 			return fmt.Errorf("setup error: %s", err.Error())
@@ -226,7 +243,11 @@ var _ = framework.Mark(
 				}
 			},
 		)
-		defer f.Destroy()
+		defer func() {
+			if err := f.Destroy(); err != nil {
+				klog.Errorf("destroy error: %s", err.Error())
+			}
+		}()
 		err := f.SetUp()
 		if err != nil {
 			return fmt.Errorf("setup error: %s", err.Error())
@@ -277,7 +298,11 @@ var _ = framework.Mark(
 				}
 			},
 		)
-		defer f.Destroy()
+		defer func() {
+			if err := f.Destroy(); err != nil {
+				klog.Errorf("destroy error: %s", err.Error())
+			}
+		}()
 		err := f.SetUp()
 		if err != nil {
 			return fmt.Errorf("setup error: %s", err.Error())
@@ -313,7 +338,11 @@ var _ = framework.Mark(
 				// set f.InitService if needed
 			},
 		)
-		defer f.Destroy()
+		defer func() {
+			if err := f.Destroy(); err != nil {
+				klog.Errorf("destroy error: %s", err.Error())
+			}
+		}()
 		err := f.SetUp()
 		if err != nil {
 			return fmt.Errorf("setup error: %s", err.Error())
@@ -372,7 +401,11 @@ var _ = framework.Mark(
 				}
 			},
 		)
-		defer f.Destroy()
+		defer func() {
+			if err := f.Destroy(); err != nil {
+				klog.Errorf("destroy error: %s", err.Error())
+			}
+		}()
 		err := f.SetUp()
 		if err != nil {
 			return fmt.Errorf("setup error: %s", err.Error())
@@ -424,7 +457,11 @@ var _ = framework.Mark(
 				}
 			},
 		)
-		defer f.Destroy()
+		defer func() {
+			if err := f.Destroy(); err != nil {
+				klog.Errorf("destroy error: %s", err.Error())
+			}
+		}()
 		err := f.SetUp()
 		if err != nil {
 			return fmt.Errorf("setup error: %s", err.Error())
@@ -481,7 +518,11 @@ var _ = framework.Mark(
 				}
 			},
 		)
-		defer f.Destroy()
+		defer func() {
+			if err := f.Destroy(); err != nil {
+				klog.Errorf("destroy error: %s", err.Error())
+			}
+		}()
 		err := f.SetUp()
 		if err != nil {
 			return fmt.Errorf("setup error: %s", err.Error())
@@ -528,7 +569,11 @@ var _ = framework.Mark(
 				}
 			},
 		)
-		defer f.Destroy()
+		defer func() {
+			if err := f.Destroy(); err != nil {
+				klog.Errorf("destroy error: %s", err.Error())
+			}
+		}()
 		err := f.SetUp()
 		if err != nil {
 			return fmt.Errorf("setup error: %s", err.Error())
@@ -576,7 +621,11 @@ var _ = framework.Mark(
 				}
 			},
 		)
-		defer f.Destroy()
+		defer func() {
+			if err := f.Destroy(); err != nil {
+				klog.Errorf("destroy error: %s", err.Error())
+			}
+		}()
 		err := f.SetUp()
 		if err != nil {
 			return fmt.Errorf("setup error: %s", err.Error())
@@ -625,7 +674,11 @@ var _ = framework.Mark(
 				}
 			},
 		)
-		defer f.Destroy()
+		defer func() {
+			if err := f.Destroy(); err != nil {
+				klog.Errorf("destroy error: %s", err.Error())
+			}
+		}()
 		err := f.SetUp()
 		if err != nil {
 			return fmt.Errorf("setup error: %s", err.Error())
@@ -694,7 +747,11 @@ var _ = framework.Mark(
 				}
 			},
 		)
-		defer f.Destroy()
+		defer func() {
+			if err := f.Destroy(); err != nil {
+				klog.Errorf("destroy error: %s", err.Error())
+			}
+		}()
 		err := f.SetUp()
 		if err != nil {
 			return fmt.Errorf("setup error: %s", err.Error())
@@ -743,7 +800,11 @@ var _ = framework.Mark(
 				}
 			},
 		)
-		defer f.Destroy()
+		defer func() {
+			if err := f.Destroy(); err != nil {
+				klog.Errorf("destroy error: %s", err.Error())
+			}
+		}()
 		err := f.SetUp()
 		if err != nil {
 			return fmt.Errorf("setup error: %s", err.Error())
@@ -791,7 +852,11 @@ var _ = framework.Mark(
 				}
 			},
 		)
-		defer f.Destroy()
+		defer func() {
+			if err := f.Destroy(); err != nil {
+				klog.Errorf("destroy error: %s", err.Error())
+			}
+		}()
 		err := f.SetUp()
 		if err != nil {
 			return fmt.Errorf("setup error: %s", err.Error())
@@ -849,7 +914,11 @@ var _ = framework.Mark(
 				}
 			},
 		)
-		defer f.Destroy()
+		defer func() {
+			if err := f.Destroy(); err != nil {
+				klog.Errorf("destroy error: %s", err.Error())
+			}
+		}()
 		err := f.SetUp()
 		if err != nil {
 			return fmt.Errorf("setup error: %s", err.Error())
@@ -899,7 +968,11 @@ var _ = framework.Mark(
 				}
 			},
 		)
-		defer f.Destroy()
+		defer func() {
+			if err := f.Destroy(); err != nil {
+				klog.Errorf("destroy error: %s", err.Error())
+			}
+		}()
 		err := f.SetUp()
 		if err != nil {
 			return fmt.Errorf("setup error: %s", err.Error())
@@ -949,7 +1022,11 @@ var _ = framework.Mark(
 				}
 			},
 		)
-		defer f.Destroy()
+		defer func() {
+			if err := f.Destroy(); err != nil {
+				klog.Errorf("destroy error: %s", err.Error())
+			}
+		}()
 		err := f.SetUp()
 		if err != nil {
 			return fmt.Errorf("setup error: %s", err.Error())
@@ -994,7 +1071,11 @@ var _ = framework.Mark(
 				}
 			},
 		)
-		defer f.Destroy()
+		defer func() {
+			if err := f.Destroy(); err != nil {
+				klog.Errorf("destroy error: %s", err.Error())
+			}
+		}()
 		err := f.SetUp()
 		if err != nil {
 			return fmt.Errorf("setup error: %s", err.Error())
@@ -1045,7 +1126,11 @@ var _ = framework.Mark(
 				}
 			},
 		)
-		defer f.Destroy()
+		defer func() {
+			if err := f.Destroy(); err != nil {
+				klog.Errorf("destroy error: %s", err.Error())
+			}
+		}()
 		err := f.SetUp()
 		if err != nil {
 			return fmt.Errorf("setup error: %s", err.Error())
@@ -1093,7 +1178,11 @@ var _ = framework.Mark(
 				}
 			},
 		)
-		defer f.Destroy()
+		defer func() {
+			if err := f.Destroy(); err != nil {
+				klog.Errorf("destroy error: %s", err.Error())
+			}
+		}()
 		err := f.SetUp()
 		if err != nil {
 			return fmt.Errorf("setup error: %s", err.Error())
