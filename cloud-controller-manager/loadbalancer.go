@@ -87,6 +87,7 @@ type AnnotationRequest struct {
 	PrivateZoneRecordTTL  int
 
 	RemoveUnscheduledBackend string
+	ResourceGroupId          string
 }
 
 // TAGKEY Default tag key.
@@ -544,6 +545,7 @@ func (s *LoadBalancerClient) getLoadBalancerOpts(service *v1.Service, vswitchid 
 		MasterZoneId:       ar.MasterZoneID,
 		SlaveZoneId:        ar.SlaveZoneID,
 		AddressIPVersion:   ar.AddressIPVersion,
+		ResourceGroupId:    ar.ResourceGroupId,
 	}
 	// paybybandwidth need a default bandwidth args, while paybytraffic doesnt.
 	if ar.ChargeType == slb.PayByBandwidth ||

@@ -157,6 +157,7 @@ func (r *RoutesClient) RouteTables(ctx context.Context) ([]string, error) {
 			"multiple vpc found by id[%s], length(vpcs)=%d", r.vpc.vpcid, len(vpcs))
 	}
 	if len(vpcs[0].RouterTableIds.RouterTableIds) != 1 {
+
 		return []string{}, fmt.Errorf("alicloud: multiple "+
 			"route table or no route table found in vpc %s, [%s]", r.vpc.vpcid, vpcs[0].RouterTableIds.RouterTableIds)
 	}
