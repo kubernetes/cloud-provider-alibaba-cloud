@@ -17,8 +17,8 @@ limitations under the License.
 package options
 
 import (
-	"github.com/golang/glog"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/client/leaderelectionconfig"
 	"k8s.io/kubernetes/pkg/util/flag"
 	// add the kubernetes feature gates
@@ -58,11 +58,11 @@ func AddFlags(ccm *app.ServerCCM, fs *pflag.FlagSet) {
 	fs.Int32Var(&ccm.ServiceController.ConcurrentServiceSyncs, "concurrent-service-syncs", ccm.ServiceController.ConcurrentServiceSyncs, "The number of services that are allowed to sync concurrently. Larger number = more responsive service management, but more CPU (and network) load")
 	err := fs.MarkDeprecated("allow-untagged-cloud", "This flag is deprecated and will be removed in a future release. A cluster-id will be required on cloud instances.")
 	if err != nil {
-		glog.Warningf("add flags error: %s", err.Error())
+		klog.Warningf("add flags error: %s", err.Error())
 	}
 	err = fs.MarkDeprecated("service-account-private-key-file", "This flag is currently no-op and will be deleted.")
 	if err != nil {
-		glog.Warningf("add flags error: %s", err.Error())
+		klog.Warningf("add flags error: %s", err.Error())
 	}
 	leaderelectionconfig.BindFlags(&ccm.Generic.LeaderElection, fs)
 
