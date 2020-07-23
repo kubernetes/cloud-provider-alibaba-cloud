@@ -95,7 +95,7 @@ func NodeSpecChanged(a, b *v1.Node) bool {
 	}
 	if a.Spec.Unschedulable != b.Spec.Unschedulable {
 		klog.Infof(
-			"spec.Unscheduleable changed: %s, from=%s, to=%s",
+			"spec.Unscheduleable changed: %s, from=%t, to=%t",
 			a.Name, a.Spec.Unschedulable, b.Spec.Unschedulable,
 		)
 		return true

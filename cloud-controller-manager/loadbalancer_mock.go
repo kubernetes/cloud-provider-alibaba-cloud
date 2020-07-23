@@ -6,11 +6,9 @@ import (
 	"fmt"
 	"github.com/denverdino/aliyungo/common"
 	"github.com/denverdino/aliyungo/slb"
-	"github.com/denverdino/aliyungo/util"
 	"reflect"
 	"strings"
 	"sync"
-	"time"
 )
 
 func WithNewLoadBalancerStore() CloudDataMock {
@@ -117,28 +115,6 @@ type LBStore struct {
 // string: *slb.LoadBalancerType{}
 var LOADBALANCER = LBStore{}
 
-func newBaseLoadbalancer() []*slb.LoadBalancerType {
-	return []*slb.LoadBalancerType{
-		{
-			LoadBalancerId:     LOADBALANCER_ID,
-			LoadBalancerName:   LOADBALANCER_NAME,
-			LoadBalancerStatus: "active",
-			Address:            LOADBALANCER_ADDRESS,
-			RegionId:           REGION,
-			RegionIdAlias:      string(REGION),
-			AddressType:        "internet",
-			VSwitchId:          "",
-			VpcId:              "",
-			NetworkType:        LOADBALANCER_NETWORK_TYPE,
-			Bandwidth:          0,
-			InternetChargeType: "4",
-			CreateTime:         "2018-03-14T17:16Z",
-			CreateTimeStamp:    util.NewISO6801Time(time.Now()),
-			LoadBalancerSpec:   slb.S1Small,
-		},
-	}
-}
-
 func (c *mockClientSLB) DescribeLoadBalancers(ctx context.Context, args *slb.DescribeLoadBalancersArgs) (loadBalancers []slb.LoadBalancerType, err error) {
 	if c.describeLoadBalancers != nil {
 		return c.describeLoadBalancers(args)
@@ -194,37 +170,32 @@ func (c *mockClientSLB) StopLoadBalancerListener(ctx context.Context, loadBalanc
 	if !ok || listenerObj == nil {
 		return fmt.Errorf("not found listener: %s %d ", loadBalancerId, port)
 	}
-	switch listenerObj.(type) {
-	case *slb.DescribeLoadBalancerTCPListenerAttributeResponse:
-		if listener, ok := listenerObj.(*slb.DescribeLoadBalancerTCPListenerAttributeResponse); ok {
-			listener.DescribeLoadBalancerListenerAttributeResponse.Status = slb.Stopped
-			LOADBALANCER.listeners.Store(key, listener)
-		}
-		break
-	case *slb.DescribeLoadBalancerUDPListenerAttributeResponse:
-		if listener, ok := listenerObj.(*slb.DescribeLoadBalancerUDPListenerAttributeResponse); ok {
-			listener.DescribeLoadBalancerListenerAttributeResponse.Status = slb.Stopped
-			LOADBALANCER.listeners.Store(key, listener)
-		}
-		break
-	case *slb.DescribeLoadBalancerHTTPListenerAttributeResponse:
-		if listener, ok := listenerObj.(*slb.DescribeLoadBalancerHTTPListenerAttributeResponse); ok {
-			listener.DescribeLoadBalancerListenerAttributeResponse.Status = slb.Stopped
-			LOADBALANCER.listeners.Store(key, listener)
-		}
-		break
-	case *slb.DescribeLoadBalancerHTTPSListenerAttributeResponse:
-		if listener, ok := listenerObj.(*slb.DescribeLoadBalancerHTTPSListenerAttributeResponse); ok {
-			listener.DescribeLoadBalancerListenerAttributeResponse.Status = slb.Stopped
-			LOADBALANCER.listeners.Store(key, listener)
-		}
-		break
-	default:
-		return fmt.Errorf("StopLoadBalancerListener() listener type error")
+
+	if listener, ok := listenerObj.(*slb.DescribeLoadBalancerTCPListenerAttributeResponse); ok {
+		listener.DescribeLoadBalancerListenerAttributeResponse.Status = slb.Stopped
+		LOADBALANCER.listeners.Store(key, listener)
+		return nil
 	}
 
-	// return nil indicate no stop success
-	return nil
+	if listener, ok := listenerObj.(*slb.DescribeLoadBalancerUDPListenerAttributeResponse); ok {
+		listener.DescribeLoadBalancerListenerAttributeResponse.Status = slb.Stopped
+		LOADBALANCER.listeners.Store(key, listener)
+		return nil
+	}
+
+	if listener, ok := listenerObj.(*slb.DescribeLoadBalancerHTTPListenerAttributeResponse); ok {
+		listener.DescribeLoadBalancerListenerAttributeResponse.Status = slb.Stopped
+		LOADBALANCER.listeners.Store(key, listener)
+		return nil
+	}
+
+	if listener, ok := listenerObj.(*slb.DescribeLoadBalancerHTTPSListenerAttributeResponse); ok {
+		listener.DescribeLoadBalancerListenerAttributeResponse.Status = slb.Stopped
+		LOADBALANCER.listeners.Store(key, listener)
+		return nil
+	}
+
+	return fmt.Errorf("StopLoadBalancerListener() listener type error")
 }
 
 func (c *mockClientSLB) CreateLoadBalancer(ctx context.Context, args *slb.CreateLoadBalancerArgs) (response *slb.CreateLoadBalancerResponse, err error) {
@@ -391,24 +362,20 @@ func (c *mockClientSLB) DescribeLoadBalancerAttribute(ctx context.Context, loadB
 				port := 0
 				descrip := ""
 				proto := ""
-				switch value.(type) {
+				switch v := value.(type) {
 				case *slb.DescribeLoadBalancerTCPListenerAttributeResponse:
-					v := value.(*slb.DescribeLoadBalancerTCPListenerAttributeResponse)
 					port = v.ListenerPort
 					descrip = v.Description
 					proto = "tcp"
 				case *slb.DescribeLoadBalancerHTTPSListenerAttributeResponse:
-					v := value.(*slb.DescribeLoadBalancerHTTPSListenerAttributeResponse)
 					port = v.ListenerPort
 					descrip = v.Description
 					proto = "https"
 				case *slb.DescribeLoadBalancerUDPListenerAttributeResponse:
-					v := value.(*slb.DescribeLoadBalancerUDPListenerAttributeResponse)
 					port = v.ListenerPort
 					descrip = v.Description
 					proto = "udp"
 				case *slb.DescribeLoadBalancerHTTPListenerAttributeResponse:
-					v := value.(*slb.DescribeLoadBalancerHTTPListenerAttributeResponse)
 					port = v.ListenerPort
 					descrip = v.Description
 					proto = "http"
@@ -516,35 +483,26 @@ func (c *mockClientSLB) StartLoadBalancerListener(ctx context.Context, loadBalan
 	if !ok {
 		return fmt.Errorf("not found listener: %s %d ", loadBalancerId, port)
 	}
-	switch listenerObj.(type) {
+	switch listener := listenerObj.(type) {
 	case *slb.DescribeLoadBalancerTCPListenerAttributeResponse:
-		if listener, ok := listenerObj.(*slb.DescribeLoadBalancerTCPListenerAttributeResponse); ok {
-			listener.DescribeLoadBalancerListenerAttributeResponse.Status = slb.Running
-			LOADBALANCER.listeners.Store(key, listener)
-		}
-		break
+		listener.DescribeLoadBalancerListenerAttributeResponse.Status = slb.Running
+		LOADBALANCER.listeners.Store(key, listener)
+		return nil
 	case *slb.DescribeLoadBalancerUDPListenerAttributeResponse:
-		if listener, ok := listenerObj.(*slb.DescribeLoadBalancerUDPListenerAttributeResponse); ok {
-			listener.DescribeLoadBalancerListenerAttributeResponse.Status = slb.Running
-			LOADBALANCER.listeners.Store(key, listener)
-		}
-		break
+		listener.DescribeLoadBalancerListenerAttributeResponse.Status = slb.Running
+		LOADBALANCER.listeners.Store(key, listener)
+		return nil
 	case *slb.DescribeLoadBalancerHTTPListenerAttributeResponse:
-		if listener, ok := listenerObj.(*slb.DescribeLoadBalancerHTTPListenerAttributeResponse); ok {
-			listener.DescribeLoadBalancerListenerAttributeResponse.Status = slb.Running
-			LOADBALANCER.listeners.Store(key, listener)
-		}
-		break
+		listener.DescribeLoadBalancerListenerAttributeResponse.Status = slb.Running
+		LOADBALANCER.listeners.Store(key, listener)
+		return nil
 	case *slb.DescribeLoadBalancerHTTPSListenerAttributeResponse:
-		if listener, ok := listenerObj.(*slb.DescribeLoadBalancerHTTPSListenerAttributeResponse); ok {
-			listener.DescribeLoadBalancerListenerAttributeResponse.Status = slb.Running
-			LOADBALANCER.listeners.Store(key, listener)
-		}
-		break
+		listener.DescribeLoadBalancerListenerAttributeResponse.Status = slb.Running
+		LOADBALANCER.listeners.Store(key, listener)
+		return nil
 	default:
 		return fmt.Errorf("StartLoadBalancerListener() listener type error")
 	}
-	return nil
 }
 func (c *mockClientSLB) CreateLoadBalancerTCPListener(ctx context.Context, args *slb.CreateLoadBalancerTCPListenerArgs) (err error) {
 	if c.createLoadBalancerTCPListener != nil {
@@ -903,7 +861,7 @@ func (c *mockClientSLB) SetLoadBalancerUDPListenerAttribute(ctx context.Context,
 	lb.VServerGroupId = args.VServerGroupId
 	lb.Description = args.Description
 	lb.Bandwidth = args.Bandwidth
-	lb.PersistenceTimeout = lb.PersistenceTimeout
+	lb.PersistenceTimeout = args.PersistenceTimeout
 	lb.BackendServerPort = args.BackendServerPort
 	lb.AclStatus = args.AclStatus
 	lb.AclId = args.AclId

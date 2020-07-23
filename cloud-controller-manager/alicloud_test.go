@@ -37,29 +37,28 @@ var keyid string
 var keysecret string
 
 var (
-	vpcId                     = "vpc-2zeaybwqmvn6qgabfd3pe"
-	regionId                  = "cn-beijing"
-	zoneId                    = "cn-beijing-b"
+	//vpcId                     = "vpc-2zeaybwqmvn6qgabfd3pe"
+	//regionId                  = "cn-beijing"
+	//zoneId                    = "cn-beijing-b"
 	certID                    = "1745547945134207_157f665c830"
 	listenPort1         int32 = 80
-	listenPort2         int32 = 90
+	//listenPort2         int32 = 90
 	targetPort1               = intstr.FromInt(8080)
-	targetPort2               = intstr.FromInt(9090)
+	//targetPort2               = intstr.FromInt(9090)
 	nodePort1           int32 = 8080
-	nodePort2           int32 = 9090
-	protocolTcp               = v1.ProtocolTCP
-	protocolUdp               = v1.ProtocolUDP
+	//nodePort2           int32 = 9090
+	//protocolTcp               = v1.ProtocolTCP
+	//protocolUdp               = v1.ProtocolUDP
 	node1                     = "i-bp1bcl00jhxr754tw8vx"
-	node2                     = "i-bp1bcl00jhxr754tw8vy"
-	clusterName               = "clusterName-random"
+	//node2                     = "i-bp1bcl00jhxr754tw8vy"
+	//clusterName               = "clusterName-random"
 	serviceUIDNoneExist       = "UID-1234567890-0987654321-1234556"
 	serviceUIDExist           = "c83f8bed-812e-11e9-a0ad-00163e0a3984"
-	nodeName                  = "iZuf694l8lw6xvdx6gh7tkZ"
+	//nodeName                  = "iZuf694l8lw6xvdx6gh7tkZ"
 )
 
 func TestImplements(t *testing.T) {
-	var cloud cloudprovider.Interface
-	cloud = &Cloud{}
+	var cloud cloudprovider.Interface = &Cloud{}
 	_ ,ok := cloud.(node.CloudInstance)
 	if !ok {
 		t.Fatalf("not implemented")

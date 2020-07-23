@@ -32,7 +32,10 @@ import (
 )
 
 func main() {
-	f.CommandLine.Parse([]string{})
+	err := f.CommandLine.Parse([]string{})
+	if err != nil {
+		klog.Warningf("parse command line error: %s", err.Error())
+	}
 
 	ccm := app.NewServerCCM()
 	options.AddFlags(ccm, pflag.CommandLine)

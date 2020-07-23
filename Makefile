@@ -43,6 +43,9 @@ gofmt:
 gofmt-fix:
 	gofmt -w $(PACKAGES)
 
+golangci-lint:
+	bash -c 'golangci-lint run'
+
 
 clean:
 	rm -f cloud-controller-manager*

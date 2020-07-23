@@ -16,6 +16,7 @@ import (
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/cloud-provider-alibaba-cloud/cloud-controller-manager/utils"
+	"k8s.io/klog"
 	controller "k8s.io/kube-aggregator/pkg/controllers"
 	"sort"
 	"strconv"
@@ -374,9 +375,9 @@ func debug(ifactory informers.SharedInformerFactory, name string, do bool) error
 		Lister().
 		Endpoints("default").
 		List(labels.NewSelector())
-	//if err != nil {
-	//	return fmt.Errorf("list: %s",err.Error())
-	//}
+	if err != nil {
+		klog.Warningf("list: %s", err.Error())
+	}
 	fmt.Printf("AllObject: %v\n", utils.PrettyJson(all))
 	endp, err := ifactory.
 		Core().V1().
@@ -505,10 +506,7 @@ func ExpectExistAndEqual(f *FrameWork) error {
 			sort.SliceStable(
 				backends,
 				func(i, j int) bool {
-					if backends[i].ServerIp < backends[j].ServerIp {
-						return true
-					}
-					return false
+					return backends[i].ServerIp < backends[j].ServerIp
 				},
 			)
 			endpoints := f.Endpoint.Subsets[0].Addresses
@@ -516,10 +514,7 @@ func ExpectExistAndEqual(f *FrameWork) error {
 			sort.SliceStable(
 				endpoints,
 				func(i, j int) bool {
-					if endpoints[i].IP < endpoints[j].IP {
-						return true
-					}
-					return false
+					return endpoints[i].IP < endpoints[j].IP
 				},
 			)
 			for k, v := range backends {
@@ -565,20 +560,14 @@ func ExpectExistAndEqual(f *FrameWork) error {
 			sort.SliceStable(
 				backends,
 				func(i, j int) bool {
-					if backends[i].ServerId < backends[j].ServerId {
-						return true
-					}
-					return false
+					return backends[i].ServerId < backends[j].ServerId
 				},
 			)
 
 			sort.SliceStable(
 				endpointPrIds,
 				func(i, j int) bool {
-					if endpointPrIds[i] < endpointPrIds[j] {
-						return true
-					}
-					return false
+					return endpointPrIds[i] < endpointPrIds[j]
 				},
 			)
 			for k, v := range backends {
@@ -595,10 +584,7 @@ func ExpectExistAndEqual(f *FrameWork) error {
 			sort.SliceStable(
 				backends,
 				func(i, j int) bool {
-					if backends[i].ServerId < backends[j].ServerId {
-						return true
-					}
-					return false
+					return backends[i].ServerId < backends[j].ServerId
 				},
 			)
 			sort.SliceStable(
@@ -678,7 +664,7 @@ func ExpectExistAndEqual(f *FrameWork) error {
 			if err != nil {
 				return fmt.Errorf("DescribeZones error: %s. ", err.Error())
 			}
-			if zones == nil || len(zones) == 0 {
+			if len(zones) == 0 {
 				return fmt.Errorf("can not find zone by zone name %s. ", defd.PrivateZoneName)
 			}
 
@@ -778,28 +764,31 @@ func (f *FrameWork) SLBSpecEqual(mlb *slb.LoadBalancerType) error {
 func (f *FrameWork) ListenerEqual(ctx context.Context, id string, p v1.ServicePort, proto string) error {
 	var (
 		// Health check
-		healthCheckInterval           = 0
-		healthCheckTimeout            = 0
-		healthCheckDomain             = ""
-		healthCheckHTTPCode           = ""
-		healthCheck                   = ""
-		healthCheckType               = ""
-		healthCheckURI                = ""
-		healthCheckConnectPort        = 0
-		healthCheckConnectTimeout     = 0
-		healthCheckHealthyThreshold   = 0
-		healthCheckUnhealthyThreshold = 0
+		healthCheckInterval           int
+		healthCheckTimeout            int
+		healthCheckDomain             string
+		healthCheckHTTPCode           string
+		healthCheck                   string
+		healthCheckType               string
+		healthCheckURI                string
+		healthCheckConnectPort        int
+		healthCheckConnectTimeout     int
+		healthCheckHealthyThreshold   int
+		healthCheckUnhealthyThreshold int
 
-		sessionStick       = ""
-		sessionStickType   = ""
-		cookieTimeout      = 0
-		cookie             = ""
-		persistenceTimeout = 0
+		// session
+		sessionStick       string
+		sessionStickType   string
+		cookieTimeout      int
+		cookie             string
+		persistenceTimeout int
 
-		aclStatus = ""
-		aclId     = ""
-		aclType   = ""
-		scheduler = ""
+		// acl
+		aclStatus string
+		aclId     string
+		aclType   string
+
+		scheduler string
 	)
 	defd, _ := ExtractAnnotationRequest(f.SVC)
 	switch proto {
@@ -986,25 +975,25 @@ func (f *FrameWork) ListenerEqual(ctx context.Context, id string, p v1.ServicePo
 
 	// Health checks with TCP type only work with listeners of the same protocol.
 	if f.hasAnnotation(ServiceAnnotationLoadBalancerHealthCheckConnectPort) {
-		if healthCheckType == proto && healthCheckConnectPort != defd.HealthCheckConnectPort {
+		if healthCheckConnectPort != defd.HealthCheckConnectPort && healthCheckType == proto {
 			return fmt.Errorf("health check connect port error")
 		}
 	}
 
 	if f.hasAnnotation(ServiceAnnotationLoadBalancerHealthCheckHealthyThreshold) {
-		if healthCheckType == proto && healthCheckHealthyThreshold != defd.HealthyThreshold {
+		if healthCheckHealthyThreshold != defd.HealthyThreshold && healthCheckType == proto {
 			return fmt.Errorf("health check health threshold error")
 		}
 	}
 
 	if f.hasAnnotation(ServiceAnnotationLoadBalancerHealthCheckUnhealthyThreshold) {
-		if healthCheckType == proto && healthCheckUnhealthyThreshold != defd.UnhealthyThreshold {
+		if healthCheckUnhealthyThreshold != defd.UnhealthyThreshold && healthCheckType == proto {
 			return fmt.Errorf("health check unhealthy threshold error")
 		}
 	}
 
 	if f.hasAnnotation(ServiceAnnotationLoadBalancerHealthCheckInterval) {
-		if healthCheckType == proto && healthCheckInterval != defd.HealthCheckInterval {
+		if healthCheckInterval != defd.HealthCheckInterval && healthCheckType == proto {
 			return fmt.Errorf("health check interval error")
 		}
 	}

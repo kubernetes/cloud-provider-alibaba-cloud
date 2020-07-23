@@ -157,8 +157,8 @@ func (ccm *ServerCCM) initialization() error {
 		return fmt.Errorf("cloud provider could not be initialized: %v", err)
 	}
 	ccm.cloud = cloud
-	if cloud.HasClusterID() == false {
-		if ccm.KubeCloudShared.AllowUntaggedCloud == true {
+	if !cloud.HasClusterID() {
+		if ccm.KubeCloudShared.AllowUntaggedCloud {
 			klog.Warning("detected a cluster without a ClusterID.  A ClusterID will " +
 				"be required in the future.  Please tag your cluster to avoid any future issues")
 		} else {
@@ -245,7 +245,7 @@ func Run(ccm *ServerCCM) error {
 	}
 
 	if !ccm.Generic.LeaderElection.LeaderElect {
-		ccm.MainLoop(nil)
+		ccm.MainLoop(context.TODO())
 	}
 
 	// Identity used to distinguish between multiple cloud controller manager instances

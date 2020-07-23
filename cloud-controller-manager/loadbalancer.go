@@ -201,7 +201,7 @@ func (s *LoadBalancerClient) FindLoadBalancerByTags(ctx context.Context, service
 		return false, nil, err
 	}
 
-	if lbs == nil || len(lbs) == 0 {
+	if len(lbs) == 0 {
 		// here we need to fallback on finding by name for compatible reason
 		// the old service slb may not have a tag.
 		return s.FindLoadBalancerByName(ctx, lbn)
@@ -227,7 +227,7 @@ func (s *LoadBalancerClient) FindLoadBalancerByName(ctx context.Context, name st
 		return false, nil, err
 	}
 
-	if lbs == nil || len(lbs) == 0 {
+	if len(lbs) == 0 {
 		return false, nil, nil
 	}
 	if len(lbs) > 1 {

@@ -59,7 +59,7 @@ type Cloud struct {
 	cfg      *CloudConfig
 	region   common.Region
 	vpcID    string
-	cid      string
+	//cid      string
 	ifactory informers.SharedInformerFactory
 }
 
@@ -462,7 +462,7 @@ func (c *Cloud) NodeAddresses(ctx context.Context, name types.NodeName) ([]v1.No
 func (c *Cloud) ListInstances(ctx context.Context, ids []string) (map[string]*node.CloudNodeAttribute, error) {
 	start := time.Now()
 	defer func() {
-		klog.V(5).Infof("ListInstance take %s to return", time.Now().Sub(start)/time.Second)
+		klog.V(5).Infof("ListInstance take %s to return", time.Since(start))
 	}()
 	return c.climgr.Instances().ListInstances(ctx, ids)
 }
