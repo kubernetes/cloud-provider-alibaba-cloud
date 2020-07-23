@@ -618,6 +618,7 @@ func (t *tcp) Update(ctx context.Context) error {
 		Scheduler:          slb.SchedulerType(response.Scheduler),
 		Bandwidth:          DEFAULT_LISTENER_BANDWIDTH,
 		PersistenceTimeout: response.PersistenceTimeout,
+		VServerGroup:       slb.OnFlag,
 		VServerGroupId:     t.findVgroup(t.NamedKey.Reference(t.NodePort)),
 
 		AclType:                   response.AclType,
@@ -794,6 +795,7 @@ func (t *udp) Update(ctx context.Context) error {
 		ListenerPort:      int(t.Port),
 		BackendServerPort: int(t.NodePort),
 		Description:       t.NamedKey.Key(),
+		VServerGroup:      slb.OnFlag,
 		VServerGroupId:    t.findVgroup(t.NamedKey.Reference(t.NodePort)),
 		AclType:           response.AclType,
 		AclStatus:         response.AclStatus,
@@ -1000,6 +1002,7 @@ func (t *http) Update(ctx context.Context) error {
 		CookieTimeout:     response.CookieTimeout,
 		Cookie:            response.Cookie,
 		Description:       t.NamedKey.Key(),
+		VServerGroup:      slb.OnFlag,
 		VServerGroupId:    t.findVgroup(t.NamedKey.Reference(t.NodePort)),
 
 		AclType:                response.AclType,
@@ -1227,6 +1230,7 @@ func (t *https) Update(ctx context.Context) error {
 			ListenerPort:      response.ListenerPort,
 			BackendServerPort: response.BackendServerPort,
 			Description:       t.NamedKey.Key(),
+			VServerGroup:      slb.OnFlag,
 			VServerGroupId:    t.findVgroup(t.NamedKey.Reference(t.NodePort)),
 			//Health Check
 			Scheduler:         slb.SchedulerType(response.Scheduler),
