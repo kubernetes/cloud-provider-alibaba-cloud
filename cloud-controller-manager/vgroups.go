@@ -567,7 +567,8 @@ func (v *EndpointWithENI) doBackendBuild(ctx context.Context, g *vgroup) ([]slb.
 			klog.Warningf("%s endpoint is nil in eni mode", g.NamedKey)
 			return backend, nil
 		}
-		klog.Infof("[ENI] mode service: %s, endpoint subsets length: %d", g.NamedKey, len(v.Endpoints.Subsets))
+		klog.Infof("[ENI] mode service: %s", g.NamedKey)
+		LogSubsetInfo(v.Endpoints,"reconcile")
 		var privateIpAddress []string
 		for _, ep := range v.Endpoints.Subsets {
 			for _, addr := range ep.Addresses {
@@ -588,7 +589,8 @@ func (v *EndpointWithENI) doBackendBuild(ctx context.Context, g *vgroup) ([]slb.
 			klog.Warningf("%s endpoint is nil in local mode", g.NamedKey)
 			return backend, nil
 		}
-		klog.Infof("[Local] mode service: %s,  endpoint subsets length: %d", g.NamedKey, len(v.Endpoints.Subsets))
+		klog.Infof("[Local] mode service: %s", g.NamedKey)
+		LogSubsetInfo(v.Endpoints,"reconcile")
 		// 1. add duplicate ecs backends
 		for _, sub := range v.Endpoints.Subsets {
 			for _, add := range sub.Addresses {
