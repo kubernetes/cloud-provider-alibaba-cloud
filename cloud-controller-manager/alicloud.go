@@ -337,6 +337,8 @@ func (c *Cloud) EnsureLoadBalancer(
 			return nil, fmt.Errorf("get available endpoints when EnsureLoadBalancer: %s", err.Error())
 		}
 	}
+	LogSubsetInfo(eps,"api")
+
 	backends := &EndpointWithENI{
 		LocalMode:      ServiceModeLocal(service),
 		Endpoints:      eps,

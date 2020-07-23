@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"github.com/docker/distribution/uuid"
 	"k8s.io/api/core/v1"
+	"k8s.io/klog"
 	"strings"
 	"sync"
 )
@@ -143,4 +144,15 @@ func GetLoadBalancerName(service *v1.Service) string {
 		ret = ret[:32]
 	}
 	return ret
+}
+
+func LogSubsetInfo(endpoint *v1.Endpoints, version string) {
+	if endpoint == nil {
+		klog.Error("endpoint is nil")
+		return
+	}
+	for i, ep := range endpoint.Subsets {
+		klog.Infof("[%s/%s]: %s , Subset index=%d, port len=%d, ready len=%d, not ready len=%d",
+			endpoint.Namespace, endpoint.Name, version, i, len(ep.Ports), len(ep.Addresses), len(ep.NotReadyAddresses))
+	}
 }
