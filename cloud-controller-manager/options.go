@@ -72,6 +72,9 @@ const (
 	// ServiceAnnotationLoadBalancerId lb id
 	ServiceAnnotationLoadBalancerId = ServiceAnnotationLoadBalancerPrefix + "id"
 
+	//ServiceAnnotationLoadBalancerName slb name
+	ServiceAnnotationLoadBalancerName = ServiceAnnotationLoadBalancerPrefix + "name"
+
 	// ServiceAnnotationLoadBalancerBackendLabel backend labels
 	ServiceAnnotationLoadBalancerBackendLabel = ServiceAnnotationLoadBalancerPrefix + "backend-label"
 
@@ -281,6 +284,12 @@ func ExtractAnnotationRequest(service *v1.Service) (*AnnotationRequest, *Annotat
 	if ok {
 		defaulted.Loadbalancerid = lbid
 		request.Loadbalancerid = defaulted.Loadbalancerid
+	}
+
+	lbName, ok := annotation[ServiceAnnotationLoadBalancerName]
+	if ok {
+		defaulted.LoadBalancerName = lbName
+		request.LoadBalancerName = defaulted.LoadBalancerName
 	}
 
 	blabel, ok := annotation[ServiceAnnotationLoadBalancerBackendLabel]

@@ -35,9 +35,10 @@ import (
 
 // AnnotationRequest annotated parameters.
 type AnnotationRequest struct {
-	Loadbalancerid string
-	BackendLabel   string
-	BackendType    string
+	Loadbalancerid   string
+	LoadBalancerName string
+	BackendLabel     string
+	BackendType      string
 
 	SSLPorts       string
 	AddressType    slb.AddressType
@@ -102,6 +103,7 @@ const MDSKEY = "managed.by.ack"
 type ClientSLBSDK interface {
 	DescribeLoadBalancers(ctx context.Context, args *slb.DescribeLoadBalancersArgs) (loadBalancers []slb.LoadBalancerType, err error)
 	CreateLoadBalancer(ctx context.Context, args *slb.CreateLoadBalancerArgs) (response *slb.CreateLoadBalancerResponse, err error)
+	SetLoadBalancerName(ctx context.Context, loadBalancerId string, loadBalancerName string) (err error)
 	DeleteLoadBalancer(ctx context.Context, loadBalancerId string) (err error)
 	SetLoadBalancerDeleteProtection(ctx context.Context, args *slb.SetLoadBalancerDeleteProtectionArgs) (err error)
 	ModifyLoadBalancerInstanceSpec(ctx context.Context, args *slb.ModifyLoadBalancerInstanceSpecArgs) (err error)
@@ -458,6 +460,17 @@ func (s *LoadBalancerClient) EnsureLoadBalancer(ctx context.Context, service *v1
 			}
 		}
 
+
+		// update slb name
+		// only user defined slb or slb which has "kubernetes.do.not.delete" tag can update name
+		if (isUserDefinedLoadBalancer(service) || isLoadBalancerHasTag(tags)) &&
+			request.LoadBalancerName != "" && request.LoadBalancerName != origined.LoadBalancerName {
+			klog.Infof("alicloud: LoadBalancer name (%s -> %s) changed, update loadbalancer [%s]",
+				origined.LoadBalancerName, request.LoadBalancerName, origined.LoadBalancerId)
+			if err := s.c.SetLoadBalancerName(ctx, origined.LoadBalancerId, request.LoadBalancerName); err != nil {
+				return nil, err
+			}
+		}
 		origined, derr = s.c.DescribeLoadBalancerAttribute(ctx, origined.LoadBalancerId)
 	}
 	if derr != nil {
@@ -496,6 +509,15 @@ func isLoadBalancerNonReusable(tags []slb.TagItemType, service *v1.Service) (boo
 		}
 	}
 	return false, ""
+}
+
+func isLoadBalancerHasTag(tags []slb.TagItemType) (bool) {
+	for _, tag := range tags {
+		if tag.TagKey == TAGKEY {
+			return true
+		}
+	}
+	return false
 }
 
 //UpdateLoadBalancer make sure slb backend is reconciled
@@ -616,7 +638,11 @@ func (s *LoadBalancerClient) getLoadBalancerOpts(service *v1.Service, vswitchid 
 			"loadbalancer will be created. address type=%s, switchid=%s", ar.AddressType, vswitchid)
 		args.VSwitchId = vswitchid
 	}
-	args.LoadBalancerName = GetLoadBalancerName(service)
+	if req.LoadBalancerName == "" {
+		args.LoadBalancerName = GetLoadBalancerName(service)
+	} else {
+		args.LoadBalancerName = req.LoadBalancerName
+	}
 	return
 }
 

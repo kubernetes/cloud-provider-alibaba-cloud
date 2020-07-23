@@ -115,6 +115,12 @@ func (c *ContextedClientSLB) SetLoadBalancerDeleteProtection(ctx context.Context
 	return c.slb.SetLoadBalancerDeleteProtection(args)
 }
 
+
+func (c *ContextedClientSLB) SetLoadBalancerName(ctx context.Context, loadBalancerId string, loadBalancerName string) (err error) {
+
+	return c.slb.SetLoadBalancerName(loadBalancerId, loadBalancerName)
+}
+
 func (c *ContextedClientSLB) ModifyLoadBalancerInstanceSpec(
 	ctx context.Context,
 	args *slb.ModifyLoadBalancerInstanceSpecArgs,

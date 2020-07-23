@@ -67,6 +67,7 @@ type mockClientSLB struct {
 	describeLoadBalancers                 func(args *slb.DescribeLoadBalancersArgs) (loadBalancers []slb.LoadBalancerType, err error)
 	createLoadBalancer                    func(args *slb.CreateLoadBalancerArgs) (response *slb.CreateLoadBalancerResponse, err error)
 	deleteLoadBalancer                    func(loadBalancerId string) (err error)
+	setLoadBalancerName                   func(loadBalancerId string, name string) (err error)
 	setLoadBalancerDeleteProtection       func(args *slb.SetLoadBalancerDeleteProtectionArgs) (err error)
 	modifyLoadBalancerInternetSpec        func(args *slb.ModifyLoadBalancerInternetSpecArgs) (err error)
 	modifyLoadBalancerInstanceSpec        func(args *slb.ModifyLoadBalancerInstanceSpecArgs) (err error)
@@ -293,6 +294,26 @@ func (c *mockClientSLB) SetLoadBalancerDeleteProtection(ctx context.Context, arg
 	if args.DeleteProtection != "" {
 		ins.DeleteProtection = args.DeleteProtection
 	}
+	LOADBALANCER.loadbalancer.Store(ins.LoadBalancerId, ins)
+	return nil
+}
+
+func (c *mockClientSLB) SetLoadBalancerName(ctx context.Context, loadBalancerId string, loadBalancerName string) (err error) {
+	if c.setLoadBalancerName != nil {
+		return c.setLoadBalancerName(loadBalancerId, loadBalancerName)
+	}
+	if loadBalancerId == "" || loadBalancerName == "" {
+		return fmt.Errorf("loadbalancer id and name must not be empty")
+	}
+	v, ok := LOADBALANCER.loadbalancer.Load(loadBalancerId)
+	if !ok {
+		return fmt.Errorf("loadbalancer not found by id %s", loadBalancerId)
+	}
+	ins, ok := v.(slb.LoadBalancerType)
+	if !ok {
+		return fmt.Errorf("not slb.LoadBalancerType")
+	}
+	ins.LoadBalancerName = loadBalancerName
 	LOADBALANCER.loadbalancer.Store(ins.LoadBalancerId, ins)
 	return nil
 }
