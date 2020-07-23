@@ -117,8 +117,19 @@ func (s *InstanceClient) filterOutByLabel(nodes []*v1.Node, labels string) ([]*v
 	return result, nil
 }
 
-// Use '.' to separate providerID which looks like 'cn-hangzhou.i-v98dklsmnxkkgiiil7'. The format of "REGION.NODEID"
+// providerID
+// 1) the id of the instance in the alicloud API. Use '.' to separate providerID which looks like 'cn-hangzhou.i-v98dklsmnxkkgiiil7'. The format of "REGION.NODEID"
+// 2) the id for an instance in the kubernetes API, which has 'alicloud://' prefix. e.g. alicloud://cn-hangzhou.i-v98dklsmnxkkgiiil7
 func nodeFromProviderID(providerID string) (common.Region, string, error) {
+	if strings.HasPrefix(providerID, ProviderName+"://") {
+		k8sName := strings.Split(providerID, "://")
+		if len(k8sName) < 2 {
+			return "", "", fmt.Errorf("alicloud: unable to split instanceid and region from providerID, error unexpected providerID=%s", providerID)
+		} else {
+			providerID = k8sName[1]
+		}
+	}
+
 	name := strings.Split(providerID, ".")
 	if len(name) < 2 {
 		return "", "", fmt.Errorf("alicloud: unable to split instanceid and region from providerID, error unexpected providerID=%s", providerID)
