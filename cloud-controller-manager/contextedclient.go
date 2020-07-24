@@ -304,7 +304,8 @@ func (c *ContextedClientINS) DescribeNetworkInterfaces(
 func NewContextedClientPVTZ(key, secret, region string) *ContextedClientPVTZ {
 	return &ContextedClientPVTZ{
 		BaseClient: BaseClient{},
-		pvtz:       pvtz.NewPVTZClientWithSecurityToken4RegionalDomain(key, secret, "", common.Region(region)),
+		// TODO: change to regional client
+		pvtz:       pvtz.NewPVTZClientWithSecurityToken(key, secret, "", common.Region(region)),
 	}
 }
 

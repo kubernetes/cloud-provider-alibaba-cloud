@@ -182,26 +182,27 @@ func (s *InstanceClient) findInstanceByProviderID(ctx context.Context, providerI
 }
 
 func (s *InstanceClient) ListInstances(ctx context.Context, ids []string) (map[string]*node.CloudNodeAttribute, error) {
-	var (
-		idsp   []string
-		region common.Region
-	)
+	nodeRegionMap := make(map[common.Region][]string)
 	for _, id := range ids {
 		regionid, nodeid, err := nodeFromProviderID(id)
 		if err != nil {
 			return nil, err
 		}
-		idsp = append(idsp, nodeid)
-		region = regionid
+		nodeRegionMap[regionid] = append(nodeRegionMap[regionid], nodeid)
 	}
-	ins, err := s.getInstances(ctx, idsp, region)
-	if err != nil {
-		return nil, err
+
+	var insList []ecs.InstanceAttributesType
+	for region, nodes := range nodeRegionMap {
+		ins, err := s.getInstances(ctx, nodes, region)
+		if err != nil {
+			return nil, err
+		}
+		insList = append(insList, ins...)
 	}
 	mins := make(map[string]*node.CloudNodeAttribute)
 	for _, id := range ids {
 		mins[id] = nil
-		for _, n := range ins {
+		for _, n := range insList {
 			if strings.Contains(id, n.InstanceId) {
 				mins[id] = &node.CloudNodeAttribute{
 					InstanceID:   n.InstanceId,
