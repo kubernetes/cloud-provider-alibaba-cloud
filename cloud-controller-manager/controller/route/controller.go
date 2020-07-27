@@ -426,7 +426,7 @@ func (rc *RouteController) tryCreateRoute(
 	// Update condition only if it doesn't reflect the current state.
 	_, condition = helpers.GetNodeCondition(&node.Status, v1.NodeNetworkUnavailable)
 	if condition != nil &&
-		condition.Status == v1.ConditionTrue {
+		condition.Status == v1.ConditionFalse {
 		return nil
 	}
 	return rc.updateNetworkingCondition(types.NodeName(node.Name), true)

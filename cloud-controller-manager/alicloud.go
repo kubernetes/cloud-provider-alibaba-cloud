@@ -627,7 +627,7 @@ func (c *Cloud) GetZone(ctx context.Context) (cloudprovider.Zone, error) {
 		return cloudprovider.Zone{}, fmt.Errorf("Alicloud.GetZone(): error execute findInstanceByProviderID(). message=[%s]", err.Error())
 	}
 	return cloudprovider.Zone{
-		Region:        string(c.region),
+		Region:        string(i.RegionId),
 		FailureDomain: i.ZoneId,
 	}, nil
 }
@@ -642,7 +642,7 @@ func (c *Cloud) GetZoneByNodeName(ctx context.Context, nodeName types.NodeName) 
 		return cloudprovider.Zone{}, fmt.Errorf("Alicloud.GetZoneByNodeName(): error execute findInstanceByNode(). message=[%s]", err.Error())
 	}
 	return cloudprovider.Zone{
-		Region:        string(c.region),
+		Region:        string(i.RegionId),
 		FailureDomain: i.ZoneId,
 	}, nil
 }
@@ -656,7 +656,7 @@ func (c *Cloud) GetZoneByProviderID(ctx context.Context, providerID string) (clo
 		return cloudprovider.Zone{}, fmt.Errorf("Alicloud.GetZoneByProviderID(), error execute findInstanceByNode(). message=[%s]", err.Error())
 	}
 	return cloudprovider.Zone{
-		Region:        string(c.region),
+		Region:        string(i.RegionId),
 		FailureDomain: i.ZoneId,
 	}, nil
 }
