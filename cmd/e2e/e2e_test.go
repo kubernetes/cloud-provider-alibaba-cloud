@@ -50,6 +50,9 @@ func TestE2E(t *testing.T) {
 	if framework.TestContext.PrivateZoneRecordTTL == "" {
 		framework.TestContext.PrivateZoneRecordTTL = "0"
 	}
+	if framework.TestContext.ResourceGroupID == "" {
+		framework.TestContext.ResourceGroupID = "rg-xxx"
+	}
 
 	if framework.TestContext.TestLabel == "quick" {
 		for i := range framework.QuickFrames {

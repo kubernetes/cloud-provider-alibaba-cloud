@@ -19,7 +19,7 @@ func RegisterCommonFlags() {
 	flag.StringVar(&TestContext.PrivateZoneName, "PrivateZoneName", "", "private zone name")
 	flag.StringVar(&TestContext.PrivateZoneRecordName, "PrivateZoneRecordName", "", "private zone record id")
 	flag.StringVar(&TestContext.PrivateZoneRecordTTL, "PrivateZoneRecordTTL", "", "private zone record ttl")
-
+	flag.StringVar(&TestContext.ResourceGroupID, "ResourceGroupID", "", "resource group id")
 }
 
 // ViperizeFlags sets up all flag and config processing. Future configuration info should be added to viper, not to flags.

@@ -76,6 +76,7 @@ type Config struct {
 	PrivateZoneRecordName string
 	PrivateZoneRecordTTL  string
 	TestLabel             string
+	ResourceGroupID       string
 }
 
 func NewFrameWork(

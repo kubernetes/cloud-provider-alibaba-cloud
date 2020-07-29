@@ -2,6 +2,7 @@ package test
 
 import (
 	"fmt"
+	"github.com/denverdino/aliyungo/slb"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -1102,10 +1103,10 @@ var _ = framework.Mark(
 						Name:      "basic-service",
 						Namespace: framework.NameSpace,
 						Annotations: map[string]string{
-							alicloud.ServiceAnnotationLoadBalancerPrivateZoneId:         "c9615dd501089b5b2a5f60ccf42394af",
-							alicloud.ServiceAnnotationLoadBalancerPrivateZoneName:       "privatezone.com",
-							alicloud.ServiceAnnotationLoadBalancerPrivateZoneRecordName: "slave3",
-							alicloud.ServiceAnnotationLoadBalancerPrivateZoneRecordTTL:  "60",
+							alicloud.ServiceAnnotationLoadBalancerPrivateZoneId:         framework.TestContext.PrivateZoneID,
+							alicloud.ServiceAnnotationLoadBalancerPrivateZoneName:       framework.TestContext.PrivateZoneName,
+							alicloud.ServiceAnnotationLoadBalancerPrivateZoneRecordName: framework.TestContext.PrivateZoneRecordName,
+							alicloud.ServiceAnnotationLoadBalancerPrivateZoneRecordTTL:  framework.TestContext.PrivateZoneRecordTTL,
 						},
 					},
 					Spec: v1.ServiceSpec{
@@ -1158,6 +1159,214 @@ var _ = framework.Mark(
 						Namespace: framework.NameSpace,
 						Annotations: map[string]string{
 							alicloud.ServiceAnnotationLoadBalancerBackendType: "eni",
+						},
+					},
+
+					Spec: v1.ServiceSpec{
+						Ports: []v1.ServicePort{
+							{
+								Port:       30080,
+								TargetPort: intstr.FromInt(80),
+								Protocol:   v1.ProtocolTCP,
+							},
+						},
+						Type:            v1.ServiceTypeLoadBalancer,
+						SessionAffinity: v1.ServiceAffinityNone,
+						Selector: map[string]string{
+							"run": "nginx",
+						},
+					},
+				}
+			},
+		)
+		defer func() {
+			if err := f.Destroy(); err != nil {
+				klog.Errorf("destroy error: %s", err.Error())
+			}
+		}()
+		err := f.SetUp()
+		if err != nil {
+			return fmt.Errorf("setup error: %s", err.Error())
+		}
+
+		return f.RunDefaultTest(
+			framework.NewDefaultAction(&framework.TestUnit{Description: "default init"}),
+			framework.NewDeleteAction(&framework.TestUnit{Description: "default delete"}),
+		)
+	},
+)
+
+//22:test slb delete protection
+var _ = framework.Mark(
+	"all",
+	func(t *testing.T) error {
+		f := framework.NewFrameWork(
+			func(f *framework.FrameWorkE2E) {
+				f.Desribe = "TestSLBDeleteProtection"
+				f.Test = t
+				f.Client = framework.NewClientOrDie()
+				f.InitService = &v1.Service{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "basic-service",
+						Namespace: framework.NameSpace,
+						Annotations: map[string]string{
+							alicloud.ServiceAnnotationLoadBalancerDeleteProtection: "on",
+						},
+					},
+
+					Spec: v1.ServiceSpec{
+						Ports: []v1.ServicePort{
+							{
+								Port:       30080,
+								TargetPort: intstr.FromInt(80),
+								Protocol:   v1.ProtocolTCP,
+							},
+						},
+						Type:            v1.ServiceTypeLoadBalancer,
+						SessionAffinity: v1.ServiceAffinityNone,
+						Selector: map[string]string{
+							"run": "nginx",
+						},
+					},
+				}
+			},
+		)
+		defer func() {
+			if err := f.Destroy(); err != nil {
+				klog.Errorf("destroy error: %s", err.Error())
+			}
+		}()
+		err := f.SetUp()
+		if err != nil {
+			return fmt.Errorf("setup error: %s", err.Error())
+		}
+
+		return f.RunDefaultTest(
+			framework.NewDefaultAction(&framework.TestUnit{Description: "default init"}),
+			framework.NewDeleteAction(&framework.TestUnit{Description: "default delete"}),
+		)
+	},
+)
+
+//23:test slb modification protection
+var _ = framework.Mark(
+	"all",
+	func(t *testing.T) error {
+		f := framework.NewFrameWork(
+			func(f *framework.FrameWorkE2E) {
+				f.Desribe = "TestSLBModificationProtection"
+				f.Test = t
+				f.Client = framework.NewClientOrDie()
+				f.InitService = &v1.Service{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "basic-service",
+						Namespace: framework.NameSpace,
+						Annotations: map[string]string{
+							alicloud.ServiceAnnotationLoadBalancerModificationProtection: string(slb.ConsoleProtection),
+						},
+					},
+
+					Spec: v1.ServiceSpec{
+						Ports: []v1.ServicePort{
+							{
+								Port:       30080,
+								TargetPort: intstr.FromInt(80),
+								Protocol:   v1.ProtocolTCP,
+							},
+						},
+						Type:            v1.ServiceTypeLoadBalancer,
+						SessionAffinity: v1.ServiceAffinityNone,
+						Selector: map[string]string{
+							"run": "nginx",
+						},
+					},
+				}
+			},
+		)
+		defer func() {
+			if err := f.Destroy(); err != nil {
+				klog.Errorf("destroy error: %s", err.Error())
+			}
+		}()
+		err := f.SetUp()
+		if err != nil {
+			return fmt.Errorf("setup error: %s", err.Error())
+		}
+
+		return f.RunDefaultTest(
+			framework.NewDefaultAction(&framework.TestUnit{Description: "default init"}),
+			framework.NewDeleteAction(&framework.TestUnit{Description: "default delete"}),
+		)
+	},
+)
+
+//24:test slb resource group id
+var _ = framework.Mark(
+	"all",
+	func(t *testing.T) error {
+		f := framework.NewFrameWork(
+			func(f *framework.FrameWorkE2E) {
+				f.Desribe = "TestSLBResourceGroupId"
+				f.Test = t
+				f.Client = framework.NewClientOrDie()
+				f.InitService = &v1.Service{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "basic-service",
+						Namespace: framework.NameSpace,
+						Annotations: map[string]string{
+							alicloud.ServiceAnnotationLoadBalancerResourceGroupId: framework.TestContext.ResourceGroupID,
+						},
+					},
+
+					Spec: v1.ServiceSpec{
+						Ports: []v1.ServicePort{
+							{
+								Port:       30080,
+								TargetPort: intstr.FromInt(80),
+								Protocol:   v1.ProtocolTCP,
+							},
+						},
+						Type:            v1.ServiceTypeLoadBalancer,
+						SessionAffinity: v1.ServiceAffinityNone,
+						Selector: map[string]string{
+							"run": "nginx",
+						},
+					},
+				}
+			},
+		)
+		defer func() {
+			if err := f.Destroy(); err != nil {
+				klog.Errorf("destroy error: %s", err.Error())
+			}
+		}()
+		err := f.SetUp()
+		if err != nil {
+			return fmt.Errorf("setup error: %s", err.Error())
+		}
+
+		return f.RunDefaultTest(
+			framework.NewDefaultAction(&framework.TestUnit{Description: "default init"}),
+			framework.NewDeleteAction(&framework.TestUnit{Description: "default delete"}),
+		)
+	},
+)
+
+//25:test slb name
+var _ = framework.Mark(
+	"all",
+	func(t *testing.T) error {
+		f := framework.NewFrameWork(
+			func(f *framework.FrameWorkE2E) {
+				f.Desribe = "TestSLBName"
+				f.Test = t
+				f.Client = framework.NewClientOrDie()
+				f.InitService = &v1.Service{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "basic-service",
+						Namespace: framework.NameSpace,
+						Annotations: map[string]string{
+							alicloud.ServiceAnnotationLoadBalancerName: "nginx-svc-name",
 						},
 					},
 
