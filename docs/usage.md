@@ -117,7 +117,7 @@ spec:
   ports:
   - port: 443
     protocol: TCP
-    targetPort: 443
+    targetPort: 80
   selector:
     run: nginx
   type: LoadBalancer
@@ -126,33 +126,9 @@ spec:
 >> **Note：**
 
 - You need a certificate ID to create an https LoadBalancer. Please heading to the Aliyun Console to create one.
+- The HTTPS request will be decrypted at the SLB and then sent to the backend Pod in the form of an HTTP request.
 
-#### 5. Restrict the bandwidth of the LoadBalancer
-
-```yaml
-apiVersion: v1
-kind: Service
-metadata:
-  annotations:
-    service.beta.kubernetes.io/alibaba-cloud-loadbalancer-bandwidth: "100"
-  name: nginx
-  namespace: default
-spec:
-  ports:
-  - port: 443
-    protocol: TCP
-    targetPort: 443
-  selector:
-    run: nginx
-  type: LoadBalancer
-```
-
->> **Note：**
-
-- Only restrict the bandwidth of the LoadBalancer. And all listeners share the same bandwidth. See [Bandwidth](https://help.aliyun.com/document_detail/85930.html?spm=a2c4g.11186623.6.640.iPgsrU)
-- Only support the public LoadBalancer.
-
-#### 6. Create a specified LoadBalancer of type `slb.s1.small`
+#### 5. Create a specified LoadBalancer of type `slb.s1.small`
 
 ```yaml
 apiVersion: v1
@@ -175,8 +151,10 @@ spec:
 >> **Note：**
 
 - Specification of the SLB instance. For more information , see [CreateLoadBalancer](https://www.alibabacloud.com/help/doc-detail/27577.htm?#SLB-api-CreateLoadBalancer).
+- With this annotation, you can create a specific specification SLB, or update the specification of an existing SLB.  
+- Note: If you modify the specification of a SLB through the SLB console, there will be a risk of being overwritten by CCM.  
 
-#### 7. Attach an exist LoadBalancer to the service with id `${YOUR_LOADBALANCER_ID}`
+#### 6. Attach an exist LoadBalancer to the service with id `${YOUR_LOADBALANCER_ID}`
 
 ```yaml
 apiVersion: v1
@@ -200,7 +178,7 @@ spec:
 
 - CloudProvider will only help to attach & detach backend server for by default. You need to specify `service.beta.kubernetes.io/alibaba-cloud-loadbalancer-force-override-listeners: "true"` to force overwrite listeners. Attention, this might delete the existing listeners.
 
-#### 8. Attach an exist LoadBalancer to the service with id `${YOUR_LOADBALANCER_ID}` , and force to overwrite its listener.
+#### 7. Attach an exist LoadBalancer to the service with id `${YOUR_LOADBALANCER_ID}` , and force to overwrite its listener.
 
 ```yaml
 apiVersion: v1
@@ -221,7 +199,7 @@ spec:
   type: LoadBalancer
 ```
 
-#### 9. Use label to select certain backend for the LoadBalancer.
+#### **8**. Use label to select certain backend for the LoadBalancer.
 
 ```yaml
 apiVersion: v1
@@ -246,7 +224,7 @@ spec:
 - Separate multiple labels with comma。 "k1=v1,k2=v2"
 - And is used in multiple label。
 
-#### 10. Config SessionSticky for TCP LoadBalancer.
+#### 9. Config SessionSticky for TCP LoadBalancer.
 
 ```yaml
 apiVersion: v1
@@ -271,7 +249,7 @@ spec:
 - Only worked with TCP listeners。
 - SessionStichy is applied to all the TCP listeners by default.
 
-#### 11. Config SessionSticky for HTTP & HTTPS LoadBalancer（insert cookie）
+#### 10. Config SessionSticky for HTTP & HTTPS LoadBalancer（insert cookie）
 
 ```yaml
 apiVersion: v1
@@ -301,7 +279,7 @@ spec:
 - SessionStichy is applied to all the HTTP&HTTPS listeners by default.
 - The above annotations are mandatory.
 
-#### 12. Config SessionSticky for HTTP & HTTPS LoadBalancer（server cookie）
+#### 11. Config SessionSticky for HTTP & HTTPS LoadBalancer（server cookie）
 
 ```yaml
 apiVersion: v1
@@ -332,7 +310,7 @@ spec:
 - The above annotations are mandatory.
 - The cookie name (service.beta.kubernetes.io/alibaba-cloud-loadbalancer-cookie) can only contain letters, numbers, ‘_’ and ‘-’.
 
-#### 13. Create LoadBalancer with specified master zoneid and slave zoneid
+#### 12. Create LoadBalancer with specified master zoneid and slave zoneid
 
 ```yaml
 apiVersion: v1
@@ -358,7 +336,7 @@ spec:
 - master/slave zone is not supported in every zone，ap-southeast-5 for example does not support master/slave zone.
 - modify master/slave available zone is not supported once LoadBalancer has been created.
 
-#### 14. Create Local traffic LoadBalancer
+#### 13. Create Local traffic LoadBalancer
 
 ```yaml
 apiVersion: v1
@@ -389,7 +367,7 @@ spec:
 
   
 
-#### 15. Create VPC network LoadBalancer
+#### 14. Create VPC network LoadBalancer
 
 ```yaml
 apiVersion: v1
@@ -415,7 +393,7 @@ spec:
 - The above anotations are mandatory.
 
 
-#### 16. Create LoadBalancer charged by bandwidth
+#### 15. Create LoadBalancer charged by bandwidth
 
 ```yaml
 apiVersion: v1
@@ -440,9 +418,10 @@ spec:
 
 - Only support for the public LoadBalancer.
 - The above annotations are mendatory.
+- For other restrictions, please refer to [Modify the charge type of the load balancer](https://help.aliyun.com/document_detail/27578.html?spm=a2c4g.11186623.6.701.22482bcdAgzI6s).
 
 
-#### 17. Create LoadBalancer with health check
+#### 16. Create LoadBalancer with health check
 
 #####  a) Create LoadBalancer with TCP type health check
 
@@ -507,7 +486,7 @@ spec:
 - All of the above parameters are mandatory for http type.
 
 
-#### 18. Setting scheduler for LoadBalancer
+#### 17. Setting scheduler for LoadBalancer
 
 ```yaml
 apiVersion: v1
@@ -534,7 +513,7 @@ spec:
 - **wlc**: In addition to polling based on the weight value set by each back-end server, the actual load of the back-end server (ie, the number of connections) is also considered. When the weight values are the same, the smaller the number of current connections, the higher the number of times (probability) that the backend server is polled.
 
 
-#### 19. Create LoadBalancer with acl
+#### 18. Create LoadBalancer with acl
 
 ```yaml
 apiVersion: v1
@@ -563,7 +542,7 @@ spec:
 - The above annotations are mandatory.
 
 
-#### 20. Create LoadBalancer with specific vswitchid
+#### *19*. Create LoadBalancer with specific vswitchid
 
 ```yaml
 apiVersion: v1
@@ -587,10 +566,11 @@ spec:
 >> **Note:**
 
 - First get the switch ID through the Alibaba Cloud onsole, and then use the above annotations to create a LoadBalancer with specific vswitchid.
+- The vswitch must belong to the same VPC as the Kubernetes cluster.  
 - The above annotations are mandatory.
 
 
-#### 21. Create LoadBalacer with forward port
+#### 20. Create LoadBalacer with forward port
 
 ```yaml
 apiVersion: v1
@@ -624,7 +604,7 @@ spec:
 - The above annotations are mandatory.
 
 
-#### 22. Create LoadBalacer with additional resource tags
+#### 21. Create LoadBalacer with additional resource tags
 
 ```yaml
 apiVersion: v1
@@ -649,7 +629,7 @@ spec:
 - Separate multiple tags with comma, e.g. "Key1=Value1,Key2=Value2".
 
 
-#### 23. Remove schedulingDisabled nodes from the slb backend
+#### 22. Remove schedulingDisabled nodes from the slb backend
 
 ```yaml
 apiVersion: v1
@@ -675,7 +655,7 @@ spec:
 - Setting the annotation `service.beta.kubernetes.io/alibaba-cloud-loadbalancer-remove-unscheduled-backend` to "on" will remove the unscheduled nodes from slb backend.
 
 
-#### 24. Add pod eni to slb backend in terway network mode
+#### 23. Add pod eni to slb backend in terway network mode
 
 ```yaml
 apiVersion: v1
@@ -699,7 +679,7 @@ spec:
 
 - Attaching Pods `ENI(Elastic Network Interface)` to SLB backend directly in [terway](https://www.alibabacloud.com/help/doc-detail/97467.html?spm=a2c5t.11065259.1996646101.searchclickresult.675f654a0FM6R7) network mode can achieve better network performance.
 
-#### 25. Create IPv6 LoadBalancer 
+#### 24. Create IPv6 LoadBalancer 
 
 ```yaml
 apiVersion: v1
@@ -722,7 +702,117 @@ spec:
 
 - Kube-proxy should run in IPVS mode.
 - The IP type cannot be changed after creation.
+#### 25. Mount ECS nodes and ENIs to the backend of the SLB instance 
+  ```yaml
+  apiVersion: v1
+  kind: Service
+  metadata:
+    name: nginx
+  spec:
+    ports:
+    - port: 80
+      protocol: TCP
+      targetPort: 80
+    selector:
+      app: nginx
+    type: LoadBalancer
+  ```
 
+>> **Note:**  
+
+- Install virtual nodes in the cluster, see details[Install the ack-virtual-node addon](https://www.alibabacloud.com/help/doc-detail/118970.htm).    
+
+- Pods run on ECS and virtual nodes at the same time, see details[Create a pod on a virtual node](https://www.alibabacloud.com/help/doc-detail/118970.htm).   
+
+- After the SLB is created, you can see both the ECS nodes and the ENIs at the backend of the SLB.   
+- 
+#### 26. Enable deletion protection for the SLB instance
+```yaml
+apiVersion: v1
+kind: Service
+metadata:
+  annotations:
+    service.beta.kubernetes.io/alibaba-cloud-loadbalancer-delete-protection: "on"
+  name: nginx
+spec:
+  externalTrafficPolicy: Local
+  ports:
+  - port: 80
+    protocol: TCP
+    targetPort: 80
+  selector:
+    app: nginx
+  type: LoadBalancer
+```
+>> **Note:**  
+
+- Delete protection is enabled by default.  
+- For the load balance created by the LoadBalancer type of service, if the deletion protection is manually enabled in the SLB console, the load balance associated with the service can still be deleted by `kubectl delete svc xxx`.  
+
+#### 27. Enable modification protection for the SLB instance
+```yaml
+apiVersion: v1
+kind: Service
+metadata:
+  annotations:
+    service.beta.kubernetes.io/alibaba-cloud-loadbalancer-modification-protection: "ConsoleProtection"
+  name: nginx
+spec:
+  externalTrafficPolicy: Local
+  ports:
+  - port: 80
+    protocol: TCP
+    targetPort: 80
+  selector:
+    app: nginx
+  type: LoadBalancer
+```
+>> **Note:**  
+
+- Modification protection is enabled by default.  
+
+#### 28. Set name for the SLB instance
+```yaml
+apiVersion: v1
+kind: Service
+metadata:
+  annotations:
+    service.beta.kubernetes.io/alibaba-cloud-loadbalancer-name: "your-svc-name"
+  name: nginx
+spec:
+  externalTrafficPolicy: Local
+  ports:
+  - port: 80
+    protocol: TCP
+    targetPort: 80
+  selector:
+    app: nginx
+  type: LoadBalancer
+```
+#### 29. Set resource group id for the SLB instance
+```yaml
+apiVersion: v1
+kind: Service
+metadata:
+  annotations:
+    service.beta.kubernetes.io/alibaba-cloud-loadbalancer-resource-group-id: "rg-xxxx"
+  name: nginx
+spec:
+  externalTrafficPolicy: Local
+  ports:
+  - port: 80
+    protocol: TCP
+    targetPort: 80
+  selector:
+    app: nginx
+  type: LoadBalancer
+```
+>> **Note:**  
+
+- Get the resource group ID in [Resource Management Platform](https://resourcemanager.console.aliyun.com/), and then use the annotation to specify the resource group for the SLB instance.
+- The resource group id cannot be modified after the SLB instance is created.
+  
+  
 #### Annotation list
 >> **Note**
 
@@ -771,5 +861,9 @@ spec:
 | service.beta.kubernetes.io/alibaba-cloud-loadbalancer-forward-port | HTTP to HTTPS listening forwarding port. e.g. 80:443 | None |
 | service.beta.kubernetes.io/alibaba-cloud-loadbalancer-additional-resource-tags | A list of tags to add.<br />e.g. "k1=v1,k2=v2" | None |
 | service.beta.kubernetes.io/alibaba-cloud-loadbalancer-remove-unscheduled-backend | Remove scheduling disabled node from the slb backend. Valid values: on or off. | off |
-| service.beta.kubernetes.io/backend-type | Add pod eni to the slb backend in the [terway](https://www.alibabacloud.com/help/doc-detail/97467.html?spm=a2c5t.11065259.1996646101.searchclickresult.675f654a0FM6R7) network mode to achieve better network performance. Valid values: eni. | None |
-| service.beta.kubernetes.io/alibaba-cloud-loadbalancer-ip-version | IP version of the LoadBalancer instance. Valid values: ipv4 or ipv6 | ipv4 |
+| service.beta.kubernetes.io/backend-type | Add pod eni to the slb backend in the [terway](https://www.alibabacloud.com/help/doc-detail/97467.html?spm=a2c5t.11065259.1996646101.searchclickresult.675f654a0FM6R7) network mode to achieve better network performance. Valid values: eni. | None |  
+| service.beta.kubernetes.io/alibaba-cloud-loadbalancer-ip-version | IP version of the LoadBalancer instance. Valid values: ipv4 or ipv6 | ipv4 |   
+| service.beta.kubernetes.io/alibaba-cloud-loadbalancer-delete-protection | enable deletion protection. Valid values: on or off | on |   
+| service.beta.kubernetes.io/alibaba-cloud-loadbalancer-modification-protection | enable modification protection. Valid values: ConsoleProtection or NonProtection | ConsoleProtection |  
+| service.beta.kubernetes.io/alibaba-cloud-loadbalancer-resource-group-id |  resource group id of the SLB instance | None | 
+| service.beta.kubernetes.io/alibaba-cloud-loadbalancer-name | name of the SLB instance | None|  
