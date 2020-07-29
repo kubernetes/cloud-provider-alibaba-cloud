@@ -463,12 +463,17 @@ func (s *LoadBalancerClient) EnsureLoadBalancer(ctx context.Context, service *v1
 
 		// update slb name
 		// only user defined slb or slb which has "kubernetes.do.not.delete" tag can update name
-		if (isUserDefinedLoadBalancer(service) || isLoadBalancerHasTag(tags)) &&
-			request.LoadBalancerName != "" && request.LoadBalancerName != origined.LoadBalancerName {
-			klog.Infof("alicloud: LoadBalancer name (%s -> %s) changed, update loadbalancer [%s]",
-				origined.LoadBalancerName, request.LoadBalancerName, origined.LoadBalancerId)
-			if err := s.c.SetLoadBalancerName(ctx, origined.LoadBalancerId, request.LoadBalancerName); err != nil {
-				return nil, err
+		if request.LoadBalancerName != "" && request.LoadBalancerName != origined.LoadBalancerName {
+			if isLoadBalancerHasTag(tags) || isUserDefinedLoadBalancer(service) {
+				klog.Infof("alicloud: LoadBalancer name (%s -> %s) changed, update loadbalancer [%s]",
+					origined.LoadBalancerName, request.LoadBalancerName, origined.LoadBalancerId)
+				if err := s.c.SetLoadBalancerName(ctx, origined.LoadBalancerId, request.LoadBalancerName); err != nil {
+					return nil, err
+				}
+			}else{
+				klog.Warningf("alicloud: LoadBalancer name (%s -> %s) changed, try to update loadbalancer [%s]," +
+					" warning: only user defined slb or slb which has 'kubernetes.do.not.delete' tag can update name",
+					origined.LoadBalancerName, request.LoadBalancerName, origined.LoadBalancerId)
 			}
 		}
 		origined, derr = s.c.DescribeLoadBalancerAttribute(ctx, origined.LoadBalancerId)
