@@ -154,6 +154,8 @@ spec:
 
 需要先在阿里云控制台上创建一个证书并记录 cert-id，然后使用如下 annotation 创建一个 HTTPS 类型的 SLB。
 
+> HTTPS请求会在SLB层解密，然后以HTTP请求的形式发送给后端Pod。
+
 ```yaml
 apiVersion: v1
 kind: Service
@@ -167,30 +169,7 @@ spec:
   ports:
   - port: 443
     protocol: TCP
-    targetPort: 443
-  selector:
-    run: nginx
-  type: LoadBalancer
-```
-
-- **限制负载均衡的带宽**
-
-只限制负载均衡实例下的总带宽，所有监听共享实例的总带宽，参见[共享实例带宽](https://help.aliyun.com/document_detail/85930.html)。
-
-```yaml
-apiVersion: v1
-kind: Service
-metadata:
-  annotations:
-    service.beta.kubernetes.io/alibaba-cloud-loadbalancer-charge-type: "paybybandwidth"
-    service.beta.kubernetes.io/alibaba-cloud-loadbalancer-bandwidth: "100"
-  name: nginx
-  namespace: default
-spec:
-  ports:
-  - port: 443
-    protocol: TCP
-    targetPort: 443
+    targetPort: 80
   selector:
     run: nginx
   type: LoadBalancer
@@ -199,7 +178,9 @@ spec:
 - **指定负载均衡规格**
 
   负载均衡规格可参考[文档](https://help.aliyun.com/document_detail/27577.html?spm=a2c4g.11186623.2.22.6be5609abM821g#SLB-api-CreateLoadBalancer)。
-
+  通过该参数可以创建指定规格的SLB，或者更新已有SLB的规格。  
+  注意：如果您通过SLB控制台修改SLB规格，将会存在被CCM修改回原规格的风险，请谨慎操作。    
+  
 ```yaml
 apiVersion: v1
 kind: Service
@@ -440,9 +421,14 @@ spec:
   type: LoadBalancer
 ```
 
-- **创建按流量付费的负载均衡**
+- **创建按带宽计费的负载均衡**
 
-  仅支持公网类型的负载均衡实例  
+  `service.beta.kubernetes.io/alibaba-cloud-loadbalancer-bandwidth`为带宽峰值  
+  
+  仅适用于公网类型的负载均衡实例  
+  
+  其他限制请参考[修改公网负载均衡实例的计费方式](https://help.aliyun.com/document_detail/27578.html?spm=a2c4g.11186623.6.701.22482bcdAgzI6s)  
+  
   以下两项annotation必选
 
 ```yaml
@@ -450,8 +436,8 @@ apiVersion: v1
 kind: Service
 metadata:
   annotations:
-    service.beta.kubernetes.io/alibaba-cloud-loadbalancer-bandwidth: "45"
     service.beta.kubernetes.io/alibaba-cloud-loadbalancer-charge-type: "paybybandwidth"
+    service.beta.kubernetes.io/alibaba-cloud-loadbalancer-bandwidth: "45"
   name: nginx
   namespace: default
 spec:
@@ -573,6 +559,7 @@ spec:
 - **为负载均衡指定虚拟交换机**
 
   通过阿里云[专有网络控制台](https://vpc.console.aliyun.com)查询交换机ID，然后使用如下的annotation为负载均衡实例指定虚拟交换机。   
+  虚拟交换机必须与Kubernetes集群属于同一个VPC。  
   为负载均衡指定虚拟交换机，以下两项annotation必选。
 
 ```yaml
@@ -714,7 +701,115 @@ spec:
     app: nginx
   type: LoadBalancer
 ```
+- **SLB后端混合挂载ECS和弹性网卡ENI** 
 
+  集群中部署虚拟节点，详情请参见[在ACK集群中部署虚拟节点Addon](https://help.aliyun.com/document_detail/118970.html?spm=a2c4g.11186623.6.873.507e76fbzlrvZ5)。  
+  应用Pod同时运行在ECS和虚拟节点上，详情请参见[调度Pod到虚拟节点](https://help.aliyun.com/document_detail/118970.html?spm=a2c4g.11186623.6.873.507e76fbzlrvZ5)。   
+  SLB创建成功后，可在SLB后端同时看到ECS和弹性网卡ENI。  
+  ```yaml
+  apiVersion: v1
+  kind: Service
+  metadata:
+    name: nginx
+  spec:
+    ports:
+    - port: 80
+      protocol: TCP
+      targetPort: 80
+    selector:
+      app: nginx
+    type: LoadBalancer
+  ```
+  
+- 为负载均衡开启删除保护
+
+  默认开启删除保护。
+
+  > 注意：对于LoadBalancer类型的service创建的负载均衡，如手动在SLB控制台开启了删除保护，仍可通过`kubectl delete svc xxx`的方式删除service关联的负载均衡。
+
+  ```yaml
+  apiVersion: v1
+  kind: Service
+  metadata:
+    annotations:
+      service.beta.kubernetes.io/alibaba-cloud-loadbalancer-delete-protection: "on"
+    name: nginx
+  spec:
+    externalTrafficPolicy: Local
+    ports:
+    - port: 80
+      protocol: TCP
+      targetPort: 80
+    selector:
+      app: nginx
+    type: LoadBalancer
+  ```
+
+- 为负载均衡开启配置修改保护
+
+  默认开启配置修改保护。
+
+  ```yaml
+  apiVersion: v1
+  kind: Service
+  metadata:
+    annotations:
+      service.beta.kubernetes.io/alibaba-cloud-loadbalancer-modification-protection: "ConsoleProtection"
+    name: nginx
+  spec:
+    externalTrafficPolicy: Local
+    ports:
+    - port: 80
+      protocol: TCP
+      targetPort: 80
+    selector:
+      app: nginx
+    type: LoadBalancer
+  ```
+
+- 指定负载均衡名称
+
+  ```yaml
+  apiVersion: v1
+  kind: Service
+  metadata:
+    annotations:
+      service.beta.kubernetes.io/alibaba-cloud-loadbalancer-name: "your-svc-name"
+    name: nginx
+  spec:
+    externalTrafficPolicy: Local
+    ports:
+    - port: 80
+      protocol: TCP
+      targetPort: 80
+    selector:
+      app: nginx
+    type: LoadBalancer
+  ```
+
+- 指定负载均衡所属的资源组
+
+  通过阿里云[资源管理平台](https://resourcemanager.console.aliyun.com/)查询资源组ID，然后使用如下的annotation为负载均衡实例指定资源组。   
+
+  资源组ID创建后不可修改。
+
+  ```yaml
+  apiVersion: v1
+  kind: Service
+  metadata:
+    annotations:
+      service.beta.kubernetes.io/alibaba-cloud-loadbalancer-resource-group-id: "rg-xxxx"
+    name: nginx
+  spec:
+    externalTrafficPolicy: Local
+    ports:
+    - port: 80
+      protocol: TCP
+      targetPort: 80
+    selector:
+      app: nginx
+    type: LoadBalancer
+  ```
 
 **说明**
 
@@ -765,6 +860,8 @@ spec:
 | service.beta.kubernetes.io/alibaba-cloud-loadbalancer-additional-resource-tags | string | 需要添加的Tag列表，多个标签用逗号分隔。如："k1=v1,k2=v2" | 无 | v1.9.3及以上版本 |
 | service.beta.kubernetes.io/alibaba-cloud-loadbalancer-remove-unscheduled-backend | string | 从slb后端移除SchedulingDisabled Node。取值：on或off | off | v1.9.3.164-g2105d2e-aliyun及以上版本 |
 | service.beta.kubernetes.io/backend-type | string | 支持在terway eni网络模式下,通过设定该参数为"eni"，可将pod直接挂载到slb后端，提升网络转发性能。取值：eni | 无 | v1.9.3.164-g2105d2e-aliyun及以上版本 |
-| service.beta.kubernetes.io/alibaba-cloud-loadbalancer-ip-version | string | 负载均衡实例的IP版本，取值：ipv4或ipv6 | ipv4 | v1.9.3.220-g24b1885-aliyun-及以上版本 |
-
-
+| service.beta.kubernetes.io/alibaba-cloud-loadbalancer-ip-version | string | 负载均衡实例的IP版本，取值：ipv4或ipv6 | ipv4 | v1.9.3.220-g24b1885-aliyun及以上版本 |
+| service.beta.kubernetes.io/alibaba-cloud-loadbalancer-delete-protection | string | 负载均衡删除保护，取值：on或off | on | v1.9.3.304-g1f42462-aliyun及以上版本 |
+| service.beta.kubernetes.io/alibaba-cloud-loadbalancer-modification-protection | string | 负载均衡配置修改保护，取值：ConsoleProtection或NonProtection | ConsoleProtection | v1.9.3.304-g1f42462-aliyun及以上版本 |
+| service.beta.kubernetes.io/alibaba-cloud-loadbalancer-resource-group-id | string | 负载均衡所属资源组ID | 无 | v1.9.3.304-g1f42462-aliyun及以上版本 |
+| service.beta.kubernetes.io/alibaba-cloud-loadbalancer-name | string | 负载均衡实例名称 | 无                                                           | v1.9.3.304-g1f42462-aliyun及以上版本 |
