@@ -32,7 +32,7 @@ root@master # kubectl get po -n kube-system -o yaml|grep image:|grep cloud-con|u
 image: registry-vpc.cn-....-controller-manager-amd64:v1.9.3
 ```
 
-- Some features might not be usable until you upgrade your cloud-controller-manager to the latest version. See[manaully upgrade CloudProvider](https://yq.aliyun.com/articles/608563?spm=a2c4e.11153940.blogrightarea608575.9.57ed1279saZghW)。
+- Some features might not be usable until you upgrade your cloud-controller-manager to the latest version. See[manually upgrade CloudProvider](https://yq.aliyun.com/articles/608563?spm=a2c4e.11153940.blogrightarea608575.9.57ed1279saZghW)。
 
 ## How to create service with Type=LoadBalancer
 

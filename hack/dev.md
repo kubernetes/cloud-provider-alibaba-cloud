@@ -5,7 +5,7 @@ This is a guide for debug cloud-controller-manager in your local intellij idea e
 ### Step 1.
 
 Go to alibaba cloud control [panel](https://cs.console.aliyun.com), create a kubernetes cluster.
-Go to [manager infomation] page find your cluster connection configuration, and copy to local. See below.
+Go to [manager information] page find your cluster connection configuration, and copy to local. See below.
 ```
 mkdir $HOME/.kube
 scp root@$APISERVER:/etc/kubernetes/kube.conf $HOME/.kube/config
