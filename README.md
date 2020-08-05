@@ -7,7 +7,7 @@ Thank you for visiting the cloud-provider-alibaba-cloud repository!
 
 ## Development
 
-Test project with command ```make test``` and Build an image with command ```make image```
+Test project with command ```make test``` and Build an image with command ```make image```.
 
 ## QuickStart
 
