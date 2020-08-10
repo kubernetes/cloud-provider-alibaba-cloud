@@ -23,6 +23,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/denverdino/aliyungo/common"
+	"github.com/denverdino/aliyungo/ecs"
 	"github.com/denverdino/aliyungo/slb"
 	"io"
 	"k8s.io/api/core/v1"
@@ -358,25 +359,32 @@ func (c *Cloud) EnsureLoadBalancer(
 		return nil, err
 	}
 
-	// EnsurePrivateZoneRecord
-	pz, pzr, err := c.climgr.
-		PrivateZones().
-		EnsurePrivateZoneRecord(
-			ctx, service, lb.Address, defaulted.AddressIPVersion,
-		)
-	if err != nil {
-		return nil, err
+	status := &v1.LoadBalancerStatus{}
+
+	// EIP ExternalIPType, display the slb associated elastic ip as service external ip
+	if defaulted.ExternalIPType == string(EIPExternalIPType) {
+		status.Ingress, err = c.setEIPAsExternalIP(ctx, lb.LoadBalancerId)
 	}
 
-	status := &v1.LoadBalancerStatus{
-		Ingress: []v1.LoadBalancerIngress{
-			{
+	// SLB ExternalIPType, display the slb ip as service external ip
+	// If the length of elastic ip is 0, display the slb ip
+	if len(status.Ingress) == 0 {
+		pz, pzr, err := c.climgr.
+			PrivateZones().
+			EnsurePrivateZoneRecord(
+				ctx, service, lb.Address, defaulted.AddressIPVersion,
+			)
+		if err != nil {
+			return nil, err
+		}
+		status.Ingress = append(status.Ingress,
+			v1.LoadBalancerIngress{
 				IP:       lb.Address,
 				Hostname: getHostName(pz, pzr),
-			},
-		},
+			})
+
 	}
-	return status, nil
+	return status, err
 }
 
 // UpdateLoadBalancer updates hosts under the specified load balancer.
@@ -701,4 +709,36 @@ func (c *Cloud) HasClusterID() bool { return CLUSTER_ID != "clusterid" }
 func (c *Cloud) fileOutNode(nodes []*v1.Node, service *v1.Service) ([]*v1.Node, error) {
 	ar, _ := ExtractAnnotationRequest(service)
 	return c.climgr.Instances().filterOutByLabel(nodes, ar.BackendLabel)
+}
+
+func (c *Cloud) setEIPAsExternalIP(ctx context.Context, lbId string) ([]v1.LoadBalancerIngress, error) {
+	var ingress []v1.LoadBalancerIngress
+	var err error
+	eipAddr, _, err := c.climgr.instance.DescribeEipAddresses(ctx,
+		&ecs.DescribeEipAddressesArgs{
+			RegionId:               c.region,
+			AssociatedInstanceType: ecs.AssociatedInstanceTypeSlbInstance,
+			AssociatedInstanceId:   lbId,
+		})
+	if err != nil {
+		return nil, fmt.Errorf("alicloud: failed to get eip by slb id[%s], DescribeEipAddresses error: %s", lbId,
+			err.Error())
+	}
+
+	if len(eipAddr) == 0 {
+		// actually return is warning, and fmt.Errorf() is used to reveal the warning event
+		return nil, fmt.Errorf("warning: slb %s has no eip, service.beta.kubernetes.io/alibaba-cloud-loadbalancer-external-ip-type annotation does not work", lbId)
+	} else {
+		for _, eip := range eipAddr {
+			ingress = append(ingress,
+				v1.LoadBalancerIngress{
+					IP: eip.IpAddress,
+				})
+		}
+		// actually return is warning, and fmt.Errorf() is used to reveal the warning event
+		if len(eipAddr) > 1 {
+			return ingress, fmt.Errorf("warning: slb %s has multiple eips, eip len %d", lbId, len(eipAddr))
+		}
+	}
+	return ingress, nil
 }

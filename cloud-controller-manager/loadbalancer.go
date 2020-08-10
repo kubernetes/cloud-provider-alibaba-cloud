@@ -92,6 +92,7 @@ type AnnotationRequest struct {
 
 	DeleteProtection             slb.FlagType
 	ModificationProtectionStatus slb.ModificationProtectionType
+	ExternalIPType           string
 }
 
 // TAGKEY Default tag key.
@@ -762,9 +763,13 @@ func isOverrideListeners(svc *v1.Service) bool {
 
 // check if the service exists in service definition
 func isLoadbalancerOwnIngress(service *v1.Service) bool {
-	if service == nil ||
-		len(service.Status.LoadBalancer.Ingress) == 0 {
-		utils.Logf(service, "service %s doesn't have ingresses", service.Name)
+	if service == nil {
+		utils.Logf(service, "service is nil", service)
+		return false
+	}
+
+	if len(service.Status.LoadBalancer.Ingress) == 0 {
+		utils.Logf(service, "service %v doesn't have ingresses", service.Name)
 		return false
 	}
 	utils.Logf(service, "service %s has ingresses=%v", service.Name, service.Status.LoadBalancer.Ingress)
