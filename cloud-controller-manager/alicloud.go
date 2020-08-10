@@ -712,17 +712,33 @@ func (c *Cloud) fileOutNode(nodes []*v1.Node, service *v1.Service) ([]*v1.Node, 
 }
 
 func (c *Cloud) setEIPAsExternalIP(ctx context.Context, lbId string) ([]v1.LoadBalancerIngress, error) {
-	var ingress []v1.LoadBalancerIngress
-	var err error
-	eipAddr, _, err := c.climgr.instance.DescribeEipAddresses(ctx,
-		&ecs.DescribeEipAddressesArgs{
-			RegionId:               c.region,
-			AssociatedInstanceType: ecs.AssociatedInstanceTypeSlbInstance,
-			AssociatedInstanceId:   lbId,
-		})
-	if err != nil {
-		return nil, fmt.Errorf("alicloud: failed to get eip by slb id[%s], DescribeEipAddresses error: %s", lbId,
-			err.Error())
+	var (
+		ingress    []v1.LoadBalancerIngress
+		pagination common.Pagination
+		eipAddr    []ecs.EipAddressSetType
+	)
+
+	for {
+		ret, paginationResult, err := c.climgr.instance.DescribeEipAddresses(ctx,
+			&ecs.DescribeEipAddressesArgs{
+				RegionId:               c.region,
+				AssociatedInstanceType: ecs.AssociatedInstanceTypeSlbInstance,
+				AssociatedInstanceId:   lbId,
+				Pagination:             pagination,
+			})
+		if err != nil {
+			return nil, fmt.Errorf("alicloud: failed to get eip by slb id[%s], DescribeEipAddresses error: %s", lbId,
+				err.Error())
+		}
+
+		eipAddr = append(eipAddr, ret...)
+
+		next := paginationResult.NextPage()
+		if next == nil {
+			break
+		} else {
+			pagination = *next
+		}
 	}
 
 	if len(eipAddr) == 0 {
