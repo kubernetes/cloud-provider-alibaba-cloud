@@ -272,7 +272,7 @@ func (c *Cloud) GetLoadBalancer(ctx context.Context, clusterName string, service
 
 	zone, record, exists, err := c.climgr.PrivateZones().findExactRecordByService(ctx, service, lb.Address, lb.AddressIPVersion)
 	if err != nil || !exists {
-		return nil, exists, err
+		return nil, true, err
 	}
 
 	return &v1.LoadBalancerStatus{
