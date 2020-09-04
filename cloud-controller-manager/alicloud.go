@@ -27,8 +27,10 @@ import (
 	"github.com/denverdino/aliyungo/slb"
 	"io"
 	"k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/informers"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/cloud-provider"
 	"k8s.io/cloud-provider-alibaba-cloud/cloud-controller-manager/controller/node"
 	"k8s.io/cloud-provider-alibaba-cloud/cloud-controller-manager/controller/route"
@@ -62,6 +64,8 @@ type Cloud struct {
 	vpcID  string
 	//cid      string
 	ifactory informers.SharedInformerFactory
+	// kubernetes client
+	kclient kubernetes.Interface
 }
 
 var (
@@ -185,8 +189,8 @@ func newAliCloud(mgr *ClientMgr, rtableids string) (*Cloud, error) {
 
 // Initialize passes a Kubernetes clientBuilder interface to the cloud provider
 func (c *Cloud) Initialize(builder cloudprovider.ControllerClientBuilder, stop <-chan struct{}) {
-	shared := informers.NewSharedInformerFactory(
-		builder.ClientOrDie("shared-informers"), syncPeriod())
+	c.kclient = builder.ClientOrDie("shared-informers")
+	shared := informers.NewSharedInformerFactory(c.kclient, syncPeriod())
 	if route.Options.ConfigCloudRoutes {
 		cidr := route.Options.ClusterCIDR
 		if len(strings.TrimSpace(cidr)) == 0 {
@@ -270,9 +274,9 @@ func (c *Cloud) GetLoadBalancer(ctx context.Context, clusterName string, service
 		return nil, exists, err
 	}
 
-	zone, record, exists, err := c.climgr.PrivateZones().findExactRecordByService(ctx, service, lb.Address, lb.AddressIPVersion)
-	if err != nil || !exists {
-		return nil, true, err
+	zone, record, _, err := c.climgr.PrivateZones().findExactRecordByService(ctx, service, lb.Address, lb.AddressIPVersion)
+	if err != nil {
+		return nil, exists, err
 	}
 
 	return &v1.LoadBalancerStatus{
@@ -322,13 +326,11 @@ func (c *Cloud) EnsureLoadBalancer(
 		}
 	}
 	// set up endpoints
-	eps, err := c.ifactory.
-		Core().V1().
-		Endpoints().
-		Lister().
-		Endpoints(
-			service.Namespace,
-		).Get(service.Name)
+	eps, err := c.kclient.
+		CoreV1().
+		Endpoints(service.Namespace).
+		Get(context.TODO(), service.Name, metav1.GetOptions{})
+
 	if err != nil {
 		if strings.Contains(err.Error(), "not found") {
 			// compatible with nil endpoint

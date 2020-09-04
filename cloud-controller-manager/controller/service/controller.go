@@ -286,8 +286,6 @@ func (con *Controller) HandlerForEndpointChange(
 				ep2, ok2 := objb.(*v1.Endpoints)
 				if ok1 && ok2 && !reflect.DeepEqual(ep1.Subsets, ep2.Subsets) {
 					klog.Infof("controller: endpoints update event, endpoints [%s/%s]", ep1.Namespace, ep1.Name)
-					logSubsetInfo(ep1, "old")
-					logSubsetInfo(ep2, "new")
 					syncEndpoints(ep2)
 				}
 			},
@@ -776,16 +774,4 @@ func getLogMessage(err error) string {
 		message = err.Error()
 	}
 	return message
-}
-
-// TODO: remove me
-func logSubsetInfo(endpoint *v1.Endpoints, version string) {
-	if endpoint == nil {
-		klog.Error("endpoint is nil")
-		return
-	}
-	for i, ep := range endpoint.Subsets {
-		klog.Infof("[%s/%s]: %s , Subset index=%d, port len=%d, ready len=%d, not ready len=%d",
-			endpoint.Namespace, endpoint.Name, version, i, len(ep.Ports), len(ep.Addresses), len(ep.NotReadyAddresses))
-	}
 }
