@@ -316,10 +316,11 @@ func (f *FrameWork) RunCustomized(
 }
 
 func (f *FrameWork) Run(run CustomizedTest) error {
-	//
+	// initialize kubernetes client
+	f.Cloud.kclient = fake.NewSimpleClientset(f.Endpoint, f.SVC)
 	// initialize shared informer factory before run any test.
 	f.Cloud.ifactory = informers.NewSharedInformerFactory(
-		fake.NewSimpleClientset(f.Endpoint, f.SVC), 0,
+		f.Cloud.kclient, 0,
 	)
 	// set informer
 	inform := f.Cloud.ifactory.Core().V1().Endpoints().Informer()
