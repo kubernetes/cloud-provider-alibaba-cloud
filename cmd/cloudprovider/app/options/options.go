@@ -22,10 +22,10 @@ import (
 	"k8s.io/kubernetes/pkg/client/leaderelectionconfig"
 	"k8s.io/kubernetes/pkg/util/flag"
 	// add the kubernetes feature gates
-	_ "k8s.io/kubernetes/pkg/features"
-
 	"github.com/spf13/pflag"
+	manager "k8s.io/cloud-provider-alibaba-cloud/cloud-controller-manager"
 	"k8s.io/cloud-provider-alibaba-cloud/cmd/cloudprovider/app"
+	_ "k8s.io/kubernetes/pkg/features"
 )
 
 // AddFlags adds flags for a specific ExternalCMServer to the specified FlagSet
@@ -56,6 +56,15 @@ func AddFlags(ccm *app.ServerCCM, fs *pflag.FlagSet) {
 	fs.Int32Var(&ccm.Generic.ClientConnection.Burst, "kube-api-burst", ccm.Generic.ClientConnection.Burst, "Burst to use while talking with kubernetes apiserver.")
 	fs.DurationVar(&ccm.Generic.ControllerStartInterval.Duration, "controller-start-interval", ccm.Generic.ControllerStartInterval.Duration, "Interval between starting controller managers.")
 	fs.Int32Var(&ccm.ServiceController.ConcurrentServiceSyncs, "concurrent-service-syncs", ccm.ServiceController.ConcurrentServiceSyncs, "The number of services that are allowed to sync concurrently. Larger number = more responsive service management, but more CPU (and network) load")
+	fs.BoolVar(&manager.RouteCfg.AutoPublishRoute, "auto-publish-route", false, "When the parameter is set to true, the Route is automatically published when it is created.")
+	fs.StringVar(&manager.RouteCfg.CenId, "cen-id", "", "Aliyun cenID")
+	if manager.RouteCfg.AutoPublishRoute {
+		if manager.RouteCfg.CenId == "" {
+			panic("need cen-id")
+		}
+		klog.Warningf("route will be published automatically when create,cenID:%v", manager.RouteCfg.CenId)
+	}
+
 	err := fs.MarkDeprecated("allow-untagged-cloud", "This flag is deprecated and will be removed in a future release. A cluster-id will be required on cloud instances.")
 	if err != nil {
 		klog.Warningf("add flags error: %s", err.Error())

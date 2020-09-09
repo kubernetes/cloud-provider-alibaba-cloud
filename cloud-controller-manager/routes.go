@@ -18,6 +18,7 @@ package alicloud
 
 import (
 	"context"
+	"github.com/aliyun/alibaba-cloud-sdk-go/services/cbn"
 	"k8s.io/cloud-provider"
 	"k8s.io/klog"
 
@@ -27,6 +28,13 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"strings"
 )
+
+var RouteCfg RouteConfig
+
+type RouteConfig struct {
+	AutoPublishRoute bool
+	CenId            string
+}
 
 type vpc struct {
 	vpcid     string
@@ -48,6 +56,7 @@ type RouteSDK interface {
 	DescribeRouteTables(ctx context.Context, args *ecs.DescribeRouteTablesArgs) (routeTables []ecs.RouteTableSetType, pagination *common.PaginationResult, err error)
 	DeleteRouteEntry(ctx context.Context, args *ecs.DeleteRouteEntryArgs) error
 	CreateRouteEntry(ctx context.Context, args *ecs.CreateRouteEntryArgs) error
+	PublishRouteEntry(ctx context.Context, args *cbn.PublishRouteEntriesRequest) error
 	WaitForAllRouteEntriesAvailable(ctx context.Context, vrouterId string, routeTableId string, timeout int) error
 	DescribeRouteEntryList(ctx context.Context, args *ecs.DescribeRouteEntryListArgs) (response *ecs.DescribeRouteEntryListResponse, err error)
 }
@@ -211,7 +220,21 @@ func WaitCreate(ctx context.Context, rc *RoutesClient, tableid string, route *ec
 	if err != nil {
 		return fmt.Errorf("WaitCreate: ceate route for table %s error, %s", tableid, err.Error())
 	}
-	return WaitForRouteEntryAvailable(ctx, rc.client, rc.vpc.vrouterid, tableid)
+	err = WaitForRouteEntryAvailable(ctx, rc.client, rc.vpc.vrouterid, tableid)
+	if err != nil {
+		return err
+	}
+	if !RouteCfg.AutoPublishRoute {
+		return nil
+	}
+	PublishRouteEntriesRequest := cbn.CreatePublishRouteEntriesRequest()
+	PublishRouteEntriesRequest.CenId = RouteCfg.CenId
+	PublishRouteEntriesRequest.ChildInstanceId = route.NextHopId
+	PublishRouteEntriesRequest.ChildInstanceType = string(route.NextHopType)
+	PublishRouteEntriesRequest.ChildInstanceRegionId = rc.region
+	PublishRouteEntriesRequest.ChildInstanceRouteTableId = route.RouteTableId
+	PublishRouteEntriesRequest.DestinationCidrBlock = route.DestinationCidrBlock
+	return rc.client.PublishRouteEntry(ctx, PublishRouteEntriesRequest)
 }
 
 // WaitDelete delete route and wait for route ready

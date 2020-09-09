@@ -60,6 +60,8 @@ type ServerCCM struct {
 	// NodeStatusUpdateFrequency is the frequency at which the controller
 	// updates nodes' status
 	NodeStatusUpdateFrequency metav1.Duration
+	// for create route and auto published
+	PublishWhenCreateRouter bool
 }
 
 // NewServerCCM creates a new ExternalCMServer with a default config.

@@ -2,11 +2,14 @@ package alicloud
 
 import (
 	"context"
+	"fmt"
+	"github.com/aliyun/alibaba-cloud-sdk-go/services/cbn"
 	"github.com/denverdino/aliyungo/common"
 	"github.com/denverdino/aliyungo/ecs"
 	"github.com/denverdino/aliyungo/pvtz"
 	"github.com/denverdino/aliyungo/slb"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/klog"
 )
 
 type BaseClient struct {
@@ -114,7 +117,6 @@ func (c *ContextedClientSLB) DeleteLoadBalancer(ctx context.Context, loadBalance
 func (c *ContextedClientSLB) SetLoadBalancerDeleteProtection(ctx context.Context, args *slb.SetLoadBalancerDeleteProtectionArgs) (err error) {
 	return c.slb.SetLoadBalancerDeleteProtection(args)
 }
-
 
 func (c *ContextedClientSLB) SetLoadBalancerName(ctx context.Context, loadBalancerId string, loadBalancerName string) (err error) {
 
@@ -312,7 +314,7 @@ func NewContextedClientPVTZ(key, secret, region string) *ContextedClientPVTZ {
 	return &ContextedClientPVTZ{
 		BaseClient: BaseClient{},
 		// TODO: change to regional client
-		pvtz:       pvtz.NewPVTZClientWithSecurityToken(key, secret, "", common.Region(region)),
+		pvtz: pvtz.NewPVTZClientWithSecurityToken(key, secret, "", common.Region(region)),
 	}
 }
 
@@ -377,9 +379,14 @@ func (c *ContextedClientPVTZ) SetZoneRecordStatus(ctx context.Context, args *pvt
 // =====================================================================================================================
 
 func NewContextedClientRoute(key, secret, region string) *ContextedClientRoute {
+	cbn, err := cbn.NewClientWithAccessKey(region, key, secret)
+	if err != nil {
+		panic(fmt.Sprintf("get error:%v , use key:%v,secret:%v,region:%v", err, key, secret, region))
+	}
 	return &ContextedClientRoute{
 		BaseClient: BaseClient{},
 		ecs:        ecs.NewVPCClientWithSecurityToken4RegionalDomain(key, secret, "", common.Region(region)),
+		cbnSDK:     cbn,
 	}
 }
 
@@ -387,6 +394,8 @@ type ContextedClientRoute struct {
 	BaseClient
 	// base slb client
 	ecs *ecs.Client
+	// some api use alibaba-cloud-sdk-go
+	cbnSDK *cbn.Client
 }
 
 func (c *ContextedClientRoute) DescribeVpcs(ctx context.Context, args *ecs.DescribeVpcsArgs) (vpcs []ecs.VpcSetType, pagination *common.PaginationResult, err error) {
@@ -408,9 +417,20 @@ func (c *ContextedClientRoute) DescribeRouteEntryList(ctx context.Context, args 
 func (c *ContextedClientRoute) DeleteRouteEntry(ctx context.Context, args *ecs.DeleteRouteEntryArgs) error {
 	return c.ecs.DeleteRouteEntry(args)
 }
+
 func (c *ContextedClientRoute) CreateRouteEntry(ctx context.Context, args *ecs.CreateRouteEntryArgs) error {
 	return c.ecs.CreateRouteEntry(args)
 }
+
+func (c *ContextedClientRoute) PublishRouteEntry(ctx context.Context, args *cbn.PublishRouteEntriesRequest) error {
+	response, err := c.cbnSDK.PublishRouteEntries(args)
+	if err != nil {
+		return err
+	}
+	klog.Infof("PublishRouteEntries response:%v", response)
+	return nil
+}
+
 func (c *ContextedClientRoute) WaitForAllRouteEntriesAvailable(ctx context.Context, vrouterId string, routeTableId string, timeout int) error {
 	return c.ecs.WaitForAllRouteEntriesAvailable(vrouterId, routeTableId, timeout)
 }
