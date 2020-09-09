@@ -425,6 +425,7 @@ func (c *ContextedClientRoute) CreateRouteEntry(ctx context.Context, args *ecs.C
 func (c *ContextedClientRoute) PublishRouteEntry(ctx context.Context, args *cbn.PublishRouteEntriesRequest) error {
 	response, err := c.cbnSDK.PublishRouteEntries(args)
 	if err != nil {
+		klog.Errorf("PublishRouteEntries err:%v", err)
 		return err
 	}
 	klog.Infof("PublishRouteEntries response:%v", response)
