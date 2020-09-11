@@ -18,7 +18,7 @@ package alicloud
 
 import (
 	"context"
-	"github.com/aliyun/alibaba-cloud-sdk-go/services/cbn"
+	"github.com/denverdino/aliyungo/cen"
 	"k8s.io/cloud-provider"
 	"k8s.io/klog"
 
@@ -56,7 +56,7 @@ type RouteSDK interface {
 	DescribeRouteTables(ctx context.Context, args *ecs.DescribeRouteTablesArgs) (routeTables []ecs.RouteTableSetType, pagination *common.PaginationResult, err error)
 	DeleteRouteEntry(ctx context.Context, args *ecs.DeleteRouteEntryArgs) error
 	CreateRouteEntry(ctx context.Context, args *ecs.CreateRouteEntryArgs) error
-	PublishRouteEntry(ctx context.Context, args *cbn.PublishRouteEntriesRequest) error
+	PublishRouteEntry(ctx context.Context, args *cen.PublishRouteEntriesArgs) error
 	WaitForAllRouteEntriesAvailable(ctx context.Context, vrouterId string, routeTableId string, timeout int) error
 	DescribeRouteEntryList(ctx context.Context, args *ecs.DescribeRouteEntryListArgs) (response *ecs.DescribeRouteEntryListResponse, err error)
 }
@@ -222,19 +222,27 @@ func WaitCreate(ctx context.Context, rc *RoutesClient, tableid string, route *ec
 	}
 	err = WaitForRouteEntryAvailable(ctx, rc.client, rc.vpc.vrouterid, tableid)
 	if err != nil {
+		klog.Errorf("WaitForRouteEntryAvailable err:%v", err)
 		return err
 	}
 	if !RouteCfg.AutoPublishRoute {
+		klog.Info("AutoPublishRoute is false")
 		return nil
 	}
-	PublishRouteEntriesRequest := cbn.CreatePublishRouteEntriesRequest()
+
+	PublishRouteEntriesRequest := &cen.PublishRouteEntriesArgs{
+		ChildInstanceType: "VPC",
+	}
 	PublishRouteEntriesRequest.CenId = RouteCfg.CenId
-	PublishRouteEntriesRequest.ChildInstanceId = route.NextHopId
-	PublishRouteEntriesRequest.ChildInstanceType = string(route.NextHopType)
+	PublishRouteEntriesRequest.ChildInstanceId = rc.vpc.vpcid
 	PublishRouteEntriesRequest.ChildInstanceRegionId = rc.region
 	PublishRouteEntriesRequest.ChildInstanceRouteTableId = route.RouteTableId
 	PublishRouteEntriesRequest.DestinationCidrBlock = route.DestinationCidrBlock
-	return rc.client.PublishRouteEntry(ctx, PublishRouteEntriesRequest)
+	klog.Info(*PublishRouteEntriesRequest)
+	if err = rc.client.PublishRouteEntry(ctx, PublishRouteEntriesRequest); err != nil {
+		klog.Errorf("PublishRouteEntry err:%v", err)
+	}
+	return err
 }
 
 // WaitDelete delete route and wait for route ready

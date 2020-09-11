@@ -3,12 +3,13 @@ module k8s.io/cloud-provider-alibaba-cloud
 go 1.14
 
 require (
-	github.com/aliyun/alibaba-cloud-sdk-go v1.61.480
+	github.com/aliyun/alibaba-cloud-sdk-go v1.61.480 // indirect
 	github.com/denverdino/aliyungo v0.0.0-20200710064824-52d8320f2b1c
 	github.com/docker/distribution v2.7.1+incompatible
 	github.com/go-cmd/cmd v1.2.0
 	github.com/golang/groupcache v0.0.0-20180513044358-24b0969c4cb7 // indirect
 	github.com/googleapis/gnostic v0.2.0 // indirect
+	github.com/labstack/gommon v0.3.0 // indirect
 	github.com/prometheus/client_golang v1.0.0
 	github.com/spf13/pflag v1.0.5
 	golang.org/x/net v0.0.0-20191004110552-13f9640d40b9

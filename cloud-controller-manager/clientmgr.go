@@ -78,11 +78,10 @@ func NewClientMgr(key, secret string) (*ClientMgr, error) {
 			c: NewContextedClientPVTZ(key, secret, "cn-hangzhou"),
 		},
 		routes: &RoutesClient{
-			client: NewContextedClientRoute(key, secret, region),
+			client: NewContextedClientRoute(key, secret, region, vpcid),
 			region: region,
 		},
 	}
-
 	if key == "" || secret == "" {
 		klog.Infof("alicloud: use ramrole token mode without ak.")
 		mgr.token = &RamRoleToken{meta: m}
@@ -156,11 +155,15 @@ func RefreshToken(mgr *ClientMgr, token *Token) error {
 	vpcclient.ecs.WithSecurityToken(token.Token).
 		WithAccessKeyId(token.AccessKey).
 		WithAccessKeySecret(token.AccessSecret)
+	vpcclient.cen.WithSecurityToken(token.Token).
+		WithAccessKeyId(token.AccessKey).
+		WithAccessKeySecret(token.AccessSecret)
 
 	ecsclient.ecs.SetUserAgent(KUBERNETES_ALICLOUD_IDENTITY)
 	slbclient.slb.SetUserAgent(KUBERNETES_ALICLOUD_IDENTITY)
 	pvtzclient.pvtz.SetUserAgent(KUBERNETES_ALICLOUD_IDENTITY)
 	vpcclient.ecs.SetUserAgent(KUBERNETES_ALICLOUD_IDENTITY)
+	vpcclient.cen.SetUserAgent(KUBERNETES_ALICLOUD_IDENTITY)
 	return nil
 }
 

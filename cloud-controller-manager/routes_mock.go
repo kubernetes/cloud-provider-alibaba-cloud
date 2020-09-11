@@ -3,7 +3,7 @@ package alicloud
 import (
 	"context"
 	"fmt"
-	"github.com/aliyun/alibaba-cloud-sdk-go/services/cbn"
+	"github.com/denverdino/aliyungo/cen"
 	"github.com/denverdino/aliyungo/common"
 	"github.com/denverdino/aliyungo/ecs"
 	"reflect"
@@ -220,7 +220,7 @@ func (m *mockRouteSDK) CreateRouteEntry(ctx context.Context, args *ecs.CreateRou
 	return nil
 }
 
-func (m *mockRouteSDK) PublishRouteEntry(ctx context.Context, args *cbn.PublishRouteEntriesRequest) error {
+func (m *mockRouteSDK) PublishRouteEntry(ctx context.Context, args *cen.PublishRouteEntriesArgs) error {
 	return nil
 }
 
