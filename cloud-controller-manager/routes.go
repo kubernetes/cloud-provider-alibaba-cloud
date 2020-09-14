@@ -238,11 +238,11 @@ func WaitCreate(ctx context.Context, rc *RoutesClient, tableid string, route *ec
 	PublishRouteEntriesRequest.ChildInstanceRegionId = rc.region
 	PublishRouteEntriesRequest.ChildInstanceRouteTableId = route.RouteTableId
 	PublishRouteEntriesRequest.DestinationCidrBlock = route.DestinationCidrBlock
-	klog.Info(*PublishRouteEntriesRequest)
 	if err = rc.client.PublishRouteEntry(ctx, PublishRouteEntriesRequest); err != nil {
 		klog.Errorf("PublishRouteEntry err:%v", err)
 	}
-	return err
+	klog.Info("PublishRouteEntry success")
+	return nil
 }
 
 // WaitDelete delete route and wait for route ready
@@ -267,5 +267,5 @@ func (r *RoutesClient) Error(e error) string {
 
 // WaitForRouteEntryAvailable wait for route entry available
 func WaitForRouteEntryAvailable(ctx context.Context, client RouteSDK, routeid, tableid string) error {
-	return client.WaitForAllRouteEntriesAvailable(ctx, routeid, tableid, 60)
+	return client.WaitForAllRouteEntriesAvailable(ctx, routeid, tableid, 360)
 }
