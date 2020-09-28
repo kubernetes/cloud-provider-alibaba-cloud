@@ -365,7 +365,7 @@ func EnsureListenersDeleted(
 		local,
 		func(i, j int) bool {
 			// 1. http comes first.
-			return strings.ToUpper(local[i].TransforedProto, ) == "HTTP"
+			return strings.ToUpper(local[i].TransforedProto) == "HTTP"
 		},
 	)
 
