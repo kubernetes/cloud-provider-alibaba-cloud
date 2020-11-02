@@ -5,8 +5,8 @@ go 1.14
 require (
 	github.com/denverdino/aliyungo v0.0.0-20200710064824-52d8320f2b1c
 	github.com/docker/distribution v2.7.1+incompatible
+	github.com/ghodss/yaml v1.0.0
 	github.com/go-cmd/cmd v1.2.0
-	github.com/golang/glog v0.0.0-20160126235308-23def4e6c14b
 	github.com/golang/groupcache v0.0.0-20180513044358-24b0969c4cb7 // indirect
 	github.com/googleapis/gnostic v0.2.0 // indirect
 	github.com/prometheus/client_golang v1.0.0
@@ -21,7 +21,6 @@ require (
 	k8s.io/component-base v0.18.1
 	k8s.io/klog v1.0.0
 	k8s.io/kube-aggregator v0.0.0
-	k8s.io/kube-controller-manager v0.18.1 // indirect
 	k8s.io/kubernetes v0.0.0
 )
 

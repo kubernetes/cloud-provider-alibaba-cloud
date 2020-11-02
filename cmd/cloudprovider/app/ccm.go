@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	alicloud "k8s.io/cloud-provider-alibaba-cloud/cloud-controller-manager"
 	"k8s.io/cloud-provider-alibaba-cloud/cloud-controller-manager/utils/metric"
 	componentbaseconfig "k8s.io/component-base/config"
 	"k8s.io/klog"
@@ -149,6 +150,7 @@ func (ccm *ServerCCM) initialization() error {
 		return fmt.Errorf("--cloud-provider cannot be empty")
 	}
 
+	alicloud.CloudConfigFile = ccm.KubeCloudShared.CloudProvider.CloudConfigFile
 	cloud, err := cloudprovider.InitCloudProvider(
 		ccm.KubeCloudShared.CloudProvider.Name,
 		ccm.KubeCloudShared.CloudProvider.CloudConfigFile,
@@ -156,6 +158,7 @@ func (ccm *ServerCCM) initialization() error {
 	if err != nil {
 		return fmt.Errorf("cloud provider could not be initialized: %v", err)
 	}
+
 	ccm.cloud = cloud
 	if !cloud.HasClusterID() {
 		if ccm.KubeCloudShared.AllowUntaggedCloud {
