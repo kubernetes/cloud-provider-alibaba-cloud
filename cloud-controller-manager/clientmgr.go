@@ -19,12 +19,16 @@ package alicloud
 import (
 	"encoding/json"
 	"github.com/denverdino/aliyungo/metadata"
+	"github.com/ghodss/yaml"
+	"github.com/go-cmd/cmd"
+
+	"io/ioutil"
 	"k8s.io/klog"
 	"path/filepath"
 	"time"
 
+	"encoding/base64"
 	"fmt"
-	"github.com/go-cmd/cmd"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"strings"
 )
@@ -195,7 +199,23 @@ type TokenAuth interface {
 // AkAuthToken implement ak auth
 type AkAuthToken struct{ ak *Token }
 
-func (f *AkAuthToken) NextToken() (*Token, error) { return f.ak, nil }
+func (f *AkAuthToken) NextToken() (*Token, error) {
+	if err := reloadConfig(); err != nil {
+		return f.ak, err
+	}
+
+	key, secret, err := getAKFromConfig()
+	if err != nil {
+		return f.ak, err
+	}
+
+	f.ak = &Token{
+		AccessKey:    key,
+		AccessSecret: secret,
+		UID:          cfg.Global.UID,
+	}
+	return f.ak, nil
+}
 
 type RamRoleToken struct {
 	meta IMetaData
@@ -225,17 +245,25 @@ type ServiceToken struct {
 }
 
 func (f *ServiceToken) NextToken() (*Token, error) {
+	if err := reloadConfig(); err != nil {
+		return nil, err
+	}
+	key, secret, err := getAKFromConfig()
+	if err != nil {
+		return nil, err
+	}
+
 	status := <-cmd.NewCmd(
 		filepath.Join(f.execpath, "servicetoken"),
 		fmt.Sprintf("--uid=%s", f.svcak.UID),
-		fmt.Sprintf("--key=%s", f.svcak.AccessKey),
-		fmt.Sprintf("--secret=%s", f.svcak.AccessSecret),
+		fmt.Sprintf("--key=%s", key),
+		fmt.Sprintf("--secret=%s", secret),
 	).Start()
 	if status.Error != nil {
 		return nil, fmt.Errorf("invoke servicetoken: %s", status.Error.Error())
 	}
 	token := &Token{}
-	err := json.Unmarshal(
+	err = json.Unmarshal(
 		[]byte(strings.Join(status.Stdout, "")),
 		token,
 	)
@@ -243,6 +271,41 @@ func (f *ServiceToken) NextToken() (*Token, error) {
 		return token, nil
 	}
 	return nil, fmt.Errorf("unmarshal token: %s", err.Error())
+}
+
+var CloudConfigFile string
+
+func reloadConfig() error {
+	if CloudConfigFile == "" {
+		return fmt.Errorf("failed to load ak, cloud config is nil")
+	}
+
+	config, err := ioutil.ReadFile(CloudConfigFile)
+	if err != nil {
+		return fmt.Errorf("read cloud config file error: %s", err.Error())
+	}
+	return yaml.Unmarshal(config, &cfg)
+}
+
+func getAKFromConfig() (string, string, error) {
+	var (
+		keyId     string
+		keySecret string
+	)
+
+	if cfg.Global.AccessKeyID != "" && cfg.Global.AccessKeySecret != "" {
+		key, err := base64.StdEncoding.DecodeString(cfg.Global.AccessKeyID)
+		if err != nil {
+			return keyId, keySecret, err
+		}
+		keyId = string(key)
+		secret, err := base64.StdEncoding.DecodeString(cfg.Global.AccessKeySecret)
+		if err != nil {
+			return keyId, keySecret, err
+		}
+		keySecret = string(secret)
+	}
+	return keyId, keySecret, nil
 }
 
 // IMetaData metadata interface

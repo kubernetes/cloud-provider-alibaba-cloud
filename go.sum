@@ -102,14 +102,6 @@ github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSs
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/daviddengcn/go-colortext v0.0.0-20160507010035-511bcaf42ccd/go.mod h1:dv4zxwHi5C/8AeI+4gX4dCWOIvNi7I6JCSX0HvlKPgE=
-github.com/denverdino/aliyungo v0.0.0-20190325014556-e961d750c214 h1:GCb/TK6QV6VsOyJyz5mAtXRChq7qLpwtv4CseZH5TZM=
-github.com/denverdino/aliyungo v0.0.0-20190325014556-e961d750c214/go.mod h1:dV8lFg6daOBZbT6/BDGIz6Y3WFGn8juu6G+CQ6LHtl0=
-github.com/denverdino/aliyungo v0.0.0-20200327235253-d59c209c7e93 h1:ujQ4DKs+MqFWy/hoLAU4Ey/nQhqJ6pXyocMDbVJ4qSw=
-github.com/denverdino/aliyungo v0.0.0-20200327235253-d59c209c7e93/go.mod h1:dV8lFg6daOBZbT6/BDGIz6Y3WFGn8juu6G+CQ6LHtl0=
-github.com/denverdino/aliyungo v0.0.0-20200518031524-d1b1bec9ae5a h1:OWBhDgIvp99ugF1+0ZeKUgOS1RLk+YPHF7/qulfswxw=
-github.com/denverdino/aliyungo v0.0.0-20200518031524-d1b1bec9ae5a/go.mod h1:dV8lFg6daOBZbT6/BDGIz6Y3WFGn8juu6G+CQ6LHtl0=
-github.com/denverdino/aliyungo v0.0.0-20200602122618-61481102ecbd h1:RyAcsUg4QLTWTNT5WJAYrCWotpxdHDk/T63bgvAKlyE=
-github.com/denverdino/aliyungo v0.0.0-20200602122618-61481102ecbd/go.mod h1:dV8lFg6daOBZbT6/BDGIz6Y3WFGn8juu6G+CQ6LHtl0=
 github.com/denverdino/aliyungo v0.0.0-20200710064824-52d8320f2b1c h1:mu8/VfrU80HCrKyUiyMkDRbkC0pkJaqQ3jAoN0YsPDA=
 github.com/denverdino/aliyungo v0.0.0-20200710064824-52d8320f2b1c/go.mod h1:dV8lFg6daOBZbT6/BDGIz6Y3WFGn8juu6G+CQ6LHtl0=
 github.com/dgrijalva/jwt-go v3.2.0+incompatible h1:7qlOGliEKZXTDg6OTjfoBKDXWrumCAMpl/TFQ4/5kLM=
@@ -771,8 +763,6 @@ k8s.io/gengo v0.0.0-20190822140433-26a664648505/go.mod h1:ezvh/TsK7cY6rbqRK0oQQ8
 k8s.io/heapster v1.2.0-beta.1/go.mod h1:h1uhptVXMwC8xtZBYsPXKVi8fpdlYkTs6k949KozGrM=
 k8s.io/klog v1.0.0 h1:Pt+yjF5aB1xDSVbau4VsWe+dQNzA0qv1LlXdC2dF6Q8=
 k8s.io/klog v1.0.0/go.mod h1:4Bi6QPql/J/LkTDqv7R/cd3hPo4k2DG6Ptcz060Ez5I=
-k8s.io/kube-controller-manager v0.18.1 h1:ZYZRJ000xstztlZn+2vTAHdrWCwyN8RkrYKxbFkiCtg=
-k8s.io/kube-controller-manager v0.18.1/go.mod h1:HFp15+aGPbGns4K9jD9TxJVuc9eeiylCtjgCunRV3B4=
 k8s.io/kube-openapi v0.0.0-20200121204235-bf4fb3bd569c h1:/KUFqjjqAcY4Us6luF5RDNZ16KJtb49HfR3ZHB9qYXM=
 k8s.io/kube-openapi v0.0.0-20200121204235-bf4fb3bd569c/go.mod h1:GRQhZsXIAJ1xR0C9bd8UpWHZ5plfAS9fzPjJuQ6JL3E=
 k8s.io/kubernetes v0.0.0-20200325144952-9e991415386e h1:qDRI4I7s1zm/HB4v4QZZgzX0z8oX+PyHsjcowu4bAJo=
