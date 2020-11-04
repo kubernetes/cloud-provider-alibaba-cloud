@@ -2,12 +2,12 @@
 
 .PHONY: test e2e-test cover gofmt gofmt-fix  clean cloud-controller-manager
 
-# Registry used for publishing images
-REGISTRY?=registry.cn-hangzhou.aliyuncs.com/acs/cloud-controller-manager-amd64
-
 # Default tag and architecture. Can be overridden
 TAG?=$(shell git describe --tags)
 ARCH?=amd64
+
+# Registry used for publishing images
+REGISTRY?=registry.cn-hangzhou.aliyuncs.com/acs/cloud-controller-manager-$(ARCH)
 
 CGO_ENABLED=1
 # Set the (cross) compiler to use for different architectures
@@ -27,7 +27,7 @@ KUBE_CROSS_TAG=v1.12.0-1
 IPTABLES_VERSION=1.4.21
 
 cloud-controller-manager: $(shell find . -type f  -name '*.go')
-		CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
+		CGO_ENABLED=0 GOOS=linux GOARCH=$(ARCH) \
 		go build \
 		    -mod readonly \
 		    -o alibaba-cloud-ccm \
@@ -45,7 +45,6 @@ gofmt-fix:
 
 golangci-lint:
 	bash -c 'golangci-lint run'
-
 
 clean:
 	rm -f cloud-controller-manager*
@@ -98,11 +97,6 @@ image: cloud-controller-manager-$(ARCH)
 docker-push:
 	docker push $(REGISTRY):$(TAG)
 
-# amd64 gets an image with the suffix too (i.e. it's the default)
-ifeq ($(ARCH),amd64)
-	docker push $(REGISTRY):$(TAG)
-endif
-
 docker-build: cloud-controller-manager-$(ARCH)
 
 ## Build an architecture specific cloud-controller-manager binary
@@ -115,4 +109,6 @@ cloud-controller-manager-$(ARCH): pre-requisite
 		-v $(HOME)/mod:/go/pkg/mod \
 		golang:1.14.1 /bin/bash -c '\
 		cd /go/src/k8s.io/cloud-provider-alibaba-cloud && \
-		TAG=$(TAG) make -e cloud-controller-manager'
+		TAG=$(TAG) ARCH=$(ARCH) make -e cloud-controller-manager'
+
+docker push $(REGISTRY):$(TAG)
