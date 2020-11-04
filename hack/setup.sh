@@ -7,7 +7,7 @@ fi
 kubectl get ds -n kube-system cloud-controller-manager -o yaml |grep image:|awk -F "image: " '{print $2}'|xargs -I '{}' kubectl set image ds/cloud-controller-manager -n kube-system cloud-controller-manager={}-bak
 
 ### restart your cloud-controller-manager.
-#kubectl get po -n kube-system|grep cloud-con|awk '{print $1}'|xargs -I '{}' kubectl delete po -n kube-system {}
+kubectl -n kube-system delete po -lapp=cloud-controller-manager
 
 setup_localproxy()
 {
@@ -23,8 +23,11 @@ setup_localproxy()
 	echo "2. copy cloud-controller-manager.conf to /etc/kubernetes/cloud-controller-manager.conf"
 	scp root@$APISERVER_IP:/etc/kubernetes/cloud-controller-manager.conf cloud-controller-manager.conf
 	SERVER=$(grep "server: https:/" cloud-controller-manager.conf)
-
 	sed -i '' "s@$SERVER@    server: https://$APISERVER_IP:6443@" cloud-controller-manager.conf
+	NAME=$(grep "name: c" cloud-controller-manager.conf)
+	if [ -n "$NAME" ];then
+	    sed -i '' "s@$NAME@  name: kubernetes@" cloud-controller-manager.conf
+	fi
 	sudo cp cloud-controller-manager.conf /etc/kubernetes/cloud-controller-manager.conf
 #	cat /etc/kubernetes/cloud-controller-manager.conf
 	sudo rm -rf cloud-controller-manager.conf

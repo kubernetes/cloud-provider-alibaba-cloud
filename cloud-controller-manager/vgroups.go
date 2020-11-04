@@ -391,7 +391,7 @@ func CleanUPVGroupDirect(ctx context.Context, local *vgroups) error {
 	return nil
 }
 
-func BuildVirturalGroupFromService(
+func BuildVirtualGroupFromService(
 	client *LoadBalancerClient,
 	service *v1.Service,
 	slbins *slb.LoadBalancerType,
