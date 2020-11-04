@@ -21,6 +21,7 @@ import (
 	"k8s.io/cloud-provider"
 	"k8s.io/cloud-provider-alibaba-cloud/cloud-controller-manager/utils"
 	"k8s.io/cloud-provider-alibaba-cloud/cloud-controller-manager/utils/metric"
+	servicehelper "k8s.io/cloud-provider/service/helpers"
 	metrics "k8s.io/component-base/metrics/prometheus/ratelimiter"
 	"k8s.io/klog"
 	controller "k8s.io/kube-aggregator/pkg/controllers"
@@ -543,6 +544,12 @@ func (con *Controller) update(cached, svc *v1.Service) error {
 			// remove svc from cache which is not loadbalancer type
 			con.local.Remove(key(svc))
 		}
+
+		//remove hashLabel
+		if err := con.removeServiceHash(svc); err != nil {
+			return err
+		}
+
 		// continue for updating service status.
 		newm = &v1.LoadBalancerStatus{}
 	} else {
@@ -573,6 +580,9 @@ func (con *Controller) update(cached, svc *v1.Service) error {
 				"SuccessfulEnsure",
 				"Ensure loadbalancer successfully",
 			)
+			if err := con.addServiceHash(svc); err != nil {
+				return err
+			}
 		} else {
 			// If error msg contains "warning", just broadcast warning events, not retry to ensure loadbalancer
 			if strings.Contains(err.Error(), "warning") {
@@ -605,6 +615,34 @@ func (con *Controller) update(cached, svc *v1.Service) error {
 	con.local.Set(key(svc), svc)
 	return nil
 }
+
+func (con *Controller) addServiceHash(svc *v1.Service) error {
+	updated := svc.DeepCopy()
+	if updated.Labels == nil {
+		updated.Labels = make(map[string]string)
+	}
+	serviceHash, err := utils.GetServiceHash(svc)
+	if err != nil {
+		return fmt.Errorf("compute service hash: %s", err.Error())
+	}
+	updated.Labels[utils.LabelServiceHash] = serviceHash
+	if _, err := servicehelper.PatchService(con.client.CoreV1(), svc, updated); err != nil {
+		return fmt.Errorf("update service hash: %s", err.Error())
+	}
+	return nil
+}
+
+func (con *Controller) removeServiceHash(svc *v1.Service) error {
+	updated := svc.DeepCopy()
+	if _, ok := updated.Labels[utils.LabelServiceHash]; ok {
+		delete(updated.Labels, utils.LabelServiceHash)
+		if _, err := servicehelper.PatchService(con.client.CoreV1(), svc, updated); err != nil {
+			return fmt.Errorf("remove service hash, error: %s", err.Error())
+		}
+	}
+	return nil
+}
+
 func (con *Controller) updateStatus(svc *v1.Service, pre, newm *v1.LoadBalancerStatus) error {
 	if newm == nil {
 		return fmt.Errorf("status not updated for nil status reason")

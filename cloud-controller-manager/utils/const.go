@@ -17,6 +17,7 @@ const (
 	// LabelNodeRoleExcludeBalancer specifies that the node should be
 	// exclude from loadbalancers created by a cloud provider.
 	LabelNodeRoleExcludeBalancer            = "alpha.service-controller.kubernetes.io/exclude-balancer"
+	LabelServiceHash                        = "service.beta.kubernetes.io/hash"
 	ECINodeLabel                            = "virtual-kubelet"
 	ContextService               contextKey = "request.service"
 )
