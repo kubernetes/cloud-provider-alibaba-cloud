@@ -650,12 +650,7 @@ func (con *Controller) updateStatus(svc *v1.Service, pre, newm *v1.LoadBalancerS
 	// Write the state if changed
 	// TODO: Be careful here ... what if there were other changes to the service?
 	if !v1helper.LoadBalancerStatusEqual(pre, newm) {
-		// Make a copy so we don't mutate the shared informer cache
-		service := svc.DeepCopy()
-
-		// Update the status on the copy
-		service.Status.LoadBalancer = *newm
-		utils.Logf(service, "status: [%v] [%v]", pre, newm)
+		utils.Logf(svc, "status: [%v] [%v]", pre, newm)
 		return retry(
 			&wait.Backoff{
 				Duration: 1 * time.Second,
@@ -664,11 +659,17 @@ func (con *Controller) updateStatus(svc *v1.Service, pre, newm *v1.LoadBalancerS
 				Jitter:   4,
 			},
 			func(svc *v1.Service) error {
-				_, err := con.
+				// get latest svc from the shared informer cache
+				updated, err := con.client.CoreV1().Services(svc.Namespace).Get(context.TODO(), svc.Name, metav1.GetOptions{ResourceVersion: "0"})
+				if err != nil {
+					return fmt.Errorf("error to get svc %s", key(svc))
+				}
+				updated.Status.LoadBalancer = *newm
+				_, err = con.
 					client.
 					CoreV1().
-					Services(service.Namespace).
-					UpdateStatus(context.Background(), service, metav1.UpdateOptions{})
+					Services(updated.Namespace).
+					UpdateStatus(context.Background(), updated, metav1.UpdateOptions{})
 				if err == nil {
 					return nil
 				}
@@ -676,7 +677,7 @@ func (con *Controller) updateStatus(svc *v1.Service, pre, newm *v1.LoadBalancerS
 				// out so that we can process the delete, which we should soon be receiving
 				// if we haven't already.
 				if errors.IsNotFound(err) {
-					utils.Logf(service, "not persisting update to service that no "+
+					utils.Logf(svc, "not persisting update to service that no "+
 						"longer exists: %v", err)
 					return nil
 				}
@@ -690,7 +691,7 @@ func (con *Controller) updateStatus(svc *v1.Service, pre, newm *v1.LoadBalancerS
 					"service %s after creating its load balancer: %v", key(svc), err)
 				return fmt.Errorf("retry with %s, %s", err.Error(), TRY_AGAIN)
 			},
-			service,
+			svc,
 		)
 	}
 	utils.Logf(svc, "not persisting unchanged LoadBalancerStatus for service to registry.")

@@ -4,6 +4,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/cloud-provider-alibaba-cloud/cloud-controller-manager/utils"
 	"testing"
 )
 
@@ -32,7 +33,11 @@ func TestGetServiceHash(t *testing.T) {
 			},
 		},
 	}
-	hashA := GetServiceHash(serviceA)
+	hashA, err := utils.GetServiceHash(serviceA)
+	if err != nil {
+		t.Logf("get service hash error")
+		t.Fail()
+	}
 
 	// change svc annotation
 	serviceB := &v1.Service{
@@ -58,7 +63,11 @@ func TestGetServiceHash(t *testing.T) {
 			},
 		},
 	}
-	hashB := GetServiceHash(serviceB)
+	hashB, err := utils.GetServiceHash(serviceB)
+	if err != nil {
+		t.Logf("get service hash error")
+		t.Fail()
+	}
 	if hashA == hashB {
 		t.Logf("svc annotation changed, but hash svc is equal")
 		t.Fail()
@@ -88,7 +97,11 @@ func TestGetServiceHash(t *testing.T) {
 			},
 		},
 	}
-	hashC := GetServiceHash(serviceC)
+	hashC, err := utils.GetServiceHash(serviceC)
+	if err != nil {
+		t.Logf("get service hash error")
+		t.Fail()
+	}
 	if hashA == hashC {
 		t.Logf("svc annotation changed, but hash svc is equal")
 		t.Fail()
@@ -119,7 +132,11 @@ func TestGetServiceHash(t *testing.T) {
 			ExternalIPs: []string{},
 		},
 	}
-	hashD := GetServiceHash(serviceD)
+	hashD, err := utils.GetServiceHash(serviceD)
+	if err != nil {
+		t.Logf("get service hash error")
+		t.Fail()
+	}
 	if hashA != hashD {
 		t.Logf("svc add empty attr, but hash changed, from %s -> %s", hashA, hashD)
 		t.Fail()
@@ -149,7 +166,11 @@ func TestGetServiceHash(t *testing.T) {
 			},
 		},
 	}
-	hashE := GetServiceHash(serviceE)
+	hashE, err := utils.GetServiceHash(serviceE)
+	if err != nil {
+		t.Logf("get service hash error")
+		t.Fail()
+	}
 	if hashA != hashE {
 		t.Logf("svc is same, but hash changed, from %s -> %s", hashA, hashE)
 		t.Fail()
