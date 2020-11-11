@@ -1,6 +1,7 @@
 package e2e
 
 import (
+	cloud "k8s.io/cloud-provider-alibaba-cloud/cloud-controller-manager"
 	"k8s.io/cloud-provider-alibaba-cloud/cmd/e2e/framework"
 	_ "k8s.io/cloud-provider-alibaba-cloud/cmd/e2e/test"
 	"testing"
@@ -16,6 +17,8 @@ func TestE2E(t *testing.T) {
 	}
 	if framework.TestContext.CloudConfig == "" {
 		t.Logf("empty cloud-config")
+	} else {
+		cloud.CloudConfigFile = framework.TestContext.CloudConfig
 	}
 	if framework.TestContext.LoadBalancerID == "" {
 		framework.TestContext.LoadBalancerID = "lb-xxxx"
