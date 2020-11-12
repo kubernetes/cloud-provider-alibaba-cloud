@@ -358,7 +358,7 @@ func runControllerService(
 
 	scon, err := service.NewController(
 		cloudslb,
-		builder.ClientOrDie("service-controller"),
+		builder.ClientOrDie("cloud-controller-manager"),
 		informer,
 		ccm.KubeCloudShared.ClusterName,
 	)
