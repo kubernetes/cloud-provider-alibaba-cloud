@@ -99,6 +99,7 @@ type CloudConfig struct {
 		VswitchID            string `json:"vswitchid"`
 		ClusterID            string `json:"clusterID"`
 		RouteTableIDS        string `json:"routeTableIDs"`
+		ServiceBackendType   string `json:"serviceBackendType"`
 
 		DisablePublicSLB bool `json:"disablePublicSLB"`
 
@@ -346,7 +347,7 @@ func (c *Cloud) EnsureLoadBalancer(
 		LocalMode:      ServiceModeLocal(service),
 		Endpoints:      eps,
 		Nodes:          ns,
-		BackendTypeENI: utils.IsENIBackendType(service),
+		BackendTypeENI: IsENIBackendType(service),
 	}
 
 	utils.Logf(service, "using vswitch id=%s", vswitchid)
@@ -426,7 +427,7 @@ func (c *Cloud) UpdateLoadBalancer(
 		LocalMode:      ServiceModeLocal(service),
 		Endpoints:      eps,
 		Nodes:          ns,
-		BackendTypeENI: utils.IsENIBackendType(service),
+		BackendTypeENI: IsENIBackendType(service),
 	}
 	return c.climgr.LoadBalancers().UpdateLoadBalancer(ctx, service, backends, true)
 }

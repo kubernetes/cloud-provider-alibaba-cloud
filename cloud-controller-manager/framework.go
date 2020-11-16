@@ -799,8 +799,8 @@ func (f *FrameWork) ListenerEqual(ctx context.Context, id string, p v1.ServicePo
 			return err
 		}
 		if resp.BackendServerPort == 0 ||
-			(!utils.IsENIBackendType(f.SVC) && resp.BackendServerPort != int(p.NodePort)) ||
-			(utils.IsENIBackendType(f.SVC) && resp.BackendServerPort != int(p.TargetPort.IntVal)) {
+			(!IsENIBackendType(f.SVC) && resp.BackendServerPort != int(p.NodePort)) ||
+			(IsENIBackendType(f.SVC) && resp.BackendServerPort != int(p.TargetPort.IntVal)) {
 			return fmt.Errorf("TCPBackendServerPortNotEqual")
 		}
 
@@ -828,8 +828,8 @@ func (f *FrameWork) ListenerEqual(ctx context.Context, id string, p v1.ServicePo
 			return err
 		}
 		if resp.BackendServerPort == 0 ||
-			(!utils.IsENIBackendType(f.SVC) && resp.BackendServerPort != int(p.NodePort)) ||
-			(utils.IsENIBackendType(f.SVC) && resp.BackendServerPort != int(p.TargetPort.IntVal)) {
+			(!IsENIBackendType(f.SVC) && resp.BackendServerPort != int(p.NodePort)) ||
+			(IsENIBackendType(f.SVC) && resp.BackendServerPort != int(p.TargetPort.IntVal)) {
 			return fmt.Errorf("UDPBackendServerPortNotEqual")
 		}
 
@@ -849,8 +849,8 @@ func (f *FrameWork) ListenerEqual(ctx context.Context, id string, p v1.ServicePo
 			return err
 		}
 		if resp.BackendServerPort == 0 ||
-			(!utils.IsENIBackendType(f.SVC) && resp.BackendServerPort != int(p.NodePort)) ||
-			(utils.IsENIBackendType(f.SVC) && resp.BackendServerPort != int(p.TargetPort.IntVal)) {
+			(!IsENIBackendType(f.SVC) && resp.BackendServerPort != int(p.NodePort)) ||
+			(IsENIBackendType(f.SVC) && resp.BackendServerPort != int(p.TargetPort.IntVal)) {
 			return fmt.Errorf("HTTPBackendServerPortNotEqual: %v, %v,%v", resp.BackendServerPort, p.NodePort, p.Port)
 		}
 
@@ -877,8 +877,8 @@ func (f *FrameWork) ListenerEqual(ctx context.Context, id string, p v1.ServicePo
 			return err
 		}
 		if resp.BackendServerPort == 0 ||
-			(!utils.IsENIBackendType(f.SVC) && resp.BackendServerPort != int(p.NodePort)) ||
-			(utils.IsENIBackendType(f.SVC) && resp.BackendServerPort != int(p.TargetPort.IntVal)) {
+			(!IsENIBackendType(f.SVC) && resp.BackendServerPort != int(p.NodePort)) ||
+			(IsENIBackendType(f.SVC) && resp.BackendServerPort != int(p.TargetPort.IntVal)) {
 			return fmt.Errorf("HTTPSBackendServerPortNotEqual")
 		}
 		if resp.ServerCertificateId == "" ||
@@ -1137,7 +1137,7 @@ func isUserManagedVBackendServer(VServerGroupName string, service *v1.Service) b
 				Prefix:      DEFAULT_PREFIX,
 			},
 		}
-		if utils.IsENIBackendType(service) {
+		if IsENIBackendType(service) {
 			vg.NamedKey.Port = port.TargetPort.IntVal
 		}
 		if vg.NamedKey.Key() == VServerGroupName {
