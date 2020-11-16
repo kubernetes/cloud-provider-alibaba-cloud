@@ -829,23 +829,13 @@ func keepResourceVersion(service *v1.Service) error {
 }
 
 func IsENIBackendType(svc *v1.Service) bool {
-	// annotation
 	if svc.Annotations[utils.BACKEND_TYPE_LABEL] != "" {
 		return svc.Annotations[utils.BACKEND_TYPE_LABEL] == utils.BACKEND_TYPE_ENI
 	}
 
-	envType := os.Getenv("SERVICE_FORCE_BACKEND_ENI")
-	cfgType := cfg.Global.ServiceBackendType
-	if envType != "" && cfgType != "" {
-		klog.Warningf("warning: set environment variables %s and configuration"+
-			" %s at the same time, env works", envType, cfgType)
+	if os.Getenv("SERVICE_FORCE_BACKEND_ENI") != "" {
+		return os.Getenv("SERVICE_FORCE_BACKEND_ENI") == "true"
 	}
 
-	// env
-	if envType != "" {
-		return envType == "true"
-	}
-
-	//cfg
-	return cfgType == utils.BACKEND_TYPE_ENI
+	return cfg.Global.ServiceBackendType == utils.BACKEND_TYPE_ENI
 }
