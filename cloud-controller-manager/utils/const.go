@@ -1,10 +1,5 @@
 package utils
 
-import (
-	"k8s.io/api/core/v1"
-	"os"
-)
-
 type contextKey string
 
 const (
@@ -21,15 +16,3 @@ const (
 	ECINodeLabel                            = "virtual-kubelet"
 	ContextService               contextKey = "request.service"
 )
-
-func IsENIBackendType(svc *v1.Service) bool {
-	if svc.Annotations[BACKEND_TYPE_LABEL] != "" {
-		return svc.Annotations[BACKEND_TYPE_LABEL] == BACKEND_TYPE_ENI
-	}
-
-	if os.Getenv("SERVICE_FORCE_BACKEND_ENI") == "true" {
-		return true
-	}
-
-	return false
-}

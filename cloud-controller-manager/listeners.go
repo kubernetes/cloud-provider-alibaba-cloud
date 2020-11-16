@@ -515,7 +515,7 @@ func BuildListenersFromService(
 			VGroups:         vgrps,
 			LoadBalancerID:  lb.LoadBalancerId,
 		}
-		if utils.IsENIBackendType(svc) {
+		if IsENIBackendType(svc) {
 			n.NodePort = port.TargetPort.IntVal
 		}
 		n.Name = n.NamedKey.Key()

@@ -413,7 +413,7 @@ func BuildVirtualGroupFromService(
 			InsClient:      client.ins,
 			VpcID:          client.vpcid,
 		}
-		if utils.IsENIBackendType(service) {
+		if IsENIBackendType(service) {
 			vg.NamedKey.Port = port.TargetPort.IntVal
 		}
 		vgrps = append(vgrps, vg)
