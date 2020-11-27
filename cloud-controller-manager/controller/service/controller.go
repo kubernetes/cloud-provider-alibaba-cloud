@@ -206,7 +206,7 @@ func (con *Controller) HandlerForNodesChange(
 					utils.Logf(svc, "node change: class not empty, skip process ")
 					return true
 				}
-				utils.Logf(svc, "node change: enque service")
+				utils.Logf(svc, "node change: enqueue service")
 				Enqueue(que, key(svc))
 				return true
 			},
@@ -241,7 +241,7 @@ func (con *Controller) HandlerForEndpointChange(
 	syncEndpoints := func(epd interface{}) {
 		ep, ok := epd.(*v1.Endpoints)
 		if !ok || ep == nil {
-			klog.Info("endpoints change: endpoint object is nil, skip")
+			klog.Info("endpoint change: endpoint object is nil, skip")
 			return
 		}
 		svc := ctx.Get(fmt.Sprintf("%s/%s", ep.Namespace, ep.Name))
@@ -314,32 +314,28 @@ func (con *Controller) HandlerForServiceChange(
 		cache.ResourceEventHandlerFuncs{
 			AddFunc: func(add interface{}) {
 				svc, ok := add.(*v1.Service)
-				if !ok {
-					utils.Logf(svc, "add: not type service %s, skip", reflect.TypeOf(add))
-					return
+				if ok && NeedAdd(svc) {
+					utils.Logf(svc, "controller: service addition event")
+					syncService(svc)
 				}
-				utils.Logf(svc, "service addition event received %s", reflect.TypeOf(svc))
-				syncService(svc)
 			},
 			UpdateFunc: func(old, cur interface{}) {
 				oldd, ok1 := old.(*v1.Service)
 				curr, ok2 := cur.(*v1.Service)
 				if ok1 && ok2 &&
 					NeedUpdate(oldd, curr, record) {
-					utils.Logf(curr, "service update event")
+					utils.Logf(curr, "controller: service update event")
 					syncService(curr)
 				}
 			},
 			DeleteFunc: func(cur interface{}) {
 				svc, ok := cur.(*v1.Service)
-				if !ok {
-					utils.Logf(svc, "delete: not type service %s, skip", reflect.TypeOf(cur))
-					return
+				if ok && NeedDelete(svc) {
+					utils.Logf(svc, "controller: service deletion received, %s", utils.PrettyJson(svc))
+					// recorder service in local context
+					context.Set(key(svc), svc)
+					syncService(svc)
 				}
-				utils.Logf(svc, "controller: service deletion received, %s", utils.PrettyJson(svc))
-				// recorder service in local context
-				context.Set(key(svc), svc)
-				syncService(svc)
 			},
 		},
 		SERVICE_SYNC_PERIOD,

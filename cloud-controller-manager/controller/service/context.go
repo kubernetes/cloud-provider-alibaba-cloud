@@ -3,6 +3,7 @@ package service
 import (
 	"k8s.io/api/core/v1"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/cloud-provider-alibaba-cloud/cloud-controller-manager/utils"
 	"k8s.io/klog"
 	"reflect"
 	"sort"
@@ -35,6 +36,21 @@ func (c *Context) Range(f func(key string, value *v1.Service) bool) {
 	)
 }
 func (c *Context) Remove(name string) { c.ctx.Delete(name) }
+
+func NeedAdd(newService *v1.Service) bool {
+	if NeedLoadBalancer(newService) {
+		return true
+	}
+
+	// was LoadBalancer
+	_, ok := newService.Labels[utils.LabelServiceHash]
+	if ok {
+		klog.Infof("service %s/%s has hash label, which may was LoadBalancer",
+			newService.Namespace, newService.Name)
+		return true
+	}
+	return false
+}
 
 // NeedUpdate compare old and new service for possible changes
 func NeedUpdate(old, newm *v1.Service, record record.EventRecorder) bool {
@@ -80,6 +96,22 @@ func NeedUpdate(old, newm *v1.Service, record record.EventRecorder) bool {
 		return true
 	}
 
+	return false
+}
+
+//NeedDelete
+func NeedDelete(service *v1.Service) bool {
+	if NeedLoadBalancer(service) {
+		return true
+	}
+
+	// was LoadBalancer
+	_, ok := service.Labels[utils.LabelServiceHash]
+	if ok {
+		klog.Infof("service %s/%s has hash label, which may was LoadBalancer",
+			service.Namespace, service.Name)
+		return true
+	}
 	return false
 }
 
