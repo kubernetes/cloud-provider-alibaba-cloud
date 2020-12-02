@@ -377,7 +377,7 @@ func (s *LoadBalancerClient) EnsureLoadBalancer(ctx context.Context, service *v1
 	}
 	if derr != nil {
 		utils.Logf(service, "alicloud: can not get loadbalancer attribute. ")
-		return nil, err
+		return nil, derr
 	}
 	vgs := BuildVirtualGroupFromService(s, service, origined)
 
