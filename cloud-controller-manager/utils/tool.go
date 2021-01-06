@@ -110,3 +110,16 @@ func GetRecorderFromContext(ctx context.Context) (record.EventRecorder, error) {
 
 	return r, nil
 }
+
+func IsExcludedNode(node *v1.Node) bool {
+	if node == nil || node.Labels == nil {
+		return false
+	}
+	if _, exclude := node.Labels[LabelNodeRoleExcludeNodeDeprecated]; exclude {
+		return true
+	}
+	if _, exclude := node.Labels[LabelNodeRoleExcludeNode]; exclude {
+		return true
+	}
+	return false
+}

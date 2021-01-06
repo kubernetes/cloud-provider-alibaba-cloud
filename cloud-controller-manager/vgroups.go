@@ -568,7 +568,7 @@ func (v *EndpointWithENI) doBackendBuild(ctx context.Context, g *vgroup) ([]slb.
 			return backend, nil
 		}
 		klog.Infof("[ENI] mode service: %s", g.NamedKey)
-		LogSubsetInfo(v.Endpoints,"reconcile")
+		LogSubsetInfo(v.Endpoints, "reconcile")
 		var privateIpAddress []string
 		for _, ep := range v.Endpoints.Subsets {
 			for _, addr := range ep.Addresses {
@@ -590,7 +590,7 @@ func (v *EndpointWithENI) doBackendBuild(ctx context.Context, g *vgroup) ([]slb.
 			return backend, nil
 		}
 		klog.Infof("[Local] mode service: %s", g.NamedKey)
-		LogSubsetInfo(v.Endpoints,"reconcile")
+		LogSubsetInfo(v.Endpoints, "reconcile")
 		// 1. add duplicate ecs backends
 		for _, sub := range v.Endpoints.Subsets {
 			for _, add := range sub.Addresses {
@@ -729,7 +729,7 @@ func (v *EndpointWithENI) addECIBackends(
 }
 
 func isExcludeNode(node *v1.Node) bool {
-	if _, exclude := node.Labels[utils.LabelNodeRoleExcludeNode]; exclude {
+	if utils.IsExcludedNode(node) {
 		klog.Infof("ignore node with exclude node label %s", node.Name)
 		return true
 	}
