@@ -405,15 +405,15 @@ func (rc *RouteController) tryCreateRoute(
 			rc.recorder.Eventf(
 				ref,
 				v1.EventTypeWarning,
-				"Failed",
-				"Fail to create route, error: %s",
+				"CreateRouteFailed",
+				"Error creating route: %s",
 				err.Error())
 			klog.Errorf("could not create route %s for node %s: %v -> %v", route.DestinationCIDR, node.Name, err, lasterr)
 		} else {
 			rc.recorder.Eventf(
 				ref,
 				v1.EventTypeNormal,
-				"SuccessfulCreate",
+				"CreatedRoute",
 				"Created route for %s with %s -> %s successfully",
 				table, node.Name, node.Spec.PodCIDR,
 			)
@@ -456,8 +456,8 @@ func (rc *RouteController) isRouteConflicted(nodes []*v1.Node, route *cloudprovi
 						Namespace: "",
 					},
 					v1.EventTypeWarning,
-					"Failed",
-					"Fail to reconcile route, route conflict error:  %s",
+					"SyncRouteFailed",
+					"Error syncing route :route conflict, %s",
 					err.Error(),
 				)
 			}

@@ -561,11 +561,12 @@ func (con *Controller) update(cached, svc *v1.Service) error {
 			con.recorder.Eventf(
 				svc,
 				v1.EventTypeWarning,
-				"NoBackend",
-				"There are no available nodes for loadbalancer",
+				"UnAvailableLoadBalancer",
+				"There are no available nodes for LoadBalancer",
 			)
 		}
 		ctx = context.WithValue(ctx, utils.ContextService, svc)
+		ctx = context.WithValue(ctx, utils.ContextRecorder, con.recorder)
 		newm, err = con.cloud.EnsureLoadBalancer(ctx, con.clusterName, svc, nodes)
 
 		metric.SLBLatency.WithLabelValues("create").Observe(metric.MsSince(start))
@@ -573,32 +574,22 @@ func (con *Controller) update(cached, svc *v1.Service) error {
 			con.recorder.Eventf(
 				svc,
 				v1.EventTypeNormal,
-				"SuccessfulEnsure",
-				"Ensure loadbalancer successfully",
+				"EnsuredLoadBalancer",
+				"Ensured load balancer",
 			)
 			if err := con.addServiceHash(svc); err != nil {
 				return err
 			}
 		} else {
-			// If error msg contains "warning", just broadcast warning events, not retry to ensure loadbalancer
-			if strings.Contains(err.Error(), "warning") {
-				con.recorder.Eventf(
-					svc,
-					v1.EventTypeWarning,
-					"Failed",
-					err.Error(),
-				)
-			} else {
-				message := getLogMessage(err)
-				con.recorder.Eventf(
-					svc,
-					v1.EventTypeWarning,
-					"Failed",
-					"Fail to ensure loadbalancer, error %s",
-					message,
-				)
-				return fmt.Errorf("ensure loadbalancer error: %s", err)
-			}
+			message := getLogMessage(err)
+			con.recorder.Eventf(
+				svc,
+				v1.EventTypeWarning,
+				"SyncLoadBalancerFailed",
+				"Error syncing load balancer: %s",
+				message,
+			)
+			return fmt.Errorf("ensure loadbalancer error: %s", err)
 		}
 	}
 	if err := con.updateStatus(svc, pre, newm); err != nil {
@@ -707,18 +698,11 @@ func (con *Controller) delete(svc *v1.Service) error {
 		con.recorder.Eventf(
 			svc,
 			v1.EventTypeWarning,
-			"Failed",
-			"Fail to delete loadbalancer, error %s",
+			"DeleteLoadBalancerFailed",
+			"Error deleting load balancer: %s",
 			message,
 		)
 		return fmt.Errorf(TRY_AGAIN)
-	} else {
-		con.recorder.Eventf(
-			svc,
-			v1.EventTypeNormal,
-			"SuccessfulDelete",
-			"Delete loadbalancer successfully",
-		)
 	}
 	metric.SLBLatency.WithLabelValues("delete").Observe(metric.MsSince(start))
 	con.recorder.Eventf(

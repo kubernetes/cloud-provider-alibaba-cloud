@@ -1,12 +1,14 @@
 package utils
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"github.com/ghodss/yaml"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/client-go/tools/record"
 	"k8s.io/klog"
 	"reflect"
 	"strings"
@@ -93,4 +95,18 @@ func IsServiceHashChanged(service *v1.Service) (bool, error) {
 
 func GetServiceHash(service *v1.Service) (string, error) {
 	return HashObjects([]interface{}{service.Spec, service.Annotations})
+}
+
+func GetRecorderFromContext(ctx context.Context) (record.EventRecorder, error) {
+	recorder := ctx.Value(ContextRecorder)
+	if recorder == nil {
+		return nil, fmt.Errorf("recorder is nil")
+	}
+
+	r, ok := recorder.(record.EventRecorder)
+	if !ok {
+		return nil, fmt.Errorf("recorder is not EventRecorder type")
+	}
+
+	return r, nil
 }

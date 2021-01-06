@@ -745,19 +745,16 @@ func (c *Cloud) setEIPAsExternalIP(ctx context.Context, lbId string) ([]v1.LoadB
 	}
 
 	if len(eipAddr) == 0 {
-		// actually return is warning, and fmt.Errorf() is used to reveal the warning event
-		return nil, fmt.Errorf("warning: slb %s has no eip, service.beta.kubernetes.io/alibaba-cloud-loadbalancer-external-ip-type annotation does not work", lbId)
-	} else {
-		for _, eip := range eipAddr {
-			ingress = append(ingress,
-				v1.LoadBalancerIngress{
-					IP: eip.IpAddress,
-				})
-		}
-		// actually return is warning, and fmt.Errorf() is used to reveal the warning event
-		if len(eipAddr) > 1 {
-			return ingress, fmt.Errorf("warning: slb %s has multiple eips, eip len %d", lbId, len(eipAddr))
-		}
+		return nil, fmt.Errorf("slb %s has no eip, svc external ip cannot be set to eip address", lbId)
+	}
+	if len(eipAddr) > 1 {
+		klog.Warningf(" slb %s has multiple eips, len [%d]", lbId, len(eipAddr))
+	}
+	for _, eip := range eipAddr {
+		ingress = append(ingress,
+			v1.LoadBalancerIngress{
+				IP: eip.IpAddress,
+			})
 	}
 	return ingress, nil
 }

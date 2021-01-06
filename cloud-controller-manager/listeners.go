@@ -717,6 +717,21 @@ func (t *tcp) Update(ctx context.Context) error {
 	if int(t.NodePort) != response.BackendServerPort {
 		config.BackendServerPort = int(t.NodePort)
 		klog.V(2).Infof("tcp listener [BackendServerPort] changed, request=%d. response=%d, recreate.", t.NodePort, response.BackendServerPort)
+		// The listener description has changed. It may be that multiple services reuse the same port of the same slb, and needs to record event.
+		if response.Description != config.Description {
+			record, err := utils.GetRecorderFromContext(ctx)
+			if err != nil {
+				klog.Warningf("get recorder error: %s", err.Error())
+			} else {
+				record.Eventf(
+					t.Service,
+					v1.EventTypeNormal,
+					"RecreateListener",
+					"Recreate TCP listener [%s] -> [%s]",
+					response.Description, config.Description,
+				)
+			}
+		}
 		err := t.Client.DeleteLoadBalancerListener(ctx, t.LoadBalancerID, int(t.Port))
 		if err != nil {
 			return err
@@ -874,6 +889,21 @@ func (t *udp) Update(ctx context.Context) error {
 		config.BackendServerPort = int(t.NodePort)
 		utils.Logf(t.Service, "udp listener checker [BackendServerPort] changed, "+
 			"request=%d. response=%d", t.NodePort, response.BackendServerPort)
+		// The listener description has changed. It may be that multiple services reuse the same port of the same slb, and needs to record event.
+		if response.Description != config.Description {
+			record, err := utils.GetRecorderFromContext(ctx)
+			if err != nil {
+				klog.Warningf("get recorder error: %s", err.Error())
+			} else {
+				record.Eventf(
+					t.Service,
+					v1.EventTypeNormal,
+					"RecreateListener",
+					"Recreate UDP listener [%s] -> [%s]",
+					response.Description, config.Description,
+				)
+			}
+		}
 		err := t.Client.DeleteLoadBalancerListener(ctx, t.LoadBalancerID, int(t.Port))
 		if err != nil {
 			return err
@@ -1136,6 +1166,21 @@ func (t *http) Update(ctx context.Context) error {
 		config.BackendServerPort = int(t.NodePort)
 		utils.Logf(t.Service, "HTTP listener checker [BackendServerPort]"+
 			" changed, request=%d. response=%d. Recreate http listener.", t.NodePort, response.BackendServerPort)
+		// The listener description has changed. It may be that multiple services reuse the same port of the same slb, and needs to record event.
+		if response.Description != config.Description {
+			record, err := utils.GetRecorderFromContext(ctx)
+			if err != nil {
+				klog.Warningf("get recorder error: %s", err.Error())
+			} else {
+				record.Eventf(
+					t.Service,
+					v1.EventTypeNormal,
+					"RecreateListener",
+					"Recreate HTTP listener [%s] -> [%s]",
+					response.Description, config.Description,
+				)
+			}
+		}
 		err := t.Client.DeleteLoadBalancerListener(ctx, t.LoadBalancerID, int(t.Port))
 		if err != nil {
 			return err
@@ -1356,6 +1401,21 @@ func (t *https) Update(ctx context.Context) error {
 	if int(t.NodePort) != response.BackendServerPort {
 		config.BackendServerPort = int(t.NodePort)
 		utils.Logf(t.Service, "listener checker [BackendServerPort] changed, request=%d. response=%d", t.NodePort, response.BackendServerPort)
+		// The listener description has changed. It may be that multiple services reuse the same port of the same slb, and needs to record event.
+		if response.Description != config.Description {
+			record, err := utils.GetRecorderFromContext(ctx)
+			if err != nil {
+				klog.Warningf("get recorder error: %s", err.Error())
+			} else {
+				record.Eventf(
+					t.Service,
+					v1.EventTypeNormal,
+					"RecreateListener",
+					"Recreate HTTPS listener [%s] -> [%s]",
+					response.Description, config.Description,
+				)
+			}
+		}
 		err := t.Client.DeleteLoadBalancerListener(ctx, t.LoadBalancerID, int(t.Port))
 		if err != nil {
 			return err

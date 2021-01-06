@@ -528,9 +528,22 @@ func updateLoadBalancerByAnnotations(context context.Context, slbClient ClientSL
 				return err
 			}
 		} else {
-			klog.Warningf("alicloud: LoadBalancer name (%s -> %s) changed, try to update loadbalancer [%s],"+
-				" warning: only user defined slb or slb which has 'kubernetes.do.not.delete' tag can update name",
-				lb.LoadBalancerName, request.LoadBalancerName, lb.LoadBalancerId)
+			record, err := utils.GetRecorderFromContext(context)
+			if err != nil {
+				klog.Warningf("get recorder error: %s", err.Error())
+				klog.Warningf("alicloud: LoadBalancer name (%s -> %s) changed, try to update loadbalancer [%s],"+
+					" warning: only user defined slb or slb which has 'kubernetes.do.not.delete' tag can update name",
+					lb.LoadBalancerName, request.LoadBalancerName, lb.LoadBalancerId)
+			} else {
+				record.Eventf(
+					service,
+					v1.EventTypeWarning,
+					"SetLoadBalancerNameFailed",
+					"Error setting load balancer %s name: "+
+						"only user defined slb or slb which has 'kubernetes.do.not.delete' tag can update name",
+					lb.LoadBalancerName, request.LoadBalancerName, lb.LoadBalancerId,
+				)
+			}
 		}
 	}
 
