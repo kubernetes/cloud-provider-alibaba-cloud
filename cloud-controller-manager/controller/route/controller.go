@@ -229,6 +229,18 @@ func (rc *RouteController) Run(stopCh <-chan struct{}, syncPeriod time.Duration)
 }
 
 func (rc *RouteController) syncd(node *v1.Node) error {
+	if _, exclude := node.Labels[utils.LabelNodeRoleExcludeNode]; exclude {
+		return nil
+	}
+	if node.Spec.PodCIDR == "" {
+		klog.Warningf("Node %s PodCIDR is nil, skip delete route", node.Name)
+		return nil
+	}
+	if node.Spec.ProviderID == "" {
+		klog.Warningf("Node %s has no Provider ID, skip delete route", node.Name)
+		return nil
+	}
+
 	ctx := context.Background()
 	tabs, err := rc.routes.RouteTables(ctx, rc.clusterName)
 	if err != nil {
