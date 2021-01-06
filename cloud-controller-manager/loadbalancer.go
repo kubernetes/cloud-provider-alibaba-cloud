@@ -96,6 +96,7 @@ type AnnotationRequest struct {
 
 // TAGKEY Default tag key.
 const TAGKEY = "kubernetes.do.not.delete"
+const REUSEKEY = "kubernetes.reused.by.user"
 const ACKKEY = "ack.aliyun.com"
 const MDSKEY = "managed.by.ack"
 
@@ -324,26 +325,7 @@ func (s *LoadBalancerClient) EnsureLoadBalancer(ctx context.Context, service *v1
 		// Add default tags
 		tags[TAGKEY] = loadbalancerName
 		tags[ACKKEY] = CLUSTER_ID
-
-		tagItemArr := make([]slb.TagItem, 0)
-		for key, value := range tags {
-			tagItemArr = append(tagItemArr, slb.TagItem{TagKey: key, TagValue: value})
-		}
-		// TODO if the key size or value size > slb's tag limit or number of tags  >limit(20), tags will insert error.
-
-		tagItems, err := json.Marshal(tagItemArr)
-
-		if err != nil {
-			return nil, err
-		}
-		if err := s.c.AddTags(
-			ctx,
-			&slb.AddTagsArgs{
-				RegionId:       opts.RegionId,
-				LoadBalancerID: lbr.LoadBalancerId,
-				Tags:           string(tagItems),
-			},
-		); err != nil {
+		if err := addSLBTag(s.c, ctx, tags, opts.RegionId, lbr.LoadBalancerId); err != nil {
 			return nil, err
 		}
 
@@ -360,6 +342,23 @@ func (s *LoadBalancerClient) EnsureLoadBalancer(ctx context.Context, service *v1
 		if err != nil {
 			return origined, err
 		}
+		// add tag for reused slb
+		found := false
+		for _, tag := range tags {
+			if tag.TagKey == REUSEKEY {
+				found = true
+			}
+		}
+		if !found {
+			if err := addSLBTag(s.c,
+				ctx,
+				map[string]string{REUSEKEY: "true"},
+				origined.RegionId,
+				origined.LoadBalancerId); err != nil {
+				return nil, err
+			}
+		}
+
 		if ok, reason := isLoadBalancerNonReusable(tags, service); ok {
 			return origined, fmt.Errorf("alicloud: the loadbalancer %s can not be reused, %s", origined.LoadBalancerId, reason)
 		}
@@ -851,4 +850,24 @@ func IsENIBackendType(svc *v1.Service) bool {
 	}
 
 	return cfg.Global.ServiceBackendType == utils.BACKEND_TYPE_ENI
+}
+
+func addSLBTag(client ClientSLBSDK, ctx context.Context, tags map[string]string, regionId common.Region, loadbalancerId string) error {
+	tagItemArr := make([]slb.TagItem, 0)
+	for key, value := range tags {
+		tagItemArr = append(tagItemArr, slb.TagItem{TagKey: key, TagValue: value})
+	}
+	// TODO if the key size or value size > slb's tag limit or number of tags  >limit(20), tags will insert error.
+	tagItems, err := json.Marshal(tagItemArr)
+	if err != nil {
+		return err
+	}
+	return client.AddTags(
+		ctx,
+		&slb.AddTagsArgs{
+			RegionId:       regionId,
+			LoadBalancerID: loadbalancerId,
+			Tags:           string(tagItems),
+		},
+	)
 }
