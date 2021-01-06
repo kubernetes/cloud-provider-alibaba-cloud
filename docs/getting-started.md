@@ -85,7 +85,7 @@ services:
       node-monitor-grace-period: 16s
       pod-eviction-timeout: 30s
     addon_job_timeout: 90
-``` 
+```
 
 3. Provision the cluster using rke
 
@@ -93,11 +93,11 @@ services:
    Once the cluster has been provisioned update the nodes and make sure providerID is set to REGION.NODEID
    
    ```
-   kubectl patch node ${NODE_NAME} -p "{\"spec\":{\"providerID\": ${NODE_NAME} }}"
+   kubectl patch node ${NODE_NAME} -p '{"spec":{"providerID": "${NODE_NAME}"}}'
    ```
    For example 
    ```
-   kubectl patch node cn-hangzhou.i-bp16uimj7fl6ze8q5rf3 -p "{\"spec\":{\"providerID\": cn-hangzhou.i-bp16uimj7fl6ze8q5rf3}}"
+   kubectl patch node cn-hangzhou.i-bp16uimj7fl6ze8q5rf3 -p '{"spec":{"providerID": "cn-hangzhou.i-bp16uimj7fl6ze8q5rf3"}}'
    ```
 
 ### Install Alibaba CloudProvider support.
@@ -119,9 +119,27 @@ Or we use Alibaba AccessKeyID AccessKeySecret to authorize the CloudProvider. Pl
 Then, create ```cloud-config``` configmap in the cluster.
 
 ```bash
-$ kubectl -n kube-system create configmap cloud-config \
-        --from-literal=special.keyid="$ACCESS_KEY_ID" \
-        --from-literal=special.keysecret="$ACCESS_KEY_SECRET"
+# base64 AccessKey & AccessKeySecret
+$ echo -n "$AccessKeyID" |base64
+$ echo -n "$AcceessKeySecret"|base64
+
+$ cat <<EOF >cloud-config.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cloud-config
+  namespace: kube-system
+data:
+  cloud-config.conf: |-
+    {
+        "Global": {
+            "accessKeyID": "$your-AccessKeyID-base64",
+            "accessKeySecret": "$your-AccessKeySecret-base64"
+        }
+    }
+EOF
+
+$ kubectl create -f cloud-config.yaml
 ```
 
 **ServiceAccount system:cloud-controller-manager**
@@ -149,47 +167,24 @@ clusters:
     certificate-authority-data: $CA_DATA
     server: https://192.168.1.76:6443
   name: kubernetes
-``` 
+```
 
 **Apply CloudProvider daemonset**
 
 An available cloudprovider daemonset yaml file is being prepared in [cloud-controller-manager.yml](examples/cloud-controller-manager.yml). The only thing you need to do is to replace the ${CLUSTER_CIDR} with your own real cluster cidr. 
 And then ``` kubectl apply -f examples/cloud-controller-manager.yml``` to finish the installation. 
 
->> Note:
-1. If you use RAM role policy , please delete env ACCESS_KEY_ID and ACCESS_KEY_SECRET from cloud-controller-manager.yml.
-
 
 ## Try With Simple Example
 Once `cloud-controller-manager` is up and running, run a sample nginx deployment:
 ```bash
-$ cat <<EOF >nginx.yaml
-apiVersion: extensions/v1beta1
-kind: Deployment
-metadata:
-  name: nginx-example
-spec:
-  replicas: 1
-  revisionHistoryLimit: 2
-  template:
-    metadata:
-      labels:
-        app: nginx-example
-    spec:
-      containers:
-      - image: nginx:latest
-        name: nginx
-        ports:
-          - containerPort: 80
-EOF
-
-$ kubectl create -f nginx.yaml
+$ kubectl create deployment nginx-example --image=nginx
 ```
 
 Then create service with type: LoadBalancer:
 ```bash
-$ kubectl expose deployment nginx-example --name=nginx-example --type=LoadBalancer --port=80
+$ kubectl expose deployment nginx-example --name=nginx-example-svc --type=LoadBalancer --port=80
 $ kubectl get svc
-NAME            CLUSTER-IP        EXTERNAL-IP     PORT(S)        AGE
-nginx-example   192.168.250.19    106.xx.xx.xxx   80:31205/TCP   5s
+NAME                TYPE           CLUSTER-IP    EXTERNAL-IP     PORT(S)        AGE
+nginx-example-svc   LoadBalancer   10.96.38.24   10.x.x.x        80:30536/TCP   38s
 ```

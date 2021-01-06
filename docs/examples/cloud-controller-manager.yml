@@ -1,5 +1,5 @@
+apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
-apiVersion: rbac.authorization.k8s.io/v1beta1
 metadata:
   name: system:cloud-controller-manager
 rules:
@@ -35,6 +35,7 @@ rules:
       - services/status
     verbs:
       - update
+      - patch
   - apiGroups:
       - ""
     resources:
@@ -52,8 +53,14 @@ rules:
       - patch
       - update
 ---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: cloud-controller-manager
+  namespace: kube-system
+---
 kind: ClusterRoleBinding
-apiVersion: rbac.authorization.k8s.io/v1beta1
+apiVersion: rbac.authorization.k8s.io/v1
 metadata:
   name: system:cloud-controller-manager
 roleRef:
@@ -61,12 +68,12 @@ roleRef:
   kind: ClusterRole
   name: system:cloud-controller-manager
 subjects:
-- kind: ServiceAccount
-  name: cloud-controller-manager
-  namespace: kube-system
+  - kind: ServiceAccount
+    name: cloud-controller-manager
+    namespace: kube-system
 ---
 kind: ClusterRoleBinding
-apiVersion: rbac.authorization.k8s.io/v1beta1
+apiVersion: rbac.authorization.k8s.io/v1
 metadata:
   name: system:shared-informers
 roleRef:
@@ -74,12 +81,12 @@ roleRef:
   kind: ClusterRole
   name: system:cloud-controller-manager
 subjects:
-- kind: ServiceAccount
-  name: shared-informers
-  namespace: kube-system
+  - kind: ServiceAccount
+    name: shared-informers
+    namespace: kube-system
 ---
 kind: ClusterRoleBinding
-apiVersion: rbac.authorization.k8s.io/v1beta1
+apiVersion: rbac.authorization.k8s.io/v1
 metadata:
   name: system:cloud-node-controller
 roleRef:
@@ -87,12 +94,12 @@ roleRef:
   kind: ClusterRole
   name: system:cloud-controller-manager
 subjects:
-- kind: ServiceAccount
-  name: cloud-node-controller
-  namespace: kube-system
+  - kind: ServiceAccount
+    name: cloud-node-controller
+    namespace: kube-system
 ---
 kind: ClusterRoleBinding
-apiVersion: rbac.authorization.k8s.io/v1beta1
+apiVersion: rbac.authorization.k8s.io/v1
 metadata:
   name: system:pvl-controller
 roleRef:
@@ -100,12 +107,12 @@ roleRef:
   kind: ClusterRole
   name: system:cloud-controller-manager
 subjects:
-- kind: ServiceAccount
-  name: pvl-controller
-  namespace: kube-system
+  - kind: ServiceAccount
+    name: pvl-controller
+    namespace: kube-system
 ---
 kind: ClusterRoleBinding
-apiVersion: rbac.authorization.k8s.io/v1beta1
+apiVersion: rbac.authorization.k8s.io/v1
 metadata:
   name: system:route-controller
 roleRef:
@@ -113,17 +120,11 @@ roleRef:
   kind: ClusterRole
   name: system:cloud-controller-manager
 subjects:
-- kind: ServiceAccount
-  name: route-controller
-  namespace: kube-system
+  - kind: ServiceAccount
+    name: route-controller
+    namespace: kube-system
 ---
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: cloud-controller-manager
-  namespace: kube-system
----
-apiVersion: extensions/v1beta1
+apiVersion: apps/v1
 kind: DaemonSet
 metadata:
   labels:
@@ -146,68 +147,67 @@ spec:
     spec:
       serviceAccountName: cloud-controller-manager
       tolerations:
-      - effect: NoSchedule
-        operator: Exists
-        key: node-role.kubernetes.io/master
-      - effect: NoSchedule
-        operator: Exists
-        key: node.cloudprovider.kubernetes.io/uninitialized
+        - effect: NoSchedule
+          operator: Exists
+          key: node-role.kubernetes.io/master
+        - effect: NoSchedule
+          operator: Exists
+          key: node.cloudprovider.kubernetes.io/uninitialized
       nodeSelector:
-         node-role.kubernetes.io/master: ""
+        node-role.kubernetes.io/master: ""
       containers:
-      - command:
-        -  /cloud-controller-manager
-        - --kubeconfig=/etc/kubernetes/cloud-controller-manager.conf
-        - --address=127.0.0.1
-        - --allow-untagged-cloud=true
-        - --leader-elect=true
-        - --cloud-provider=alicloud
-        - --allocate-node-cidrs=true
-        - --cluster-cidr=${CLUSTER_CIDR}
-        - --use-service-account-credentials=true
-        - --route-reconciliation-period=30s
-        - --v=5
-        image: registry.cn-hangzhou.aliyuncs.com/acs/cloud-controller-manager-amd64:v1.9.3.10-gfb99107-aliyun
-        env:
-        - name: ACCESS_KEY_ID
-          valueFrom:
-            configMapKeyRef:
+        - command:
+          -  /cloud-controller-manager
+          - --kubeconfig=/etc/kubernetes/cloud-controller-manager.conf
+          - --address=127.0.0.1
+          - --allow-untagged-cloud=true
+          - --leader-elect=true
+          - --cloud-provider=alicloud
+          - --use-service-account-credentials=true
+          - --cloud-config=/etc/kubernetes/config/cloud-config.conf
+          - --configure-cloud-routes=true
+          - --allocate-node-cidrs=true
+          - --route-reconciliation-period=3m
+          # replace ${cluster-cidr} with your own cluster cidr
+          - --cluster-cidr=172.20.0.0/16
+          image: registry.cn-hangzhou.aliyuncs.com/acs/cloud-controller-manager-amd64:v1.9.3.339-g9830b58-aliyun
+          livenessProbe:
+            failureThreshold: 8
+            httpGet:
+              host: 127.0.0.1
+              path: /healthz
+              port: 10258
+              scheme: HTTP
+            initialDelaySeconds: 15
+            timeoutSeconds: 15
+          name: cloud-controller-manager
+          resources:
+            requests:
+              cpu: 200m
+          volumeMounts:
+            - mountPath: /etc/kubernetes/
+              name: k8s
+            - mountPath: /etc/ssl/certs
+              name: certs
+            - mountPath: /etc/pki
+              name: pki
+            - mountPath: /etc/kubernetes/config
               name: cloud-config
-              key: special.keyid
-        - name: ACCESS_KEY_SECRET
-          valueFrom:
-            configMapKeyRef:
-              name: cloud-config
-              key: special.keysecret
-        livenessProbe:
-          failureThreshold: 8
-          httpGet:
-            host: 127.0.0.1
-            path: /healthz
-            port: 10252
-            scheme: HTTP
-          initialDelaySeconds: 15
-          timeoutSeconds: 15
-        name: cloud-controller-manager
-        resources:
-          requests:
-            cpu: 200m
-        volumeMounts:
-        - mountPath: /etc/kubernetes/
-          name: k8s
-          readOnly: true
-        - mountPath: /etc/ssl/certs
-          name: certs
-        - mountPath: /etc/pki
-          name: pki
       hostNetwork: true
       volumes:
-      - hostPath:
-          path: /etc/kubernetes
-        name: k8s
-      - hostPath:
-          path: /etc/ssl/certs
-        name: certs
-      - hostPath:
-          path: /etc/pki
-        name: pki
+        - hostPath:
+            path: /etc/kubernetes
+          name: k8s
+        - hostPath:
+            path: /etc/ssl/certs
+          name: certs
+        - hostPath:
+            path: /etc/pki
+          name: pki
+        - configMap:
+            defaultMode: 420
+            items:
+              - key: cloud-config.conf
+                path: cloud-config.conf
+            name: cloud-config
+          name: cloud-config
