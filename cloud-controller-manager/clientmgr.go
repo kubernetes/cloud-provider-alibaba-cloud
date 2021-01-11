@@ -30,6 +30,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"os"
 	"strings"
 )
 
@@ -200,11 +201,7 @@ type TokenAuth interface {
 type AkAuthToken struct{ ak *Token }
 
 func (f *AkAuthToken) NextToken() (*Token, error) {
-	if err := reloadConfig(); err != nil {
-		return f.ak, err
-	}
-
-	key, secret, err := getAKFromConfig()
+	key, secret, err := loadAK()
 	if err != nil {
 		return f.ak, err
 	}
@@ -245,10 +242,7 @@ type ServiceToken struct {
 }
 
 func (f *ServiceToken) NextToken() (*Token, error) {
-	if err := reloadConfig(); err != nil {
-		return nil, err
-	}
-	key, secret, err := getAKFromConfig()
+	key, secret, err := loadAK()
 	if err != nil {
 		return nil, err
 	}
@@ -275,35 +269,40 @@ func (f *ServiceToken) NextToken() (*Token, error) {
 
 var CloudConfigFile string
 
-func reloadConfig() error {
-	if CloudConfigFile == "" {
-		return fmt.Errorf("failed to load ak, cloud config is nil")
-	}
-
-	config, err := ioutil.ReadFile(CloudConfigFile)
-	if err != nil {
-		return fmt.Errorf("read cloud config file error: %s", err.Error())
-	}
-	return yaml.Unmarshal(config, &cfg)
-}
-
-func getAKFromConfig() (string, string, error) {
+func loadAK() (string, string, error) {
 	var (
 		keyId     string
 		keySecret string
 	)
-
-	if cfg.Global.AccessKeyID != "" && cfg.Global.AccessKeySecret != "" {
-		key, err := base64.StdEncoding.DecodeString(cfg.Global.AccessKeyID)
+	if CloudConfigFile != "" {
+		klog.V(2).Infof("LoadAK: try Accesskey and AccessKeySecret from config file.")
+		config, err := ioutil.ReadFile(CloudConfigFile)
 		if err != nil {
-			return keyId, keySecret, err
+			return keyId, keySecret, fmt.Errorf("read cloud config file error: %s", err.Error())
 		}
-		keyId = string(key)
-		secret, err := base64.StdEncoding.DecodeString(cfg.Global.AccessKeySecret)
-		if err != nil {
-			return keyId, keySecret, err
+		if err := yaml.Unmarshal(config, &cfg); err != nil {
+			return keyId, keySecret, fmt.Errorf("unmarshal config error: %s", err.Error())
 		}
-		keySecret = string(secret)
+		if cfg.Global.AccessKeyID != "" && cfg.Global.AccessKeySecret != "" {
+			key, err := base64.StdEncoding.DecodeString(cfg.Global.AccessKeyID)
+			if err != nil {
+				return keyId, keySecret, err
+			}
+			keyId = string(key)
+			secret, err := base64.StdEncoding.DecodeString(cfg.Global.AccessKeySecret)
+			if err != nil {
+				return keyId, keySecret, err
+			}
+			keySecret = string(secret)
+		}
+	}
+	if keyId == "" || keySecret == "" {
+		klog.V(2).Infof("LoadAK: cloud config does not have keyId or keySecret. try environment ACCESS_KEY_ID ACCESS_KEY_SECRET")
+		keyId = os.Getenv("ACCESS_KEY_ID")
+		keySecret = os.Getenv("ACCESS_KEY_SECRET")
+		if keyId == "" || keySecret == "" {
+			return keyId, keySecret, fmt.Errorf("cloud config and env do not have keyId or keySecret, load AK failed")
+		}
 	}
 	return keyId, keySecret, nil
 }
