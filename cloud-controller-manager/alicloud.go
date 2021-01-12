@@ -123,6 +123,7 @@ func init() {
 					return nil, err
 				}
 				if cfg.Global.AccessKeyID != "" && cfg.Global.AccessKeySecret != "" {
+					klog.V(2).Infof("Alicloud: Try Accesskey and AccessKeySecret from config file.")
 					key, err := b64.StdEncoding.DecodeString(cfg.Global.AccessKeyID)
 					if err != nil {
 						return nil, err
@@ -133,7 +134,6 @@ func init() {
 						return nil, err
 					}
 					keysecret = string(secret)
-					klog.V(2).Infof("Alicloud: Try Accesskey and AccessKeySecret from config file.")
 				}
 				if cfg.Global.ClusterID != "" {
 					CLUSTER_ID = cfg.Global.ClusterID
