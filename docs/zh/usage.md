@@ -110,7 +110,7 @@ spec:
   type: LoadBalancer
 ```
 
-- **创建一个私网负载的均衡**
+- **创建一个私网类型的负载均衡**
 
 ```yaml
 apiVersion: v1
