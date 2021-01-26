@@ -761,6 +761,12 @@ func NodeConditionPredicate(svc *v1.Service) (NodeConditionPredicateFunc, error)
 			return false
 		}
 
+		// ignore eci node condition check
+		if label, ok := node.Labels["type"]; ok && label == utils.ECINodeLabel {
+			utils.Logf(svc, "ignoring eci node %v condition check", node.Name)
+			return true
+		}
+
 		// If we have no info, don't accept
 		if len(node.Status.Conditions) == 0 {
 			return false
