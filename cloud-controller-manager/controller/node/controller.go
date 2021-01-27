@@ -86,6 +86,8 @@ type CloudNodeAttribute struct {
 	InstanceID   string
 	Addresses    []v1.NodeAddress
 	InstanceType string
+	Zone         string
+	Region       string
 }
 
 // CloudInstance is an interface to interact with cloud api
@@ -337,6 +339,8 @@ func (cnc *CloudNodeController) syncCloudNodes(nodes []v1.Node) error {
 	return nil
 }
 
+type nodeModifier func(*v1.Node)
+
 // This processes nodes that were added into the cluster, and cloud initialize them if appropriate
 func (cnc *CloudNodeController) doAddCloudNode(node *v1.Node) error {
 	ctx := context.Background()
@@ -356,37 +360,30 @@ func (cnc *CloudNodeController) doAddCloudNode(node *v1.Node) error {
 				//retry
 				return false, nil
 			}
-			orignode := curNode.DeepCopy()
-			setDefaultProviderID(cnc, curNode)
-
-			nodes, err := ins.ListInstances(ctx, []string{curNode.Spec.ProviderID})
+			copyNode := curNode.DeepCopy()
+			providerID, err := cnc.getProviderID(copyNode)
 			if err != nil {
-				klog.Errorf("cloud instance api fail, %s", err.Error())
-				//retry
+				klog.Errorf("failed to get provider ID for node %s at cloudprovider: %v", node.Name, err)
 				return false, nil
 			}
-			cloudins, ok := nodes[curNode.Spec.ProviderID]
-			if !ok || cloudins == nil {
-				return false, fmt.Errorf("instance not found")
+
+			cloudIns, err := cnc.getCloudInstance(ctx, ins, providerID)
+			if err != nil {
+				klog.Errorf("failed to get cloud instance data for node %s: %v", node.Name, err)
+				return false, nil
 			}
 
-			// If user provided an IP address, ensure that IP address is found
-			// in the cloud provider before removing the taint on the node
-			nodeIP, ok := isProvidedAddrExist(curNode, cloudins.Addresses)
-			if ok && nodeIP == nil {
-				klog.Errorf("failed to get specified nodeIP in cloudprovider, fail fast")
+			nodeModifiers, err := cnc.getNodeModifiersFromCloudProvider(providerID, copyNode, cloudIns)
+			if err != nil {
+				klog.Errorf("failed to get node modifiers for node %s: %v", node.Name, err)
+				// fast fail
 				return true, nil
 			}
 
-			if cloudins.InstanceType != "" {
-				klog.Infof(
-					"Adding node label from cloud provider: %s=%s, %s=%s",
-					v1.LabelInstanceType, cloudins.InstanceType,
-					v1.LabelInstanceTypeStable, cloudins.InstanceType,
-				)
-				curNode.ObjectMeta.Labels[v1.LabelInstanceType] = cloudins.InstanceType
-				curNode.ObjectMeta.Labels[v1.LabelInstanceTypeStable] = cloudins.InstanceType
-			}
+			// remove cloud taint
+			nodeModifiers = append(nodeModifiers, func(n *v1.Node) {
+				removeCloudTaints(n)
+			})
 
 			// TODO(wlan0): Move this logic to the route controller using the node taint instead of condition
 			// Since there are node taints, do we still need this?
@@ -394,28 +391,27 @@ func (cnc *CloudNodeController) doAddCloudNode(node *v1.Node) error {
 			// Aoxn: Hack for alibaba cloud
 			if route.Options.ConfigCloudRoutes &&
 				cnc.cloud.ProviderName() == "alicloud" {
-				curNode.Status.Conditions = append(
-					node.Status.Conditions,
-					v1.NodeCondition{
-						Type:               v1.NodeNetworkUnavailable,
-						Status:             v1.ConditionTrue,
-						Reason:             "NoRouteCreated",
-						Message:            "Node created without a route",
-						LastTransitionTime: metav1.Now(),
-					},
-				)
+				if err := cnc.setNodeCondition(node); err != nil {
+					klog.Errorf("set node %s condition error: %s", node.Name, err.Error())
+					return false, nil
+				}
+
+				// fetch latest node from API server since alicloud-specific condition was set and informer cache may be stale
+				curNode, err = cnc.kclient.CoreV1().Nodes().Get(context.TODO(), node.Name, metav1.GetOptions{})
+				if err != nil {
+					klog.Errorf("get node %s error: %s", node.Name, err.Error())
+					return false, nil
+				}
 			}
 
-			if err = setFailureZones(cnc.cloud, curNode); err != nil {
-				klog.Errorf("set failed zone error: %s", err.Error())
-				//retry
-				return false, nil
+			newNode := curNode.DeepCopy()
+			for _, modify := range nodeModifiers {
+				modify(newNode)
 			}
-			removeCloudTaints(curNode)
 
 			err = ins.SetInstanceTags(
 				ctx,
-				cloudins.InstanceID,
+				cloudIns.InstanceID,
 				map[string]string{
 					"k8s.aliyun.com": "true",
 					"kubernetes.ccm": "true",
@@ -423,7 +419,7 @@ func (cnc *CloudNodeController) doAddCloudNode(node *v1.Node) error {
 			)
 			if err != nil {
 				if !strings.Contains(err.Error(), "Forbidden.RAM") {
-					klog.Errorf("tag instance %s error: %s", cloudins.InstanceID, err.Error())
+					klog.Errorf("tag instance %s error: %s", cloudIns.InstanceID, err.Error())
 					//retry
 					return false, nil
 				}
@@ -431,7 +427,7 @@ func (cnc *CloudNodeController) doAddCloudNode(node *v1.Node) error {
 				// It is ok to skip `Forbidden` error for compatible reason.
 			}
 
-			nnode, err := PatchNode(cnc.kclient, orignode, curNode)
+			nnode, err := PatchNode(cnc.kclient, curNode, newNode)
 			if err != nil {
 				klog.Errorf("patch error: %s", err.Error())
 				return false, nil
@@ -604,50 +600,122 @@ func nodeConditionReady(kclient kubernetes.Interface, node *v1.Node) *v1.NodeCon
 	return nil
 }
 
-func setDefaultProviderID(cnc *CloudNodeController, node *v1.Node) {
-
+func (cnc *CloudNodeController) getProviderID(node *v1.Node) (string, error) {
 	if node.Spec.ProviderID != "" {
-		return
+		return node.Spec.ProviderID, nil
 	}
-	id, err := cloudprovider.GetInstanceProviderID(context.Background(), cnc.cloud, types.NodeName(node.Name))
-	if err == nil {
-		node.Spec.ProviderID = id
-	} else {
+
+	providerID, err := cloudprovider.GetInstanceProviderID(context.Background(), cnc.cloud, types.NodeName(node.Name))
+	if err == cloudprovider.NotImplemented {
 		// we should attempt to set providerID on curNode, but
 		// we can continue if we fail since we will attempt to set
 		// node addresses given the node name in getNodeAddressesByProviderIDOrName
-		klog.Errorf("failed to set node provider id: %v", err)
+		klog.Warningf("cloud provider does not set node provider ID, using node name to discover node %s", node.Name)
+		return "", nil
 	}
+
+	return providerID, err
 }
 
-func setFailureZones(cloud cloudprovider.Interface, node *v1.Node) error {
-	zones, ok := cloud.Zones()
-	if !ok {
-		return nil
-	}
-	zone, err := zones.GetZoneByProviderID(context.Background(), node.Spec.ProviderID)
+func (cnc *CloudNodeController) getCloudInstance(
+	ctx context.Context, ins CloudInstance,
+	providerID string,
+) (*CloudNodeAttribute, error) {
+	nodes, err := ins.ListInstances(ctx, []string{providerID})
 	if err != nil {
-		return fmt.Errorf("failed to get zone from cloud provider: %v", err)
+		return nil, fmt.Errorf("cloud instance api fail, %s", err.Error())
 	}
-	if zone.FailureDomain != "" {
+	cloudIns, ok := nodes[providerID]
+	if !ok || cloudIns == nil {
+		return nil, fmt.Errorf("instance not found")
+	}
+	return cloudIns, nil
+}
+
+func (cnc *CloudNodeController) getNodeModifiersFromCloudProvider(
+	providerID string,
+	node *v1.Node,
+	cloudIns *CloudNodeAttribute,
+) ([]nodeModifier, error) {
+	var nodeModifiers []nodeModifier
+	if node.Spec.ProviderID == "" {
+		if providerID != "" {
+			nodeModifiers = append(nodeModifiers, func(n *v1.Node) {
+				n.Spec.ProviderID = providerID
+			})
+		}
+	}
+
+	// If user provided an IP address, ensure that IP address is found
+	// in the cloud provider before removing the taint on the node
+	if nodeIP, ok := isProvidedAddrExist(node, cloudIns.Addresses); ok && nodeIP == nil {
+		return nil, fmt.Errorf("failed to get specified nodeIP in cloud provider")
+	}
+
+	if cloudIns.InstanceType != "" {
 		klog.Infof(
 			"Adding node label from cloud provider: %s=%s, %s=%s",
-			v1.LabelZoneFailureDomain, zone.FailureDomain,
-			v1.LabelZoneFailureDomainStable, zone.FailureDomain,
+			v1.LabelInstanceType, cloudIns.InstanceType,
+			v1.LabelInstanceTypeStable, cloudIns.InstanceType,
 		)
-		node.ObjectMeta.Labels[v1.LabelZoneFailureDomain] = zone.FailureDomain
-		node.ObjectMeta.Labels[v1.LabelZoneFailureDomainStable] = zone.FailureDomain
+		nodeModifiers = append(nodeModifiers, func(n *v1.Node) {
+			if n.Labels == nil {
+				n.Labels = map[string]string{}
+			}
+			n.Labels[v1.LabelInstanceType] = cloudIns.InstanceType
+			n.Labels[v1.LabelInstanceTypeStable] = cloudIns.InstanceType
+
+		})
 	}
-	if zone.Region != "" {
+
+	if cloudIns.Zone != "" {
 		klog.Infof(
 			"Adding node label from cloud provider: %s=%s, %s=%s",
-			v1.LabelZoneRegion, zone.Region,
-			v1.LabelZoneRegionStable, zone.Region,
+			v1.LabelZoneFailureDomain, cloudIns.Zone,
+			v1.LabelZoneFailureDomainStable, cloudIns.Zone,
 		)
-		node.ObjectMeta.Labels[v1.LabelZoneRegion] = zone.Region
-		node.ObjectMeta.Labels[v1.LabelZoneRegionStable] = zone.Region
+		nodeModifiers = append(nodeModifiers, func(n *v1.Node) {
+			if n.Labels == nil {
+				n.Labels = map[string]string{}
+			}
+			n.Labels[v1.LabelZoneFailureDomain] = cloudIns.Zone
+			n.Labels[v1.LabelZoneFailureDomainStable] = cloudIns.Zone
+		})
 	}
-	return nil
+
+	if cloudIns.Region != "" {
+		klog.Infof(
+			"Adding node label from cloud provider: %s=%s, %s=%s",
+			v1.LabelZoneRegion, cloudIns.Region,
+			v1.LabelZoneRegionStable, cloudIns.Region,
+		)
+		nodeModifiers = append(nodeModifiers, func(n *v1.Node) {
+			if n.Labels == nil {
+				n.Labels = map[string]string{}
+			}
+			n.Labels[v1.LabelZoneRegion] = cloudIns.Region
+			n.Labels[v1.LabelZoneRegionStable] = cloudIns.Region
+		})
+	}
+
+	return nodeModifiers, nil
+}
+
+func (cnc *CloudNodeController) setNodeCondition(n *v1.Node) error {
+	for _, condition := range n.Status.Conditions {
+		if condition.Type == v1.NodeNetworkUnavailable &&
+			condition.Status == v1.ConditionFalse {
+			klog.Infof("node %s network is available", n.Name)
+			return nil
+		}
+	}
+	return nodeutil.SetNodeCondition(cnc.kclient, types.NodeName(n.Name), v1.NodeCondition{
+		Type:               v1.NodeNetworkUnavailable,
+		Status:             v1.ConditionTrue,
+		Reason:             "NoRouteCreated",
+		Message:            "Node created without a route",
+		LastTransitionTime: metav1.Now(),
+	})
 }
 
 func findCloudTaint(taints []v1.Taint) *v1.Taint {
