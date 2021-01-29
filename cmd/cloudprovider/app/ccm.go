@@ -94,7 +94,7 @@ func NewServerCCM() *ServerCCM {
 				RouteReconciliationPeriod: metav1.Duration{Duration: 10 * time.Second},
 			},
 			ServiceController: serviceconfig.ServiceControllerConfiguration{
-				ConcurrentServiceSyncs: 2,
+				ConcurrentServiceSyncs: 3,
 			},
 		},
 		NodeStatusUpdateFrequency: metav1.Duration{Duration: 5 * time.Minute},
