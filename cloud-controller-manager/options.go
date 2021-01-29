@@ -195,10 +195,17 @@ const (
 )
 
 //compatible to old camel annotation
+//If the old and new annotation coexist, the new version will take effect
 func getBackwardsCompatibleAnnotation(annotations map[string]string) map[string]string {
 	newAnnotation := make(map[string]string)
 	for k, v := range annotations {
-		newAnnotation[replaceCamel(normalizePrefix(k))] = v
+		newKey := replaceCamel(normalizePrefix(k))
+		if _, ok := newAnnotation[newKey]; ok {
+			if strings.HasPrefix(k, ServiceAnnotationLegacyPrefix) {
+				continue
+			}
+		}
+		newAnnotation[newKey] = v
 	}
 	return newAnnotation
 }
