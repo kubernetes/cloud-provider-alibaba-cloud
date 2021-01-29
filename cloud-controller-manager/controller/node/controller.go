@@ -290,6 +290,12 @@ func (cnc *CloudNodeController) syncNodeAddress(nodes []v1.Node) error {
 		err := tryPatchNodeAddress(cnc.kclient, node, cloudNode.Addresses)
 		if err != nil {
 			klog.Errorf("Wait for next retry, patch node address error: %s", err.Error())
+			cnc.recorder.Eventf(
+				node,
+				v1.EventTypeWarning,
+				"SyncNodeFailed",
+				"Error patching node address: %s", err.Error(),
+			)
 		}
 	}
 	return nil
@@ -450,8 +456,8 @@ func (cnc *CloudNodeController) doAddCloudNode(node *v1.Node) error {
 		cnc.recorder.Eventf(
 			ref,
 			v1.EventTypeWarning,
-			"Failed",
-			"Fail to add node, error: %s",
+			"AddNodeFailed",
+			"Error add node: %s",
 			err.Error(),
 		)
 		utilruntime.HandleError(err)
@@ -463,8 +469,8 @@ func (cnc *CloudNodeController) doAddCloudNode(node *v1.Node) error {
 	cnc.recorder.Eventf(
 		ref,
 		v1.EventTypeNormal,
-		"SuccessfulInitialize",
-		"Initialize node with cloud provider successfully",
+		"InitializedNode",
+		"Initialize node successfully",
 	)
 	return nil
 }
@@ -561,16 +567,16 @@ func deleteNode(cnc *CloudNodeController, node *v1.Node) {
 			cnc.recorder.Eventf(
 				ref,
 				v1.EventTypeWarning,
-				"Failed",
-				"Fail to delete node, error: %s",
+				"DeleteNodeFailed",
+				"Error deleting node: %s",
 				err.Error(),
 			)
 		} else {
 			cnc.recorder.Eventf(
 				ref,
 				v1.EventTypeNormal,
-				"SuccessfulDelete",
-				"Delete node successfully",
+				"DeletedNode",
+				"Deleted node",
 			)
 		}
 	}(node.Name)
