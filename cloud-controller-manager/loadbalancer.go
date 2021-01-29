@@ -439,6 +439,9 @@ func updateLoadBalancerByAnnotations(context context.Context, slbClient ClientSL
 	if !equalsAddressIPVersion(request.AddressIPVersion, lb.AddressIPVersion) {
 		return fmt.Errorf("alicloud: can not change LoadBalancer AddressIPVersion once created")
 	}
+	if request.ResourceGroupId != "" && request.ResourceGroupId != lb.ResourceGroupId {
+		return fmt.Errorf("alicloud: can not change ResourceGroupId once created")
+	}
 
 	// update chargeType & bandwidth
 	needUpdate, charge, bandwidth := false, lb.InternetChargeType, lb.Bandwidth
