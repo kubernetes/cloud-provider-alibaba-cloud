@@ -155,7 +155,7 @@ func (rc *RouteController) HandlerForNodeDeletion(
 					klog.Infof("not node type: %s\n", reflect.TypeOf(nodec))
 					return
 				}
-				if _, exclude := node.Labels[utils.LabelNodeRoleExcludeNode]; exclude {
+				if utils.IsExcludedNode(node) {
 					klog.Infof("ignore node with exclude node label %s", node.Name)
 					return
 				}
@@ -229,7 +229,7 @@ func (rc *RouteController) Run(stopCh <-chan struct{}, syncPeriod time.Duration)
 }
 
 func (rc *RouteController) syncd(node *v1.Node) error {
-	if _, exclude := node.Labels[utils.LabelNodeRoleExcludeNode]; exclude {
+	if utils.IsExcludedNode(node) {
 		return nil
 	}
 	if node.Spec.PodCIDR == "" {
@@ -314,7 +314,7 @@ func (rc *RouteController) sync(ctx context.Context, table string, nodes []*v1.N
 	// try create desired routes
 	for _, node := range nodes {
 
-		if _, exclude := node.Labels[utils.LabelNodeRoleExcludeNode]; exclude {
+		if utils.IsExcludedNode(node) {
 			continue
 		}
 		if node.Spec.PodCIDR == "" {

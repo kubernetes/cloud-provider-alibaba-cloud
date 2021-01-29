@@ -190,7 +190,7 @@ func (con *Controller) HandlerForNodesChange(
 			klog.Info("node change: node object is nil, skip")
 			return
 		}
-		if _, exclude := node.Labels[utils.LabelNodeRoleExcludeNode]; exclude {
+		if utils.IsExcludedNode(node) {
 			klog.Infof("node change: node %s is excluded from CCM, skip", node.Name)
 			return
 		}

@@ -688,7 +688,7 @@ func nodeLists(kclient kubernetes.Interface) (*v1.NodeList, error) {
 	}
 	var nodes []v1.Node
 	for _, node := range allNodes.Items {
-		if _, exclude := node.Labels[utils.LabelNodeRoleExcludeNode]; exclude {
+		if utils.IsExcludedNode(&node) {
 			continue
 		}
 		if node.Spec.ProviderID == "" {
