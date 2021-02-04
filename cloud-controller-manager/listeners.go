@@ -639,6 +639,10 @@ func (t *tcp) Update(ctx context.Context) error {
 			klog.V(2).Infof("TCP listener checker [bandwidth] changed, request=%d. response=%d", def.Bandwidth, response.Bandwidth)
 		}
 	*/
+	if response.VServerGroupId != "" &&
+		response.VServerGroupId != config.VServerGroupId {
+		needUpdate = true
+	}
 
 	if request.AclStatus != "" &&
 		def.AclStatus != response.AclStatus {
@@ -832,6 +836,10 @@ func (t *udp) Update(ctx context.Context) error {
 			klog.V(2).Infof("UDP listener checker [bandwidth] changed, request=%d. response=%d", request.Bandwidth, response.Bandwidth)
 		}
 	*/
+	if response.VServerGroupId != "" &&
+		response.VServerGroupId != config.VServerGroupId {
+		needUpdate = true
+	}
 	if request.AclStatus != "" &&
 		def.AclStatus != response.AclStatus {
 		needUpdate = true
@@ -1053,6 +1061,10 @@ func (t *http) Update(ctx context.Context) error {
 			klog.V(2).Infof("HTTP listener checker [bandwidth] changed, request=%d. response=%d", request.Bandwidth, response.Bandwidth)
 		}
 	*/
+	if response.VServerGroupId != "" &&
+		response.VServerGroupId != config.VServerGroupId {
+		needUpdate = true
+	}
 	if request.AclStatus != "" &&
 		def.AclStatus != response.AclStatus {
 		needUpdate = true
@@ -1306,6 +1318,10 @@ func (t *https) Update(ctx context.Context) error {
 		}
 	*/
 	// todo: perform healthcheck update.
+	if response.VServerGroupId != "" &&
+		response.VServerGroupId != config.VServerGroupId {
+		needUpdate = true
+	}
 	if request.AclStatus != "" &&
 		def.AclStatus != response.AclStatus {
 		needUpdate = true
