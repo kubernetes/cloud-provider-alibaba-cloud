@@ -185,11 +185,11 @@ func (s *InstanceClient) findInstanceByProviderID(ctx context.Context, providerI
 func (s *InstanceClient) ListInstances(ctx context.Context, ids []string) (map[string]*node.CloudNodeAttribute, error) {
 	nodeRegionMap := make(map[common.Region][]string)
 	for _, id := range ids {
-		regionid, nodeid, err := nodeFromProviderID(id)
+		regionID, nodeID, err := nodeFromProviderID(id)
 		if err != nil {
 			return nil, err
 		}
-		nodeRegionMap[regionid] = append(nodeRegionMap[regionid], nodeid)
+		nodeRegionMap[regionID] = append(nodeRegionMap[regionID], nodeID)
 	}
 
 	var insList []ecs.InstanceAttributesType
@@ -209,6 +209,8 @@ func (s *InstanceClient) ListInstances(ctx context.Context, ids []string) (map[s
 					InstanceID:   n.InstanceId,
 					InstanceType: n.InstanceType,
 					Addresses:    s.findAddressByInstance(&n),
+					Zone:         n.ZoneId,
+					Region:       string(n.RegionId),
 				}
 				break
 			}
