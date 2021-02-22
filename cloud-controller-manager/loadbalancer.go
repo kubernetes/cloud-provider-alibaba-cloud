@@ -796,9 +796,8 @@ func isLoadbalancerOwnIngress(service *v1.Service) bool {
 		utils.Logf(service, "service is nil")
 		return false
 	}
-
 	if len(service.Status.LoadBalancer.Ingress) == 0 {
-		utils.Logf(service, "service %v doesn't have ingresses", service.Name)
+		utils.Logf(service, "service %s doesn't have ingresses", service.Name)
 		return false
 	}
 	utils.Logf(service, "service %s has ingresses=%v", service.Name, service.Status.LoadBalancer.Ingress)

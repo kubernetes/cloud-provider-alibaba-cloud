@@ -86,15 +86,27 @@ func (v *vgroup) Add(ctx context.Context) error {
 	v.VGroupId = gp.VServerGroupId
 	return nil
 }
+
 func (v *vgroup) Remove(ctx context.Context) error {
 	if v.LoadBalancerId == "" || v.VGroupId == "" {
 		return fmt.Errorf("can not delete vserver group. LoadBalancerId or vgroup id should not be empty")
 	}
+
+	hasUserManagedNode, err := v.removeUserManagedNodeFromVgBackends(ctx)
+	if err != nil {
+		return fmt.Errorf("error to remove vgroup backends: %s", err.Error())
+	}
+	if hasUserManagedNode {
+		v.Logf("do not delete vgroup[%s]"+
+			" for loadbalancer[%s], because it has user added backends.", v.NamedKey.Key(), v.LoadBalancerId)
+		return nil
+	}
+
 	vdel := slb.DeleteVServerGroupArgs{
 		VServerGroupId: v.VGroupId,
 		RegionId:       v.RegionId,
 	}
-	_, err := v.Client.DeleteVServerGroup(ctx, &vdel)
+	_, err = v.Client.DeleteVServerGroup(ctx, &vdel)
 	return err
 }
 func (v *vgroup) Update(ctx context.Context) error {
@@ -127,67 +139,52 @@ func (v *vgroup) Update(ctx context.Context) error {
 	}
 
 	if len(add) > 0 {
-		if err := Batch(add, MAX_BACKEND_NUM,
-			func(list []interface{}) error {
-				additions, err := json.Marshal(list)
-				if err != nil {
-					return fmt.Errorf("error marshal backends: %s, %v", err.Error(), list)
-				}
-				v.Logf("update: try to update vserver group[%s],"+
-					" backend add[%s]", v.NamedKey.Key(), string(additions))
-				_, err = v.Client.AddVServerGroupBackendServers(
-					ctx,
-					&slb.AddVServerGroupBackendServersArgs{
-						VServerGroupId: v.VGroupId,
-						RegionId:       v.RegionId,
-						BackendServers: string(additions),
-					})
-				return err
-			}); err != nil {
+		if err := v.BatchAddVServerGroupBackendServers(ctx, add); err != nil {
 			return err
 		}
 	}
 	if len(del) > 0 {
-		if err := Batch(del, MAX_BACKEND_NUM,
-			func(list []interface{}) error {
-				deletions, err := json.Marshal(list)
-				if err != nil {
-					return fmt.Errorf("error marshal backends: %s, %v", err.Error(), list)
-				}
-				v.Logf("update: try to update vserver group[%s],"+
-					" backend del[%s]", v.NamedKey.Key(), string(deletions))
-				_, err = v.Client.RemoveVServerGroupBackendServers(
-					ctx,
-					&slb.RemoveVServerGroupBackendServersArgs{
-						VServerGroupId: v.VGroupId,
-						RegionId:       v.RegionId,
-						BackendServers: string(deletions),
-					})
-				return err
-			}); err != nil {
+		if err := v.BatchRemoveVServerGroupBackendServers(ctx, del); err != nil {
 			return err
 		}
 	}
 	if len(update) > 0 {
-		return Batch(update, MAX_BACKEND_NUM,
-			func(list []interface{}) error {
-				updateJson, err := json.Marshal(list)
-				if err != nil {
-					return fmt.Errorf("error marshal backends: %s, %v", err.Error(), list)
-				}
-				v.Logf("update: try to update vserver group[%s],"+
-					" backend update[%s]", v.NamedKey.Key(), string(updateJson))
-				_, err = v.Client.SetVServerGroupAttribute(
-					ctx,
-					&slb.SetVServerGroupAttributeArgs{
-						VServerGroupId: v.VGroupId,
-						RegionId:       v.RegionId,
-						BackendServers: string(updateJson),
-					})
-				return err
-			})
+		return v.BatchUpdateVServerGroupBackendServers(ctx, update)
 	}
 	return nil
+}
+
+
+func (v *vgroup) removeUserManagedNodeFromVgBackends(ctx context.Context) (bool, error) {
+	hasUserManagedNode := false
+	remoteVg, err := v.Client.DescribeVServerGroupAttribute(
+		ctx,
+		&slb.DescribeVServerGroupAttributeArgs{
+			VServerGroupId: v.VGroupId,
+		})
+	if err != nil {
+		v.Logf("Error: DescribeVServerGroupAttribute: "+
+			"failed to DescribeVServerGroupAttribute vgroup[%s]", v.NamedKey.Key(), err.Error())
+		return false, err
+	}
+
+	var removedBackends []slb.VBackendServerType
+	for _, backend := range remoteVg.BackendServers.BackendServer {
+		if isUserManagedNode(backend.Description, v.NamedKey.Key()) {
+			hasUserManagedNode = true
+		} else {
+			removedBackends = append(removedBackends, backend)
+		}
+	}
+
+	if hasUserManagedNode {
+		if len(removedBackends) <= 0 {
+			return true, nil
+		}
+		return true, v.BatchRemoveVServerGroupBackendServers(ctx, removedBackends)
+	}
+
+	return false, nil
 }
 
 // MAX_BACKEND_NUM max batch backend num
@@ -228,6 +225,66 @@ func Batch(m interface{}, cnt int, batch Func) error {
 	return batch(target)
 }
 
+func (v *vgroup) BatchAddVServerGroupBackendServers(ctx context.Context, add interface{}) error {
+	return Batch(add, MAX_BACKEND_NUM,
+		func(list []interface{}) error {
+			additions, err := json.Marshal(list)
+			if err != nil {
+				return fmt.Errorf("error marshal backends: %s, %v", err.Error(), list)
+			}
+			v.Logf("update: try to update vserver group[%s],"+
+				" backend add[%s]", v.NamedKey.Key(), string(additions))
+			_, err = v.Client.AddVServerGroupBackendServers(
+				ctx,
+				&slb.AddVServerGroupBackendServersArgs{
+					VServerGroupId: v.VGroupId,
+					RegionId:       v.RegionId,
+					BackendServers: string(additions),
+				})
+			return err
+		})
+}
+
+func (v *vgroup) BatchRemoveVServerGroupBackendServers(ctx context.Context, del interface{}) error {
+	return Batch(del, MAX_BACKEND_NUM,
+		func(list []interface{}) error {
+			deletions, err := json.Marshal(list)
+			if err != nil {
+				return fmt.Errorf("error marshal backends: %s, %v", err.Error(), list)
+			}
+			v.Logf("update: try to update vserver group[%s],"+
+				" backend del[%s]", v.NamedKey.Key(), string(deletions))
+			_, err = v.Client.RemoveVServerGroupBackendServers(
+				ctx,
+				&slb.RemoveVServerGroupBackendServersArgs{
+					VServerGroupId: v.VGroupId,
+					RegionId:       v.RegionId,
+					BackendServers: string(deletions),
+				})
+			return err
+		})
+}
+
+func (v *vgroup) BatchUpdateVServerGroupBackendServers(ctx context.Context, update interface{}) error {
+	return Batch(update, MAX_BACKEND_NUM,
+		func(list []interface{}) error {
+			updateJson, err := json.Marshal(list)
+			if err != nil {
+				return fmt.Errorf("error marshal backends: %s, %v", err.Error(), list)
+			}
+			v.Logf("update: try to update vserver group[%s],"+
+				" backend update[%s]", v.NamedKey.Key(), string(updateJson))
+			_, err = v.Client.SetVServerGroupAttribute(
+				ctx,
+				&slb.SetVServerGroupAttributeArgs{
+					VServerGroupId: v.VGroupId,
+					RegionId:       v.RegionId,
+					BackendServers: string(updateJson),
+				})
+			return err
+		})
+}
+
 func (v *vgroup) diff(apis, nodes []slb.VBackendServerType) (
 	[]slb.VBackendServerType, []slb.VBackendServerType, []slb.VBackendServerType) {
 
@@ -238,6 +295,10 @@ func (v *vgroup) diff(apis, nodes []slb.VBackendServerType) (
 	)
 
 	for _, api := range apis {
+		// skip nodes which does not belong to the cluster
+		if isUserManagedNode(api.Description, v.NamedKey.Key()) {
+			continue
+		}
 		found := false
 		for _, node := range nodes {
 			if node.Type == "eni" {
@@ -281,18 +342,19 @@ func (v *vgroup) diff(apis, nodes []slb.VBackendServerType) (
 	}
 	for _, node := range nodes {
 		for _, api := range apis {
+			if isUserManagedNode(api.Description, v.NamedKey.Key()) {
+				continue
+			}
 			if node.Type == "eni" {
 				if node.ServerId == api.ServerId &&
 					node.ServerIp == api.ServerIp &&
-					(node.Weight != api.Weight ||
-						api.Description != v.NamedKey.Key()) {
+					node.Weight != api.Weight {
 					updates = append(updates, node)
 					break
 				}
 			} else {
 				if node.ServerId == api.ServerId &&
-					(node.Weight != api.Weight ||
-						api.Description != v.NamedKey.Key()) {
+					node.Weight != api.Weight {
 					updates = append(updates, node)
 					break
 				}
@@ -738,4 +800,8 @@ func isExcludeNode(node *v1.Node) bool {
 		return true
 	}
 	return false
+}
+
+func isUserManagedNode(nodeDescription, vNameKey string) bool {
+	return nodeDescription != vNameKey
 }
