@@ -154,7 +154,6 @@ func (v *vgroup) Update(ctx context.Context) error {
 	return nil
 }
 
-
 func (v *vgroup) removeUserManagedNodeFromVgBackends(ctx context.Context) (bool, error) {
 	hasUserManagedNode := false
 	remoteVg, err := v.Client.DescribeVServerGroupAttribute(
@@ -170,7 +169,7 @@ func (v *vgroup) removeUserManagedNodeFromVgBackends(ctx context.Context) (bool,
 
 	var removedBackends []slb.VBackendServerType
 	for _, backend := range remoteVg.BackendServers.BackendServer {
-		if isUserManagedNode(backend.Description, v.NamedKey.Key()) {
+		if isUserManagedNode(backend.Description, remoteVg.VServerGroupName) {
 			hasUserManagedNode = true
 		} else {
 			removedBackends = append(removedBackends, backend)
@@ -411,7 +410,8 @@ func CleanUPVGroupMerged(
 		}
 		found := false
 		for _, svc := range *local {
-			if rem.NamedKey.Port == svc.NamedKey.Port {
+			if rem.NamedKey.Port.BackendPort.IntVal == svc.NamedKey.Port.BackendPort.IntVal &&
+				rem.NamedKey.Port.BackendPort.StrVal == svc.NamedKey.Port.BackendPort.StrVal {
 				found = true
 				break
 			}
@@ -463,20 +463,17 @@ func BuildVirtualGroupFromService(
 		vg := &vgroup{
 			NamedKey: &NamedKey{
 				CID:         CLUSTER_ID,
-				Port:        port.NodePort,
-				TargetPort:  port.TargetPort.IntVal,
 				Namespace:   service.Namespace,
 				ServiceName: service.Name,
 				Prefix:      DEFAULT_PREFIX,
+				Port:        BuildNameKeyPort(service, port),
+				NameKeyType: VGroupType,
 			},
 			LoadBalancerId: slbins.LoadBalancerId,
 			Client:         client.c,
 			RegionId:       common.Region(client.region),
 			InsClient:      client.ins,
 			VpcID:          client.vpcid,
-		}
-		if IsENIBackendType(service) {
-			vg.NamedKey.Port = port.TargetPort.IntVal
 		}
 		vgrps = append(vgrps, vg)
 	}
@@ -499,7 +496,7 @@ func BuildVirtualGroupFromRemoteAPI(
 		return vgrps, fmt.Errorf("list: vgroup error, %s", err.Error())
 	}
 	for _, val := range vgrp.VServerGroups.VServerGroup {
-		key, err := LoadNamedKey(val.VServerGroupName)
+		key, err := LoadNamedKey(val.VServerGroupName, VGroupType)
 		if err != nil {
 			klog.Warningf("we just en-counted an "+
 				"unexpected vserver group name: [%s]. Assume user managed "+
@@ -574,11 +571,11 @@ func (v *EndpointWithENI) buildFunc(
 	return func(o []interface{}) error {
 		var ips []string
 		for _, i := range o {
-			ip, ok := i.(string)
+			b, ok := i.(slb.VBackendServerType)
 			if !ok {
-				return fmt.Errorf("not string: %v", i)
+				return fmt.Errorf("not VBackendServerType: %v", i)
 			}
-			ips = append(ips, ip)
+			ips = append(ips, b.ServerIp)
 		}
 		targs := &ecs.DescribeNetworkInterfacesArgs{
 			VpcID:            g.VpcID,
@@ -590,8 +587,9 @@ func (v *EndpointWithENI) buildFunc(
 		if err != nil {
 			return fmt.Errorf("call DescribeNetworkInterfaces: %s", err.Error())
 		}
-		for _, ip := range ips {
-			eniid, err := findENIbyAddrIP(resp, ip)
+		for _, backendAddr := range o {
+			b, _ := backendAddr.(slb.VBackendServerType)
+			eniid, err := findENIbyAddrIP(resp, b.ServerIp)
 			if err != nil {
 				return err
 			}
@@ -601,8 +599,8 @@ func (v *EndpointWithENI) buildFunc(
 					ServerId:    eniid,
 					Weight:      DEFAULT_SERVER_WEIGHT,
 					Type:        "eni",
-					Port:        int(g.NamedKey.TargetPort),
-					ServerIp:    ip,
+					Port:        b.Port,
+					ServerIp:    b.ServerIp,
 					Description: g.NamedKey.Key(),
 				},
 			)
@@ -631,10 +629,21 @@ func (v *EndpointWithENI) doBackendBuild(ctx context.Context, g *vgroup) ([]slb.
 		}
 		klog.Infof("[ENI] mode service: %s", g.NamedKey)
 		LogSubsetInfo(v.Endpoints, "reconcile")
-		var privateIpAddress []string
+		var privateIpAddress []slb.VBackendServerType
 		for _, ep := range v.Endpoints.Subsets {
+			var backendPort int
+			for _, p := range ep.Ports {
+				if p.Name == "" || p.Name == g.NamedKey.Port.BackendPort.StrVal {
+					backendPort = int(p.Port)
+					break
+				}
+			}
+
 			for _, addr := range ep.Addresses {
-				privateIpAddress = append(privateIpAddress, addr.IP)
+				privateIpAddress = append(privateIpAddress, slb.VBackendServerType{
+					ServerIp: addr.IP,
+					Port:     backendPort,
+				})
 			}
 		}
 		err := Batch(privateIpAddress, 40, v.buildFunc(ctx, &backend, g))
@@ -678,7 +687,7 @@ func (v *EndpointWithENI) doBackendBuild(ctx context.Context, g *vgroup) ([]slb.
 					slb.VBackendServerType{
 						ServerId:    string(id),
 						Weight:      DEFAULT_SERVER_WEIGHT,
-						Port:        int(g.NamedKey.Port),
+						Port:        int(g.NamedKey.Port.BackendPort.IntVal),
 						Type:        "ecs",
 						Description: g.NamedKey.Key(),
 					},
@@ -708,7 +717,7 @@ func (v *EndpointWithENI) doBackendBuild(ctx context.Context, g *vgroup) ([]slb.
 			slb.VBackendServerType{
 				ServerId:    string(id),
 				Weight:      DEFAULT_SERVER_WEIGHT,
-				Port:        int(g.NamedKey.Port),
+				Port:        int(g.NamedKey.Port.BackendPort.IntVal),
 				Type:        "ecs",
 				Description: g.NamedKey.Key(),
 			},
@@ -756,13 +765,20 @@ func (v *EndpointWithENI) addECIBackends(
 	backend []slb.VBackendServerType,
 	g *vgroup,
 ) ([]slb.VBackendServerType, error) {
-	var privateIpAddress []string
+	var privateIpAddress []slb.VBackendServerType
 	// filter ECI nodes
 	if v.Endpoints == nil {
 		klog.Warningf("%s endpoint is nil in eci mode", g.NamedKey)
 		return backend, nil
 	}
 	for _, sub := range v.Endpoints.Subsets {
+		var backendPort int
+		for _, p := range sub.Ports {
+			if p.Name == "" || p.Name == g.NamedKey.Port.BackendPort.StrVal {
+				backendPort = int(p.Port)
+				break
+			}
+		}
 		for _, add := range sub.Addresses {
 			if add.NodeName == nil {
 				return nil, fmt.Errorf("add eci backends for service[%s] error, NodeName is nil for ip %s ", g.NamedKey.String(), add.IP)
@@ -774,7 +790,10 @@ func (v *EndpointWithENI) addECIBackends(
 			// check if the node is ECI
 			if node.Labels["type"] == utils.ECINodeLabel {
 				klog.Infof("hybrid: %s not an ecs, use eni object as backend", add.IP)
-				privateIpAddress = append(privateIpAddress, add.IP)
+				privateIpAddress = append(privateIpAddress, slb.VBackendServerType{
+					ServerIp: add.IP,
+					Port:     backendPort,
+				})
 			}
 		}
 	}
