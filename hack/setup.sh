@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e -x
 if [ -z $APISERVER_IP ];then
-	APISERVER_IP={your-apiserver-ip}
+	APISERVER_IP=47.110.78.7
 fi
 ### rename your cloud-controller-manager image.
 kubectl get ds -n kube-system cloud-controller-manager -o yaml |grep image:|awk -F "image: " '{print $2}'|xargs -I '{}' kubectl set image ds/cloud-controller-manager -n kube-system cloud-controller-manager={}-bak

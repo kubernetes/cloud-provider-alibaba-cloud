@@ -18,6 +18,8 @@ package alicloud
 
 import (
 	"context"
+	"k8s.io/apimachinery/pkg/util/intstr"
+
 	//"errors"
 	"fmt"
 	"github.com/denverdino/aliyungo/slb"
@@ -111,9 +113,16 @@ type NamedKey struct {
 	CID         string
 	Namespace   string
 	ServiceName string
-	Port        int32
-	TargetPort  int32
+	Port        NameKeyPort
+	NameKeyType NameKeyType
 }
+
+type NameKeyType string
+
+const (
+	ListenerType = NameKeyType("listener")
+	VGroupType   = NameKeyType("vgroup")
+)
 
 func (n *NamedKey) String() string {
 	if n == nil {
@@ -127,7 +136,17 @@ func (n *NamedKey) Key() string {
 	if n.Prefix == "" {
 		n.Prefix = DEFAULT_PREFIX
 	}
-	return fmt.Sprintf("%s/%d/%s/%s/%s", n.Prefix, n.Port, n.ServiceName, n.Namespace, n.CID)
+	if n.NameKeyType == ListenerType {
+		return fmt.Sprintf("%s/%d/%s/%s/%s", n.Prefix, n.Port.FrontPort, n.ServiceName, n.Namespace, n.CID)
+	}
+	if n.NameKeyType == VGroupType {
+		if n.Port.BackendPort.Type == intstr.String {
+			return fmt.Sprintf("%s/%s/%s/%s/%s", n.Prefix, n.Port.BackendPort.StrVal, n.ServiceName, n.Namespace, n.CID)
+		}
+		return fmt.Sprintf("%s/%d/%s/%s/%s", n.Prefix, n.Port.BackendPort.IntVal, n.ServiceName, n.Namespace, n.CID)
+	}
+	klog.Warningf("got unexpected namekey type: %s")
+	return ""
 }
 
 //ServiceURI service URI for the NamedKey.
@@ -139,13 +158,54 @@ func (n *NamedKey) ServiceURI() string {
 }
 
 // Reference reference
-func (n *NamedKey) Reference(backport int32) string {
+func (n *NamedKey) Reference(port NameKeyPort, keyType NameKeyType) string {
 	return (&NamedKey{
 		Prefix:      n.Prefix,
 		Namespace:   n.Namespace,
 		CID:         n.CID,
-		Port:        backport,
-		ServiceName: n.ServiceName}).Key()
+		ServiceName: n.ServiceName,
+		Port:        port,
+		NameKeyType: keyType}).Key()
+}
+
+type NameKeyPort struct {
+	FrontPort   int32
+	BackendPort intstr.IntOrString
+}
+
+func BuildNameKeyPort(svc *v1.Service, port v1.ServicePort) NameKeyPort {
+	retPort := NameKeyPort{
+		FrontPort: port.Port,
+	}
+	if IsENIBackendType(svc) {
+		retPort.BackendPort = port.TargetPort
+	} else {
+		retPort.BackendPort.IntVal = port.NodePort
+	}
+	return retPort
+}
+
+func LoadNameKeyPort(remote string, keyType NameKeyType) (NameKeyPort, error) {
+	port := NameKeyPort{}
+	if keyType == ListenerType {
+		frontPort, err := strconv.Atoi(remote)
+		if err != nil {
+			return port, err
+		}
+		port.FrontPort = int32(frontPort)
+		return port, nil
+	}
+
+	if keyType == VGroupType {
+		backendPort, err := strconv.Atoi(remote)
+		if err != nil {
+			port.BackendPort.StrVal = remote
+		} else {
+			port.BackendPort.IntVal = int32(backendPort)
+		}
+		return port, nil
+	}
+	return port, fmt.Errorf("got unexpected namekey type: %s", keyType)
 }
 
 // URIfromService build ServiceURI from service
@@ -154,12 +214,13 @@ func URIfromService(svc *v1.Service) string {
 }
 
 // LoadNamedKey build NamedKey from string.
-func LoadNamedKey(key string) (*NamedKey, error) {
+func LoadNamedKey(key string, keyType NameKeyType) (*NamedKey, error) {
+	klog.Infof("=====debug===: key: %s", key)
 	metas := strings.Split(key, "/")
 	if len(metas) != 5 || metas[0] != DEFAULT_PREFIX {
 		return nil, formatError{key: key}
 	}
-	port, err := strconv.Atoi(metas[1])
+	port, err := LoadNameKeyPort(metas[1], keyType)
 	if err != nil {
 		return nil, err
 	}
@@ -167,8 +228,9 @@ func LoadNamedKey(key string) (*NamedKey, error) {
 		CID:         metas[4],
 		Namespace:   metas[3],
 		ServiceName: metas[2],
-		Port:        int32(port),
-		Prefix:      DEFAULT_PREFIX}, nil
+		Port:        port,
+		Prefix:      DEFAULT_PREFIX,
+		NameKeyType: keyType}, nil
 }
 
 // Listener loadbalancer listener
@@ -183,10 +245,7 @@ type Listener struct {
 	// TransforedProto is the real protocol that a listener indicated.
 	TransforedProto string
 
-	Port int32
-
-	// NodePort Backend server port
-	NodePort int32
+	Port NameKeyPort
 
 	// ServiceName reference from k8s service
 	Service *v1.Service
@@ -251,7 +310,7 @@ func (n *Listener) Apply(ctx context.Context) error {
 // Start start listener
 func (n *Listener) Start(ctx context.Context) error {
 	return n.Client.StartLoadBalancerListener(
-		ctx, n.LoadBalancerID, int(n.Port),
+		ctx, n.LoadBalancerID, int(n.Port.FrontPort),
 	)
 }
 
@@ -263,11 +322,11 @@ func (n *Listener) Describe(ctx context.Context) error {
 
 // Remove remove Listener
 func (n *Listener) Remove(ctx context.Context) error {
-	err := n.Client.StopLoadBalancerListener(ctx, n.LoadBalancerID, int(n.Port))
+	err := n.Client.StopLoadBalancerListener(ctx, n.LoadBalancerID, int(n.Port.FrontPort))
 	if err != nil {
 		return err
 	}
-	return n.Client.DeleteLoadBalancerListener(ctx, n.LoadBalancerID, int(n.Port))
+	return n.Client.DeleteLoadBalancerListener(ctx, n.LoadBalancerID, int(n.Port.FrontPort))
 }
 
 func (n *Listener) findVgroup(key string) string {
@@ -518,15 +577,17 @@ func BuildListenersFromService(
 		if err != nil {
 			return nil, err
 		}
+		nameKeyPort := BuildNameKeyPort(svc, port)
 		n := Listener{
 			NamedKey: &NamedKey{
 				CID:         CLUSTER_ID,
 				Namespace:   svc.Namespace,
 				ServiceName: svc.Name,
-				Port:        port.Port,
-				Prefix:      DEFAULT_PREFIX},
-			Port:            port.Port,
-			NodePort:        port.NodePort,
+				Port:        nameKeyPort,
+				Prefix:      DEFAULT_PREFIX,
+				NameKeyType: ListenerType,
+			},
+			Port:            nameKeyPort,
 			Proto:           string(port.Protocol),
 			Service:         svc,
 			TransforedProto: proto,
@@ -534,9 +595,7 @@ func BuildListenersFromService(
 			VGroups:         vgrps,
 			LoadBalancerID:  lb.LoadBalancerId,
 		}
-		if IsENIBackendType(svc) {
-			n.NodePort = port.TargetPort.IntVal
-		}
+
 		n.Name = n.NamedKey.Key()
 		listeners = append(listeners, &n)
 	}
@@ -552,7 +611,7 @@ func BuildListenersFromAPI(
 ) (listeners Listeners) {
 	ports := lb.ListenerPortsAndProtocol.ListenerPortAndProtocol
 	for _, port := range ports {
-		key, err := LoadNamedKey(port.Description)
+		key, err := LoadNamedKey(port.Description, ListenerType)
 		if err != nil {
 			klog.Warningf("alicloud: error parse listener description[%s]. %s", port.Description, err.Error())
 		}
@@ -564,7 +623,7 @@ func BuildListenersFromAPI(
 		n := Listener{
 			Name:            port.Description,
 			NamedKey:        key,
-			Port:            int32(port.ListenerPort),
+			Port:            NameKeyPort{FrontPort: int32(port.ListenerPort)},
 			Proto:           proto,
 			TransforedProto: port.ListenerProtocol,
 			LoadBalancerID:  lb.LoadBalancerId,
@@ -581,59 +640,60 @@ type tcp struct{ *Listener }
 
 func (t *tcp) Add(ctx context.Context) error {
 	def, _ := ExtractAnnotationRequest(t.Service)
-	return t.Client.CreateLoadBalancerTCPListener(
-		ctx,
-		&slb.CreateLoadBalancerTCPListenerArgs{
-			LoadBalancerId:    t.LoadBalancerID,
-			ListenerPort:      int(t.Port),
-			BackendServerPort: int(t.NodePort),
-			//Health Check
-			Scheduler:          slb.SchedulerType(def.Scheduler),
-			Bandwidth:          DEFAULT_LISTENER_BANDWIDTH,
-			PersistenceTimeout: def.PersistenceTimeout,
-			Description:        t.NamedKey.Key(),
+	args := &slb.CreateLoadBalancerTCPListenerArgs{
+		LoadBalancerId: t.LoadBalancerID,
+		ListenerPort:   int(t.Port.FrontPort),
+		//Health Check
+		Scheduler:          slb.SchedulerType(def.Scheduler),
+		Bandwidth:          DEFAULT_LISTENER_BANDWIDTH,
+		PersistenceTimeout: def.PersistenceTimeout,
+		Description:        t.NamedKey.Key(),
 
-			VServerGroupId:            t.findVgroup(t.NamedKey.Reference(t.NodePort)),
-			AclType:                   def.AclType,
-			AclStatus:                 def.AclStatus,
-			AclId:                     def.AclID,
-			HealthCheckType:           def.HealthCheckType,
-			HealthCheckURI:            def.HealthCheckURI,
-			HealthCheckConnectPort:    def.HealthCheckConnectPort,
-			HealthyThreshold:          def.HealthyThreshold,
-			UnhealthyThreshold:        def.UnhealthyThreshold,
-			HealthCheckConnectTimeout: def.HealthCheckConnectTimeout,
-			HealthCheckInterval:       def.HealthCheckInterval,
-			HealthCheck:               def.HealthCheck,
-			HealthCheckDomain:         def.HealthCheckDomain,
-			HealthCheckHttpCode:       def.HealthCheckHttpCode,
-		})
+		VServerGroupId:            t.findVgroup(t.NamedKey.Reference(t.Port, VGroupType)),
+		AclType:                   def.AclType,
+		AclStatus:                 def.AclStatus,
+		AclId:                     def.AclID,
+		HealthCheckType:           def.HealthCheckType,
+		HealthCheckURI:            def.HealthCheckURI,
+		HealthCheckConnectPort:    def.HealthCheckConnectPort,
+		HealthyThreshold:          def.HealthyThreshold,
+		UnhealthyThreshold:        def.UnhealthyThreshold,
+		HealthCheckConnectTimeout: def.HealthCheckConnectTimeout,
+		HealthCheckInterval:       def.HealthCheckInterval,
+		HealthCheck:               def.HealthCheck,
+		HealthCheckDomain:         def.HealthCheckDomain,
+		HealthCheckHttpCode:       def.HealthCheckHttpCode,
+	}
+	if t.Port.BackendPort.Type == intstr.Int {
+		args.BackendServerPort = int(t.Port.BackendPort.IntVal)
+	}
+	return t.Client.CreateLoadBalancerTCPListener(ctx, args)
 }
 
 func (t *tcp) Update(ctx context.Context) error {
 	def, request := ExtractAnnotationRequest(t.Service)
 
-	response, err := t.Client.DescribeLoadBalancerTCPListenerAttribute(ctx, t.LoadBalancerID, int(t.Port))
+	response, err := t.Client.DescribeLoadBalancerTCPListenerAttribute(ctx, t.LoadBalancerID, int(t.Port.FrontPort))
 	if err != nil {
 		return fmt.Errorf("update tcp listener: %s", err.Error())
 	}
-	utils.Logf(t.Service, "tcp listener %d status is %s.", t.Port, response.Status)
+	utils.Logf(t.Service, "tcp listener %d status is %s.", t.Port.FrontPort, response.Status)
 	if response.Status == slb.Stopped {
-		if err = t.Client.StartLoadBalancerListener(ctx, t.LoadBalancerID, int(t.Port)); err != nil {
+		if err = t.Client.StartLoadBalancerListener(ctx, t.LoadBalancerID, int(t.Port.FrontPort)); err != nil {
 			return fmt.Errorf("start tcp listener error: %s", err.Error())
 		}
 	}
 	config := &slb.SetLoadBalancerTCPListenerAttributeArgs{
 		LoadBalancerId:    t.LoadBalancerID,
-		ListenerPort:      int(t.Port),
-		BackendServerPort: int(t.NodePort),
+		ListenerPort:      int(t.Port.FrontPort),
+		BackendServerPort: response.BackendServerPort,
 		Description:       t.NamedKey.Key(),
 		//Health Check
 		Scheduler:          slb.SchedulerType(response.Scheduler),
 		Bandwidth:          DEFAULT_LISTENER_BANDWIDTH,
 		PersistenceTimeout: response.PersistenceTimeout,
 		VServerGroup:       slb.OnFlag,
-		VServerGroupId:     t.findVgroup(t.NamedKey.Reference(t.NodePort)),
+		VServerGroupId:     t.findVgroup(t.NamedKey.Reference(t.Port, VGroupType)),
 
 		AclType:                   response.AclType,
 		AclStatus:                 response.AclStatus,
@@ -730,9 +790,10 @@ func (t *tcp) Update(ctx context.Context) error {
 		config.HealthCheckDomain = def.HealthCheckDomain
 	}
 	// backend server port has changed.
-	if int(t.NodePort) != response.BackendServerPort {
-		config.BackendServerPort = int(t.NodePort)
-		klog.V(2).Infof("tcp listener [BackendServerPort] changed, request=%d. response=%d, recreate.", t.NodePort, response.BackendServerPort)
+	if t.Port.BackendPort.Type == intstr.Int &&
+		int(t.Port.BackendPort.IntVal) != config.BackendServerPort {
+		config.BackendServerPort = int(t.Port.BackendPort.IntVal)
+		klog.V(2).Infof("tcp listener [BackendServerPort] changed, request=%d. response=%d, recreate.", config.BackendServerPort, response.BackendServerPort)
 		// The listener description has changed. It may be that multiple services reuse the same port of the same slb, and needs to record event.
 		if response.Description != config.Description {
 			record, err := utils.GetRecorderFromContext(ctx)
@@ -748,7 +809,7 @@ func (t *tcp) Update(ctx context.Context) error {
 				)
 			}
 		}
-		err := t.Client.DeleteLoadBalancerListener(ctx, t.LoadBalancerID, int(t.Port))
+		err := t.Client.DeleteLoadBalancerListener(ctx, t.LoadBalancerID, int(t.Port.FrontPort))
 		if err != nil {
 			return err
 		}
@@ -756,10 +817,10 @@ func (t *tcp) Update(ctx context.Context) error {
 		if err != nil {
 			return err
 		}
-		return t.Client.StartLoadBalancerListener(ctx, t.LoadBalancerID, int(t.Port))
+		return t.Client.StartLoadBalancerListener(ctx, t.LoadBalancerID, int(t.Port.FrontPort))
 	}
 	if !needUpdate {
-		utils.Logf(t.Service, "tcp listener did not change, skip [update], port=[%d], nodeport=[%d]", t.Port, t.NodePort)
+		utils.Logf(t.Service, "tcp listener did not change, skip [update], port=[%d], backendPort=[%v]", t.Port.FrontPort, t.Port.BackendPort)
 		// no recreate needed.  skip
 		return nil
 	}
@@ -770,14 +831,13 @@ func (t *tcp) Update(ctx context.Context) error {
 }
 
 func (t *tcp) Describe(ctx context.Context) error {
-	response, err := t.Client.DescribeLoadBalancerTCPListenerAttribute(ctx, t.LoadBalancerID, int(t.Port))
+	response, err := t.Client.DescribeLoadBalancerTCPListenerAttribute(ctx, t.LoadBalancerID, int(t.Port.FrontPort))
 	if err != nil {
-		return fmt.Errorf("%s DescribeLoadBalancer tcp listener %d: %s", t.Name, t.Port, err.Error())
+		return fmt.Errorf("%s DescribeLoadBalancer tcp listener %d: %s", t.Name, t.Port.FrontPort, err.Error())
 	}
 	if response == nil {
-		return fmt.Errorf("%s DescribeLoadBalancer tcp listener %d: response is nil", t.Name, t.Port)
+		return fmt.Errorf("%s DescribeLoadBalancer tcp listener %d: response is nil", t.Name, t.Port.FrontPort)
 	}
-	// other fields to be filled
 	t.VServerGroupId = response.VServerGroupId
 	return nil
 }
@@ -785,67 +845,66 @@ func (t *tcp) Describe(ctx context.Context) error {
 type udp struct{ *Listener }
 
 func (t *udp) Describe(ctx context.Context) error {
-	response, err := t.Client.DescribeLoadBalancerUDPListenerAttribute(ctx, t.LoadBalancerID, int(t.Port))
+	response, err := t.Client.DescribeLoadBalancerUDPListenerAttribute(ctx, t.LoadBalancerID, int(t.Port.FrontPort))
 	if err != nil {
-		return fmt.Errorf("%s DescribeLoadBalancer udp listener %d: %s", t.Name, t.Port, err.Error())
+		return fmt.Errorf("%s DescribeLoadBalancer udp listener %d: %s", t.Name, t.Port.FrontPort, err.Error())
 	}
 	if response == nil {
-		return fmt.Errorf("%s DescribeLoadBalancer udp listener %d: response is nil", t.Name, t.Port)
+		return fmt.Errorf("%s DescribeLoadBalancer udp listener %d: response is nil", t.Name, t.Port.FrontPort)
 	}
-	// other fields to be filled
 	t.VServerGroupId = response.VServerGroupId
 	return nil
 }
 
 func (t *udp) Add(ctx context.Context) error {
 	def, _ := ExtractAnnotationRequest(t.Service)
-	return t.Client.CreateLoadBalancerUDPListener(
-		ctx,
-		&slb.CreateLoadBalancerUDPListenerArgs{
-			LoadBalancerId:    t.LoadBalancerID,
-			ListenerPort:      int(t.Port),
-			BackendServerPort: int(t.NodePort),
-			Description:       t.NamedKey.Key(),
-			VServerGroupId:    t.findVgroup(t.NamedKey.Reference(t.NodePort)),
-			//Health Check
-			Scheduler:          slb.SchedulerType(def.Scheduler),
-			Bandwidth:          DEFAULT_LISTENER_BANDWIDTH,
-			PersistenceTimeout: def.PersistenceTimeout,
+	args := &slb.CreateLoadBalancerUDPListenerArgs{
+		LoadBalancerId: t.LoadBalancerID,
+		ListenerPort:   int(t.Port.FrontPort),
+		Description:    t.NamedKey.Key(),
+		VServerGroupId: t.findVgroup(t.NamedKey.Reference(t.Port, VGroupType)),
+		//Health Check
+		Scheduler:          slb.SchedulerType(def.Scheduler),
+		Bandwidth:          DEFAULT_LISTENER_BANDWIDTH,
+		PersistenceTimeout: def.PersistenceTimeout,
 
-			AclType:   def.AclType,
-			AclStatus: def.AclStatus,
-			AclId:     def.AclID,
-			//HealthCheckType:           request.HealthCheckType,
-			//HealthCheckURI:            request.HealthCheckURI,
-			HealthCheckConnectPort:    def.HealthCheckConnectPort,
-			HealthyThreshold:          def.HealthyThreshold,
-			UnhealthyThreshold:        def.UnhealthyThreshold,
-			HealthCheckConnectTimeout: def.HealthCheckConnectTimeout,
-			HealthCheckInterval:       def.HealthCheckInterval,
-			HealthCheck:               def.HealthCheck,
-		},
-	)
+		AclType:   def.AclType,
+		AclStatus: def.AclStatus,
+		AclId:     def.AclID,
+		//HealthCheckType:           request.HealthCheckType,
+		//HealthCheckURI:            request.HealthCheckURI,
+		HealthCheckConnectPort:    def.HealthCheckConnectPort,
+		HealthyThreshold:          def.HealthyThreshold,
+		UnhealthyThreshold:        def.UnhealthyThreshold,
+		HealthCheckConnectTimeout: def.HealthCheckConnectTimeout,
+		HealthCheckInterval:       def.HealthCheckInterval,
+		HealthCheck:               def.HealthCheck,
+	}
+	if t.Port.BackendPort.Type == intstr.Int {
+		args.BackendServerPort = int(t.Port.BackendPort.IntVal)
+	}
+	return t.Client.CreateLoadBalancerUDPListener(ctx, args)
 }
 
 func (t *udp) Update(ctx context.Context) error {
 	def, request := ExtractAnnotationRequest(t.Service)
-	response, err := t.Client.DescribeLoadBalancerUDPListenerAttribute(ctx, t.LoadBalancerID, int(t.Port))
+	response, err := t.Client.DescribeLoadBalancerUDPListenerAttribute(ctx, t.LoadBalancerID, int(t.Port.FrontPort))
 	if err != nil {
 		return err
 	}
-	utils.Logf(t.Service, "udp listener %d status is %s.", t.Port, response.Status)
+	utils.Logf(t.Service, "udp listener %d status is %s.", t.Port.FrontPort, response.Status)
 	if response.Status == slb.Stopped {
-		if err = t.Client.StartLoadBalancerListener(ctx, t.LoadBalancerID, int(t.Port)); err != nil {
+		if err = t.Client.StartLoadBalancerListener(ctx, t.LoadBalancerID, int(t.Port.FrontPort)); err != nil {
 			return fmt.Errorf("start udp listener error: %s", err.Error())
 		}
 	}
 	config := &slb.SetLoadBalancerUDPListenerAttributeArgs{
 		LoadBalancerId:    t.LoadBalancerID,
-		ListenerPort:      int(t.Port),
-		BackendServerPort: int(t.NodePort),
+		ListenerPort:      int(t.Port.FrontPort),
+		BackendServerPort: response.BackendServerPort,
 		Description:       t.NamedKey.Key(),
 		VServerGroup:      slb.OnFlag,
-		VServerGroupId:    t.findVgroup(t.NamedKey.Reference(t.NodePort)),
+		VServerGroupId:    t.findVgroup(t.NamedKey.Reference(t.Port, VGroupType)),
 		AclType:           response.AclType,
 		AclStatus:         response.AclStatus,
 		AclId:             response.AclId,
@@ -922,10 +981,11 @@ func (t *udp) Update(ctx context.Context) error {
 		config.PersistenceTimeout = def.PersistenceTimeout
 	}
 	// backend server port has changed.
-	if int(t.NodePort) != response.BackendServerPort {
-		config.BackendServerPort = int(t.NodePort)
+	if t.Port.BackendPort.Type == intstr.Int &&
+		int(t.Port.BackendPort.IntVal) != config.BackendServerPort {
+		config.BackendServerPort = int(t.Port.BackendPort.IntVal)
 		utils.Logf(t.Service, "udp listener checker [BackendServerPort] changed, "+
-			"request=%d. response=%d", t.NodePort, response.BackendServerPort)
+			"request=%d. response=%d", config.BackendServerPort, response.BackendServerPort)
 		// The listener description has changed. It may be that multiple services reuse the same port of the same slb, and needs to record event.
 		if response.Description != config.Description {
 			record, err := utils.GetRecorderFromContext(ctx)
@@ -941,7 +1001,7 @@ func (t *udp) Update(ctx context.Context) error {
 				)
 			}
 		}
-		err := t.Client.DeleteLoadBalancerListener(ctx, t.LoadBalancerID, int(t.Port))
+		err := t.Client.DeleteLoadBalancerListener(ctx, t.LoadBalancerID, int(t.Port.FrontPort))
 		if err != nil {
 			return err
 		}
@@ -949,12 +1009,12 @@ func (t *udp) Update(ctx context.Context) error {
 		if err != nil {
 			return err
 		}
-		return t.Client.StartLoadBalancerListener(ctx, t.LoadBalancerID, int(t.Port))
+		return t.Client.StartLoadBalancerListener(ctx, t.LoadBalancerID, int(t.Port.FrontPort))
 	}
 
 	if !needUpdate {
 		utils.Logf(t.Service, "udp listener did not change, skip "+
-			"[update], port=[%d], nodeport=[%d]\n", t.Port, t.NodePort)
+			"[update], port=[%d], backendPort=[%v]\n", t.Port.FrontPort, t.Port.BackendPort)
 		// no recreate needed.  skip
 		return nil
 	}
@@ -967,12 +1027,12 @@ func (t *udp) Update(ctx context.Context) error {
 type http struct{ *Listener }
 
 func (t *http) Describe(ctx context.Context) error {
-	response, err := t.Client.DescribeLoadBalancerHTTPListenerAttribute(ctx, t.LoadBalancerID, int(t.Port))
+	response, err := t.Client.DescribeLoadBalancerHTTPListenerAttribute(ctx, t.LoadBalancerID, int(t.Port.FrontPort))
 	if err != nil {
-		return fmt.Errorf("%s DescribeLoadBalancer http listener %d: %s", t.Name, t.Port, err.Error())
+		return fmt.Errorf("%s DescribeLoadBalancer http listener %d: %s", t.Name, t.Port.FrontPort, err.Error())
 	}
 	if response == nil {
-		return fmt.Errorf(" %s DescribeLoadBalancer http listener %d: response is nil", t.Name, t.Port)
+		return fmt.Errorf(" %s DescribeLoadBalancer http listener %d: response is nil", t.Name, t.Port.FrontPort)
 	}
 	// other fields to be filled
 	t.VServerGroupId = response.VServerGroupId
@@ -983,21 +1043,18 @@ func (t *http) Add(ctx context.Context) error {
 	def, request := ExtractAnnotationRequest(t.Service)
 	httpc := &slb.CreateLoadBalancerHTTPListenerArgs{
 		LoadBalancerId:    t.LoadBalancerID,
-		ListenerPort:      int(t.Port),
-		BackendServerPort: int(t.NodePort),
+		ListenerPort:      int(t.Port.FrontPort),
 		Description:       t.NamedKey.Key(),
-		VServerGroupId:    t.findVgroup(t.NamedKey.Reference(t.NodePort)),
-		//Health Check
+		VServerGroupId:    t.findVgroup(t.NamedKey.Reference(t.Port, VGroupType)),
 		Scheduler:         slb.SchedulerType(def.Scheduler),
 		Bandwidth:         DEFAULT_LISTENER_BANDWIDTH,
 		StickySession:     def.StickySession,
 		StickySessionType: def.StickySessionType,
 		CookieTimeout:     def.CookieTimeout,
 		Cookie:            def.Cookie,
-
-		AclType:   def.AclType,
-		AclStatus: def.AclStatus,
-		AclId:     def.AclID,
+		AclType:           def.AclType,
+		AclStatus:         def.AclStatus,
+		AclId:             def.AclID,
 		//HealthCheckType:           request.HealthCheckType,
 		HealthCheckURI:         request.HealthCheckURI,
 		HealthCheckConnectPort: request.HealthCheckConnectPort,
@@ -1010,7 +1067,10 @@ func (t *http) Add(ctx context.Context) error {
 		HealthCheckTimeout:  def.HealthCheckTimeout,
 		HealthCheckHttpCode: def.HealthCheckHttpCode,
 	}
-	forward := forwardPort(def.ForwardPort, t.Port)
+	if t.Port.BackendPort.Type == intstr.Int {
+		httpc.BackendServerPort = int(t.Port.BackendPort.IntVal)
+	}
+	forward := forwardPort(def.ForwardPort, t.Port.FrontPort)
 	if forward != 0 {
 		httpc.ListenerForward = slb.OnFlag
 	} else {
@@ -1052,22 +1112,21 @@ func forwardPort(port string, target int32) int32 {
 func (t *http) Update(ctx context.Context) error {
 
 	def, request := ExtractAnnotationRequest(t.Service)
-	response, err := t.Client.DescribeLoadBalancerHTTPListenerAttribute(ctx, t.LoadBalancerID, int(t.Port))
+	response, err := t.Client.DescribeLoadBalancerHTTPListenerAttribute(ctx, t.LoadBalancerID, int(t.Port.FrontPort))
 	if err != nil {
 		return err
 	}
-	utils.Logf(t.Service, "http listener %d status is %s.", t.Port, response.Status)
+	utils.Logf(t.Service, "http listener %d status is %s.", t.Port.FrontPort, response.Status)
 	if response.Status == slb.Stopped {
-		if err = t.Client.StartLoadBalancerListener(ctx, t.LoadBalancerID, int(t.Port)); err != nil {
+		if err = t.Client.StartLoadBalancerListener(ctx, t.LoadBalancerID, int(t.Port.FrontPort)); err != nil {
 			return fmt.Errorf("start http listener error: %s", err.Error())
 		}
 	}
 	config := &slb.SetLoadBalancerHTTPListenerAttributeArgs{
 		LoadBalancerId:    t.LoadBalancerID,
-		ListenerPort:      int(t.Port),
-		BackendServerPort: int(t.NodePort),
-		//Health Check
-		Scheduler:         slb.SchedulerType(response.Scheduler),
+		ListenerPort:      int(t.Port.FrontPort),
+		BackendServerPort: response.BackendServerPort,
+		Scheduler:         response.Scheduler,
 		Bandwidth:         DEFAULT_LISTENER_BANDWIDTH,
 		StickySession:     response.StickySession,
 		StickySessionType: response.StickySessionType,
@@ -1075,7 +1134,7 @@ func (t *http) Update(ctx context.Context) error {
 		Cookie:            response.Cookie,
 		Description:       t.NamedKey.Key(),
 		VServerGroup:      slb.OnFlag,
-		VServerGroupId:    t.findVgroup(t.NamedKey.Reference(t.NodePort)),
+		VServerGroupId:    t.findVgroup(t.NamedKey.Reference(t.Port, VGroupType)),
 
 		AclType:                response.AclType,
 		AclStatus:              response.AclStatus,
@@ -1092,14 +1151,7 @@ func (t *http) Update(ctx context.Context) error {
 	}
 	needUpdate := false
 	needRecreate := false
-	/*
-		if request.Bandwidth != 0 &&
-			request.Bandwidth != response.Bandwidth {
-			needUpdate = true
-			config.Bandwidth = request.Bandwidth
-			klog.V(2).Infof("HTTP listener checker [bandwidth] changed, request=%d. response=%d", request.Bandwidth, response.Bandwidth)
-		}
-	*/
+
 	if request.AclStatus != "" &&
 		def.AclStatus != response.AclStatus {
 		needUpdate = true
@@ -1186,7 +1238,7 @@ func (t *http) Update(ctx context.Context) error {
 		needUpdate = true
 		config.HealthCheckDomain = def.HealthCheckDomain
 	}
-	forward := forwardPort(def.ForwardPort, t.Port)
+	forward := forwardPort(def.ForwardPort, t.Port.FrontPort)
 	if forward != 0 {
 		if response.ListenerForward != slb.OnFlag {
 			needRecreate = true
@@ -1201,18 +1253,18 @@ func (t *http) Update(ctx context.Context) error {
 	config.ForwardPort = int(forward)
 
 	// backend server port has changed.
-	if int(t.NodePort) != response.BackendServerPort {
+	if t.Port.BackendPort.Type == intstr.Int &&
+		int(t.Port.BackendPort.IntVal) != response.BackendServerPort {
 		// listener with listenerforward status on, no need to reRecreate
 		if response.ListenerForward == slb.OffFlag {
 			needRecreate = true
+			config.BackendServerPort = int(t.Port.BackendPort.IntVal)
+			utils.Logf(t.Service, "HTTP listener checker [BackendServerPort]"+
+				" changed, request=%d. response=%d. Recreate http listener.", config.BackendServerPort, response.BackendServerPort)
 		}
 	}
 
 	if needRecreate {
-
-		config.BackendServerPort = int(t.NodePort)
-		utils.Logf(t.Service, "HTTP listener checker [BackendServerPort]"+
-			" changed, request=%d. response=%d. Recreate http listener.", t.NodePort, response.BackendServerPort)
 		// The listener description has changed. It may be that multiple services reuse the same port of the same slb, and needs to record event.
 		if response.Description != config.Description {
 			record, err := utils.GetRecorderFromContext(ctx)
@@ -1228,7 +1280,7 @@ func (t *http) Update(ctx context.Context) error {
 				)
 			}
 		}
-		err := t.Client.DeleteLoadBalancerListener(ctx, t.LoadBalancerID, int(t.Port))
+		err := t.Client.DeleteLoadBalancerListener(ctx, t.LoadBalancerID, int(t.Port.FrontPort))
 		if err != nil {
 			return err
 		}
@@ -1236,17 +1288,17 @@ func (t *http) Update(ctx context.Context) error {
 		if err != nil {
 			return err
 		}
-		return t.Client.StartLoadBalancerListener(ctx, t.LoadBalancerID, int(t.Port))
+		return t.Client.StartLoadBalancerListener(ctx, t.LoadBalancerID, int(t.Port.FrontPort))
 	}
 
 	if response.ListenerForward == slb.OnFlag {
-		utils.Logf(t.Service, "%d ListenerForward is on, cannot update listener", t.Port)
+		utils.Logf(t.Service, "%d ListenerForward is on, cannot update listener", t.Port.FrontPort)
 		// no update needed.  skip
 		return nil
 	}
 
 	if !needUpdate {
-		utils.Logf(t.Service, "http listener did not change, skip [update], port=[%d], nodeport=[%d]\n", t.Port, t.NodePort)
+		utils.Logf(t.Service, "http listener did not change, skip [update], port=[%d], backend=[%v]\n", t.Port.FrontPort, t.Port.BackendPort)
 		// no recreate needed.  skip
 		return nil
 	}
@@ -1259,12 +1311,12 @@ func (t *http) Update(ctx context.Context) error {
 type https struct{ *Listener }
 
 func (t *https) Describe(ctx context.Context) error {
-	response, err := t.Client.DescribeLoadBalancerHTTPSListenerAttribute(ctx, t.LoadBalancerID, int(t.Port))
+	response, err := t.Client.DescribeLoadBalancerHTTPSListenerAttribute(ctx, t.LoadBalancerID, int(t.Port.FrontPort))
 	if err != nil {
-		return fmt.Errorf("%s DescribeLoadBalancer https listener %d: %s", t.Name, t.Port, err.Error())
+		return fmt.Errorf("%s DescribeLoadBalancer https listener %d: %s", t.Name, t.Port.FrontPort, err.Error())
 	}
 	if response == nil {
-		return fmt.Errorf("%s DescribeLoadBalancer https listener %d: response is nil", t.Name, t.Port)
+		return fmt.Errorf("%s DescribeLoadBalancer https listener %d: response is nil", t.Name, t.Port.FrontPort)
 	}
 	// other fields to be filled
 	t.VServerGroupId = response.VServerGroupId
@@ -1274,50 +1326,50 @@ func (t *https) Describe(ctx context.Context) error {
 func (t *https) Add(ctx context.Context) error {
 
 	def, request := ExtractAnnotationRequest(t.Service)
-	return t.Client.CreateLoadBalancerHTTPSListener(
-		ctx,
-		&slb.CreateLoadBalancerHTTPSListenerArgs{
-			HTTPListenerType: slb.HTTPListenerType{
-				LoadBalancerId:    t.LoadBalancerID,
-				ListenerPort:      int(t.Port),
-				BackendServerPort: int(t.NodePort),
-				Description:       t.NamedKey.Key(),
-				VServerGroupId:    t.findVgroup(t.NamedKey.Reference(t.NodePort)),
-				AclType:           def.AclType,
-				AclStatus:         def.AclStatus,
-				AclId:             def.AclID,
-				//Health Check
-				Scheduler:         slb.SchedulerType(def.Scheduler),
-				HealthCheck:       def.HealthCheck,
-				Bandwidth:         DEFAULT_LISTENER_BANDWIDTH,
-				StickySession:     def.StickySession,
-				StickySessionType: def.StickySessionType,
-				Cookie:            def.Cookie,
-				CookieTimeout:     def.CookieTimeout,
+	args := &slb.CreateLoadBalancerHTTPSListenerArgs{
+		HTTPListenerType: slb.HTTPListenerType{
+			LoadBalancerId: t.LoadBalancerID,
+			ListenerPort:   int(t.Port.FrontPort),
+			Description:    t.NamedKey.Key(),
+			VServerGroupId: t.findVgroup(t.NamedKey.Reference(t.Port, VGroupType)),
+			AclType:        def.AclType,
+			AclStatus:      def.AclStatus,
+			AclId:          def.AclID,
+			//Health Check
+			Scheduler:         slb.SchedulerType(def.Scheduler),
+			HealthCheck:       def.HealthCheck,
+			Bandwidth:         DEFAULT_LISTENER_BANDWIDTH,
+			StickySession:     def.StickySession,
+			StickySessionType: def.StickySessionType,
+			Cookie:            def.Cookie,
+			CookieTimeout:     def.CookieTimeout,
 
-				HealthCheckURI:         def.HealthCheckURI,
-				HealthCheckConnectPort: def.HealthCheckConnectPort,
-				HealthyThreshold:       def.HealthyThreshold,
-				UnhealthyThreshold:     def.UnhealthyThreshold,
-				HealthCheckTimeout:     def.HealthCheckTimeout,
-				HealthCheckInterval:    def.HealthCheckInterval,
-				HealthCheckDomain:      def.HealthCheckDomain,
-				HealthCheckHttpCode:    def.HealthCheckHttpCode,
-			},
-			ServerCertificateId: request.CertID,
+			HealthCheckURI:         def.HealthCheckURI,
+			HealthCheckConnectPort: def.HealthCheckConnectPort,
+			HealthyThreshold:       def.HealthyThreshold,
+			UnhealthyThreshold:     def.UnhealthyThreshold,
+			HealthCheckTimeout:     def.HealthCheckTimeout,
+			HealthCheckInterval:    def.HealthCheckInterval,
+			HealthCheckDomain:      def.HealthCheckDomain,
+			HealthCheckHttpCode:    def.HealthCheckHttpCode,
 		},
-	)
+		ServerCertificateId: request.CertID,
+	}
+	if t.Port.BackendPort.Type == intstr.Int {
+		args.BackendServerPort = int(t.Port.BackendPort.IntVal)
+	}
+	return t.Client.CreateLoadBalancerHTTPSListener(ctx, args)
 }
 
 func (t *https) Update(ctx context.Context) error {
 	def, request := ExtractAnnotationRequest(t.Service)
-	response, err := t.Client.DescribeLoadBalancerHTTPSListenerAttribute(ctx, t.LoadBalancerID, int(t.Port))
+	response, err := t.Client.DescribeLoadBalancerHTTPSListenerAttribute(ctx, t.LoadBalancerID, int(t.Port.FrontPort))
 	if err != nil {
 		return err
 	}
-	utils.Logf(t.Service, "https listener %d status is %s.", t.Port, response.Status)
+	utils.Logf(t.Service, "https listener %d status is %s.", t.Port.FrontPort, response.Status)
 	if response.Status == slb.Stopped {
-		if err = t.Client.StartLoadBalancerListener(ctx, t.LoadBalancerID, int(t.Port)); err != nil {
+		if err = t.Client.StartLoadBalancerListener(ctx, t.LoadBalancerID, int(t.Port.FrontPort)); err != nil {
 			return fmt.Errorf("start https listener error: %s", err.Error())
 		}
 	}
@@ -1328,9 +1380,8 @@ func (t *https) Update(ctx context.Context) error {
 			BackendServerPort: response.BackendServerPort,
 			Description:       t.NamedKey.Key(),
 			VServerGroup:      slb.OnFlag,
-			VServerGroupId:    t.findVgroup(t.NamedKey.Reference(t.NodePort)),
-			//Health Check
-			Scheduler:         slb.SchedulerType(response.Scheduler),
+			VServerGroupId:    t.findVgroup(t.NamedKey.Reference(t.Port, VGroupType)),
+			Scheduler:         response.Scheduler,
 			HealthCheck:       response.HealthCheck,
 			Bandwidth:         DEFAULT_LISTENER_BANDWIDTH,
 			StickySession:     response.StickySession,
@@ -1452,9 +1503,10 @@ func (t *https) Update(ctx context.Context) error {
 		config.ServerCertificateId = def.CertID
 	}
 	// backend server port has changed.
-	if int(t.NodePort) != response.BackendServerPort {
-		config.BackendServerPort = int(t.NodePort)
-		utils.Logf(t.Service, "listener checker [BackendServerPort] changed, request=%d. response=%d", t.NodePort, response.BackendServerPort)
+	if t.Port.BackendPort.Type == intstr.Int &&
+		int(t.Port.BackendPort.IntVal) != response.BackendServerPort {
+		config.BackendServerPort = int(t.Port.BackendPort.IntVal)
+		utils.Logf(t.Service, "listener checker [BackendServerPort] changed, request=%d. response=%d", config.BackendServerPort, response.BackendServerPort)
 		// The listener description has changed. It may be that multiple services reuse the same port of the same slb, and needs to record event.
 		if response.Description != config.Description {
 			record, err := utils.GetRecorderFromContext(ctx)
@@ -1470,7 +1522,7 @@ func (t *https) Update(ctx context.Context) error {
 				)
 			}
 		}
-		err := t.Client.DeleteLoadBalancerListener(ctx, t.LoadBalancerID, int(t.Port))
+		err := t.Client.DeleteLoadBalancerListener(ctx, t.LoadBalancerID, int(t.Port.FrontPort))
 		if err != nil {
 			return err
 		}
@@ -1478,11 +1530,11 @@ func (t *https) Update(ctx context.Context) error {
 		if err != nil {
 			return err
 		}
-		return t.Client.StartLoadBalancerListener(ctx, t.LoadBalancerID, int(t.Port))
+		return t.Client.StartLoadBalancerListener(ctx, t.LoadBalancerID, int(t.Port.FrontPort))
 	}
 
 	if !needUpdate {
-		utils.Logf(t.Service, "https listener did not change, skip [update], port=[%d], nodeport=[%d]\n", t.Port, t.NodePort)
+		utils.Logf(t.Service, "https listener did not change, skip [update], port=[%d], backendPort=[%v]\n", t.Port.FrontPort, t.Port.BackendPort)
 		// no recreate needed.  skip
 		return nil
 	}
@@ -1513,8 +1565,7 @@ func (n *Listener) listenerHasUserManagedNode(ctx context.Context) (bool, error)
 	}
 
 	for _, backend := range remoteVg.BackendServers.BackendServer {
-		klog.V(5).Infof("remote: %s, local: %s ", backend.Description, n.NamedKey.Reference(int32(backend.Port)))
-		if isUserManagedNode(backend.Description, n.NamedKey.Reference(int32(backend.Port))) {
+		if isUserManagedNode(backend.Description, remoteVg.VServerGroupName) {
 			klog.Infof("%s vgroup %s has user managed node, node ip is %s, node id is %s",
 				n.NamedKey, n.VServerGroupId, backend.ServerIp, backend.ServerId)
 			return true, nil

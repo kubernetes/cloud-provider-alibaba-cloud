@@ -119,21 +119,3 @@ func TestSep(t *testing.T) {
 	// Ignore the unsupported annotation
 	testCamel(t, "alicloud-loadbalancer-HealthCheckTimeout", "alicloud-loadbalancer-HealthCheckTimeout")
 }
-
-//func RealClient(t *testing.T) {
-//	realRouteClient(keyid, keysecret)
-//}
-//
-//func realRouteClient(keyid, keysec string) {
-//	if keyid == "" || keysec == "" {
-//		return
-//	}
-//	cs := ecs.NewClient(keyid, keysec)
-//
-//	vpc, _, _ := cs.DescribeRouteTables(&ecs.DescribeRouteTablesArgs{
-//		RouteTableId: "vtb-2zedne8cr43rp5oqsr9xg",
-//		VRouterId:    "vrt-2zegcm0ty46mq243fmxoj",
-//	})
-//
-//	fmt.Print(PrettyJson(vpc))
-//}
