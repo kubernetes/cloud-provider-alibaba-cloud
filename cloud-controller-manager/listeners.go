@@ -1092,14 +1092,11 @@ func (t *http) Update(ctx context.Context) error {
 	}
 	needUpdate := false
 	needRecreate := false
-	/*
-		if request.Bandwidth != 0 &&
-			request.Bandwidth != response.Bandwidth {
-			needUpdate = true
-			config.Bandwidth = request.Bandwidth
-			klog.V(2).Infof("HTTP listener checker [bandwidth] changed, request=%d. response=%d", request.Bandwidth, response.Bandwidth)
-		}
-	*/
+
+	if response.VServerGroupId != "" &&
+		response.VServerGroupId != config.VServerGroupId {
+		needUpdate = true
+	}
 	if request.AclStatus != "" &&
 		def.AclStatus != response.AclStatus {
 		needUpdate = true
