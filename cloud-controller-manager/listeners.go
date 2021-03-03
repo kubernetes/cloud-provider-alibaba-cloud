@@ -1513,10 +1513,9 @@ func (n *Listener) listenerHasUserManagedNode(ctx context.Context) (bool, error)
 	}
 
 	for _, backend := range remoteVg.BackendServers.BackendServer {
-		klog.V(5).Infof("remote: %s, local: %s ", backend.Description, n.NamedKey.Reference(int32(backend.Port)))
-		if isUserManagedNode(backend.Description, n.NamedKey.Reference(int32(backend.Port))) {
-			klog.Infof("%s vgroup %s has user managed node, node ip is %s, node id is %s",
-				n.NamedKey, n.VServerGroupId, backend.ServerIp, backend.ServerId)
+		if isUserManagedNode(backend.Description, remoteVg.VServerGroupName) {
+			klog.Infof("%s has user managed node %s, description %s, vGroupName: %s",
+				n.VServerGroupId, backend.ServerId, backend.Description, remoteVg.VServerGroupName)
 			return true, nil
 		}
 	}
