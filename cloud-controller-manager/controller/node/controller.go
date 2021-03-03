@@ -390,7 +390,8 @@ func (cnc *CloudNodeController) doAddCloudNode(node *v1.Node) error {
 			// This condition marks the node as unusable until routes are initialized in the cloud provider
 			// Aoxn: Hack for alibaba cloud
 			if route.Options.ConfigCloudRoutes &&
-				cnc.cloud.ProviderName() == "alicloud" {
+				cnc.cloud.ProviderName() == "alicloud" &&
+				!utils.IsExcludedNode(node) {
 				if err := cnc.setNodeCondition(node); err != nil {
 					klog.Errorf("set node %s condition error: %s", node.Name, err.Error())
 					return false, nil
