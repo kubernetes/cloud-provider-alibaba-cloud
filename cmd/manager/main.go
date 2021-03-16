@@ -5,6 +5,8 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/context/shared"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba"
 	"net/http"
 	"os"
 	"runtime"
@@ -58,10 +60,10 @@ func main() {
 		"logrus log level ",
 	)
 	pflag.CommandLine.StringVar(
-		&ctx2.GlobalFlag.Config,
-		"config",
+		&ctx2.GlobalFlag.CloudConfig,
+		"cloud-config",
 		"",
-		"config file for ncl",
+		"cloud config file for ncl",
 	)
 
 	pflag.CommandLine.BoolVar(
@@ -95,7 +97,7 @@ func main() {
 
 	printVersion()
 
-	if ctx2.GlobalFlag.Config == "" {
+	if ctx2.GlobalFlag.CloudConfig == "" {
 		log.Errorf("config file must be provided for ak. --config")
 		os.Exit(1)
 	}
@@ -134,8 +136,9 @@ func main() {
 
 	log.Info("Registering Components.")
 
+	ctx := shared.NewSharedContext(alibaba.NewAlibabaCloud())
 	// Setup all Controllers
-	if err := controller.AddToManager(mgr); err != nil {
+	if err := controller.AddToManager(mgr, ctx); err != nil {
 		log.Errorf("add controller: %s", err.Error())
 		os.Exit(1)
 	}
@@ -210,4 +213,3 @@ func addMetrics(ctx context.Context, cfg *rest.Config) {
 		}
 	}
 }
-

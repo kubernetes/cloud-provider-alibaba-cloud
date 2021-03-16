@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/context/shared"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/node"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/privatezone"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/route"
@@ -16,13 +17,13 @@ func init() {
 }
 
 // Adds is a list of functions to add all Controllers to the Manager
-var Adds []func(manager.Manager) error
+var Adds []func(manager.Manager, *shared.SharedContext) error
 
 // AddToManager adds all Controllers to the Manager
-func AddToManager(m manager.Manager) error {
+func AddToManager(m manager.Manager, ctx *shared.SharedContext) error {
 
 	for _, f := range Adds {
-		if err := f(m); err != nil {
+		if err := f(m, ctx); err != nil {
 			return err
 		}
 	}

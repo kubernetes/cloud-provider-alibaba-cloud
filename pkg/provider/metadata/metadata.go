@@ -38,8 +38,8 @@ const (
 	REGION             = "region-id"
 	SERIAL_NUMBER      = "serial-number"
 	SOURCE_ADDRESS     = "source-address"
-	VPC_CIDR_BLOCK     = "vpc-cidr-block"
-	VPC_ID             = "vpc-id"
+	VPC_CIDR_BLOCK     = "alibaba-cidr-block"
+	VPC_ID             = "alibaba-id"
 	VSWITCH_CIDR_BLOCK = "vswitch-cidr-block"
 	VSWITCH_ID         = "vswitch-id"
 	ZONE               = "zone-id"
@@ -62,7 +62,7 @@ type MetaData struct {
 	client *http.Client
 }
 
-func NewMetaData(client *http.Client) *MetaData {
+func NewBaseMetaData(client *http.Client) *MetaData {
 	if client == nil {
 		client = &http.Client{}
 	}

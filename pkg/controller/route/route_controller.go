@@ -7,6 +7,8 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/context/shared"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
@@ -15,13 +17,14 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 )
 
-func Add(mgr manager.Manager) error {
-	return add(mgr, newReconciler(mgr))
+func Add(mgr manager.Manager, ctx *shared.SharedContext) error {
+	return add(mgr, newReconciler(mgr, ctx))
 }
 
 // newReconciler returns a new reconcile.Reconciler
-func newReconciler(mgr manager.Manager) reconcile.Reconciler {
+func newReconciler(mgr manager.Manager, ctx *shared.SharedContext) reconcile.Reconciler {
 	recon := &ReconcileRoute{
+		cloud:  ctx.Provider(),
 		client: mgr.GetClient(),
 		scheme: mgr.GetScheme(),
 		record: mgr.GetEventRecorderFor("Route"),
@@ -57,6 +60,7 @@ var _ reconcile.Reconciler = &ReconcileRoute{}
 
 // ReconcileRoute reconciles a AutoRepair object
 type ReconcileRoute struct {
+	cloud  provider.Provider
 	client client.Client
 	scheme *runtime.Scheme
 
@@ -65,7 +69,7 @@ type ReconcileRoute struct {
 }
 
 func (r *ReconcileRoute) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
-	rlog := log.WithFields(log.Fields{"NodePool": request.NamespacedName})
+	rlog := log.WithFields(log.Fields{"Route": request.NamespacedName})
 
 	nodepool := &corev1.Node{}
 	err := r.client.Get(context.TODO(), request.NamespacedName, nodepool)

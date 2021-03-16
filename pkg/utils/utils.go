@@ -6,7 +6,9 @@ import (
 	apimachineryvalidation "k8s.io/apimachinery/pkg/api/validation"
 )
 
-const NODE_MASTER_LABEL = "node-role.kubernetes.io/master"
+const (
+	NODE_MASTER_LABEL = "node-role.kubernetes.io/master"
+)
 
 func NodeIsMaster(node *corev1.Node) bool {
 	labels := node.Labels

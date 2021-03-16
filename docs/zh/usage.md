@@ -408,7 +408,7 @@ kind: Service
 metadata:
   annotations:
     service.beta.kubernetes.io/alibaba-cloud-loadbalancer-address-type: "intranet"
-    service.beta.kubernetes.io/alibaba-cloud-loadbalancer-network-type: "vpc"
+    service.beta.kubernetes.io/alibaba-cloud-loadbalancer-network-type: "alibaba"
   name: nginx
   namespace: default
 spec:

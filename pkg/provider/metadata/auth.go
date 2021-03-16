@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package ecs
+package metadata
 
 import (
 	b64 "encoding/base64"
@@ -34,7 +34,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 
 	ctx2 "k8s.io/cloud-provider-alibaba-cloud/pkg/context"
-	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/ecs/metadata"
 	"k8s.io/cloud-provider-alibaba-cloud/version"
 )
 
@@ -59,13 +58,13 @@ func NewClientAuth() (*ClientAuth, error) {
 	// ctx2.CFG.Region might be nil,
 	// but it is ok to have empty value.
 	// because region will be filled in the next token refresh
-	region := ctx2.CFG.Region
+	region := ctx2.CFG.Global.Region
 	log.Infof("new provider in region: [%s]", region)
 	ecli, err := ecs.NewClientWithStsToken(
 		region, "key", "secret", "",
 	)
 	if err != nil {
-		return nil, fmt.Errorf("initialize ecs client: %s", err.Error())
+		return nil, fmt.Errorf("initialize alibaba client: %s", err.Error())
 	}
 	ocli, err := oos.NewClientWithStsToken(
 		region, "key", "secret", "",
@@ -88,8 +87,9 @@ func (mgr *ClientAuth) Start(
 ) error {
 	initialized := false
 	tokenfunc := func() {
+		log.Infof("load cfg from file: %s", ctx2.GlobalFlag.CloudConfig)
 		// reload config while token refresh
-		err := LoadCfg(ctx2.GlobalFlag.Config)
+		err := LoadCfg(ctx2.GlobalFlag.CloudConfig)
 		if err != nil {
 			log.Warnf("load config fail: %s", err.Error())
 			return
@@ -135,20 +135,20 @@ func LoadCfg(cfg string) error {
 }
 
 func (mgr *ClientAuth) Token() TokenAuth {
-	key, err := b64.StdEncoding.DecodeString(ctx2.CFG.AccessKey)
+	key, err := b64.StdEncoding.DecodeString(ctx2.CFG.Global.AccessKeyID)
 	if err != nil {
-		panic(fmt.Sprintf("ak must be base64 encoded: %s", err.Error()))
+		panic(fmt.Sprintf("ak key must be base64 encoded: %s", err.Error()))
 	}
-	secret, err := b64.StdEncoding.DecodeString(ctx2.CFG.AccessSecret)
+	secret, err := b64.StdEncoding.DecodeString(ctx2.CFG.Global.AccessKeySecret)
 	if err != nil {
-		panic(fmt.Sprintf("ak must be base64 encoded: %s", err.Error()))
+		panic(fmt.Sprintf("ak secret must be base64 encoded: %s", err.Error()))
 	}
 	if len(key) == 0 ||
 		len(secret) == 0 {
 		log.Infof("ccm: use ramrole Token mode without ak.")
 		return &RamRoleToken{meta: mgr.Meta}
 	}
-	region := ctx2.CFG.Region
+	region := ctx2.CFG.Global.Region
 	if region == "" {
 		region, err = mgr.Meta.Region()
 		if err != nil {
@@ -158,7 +158,7 @@ func (mgr *ClientAuth) Token() TokenAuth {
 	inittoken := &Token{
 		AccessKey:    string(key),
 		AccessSecret: string(secret),
-		UID:          ctx2.CFG.UID,
+		UID:          ctx2.CFG.Global.UID,
 		Region:       region,
 	}
 	if inittoken.UID == "" {
@@ -233,7 +233,7 @@ func (f *RamRoleToken) NextToken() (*Token, error) {
 	if err != nil {
 		return nil, fmt.Errorf("ramrole Token retrieve: %s", err.Error())
 	}
-	region := ctx2.CFG.Region
+	region := ctx2.CFG.Global.Region
 	if region == "" {
 		region, err = f.meta.Region()
 		if err != nil {
@@ -292,7 +292,7 @@ type IMetaData interface {
 	Zone() (string, error)
 	NTPConfigServers() ([]string, error)
 	RoleName() (string, error)
-	RamRoleToken(role string) (metadata.RoleAuth, error)
+	RamRoleToken(role string) (RoleAuth, error)
 	VswitchID() (string, error)
 }
 
@@ -301,9 +301,9 @@ func NewMetaData() IMetaData {
 	if false {
 		// use mocked Meta depend
 		log.Infof("use mocked metadata server.")
-		return &fakeMetaData{base: metadata.NewMetaData(nil)}
+		return &fakeMetaData{base: NewBaseMetaData(nil)}
 	}
-	return metadata.NewMetaData(nil)
+	return NewBaseMetaData(nil)
 }
 
 type fakeMetaData struct {
@@ -404,7 +404,7 @@ func (m *fakeMetaData) RoleName() (string, error) {
 	return m.base.RoleName()
 }
 
-func (m *fakeMetaData) RamRoleToken(role string) (metadata.RoleAuth, error) {
+func (m *fakeMetaData) RamRoleToken(role string) (RoleAuth, error) {
 
 	return m.base.RamRoleToken(role)
 }

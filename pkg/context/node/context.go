@@ -1,4 +1,4 @@
-package context
+package node
 
 import (
 	"fmt"
@@ -15,8 +15,8 @@ func NewNodeContext(
 }
 
 const (
-	Node = "Node"
-	Task = "Task"
+	Node     = "Node"
+	Task     = "Task"
 	NodePool = "NodePool"
 )
 

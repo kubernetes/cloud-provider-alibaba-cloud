@@ -102,4 +102,3 @@ func (p *RollingCRD) GetListerWatcher() cache.ListerWatcher {
 
 // GetObject satisfies resource.crd interface (and retrieve.Retriever).
 func (p *RollingCRD) GetObject() runtime.Object { return &corev1.Node{} }
-

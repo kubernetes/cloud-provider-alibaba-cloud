@@ -2,24 +2,46 @@ package provider
 
 import (
 	"github.com/aliyun/alibaba-cloud-sdk-go/services/ecs"
-
-	"k8s.io/cloud-provider-alibaba-cloud/pkg/context"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/context/node"
 )
 
 type DetailECS struct {
-	// ImageID ecs image id
+	// ImageID alibaba image id
 	ImageID string
 }
 
-type Interface interface {
-	DetailECS(ctx *context.NodeContext) (*DetailECS, error)
+type Provider interface {
+	Instance
+	Route
+	LoadBalancer
+	PrivateZone
+}
+
+type Instance interface {
+	DetailECS(ctx *node.NodeContext) (*DetailECS, error)
 	// RestartECS
-	// restart ecs and wait for running
-	RestartECS(ctx *context.NodeContext) error
+	// restart alibaba and wait for running
+	RestartECS(ctx *node.NodeContext) error
 
-	DestroyECS(ctx *context.NodeContext) error
+	DestroyECS(ctx *node.NodeContext) error
 
-	RunCommand(ctx *context.NodeContext, cmd string) (*ecs.Invocation, error)
+	RunCommand(ctx *node.NodeContext, cmd string) (*ecs.Invocation, error)
 	// ReplaceSystemDisk replace system disk and run user data
-	ReplaceSystemDisk(ctx *context.NodeContext) error
+	ReplaceSystemDisk(ctx *node.NodeContext) error
+}
+
+type Route interface {
+	CreateRoute()
+	DeleteRoute()
+	ListRoute()
+}
+
+type PrivateZone interface {
+	CreatePVTZ()
+}
+
+type LoadBalancer interface {
+	FindLoadBalancer()
+	ListLoadBalancer()
+	CreateLoadBalancer()
 }

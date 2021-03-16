@@ -34,16 +34,33 @@ cat > ${WORKINGDIR}/cloud-config << EOF
   "Global": {
     "region": "${REGION}",
     "routeTableIDs": "",
-    "accessKey": "$(echo -n "${KEY}"|base64)",
-    "accessSecret": $(echo -n "${SECRET}"|base64)",
+    "accessKeyID": "$(echo -n "${KEY}"|base64)",
+    "accessKeySecret": "$(echo -n "${SECRET}"|base64)",
     "disablePublicSLB": false
   }
 }
 EOF
-
+if [[ "$POD_CIDR" == "" ]];
+then
+   ROUTE=" --configure-cloud-routes=false \
+      --allocate-node-cidrs=false"
+else
+  ROUTE="      --route-reconciliation-period=30s \
+      --configure-cloud-routes=true \
+      --allocate-node-cidrs=true \
+      --cluster-cidr=${POD_CIDR}"
+fi
 cmd="./cloud-controller-manager \
       --kubeconfig=${WORKINGDIR}/config \
-      --config=${WORKINGDIR}/cloud-config "
+      --cloud-config=${WORKINGDIR}/cloud-config \
+      --leader-elect=true \
+      --cloud-provider=alicloud \
+      --use-service-account-credentials=true \
+      --v=3 \
+      --feature-gates=ServiceNodeExclusion=true \
+      --allow-untagged-cloud=true \
+      ${ROUTE}
+      "
 echo
 echo "通过以下启动命令运行NLC"
 echo "${cmd}"

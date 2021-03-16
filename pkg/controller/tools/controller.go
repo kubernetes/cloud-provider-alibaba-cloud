@@ -14,7 +14,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
-
 func FindCondition(
 	conds []corev1.NodeCondition,
 	typ corev1.NodeConditionType,
@@ -41,8 +40,31 @@ const (
 	PatchStatus = "status"
 )
 
-func Patch(rclient client.Client, getter func() (o, n runtime.Object, e error), resource string) error {
-
+// Patch used to patch an object. get the latest object,
+// make a copy and do some modification.
+// finally apply the diff.
+// eg.
+// 	otask := &acv1.Task{}
+//	err := mclient.Get(
+//		context.TODO(),
+//		client.ObjectKey{
+//			Name:      task.Name,
+//			Namespace: task.Namespace,
+//		}, otask,
+//	)
+//	if err != nil {
+//		return fmt.Errorf("get task: %s", err.Error())
+//	}
+// diff := func() (o, n runtime.Object, e error) {
+//		ntask := otask.DeepCopy()
+//		ntask.Status.Hash = value
+//		ntask.Status.Phase = phase
+//		ntask.Status.Reason = reason
+//		ntask.Status.LastOperateTime = metav1.Now()
+//		return otask,ntask,nil
+//	}
+//	return tools.Patch(mclient, diff, tools.PatchStatus)
+func Patch(mclient client.Client, getter func() (o, n client.Object, e error), resource string) error {
 	otarget, ntarget, err := getter()
 	if err != nil {
 		return fmt.Errorf("get object diff patch: %s", err.Error())
@@ -61,7 +83,7 @@ func Patch(rclient client.Client, getter func() (o, n runtime.Object, e error), 
 	}
 
 	if resource == PatchSpec || resource == PatchAll {
-		err := rclient.Patch(
+		err := mclient.Patch(
 			context.TODO(), ntarget,
 			client.RawPatch(types.MergePatchType, patchBytes),
 		)
@@ -71,7 +93,70 @@ func Patch(rclient client.Client, getter func() (o, n runtime.Object, e error), 
 	}
 
 	if resource == PatchStatus || resource == PatchAll {
-		return rclient.Status().Patch(
+		return mclient.Status().Patch(
+			context.TODO(), ntarget,
+			client.RawPatch(types.MergePatchType, patchBytes),
+		)
+	}
+	return nil
+}
+
+// PatchM patch object
+// diff := func(copy runtime.Object) (client.Object,error) {
+//      nins := copy.(*v1.Node)
+//		nins.Status.Hash = value
+//		nins.Status.Phase = phase
+//		nins.Status.Reason = reason
+//		nins.Status.LastOperateTime = metav1.Now()
+//		return nins,nil
+//	}
+//	return tools.PatchM(mclient,yourObject, diff, tools.PatchStatus)
+func PatchM(
+	mclient client.Client,
+	target client.Object,
+	getter func(runtime.Object) (client.Object, error),
+	resource string,
+) error {
+	err := mclient.Get(
+		context.TODO(),
+		client.ObjectKey{
+			Name:      target.GetName(),
+			Namespace: target.GetNamespace(),
+		}, target,
+	)
+	if err != nil {
+		return fmt.Errorf("get origin object: %s", err.Error())
+	}
+
+	ntarget, err := getter(target.DeepCopyObject())
+	if err != nil {
+		return fmt.Errorf("get object diff patch: %s", err.Error())
+	}
+	oldData, err := json.Marshal(target)
+	if err != nil {
+		return fmt.Errorf("ensure marshal: %s", err.Error())
+	}
+	newData, err := json.Marshal(ntarget)
+	if err != nil {
+		return fmt.Errorf("ensure marshal: %s", err.Error())
+	}
+	patchBytes, patchErr := strategicpatch.CreateTwoWayMergePatch(oldData, newData, target)
+	if patchErr != nil {
+		return fmt.Errorf("create merge patch: %s", patchErr.Error())
+	}
+
+	if resource == PatchSpec || resource == PatchAll {
+		err := mclient.Patch(
+			context.TODO(), ntarget,
+			client.RawPatch(types.MergePatchType, patchBytes),
+		)
+		if err != nil {
+			return fmt.Errorf("patch spec: %s", err.Error())
+		}
+	}
+
+	if resource == PatchStatus || resource == PatchAll {
+		return mclient.Status().Patch(
 			context.TODO(), ntarget,
 			client.RawPatch(types.MergePatchType, patchBytes),
 		)

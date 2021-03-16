@@ -7,6 +7,8 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/context/shared"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
@@ -15,16 +17,17 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 )
 
-func Add(mgr manager.Manager) error {
-	return add(mgr, newReconciler(mgr))
+func Add(mgr manager.Manager, ctx *shared.SharedContext) error {
+	return add(mgr, newReconciler(mgr, ctx))
 }
 
 // newReconciler returns a new reconcile.Reconciler
-func newReconciler(mgr manager.Manager) reconcile.Reconciler {
+func newReconciler(mgr manager.Manager, ctx *shared.SharedContext) reconcile.Reconciler {
 	recon := &ReconcilePVTZ{
+		cloud:  ctx.Provider(),
 		client: mgr.GetClient(),
 		scheme: mgr.GetScheme(),
-		record: mgr.GetEventRecorderFor("NodePool"),
+		record: mgr.GetEventRecorderFor("PVTZ"),
 	}
 	return recon
 }
@@ -33,7 +36,7 @@ func newReconciler(mgr manager.Manager) reconcile.Reconciler {
 func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	// Create a new controller
 	c, err := controller.New(
-		"service-controller", mgr,
+		"pvtz-controller", mgr,
 		controller.Options{
 			Reconciler:              r,
 			MaxConcurrentReconciles: 1,
@@ -46,7 +49,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	// Watch for changes to primary resource AutoRepair
 	return c.Watch(
 		&source.Kind{
-			Type: &corev1.Node{},
+			Type: &corev1.Service{},
 		},
 		&handler.EnqueueRequestForObject{},
 	)
@@ -57,6 +60,7 @@ var _ reconcile.Reconciler = &ReconcilePVTZ{}
 
 // ReconcilePVTZ reconciles a AutoRepair object
 type ReconcilePVTZ struct {
+	cloud  provider.Provider
 	client client.Client
 	scheme *runtime.Scheme
 
@@ -65,13 +69,13 @@ type ReconcilePVTZ struct {
 }
 
 func (r *ReconcilePVTZ) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
-	rlog := log.WithFields(log.Fields{"NodePool": request.NamespacedName})
+	rlog := log.WithFields(log.Fields{"PrivateZone": request.NamespacedName})
 
 	nodepool := &corev1.Node{}
 	err := r.client.Get(context.TODO(), request.NamespacedName, nodepool)
 	if err != nil {
 		if errors.IsNotFound(err) {
-			rlog.Infof("service not found, skip")
+			rlog.Infof("pvtz not found, skip")
 			// Request object not found, could have been deleted
 			// after reconcile request.
 			// Owned objects are automatically garbage collected.
