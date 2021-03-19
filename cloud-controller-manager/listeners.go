@@ -373,19 +373,23 @@ func EnsureListenersDeleted(
 
 	for _, loc := range local {
 		for _, rem := range remote {
-			if !isManagedByMyService(service, rem) {
-				continue
-			}
-			hasUserNode, err := rem.listenerHasUserManagedNode(ctx)
-			if err != nil {
-				return fmt.Errorf("check if listener has user managed node, error: %s", err.Error())
-			}
-			if hasUserNode {
-				klog.Infof("%s port %d vgroup has user managed node, skip", rem.NamedKey, rem.Port)
-				continue
-			}
+
 			if loc.Port == rem.Port {
-				err := loc.Remove(ctx)
+
+				if !isManagedByMyService(service, rem) {
+					continue
+				}
+
+				hasUserNode, err := rem.listenerHasUserManagedNode(ctx)
+				if err != nil {
+					return fmt.Errorf("check if listener has user managed node, error: %s", err.Error())
+				}
+				if hasUserNode {
+					klog.Infof("%s port %d vgroup has user managed node, skip", rem.NamedKey, rem.Port)
+					continue
+				}
+
+				err = loc.Remove(ctx)
 				if err != nil {
 					return fmt.Errorf("ensure listener: %s", err.Error())
 				}
@@ -1497,6 +1501,10 @@ func (n *Listener) listenerHasUserManagedNode(ctx context.Context) (bool, error)
 	err := n.Instance().Describe(ctx)
 	if err != nil {
 		return false, err
+	}
+
+	if n.VServerGroupId == "" {
+		return false, nil
 	}
 
 	remoteVg, err := n.Client.DescribeVServerGroupAttribute(
