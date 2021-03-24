@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/version"
 	alicloud "k8s.io/cloud-provider-alibaba-cloud/cloud-controller-manager"
 	"k8s.io/cloud-provider-alibaba-cloud/cloud-controller-manager/utils/metric"
 	componentbaseconfig "k8s.io/component-base/config"
@@ -83,7 +84,6 @@ func NewServerCCM() *ServerCCM {
 					LeaseDuration: metav1.Duration{Duration: 15 * time.Second},
 					RenewDeadline: metav1.Duration{Duration: 10 * time.Second},
 					RetryPeriod:   metav1.Duration{Duration: 2 * time.Second},
-					ResourceLock:  resourcelock.LeasesResourceLock,
 				},
 				ControllerStartInterval: metav1.Duration{Duration: 0 * time.Second},
 			},
@@ -181,6 +181,11 @@ func (ccm *ServerCCM) initialization() error {
 	if err != nil {
 		return fmt.Errorf("create client error: %s", err.Error())
 	}
+
+	if err := setResourceLock(ccm); err != nil {
+		return fmt.Errorf("set resource lock error: %s", err.Error())
+	}
+
 	ccm.recorder = createRecorder(ccm.client)
 	return err
 }
@@ -374,4 +379,27 @@ func resyncPeriod(ccm *ServerCCM) func() time.Duration {
 		factor := rand.Float64() + 1
 		return time.Duration(float64(ccm.Generic.MinResyncPeriod.Nanoseconds()) * factor)
 	}
+}
+
+func setResourceLock(ccm *ServerCCM) error {
+	// check kubernetes version to use lease or not
+	version114, _ := version.ParseGeneric("v1.14.0")
+	serverVersion, err := ccm.client.Discovery().ServerVersion()
+	if err != nil {
+		return fmt.Errorf("get kubernetes version error: %s", err.Error())
+	}
+
+	runningVersion, err := version.ParseGeneric(serverVersion.String())
+	if err != nil {
+		return fmt.Errorf("unexpected error parsing running Kubernetes version, %s", err.Error())
+	}
+
+	if runningVersion.AtLeast(version114) {
+		ccm.CloudControllerManagerConfiguration.Generic.LeaderElection.ResourceLock = resourcelock.LeasesResourceLock
+	} else {
+		klog.V(5).Infof("kubernetes version: %s, resource lock use EndpointsResourceLock", runningVersion)
+		ccm.CloudControllerManagerConfiguration.Generic.LeaderElection.ResourceLock = resourcelock.EndpointsResourceLock
+	}
+
+	return nil
 }
