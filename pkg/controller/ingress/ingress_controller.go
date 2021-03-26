@@ -1,17 +1,17 @@
-package service
+package ingress
 
 import (
 	"context"
-	"fmt"
 	log "github.com/sirupsen/logrus"
-	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
+	v1 "k8s.io/cloud-provider-alibaba-cloud/pkg/apis/alibabacloud/v1"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/context/shared"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
@@ -23,11 +23,11 @@ func Add(mgr manager.Manager, ctx *shared.SharedContext) error {
 
 // newReconciler returns a new reconcile.Reconciler
 func newReconciler(mgr manager.Manager, ctx *shared.SharedContext) reconcile.Reconciler {
-	recon := &ReconcileService{
+	recon := &ReconcileIngress{
 		cloud:  ctx.Provider(),
 		client: mgr.GetClient(),
 		scheme: mgr.GetScheme(),
-		record: mgr.GetEventRecorderFor("NodePool"),
+		record: mgr.GetEventRecorderFor("Node"),
 	}
 	return recon
 }
@@ -36,7 +36,7 @@ func newReconciler(mgr manager.Manager, ctx *shared.SharedContext) reconcile.Rec
 func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	// Create a new controller
 	c, err := controller.New(
-		"service-controller", mgr,
+		"ingress-controller", mgr,
 		controller.Options{
 			Reconciler:              r,
 			MaxConcurrentReconciles: 1,
@@ -45,24 +45,21 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	if err != nil {
 		return err
 	}
-	hand := NewMapHandler()
-	ki := []*source.Kind{
-		{Type: &corev1.Service{}}, {Type: &corev1.Endpoints{}}, {Type: &corev1.Node{}},
-	}
-	for i := range ki {
-		err = c.Watch(ki[i], hand)
-		if err != nil {
-			return fmt.Errorf("watch resource: %s, %s", ki[i].Type, err.Error())
-		}
-	}
-	return nil
+
+	// Watch for changes to primary resource AutoRepair
+	return c.Watch(
+		&source.Kind{
+			Type: &v1.AckIngress{},
+		},
+		&handler.EnqueueRequestForObject{},
+	)
 }
 
-// ReconcileService implements reconcile.Reconciler
-var _ reconcile.Reconciler = &ReconcileService{}
+// ReconcileIngress implements reconcile.Reconciler
+var _ reconcile.Reconciler = &ReconcileIngress{}
 
-// ReconcileService reconciles a AutoRepair object
-type ReconcileService struct {
+// ReconcileIngress reconciles a AutoRepair object
+type ReconcileIngress struct {
 	cloud  provider.Provider
 	client client.Client
 	scheme *runtime.Scheme
@@ -71,14 +68,14 @@ type ReconcileService struct {
 	record record.EventRecorder
 }
 
-func (m *ReconcileService) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
-	rlog := log.WithFields(log.Fields{"Service": request.NamespacedName})
-
-	svc := &corev1.Service{}
-	err := m.client.Get(context.TODO(), request.NamespacedName, svc)
+func (r *ReconcileIngress) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
+	rlog := log.WithFields(log.Fields{"AckIngress": request.NamespacedName})
+	rlog.Infof("ackingress watched: %s", request.NamespacedName)
+	nodepool := &v1.AckIngress{}
+	err := r.client.Get(context.TODO(), request.NamespacedName, nodepool)
 	if err != nil {
 		if errors.IsNotFound(err) {
-			rlog.Infof("service %s not found, skip", request.NamespacedName)
+			rlog.Infof("Ingress not found, skip")
 			// Request object not found, could have been deleted
 			// after reconcile request.
 			// Owned objects are automatically garbage collected.
@@ -88,7 +85,6 @@ func (m *ReconcileService) Reconcile(ctx context.Context, request reconcile.Requ
 		}
 		return reconcile.Result{}, err
 	}
-	log.Infof("do reconcile service %s/%s", svc.Namespace, svc.Name)
-	ctxMgr := NewContextMgr(svc,m.cloud, m.client, m.record)
-	return reconcile.Result{}, ctxMgr.Reconcile()
+
+	return reconcile.Result{}, nil
 }

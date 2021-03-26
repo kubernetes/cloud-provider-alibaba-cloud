@@ -1,6 +1,7 @@
 package provider
 
 import (
+	"context"
 	"github.com/aliyun/alibaba-cloud-sdk-go/services/ecs"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/context/node"
 )
@@ -13,7 +14,7 @@ type DetailECS struct {
 type Provider interface {
 	Instance
 	Route
-	LoadBalancer
+	ILoadBalancer
 	PrivateZone
 }
 
@@ -40,8 +41,34 @@ type PrivateZone interface {
 	CreatePVTZ()
 }
 
-type LoadBalancer interface {
-	FindLoadBalancer()
-	ListLoadBalancer()
-	CreateLoadBalancer()
+type ILoadBalancer interface {
+	FindSLB(ctx context.Context, id string) ([]SLB, error)
+	ListSLB(ctx context.Context, slb SLB) ([]SLB, error)
+	CreateSLB(ctx context.Context, slb SLB) error
+	DeleteSLB(ctx context.Context, slb SLB) error
+}
+
+type SLB struct {
+	Id   string
+	Name string
+
+	Ports map[int]Port
+
+	Vgroup map[string]Vgroup
+}
+
+type Port struct {
+	Port        int
+	Description string
+}
+
+type Vgroup struct {
+	Gid         string
+	Description string
+	Servers     map[string]ECS
+}
+
+type ECS struct {
+	Id          string
+	Description string
 }

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/apis"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/context/shared"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba"
 	"net/http"
@@ -116,6 +117,12 @@ func main() {
 			os.Exit(1)
 		}
 	}
+	log.Info("start to register crds")
+	err = controller.RegisterCRD(cfg)
+	if err != nil {
+		log.Errorf("register crd: %s", err.Error())
+		os.Exit(1)
+	}
 
 	// Set default manager options
 	options := manager.Options{
@@ -136,20 +143,19 @@ func main() {
 
 	log.Info("Registering Components.")
 
+	// Setup Scheme for all resources
+	if err := apis.AddToScheme(mgr.GetScheme()); err != nil {
+		log.Error(err, "add apis to schema: %s", err.Error())
+		os.Exit(1)
+	}
+
 	ctx := shared.NewSharedContext(alibaba.NewAlibabaCloud())
 	// Setup all Controllers
 	if err := controller.AddToManager(mgr, ctx); err != nil {
 		log.Errorf("add controller: %s", err.Error())
 		os.Exit(1)
 	}
-	log.Info("start to register crds")
-	err = controller.RegisterCRD(cfg)
-	if err != nil {
-		log.Errorf("register crd: %s", err.Error())
-		os.Exit(1)
-	}
-	// 注册完成后，设置状态
-	health.CRDReady = true
+
 	// Add the Metrics Service
 	addMetrics(context.TODO(), cfg)
 

@@ -2,7 +2,8 @@ package controller
 
 import (
 	"fmt"
-	corev1 "k8s.io/api/core/v1"
+	"k8s.io/cloud-provider-alibaba-cloud/cmd/health"
+	v1 "k8s.io/cloud-provider-alibaba-cloud/pkg/apis/alibabacloud/v1"
 	"reflect"
 
 	apiextv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
@@ -41,13 +42,15 @@ func RegisterCRD(cfg *rest.Config) error {
 	}
 	client := crd.NewClient(extc)
 	for _, crd := range []CRD{
-		NewClusterCRD(client),
+		NewGatewayCRD(client),
+		NewAckIngressCRD(client),
 	} {
 		err := crd.Initialize()
 		if err != nil {
 			return fmt.Errorf("initialize crd: %s, %s", reflect.TypeOf(crd), err.Error())
 		}
 	}
+	health.CRDReady = true
 	return nil
 }
 
@@ -57,27 +60,27 @@ type CRD interface {
 	GetListerWatcher() cache.ListerWatcher
 }
 
-// RollingCRD is the cluster crd .
-type RollingCRD struct {
+// AckIngressCRD is the cluster crd .
+type AckIngressCRD struct {
 	crdc crd.Interface
 	//kino vcset.Interface
 }
 
-func NewClusterCRD(
+func NewAckIngressCRD(
 	//kinoClient vcset.Interface,
 	crdClient crd.Interface,
-) *RollingCRD {
-	return &RollingCRD{
+) *AckIngressCRD {
+	return &AckIngressCRD{
 		crdc: crdClient,
 		//kino: kinoClient,
 	}
 }
 
 // podTerminatorCRD satisfies resource.crd interface.
-func (p *RollingCRD) Initialize() error {
+func (p *AckIngressCRD) Initialize() error {
 	crd := crd.Conf{
-		Kind:                    "Rolling",
-		NamePlural:              "rollings",
+		Kind:                    "AckIngress",
+		NamePlural:              "ackingresses",
 		Group:                   "alibabacloud.com",
 		Version:                 "v1",
 		Scope:                   apiextv1beta1.NamespaceScoped,
@@ -88,7 +91,7 @@ func (p *RollingCRD) Initialize() error {
 }
 
 // GetListerWatcher satisfies resource.crd interface (and retrieve.Retriever).
-func (p *RollingCRD) GetListerWatcher() cache.ListerWatcher {
+func (p *AckIngressCRD) GetListerWatcher() cache.ListerWatcher {
 	//return &cache.ListWatch{
 	//	ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 	//		return p.kino.KinoV1().Clusters("").List(context.TODO(), options)
@@ -101,4 +104,50 @@ func (p *RollingCRD) GetListerWatcher() cache.ListerWatcher {
 }
 
 // GetObject satisfies resource.crd interface (and retrieve.Retriever).
-func (p *RollingCRD) GetObject() runtime.Object { return &corev1.Node{} }
+func (p *AckIngressCRD) GetObject() runtime.Object { return &v1.AckIngress{} }
+
+// AckIngressCRD is the cluster crd .
+type GatewayCRD struct {
+	crdc crd.Interface
+	//kino vcset.Interface
+}
+
+func NewGatewayCRD(
+//kinoClient vcset.Interface,
+	crdClient crd.Interface,
+) *GatewayCRD {
+	return &GatewayCRD{
+		crdc: crdClient,
+		//kino: kinoClient,
+	}
+}
+
+// podTerminatorCRD satisfies resource.crd interface.
+func (p *GatewayCRD) Initialize() error {
+	crd := crd.Conf{
+		Kind:                    "Gateway",
+		NamePlural:              "gateways",
+		Group:                   "alibabacloud.com",
+		Version:                 "v1",
+		Scope:                   apiextv1beta1.NamespaceScoped,
+		EnableStatusSubresource: true,
+	}
+
+	return p.crdc.EnsurePresent(crd)
+}
+
+// GetListerWatcher satisfies resource.crd interface (and retrieve.Retriever).
+func (p *GatewayCRD) GetListerWatcher() cache.ListerWatcher {
+	//return &cache.ListWatch{
+	//	ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+	//		return p.kino.KinoV1().Clusters("").List(context.TODO(), options)
+	//	},
+	//	WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+	//		return p.kino.KinoV1().Clusters("").Watch(context.TODO(),options)
+	//	},
+	//}
+	return nil
+}
+
+// GetObject satisfies resource.crd interface (and retrieve.Retriever).
+func (p *GatewayCRD) GetObject() runtime.Object { return &v1.Gateway{} }

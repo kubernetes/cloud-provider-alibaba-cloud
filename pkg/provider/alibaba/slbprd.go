@@ -1,25 +1,33 @@
 package alibaba
 
-import "k8s.io/cloud-provider-alibaba-cloud/pkg/provider/metadata"
+import (
+	"context"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/metadata"
+)
 
 func NewLBProvider(
 	auth *metadata.ClientAuth,
-) *LBProvider {
-	return &LBProvider{auth: auth}
+) *ProviderSLB {
+	return &ProviderSLB{auth: auth}
 }
 
-type LBProvider struct {
+type ProviderSLB struct{
 	auth *metadata.ClientAuth
 }
 
-func (*LBProvider) FindLoadBalancer() {
+func (ProviderSLB) FindSLB(ctx context.Context, id string) ([]provider.SLB, error) {
 	panic("implement me")
 }
 
-func (*LBProvider) ListLoadBalancer() {
+func (ProviderSLB) ListSLB(ctx context.Context, slb provider.SLB) ([]provider.SLB, error) {
 	panic("implement me")
 }
 
-func (*LBProvider) CreateLoadBalancer() {
+func (ProviderSLB) CreateSLB(ctx context.Context, slb provider.SLB) error {
+	panic("implement me")
+}
+
+func (ProviderSLB) DeleteSLB(ctx context.Context, slb provider.SLB) error {
 	panic("implement me")
 }
