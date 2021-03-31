@@ -8,21 +8,40 @@ import (
 	log "github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+	ctx2 "k8s.io/cloud-provider-alibaba-cloud/pkg/context"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
+var (
+	defaultTTL = ctx2.CFG.Global.PrivateZoneRecordTTL
+)
+
 type Actuator struct {
-	client client.Client
+	client   client.Client
 	provider provider.Provider
 }
 
 func NewActuator(c client.Client, p provider.Provider) *Actuator {
 	a := &Actuator{
-		client: c,
+		client:   c,
 		provider: p,
 	}
 	return a
+}
+
+func (a *Actuator) ReconcileService(svc *corev1.Service) error {
+	rlog := log.WithFields(log.Fields{"service": fullServiceName(svc)})
+	rlog.Println("reconciling service")
+	ep, err := a.desiredEndpoints(svc)
+	if err != nil {
+		rlog.Errorf("getting desiredEndpoint error: %s", err)
+	}
+	err = a.provider.UpdatePVTZ(context.TODO(), ep)
+	if err != nil {
+		rlog.Errorf("adding service error: %s", err)
+	}
+	return nil
 }
 
 func (a *Actuator) getEndpoints(epName types.NamespacedName) (*corev1.Endpoints, error) {
@@ -34,11 +53,10 @@ func (a *Actuator) getEndpoints(epName types.NamespacedName) (*corev1.Endpoints,
 	return eps, nil
 }
 
-func (a *Actuator) DesiredEndpoints(svc *corev1.Service) (*provider.PvtzEndpoint, error) {
+func (a *Actuator) desiredEndpoints(svc *corev1.Service) (*provider.PvtzEndpoint, error) {
 	ep := &provider.PvtzEndpoint{
-		Rr: fmt.Sprintf("%s.%s.svc", svc.Name, svc.Namespace),
-		// TODO customized ttl
-		Ttl: int64(60),
+		Rr:  serviceRr(svc),
+		Ttl: defaultTTL,
 	}
 	switch svc.Spec.Type {
 	case corev1.ServiceTypeLoadBalancer:
@@ -46,7 +64,7 @@ func (a *Actuator) DesiredEndpoints(svc *corev1.Service) (*provider.PvtzEndpoint
 		if len(svc.Status.LoadBalancer.Ingress) > 0 {
 			lbIP := svc.Status.LoadBalancer.Ingress[0].IP
 			if lbIP == "" {
-				return nil, fmt.Errorf("not lbIP found for loadbalancer service %s/%s", svc.Namespace, svc.Name)
+				return nil, fmt.Errorf("no lb IP found")
 			}
 			ep.Values = []provider.PvtzValue{{Data: lbIP}}
 			ep.Type = provider.RecordTypeA
@@ -57,7 +75,7 @@ func (a *Actuator) DesiredEndpoints(svc *corev1.Service) (*provider.PvtzEndpoint
 			// TODO
 			rawEps, err := a.getEndpoints(types.NamespacedName{Namespace: svc.Namespace, Name: svc.Name})
 			if err != nil {
-				return nil, fmt.Errorf("getting endpoints for %s/%s error: %s", svc.Namespace, svc.Name, err)
+				return nil, fmt.Errorf("getting endpoints error: %s", err)
 			}
 			ep.Values = make([]provider.PvtzValue, 0)
 			for _, rawSubnet := range rawEps.Subsets {
@@ -65,7 +83,6 @@ func (a *Actuator) DesiredEndpoints(svc *corev1.Service) (*provider.PvtzEndpoint
 					ep.Values = append(ep.Values, provider.PvtzValue{Data: addr.IP})
 				}
 			}
-			log.Infof("headless service have %d endpoints %s", len(ep.Values), rawEps.Subsets)
 			ep.Type = provider.RecordTypeA
 		} else {
 			ep.Values = []provider.PvtzValue{{Data: svc.Spec.ClusterIP}}

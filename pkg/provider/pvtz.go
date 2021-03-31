@@ -12,11 +12,10 @@ const (
 )
 
 type PrivateZone interface {
-	CreatePVTZ()
-	Records(ctx context.Context) ([]*PvtzEndpoint, error)
-	Create(ctx context.Context, ep *PvtzEndpoint) error
-	Update(ctx context.Context, ep *PvtzEndpoint) error
-	Delete(ctx context.Context, ep *PvtzEndpoint) error
+	ListPVTZ(ctx context.Context) ([]*PvtzEndpoint, error)
+	SearchPVTZ(ctx context.Context, ep *PvtzEndpoint, exact bool) ([]*PvtzEndpoint, error)
+	UpdatePVTZ(ctx context.Context, ep *PvtzEndpoint) error
+	DeletePVTZ(ctx context.Context, ep *PvtzEndpoint) error
 }
 
 type PvtzValue struct {
@@ -29,4 +28,15 @@ type PvtzEndpoint struct {
 	Values []PvtzValue `json:"values,omitempty"`
 	Type   string      `json:"recordType,omitempty"`
 	Ttl    int64       `json:"recordTTL,omitempty"`
+}
+
+func (v *PvtzValue) InVals(vals []PvtzValue) bool {
+	var found bool
+	for _, v := range vals {
+		if v.Data == v.Data {
+			found = true
+			break
+		}
+	}
+	return found
 }

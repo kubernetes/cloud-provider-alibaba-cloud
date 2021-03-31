@@ -28,6 +28,7 @@ import (
 	"github.com/aliyun/alibaba-cloud-sdk-go/services/ecs"
 	"github.com/aliyun/alibaba-cloud-sdk-go/services/ess"
 	"github.com/aliyun/alibaba-cloud-sdk-go/services/oos"
+	"github.com/aliyun/alibaba-cloud-sdk-go/services/pvtz"
 	"github.com/ghodss/yaml"
 	"github.com/go-cmd/cmd"
 	log "github.com/sirupsen/logrus"
@@ -50,6 +51,7 @@ type ClientAuth struct {
 	ECS  *ecs.Client
 	OOS  *oos.Client
 	ESS  *ess.Client
+	PVTZ *pvtz.Client
 }
 
 // NewClientMgr return a new client manager
@@ -72,11 +74,15 @@ func NewClientAuth() (*ClientAuth, error) {
 	esscli, err := ess.NewClientWithStsToken(
 		region, "key", "secret", "",
 	)
+	pvtzcli, err := pvtz.NewClientWithStsToken(
+		region, "key", "secret", "",
+	)
 	auth := &ClientAuth{
 		ECS:  ecli,
 		OOS:  ocli,
 		Meta: meta,
 		ESS:  esscli,
+		PVTZ: pvtzcli,
 		stop: make(<-chan struct{}, 1),
 	}
 	return auth, nil
@@ -193,6 +199,14 @@ func RefreshToken(mgr *ClientAuth, token *Token) error {
 		return fmt.Errorf("init ess sts token config: %s", err.Error())
 	}
 	mgr.ESS.AppendUserAgent(KUBERNETES_NODE_LIFE_CYCLE, version.Version)
+
+	err = mgr.PVTZ.InitWithStsToken(
+		token.Region, token.AccessKey, token.AccessSecret, token.Token,
+	)
+	if err != nil {
+		return fmt.Errorf("init pvtz sts token config: %s", err.Error())
+	}
+	mgr.PVTZ.AppendUserAgent(KUBERNETES_NODE_LIFE_CYCLE, version.Version)
 
 	return nil
 }

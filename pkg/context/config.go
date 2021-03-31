@@ -19,7 +19,8 @@ type CloudConfig struct {
 
 		DisablePublicSLB bool `json:"disablePublicSLB"`
 
-		PrivateZoneID string `json:"privateZoneId"`
+		PrivateZoneID        string `json:"privateZoneId"`
+		PrivateZoneRecordTTL int64  `json:"privateZoneRecordTTL"`
 
 		AccessKeyID     string `json:"accessKeyID"`
 		AccessKeySecret string `json:"accessKeySecret"`

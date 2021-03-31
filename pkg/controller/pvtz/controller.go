@@ -83,7 +83,7 @@ type ReconcileDNS struct {
 }
 
 func (m *ReconcileDNS) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
-	rlog := log.WithFields(log.Fields{"Service": request.NamespacedName})
+	rlog := log.WithFields(log.Fields{"service": request.NamespacedName})
 
 	svc := &corev1.Service{}
 	err := m.client.Get(context.TODO(), request.NamespacedName, svc)
@@ -98,11 +98,11 @@ func (m *ReconcileDNS) Reconcile(ctx context.Context, request reconcile.Request)
 }
 
 func (m *ReconcileDNS) reconcile(svc *corev1.Service) error {
-	desiredEps, err := m.actuator.DesiredEndpoints(svc)
+	err := m.actuator.ReconcileService(svc)
 	if err != nil {
 		return err
 	}
-	log.Infof("reconciling svc %s/%s to endpoints %++v", svc.Namespace, svc.Name, desiredEps)
+	log.Infof("reconciling svc %s/%s to endpoints succeed!", svc.Namespace, svc.Name)
 	return nil
 }
 
