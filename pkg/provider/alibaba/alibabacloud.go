@@ -21,7 +21,7 @@ func NewAlibabaCloud() provider.Provider {
 	return &AlibabaCloud{
 		Auth:          auth,
 		EcsProvider:   NewEcsProvider(auth),
-		ProviderSLB:    NewLBProvider(auth),
+		ProviderSLB:   NewLBProvider(auth),
 		PVTZProvider:  NewPVTZProvider(auth),
 		RouteProvider: NewRouteProvider(auth),
 	}

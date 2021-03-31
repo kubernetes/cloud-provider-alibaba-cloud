@@ -37,10 +37,6 @@ type Route interface {
 	ListRoute()
 }
 
-type PrivateZone interface {
-	CreatePVTZ()
-}
-
 type ILoadBalancer interface {
 	FindSLB(ctx context.Context, id string) ([]SLB, error)
 	ListSLB(ctx context.Context, slb SLB) ([]SLB, error)
