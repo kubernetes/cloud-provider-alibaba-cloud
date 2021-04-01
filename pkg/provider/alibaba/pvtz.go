@@ -3,10 +3,13 @@ package alibaba
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/aliyun/alibaba-cloud-sdk-go/sdk/requests"
 	"github.com/aliyun/alibaba-cloud-sdk-go/services/pvtz"
+	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
+	util_errors "k8s.io/apimachinery/pkg/util/errors"
 	ctx2 "k8s.io/cloud-provider-alibaba-cloud/pkg/context"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/metadata"
@@ -15,7 +18,7 @@ import (
 const (
 	DescribeZoneRecordPageSize = 50
 	// TODO add remark
-	ZoneRecordRemark = "ack.aliyun.com: %s"
+	ZoneRecordRemark = "record.managed.by.ack.ccm"
 )
 
 type PVTZProvider struct {
@@ -34,7 +37,6 @@ func (p *PVTZProvider) ListPVTZ(ctx context.Context) ([]*provider.PvtzEndpoint, 
 }
 
 func (p *PVTZProvider) SearchPVTZ(ctx context.Context, ep *provider.PvtzEndpoint, exact bool) ([]*provider.PvtzEndpoint, error) {
-	rlog := log.WithFields(log.Fields{"endpointRr": ep.Rr, "endpointType": ep.Type})
 	req := pvtz.CreateDescribeZoneRecordsRequest()
 	req.ZoneId = p.zoneId
 	req.PageSize = requests.NewInteger(DescribeZoneRecordPageSize)
@@ -52,13 +54,16 @@ func (p *PVTZProvider) SearchPVTZ(ctx context.Context, ep *provider.PvtzEndpoint
 		req.PageNumber = requests.NewInteger(pageNumber)
 		resp, err := p.client.DescribeZoneRecords(req)
 		if err != nil {
-			rlog.Errorf("searchPVTZ error describeZoneRecords: %s", err.Error())
 			return nil, err
 		}
 		for _, record := range resp.Records.Record {
-			if p.filterDNSRecordTypes(record) {
-				records = append(records, record)
+			if p.filterUnsupportedDNSRecordTypes(record) {
+				continue
 			}
+			if p.filterUnmanagedDNSRecord(record) {
+				continue
+			}
+			records = append(records, record)
 		}
 		if pageNumber < resp.TotalPages {
 			pageNumber++
@@ -66,6 +71,7 @@ func (p *PVTZProvider) SearchPVTZ(ctx context.Context, ep *provider.PvtzEndpoint
 			break
 		}
 	}
+	// transform raw zone records into endpoints
 	typedEndpointsMap := make(map[string]map[string]*provider.PvtzEndpoint)
 	for _, record := range records {
 		if endpointsMap := typedEndpointsMap[record.Type]; endpointsMap == nil {
@@ -98,58 +104,13 @@ func (p *PVTZProvider) SearchPVTZ(ctx context.Context, ep *provider.PvtzEndpoint
 	return totalEndpoints, nil
 }
 
-func (p *PVTZProvider) filterDNSRecordTypes(record pvtz.Record) bool {
-	switch record.Type {
-	case provider.RecordTypeA, provider.RecordTypeCNAME, provider.RecordTypePTR, provider.RecordTypeSRV, provider.RecordTypeTXT:
-		return true
-	default:
-		return false
-	}
-}
-
-func (p *PVTZProvider) record(ctx context.Context, ep *provider.PvtzEndpoint) error {
-	if ep.Rr == "" || ep.Type == "" {
-		return fmt.Errorf("endpoint %s %s not found", ep.Rr, ep.Type)
-	}
-	records, err := p.SearchPVTZ(ctx, ep, true)
-	if err != nil {
-		return err
-	}
-	for _, record := range records {
-		if record.Rr == ep.Rr && record.Type == ep.Type {
-			ep.Values = record.Values
-			ep.Ttl = record.Ttl
-			return nil
-		}
-	}
-	return fmt.Errorf("record can not find any records matching %s:%s", ep.Type, ep.Rr)
-}
-
-func (p *PVTZProvider) create(zoneId, recordType, rr, value string, ttl int) error {
-	req := pvtz.CreateAddZoneRecordRequest()
-	req.ZoneId = zoneId
-	req.Type = recordType
-	req.Rr = rr
-	req.Ttl = requests.NewInteger(ttl)
-	req.Value = value
-	_, err := p.client.AddZoneRecord(req)
-	return err
-}
-
-func (p *PVTZProvider) delete(recordId int64) error {
-	req := pvtz.CreateDeleteZoneRecordRequest()
-	req.RecordId = requests.NewInteger(int(recordId))
-	_, err := p.client.DeleteZoneRecord(req)
-	return err
-}
-
 func (p *PVTZProvider) UpdatePVTZ(ctx context.Context, ep *provider.PvtzEndpoint) error {
 	rlog := log.WithFields(log.Fields{"endpointRr": ep.Rr, "endpointType": ep.Type})
 	newValues := ep.Values
 	oldValues := make([]provider.PvtzValue, 0)
 	err := p.record(context.TODO(), ep)
 	if err != nil {
-		rlog.Errorf("update service getting old endpoint error: %s", err.Error())
+		return errors.Wrap(err, "UpdatePVTZ query old zone records error")
 	} else {
 		oldValues = ep.Values
 	}
@@ -160,40 +121,109 @@ func (p *PVTZProvider) UpdatePVTZ(ctx context.Context, ep *provider.PvtzEndpoint
 			valueToAdd = append(valueToAdd, newVal.Data)
 		}
 	}
-
 	recordIdToDelete := make([]int64, 0)
 	for _, oldVal := range oldValues {
 		if !oldVal.InVals(newValues) {
 			recordIdToDelete = append(recordIdToDelete, oldVal.RecordId)
 		}
 	}
+	errs := make([]error, 0)
+	var resp *pvtz.AddZoneRecordResponse
 	for _, val := range valueToAdd {
-		err = p.create(p.zoneId, ep.Type, ep.Rr, val, int(ep.Ttl))
+		resp, err = p.create(ep.Type, ep.Rr, val, int(ep.Ttl))
 		if err != nil {
-			rlog.Errorf("failed to add zone record, value: %s", val)
+			errs = append(errs, err)
+		}
+		// TODO should have set remark when creating zone record
+		err = p.remark(resp.RecordId)
+		if err != nil {
+			errs = append(errs, err)
 		}
 	}
 	for _, id := range recordIdToDelete {
 		err = p.delete(id)
 		if err != nil {
-			rlog.Errorf("failed to delete zone record, id: %s", id)
+			errs = append(errs, err)
 		}
 	}
-	return nil
+	return errors.Wrap(util_errors.NewAggregate(errs), "UpdatePVTZ update zone records error")
 }
 
 func (p *PVTZProvider) DeletePVTZ(ctx context.Context, ep *provider.PvtzEndpoint) error {
-	rlog := log.WithFields(log.Fields{"endpointRr": ep.Rr, "endpointType": ep.Type})
 	err := p.record(context.TODO(), ep)
 	if err != nil {
-		rlog.Errorf("deleting service failed: getting old endpoint error %s", err.Error())
+		return errors.Wrap(err, "DeletePVTZ query old zone records error")
 	}
 	oldValues := ep.Values
+	errs := make([]error, 0)
 	for _, val := range oldValues {
 		err = p.delete(val.RecordId)
 		if err != nil {
-			rlog.Errorf("deleting service failed: deleting old endpoint id %s error %s", val.RecordId, err.Error())
+			errs = append(errs, err)
 		}
 	}
+	return errors.Wrap(util_errors.NewAggregate(errs), "DeletePVTZ deleting old endpoint error")
+}
+
+func (p *PVTZProvider) filterUnmanagedDNSRecord(record pvtz.Record) bool {
+	if strings.Contains(record.Remark, ZoneRecordRemark) {
+		return false
+	}
+	return true
+}
+
+func (p *PVTZProvider) filterUnsupportedDNSRecordTypes(record pvtz.Record) bool {
+	switch record.Type {
+	case provider.RecordTypeA, provider.RecordTypeCNAME, provider.RecordTypePTR, provider.RecordTypeSRV, provider.RecordTypeTXT:
+		return false
+	default:
+		return true
+	}
+}
+
+func (p *PVTZProvider) record(ctx context.Context, ep *provider.PvtzEndpoint) error {
+	if ep.Rr == "" {
+		return fmt.Errorf("endpoint %s %s not found", ep.Rr, ep.Type)
+	}
+	records, err := p.SearchPVTZ(ctx, ep, true)
+	if err != nil {
+		return err
+	}
+	for _, record := range records {
+		if record.Rr == ep.Rr &&
+			(ep.Type == "" || record.Type == ep.Type) {
+			ep.Values = record.Values
+			ep.Ttl = record.Ttl
+			return nil
+		}
+	}
+	// not found, setting result ep to empty
+	ep.Values = []provider.PvtzValue{}
 	return nil
+}
+
+func (p *PVTZProvider) create(recordType, rr, value string, ttl int) (*pvtz.AddZoneRecordResponse, error) {
+	req := pvtz.CreateAddZoneRecordRequest()
+	req.ZoneId = p.zoneId
+	req.Type = recordType
+	req.Rr = rr
+	req.Ttl = requests.NewInteger(ttl)
+	req.Value = value
+	resp, err := p.client.AddZoneRecord(req)
+	return resp, err
+}
+
+func (p *PVTZProvider) remark(recordId int64) error {
+	req := pvtz.CreateUpdateRecordRemarkRequest()
+	req.RecordId = requests.NewInteger(int(recordId))
+	req.Remark = ZoneRecordRemark
+	_, err := p.client.UpdateRecordRemark(req)
+	return err
+}
+
+func (p *PVTZProvider) delete(recordId int64) error {
+	req := pvtz.CreateDeleteZoneRecordRequest()
+	req.RecordId = requests.NewInteger(int(recordId))
+	_, err := p.client.DeleteZoneRecord(req)
+	return err
 }
