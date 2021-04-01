@@ -82,6 +82,10 @@ func Patch(mclient client.Client, getter func() (o, n client.Object, e error), r
 		return fmt.Errorf("create merge patch: %s", patchErr.Error())
 	}
 
+	if string(patchBytes) == "{}" {
+		return nil
+	}
+
 	if resource == PatchSpec || resource == PatchAll {
 		err := mclient.Patch(
 			context.TODO(), ntarget,
@@ -145,7 +149,7 @@ func PatchM(
 		return fmt.Errorf("create merge patch: %s", patchErr.Error())
 	}
 
-	if len(patchBytes) == 0 {
+	if string(patchBytes) == "{}" {
 		return nil
 	}
 	if resource == PatchSpec || resource == PatchAll {
