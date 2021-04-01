@@ -1,8 +1,9 @@
-package provider
+package prvd
 
 import (
 	"context"
 	"github.com/aliyun/alibaba-cloud-sdk-go/services/ecs"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/context/node"
 )
 
@@ -18,7 +19,18 @@ type Provider interface {
 	PrivateZone
 }
 
+// NodeAttribute node attribute from cloud instance
+type NodeAttribute struct {
+	InstanceID   string
+	Addresses    []v1.NodeAddress
+	InstanceType string
+	Zone         string
+	Region       string
+}
+
 type Instance interface {
+	ListInstances(ctx *node.NodeContext, ids []string) (map[string]*NodeAttribute, error)
+	SetInstanceTags(ctx *node.NodeContext,id string, tags map[string]string) error
 	DetailECS(ctx *node.NodeContext) (*DetailECS, error)
 	// RestartECS
 	// restart alibaba and wait for running

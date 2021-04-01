@@ -16,18 +16,18 @@ type ProviderSLB struct{
 	auth *metadata.ClientAuth
 }
 
-func (ProviderSLB) FindSLB(ctx context.Context, id string) ([]provider.SLB, error) {
+func (ProviderSLB) FindSLB(ctx context.Context, id string) ([]prvd.SLB, error) {
 	panic("implement me")
 }
 
-func (ProviderSLB) ListSLB(ctx context.Context, slb provider.SLB) ([]provider.SLB, error) {
+func (ProviderSLB) ListSLB(ctx context.Context, slb prvd.SLB) ([]prvd.SLB, error) {
 	panic("implement me")
 }
 
-func (ProviderSLB) CreateSLB(ctx context.Context, slb provider.SLB) error {
+func (ProviderSLB) CreateSLB(ctx context.Context, slb prvd.SLB) error {
 	panic("implement me")
 }
 
-func (ProviderSLB) DeleteSLB(ctx context.Context, slb provider.SLB) error {
+func (ProviderSLB) DeleteSLB(ctx context.Context, slb prvd.SLB) error {
 	panic("implement me")
 }

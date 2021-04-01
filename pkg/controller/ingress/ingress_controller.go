@@ -60,7 +60,7 @@ var _ reconcile.Reconciler = &ReconcileIngress{}
 
 // ReconcileIngress reconciles a AutoRepair object
 type ReconcileIngress struct {
-	cloud  provider.Provider
+	cloud  prvd.Provider
 	client client.Client
 	scheme *runtime.Scheme
 

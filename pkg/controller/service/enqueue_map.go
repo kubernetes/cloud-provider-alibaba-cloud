@@ -5,7 +5,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/cloud-provider-alibaba-cloud/pkg/utils/hash"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/util/hash"
 	"reflect"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/handler"

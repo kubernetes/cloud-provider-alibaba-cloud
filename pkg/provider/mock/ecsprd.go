@@ -12,9 +12,9 @@ import (
 
 type Dummy struct{}
 
-var _ provider.Instance = &Dummy{}
+var _ prvd.Instance = &Dummy{}
 
-func (d *Dummy) DetailECS(ctx *node.NodeContext) (*provider.DetailECS, error) { return nil, nil }
+func (d *Dummy) DetailECS(ctx *node.NodeContext) (*prvd.DetailECS, error) { return nil, nil }
 
 func (d *Dummy) RestartECS(ctx *node.NodeContext) error { return nil }
 
@@ -39,13 +39,13 @@ func NewEcsProvider(
 	return &EcsProvider{auth: auth}
 }
 
-var _ provider.Instance = &EcsProvider{}
+var _ prvd.Instance = &EcsProvider{}
 
 type EcsProvider struct {
 	auth *metadata.ClientAuth
 }
 
-func (e *EcsProvider) DetailECS(ctx *node.NodeContext) (*provider.DetailECS, error) {
+func (e *EcsProvider) DetailECS(ctx *node.NodeContext) (*prvd.DetailECS, error) {
 	return nil, nil
 }
 

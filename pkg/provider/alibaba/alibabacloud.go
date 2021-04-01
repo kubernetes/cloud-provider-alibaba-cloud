@@ -6,7 +6,7 @@ import (
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/metadata"
 )
 
-func NewAlibabaCloud() provider.Provider {
+func NewAlibabaCloud() prvd.Provider {
 	auth, err := metadata.NewClientAuth()
 	if err != nil {
 		log.Warnf("initialize alibaba cloud client auth: %s", err.Error())
@@ -27,7 +27,7 @@ func NewAlibabaCloud() provider.Provider {
 	}
 }
 
-var _ provider.Provider = AlibabaCloud{}
+var _ prvd.Provider = AlibabaCloud{}
 
 type AlibabaCloud struct {
 	*EcsProvider

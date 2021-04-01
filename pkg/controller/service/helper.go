@@ -96,15 +96,15 @@ func isLocalModeService(svc *v1.Service) bool {
 }
 
 func IsENIBackendType(svc *v1.Service) bool {
-	//if svc.Annotations[utils.BACKEND_TYPE_LABEL] != "" {
-	//	return svc.Annotations[utils.BACKEND_TYPE_LABEL] == utils.BACKEND_TYPE_ENI
+	//if svc.Annotations[util.BACKEND_TYPE_LABEL] != "" {
+	//	return svc.Annotations[util.BACKEND_TYPE_LABEL] == util.BACKEND_TYPE_ENI
 	//}
 	//
 	//if os.Getenv("SERVICE_FORCE_BACKEND_ENI") != "" {
 	//	return os.Getenv("SERVICE_FORCE_BACKEND_ENI") == "true"
 	//}
 	//
-	//return cfg.Global.ServiceBackendType == utils.BACKEND_TYPE_ENI
+	//return cfg.Global.ServiceBackendType == util.BACKEND_TYPE_ENI
 	return false
 }
 

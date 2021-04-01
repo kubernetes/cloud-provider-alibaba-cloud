@@ -145,6 +145,9 @@ func PatchM(
 		return fmt.Errorf("create merge patch: %s", patchErr.Error())
 	}
 
+	if len(patchBytes) == 0 {
+		return nil
+	}
 	if resource == PatchSpec || resource == PatchAll {
 		err := mclient.Patch(
 			context.TODO(), ntarget,
