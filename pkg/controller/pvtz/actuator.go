@@ -34,7 +34,7 @@ func (a *Actuator) Update(svc *corev1.Service) error {
 }
 
 func (a *Actuator) Delete(svcName types.NamespacedName) error {
-	ep := &provider.PvtzEndpoint{
+	ep := &prvd.PvtzEndpoint{
 		Rr:  serviceRrByName(svcName),
 		Ttl: ctx2.CFG.Global.PrivateZoneRecordTTL,
 	}

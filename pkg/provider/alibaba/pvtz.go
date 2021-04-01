@@ -32,11 +32,11 @@ func NewPVTZProvider(auth *metadata.ClientAuth) *PVTZProvider {
 		zoneId: ctx2.CFG.Global.PrivateZoneID,
 	}
 }
-func (p *PVTZProvider) ListPVTZ(ctx context.Context) ([]*provider.PvtzEndpoint, error) {
-	return p.SearchPVTZ(ctx, &provider.PvtzEndpoint{}, false)
+func (p *PVTZProvider) ListPVTZ(ctx context.Context) ([]*prvd.PvtzEndpoint, error) {
+	return p.SearchPVTZ(ctx, &prvd.PvtzEndpoint{}, false)
 }
 
-func (p *PVTZProvider) SearchPVTZ(ctx context.Context, ep *provider.PvtzEndpoint, exact bool) ([]*provider.PvtzEndpoint, error) {
+func (p *PVTZProvider) SearchPVTZ(ctx context.Context, ep *prvd.PvtzEndpoint, exact bool) ([]*prvd.PvtzEndpoint, error) {
 	req := pvtz.CreateDescribeZoneRecordsRequest()
 	req.ZoneId = p.zoneId
 	req.PageSize = requests.NewInteger(DescribeZoneRecordPageSize)
@@ -72,16 +72,16 @@ func (p *PVTZProvider) SearchPVTZ(ctx context.Context, ep *provider.PvtzEndpoint
 		}
 	}
 	// transform raw zone records into endpoints
-	typedEndpointsMap := make(map[string]map[string]*provider.PvtzEndpoint)
+	typedEndpointsMap := make(map[string]map[string]*prvd.PvtzEndpoint)
 	for _, record := range records {
 		if endpointsMap := typedEndpointsMap[record.Type]; endpointsMap == nil {
-			typedEndpointsMap[record.Type] = make(map[string]*provider.PvtzEndpoint)
+			typedEndpointsMap[record.Type] = make(map[string]*prvd.PvtzEndpoint)
 		}
 
 		if rrMap := typedEndpointsMap[record.Type][record.Rr]; rrMap == nil {
-			typedEndpointsMap[record.Type][record.Rr] = &provider.PvtzEndpoint{
+			typedEndpointsMap[record.Type][record.Rr] = &prvd.PvtzEndpoint{
 				Rr: record.Rr,
-				Values: []provider.PvtzValue{{
+				Values: []prvd.PvtzValue{{
 					Data:     record.Value,
 					RecordId: record.RecordId,
 				}},
@@ -89,13 +89,13 @@ func (p *PVTZProvider) SearchPVTZ(ctx context.Context, ep *provider.PvtzEndpoint
 				Type: record.Type,
 			}
 		} else {
-			typedEndpointsMap[record.Type][record.Rr].Values = append(typedEndpointsMap[record.Type][record.Rr].Values, provider.PvtzValue{
+			typedEndpointsMap[record.Type][record.Rr].Values = append(typedEndpointsMap[record.Type][record.Rr].Values, prvd.PvtzValue{
 				Data:     record.Value,
 				RecordId: record.RecordId,
 			})
 		}
 	}
-	totalEndpoints := make([]*provider.PvtzEndpoint, 0)
+	totalEndpoints := make([]*prvd.PvtzEndpoint, 0)
 	for _, endpointsMap := range typedEndpointsMap {
 		for _, endpoint := range endpointsMap {
 			totalEndpoints = append(totalEndpoints, endpoint)
@@ -104,10 +104,10 @@ func (p *PVTZProvider) SearchPVTZ(ctx context.Context, ep *provider.PvtzEndpoint
 	return totalEndpoints, nil
 }
 
-func (p *PVTZProvider) UpdatePVTZ(ctx context.Context, ep *provider.PvtzEndpoint) error {
+func (p *PVTZProvider) UpdatePVTZ(ctx context.Context, ep *prvd.PvtzEndpoint) error {
 	rlog := log.WithFields(log.Fields{"endpointRr": ep.Rr, "endpointType": ep.Type})
 	newValues := ep.Values
-	oldValues := make([]provider.PvtzValue, 0)
+	oldValues := make([]prvd.PvtzValue, 0)
 	err := p.record(context.TODO(), ep)
 	if err != nil {
 		return errors.Wrap(err, "UpdatePVTZ query old zone records error")
@@ -149,7 +149,7 @@ func (p *PVTZProvider) UpdatePVTZ(ctx context.Context, ep *provider.PvtzEndpoint
 	return errors.Wrap(util_errors.NewAggregate(errs), "UpdatePVTZ update zone records error")
 }
 
-func (p *PVTZProvider) DeletePVTZ(ctx context.Context, ep *provider.PvtzEndpoint) error {
+func (p *PVTZProvider) DeletePVTZ(ctx context.Context, ep *prvd.PvtzEndpoint) error {
 	err := p.record(context.TODO(), ep)
 	if err != nil {
 		return errors.Wrap(err, "DeletePVTZ query old zone records error")
@@ -174,14 +174,14 @@ func (p *PVTZProvider) filterUnmanagedDNSRecord(record pvtz.Record) bool {
 
 func (p *PVTZProvider) filterUnsupportedDNSRecordTypes(record pvtz.Record) bool {
 	switch record.Type {
-	case provider.RecordTypeA, provider.RecordTypeCNAME, provider.RecordTypePTR, provider.RecordTypeSRV, provider.RecordTypeTXT:
+	case prvd.RecordTypeA, prvd.RecordTypeCNAME, prvd.RecordTypePTR, prvd.RecordTypeSRV, prvd.RecordTypeTXT:
 		return false
 	default:
 		return true
 	}
 }
 
-func (p *PVTZProvider) record(ctx context.Context, ep *provider.PvtzEndpoint) error {
+func (p *PVTZProvider) record(ctx context.Context, ep *prvd.PvtzEndpoint) error {
 	if ep.Rr == "" {
 		return fmt.Errorf("endpoint %s %s not found", ep.Rr, ep.Type)
 	}
@@ -198,7 +198,7 @@ func (p *PVTZProvider) record(ctx context.Context, ep *provider.PvtzEndpoint) er
 		}
 	}
 	// not found, setting result ep to empty
-	ep.Values = []provider.PvtzValue{}
+	ep.Values = []prvd.PvtzValue{}
 	return nil
 }
 
