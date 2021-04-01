@@ -4,11 +4,9 @@ import (
 	"context"
 	"fmt"
 
-	log "github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/context/shared"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider"
@@ -30,7 +28,7 @@ func newReconciler(mgr manager.Manager, ctx *shared.SharedContext) reconcile.Rec
 		client:   mgr.GetClient(),
 		scheme:   mgr.GetScheme(),
 		actuator: NewActuator(mgr.GetClient(), ctx.Provider()),
-		record:   mgr.GetEventRecorderFor("NodePool"),
+		record:   mgr.GetEventRecorderFor("Pvtz"),
 	}
 	return recon
 }
@@ -83,30 +81,25 @@ type ReconcileDNS struct {
 }
 
 func (m *ReconcileDNS) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
-	rlog := log.WithFields(log.Fields{"service": request.NamespacedName})
-
 	svc := &corev1.Service{}
 	err := m.client.Get(context.TODO(), request.NamespacedName, svc)
 	if err != nil {
 		if errors.IsNotFound(err) {
-			return reconcile.Result{}, m.delete(request.NamespacedName)
+			err = m.actuator.Delete(request.NamespacedName)
+			if err != nil {
+				m.record.Event(svc, corev1.EventTypeWarning, EventReasonHandleServiceDeletionError, err.Error())
+			} else {
+				m.record.Event(svc, corev1.EventTypeNormal, EventReasonHandleServiceDeletionSucceed, EventReasonHandleServiceDeletionSucceed)
+			}
+			return reconcile.Result{}, err
 		}
 		return reconcile.Result{}, err
 	}
-	rlog.Infof("do reconcile service %s/%s", svc.Namespace, svc.Name)
-	return reconcile.Result{}, m.reconcile(svc)
-}
-
-func (m *ReconcileDNS) reconcile(svc *corev1.Service) error {
-	err := m.actuator.ReconcileService(svc)
+	err = m.actuator.Update(svc)
 	if err != nil {
-		return err
+		m.record.Event(svc, corev1.EventTypeWarning, EventReasonHandleServiceUpdateError, err.Error())
+	} else {
+		m.record.Event(svc, corev1.EventTypeNormal, EventReasonHandleServiceUpdateSucceed, EventReasonHandleServiceUpdateSucceed)
 	}
-	log.Infof("reconciling svc %s/%s to endpoints succeed!", svc.Namespace, svc.Name)
-	return nil
-}
-
-func (m *ReconcileDNS) delete(svcName types.NamespacedName) error {
-	log.Infof("deleting svc %s/%s", svcName.Namespace, svcName.Name)
-	return nil
+	return reconcile.Result{}, err
 }

@@ -5,16 +5,11 @@ import (
 	"fmt"
 	"net"
 
-	log "github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	ctx2 "k8s.io/cloud-provider-alibaba-cloud/pkg/context"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-)
-
-var (
-	defaultTTL = ctx2.CFG.Global.PrivateZoneRecordTTL
 )
 
 type Actuator struct {
@@ -30,18 +25,20 @@ func NewActuator(c client.Client, p provider.Provider) *Actuator {
 	return a
 }
 
-func (a *Actuator) ReconcileService(svc *corev1.Service) error {
-	rlog := log.WithFields(log.Fields{"service": fullServiceName(svc)})
-	rlog.Println("reconciling service")
+func (a *Actuator) Update(svc *corev1.Service) error {
 	ep, err := a.desiredEndpoints(svc)
 	if err != nil {
-		rlog.Errorf("getting desiredEndpoint error: %s", err)
+		return err
 	}
-	err = a.provider.UpdatePVTZ(context.TODO(), ep)
-	if err != nil {
-		rlog.Errorf("adding service error: %s", err)
+	return a.provider.UpdatePVTZ(context.TODO(), ep)
+}
+
+func (a *Actuator) Delete(svcName types.NamespacedName) error {
+	ep := &provider.PvtzEndpoint{
+		Rr:  serviceRrByName(svcName),
+		Ttl: ctx2.CFG.Global.PrivateZoneRecordTTL,
 	}
-	return nil
+	return a.provider.DeletePVTZ(context.TODO(), ep)
 }
 
 func (a *Actuator) getEndpoints(epName types.NamespacedName) (*corev1.Endpoints, error) {
@@ -56,7 +53,7 @@ func (a *Actuator) getEndpoints(epName types.NamespacedName) (*corev1.Endpoints,
 func (a *Actuator) desiredEndpoints(svc *corev1.Service) (*provider.PvtzEndpoint, error) {
 	ep := &provider.PvtzEndpoint{
 		Rr:  serviceRr(svc),
-		Ttl: defaultTTL,
+		Ttl: ctx2.CFG.Global.PrivateZoneRecordTTL,
 	}
 	switch svc.Spec.Type {
 	case corev1.ServiceTypeLoadBalancer:
