@@ -36,7 +36,7 @@ import (
 	"k8s.io/cloud-provider-alibaba-cloud/version"
 )
 
-// Change below variables to serve metrics on different host or port.
+// Change below variables to serve metric on different host or port.
 var (
 	metricsHost               = "0.0.0.0"
 	metricsPort         int32 = 8089
@@ -180,32 +180,32 @@ func main() {
 	}
 }
 
-// addMetrics will create the Services and Service Monitors to allow the operator export the metrics by using
+// addMetrics will create the Services and Service Monitors to allow the operator export the metric by using
 // the Prometheus operator
 func addMetrics(ctx context.Context, cfg *rest.Config) {
 	// Get the namespace the operator is currently deployed in.
 	operatorNs, err := k8sutil.GetOperatorNamespace()
 	if err != nil {
 		if errors.Is(err, k8sutil.ErrRunLocal) {
-			log.Info("Skipping CR metrics server creation; not running in a cluster.")
+			log.Info("Skipping CR metric server creation; not running in a cluster.")
 			return
 		}
 	}
 
-	// Add to the below struct any other metrics ports you want to expose.
+	// Add to the below struct any other metric ports you want to expose.
 	servicePorts := []v1.ServicePort{
 		{Port: metricsPort, Name: metrics.OperatorPortName, Protocol: v1.ProtocolTCP, TargetPort: intstr.IntOrString{Type: intstr.Int, IntVal: metricsPort}},
 		{Port: operatorMetricsPort, Name: metrics.CRPortName, Protocol: v1.ProtocolTCP, TargetPort: intstr.IntOrString{Type: intstr.Int, IntVal: operatorMetricsPort}},
 	}
 
-	// Create Service object to expose the metrics port(s).
+	// Create Service object to expose the metric port(s).
 	service, err := metrics.CreateMetricsService(ctx, cfg, servicePorts)
 	if err != nil {
-		log.Infof("Could not create metrics Service: %s", err.Error())
+		log.Infof("Could not create metric Service: %s", err.Error())
 	}
 
 	// CreateServiceMonitors will automatically create the prometheus-operator ServiceMonitor resources
-	// necessary to configure Prometheus to scrape metrics from this operator.
+	// necessary to configure Prometheus to scrape metric from this operator.
 	services := []*v1.Service{service}
 
 	// The ServiceMonitor is created in the same namespace where the operator is deployed

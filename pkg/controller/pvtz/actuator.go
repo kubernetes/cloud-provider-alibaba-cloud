@@ -14,10 +14,10 @@ import (
 
 type Actuator struct {
 	client   client.Client
-	provider provider.Provider
+	provider prvd.Provider
 }
 
-func NewActuator(c client.Client, p provider.Provider) *Actuator {
+func NewActuator(c client.Client, p prvd.Provider) *Actuator {
 	a := &Actuator{
 		client:   c,
 		provider: p,
@@ -50,8 +50,8 @@ func (a *Actuator) getEndpoints(epName types.NamespacedName) (*corev1.Endpoints,
 	return eps, nil
 }
 
-func (a *Actuator) desiredEndpoints(svc *corev1.Service) (*provider.PvtzEndpoint, error) {
-	ep := &provider.PvtzEndpoint{
+func (a *Actuator) desiredEndpoints(svc *corev1.Service) (*prvd.PvtzEndpoint, error) {
+	ep := &prvd.PvtzEndpoint{
 		Rr:  serviceRr(svc),
 		Ttl: ctx2.CFG.Global.PrivateZoneRecordTTL,
 	}
@@ -63,8 +63,8 @@ func (a *Actuator) desiredEndpoints(svc *corev1.Service) (*provider.PvtzEndpoint
 			if lbIP == "" {
 				return nil, fmt.Errorf("no lb IP found")
 			}
-			ep.Values = []provider.PvtzValue{{Data: lbIP}}
-			ep.Type = provider.RecordTypeA
+			ep.Values = []prvd.PvtzValue{{Data: lbIP}}
+			ep.Type = prvd.RecordTypeA
 		}
 	case corev1.ServiceTypeClusterIP:
 		// Headless
@@ -74,26 +74,26 @@ func (a *Actuator) desiredEndpoints(svc *corev1.Service) (*provider.PvtzEndpoint
 			if err != nil {
 				return nil, fmt.Errorf("getting endpoints error: %s", err)
 			}
-			ep.Values = make([]provider.PvtzValue, 0)
+			ep.Values = make([]prvd.PvtzValue, 0)
 			for _, rawSubnet := range rawEps.Subsets {
 				for _, addr := range rawSubnet.Addresses {
-					ep.Values = append(ep.Values, provider.PvtzValue{Data: addr.IP})
+					ep.Values = append(ep.Values, prvd.PvtzValue{Data: addr.IP})
 				}
 			}
-			ep.Type = provider.RecordTypeA
+			ep.Type = prvd.RecordTypeA
 		} else {
-			ep.Values = []provider.PvtzValue{{Data: svc.Spec.ClusterIP}}
-			ep.Type = provider.RecordTypeA
+			ep.Values = []prvd.PvtzValue{{Data: svc.Spec.ClusterIP}}
+			ep.Type = prvd.RecordTypeA
 		}
 	case corev1.ServiceTypeNodePort:
-		ep.Values = []provider.PvtzValue{{Data: svc.Spec.ClusterIP}}
-		ep.Type = provider.RecordTypeA
+		ep.Values = []prvd.PvtzValue{{Data: svc.Spec.ClusterIP}}
+		ep.Type = prvd.RecordTypeA
 	case corev1.ServiceTypeExternalName:
-		ep.Values = []provider.PvtzValue{{Data: svc.Spec.ExternalName}}
+		ep.Values = []prvd.PvtzValue{{Data: svc.Spec.ExternalName}}
 		if ip := net.ParseIP(svc.Spec.ExternalName); ip != nil {
-			ep.Type = provider.RecordTypeA
+			ep.Type = prvd.RecordTypeA
 		} else {
-			ep.Type = provider.RecordTypeCNAME
+			ep.Type = prvd.RecordTypeCNAME
 		}
 	}
 	return ep, nil

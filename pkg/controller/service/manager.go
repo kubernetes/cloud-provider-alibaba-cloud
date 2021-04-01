@@ -61,7 +61,7 @@ type ContextManager struct {
 	svc *v1.Service
 	req *AnnotationRequest
 
-	cloud       provider.Provider
+	cloud       prvd.Provider
 	client      client.Client
 	endpointMgr *EndpointMgr
 
@@ -71,7 +71,7 @@ type ContextManager struct {
 
 func NewContextMgr(
 	svc *v1.Service,
-	cloud provider.Provider,
+	cloud prvd.Provider,
 	mclient client.Client,
 	record record.EventRecorder,
 ) *ContextManager {

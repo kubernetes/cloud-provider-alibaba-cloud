@@ -6,7 +6,7 @@ import (
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/metadata"
 )
 
-func NewMockCloud(auth *metadata.ClientAuth) provider.Provider {
+func NewMockCloud(auth *metadata.ClientAuth) prvd.Provider {
 
 	return &MockCloud{
 		Auth:          auth,
@@ -17,7 +17,7 @@ func NewMockCloud(auth *metadata.ClientAuth) provider.Provider {
 	}
 }
 
-var _ provider.Provider = alibaba.AlibabaCloud{}
+var _ prvd.Provider = alibaba.AlibabaCloud{}
 
 // MockCloud for unit test
 type MockCloud struct {

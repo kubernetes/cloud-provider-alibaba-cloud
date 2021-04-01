@@ -14,7 +14,7 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 
-	"k8s.io/cloud-provider-alibaba-cloud/pkg/utils/crd"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/util/crd"
 )
 
 // RegisterFromInClusterCfg register crds from in cluster config file

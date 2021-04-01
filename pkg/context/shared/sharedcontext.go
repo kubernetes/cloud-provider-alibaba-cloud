@@ -6,7 +6,7 @@ import (
 )
 
 func NewSharedContext(
-	prvd provider.Provider,
+	prvd prvd.Provider,
 ) *SharedContext {
 	ctxs := SharedContext{}
 	ctxs.SetKV(Provider, prvd)
@@ -20,10 +20,10 @@ const (
 type SharedContext struct{ base.Context }
 
 // Node
-func (c *SharedContext) Provider() provider.Provider {
+func (c *SharedContext) Provider() prvd.Provider {
 	node, ok := c.Value(Provider)
 	if !ok {
 		return nil
 	}
-	return node.(provider.Provider)
+	return node.(prvd.Provider)
 }

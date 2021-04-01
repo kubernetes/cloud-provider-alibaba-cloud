@@ -60,7 +60,7 @@ var _ reconcile.Reconciler = &ReconcileRoute{}
 
 // ReconcileRoute reconciles a AutoRepair object
 type ReconcileRoute struct {
-	cloud  provider.Provider
+	cloud  prvd.Provider
 	client client.Client
 	scheme *runtime.Scheme
 

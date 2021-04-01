@@ -70,7 +70,7 @@ var _ reconcile.Reconciler = &ReconcileDNS{}
 
 // ReconcileService reconciles a AutoRepair object
 type ReconcileDNS struct {
-	cloud  provider.Provider
+	cloud  prvd.Provider
 	client client.Client
 	scheme *runtime.Scheme
 

@@ -6,6 +6,10 @@ import (
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/context/base"
 )
 
+func NewEmpty() *NodeContext {
+	return &NodeContext{}
+}
+
 func NewNodeContext(
 	node *v1.Node,
 ) *NodeContext {
