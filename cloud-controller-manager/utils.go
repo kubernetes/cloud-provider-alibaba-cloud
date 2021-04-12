@@ -136,12 +136,11 @@ func ServiceModeLocal(svc *v1.Service) bool {
 }
 
 func GetLoadBalancerName(service *v1.Service) string {
-	//GCE requires that the name of a load balancer starts with a lower case letter.
-	ret := "a" + string(service.UID)
-	ret = strings.Replace(ret, "-", "", -1)
-	//AWS requires that the name of a load balancer is shorter than 32 bytes.
-	if len(ret) > 32 {
-		ret = ret[:32]
+	//AliCloud requires that the name of a load balancer does the service used.
+	ret := string(service.Name)
+	//AliCloud requires that the name of a load balancer is shorter than 80 bytes.
+	if len(ret) > 80 {
+		ret = ret[:80]
 	}
 	return ret
 }
