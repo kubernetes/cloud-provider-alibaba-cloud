@@ -128,14 +128,8 @@ func (p *PVTZProvider) UpdatePVTZ(ctx context.Context, ep *prvd.PvtzEndpoint) er
 		}
 	}
 	errs := make([]error, 0)
-	var resp *pvtz.AddZoneRecordResponse
 	for _, val := range valueToAdd {
-		resp, err = p.create(ep.Type, ep.Rr, val, int(ep.Ttl))
-		if err != nil {
-			errs = append(errs, err)
-		}
-		// TODO should have set remark when creating zone record
-		err = p.remark(resp.RecordId)
+		_, err = p.create(ep.Type, ep.Rr, val, int(ep.Ttl))
 		if err != nil {
 			errs = append(errs, err)
 		}
@@ -208,17 +202,10 @@ func (p *PVTZProvider) create(recordType, rr, value string, ttl int) (*pvtz.AddZ
 	req.Type = recordType
 	req.Rr = rr
 	req.Ttl = requests.NewInteger(ttl)
+	req.Remark = ZoneRecordRemark
 	req.Value = value
 	resp, err := p.client.AddZoneRecord(req)
 	return resp, err
-}
-
-func (p *PVTZProvider) remark(recordId int64) error {
-	req := pvtz.CreateUpdateRecordRemarkRequest()
-	req.RecordId = requests.NewInteger(int(recordId))
-	req.Remark = ZoneRecordRemark
-	_, err := p.client.UpdateRecordRemark(req)
-	return err
 }
 
 func (p *PVTZProvider) delete(recordId int64) error {

@@ -50,51 +50,49 @@ func (a *Actuator) getEndpoints(epName types.NamespacedName) (*corev1.Endpoints,
 	return eps, nil
 }
 
+// desiredEndpoints should applies to Kubernetes DNS Spec
+// https://github.com/kubernetes/dns/blob/master/docs/specification.md
 func (a *Actuator) desiredEndpoints(svc *corev1.Service) (*prvd.PvtzEndpoint, error) {
-	ep := &prvd.PvtzEndpoint{
-		Rr:  serviceRr(svc),
-		Ttl: ctx2.CFG.Global.PrivateZoneRecordTTL,
-	}
+	epb := prvd.NewPvtzEndpointBuilder()
+	epb.WithRr(serviceRr(svc))
+	epb.WithTtl(ctx2.CFG.Global.PrivateZoneRecordTTL)
 	switch svc.Spec.Type {
 	case corev1.ServiceTypeLoadBalancer:
-		// FIXME Short circuit to ClusterIP?
-		if len(svc.Status.LoadBalancer.Ingress) > 0 {
-			lbIP := svc.Status.LoadBalancer.Ingress[0].IP
-			if lbIP == "" {
-				return nil, fmt.Errorf("no lb IP found")
-			}
-			ep.Values = []prvd.PvtzValue{{Data: lbIP}}
-			ep.Type = prvd.RecordTypeA
+		epb.WithType(prvd.RecordTypeA)
+		for _, ingress := range svc.Status.LoadBalancer.Ingress {
+			epb.WithValueData(ingress.IP)
 		}
 	case corev1.ServiceTypeClusterIP:
-		// Headless
+		epb.WithType(prvd.RecordTypeA)
 		if svc.Spec.ClusterIP == corev1.ClusterIPNone {
-			// TODO
 			rawEps, err := a.getEndpoints(types.NamespacedName{Namespace: svc.Namespace, Name: svc.Name})
 			if err != nil {
 				return nil, fmt.Errorf("getting endpoints error: %s", err)
 			}
-			ep.Values = make([]prvd.PvtzValue, 0)
 			for _, rawSubnet := range rawEps.Subsets {
 				for _, addr := range rawSubnet.Addresses {
-					ep.Values = append(ep.Values, prvd.PvtzValue{Data: addr.IP})
+					epb.WithValueData(addr.IP)
 				}
 			}
-			ep.Type = prvd.RecordTypeA
 		} else {
-			ep.Values = []prvd.PvtzValue{{Data: svc.Spec.ClusterIP}}
-			ep.Type = prvd.RecordTypeA
+			epb.WithValueData(svc.Spec.ClusterIP)
+			for _, ip := range svc.Spec.ClusterIPs {
+				epb.WithValueData(ip)
+			}
 		}
 	case corev1.ServiceTypeNodePort:
-		ep.Values = []prvd.PvtzValue{{Data: svc.Spec.ClusterIP}}
-		ep.Type = prvd.RecordTypeA
+		epb.WithType(prvd.RecordTypeA)
+		epb.WithValueData(svc.Spec.ClusterIP)
+		for _, ip := range svc.Spec.ClusterIPs {
+			epb.WithValueData(ip)
+		}
 	case corev1.ServiceTypeExternalName:
-		ep.Values = []prvd.PvtzValue{{Data: svc.Spec.ExternalName}}
+		epb.WithValueData(svc.Spec.ExternalName)
 		if ip := net.ParseIP(svc.Spec.ExternalName); ip != nil {
-			ep.Type = prvd.RecordTypeA
+			epb.WithType(prvd.RecordTypeA)
 		} else {
-			ep.Type = prvd.RecordTypeCNAME
+			epb.WithType(prvd.RecordTypeCNAME)
 		}
 	}
-	return ep, nil
+	return epb.Build(), nil
 }
