@@ -2,7 +2,6 @@ package service
 
 import (
 	"fmt"
-	"github.com/denverdino/aliyungo/slb"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/klog"
 	"strings"
@@ -21,7 +20,7 @@ const (
 )
 
 var DefaultValue = map[string]string{
-	composite(AnnotationPrefix, AddressType): string(slb.InternetAddressType),
+	composite(AnnotationPrefix, AddressType): string("internet"),
 }
 
 type AnnotationRequest struct{ svc *v1.Service }

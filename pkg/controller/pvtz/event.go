@@ -1,8 +1,8 @@
 package pvtz
 
 const (
-	EventReasonHandleServiceDeletionError = "HandleServiceDeletionError"
+	EventReasonHandleServiceDeletionError   = "HandleServiceDeletionError"
 	EventReasonHandleServiceDeletionSucceed = "HandleServiceDeletionSucceed"
-	EventReasonHandleServiceUpdateError = "HandleServiceUpdateError"
-	EventReasonHandleServiceUpdateSucceed = "HandleServiceUpdateSucceed"
+	EventReasonHandleServiceUpdateError     = "HandleServiceUpdateError"
+	EventReasonHandleServiceUpdateSucceed   = "HandleServiceUpdateSucceed"
 )

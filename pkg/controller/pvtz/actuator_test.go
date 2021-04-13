@@ -39,7 +39,7 @@ var (
 			Type:   prvd.RecordTypeA,
 			Values: []prvd.PvtzValue{{Data: IP1}, {Data: IP2}},
 		},
-		// TODO Headless ClusterIP, mock client
+		// TODO Headless ClusterIP, vmock client
 		// Normal ClusterIP
 		&corev1.Service{
 			ObjectMeta: testCommonObjectMeta,

@@ -1,4 +1,4 @@
-package mock
+package vmock
 
 import (
 	"encoding/base64"

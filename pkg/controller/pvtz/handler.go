@@ -10,7 +10,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
-func NewEventHandlerWithClient() *EventHandlerWithClient{
+func NewEventHandlerWithClient() *EventHandlerWithClient {
 	h := &EventHandlerWithClient{}
 	h.EventHandler = handler.EnqueueRequestsFromMapFunc(h.norm)
 	return h

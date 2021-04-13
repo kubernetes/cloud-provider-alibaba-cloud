@@ -15,32 +15,6 @@ import (
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider"
 )
 
-type Dummy struct{}
-
-var _ prvd.Instance = &Dummy{}
-
-func (d *Dummy) ListInstances(ctx *node.NodeContext, ids []string) (map[string]*prvd.NodeAttribute, error){
-	return nil, nil
-}
-func (d *Dummy) SetInstanceTags(ctx *node.NodeContext,id string, tags map[string]string) error{
-	return nil
-}
-
-func (d *Dummy) DetailECS(ctx *node.NodeContext) (*prvd.DetailECS, error) { return nil, nil }
-
-func (d *Dummy) RestartECS(ctx *node.NodeContext) error { return nil }
-
-func (d *Dummy) DestroyECS(ctx *node.NodeContext) error { return nil }
-
-func (d *Dummy) RunCommand(ctx *node.NodeContext, cmd string) (*ecs.Invocation, error) {
-	return &ecs.Invocation{}, nil
-}
-
-func (d *Dummy) ReplaceSystemDisk(ctx *node.NodeContext) error {
-	log.Infof("replace system disk done")
-	return nil
-}
-
 /*
 	Provider needs permission
 	"alibaba:DeleteInstance", "alibaba:RunCommand",
@@ -57,7 +31,7 @@ type EcsProvider struct {
 	auth *metadata.ClientAuth
 }
 
-func (e *EcsProvider) ListInstances(ctx *node.NodeContext, ids []string) (map[string]*prvd.NodeAttribute, error){
+func (e *EcsProvider) ListInstances(ctx *node.NodeContext, ids []string) (map[string]*prvd.NodeAttribute, error) {
 	nodeRegionMap := make(map[string][]string)
 	for _, id := range ids {
 		regionID, nodeID, err := nodeFromProviderID(id)
@@ -114,10 +88,10 @@ func (e *EcsProvider) getInstances(ids []string, region string) ([]ecs.Instance,
 }
 
 func (e *EcsProvider) SetInstanceTags(
-	ctx *node.NodeContext,id string, tags map[string]string,
-) error{
+	ctx *node.NodeContext, id string, tags map[string]string,
+) error {
 	var mtag []ecs.AddTagsTag
-	for k,v := range tags {
+	for k, v := range tags {
 		mtag = append(mtag, ecs.AddTagsTag{Key: k, Value: v})
 	}
 	req := ecs.CreateAddTagsRequest()
@@ -125,7 +99,7 @@ func (e *EcsProvider) SetInstanceTags(
 	req.Tag = &mtag
 	req.ResourceType = "instance"
 
-	_,err := e.auth.ECS.AddTags(req)
+	_, err := e.auth.ECS.AddTags(req)
 	return err
 }
 

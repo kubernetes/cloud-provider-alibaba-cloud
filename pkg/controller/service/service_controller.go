@@ -89,6 +89,6 @@ func (m *ReconcileService) Reconcile(ctx context.Context, request reconcile.Requ
 		return reconcile.Result{}, err
 	}
 	log.Infof("do reconcile service %s/%s", svc.Namespace, svc.Name)
-	ctxMgr := NewContextMgr(svc,m.cloud, m.client, m.record)
+	ctxMgr := NewContextMgr(svc, m.cloud, m.client, m.record)
 	return reconcile.Result{}, ctxMgr.Reconcile()
 }

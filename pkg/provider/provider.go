@@ -30,7 +30,7 @@ type NodeAttribute struct {
 
 type Instance interface {
 	ListInstances(ctx *node.NodeContext, ids []string) (map[string]*NodeAttribute, error)
-	SetInstanceTags(ctx *node.NodeContext,id string, tags map[string]string) error
+	SetInstanceTags(ctx *node.NodeContext, id string, tags map[string]string) error
 	DetailECS(ctx *node.NodeContext) (*DetailECS, error)
 	// RestartECS
 	// restart alibaba and wait for running

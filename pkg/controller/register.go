@@ -113,7 +113,7 @@ type GatewayCRD struct {
 }
 
 func NewGatewayCRD(
-//kinoClient vcset.Interface,
+	//kinoClient vcset.Interface,
 	crdClient crd.Interface,
 ) *GatewayCRD {
 	return &GatewayCRD{

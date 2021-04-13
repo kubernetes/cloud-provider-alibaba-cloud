@@ -3,7 +3,6 @@ package service
 import (
 	"context"
 	"fmt"
-	"github.com/denverdino/aliyungo/slb"
 	"github.com/pkg/errors"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/tools/record"
@@ -13,6 +12,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"strings"
 )
+
 type EndpointMgr struct {
 	isEniBackendType bool
 
@@ -55,7 +55,6 @@ func NewEndpointMgr(
 	mgr.endpoints = &eps
 	return mgr, nil
 }
-
 
 type ContextManager struct {
 	svc *v1.Service
@@ -112,11 +111,10 @@ func (m *ContextManager) validate() error {
 	}
 
 	// disable public address
-	if m.req.Get(AddressType) == string(slb.InternetAddressType) {
+	if m.req.Get(AddressType) == "internet" {
 		if ctx2.CFG.Global.DisablePublicSLB {
 			return fmt.Errorf("PublicAddress SLB is Not allowed")
 		}
 	}
 	return nil
 }
-

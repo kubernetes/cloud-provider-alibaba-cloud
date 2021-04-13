@@ -10,7 +10,6 @@ func init() {
 	SchemeBuilder.Register(&AckIngress{}, &AckIngressList{})
 }
 
-
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
@@ -307,4 +306,3 @@ type IngressClassList struct {
 	// +listType=set
 	Items []IngressClass `json:"items" protobuf:"bytes,2,rep,name=items"`
 }
-

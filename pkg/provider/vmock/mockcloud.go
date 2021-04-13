@@ -1,4 +1,4 @@
-package mock
+package vmock
 
 import (
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider"
@@ -10,9 +10,9 @@ func NewMockCloud(auth *metadata.ClientAuth) prvd.Provider {
 
 	return &MockCloud{
 		Auth:          auth,
-		EcsProvider:   NewEcsProvider(auth),
-		LBProvider:    NewLBProvider(auth),
-		PVTZProvider:  NewPVTZProvider(auth),
+		MockECS:       NewMockECS(auth),
+		MockCLB:       NewMockCLB(auth),
+		MockPVTZ:      NewPVTZProvider(auth),
 		RouteProvider: NewRouteProvider(auth),
 	}
 }
@@ -21,9 +21,9 @@ var _ prvd.Provider = alibaba.AlibabaCloud{}
 
 // MockCloud for unit test
 type MockCloud struct {
-	*EcsProvider
-	*PVTZProvider
+	*MockECS
+	*MockPVTZ
 	*RouteProvider
-	*LBProvider
+	*MockCLB
 	Auth *metadata.ClientAuth
 }

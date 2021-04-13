@@ -1,4 +1,4 @@
-package mock
+package vmock
 
 import "k8s.io/cloud-provider-alibaba-cloud/pkg/provider/metadata"
 

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/util"
 	"net"
 	"net/http"
 	"net/url"
@@ -13,8 +14,6 @@ import (
 	"reflect"
 	"strings"
 	"time"
-
-	"github.com/denverdino/aliyungo/util"
 )
 
 const (

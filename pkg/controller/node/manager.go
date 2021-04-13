@@ -163,7 +163,7 @@ func findCloudECS(
 	return cloudIns, nil
 }
 
-func setFields(node *v1.Node, ins *prvd.NodeAttribute,cfgRoute bool) {
+func setFields(node *v1.Node, ins *prvd.NodeAttribute, cfgRoute bool) {
 
 	if node.Labels == nil {
 		node.Labels = make(map[string]string)
@@ -273,7 +273,7 @@ func excludeTaintFromList(taints []v1.Taint, toExclude v1.Taint) []v1.Taint {
 
 func NodeList(kclient client.Client) (*v1.NodeList, error) {
 	nodes := &v1.NodeList{}
-	err := kclient.List(context.TODO(),nodes)
+	err := kclient.List(context.TODO(), nodes)
 	if err != nil {
 		return nil, err
 	}

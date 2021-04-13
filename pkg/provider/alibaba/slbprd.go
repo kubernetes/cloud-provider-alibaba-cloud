@@ -12,7 +12,7 @@ func NewLBProvider(
 	return &ProviderSLB{auth: auth}
 }
 
-type ProviderSLB struct{
+type ProviderSLB struct {
 	auth *metadata.ClientAuth
 }
 
