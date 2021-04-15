@@ -58,12 +58,17 @@ func (a *Actuator) desiredEndpoints(svc *corev1.Service) (*prvd.PvtzEndpoint, er
 	epb.WithTtl(ctx2.CFG.Global.PrivateZoneRecordTTL)
 	switch svc.Spec.Type {
 	case corev1.ServiceTypeLoadBalancer:
-		epb.WithType(prvd.RecordTypeA)
 		for _, ingress := range svc.Status.LoadBalancer.Ingress {
 			epb.WithValueData(ingress.IP)
+			if IsIPv4(ingress.IP) {
+				epb.WithType(prvd.RecordTypeA)
+			} else if IsIPv6(ingress.IP) {
+				epb.WithType(prvd.RecordTypeAAAA)
+			} else {
+				return nil, fmt.Errorf("ingress ip %s is invalid", ingress.IP)
+			}
 		}
 	case corev1.ServiceTypeClusterIP:
-		epb.WithType(prvd.RecordTypeA)
 		if svc.Spec.ClusterIP == corev1.ClusterIPNone {
 			rawEps, err := a.getEndpoints(types.NamespacedName{Namespace: svc.Namespace, Name: svc.Name})
 			if err != nil {
@@ -72,24 +77,50 @@ func (a *Actuator) desiredEndpoints(svc *corev1.Service) (*prvd.PvtzEndpoint, er
 			for _, rawSubnet := range rawEps.Subsets {
 				for _, addr := range rawSubnet.Addresses {
 					epb.WithValueData(addr.IP)
+					if IsIPv4(addr.IP) {
+						epb.WithType(prvd.RecordTypeA)
+					} else if IsIPv6(addr.IP) {
+						epb.WithType(prvd.RecordTypeAAAA)
+					} else {
+						return nil, fmt.Errorf("cluster ip %s is invalid", addr.IP)
+					}
 				}
 			}
 		} else {
 			epb.WithValueData(svc.Spec.ClusterIP)
 			for _, ip := range svc.Spec.ClusterIPs {
 				epb.WithValueData(ip)
+				if IsIPv4(ip) {
+					epb.WithType(prvd.RecordTypeA)
+				} else if IsIPv6(ip) {
+					epb.WithType(prvd.RecordTypeAAAA)
+				} else {
+					return nil, fmt.Errorf("cluster ip %s is invalid", ip)
+				}
 			}
 		}
 	case corev1.ServiceTypeNodePort:
-		epb.WithType(prvd.RecordTypeA)
 		epb.WithValueData(svc.Spec.ClusterIP)
 		for _, ip := range svc.Spec.ClusterIPs {
 			epb.WithValueData(ip)
+			if IsIPv4(ip) {
+				epb.WithType(prvd.RecordTypeA)
+			} else if IsIPv6(ip) {
+				epb.WithType(prvd.RecordTypeAAAA)
+			} else {
+				return nil, fmt.Errorf("cluster ip %s is invalid", ip)
+			}
 		}
 	case corev1.ServiceTypeExternalName:
 		epb.WithValueData(svc.Spec.ExternalName)
 		if ip := net.ParseIP(svc.Spec.ExternalName); ip != nil {
-			epb.WithType(prvd.RecordTypeA)
+			if IsIPv4(ip.String()) {
+				epb.WithType(prvd.RecordTypeA)
+			} else if IsIPv6(ip.String()) {
+				epb.WithType(prvd.RecordTypeAAAA)
+			} else {
+				return nil, fmt.Errorf("external ip %s is invalid", ip.String())
+			}
 		} else {
 			epb.WithType(prvd.RecordTypeCNAME)
 		}
