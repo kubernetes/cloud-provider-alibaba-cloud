@@ -100,15 +100,29 @@ func GetServiceHash(service *v1.Service) (string, error) {
 func GetRecorderFromContext(ctx context.Context) (record.EventRecorder, error) {
 	recorder := ctx.Value(ContextRecorder)
 	if recorder == nil {
-		return nil, fmt.Errorf("recorder is nil")
+		return nil, fmt.Errorf("recorder in context is nil")
 	}
 
 	r, ok := recorder.(record.EventRecorder)
 	if !ok {
-		return nil, fmt.Errorf("recorder is not EventRecorder type")
+		return nil, fmt.Errorf("expect EventRecorder type, got %s", reflect.TypeOf(recorder))
 	}
 
 	return r, nil
+}
+
+func GetServiceFromContext(ctx context.Context) (*v1.Service, error) {
+	service := ctx.Value(ContextService)
+	if service == nil {
+		return nil, fmt.Errorf("service in context is nil")
+	}
+
+	svc, ok := service.(*v1.Service)
+	if !ok {
+		return nil, fmt.Errorf("expect Service type, got %s", reflect.TypeOf(service))
+	}
+
+	return svc, nil
 }
 
 func IsExcludedNode(node *v1.Node) bool {
@@ -122,4 +136,25 @@ func IsExcludedNode(node *v1.Node) bool {
 		return true
 	}
 	return false
+}
+
+func RecordNoBackends(ctx context.Context, key string) {
+	r, err := GetRecorderFromContext(ctx)
+	if err != nil {
+		klog.Warningf("get recorder from ctx error: %s", err.Error())
+		klog.Warningf("%s has no backends", key)
+		return
+	}
+	svc, err := GetServiceFromContext(ctx)
+	if err != nil {
+		klog.Warningf("get service from ctx error: %s", err.Error())
+		klog.Warningf("%s has no backends", key)
+		return
+	}
+	r.Eventf(
+		svc,
+		v1.EventTypeWarning,
+		"UnAvailableLoadBalancer",
+		"There are no available backends",
+	)
 }

@@ -369,6 +369,9 @@ func Ensure(ctx context.Context, v *vgroup, nodes *EndpointWithENI) error {
 	if err != nil {
 		return fmt.Errorf("build backend: %s, %s", err.Error(), v.NamedKey)
 	}
+	if len(backend) == 0 {
+		utils.RecordNoBackends(ctx, v.NamedKey.Key())
+	}
 	v.BackendServers = backend
 	return v.Update(ctx)
 }

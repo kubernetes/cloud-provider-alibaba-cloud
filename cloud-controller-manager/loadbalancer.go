@@ -572,7 +572,7 @@ func (s *LoadBalancerClient) UpdateLoadBalancer(ctx context.Context, service *v1
 		return nil
 	}
 	utils.Logf(service, "update default backend server group")
-	return s.UpdateDefaultServerGroup(ctx, nodes, lb)
+	return s.UpdateDefaultServerGroup(ctx, service, nodes, lb)
 }
 
 // needUpdateDefaultBackend when listeners have legacy listener.
@@ -683,24 +683,65 @@ func (s *LoadBalancerClient) getLoadBalancerOpts(service *v1.Service, vswitchid 
 const DEFAULT_SERVER_WEIGHT = 100
 
 // UpdateDefaultServerGroup update default server group
-func (s *LoadBalancerClient) UpdateDefaultServerGroup(ctx context.Context, backends interface{}, lb *slb.LoadBalancerType) error {
-	nodes, ok := backends.([]*v1.Node)
+func (s *LoadBalancerClient) UpdateDefaultServerGroup(ctx context.Context, service *v1.Service, backends interface{}, lb *slb.LoadBalancerType) error {
+	v, ok := backends.(*EndpointWithENI)
 	if !ok {
-		klog.Infof("skip default server group update for type %s", reflect.TypeOf(backends))
+		utils.Logf(service, "skip default server group update for type %s", reflect.TypeOf(backends))
 		return nil
 	}
-	additions, deletions := []slb.BackendServerType{}, []string{}
-	klog.V(5).Infof("alicloud: try to update loadbalancer backend servers. [%s]", lb.LoadBalancerId)
-	// checkout for newly added servers
-	for _, n1 := range nodes {
-		found := false
-		_, id, err := nodeFromProviderID(n1.Spec.ProviderID)
-		for _, n2 := range lb.BackendServers.BackendServer {
-			if err != nil {
-				klog.Errorf("alicloud: node providerid=%s is not"+
-					" in the correct form, expect regionid.instanceid. skip add op", n1.Spec.ProviderID)
+	backendServerIds := make(map[string]string)
+	if v.LocalMode {
+		klog.Infof("[Local] mode service: %s/%s", service.Namespace, service.Name)
+		for _, sub := range v.Endpoints.Subsets {
+			for _, add := range sub.Addresses {
+				if add.NodeName == nil {
+					return fmt.Errorf("add ecs backends for service[%s/%s] error, NodeName is nil for ip %s ",
+						service.Namespace, service.Name, add.IP)
+				}
+				node := findNodeByNodeName(v.Nodes, *add.NodeName)
+				if node == nil {
+					klog.Warningf("can not find correspond node %s for endpoint %s", *add.NodeName, add.IP)
+					continue
+				}
+				if isExcludeNode(node) {
+					continue
+				}
+				_, id, err := nodeFromProviderID(node.Spec.ProviderID)
+				if err != nil {
+					return fmt.Errorf("parse providerid: %s. "+
+						"expected: ${regionid}.${nodeid}, %s", node.Spec.ProviderID, err.Error())
+				}
+				backendServerIds[id] = id
+			}
+		}
+		// Cluster mode
+	} else {
+		klog.Infof("[Cluster] mode service: %s/%s", service.Namespace, service.Name)
+		for _, node := range v.Nodes {
+			if isExcludeNode(node) {
 				continue
 			}
+			_, id, err := nodeFromProviderID(node.Spec.ProviderID)
+			if err != nil {
+				return fmt.Errorf("normal parse providerid: %s. "+
+					"expected: ${regionid}.${nodeid}, %s", node.Spec.ProviderID, err.Error())
+			}
+			backendServerIds[id] = id
+		}
+	}
+	// record event if no backends
+	if len(backendServerIds) == 0 {
+		utils.RecordNoBackends(ctx, fmt.Sprintf("%s/%s", service.Namespace, service.Name))
+	}
+
+	utils.Logf(service, "try to update default backend servers, apis[%v], nodes[%v]",
+		lb.BackendServers.BackendServer, backendServerIds)
+
+	additions, deletions := []slb.BackendServerType{}, []string{}
+	// checkout for newly added servers
+	for _, id := range backendServerIds {
+		found := false
+		for _, n2 := range lb.BackendServers.BackendServer {
 			if id == n2.ServerId {
 				found = true
 				break
@@ -733,13 +774,7 @@ func (s *LoadBalancerClient) UpdateDefaultServerGroup(ctx context.Context, backe
 	// check for removed backend servers
 	for _, n1 := range lb.BackendServers.BackendServer {
 		found := false
-		for _, n2 := range nodes {
-			_, id, err := nodeFromProviderID(n2.Spec.ProviderID)
-			if err != nil {
-				klog.Errorf("alicloud: node providerid=%s is not "+
-					"in the correct form, expect regionid.instanceid.. skip delete op... [%s]", n2.Spec.ProviderID, err.Error())
-				continue
-			}
+		for _, id := range backendServerIds {
 			if n1.ServerId == id {
 				found = true
 				break
