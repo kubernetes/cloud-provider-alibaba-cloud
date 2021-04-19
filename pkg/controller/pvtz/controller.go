@@ -3,6 +3,7 @@ package pvtz
 import (
 	"context"
 	"fmt"
+	prvd "gitlab.alibaba-inc.com/shuqi.nsq/cloud-provider-alibaba-cloud/pkg/provider"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -101,5 +102,20 @@ func (m *ReconcileDNS) Reconcile(ctx context.Context, request reconcile.Request)
 	} else {
 		m.record.Event(svc, corev1.EventTypeNormal, EventReasonHandleServiceUpdateSucceed, EventReasonHandleServiceUpdateSucceed)
 	}
+
+	err = m.actuator.UpdateSrv(svc)
+	if err != nil {
+		m.record.Event(svc, corev1.EventTypeWarning, EventReasonHandleServiceUpdateError, err.Error())
+	} else {
+		m.record.Event(svc, corev1.EventTypeNormal, EventReasonHandleServiceUpdateSucceed, EventReasonHandleServiceUpdateSucceed)
+	}
+
+	err = m.actuator.UpdatePtr(svc)
+	if err != nil {
+		m.record.Event(svc, corev1.EventTypeWarning, EventReasonHandleServiceUpdateError, err.Error())
+	} else {
+		m.record.Event(svc, corev1.EventTypeNormal, EventReasonHandleServiceUpdateSucceed, EventReasonHandleServiceUpdateSucceed)
+	}
+
 	return reconcile.Result{}, err
 }
