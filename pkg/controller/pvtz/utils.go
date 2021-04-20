@@ -34,15 +34,3 @@ func reverseIPv6(ip string) string {
 	}
 	return strings.Join(ipS, ".")
 }
-
-func removeDuplicateElement(elements []string) []string {
-	result := make([]string, 0, len(elements))
-	temp := map[string]struct{}{}
-	for _, item := range elements {
-		if _, ok := temp[item]; !ok {
-			temp[item] = struct{}{}
-			result = append(result, item)
-		}
-	}
-	return result
-}
