@@ -3,7 +3,6 @@ package pvtz
 import (
 	"context"
 	"fmt"
-	prvd "gitlab.alibaba-inc.com/shuqi.nsq/cloud-provider-alibaba-cloud/pkg/provider"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
