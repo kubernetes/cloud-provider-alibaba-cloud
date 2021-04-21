@@ -25,8 +25,35 @@ func NewActuator(c client.Client, p prvd.Provider) *Actuator {
 	return a
 }
 
-func (a *Actuator) Update(svc *corev1.Service) error {
-	ep, err := a.desiredEndpoints(svc)
+func (a *Actuator) UpdateAandAAAA(svc *corev1.Service) error {
+	eps, err := a.desiredAandAAAA(svc)
+	if err != nil {
+		return err
+	}
+	for _, ep := range eps {
+		err = a.provider.UpdatePVTZ(context.TODO(), ep)
+	}
+	return err
+}
+
+func (a *Actuator) UpdatePTR(svc *corev1.Service) error {
+	ep, err := a.desiredPTR(svc)
+	if err != nil {
+		return err
+	}
+	return a.provider.UpdatePVTZ(context.TODO(), ep)
+}
+
+func (a *Actuator) UpdateSRV(svc *corev1.Service) error {
+	ep, err := a.desiredSRV(svc)
+	if err != nil {
+		return err
+	}
+	return a.provider.UpdatePVTZ(context.TODO(), ep)
+}
+
+func (a *Actuator) UpdateCNAME(svc *corev1.Service) error {
+	ep, err := a.desiredCNAME(svc)
 	if err != nil {
 		return err
 	}
@@ -52,18 +79,23 @@ func (a *Actuator) getEndpoints(epName types.NamespacedName) (*corev1.Endpoints,
 
 // desiredEndpoints should applies to Kubernetes DNS Spec
 // https://github.com/kubernetes/dns/blob/master/docs/specification.md
-func (a *Actuator) desiredEndpoints(svc *corev1.Service) (*prvd.PvtzEndpoint, error) {
-	epb := prvd.NewPvtzEndpointBuilder()
-	epb.WithRr(serviceRr(svc))
-	epb.WithTtl(ctx2.CFG.Global.PrivateZoneRecordTTL)
+func (a *Actuator) desiredAandAAAA(svc *corev1.Service) ([] *prvd.PvtzEndpoint, error) {
+	var epbs [] *prvd.PvtzEndpoint
+	var ipsV4 [] string
+	var ipsV6 [] string
+
 	switch svc.Spec.Type {
 	case corev1.ServiceTypeLoadBalancer:
-		epb.WithType(prvd.RecordTypeA)
 		for _, ingress := range svc.Status.LoadBalancer.Ingress {
-			epb.WithValueData(ingress.IP)
+			if IsIPv4(ingress.IP) {
+				ipsV4 = append(ipsV4, ingress.IP)
+			} else if IsIPv6(ingress.IP) {
+				ipsV6 = append(ipsV6, ingress.IP)
+			} else {
+				return nil, fmt.Errorf("ingress ip %s is invalid", ingress.IP)
+			}
 		}
 	case corev1.ServiceTypeClusterIP:
-		epb.WithType(prvd.RecordTypeA)
 		if svc.Spec.ClusterIP == corev1.ClusterIPNone {
 			rawEps, err := a.getEndpoints(types.NamespacedName{Namespace: svc.Namespace, Name: svc.Name})
 			if err != nil {
@@ -71,27 +103,153 @@ func (a *Actuator) desiredEndpoints(svc *corev1.Service) (*prvd.PvtzEndpoint, er
 			}
 			for _, rawSubnet := range rawEps.Subsets {
 				for _, addr := range rawSubnet.Addresses {
-					epb.WithValueData(addr.IP)
+					if IsIPv4(addr.IP) {
+						ipsV4 = append(ipsV4, addr.IP)
+					} else if IsIPv6(addr.IP) {
+						ipsV6 = append(ipsV6, addr.IP)
+					} else {
+						return nil, fmt.Errorf("pod ip %s is invalid", addr.IP)
+					}
 				}
 			}
 		} else {
-			epb.WithValueData(svc.Spec.ClusterIP)
-			for _, ip := range svc.Spec.ClusterIPs {
-				epb.WithValueData(ip)
+			ips := append(svc.Spec.ClusterIPs, svc.Spec.ClusterIP)
+			for _, ip := range ips {
+				if IsIPv4(ip) {
+					ipsV4 = append(ipsV4, ip)
+				} else if IsIPv6(ip) {
+					ipsV6 = append(ipsV6, ip)
+				} else {
+					return nil, fmt.Errorf("cluster ip %s is invalid", ip)
+				}
 			}
 		}
 	case corev1.ServiceTypeNodePort:
-		epb.WithType(prvd.RecordTypeA)
-		epb.WithValueData(svc.Spec.ClusterIP)
-		for _, ip := range svc.Spec.ClusterIPs {
-			epb.WithValueData(ip)
+		ips := append(svc.Spec.ClusterIPs, svc.Spec.ClusterIP)
+		for _, ip := range ips {
+			if IsIPv4(ip) {
+				ipsV4 = append(ipsV4, ip)
+			} else if IsIPv6(ip) {
+				ipsV6  = append(ipsV6, ip)
+			} else {
+				return nil, fmt.Errorf("cluster ip %s is invalid", ip)
+			}
 		}
 	case corev1.ServiceTypeExternalName:
-		epb.WithValueData(svc.Spec.ExternalName)
 		if ip := net.ParseIP(svc.Spec.ExternalName); ip != nil {
-			epb.WithType(prvd.RecordTypeA)
+			if IsIPv4(ip.String()) {
+				ipsV4 = append(ipsV4, svc.Spec.ExternalName)
+			} else {
+				ipsV6 = append(ipsV6, svc.Spec.ExternalName)
+			}
+		}
+	}
+	if len(ipsV4) != 0 {
+		epb := prvd.NewPvtzEndpointBuilder()
+		epb.WithRr(serviceRr(svc))
+		epb.WithTtl(ctx2.CFG.Global.PrivateZoneRecordTTL)
+		epb.WithType(prvd.RecordTypeA)
+		for _, ip := range ipsV4 {
+			epb.WithValueData(ip)
+		}
+		epbs = append(epbs, epb.Build())
+	}
+	if len(ipsV6) != 0 {
+		epb := prvd.NewPvtzEndpointBuilder()
+		epb.WithRr(serviceRr(svc))
+		epb.WithTtl(ctx2.CFG.Global.PrivateZoneRecordTTL)
+		epb.WithType(prvd.RecordTypeAAAA)
+		for _, ip := range ipsV6 {
+			epb.WithValueData(ip)
+		}
+		epbs = append(epbs, epb.Build())
+	}
+	return epbs, nil
+}
+
+func (a *Actuator) desiredSRV(svc *corev1.Service) (*prvd.PvtzEndpoint, error) {
+	epb := prvd.NewPvtzEndpointBuilder()
+	epb.WithTtl(ctx2.CFG.Global.PrivateZoneRecordTTL)
+	epb.WithType(prvd.RecordTypeSRV)
+	svcName := svc.Name
+	ns := svc.Namespace
+	for _, servicePort := range svc.Spec.Ports {
+		srvRr := fmt.Sprintf("_%s._%s.%s.%s.svc", servicePort.Name, servicePort.Protocol, svcName, ns)
+		epb.WithRr(srvRr)
+		v := fmt.Sprintf("0 100 %s %s.%s.svc", servicePort.TargetPort.String(), svcName, ns)
+		epb.WithValueData(v)
+	}
+	return epb.Build(), nil
+}
+
+func (a *Actuator) desiredPTR(svc *corev1.Service) (*prvd.PvtzEndpoint, error) {
+	epb := prvd.NewPvtzEndpointBuilder()
+	epb.WithTtl(ctx2.CFG.Global.PrivateZoneRecordTTL)
+	epb.WithType(prvd.RecordTypePTR)
+	epb.WithValueData(serviceRr(svc))
+	switch svc.Spec.Type {
+	case corev1.ServiceTypeLoadBalancer:
+		for _, ingress := range svc.Status.LoadBalancer.Ingress {
+			if IsIPv4(ingress.IP) {
+				epb.WithRr(reverseIPv4(ingress.IP))
+			} else if IsIPv6(ingress.IP) {
+				epb.WithRr(reverseIPv6(ingress.IP))
+			} else {
+				return nil, fmt.Errorf("ingress ip %s is invalid", ingress.IP)
+			}
+		}
+	case corev1.ServiceTypeClusterIP:
+		if svc.Spec.ClusterIP == corev1.ClusterIPNone {
+			rawEps, err := a.getEndpoints(types.NamespacedName{Namespace: svc.Namespace, Name: svc.Name})
+			if err != nil {
+				return nil, fmt.Errorf("getting endpoints error: %s", err)
+			}
+			for _, rawSubnet := range rawEps.Subsets {
+				for _, addr := range rawSubnet.Addresses {
+					if IsIPv4(addr.IP) {
+						epb.WithRr(reverseIPv4(addr.IP))
+					} else if IsIPv6(addr.IP) {
+						epb.WithRr(reverseIPv6(addr.IP))
+					} else {
+						return nil, fmt.Errorf("pod ip %s is invalid", addr.IP)
+					}
+				}
+			}
 		} else {
-			epb.WithType(prvd.RecordTypeCNAME)
+			ips := append(svc.Spec.ClusterIPs, svc.Spec.ClusterIP)
+			for _, ip := range ips {
+				if IsIPv4(ip) {
+					epb.WithRr(reverseIPv4(ip))
+				} else if IsIPv6(ip) {
+					epb.WithRr(reverseIPv6(ip))
+				} else {
+					return nil, fmt.Errorf("cluster ip %s is invalid", ip)
+				}
+			}
+		}
+	case corev1.ServiceTypeNodePort:
+		ips := append(svc.Spec.ClusterIPs, svc.Spec.ClusterIP)
+		for _, ip := range ips {
+			if IsIPv4(ip) {
+				epb.WithRr(reverseIPv4(ip))
+			} else if IsIPv6(ip) {
+				epb.WithRr(reverseIPv6(ip))
+			} else {
+				return nil, fmt.Errorf("cluster ip %s is invalid", ip)
+			}
+		}
+	}
+	return epb.Build(), nil
+}
+
+func (a *Actuator) desiredCNAME(svc *corev1.Service) (*prvd.PvtzEndpoint, error) {
+	epb := prvd.NewPvtzEndpointBuilder()
+	epb.WithRr(serviceRr(svc))
+	epb.WithTtl(ctx2.CFG.Global.PrivateZoneRecordTTL)
+	epb.WithType(prvd.RecordTypeCNAME)
+	if svc.Spec.Type == corev1.ServiceTypeExternalName {
+		if ip := net.ParseIP(svc.Spec.ExternalName); ip == nil {
+			epb.WithValueData(svc.Spec.ExternalName)
 		}
 	}
 	return epb.Build(), nil
