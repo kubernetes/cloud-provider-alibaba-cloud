@@ -5,8 +5,10 @@ import (
 	"fmt"
 	"net"
 
+	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+	util_errors "k8s.io/apimachinery/pkg/util/errors"
 	ctx2 "k8s.io/cloud-provider-alibaba-cloud/pkg/context"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -25,39 +27,29 @@ func NewActuator(c client.Client, p prvd.Provider) *Actuator {
 	return a
 }
 
-func (a *Actuator) UpdateAandAAAA(svc *corev1.Service) error {
-	eps, err := a.desiredAandAAAA(svc)
-	if err != nil {
-		return err
+func (a *Actuator) UpdateService(svc *corev1.Service) error {
+	eps := make([]*prvd.PvtzEndpoint, 0)
+	desiredFuncs := []func(svc *corev1.Service) ([]*prvd.PvtzEndpoint, error){
+		a.desiredAandAAAA,
+		a.desiredSRV,
+		a.desiredCNAME,
+		a.desiredPTR,
+	}
+	errs := make([]error, 0)
+	for _, f := range desiredFuncs {
+		ps, err := f(svc)
+		if err != nil {
+			errs = append(errs, err)
+		}
+		eps = append(eps, ps...)
 	}
 	for _, ep := range eps {
-		err = a.provider.UpdatePVTZ(context.TODO(), ep)
+		err := a.provider.UpdatePVTZ(context.TODO(), ep)
+		if err != nil {
+			errs = append(errs, err)
+		}
 	}
-	return err
-}
-
-func (a *Actuator) UpdatePTR(svc *corev1.Service) error {
-	ep, err := a.desiredPTR(svc)
-	if err != nil {
-		return err
-	}
-	return a.provider.UpdatePVTZ(context.TODO(), ep)
-}
-
-func (a *Actuator) UpdateSRV(svc *corev1.Service) error {
-	ep, err := a.desiredSRV(svc)
-	if err != nil {
-		return err
-	}
-	return a.provider.UpdatePVTZ(context.TODO(), ep)
-}
-
-func (a *Actuator) UpdateCNAME(svc *corev1.Service) error {
-	ep, err := a.desiredCNAME(svc)
-	if err != nil {
-		return err
-	}
-	return a.provider.UpdatePVTZ(context.TODO(), ep)
+	return errors.Wrap(util_errors.NewAggregate(errs), "UpdateService error")
 }
 
 func (a *Actuator) Delete(svcName types.NamespacedName) error {
@@ -79,10 +71,9 @@ func (a *Actuator) getEndpoints(epName types.NamespacedName) (*corev1.Endpoints,
 
 // desiredEndpoints should applies to Kubernetes DNS Spec
 // https://github.com/kubernetes/dns/blob/master/docs/specification.md
-func (a *Actuator) desiredAandAAAA(svc *corev1.Service) ([] *prvd.PvtzEndpoint, error) {
-	var epbs [] *prvd.PvtzEndpoint
-	var ipsV4 [] string
-	var ipsV6 [] string
+func (a *Actuator) desiredAandAAAA(svc *corev1.Service) ([]*prvd.PvtzEndpoint, error) {
+	var ipsV4 []string
+	var ipsV6 []string
 
 	switch svc.Spec.Type {
 	case corev1.ServiceTypeLoadBalancer:
@@ -130,7 +121,7 @@ func (a *Actuator) desiredAandAAAA(svc *corev1.Service) ([] *prvd.PvtzEndpoint, 
 			if IsIPv4(ip) {
 				ipsV4 = append(ipsV4, ip)
 			} else if IsIPv6(ip) {
-				ipsV6  = append(ipsV6, ip)
+				ipsV6 = append(ipsV6, ip)
 			} else {
 				return nil, fmt.Errorf("cluster ip %s is invalid", ip)
 			}
@@ -144,45 +135,48 @@ func (a *Actuator) desiredAandAAAA(svc *corev1.Service) ([] *prvd.PvtzEndpoint, 
 			}
 		}
 	}
+	var eps []*prvd.PvtzEndpoint
+
+	epTemplate := prvd.NewPvtzEndpointBuilder()
+	epTemplate.WithRr(serviceRr(svc))
+	epTemplate.WithTtl(ctx2.CFG.Global.PrivateZoneRecordTTL)
+
 	if len(ipsV4) != 0 {
-		epb := prvd.NewPvtzEndpointBuilder()
-		epb.WithRr(serviceRr(svc))
-		epb.WithTtl(ctx2.CFG.Global.PrivateZoneRecordTTL)
+		epb := epTemplate.DeepCopy()
 		epb.WithType(prvd.RecordTypeA)
 		for _, ip := range ipsV4 {
 			epb.WithValueData(ip)
 		}
-		epbs = append(epbs, epb.Build())
+		eps = append(eps, epb.Build())
 	}
 	if len(ipsV6) != 0 {
-		epb := prvd.NewPvtzEndpointBuilder()
-		epb.WithRr(serviceRr(svc))
-		epb.WithTtl(ctx2.CFG.Global.PrivateZoneRecordTTL)
+		epb := epTemplate.DeepCopy()
 		epb.WithType(prvd.RecordTypeAAAA)
 		for _, ip := range ipsV6 {
 			epb.WithValueData(ip)
 		}
-		epbs = append(epbs, epb.Build())
+		eps = append(eps, epb.Build())
 	}
-	return epbs, nil
+	return eps, nil
 }
 
-func (a *Actuator) desiredSRV(svc *corev1.Service) (*prvd.PvtzEndpoint, error) {
-	epb := prvd.NewPvtzEndpointBuilder()
-	epb.WithTtl(ctx2.CFG.Global.PrivateZoneRecordTTL)
-	epb.WithType(prvd.RecordTypeSRV)
+func (a *Actuator) desiredSRV(svc *corev1.Service) ([]*prvd.PvtzEndpoint, error) {
+	eps := make([]*prvd.PvtzEndpoint, 0)
+	epTemplate := prvd.NewPvtzEndpointBuilder()
+	epTemplate.WithTtl(ctx2.CFG.Global.PrivateZoneRecordTTL)
+	epTemplate.WithType(prvd.RecordTypeSRV)
 	svcName := svc.Name
 	ns := svc.Namespace
 	for _, servicePort := range svc.Spec.Ports {
-		srvRr := fmt.Sprintf("_%s._%s.%s.%s.svc", servicePort.Name, servicePort.Protocol, svcName, ns)
-		epb.WithRr(srvRr)
-		v := fmt.Sprintf("0 100 %s %s.%s.svc", servicePort.TargetPort.String(), svcName, ns)
-		epb.WithValueData(v)
+		epb := epTemplate.DeepCopy()
+		epb.WithRr(fmt.Sprintf("_%s._%s.%s.%s.svc", servicePort.Name, servicePort.Protocol, svcName, ns))
+		epb.WithValueData(fmt.Sprintf("0 100 %s %s.%s.svc", servicePort.TargetPort.String(), svcName, ns))
+		eps = append(eps, epb.Build())
 	}
-	return epb.Build(), nil
+	return eps, nil
 }
 
-func (a *Actuator) desiredPTR(svc *corev1.Service) (*prvd.PvtzEndpoint, error) {
+func (a *Actuator) desiredPTR(svc *corev1.Service) ([]*prvd.PvtzEndpoint, error) {
 	epb := prvd.NewPvtzEndpointBuilder()
 	epb.WithTtl(ctx2.CFG.Global.PrivateZoneRecordTTL)
 	epb.WithType(prvd.RecordTypePTR)
@@ -239,10 +233,10 @@ func (a *Actuator) desiredPTR(svc *corev1.Service) (*prvd.PvtzEndpoint, error) {
 			}
 		}
 	}
-	return epb.Build(), nil
+	return []*prvd.PvtzEndpoint{epb.Build()}, nil
 }
 
-func (a *Actuator) desiredCNAME(svc *corev1.Service) (*prvd.PvtzEndpoint, error) {
+func (a *Actuator) desiredCNAME(svc *corev1.Service) ([]*prvd.PvtzEndpoint, error) {
 	epb := prvd.NewPvtzEndpointBuilder()
 	epb.WithRr(serviceRr(svc))
 	epb.WithTtl(ctx2.CFG.Global.PrivateZoneRecordTTL)
@@ -252,5 +246,5 @@ func (a *Actuator) desiredCNAME(svc *corev1.Service) (*prvd.PvtzEndpoint, error)
 			epb.WithValueData(svc.Spec.ExternalName)
 		}
 	}
-	return epb.Build(), nil
+	return []*prvd.PvtzEndpoint{epb.Build()}, nil
 }

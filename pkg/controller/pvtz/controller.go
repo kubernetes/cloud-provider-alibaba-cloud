@@ -95,25 +95,7 @@ func (m *ReconcileDNS) Reconcile(ctx context.Context, request reconcile.Request)
 		}
 		return reconcile.Result{}, err
 	}
-	err = m.actuator.UpdateAandAAAA(svc)
-	if err != nil {
-		m.record.Event(svc, corev1.EventTypeWarning, EventReasonHandleServiceUpdateError, err.Error())
-	} else {
-		m.record.Event(svc, corev1.EventTypeNormal, EventReasonHandleServiceUpdateSucceed, EventReasonHandleServiceUpdateSucceed)
-	}
-	err = m.actuator.UpdateSRV(svc)
-	if err != nil {
-		m.record.Event(svc, corev1.EventTypeWarning, EventReasonHandleServiceUpdateError, err.Error())
-	} else {
-		m.record.Event(svc, corev1.EventTypeNormal, EventReasonHandleServiceUpdateSucceed, EventReasonHandleServiceUpdateSucceed)
-	}
-	err = m.actuator.UpdatePTR(svc)
-	if err != nil {
-		m.record.Event(svc, corev1.EventTypeWarning, EventReasonHandleServiceUpdateError, err.Error())
-	} else {
-		m.record.Event(svc, corev1.EventTypeNormal, EventReasonHandleServiceUpdateSucceed, EventReasonHandleServiceUpdateSucceed)
-	}
-	err = m.actuator.UpdateCNAME(svc)
+	err = m.actuator.UpdateService(svc)
 	if err != nil {
 		m.record.Event(svc, corev1.EventTypeWarning, EventReasonHandleServiceUpdateError, err.Error())
 	} else {
