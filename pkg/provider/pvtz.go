@@ -93,6 +93,12 @@ func (peb *PvtzEndpointBuilder) WithType(recordType string) {
 	peb.Type = recordType
 }
 
+func (peb *PvtzEndpointBuilder) DeepCopy() *PvtzEndpointBuilder {
+	return &PvtzEndpointBuilder{
+		PvtzEndpoint: peb.PvtzEndpoint,
+	}
+}
+
 func (peb *PvtzEndpointBuilder) WithTtl(ttl int64) {
 	peb.Ttl = ttl
 }
