@@ -29,6 +29,8 @@ func (e *EventHandlerWithClient) norm(o client.Object) []reconcile.Request {
 		request = append(request, e.normEndpoint(o.(*v1.Endpoints))...)
 	case *v1.Service:
 		request = append(request, e.normService(o.(*v1.Service))...)
+	case *v1.Pod:
+		request = append(request, e.normPod(o.(*v1.Pod))...)
 	default:
 		log.Warnf("unknown object: %s, %v", reflect.TypeOf(o), o)
 	}
@@ -42,6 +44,12 @@ func (e *EventHandlerWithClient) normEndpoint(o *v1.Endpoints) []reconcile.Reque
 }
 
 func (e *EventHandlerWithClient) normService(o *v1.Service) []reconcile.Request {
+	return []reconcile.Request{
+		{NamespacedName: client.ObjectKey{Namespace: o.GetNamespace(), Name: o.GetName()}},
+	}
+}
+
+func (e *EventHandlerWithClient) normPod(o *v1.Pod) []reconcile.Request {
 	return []reconcile.Request{
 		{NamespacedName: client.ObjectKey{Namespace: o.GetNamespace(), Name: o.GetName()}},
 	}

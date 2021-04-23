@@ -9,11 +9,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 )
 
-type PredicateDNS struct {
+type ServicePredicate struct {
 	predicate.Funcs
 }
 
-func (pd *PredicateDNS) filterLeaseEvents(obj client.Object) bool {
+func (sp *ServicePredicate) filterLeaseEvents(obj client.Object) bool {
 	empty := sets.Empty{}
 	avoid := sets.String{
 		"kube-system/kube-scheduler":          empty,
@@ -27,10 +27,10 @@ func (pd *PredicateDNS) filterLeaseEvents(obj client.Object) bool {
 	return true
 }
 
-func (pd *PredicateDNS) Create(e event.CreateEvent) bool {
-	return pd.filterLeaseEvents(e.Object)
+func (sp *ServicePredicate) Create(e event.CreateEvent) bool {
+	return sp.filterLeaseEvents(e.Object)
 }
 
-func (pd *PredicateDNS) Update(e event.UpdateEvent) bool {
-	return pd.filterLeaseEvents(e.ObjectOld)
+func (sp *ServicePredicate) Update(e event.UpdateEvent) bool {
+	return sp.filterLeaseEvents(e.ObjectOld)
 }
