@@ -4,11 +4,14 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"strings"
 
 	"github.com/pkg/errors"
+	log "github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	util_errors "k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	ctx2 "k8s.io/cloud-provider-alibaba-cloud/pkg/context"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -46,13 +49,14 @@ func (a *Actuator) UpdateService(svc *corev1.Service) error {
 	for _, ep := range eps {
 		err := a.provider.UpdatePVTZ(context.TODO(), ep)
 		if err != nil {
+			log.Printf("update pvtz error %s", err.Error())
 			errs = append(errs, err)
 		}
 	}
 	return errors.Wrap(util_errors.NewAggregate(errs), "UpdateService error")
 }
 
-func (a *Actuator) Delete(svcName types.NamespacedName) error {
+func (a *Actuator) DeleteService(svcName types.NamespacedName) error {
 	ep := &prvd.PvtzEndpoint{
 		Rr:  serviceRrByName(svcName),
 		Ttl: ctx2.CFG.Global.PrivateZoneRecordTTL,
@@ -161,6 +165,12 @@ func (a *Actuator) desiredAandAAAA(svc *corev1.Service) ([]*prvd.PvtzEndpoint, e
 }
 
 func (a *Actuator) desiredSRV(svc *corev1.Service) ([]*prvd.PvtzEndpoint, error) {
+	rawEps, err := a.getEndpoints(types.NamespacedName{Namespace: svc.Namespace, Name: svc.Name})
+	if err != nil {
+		return nil, fmt.Errorf("getting endpoints error: %s", err)
+	}
+	namedPortmap := NewNamedPortMap(rawEps)
+
 	eps := make([]*prvd.PvtzEndpoint, 0)
 	epTemplate := prvd.NewPvtzEndpointBuilder()
 	epTemplate.WithTtl(ctx2.CFG.Global.PrivateZoneRecordTTL)
@@ -168,9 +178,21 @@ func (a *Actuator) desiredSRV(svc *corev1.Service) ([]*prvd.PvtzEndpoint, error)
 	svcName := svc.Name
 	ns := svc.Namespace
 	for _, servicePort := range svc.Spec.Ports {
+		var targetPort int32
+		if servicePort.TargetPort.Type == intstr.Int {
+			targetPort = int32(servicePort.TargetPort.IntValue())
+		} else {
+			if p, ok := namedPortmap.GetByProtocolAndPortName(string(servicePort.Protocol), servicePort.Name); ok {
+				targetPort = p
+			}
+		}
+		if targetPort == 0 {
+			log.Printf("unabled to get namedPort's int value for %s/%s, port %+v \n", svc.Namespace, svc.Name, servicePort)
+			continue
+		}
 		epb := epTemplate.DeepCopy()
-		epb.WithRr(fmt.Sprintf("_%s._%s.%s.%s.svc", servicePort.Name, servicePort.Protocol, svcName, ns))
-		epb.WithValueData(fmt.Sprintf("0 100 %s %s.%s.svc", servicePort.TargetPort.String(), svcName, ns))
+		epb.WithRr(strings.ToLower(fmt.Sprintf("_%s._%s.%s.%s.svc", servicePort.Name, servicePort.Protocol, svcName, ns)))
+		epb.WithValueData(strings.ToLower(fmt.Sprintf("0 100 %d %s.%s.svc", targetPort, svcName, ns)))
 		eps = append(eps, epb.Build())
 	}
 	return eps, nil
@@ -233,7 +255,11 @@ func (a *Actuator) desiredPTR(svc *corev1.Service) ([]*prvd.PvtzEndpoint, error)
 			}
 		}
 	}
-	return []*prvd.PvtzEndpoint{epb.Build()}, nil
+	eps := make([]*prvd.PvtzEndpoint, 0)
+	if ep := epb.Build(); ep != nil {
+		eps = append(eps, ep)
+	}
+	return eps, nil
 }
 
 func (a *Actuator) desiredCNAME(svc *corev1.Service) ([]*prvd.PvtzEndpoint, error) {
@@ -246,5 +272,19 @@ func (a *Actuator) desiredCNAME(svc *corev1.Service) ([]*prvd.PvtzEndpoint, erro
 			epb.WithValueData(svc.Spec.ExternalName)
 		}
 	}
-	return []*prvd.PvtzEndpoint{epb.Build()}, nil
+	eps := make([]*prvd.PvtzEndpoint, 0)
+	if ep := epb.Build(); ep != nil {
+		eps = append(eps, ep)
+	}
+	return eps, nil
+}
+
+func (a *Actuator) UpdatePod(pod *corev1.Pod) error {
+	// TODO
+	return nil
+}
+
+func (a *Actuator) DeletePod(podName types.NamespacedName) error {
+	// TODO
+	return nil
 }

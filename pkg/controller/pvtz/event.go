@@ -5,4 +5,8 @@ const (
 	EventReasonHandleServiceDeletionSucceed = "HandleServiceDeletionSucceed"
 	EventReasonHandleServiceUpdateError     = "HandleServiceUpdateError"
 	EventReasonHandleServiceUpdateSucceed   = "HandleServiceUpdateSucceed"
+	EventReasonHandlePodDeletionError       = "HandlePodDeletionError"
+	EventReasonHandlePodDeletionSucceed     = "HandlePodDeletionSucceed"
+	EventReasonHandlePodUpdateError         = "HandlePodUpdateError"
+	EventReasonHandlePodUpdateSucceed       = "HandlePodUpdateSucceed"
 )

@@ -104,12 +104,15 @@ func (peb *PvtzEndpointBuilder) WithTtl(ttl int64) {
 }
 
 func (peb *PvtzEndpointBuilder) Build() *PvtzEndpoint {
+	if peb.Rr == "" || len(peb.Values) == 0 {
+		return nil
+	}
 	ret := &peb.PvtzEndpoint
-	ret.Values = peb.unifyValues(peb.Values)
+	ret.Values = peb.dedupValues(peb.Values)
 	return ret
 }
 
-func (peb *PvtzEndpointBuilder) unifyValues(vals []PvtzValue) []PvtzValue {
+func (peb *PvtzEndpointBuilder) dedupValues(vals []PvtzValue) []PvtzValue {
 	valMap := make(map[string]PvtzValue)
 	for _, val := range vals {
 		valMap[val.Data] = val
