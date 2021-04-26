@@ -1,7 +1,7 @@
 #!/bin/bash
 
 ME=$(dirname "$0")
-WORKINGDIR=~/.nlc
+WORKINGDIR=~/.kube
 
 mkdir -p ${WORKINGDIR}
 
@@ -45,7 +45,7 @@ then
    ROUTE=" --configure-cloud-routes=false \
       --allocate-node-cidrs=false"
 else
-  ROUTE="      --route-reconciliation-period=30s \
+  ROUTE=" --route-reconciliation-period=30s \
       --configure-cloud-routes=true \
       --allocate-node-cidrs=true \
       --cluster-cidr=${POD_CIDR}"
@@ -53,15 +53,11 @@ fi
 cmd="./cloud-controller-manager \
       --kubeconfig=${WORKINGDIR}/config \
       --cloud-config=${WORKINGDIR}/cloud-config \
-      --leader-elect=true \
-      --cloud-provider=alicloud \
-      --use-service-account-credentials=true \
-      --v=3 \
-      --feature-gates=ServiceNodeExclusion=true \
-      --allow-untagged-cloud=true \
+      --enable-leader-select=true \
+      --loglevel=3 \
       ${ROUTE}
       "
 echo
-echo "通过以下启动命令运行NLC"
+echo "通过以下启动命令运行CCM"
 echo "${cmd}"
 echo

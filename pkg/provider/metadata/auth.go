@@ -26,9 +26,9 @@ import (
 	"time"
 
 	"github.com/aliyun/alibaba-cloud-sdk-go/services/ecs"
-	"github.com/aliyun/alibaba-cloud-sdk-go/services/ess"
-	"github.com/aliyun/alibaba-cloud-sdk-go/services/oos"
 	"github.com/aliyun/alibaba-cloud-sdk-go/services/pvtz"
+	"github.com/aliyun/alibaba-cloud-sdk-go/services/slb"
+	"github.com/aliyun/alibaba-cloud-sdk-go/services/vpc"
 	"github.com/ghodss/yaml"
 	"github.com/go-cmd/cmd"
 	log "github.com/sirupsen/logrus"
@@ -38,7 +38,7 @@ import (
 	"k8s.io/cloud-provider-alibaba-cloud/version"
 )
 
-var KUBERNETES_NODE_LIFE_CYCLE = "ack.nodelifecycle"
+var KUBERNETES_CLOUD_CONTROLLER_MANAGER = "ack.ccm"
 
 // TOKEN_RESYNC_PERIOD default Token sync period
 var TOKEN_RESYNC_PERIOD = 10 * time.Minute
@@ -49,8 +49,8 @@ type ClientAuth struct {
 
 	Meta IMetaData
 	ECS  *ecs.Client
-	OOS  *oos.Client
-	ESS  *ess.Client
+	VPC  *vpc.Client
+	SLB  *slb.Client
 	PVTZ *pvtz.Client
 }
 
@@ -66,22 +66,30 @@ func NewClientAuth() (*ClientAuth, error) {
 		region, "key", "secret", "",
 	)
 	if err != nil {
-		return nil, fmt.Errorf("initialize alibaba client: %s", err.Error())
+		return nil, fmt.Errorf("initialize alibaba ecs client: %s", err.Error())
 	}
-	ocli, err := oos.NewClientWithStsToken(
-		region, "key", "secret", "",
-	)
-	esscli, err := ess.NewClientWithStsToken(
-		region, "key", "secret", "",
-	)
+	vpcli, err := vpc.NewClientWithStsToken(
+		region, "key", "secret", "")
+	if err != nil {
+		return nil, fmt.Errorf("initialize alibaba vpc client: %s", err.Error())
+	}
+	slbcli, err := slb.NewClientWithStsToken(
+		region, "key", "secret", "")
+	if err != nil {
+		return nil, fmt.Errorf("initialize alibaba slb client: %s", err.Error())
+	}
 	pvtzcli, err := pvtz.NewClientWithStsToken(
 		region, "key", "secret", "",
 	)
+	if err != nil {
+		return nil, fmt.Errorf("initialize alibaba pvtz client: %s", err.Error())
+	}
+
 	auth := &ClientAuth{
-		ECS:  ecli,
-		OOS:  ocli,
 		Meta: meta,
-		ESS:  esscli,
+		ECS:  ecli,
+		VPC:  vpcli,
+		SLB:  slbcli,
 		PVTZ: pvtzcli,
 		stop: make(<-chan struct{}, 1),
 	}
@@ -181,24 +189,25 @@ func RefreshToken(mgr *ClientAuth, token *Token) error {
 		token.Region, token.AccessKey, token.AccessSecret, token.Token,
 	)
 	if err != nil {
-		return fmt.Errorf("init sts token config: %s", err.Error())
+		return fmt.Errorf("init ecs sts token config: %s", err.Error())
 	}
-	mgr.ECS.AppendUserAgent(KUBERNETES_NODE_LIFE_CYCLE, version.Version)
-	err = mgr.OOS.InitWithStsToken(
-		token.Region, token.AccessKey, token.AccessSecret, token.Token,
-	)
-	if err != nil {
-		return fmt.Errorf("init oos sts token config: %s", err.Error())
-	}
-	mgr.OOS.AppendUserAgent(KUBERNETES_NODE_LIFE_CYCLE, version.Version)
+	mgr.ECS.AppendUserAgent(KUBERNETES_CLOUD_CONTROLLER_MANAGER, version.Version)
 
-	err = mgr.ESS.InitWithStsToken(
+	err = mgr.VPC.InitWithStsToken(
 		token.Region, token.AccessKey, token.AccessSecret, token.Token,
 	)
 	if err != nil {
-		return fmt.Errorf("init ess sts token config: %s", err.Error())
+		return fmt.Errorf("init vpc sts token config: %s", err.Error())
 	}
-	mgr.ESS.AppendUserAgent(KUBERNETES_NODE_LIFE_CYCLE, version.Version)
+	mgr.VPC.AppendUserAgent(KUBERNETES_CLOUD_CONTROLLER_MANAGER, version.Version)
+
+	err = mgr.SLB.InitWithStsToken(
+		token.Region, token.AccessKey, token.AccessSecret, token.Token,
+	)
+	if err != nil {
+		return fmt.Errorf("init slb sts token config: %s", err.Error())
+	}
+	mgr.SLB.AppendUserAgent(KUBERNETES_CLOUD_CONTROLLER_MANAGER, version.Version)
 
 	err = mgr.PVTZ.InitWithStsToken(
 		token.Region, token.AccessKey, token.AccessSecret, token.Token,
@@ -206,9 +215,18 @@ func RefreshToken(mgr *ClientAuth, token *Token) error {
 	if err != nil {
 		return fmt.Errorf("init pvtz sts token config: %s", err.Error())
 	}
-	mgr.PVTZ.AppendUserAgent(KUBERNETES_NODE_LIFE_CYCLE, version.Version)
+	mgr.PVTZ.AppendUserAgent(KUBERNETES_CLOUD_CONTROLLER_MANAGER, version.Version)
 
+	// TODO revert me
+	//setVPCEndpoint(mgr)
 	return nil
+}
+
+func setVPCEndpoint(mgr *ClientAuth) {
+	mgr.ECS.Network = "vpc"
+	mgr.VPC.Network = "vpc"
+	mgr.SLB.Network = "vpc"
+	mgr.PVTZ.Network = "vpc"
 }
 
 // MetaData return MetaData client

@@ -5,6 +5,7 @@ import (
 	"github.com/aliyun/alibaba-cloud-sdk-go/services/ecs"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/context/node"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/model"
 )
 
 type DetailECS struct {
@@ -50,33 +51,8 @@ type Route interface {
 }
 
 type ILoadBalancer interface {
-	FindSLB(ctx context.Context, id string) ([]SLB, error)
-	ListSLB(ctx context.Context, slb SLB) ([]SLB, error)
-	CreateSLB(ctx context.Context, slb SLB) error
-	DeleteSLB(ctx context.Context, slb SLB) error
-}
-
-type SLB struct {
-	Id   string
-	Name string
-
-	Ports map[int]Port
-
-	Vgroup map[string]Vgroup
-}
-
-type Port struct {
-	Port        int
-	Description string
-}
-
-type Vgroup struct {
-	Gid         string
-	Description string
-	Servers     map[string]ECS
-}
-
-type ECS struct {
-	Id          string
-	Description string
+	FindSLB(ctx context.Context, id string) ([]model.LoadBalancer, error)
+	ListSLB(ctx context.Context, slb model.LoadBalancer) ([]model.LoadBalancer, error)
+	CreateSLB(ctx context.Context, slb *model.LoadBalancer) (*model.LoadBalancer, error)
+	DeleteSLB(ctx context.Context, slb model.LoadBalancer) error
 }

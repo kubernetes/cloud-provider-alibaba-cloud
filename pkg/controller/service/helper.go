@@ -3,60 +3,11 @@ package service
 import (
 	"fmt"
 	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/klog"
 	"strings"
 )
-
-const (
-	// AnnotationPrefix prefix of service annotation
-	AnnotationPrefix = "service.beta.kubernetes.io/alibaba-cloud"
-
-	// AnnotationLegacyPrefix legacy prefix of service annotation
-	AnnotationLegacyPrefix = "service.beta.kubernetes.io/alicloud"
-
-	// parameters
-	AddressType  = "address-type"
-	BackendLabel = "backend-label"
-)
-
-var DefaultValue = map[string]string{
-	composite(AnnotationPrefix, AddressType): string("internet"),
-}
-
-type AnnotationRequest struct{ svc *v1.Service }
-
-// Get(AddressType)
-func (n *AnnotationRequest) Get(k string) string {
-	if n.svc == nil {
-		klog.Infof("extract annotation %s from empty service", k)
-		return ""
-	}
-	if n.svc.Annotations == nil {
-		return ""
-	}
-	key := composite(AnnotationPrefix, k)
-	v, ok := n.svc.Annotations[key]
-	if ok {
-		//
-		return v
-	}
-	// todo: fix legacy key.  address-type to AddressType
-	lkey := composite(AnnotationLegacyPrefix, k)
-	v, ok = n.svc.Annotations[lkey]
-	if ok {
-		//
-		return v
-	}
-	// return default
-	return DefaultValue[key]
-}
-
-/*
-	some help functions
-*/
-func composite(p, k string) string {
-	return fmt.Sprintf("%s-%s", p, k)
-}
 
 func filterOutByLabel(nodes []v1.Node, labels string) ([]v1.Node, error) {
 	if labels == "" {
@@ -110,4 +61,26 @@ func IsENIBackendType(svc *v1.Service) bool {
 func isSLBNeeded(svc *v1.Service) bool {
 	// finalizer must be supported
 	return svc.DeletionTimestamp == nil && svc.Spec.Type == v1.ServiceTypeLoadBalancer
+}
+
+func NamespacedName(obj metav1.Object) types.NamespacedName {
+	return types.NamespacedName{
+		Namespace: obj.GetNamespace(),
+		Name:      obj.GetName(),
+	}
+}
+
+func GetLoadBalancerName(service *v1.Service) string {
+	//GCE requires that the name of a load balancer starts with a lower case letter.
+	ret := "a" + string(service.UID)
+	ret = strings.Replace(ret, "-", "", -1)
+	//AWS requires that the name of a load balancer is shorter than 32 bytes.
+	if len(ret) > 32 {
+		ret = ret[:32]
+	}
+	return ret
+}
+
+func NeedLoadBalancer(service *v1.Service) bool {
+	return service.Spec.Type == v1.ServiceTypeLoadBalancer
 }

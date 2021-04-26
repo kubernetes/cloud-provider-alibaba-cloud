@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 	log "github.com/sirupsen/logrus"
-	corev1 "k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
@@ -15,6 +15,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
+	"sync"
 )
 
 func Add(mgr manager.Manager, ctx *shared.SharedContext) error {
@@ -27,7 +28,7 @@ func newReconciler(mgr manager.Manager, ctx *shared.SharedContext) reconcile.Rec
 		cloud:  ctx.Provider(),
 		client: mgr.GetClient(),
 		scheme: mgr.GetScheme(),
-		record: mgr.GetEventRecorderFor("NodePool"),
+		record: mgr.GetEventRecorderFor("service-controller"),
 	}
 	return recon
 }
@@ -46,14 +47,19 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		return err
 	}
 	hand := NewMapHandler()
-	ki := []*source.Kind{
-		{Type: &corev1.Service{}}, {Type: &corev1.Endpoints{}}, {Type: &corev1.Node{}},
+	if err := c.Watch(&source.Kind{Type: &v1.Service{}}, hand,
+		NewPredicateForServiceEvent(mgr.GetEventRecorderFor("service-controller"))); err != nil {
+		return fmt.Errorf("watch resource svc error: %s", err.Error())
 	}
-	for i := range ki {
-		err = c.Watch(ki[i], hand)
-		if err != nil {
-			return fmt.Errorf("watch resource: %s, %s", ki[i].Type, err.Error())
-		}
+
+	if err := c.Watch(&source.Kind{Type: &v1.Endpoints{}}, hand,
+		NewPredicateForEndpointEvent(mgr.GetClient())); err != nil {
+		return fmt.Errorf("watch resource endpoint error: %s", err.Error())
+	}
+
+	if err := c.Watch(&source.Kind{Type: &v1.Node{}}, hand,
+		NewPredicateForNodeEvent(mgr.GetEventRecorderFor("service-controller"))); err != nil {
+		return fmt.Errorf("watch resource node error: %s", err.Error())
 	}
 	return nil
 }
@@ -69,12 +75,13 @@ type ReconcileService struct {
 
 	//record event recorder
 	record record.EventRecorder
+	cache  sync.Map
 }
 
 func (m *ReconcileService) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
 	rlog := log.WithFields(log.Fields{"Service": request.NamespacedName})
 
-	svc := &corev1.Service{}
+	svc := &v1.Service{}
 	err := m.client.Get(context.TODO(), request.NamespacedName, svc)
 	if err != nil {
 		if errors.IsNotFound(err) {
