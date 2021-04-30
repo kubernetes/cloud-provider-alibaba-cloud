@@ -11,7 +11,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	nctx "k8s.io/cloud-provider-alibaba-cloud/pkg/context/node"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/context/shared"
-	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/tools"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/helper"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -151,7 +151,7 @@ func (m *ReconcileNode) doAddCloudNode(node *corev1.Node) error {
 			setFields(nins, instance, m.configCloudRoute)
 			return nins, nil
 		}
-		err = tools.PatchM(m.client, node, diff, tools.PatchAll)
+		err = helper.PatchM(m.client, node, diff, helper.PatchAll)
 		if err != nil {
 			log.Errorf("patch node: %s", err.Error())
 			return false, nil
@@ -228,7 +228,7 @@ func (m *ReconcileNode) syncNodeAddress(nodes []corev1.Node) error {
 			nins.Status.Addresses = cloudNode.Addresses
 			return nins, nil
 		}
-		err := tools.PatchM(m.client, node, diff, tools.PatchStatus)
+		err := helper.PatchM(m.client, node, diff, helper.PatchStatus)
 		if err != nil {
 			log.Errorf("wait for next retry, patch node address error: %s", err.Error())
 			m.record.Eventf(

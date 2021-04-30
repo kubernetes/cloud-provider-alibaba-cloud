@@ -2,6 +2,7 @@ package model
 
 import (
 	"github.com/aliyun/alibaba-cloud-sdk-go/services/slb"
+	"k8s.io/apimachinery/pkg/types"
 )
 
 type AddressType string
@@ -66,15 +67,16 @@ const (
 
 // LoadBalancer represents a AlibabaCloud LoadBalancer.
 type LoadBalancer struct {
+	NamespacedName        types.NamespacedName
 	LoadBalancerAttribute LoadBalancerAttribute
 	Listeners             []ListenerAttribute
 	Backends              []BackendAttribute
 }
 
 type LoadBalancerAttribute struct {
+	IsUserManaged bool
+
 	// values can be modified by annotation
-	// reused load balancer id
-	RefLoadBalancerId            *string
 	LoadBalancerName             *string
 	AddressType                  *string
 	VSwitchId                    *string
@@ -102,7 +104,7 @@ type LoadBalancerAttribute struct {
 
 type ListenerAttribute struct {
 	IsUserManaged bool
-	//
+	// values can be modified by annotation
 	LoadBalancerId            string
 	ListenerPort              int
 	BackendServerPort         int
@@ -120,6 +122,7 @@ type ListenerAttribute struct {
 	HealthCheckInterval       int
 	HealthCheckHttpCode       string
 
+	// values are immutable
 	VServerGroup   FlagType
 	VServerGroupId string
 	Description    string

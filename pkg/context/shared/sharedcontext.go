@@ -19,11 +19,11 @@ const (
 
 type SharedContext struct{ base.Context }
 
-// Node
+// Provider
 func (c *SharedContext) Provider() prvd.Provider {
-	node, ok := c.Value(Provider)
+	provider, ok := c.Value(Provider)
 	if !ok {
 		return nil
 	}
-	return node.(prvd.Provider)
+	return provider.(prvd.Provider)
 }

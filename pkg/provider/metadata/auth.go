@@ -60,6 +60,8 @@ func NewClientAuth() (*ClientAuth, error) {
 	// ctx2.CFG.Region might be nil,
 	// but it is ok to have empty value.
 	// because region will be filled in the next token refresh
+
+	// TODO FIX ME
 	region := ctx2.CFG.Global.Region
 	log.Infof("new provider in region: [%s]", region)
 	ecli, err := ecs.NewClientWithStsToken(

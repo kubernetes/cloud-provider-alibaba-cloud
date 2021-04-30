@@ -6,6 +6,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/util"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/util/hash"
 	"k8s.io/klog"
 	"reflect"
@@ -147,7 +148,7 @@ func getPreHash(o map[string]string) string {
 	return o[hash.ReconcileHashLable]
 }
 
-// PredicateForServiceEvent
+// PredicateForServiceEvent, filter service event
 func NewPredicateForServiceEvent(eventRecorder record.EventRecorder) *predicateForServiceEvent {
 	return &predicateForServiceEvent{eventRecorder: eventRecorder}
 }
@@ -187,12 +188,12 @@ func (p *predicateForServiceEvent) Generic(event.GenericEvent) bool {
 }
 
 func needUpdate(oldSvc, newSvc *v1.Service, recorder record.EventRecorder) bool {
-	if !NeedLoadBalancer(oldSvc) && !NeedLoadBalancer(newSvc) {
+	if !needLoadBalancer(oldSvc) && !needLoadBalancer(newSvc) {
 		return false
 	}
 
-	if NeedLoadBalancer(oldSvc) != NeedLoadBalancer(newSvc) {
-		klog.Infof("%s type changed: %s -> %s", NamespacedName(oldSvc).String(), oldSvc.Spec.Type, newSvc.Spec.Type)
+	if needLoadBalancer(oldSvc) != needLoadBalancer(newSvc) {
+		klog.Infof("%s type changed: %s -> %s", util.NamespacedName(oldSvc).String(), oldSvc.Spec.Type, newSvc.Spec.Type)
 		recorder.Eventf(
 			newSvc,
 			v1.EventTypeNormal,
@@ -246,7 +247,7 @@ func needUpdate(oldSvc, newSvc *v1.Service, recorder record.EventRecorder) bool 
 }
 
 func needAdd(newService *v1.Service) bool {
-	if NeedLoadBalancer(newService) {
+	if needLoadBalancer(newService) {
 		return true
 	}
 
@@ -254,13 +255,13 @@ func needAdd(newService *v1.Service) bool {
 	_, ok := newService.Labels[LabelServiceHash]
 	if ok {
 		klog.Infof("service %s has hash label, which may was LoadBalancer",
-			NamespacedName(newService).String())
+			util.NamespacedName(newService).String())
 		return true
 	}
 	return false
 }
 
-// PredicateForEndpointEvent
+// PredicateForEndpointEvent, filter endpoint event
 func NewPredicateForEndpointEvent(client client.Client) *predicateForEndpointEvent {
 	return &predicateForEndpointEvent{client}
 }
@@ -274,7 +275,7 @@ var _ predicate.Predicate = (*predicateForEndpointEvent)(nil)
 func (p *predicateForEndpointEvent) Create(e event.CreateEvent) bool {
 	ep, ok := e.Object.(*v1.Endpoints)
 	if ok && isEndpointProcessNeeded(ep, p.client) {
-		klog.Infof("controller: %s endpoint create event", NamespacedName(ep).String())
+		klog.Infof("controller: %s endpoint create event", util.NamespacedName(ep).String())
 		return true
 	}
 	return false
@@ -288,7 +289,7 @@ func (p *predicateForEndpointEvent) Update(e event.UpdateEvent) bool {
 		isEndpointProcessNeeded(ep1, p.client) &&
 		!reflect.DeepEqual(ep1.Subsets, ep2.Subsets) {
 		klog.Infof("controller: %s endpoint update event, before [%v], after [%v]",
-			NamespacedName(ep1).String(), ep1.Subsets, ep2.Subsets)
+			util.NamespacedName(ep1).String(), ep1.Subsets, ep2.Subsets)
 		return true
 	}
 	return false
@@ -327,7 +328,7 @@ func isEndpointProcessNeeded(ep *v1.Endpoints, client client.Client) bool {
 		klog.Infof("endpoint: class not empty, skip process ")
 		return false
 	}
-	if !NeedLoadBalancer(svc) {
+	if !needLoadBalancer(svc) {
 		// we are safe here to skip process syncEnpoint.
 		klog.V(5).Infof("endpoint change: loadBalancer is not needed, skip")
 		return false
@@ -335,7 +336,7 @@ func isEndpointProcessNeeded(ep *v1.Endpoints, client client.Client) bool {
 	return true
 }
 
-// PredicateForNodeEvent
+// PredicateForNodeEvent, filter node event
 func NewPredicateForNodeEvent(record record.EventRecorder) *predicateForNodeEvent {
 	return &predicateForNodeEvent{eventRecorder: record}
 }

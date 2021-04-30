@@ -4,15 +4,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/aliyun/alibaba-cloud-sdk-go/sdk/requests"
-	v1 "k8s.io/api/core/v1"
-	"k8s.io/cloud-provider-alibaba-cloud/pkg/context/node"
-	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/metadata"
-	"strings"
-	"time"
-
 	"github.com/aliyun/alibaba-cloud-sdk-go/services/ecs"
 	log "github.com/sirupsen/logrus"
+	v1 "k8s.io/api/core/v1"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/context/node"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/metadata"
+	"strings"
 )
 
 /*
@@ -103,23 +101,13 @@ func (e *EcsProvider) SetInstanceTags(
 	return err
 }
 
-func (e *EcsProvider) DetailECS(ctx *node.NodeContext) (*prvd.DetailECS, error) {
-	return nil, nil
-}
+func (e *EcsProvider) DescribeNetworkInterfaces(vpcId string, ips *[]string) (*ecs.DescribeNetworkInterfacesResponse, error) {
+	req := ecs.CreateDescribeNetworkInterfacesRequest()
+	req.VpcId = vpcId
+	req.PrivateIpAddress = ips
+	req.PageSize = requests.Integer(100)
 
-func (e *EcsProvider) ReplaceSystemDisk(ctx *node.NodeContext) error {
-	return nil
-}
-
-func (e *EcsProvider) DestroyECS(ctx *node.NodeContext) error {
-	return nil
-}
-func (e *EcsProvider) RestartECS(ctx *node.NodeContext) error { return nil }
-func (e *EcsProvider) RunCommand(
-	ctx *node.NodeContext, command string,
-) (*ecs.Invocation, error) {
-
-	return nil, nil
+	return e.auth.ECS.DescribeNetworkInterfaces(req)
 }
 
 const (
@@ -131,37 +119,6 @@ const (
 	InstanceDefaultTimeout = 120
 	DefaultWaitForInterval = 5
 )
-
-func Wait4Instance(
-	client *ecs.Client,
-	id, status string,
-	timeout int,
-) error {
-	if timeout <= 0 {
-		timeout = InstanceDefaultTimeout
-	}
-	req := ecs.CreateDescribeInstanceAttributeRequest()
-	req.InstanceId = id
-	for {
-		instance, err := client.DescribeInstanceAttribute(req)
-		if err != nil {
-			return err
-		}
-		if instance.Status == status {
-			//TODO
-			//Sleep one more time for timing issues
-			time.Sleep(DefaultWaitForInterval * time.Second)
-			break
-		}
-		timeout = timeout - DefaultWaitForInterval
-		if timeout <= 0 {
-			return fmt.Errorf("timeout waiting %s %s", id, status)
-		}
-		time.Sleep(DefaultWaitForInterval * time.Second)
-
-	}
-	return nil
-}
 
 // providerID
 // 1) the id of the instance in the alicloud API. Use '.' to separate providerID which looks like 'cn-hangzhou.i-v98dklsmnxkkgiiil7'. The format of "REGION.NODEID"

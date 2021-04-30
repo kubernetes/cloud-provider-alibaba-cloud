@@ -2,9 +2,12 @@ package service
 
 import (
 	"fmt"
+	"github.com/aliyun/alibaba-cloud-sdk-go/services/slb"
 	v1 "k8s.io/api/core/v1"
+	ctx2 "k8s.io/cloud-provider-alibaba-cloud/pkg/context"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/model"
 	"k8s.io/klog"
+	"strings"
 )
 
 // prefix
@@ -13,6 +16,11 @@ const (
 	AnnotationLegacyPrefix = "service.beta.kubernetes.io/alicloud"
 	// AnnotationPrefix prefix of service annotation
 	AnnotationPrefix = "service.beta.kubernetes.io/alibaba-cloud"
+)
+
+const (
+	TAGKEY = "kubernetes.do.not.delete"
+	ACKKEY = "ack.aliyun.com"
 )
 
 // load balancer annotations
@@ -132,7 +140,7 @@ var DefaultValue = map[string]string{
 	composite(AnnotationPrefix, Spec):                   model.S1Small,
 	composite(AnnotationPrefix, IPVersion):              string(model.IPv4),
 	composite(AnnotationPrefix, DeleteProtection):       string(model.OnFlag),
-	composite(AnnotationPrefix, ModificationProtection): string(model.OnFlag),
+	composite(AnnotationPrefix, ModificationProtection): string(model.ConsoleProtection),
 }
 
 type AnnotationRequest struct{ svc *v1.Service }
@@ -168,6 +176,30 @@ func (n *AnnotationRequest) GetRaw(k string) string {
 
 func (n *AnnotationRequest) GetDefaultValue(k string) string {
 	return DefaultValue[composite(AnnotationPrefix, k)]
+}
+
+func (n *AnnotationRequest) GetDefaultTags() []slb.Tag {
+	return []slb.Tag{
+		{
+			TagKey:   TAGKEY,
+			TagValue: n.GetDefaultValue(LoadBalancerName),
+		},
+		{
+			TagKey:   ACKKEY,
+			TagValue: ctx2.CFG.Global.ClusterID,
+		},
+	}
+}
+
+func (n *AnnotationRequest) GetDefaultLoadBalancerName() string {
+	//GCE requires that the name of a load balancer starts with a lower case letter.
+	ret := "a" + string(n.svc.UID)
+	ret = strings.Replace(ret, "-", "", -1)
+	//AWS requires that the name of a load balancer is shorter than 32 bytes.
+	if len(ret) > 32 {
+		ret = ret[:32]
+	}
+	return ret
 }
 
 func composite(p, k string) string {
