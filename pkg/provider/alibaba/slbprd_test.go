@@ -1,9 +1,9 @@
 package alibaba
 
 import (
+	"github.com/aliyun/alibaba-cloud-sdk-go/sdk/requests"
 	"github.com/aliyun/alibaba-cloud-sdk-go/sdk/utils"
 	"github.com/aliyun/alibaba-cloud-sdk-go/services/slb"
-	"k8s.io/klog"
 	"testing"
 )
 
@@ -40,8 +40,19 @@ func TestProviderSLB_DeleteSLB(t *testing.T) {
 	}
 }
 
-func TestNewLBProvider(t *testing.T) {
-	var p *string
-	p = nil
-	klog.Info(*p)
+func TestProviderSLB_DescribeLoadBalancerListeners(t *testing.T) {
+	client, err := slb.NewClientWithAccessKey("cn-hangzhou",
+		"key", "secret")
+	if err != nil {
+		t.Fatalf(err.Error())
+	}
+
+	req := slb.CreateDescribeLoadBalancerTCPListenerAttributeRequest()
+	req.LoadBalancerId = "lb-xxxx"
+	req.ListenerPort = requests.NewInteger(80)
+	resp, err := client.DescribeLoadBalancerTCPListenerAttribute(req)
+	if err != nil {
+		t.Fatalf("DescribeLoadBalancerTCPListenerAttribute error: %s", err.Error())
+	}
+	t.Logf("%v", resp)
 }

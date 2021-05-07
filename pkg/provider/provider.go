@@ -46,4 +46,8 @@ type ILoadBalancer interface {
 	FindSLB(ctx context.Context, slb *model.LoadBalancer) (bool, *model.LoadBalancer, error)
 	CreateSLB(ctx context.Context, slb *model.LoadBalancer) (*model.LoadBalancer, error)
 	DeleteSLB(ctx context.Context, slb *model.LoadBalancer) error
+	// Listener
+	DescribeLoadBalancerListeners(ctx context.Context, slb *model.LoadBalancer) (*model.LoadBalancer, error)
+	CreateLoadBalancerTCPListener(ctx context.Context, port *model.ListenerAttribute) error
+	StartLoadBalancerListener(ctx context.Context, loadBalancerId string, port int) (err error)
 }

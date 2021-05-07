@@ -70,22 +70,29 @@ func NewClientAuth() (*ClientAuth, error) {
 	if err != nil {
 		return nil, fmt.Errorf("initialize alibaba ecs client: %s", err.Error())
 	}
+	ecli.AppendUserAgent(KUBERNETES_CLOUD_CONTROLLER_MANAGER, version.Version)
+
 	vpcli, err := vpc.NewClientWithStsToken(
 		region, "key", "secret", "")
 	if err != nil {
 		return nil, fmt.Errorf("initialize alibaba vpc client: %s", err.Error())
 	}
+	vpcli.AppendUserAgent(KUBERNETES_CLOUD_CONTROLLER_MANAGER, version.Version)
+
 	slbcli, err := slb.NewClientWithStsToken(
 		region, "key", "secret", "")
 	if err != nil {
 		return nil, fmt.Errorf("initialize alibaba slb client: %s", err.Error())
 	}
+	slbcli.AppendUserAgent(KUBERNETES_CLOUD_CONTROLLER_MANAGER, version.Version)
+
 	pvtzcli, err := pvtz.NewClientWithStsToken(
 		region, "key", "secret", "",
 	)
 	if err != nil {
 		return nil, fmt.Errorf("initialize alibaba pvtz client: %s", err.Error())
 	}
+	pvtzcli.AppendUserAgent(KUBERNETES_CLOUD_CONTROLLER_MANAGER, version.Version)
 
 	auth := &ClientAuth{
 		Meta: meta,
@@ -193,7 +200,6 @@ func RefreshToken(mgr *ClientAuth, token *Token) error {
 	if err != nil {
 		return fmt.Errorf("init ecs sts token config: %s", err.Error())
 	}
-	mgr.ECS.AppendUserAgent(KUBERNETES_CLOUD_CONTROLLER_MANAGER, version.Version)
 
 	err = mgr.VPC.InitWithStsToken(
 		token.Region, token.AccessKey, token.AccessSecret, token.Token,
@@ -201,7 +207,6 @@ func RefreshToken(mgr *ClientAuth, token *Token) error {
 	if err != nil {
 		return fmt.Errorf("init vpc sts token config: %s", err.Error())
 	}
-	mgr.VPC.AppendUserAgent(KUBERNETES_CLOUD_CONTROLLER_MANAGER, version.Version)
 
 	err = mgr.SLB.InitWithStsToken(
 		token.Region, token.AccessKey, token.AccessSecret, token.Token,
@@ -209,7 +214,6 @@ func RefreshToken(mgr *ClientAuth, token *Token) error {
 	if err != nil {
 		return fmt.Errorf("init slb sts token config: %s", err.Error())
 	}
-	mgr.SLB.AppendUserAgent(KUBERNETES_CLOUD_CONTROLLER_MANAGER, version.Version)
 
 	err = mgr.PVTZ.InitWithStsToken(
 		token.Region, token.AccessKey, token.AccessSecret, token.Token,
@@ -217,7 +221,6 @@ func RefreshToken(mgr *ClientAuth, token *Token) error {
 	if err != nil {
 		return fmt.Errorf("init pvtz sts token config: %s", err.Error())
 	}
-	mgr.PVTZ.AppendUserAgent(KUBERNETES_CLOUD_CONTROLLER_MANAGER, version.Version)
 
 	// TODO revert me
 	//setVPCEndpoint(mgr)

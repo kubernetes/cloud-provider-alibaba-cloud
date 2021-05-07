@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/aliyun/alibaba-cloud-sdk-go/services/slb"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	ctx2 "k8s.io/cloud-provider-alibaba-cloud/pkg/context"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/model"
 	prvd "k8s.io/cloud-provider-alibaba-cloud/pkg/provider"
@@ -46,9 +47,10 @@ func (c clusterModelBuilder) Build() (*model.LoadBalancer, error) {
 	//if err := c.buildBackend(lbMdl); err != nil {
 	//	return nil, fmt.Errorf("build slb backend error: %s", err.Error())
 	//}
-	//if err := c.buildListener(lbMdl); err != nil {
-	//	return nil, fmt.Errorf("build slb listener error: %s", err.Error())
-	//}
+	if err := c.buildListener(lbMdl); err != nil {
+		return nil, fmt.Errorf("build slb listener error: %s", err.Error())
+	}
+	klog.Infof("cluster build: %v", lbMdl.Listeners)
 	return lbMdl, nil
 }
 
@@ -244,13 +246,26 @@ func (c clusterModelBuilder) buildFunc(backend *[]model.BackendAttribute) func(o
 }
 
 func (c clusterModelBuilder) buildListener(mdl *model.LoadBalancer) error {
+	updateListenerByAnno(c, mdl)
 	for _, port := range c.svc.Spec.Ports {
 		listener := model.ListenerAttribute{
+			Protocol:     string(port.Protocol),
 			ListenerPort: int(port.Port),
+			VGroup: model.VServerGroup{
+				// TODO new func
+				VGroupName: fmt.Sprintf("%s/%d/%s/%s/%s", "k8s", port.Port, c.svc.Name, c.svc.Namespace, "clusterid"),
+				// TODO remove me, just for test
+				VGroupId: "rsp-bp1c1bw0yw3hi",
+			},
 		}
 		mdl.Listeners = append(mdl.Listeners, listener)
 	}
 	return nil
+}
+
+func updateListenerByAnno(c clusterModelBuilder, mdl *model.LoadBalancer) {
+	// TODO
+	//proto, err := Protocol(serviceAnnotation(svc, ServiceAnnotationLoadBalancerProtocolPort), port)
 }
 
 // NewCloudModelBuilder construct a new defaultModelBuilder
@@ -281,7 +296,10 @@ func (c cloudModelBuilder) Build() (*model.LoadBalancer, error) {
 		return nil, fmt.Errorf("can not get load balancer attribute from cloud, error: %s", err.Error())
 	}
 	//buildBackend(svc, lb)
-	//buildListener(svc, lb)
+	lb, err = c.buildListener(lb)
+	if err != nil {
+		return nil, fmt.Errorf("can not build listener attribute from cloud, error: %s", err.Error())
+	}
 	return lb, nil
 }
 
@@ -302,4 +320,23 @@ func (c cloudModelBuilder) buildLoadBalancerAttribute(lb *model.LoadBalancer) (b
 		},
 	}
 	return c.cloud.FindSLB(c.ctx, lb)
+}
+
+func (c cloudModelBuilder) buildListener(mdl *model.LoadBalancer) (*model.LoadBalancer, error) {
+
+	return c.cloud.DescribeLoadBalancerListeners(c.ctx, mdl)
+}
+
+func genVGroupPortName(servicePort v1.ServicePort, isENI bool) string {
+	if isENI {
+		switch servicePort.TargetPort.Type {
+		case intstr.Int:
+			return fmt.Sprintf("%d", servicePort.TargetPort.IntValue())
+		case intstr.String:
+			return servicePort.TargetPort.StrVal
+		}
+	} else {
+		return fmt.Sprintf("%d", servicePort.NodePort)
+	}
+	return ""
 }

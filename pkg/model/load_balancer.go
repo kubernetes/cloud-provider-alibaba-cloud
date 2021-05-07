@@ -65,6 +65,9 @@ const (
 	ServerStickySessionType = StickySessionType("server")
 )
 
+// DEFAULT_LISTENER_BANDWIDTH default listener bandwidth
+var DEFAULT_LISTENER_BANDWIDTH = -1
+
 // LoadBalancer represents a AlibabaCloud LoadBalancer.
 type LoadBalancer struct {
 	NamespacedName        types.NamespacedName
@@ -104,13 +107,17 @@ type LoadBalancerAttribute struct {
 
 type ListenerAttribute struct {
 	IsUserManaged bool
+
 	// values can be modified by annotation
-	LoadBalancerId            string
-	ListenerPort              int
-	BackendServerPort         int
-	Bandwidth                 int
-	Scheduler                 string
-	PersistenceTimeout        int
+	LoadBalancerId string
+	Description    string
+	ListenerPort   int
+	Protocol       string
+
+	Bandwidth          int
+	Scheduler          string
+	PersistenceTimeout int
+	// health check
 	HealthCheck               FlagType
 	HealthCheckType           string
 	HealthCheckDomain         string
@@ -121,11 +128,21 @@ type ListenerAttribute struct {
 	HealthCheckConnectTimeout int
 	HealthCheckInterval       int
 	HealthCheckHttpCode       string
+	// ACL
+	AclId     string
+	AclType   string
+	AclStatus string
+	// connection drain
+	ConnectionDrain        string
+	ConnectionDrainTimeout int
 
-	// values are immutable
-	VServerGroup   FlagType
-	VServerGroupId string
-	Description    string
+	VGroup VServerGroup
+}
+
+type VServerGroup struct {
+	VGroupId   string
+	VGroupName string
+	Backends   []BackendAttribute
 }
 
 type BackendAttribute struct {

@@ -175,3 +175,61 @@ func (p ProviderSLB) DeleteSLB(ctx context.Context, mdl *model.LoadBalancer) err
 	_, err := p.auth.SLB.DeleteLoadBalancer(request)
 	return err
 }
+
+// TODO
+func (p ProviderSLB) DescribeLoadBalancerListeners(ctx context.Context, mdl *model.LoadBalancer) (*model.LoadBalancer, error) {
+	req := slb.CreateDescribeLoadBalancerTCPListenerAttributeRequest()
+	req.LoadBalancerId = mdl.LoadBalancerAttribute.LoadBalancerId
+	// FOR test
+	req.ListenerPort = requests.NewInteger(80)
+	resp, err := p.auth.SLB.DescribeLoadBalancerTCPListenerAttribute(req)
+	if err != nil {
+		return nil, err
+	}
+	mdl.Listeners = append(mdl.Listeners, model.ListenerAttribute{
+		Description:               resp.Description,
+		ListenerPort:              resp.ListenerPort,
+		Protocol:                  "TCP",
+		Bandwidth:                 resp.Bandwidth,
+		Scheduler:                 resp.Scheduler,
+		PersistenceTimeout:        resp.PersistenceTimeout,
+		HealthCheck:               model.FlagType(resp.HealthCheck),
+		HealthCheckType:           resp.HealthCheckType,
+		HealthCheckDomain:         resp.HealthCheckDomain,
+		HealthCheckURI:            resp.HealthCheckURI,
+		HealthCheckConnectPort:    resp.HealthCheckConnectPort,
+		HealthyThreshold:          resp.HealthyThreshold,
+		UnhealthyThreshold:        resp.UnhealthyThreshold,
+		HealthCheckConnectTimeout: resp.HealthCheckConnectPort,
+		HealthCheckInterval:       resp.HealthCheckInterval,
+		HealthCheckHttpCode:       resp.HealthCheckHttpCode,
+		VGroup: model.VServerGroup{
+			VGroupId: resp.VServerGroupId,
+		},
+	})
+	return mdl, nil
+}
+
+func (p ProviderSLB) CreateLoadBalancerTCPListener(ctx context.Context, port *model.ListenerAttribute) error {
+	req := slb.CreateCreateLoadBalancerTCPListenerRequest()
+	setCreateTCPListenerReqFromModel(req, port)
+	_, err := p.auth.SLB.CreateLoadBalancerTCPListener(req)
+	return err
+}
+
+func setCreateTCPListenerReqFromModel(req *slb.CreateLoadBalancerTCPListenerRequest, port *model.ListenerAttribute) {
+	req.LoadBalancerId = port.LoadBalancerId
+	req.ListenerPort = requests.NewInteger(port.ListenerPort)
+	req.Bandwidth = requests.NewInteger(model.DEFAULT_LISTENER_BANDWIDTH)
+	req.VServerGroupId = port.VGroup.VGroupId
+	// TODO
+
+}
+
+func (p ProviderSLB) StartLoadBalancerListener(ctx context.Context, loadBalancerId string, port int) error {
+	req := slb.CreateStartLoadBalancerListenerRequest()
+	req.LoadBalancerId = loadBalancerId
+	req.ListenerPort = requests.NewInteger(port)
+	_, err := p.auth.SLB.StartLoadBalancerListener(req)
+	return err
+}
