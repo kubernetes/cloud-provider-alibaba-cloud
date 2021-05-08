@@ -3,6 +3,7 @@ package pvtz
 import (
 	"context"
 	"fmt"
+	"github.com/orcaman/concurrent-map"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -10,6 +11,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/context/shared"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider"
+
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
@@ -77,6 +79,12 @@ type ServiceReconciler struct {
 
 	//record event recorder
 	record record.EventRecorder
+}
+
+var svcCache = newCache()
+func newCache() cmap.ConcurrentMap {
+	c := cmap.New()
+	return c
 }
 
 func (m *ServiceReconciler) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {

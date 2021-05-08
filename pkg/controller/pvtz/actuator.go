@@ -57,11 +57,35 @@ func (a *Actuator) UpdateService(svc *corev1.Service) error {
 }
 
 func (a *Actuator) DeleteService(svcName types.NamespacedName) error {
-	ep := &prvd.PvtzEndpoint{
-		Rr:  serviceRrByName(svcName),
-		Ttl: ctx2.CFG.Global.PrivateZoneRecordTTL,
+	if rrs, exist := svcCache.Get(serviceRrByName(svcName)); exist {
+		errs := make([]error, 0)
+		s := strings.Split(rrs.(string), ",")
+		for i, rr := range s {
+			ep := &prvd.PvtzEndpoint{
+				Rr:  rr,
+				Ttl: ctx2.CFG.Global.PrivateZoneRecordTTL,
+			}
+			err := a.provider.DeletePVTZ(context.TODO(), ep)
+			if err != nil {
+				log.Printf("Delete pvtz error %s", err.Error())
+				errs = append(errs, err)
+			} else {
+				s = append(s[:i], s[i+1:]...)
+			}
+		}
+		if len(s) > 0 {
+			svcCache.Set(serviceRrByName(svcName), s)
+		} else {
+			svcCache.Remove(serviceRrByName(svcName))
+		}
+		return errors.Wrap(util_errors.NewAggregate(errs), "DeleteService error")
+	} else {
+		ep := &prvd.PvtzEndpoint{
+			Rr:  serviceRrByName(svcName),
+			Ttl: ctx2.CFG.Global.PrivateZoneRecordTTL,
+		}
+		return a.provider.DeletePVTZ(context.TODO(), ep)
 	}
-	return a.provider.DeletePVTZ(context.TODO(), ep)
 }
 
 func (a *Actuator) getEndpoints(epName types.NamespacedName) (*corev1.Endpoints, error) {
@@ -172,6 +196,7 @@ func (a *Actuator) desiredSRV(svc *corev1.Service) ([]*prvd.PvtzEndpoint, error)
 	namedPortmap := NewNamedPortMap(rawEps)
 
 	eps := make([]*prvd.PvtzEndpoint, 0)
+	rrs := make([]string, 0)
 	epTemplate := prvd.NewPvtzEndpointBuilder()
 	epTemplate.WithTtl(ctx2.CFG.Global.PrivateZoneRecordTTL)
 	epTemplate.WithType(prvd.RecordTypeSRV)
@@ -191,10 +216,13 @@ func (a *Actuator) desiredSRV(svc *corev1.Service) ([]*prvd.PvtzEndpoint, error)
 			continue
 		}
 		epb := epTemplate.DeepCopy()
-		epb.WithRr(strings.ToLower(fmt.Sprintf("_%s._%s.%s.%s.svc", servicePort.Name, servicePort.Protocol, svcName, ns)))
+		rr := strings.ToLower(fmt.Sprintf("_%s._%s.%s.%s.svc", servicePort.Name, servicePort.Protocol, svcName, ns))
+		epb.WithRr(rr)
 		epb.WithValueData(strings.ToLower(fmt.Sprintf("0 100 %d %s.%s.svc", targetPort, svcName, ns)))
+		rrs = append(rrs, rr)
 		eps = append(eps, epb.Build())
 	}
+	svcCache.Set(serviceRr(svc), rrs)
 	return eps, nil
 }
 
@@ -203,13 +231,16 @@ func (a *Actuator) desiredPTR(svc *corev1.Service) ([]*prvd.PvtzEndpoint, error)
 	epb.WithTtl(ctx2.CFG.Global.PrivateZoneRecordTTL)
 	epb.WithType(prvd.RecordTypePTR)
 	epb.WithValueData(serviceRr(svc))
+	rrs := make([]string, 0)
 	switch svc.Spec.Type {
 	case corev1.ServiceTypeLoadBalancer:
 		for _, ingress := range svc.Status.LoadBalancer.Ingress {
 			if IsIPv4(ingress.IP) {
 				epb.WithRr(reverseIPv4(ingress.IP))
+				rrs = append(rrs, reverseIPv4(ingress.IP))
 			} else if IsIPv6(ingress.IP) {
 				epb.WithRr(reverseIPv6(ingress.IP))
+				rrs = append(rrs, reverseIPv6(ingress.IP))
 			} else {
 				return nil, fmt.Errorf("ingress ip %s is invalid", ingress.IP)
 			}
@@ -224,8 +255,10 @@ func (a *Actuator) desiredPTR(svc *corev1.Service) ([]*prvd.PvtzEndpoint, error)
 				for _, addr := range rawSubnet.Addresses {
 					if IsIPv4(addr.IP) {
 						epb.WithRr(reverseIPv4(addr.IP))
+						rrs = append(rrs, reverseIPv4(addr.IP))
 					} else if IsIPv6(addr.IP) {
 						epb.WithRr(reverseIPv6(addr.IP))
+						rrs = append(rrs, reverseIPv6(addr.IP))
 					} else {
 						return nil, fmt.Errorf("pod ip %s is invalid", addr.IP)
 					}
@@ -236,8 +269,10 @@ func (a *Actuator) desiredPTR(svc *corev1.Service) ([]*prvd.PvtzEndpoint, error)
 			for _, ip := range ips {
 				if IsIPv4(ip) {
 					epb.WithRr(reverseIPv4(ip))
+					rrs = append(rrs, reverseIPv4(ip))
 				} else if IsIPv6(ip) {
 					epb.WithRr(reverseIPv6(ip))
+					rrs = append(rrs, reverseIPv6(ip))
 				} else {
 					return nil, fmt.Errorf("cluster ip %s is invalid", ip)
 				}
@@ -248,13 +283,16 @@ func (a *Actuator) desiredPTR(svc *corev1.Service) ([]*prvd.PvtzEndpoint, error)
 		for _, ip := range ips {
 			if IsIPv4(ip) {
 				epb.WithRr(reverseIPv4(ip))
+				rrs = append(rrs, reverseIPv4(ip))
 			} else if IsIPv6(ip) {
 				epb.WithRr(reverseIPv6(ip))
+				rrs = append(rrs, reverseIPv6(ip))
 			} else {
 				return nil, fmt.Errorf("cluster ip %s is invalid", ip)
 			}
 		}
 	}
+	svcCache.Set(serviceRr(svc), rrs)
 	eps := make([]*prvd.PvtzEndpoint, 0)
 	if ep := epb.Build(); ep != nil {
 		eps = append(eps, ep)
