@@ -3,7 +3,6 @@ package pvtz
 import (
 	"context"
 	"fmt"
-	"github.com/orcaman/concurrent-map"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -79,12 +78,6 @@ type ServiceReconciler struct {
 
 	//record event recorder
 	record record.EventRecorder
-}
-
-var svcCache = newCache()
-func newCache() cmap.ConcurrentMap {
-	c := cmap.New()
-	return c
 }
 
 func (m *ServiceReconciler) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {

@@ -202,7 +202,7 @@ func (p *PVTZProvider) create(recordType, rr, value string, ttl int) (*pvtz.AddZ
 	req.Type = recordType
 	req.Rr = rr
 	req.Ttl = requests.NewInteger(ttl)
-	//req.Remark = ZoneRecordRemark
+	req.Remark = ZoneRecordRemark
 	req.Value = value
 	resp, err := p.client.AddZoneRecord(req)
 	return resp, err
