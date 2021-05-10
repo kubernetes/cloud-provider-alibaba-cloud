@@ -713,6 +713,8 @@ github.com/operator-framework/api v0.3.7-0.20200602203552-431198de9fc2/go.mod h1
 github.com/operator-framework/operator-registry v1.12.6-0.20200605115407-01fa069730e2/go.mod h1:loVINznYhgBIkmv83kU4yee88RS0BBk+hqOw9r4bhJk=
 github.com/operator-framework/operator-sdk v0.18.1 h1:AOUOBchkx8r3yYF/MDjH0gdtd13ACENuy2gnsSXQXt0=
 github.com/operator-framework/operator-sdk v0.18.1/go.mod h1:QMFHXj8+SxF56tfR1QmIU/tc9FKI73TG8Qw7Iy4D2zY=
+github.com/orcaman/concurrent-map v0.0.0-20210501183033-44dafcb38ecc h1:Ak86L+yDSOzKFa7WM5bf5itSOo1e3Xh8bm5YCMUXIjQ=
+github.com/orcaman/concurrent-map v0.0.0-20210501183033-44dafcb38ecc/go.mod h1:Lu3tH6HLW3feq74c2GC+jIMS/K2CFcDWnWD9XkenwhI=
 github.com/otiai10/copy v1.2.0/go.mod h1:rrF5dJ5F0t/EWSYODDu4j9/vEeYHMkc8jt0zJChqQWw=
 github.com/otiai10/curr v0.0.0-20150429015615-9b4961190c95/go.mod h1:9qAhocn7zKJG+0mI8eUu6xqkFDYS2kb2saOteoSB3cE=
 github.com/otiai10/curr v1.0.0/go.mod h1:LskTG5wDwr8Rs+nNQ+1LlxRjAtTZZjtJW4rMXl6j4vs=

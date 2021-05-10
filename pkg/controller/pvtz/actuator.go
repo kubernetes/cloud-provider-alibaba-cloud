@@ -6,6 +6,7 @@ import (
 	"net"
 	"strings"
 
+	cmap "github.com/orcaman/concurrent-map"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
@@ -20,12 +21,14 @@ import (
 type Actuator struct {
 	client   client.Client
 	provider prvd.Provider
+	cacheMap cmap.ConcurrentMap
 }
 
 func NewActuator(c client.Client, p prvd.Provider) *Actuator {
 	a := &Actuator{
 		client:   c,
 		provider: p,
+		cacheMap: cmap.New(),
 	}
 	return a
 }
@@ -46,6 +49,7 @@ func (a *Actuator) UpdateService(svc *corev1.Service) error {
 		}
 		eps = append(eps, ps...)
 	}
+	a.cacheMap.Set(serviceRr(svc), eps)
 	for _, ep := range eps {
 		err := a.provider.UpdatePVTZ(context.TODO(), ep)
 		if err != nil {
@@ -57,11 +61,32 @@ func (a *Actuator) UpdateService(svc *corev1.Service) error {
 }
 
 func (a *Actuator) DeleteService(svcName types.NamespacedName) error {
-	ep := &prvd.PvtzEndpoint{
-		Rr:  serviceRrByName(svcName),
-		Ttl: ctx2.CFG.Global.PrivateZoneRecordTTL,
+	if eps, exist := a.cacheMap.Get(serviceRrByName(svcName)); exist {
+		errs := make([]error, 0)
+		remains := make([]*prvd.PvtzEndpoint, 0)
+		for _, ep := range eps.([]*prvd.PvtzEndpoint) {
+			err := a.provider.DeletePVTZ(context.TODO(), &prvd.PvtzEndpoint{
+				Rr: ep.Rr,
+			})
+			if err != nil {
+				log.Printf("Delete pvtz error %s", err.Error())
+				errs = append(errs, err)
+			} else {
+				remains = append(remains, ep)
+			}
+		}
+		if len(remains) > 0 {
+			a.cacheMap.Set(serviceRrByName(svcName), remains)
+		} else {
+			a.cacheMap.Remove(serviceRrByName(svcName))
+		}
+		return errors.Wrap(util_errors.NewAggregate(errs), "DeleteService error")
+	} else {
+		ep := &prvd.PvtzEndpoint{
+			Rr: serviceRrByName(svcName),
+		}
+		return a.provider.DeletePVTZ(context.TODO(), ep)
 	}
-	return a.provider.DeletePVTZ(context.TODO(), ep)
 }
 
 func (a *Actuator) getEndpoints(epName types.NamespacedName) (*corev1.Endpoints, error) {
@@ -191,7 +216,8 @@ func (a *Actuator) desiredSRV(svc *corev1.Service) ([]*prvd.PvtzEndpoint, error)
 			continue
 		}
 		epb := epTemplate.DeepCopy()
-		epb.WithRr(strings.ToLower(fmt.Sprintf("_%s._%s.%s.%s.svc", servicePort.Name, servicePort.Protocol, svcName, ns)))
+		rr := strings.ToLower(fmt.Sprintf("_%s._%s.%s.%s.svc", servicePort.Name, servicePort.Protocol, svcName, ns))
+		epb.WithRr(rr)
 		epb.WithValueData(strings.ToLower(fmt.Sprintf("0 100 %d %s.%s.svc", targetPort, svcName, ns)))
 		eps = append(eps, epb.Build())
 	}

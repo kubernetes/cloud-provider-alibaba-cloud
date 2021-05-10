@@ -8,6 +8,7 @@ require (
 	github.com/go-cmd/cmd v1.2.1
 	github.com/golang/glog v0.0.0-20160126235308-23def4e6c14b
 	github.com/operator-framework/operator-sdk v0.18.1
+	github.com/orcaman/concurrent-map v0.0.0-20210501183033-44dafcb38ecc
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.7.1
 	github.com/sirupsen/logrus v1.6.0
