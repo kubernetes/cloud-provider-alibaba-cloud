@@ -4,6 +4,7 @@ import (
 	"github.com/aliyun/alibaba-cloud-sdk-go/sdk/requests"
 	"github.com/aliyun/alibaba-cloud-sdk-go/sdk/utils"
 	"github.com/aliyun/alibaba-cloud-sdk-go/services/slb"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/model"
 	"testing"
 )
 
@@ -55,4 +56,26 @@ func TestProviderSLB_DescribeLoadBalancerListeners(t *testing.T) {
 		t.Fatalf("DescribeLoadBalancerTCPListenerAttribute error: %s", err.Error())
 	}
 	t.Logf("%v", resp)
+}
+
+func TestNewLBProvider(t *testing.T) {
+	ln := "local"
+	rn := "remote"
+	local := &model.LoadBalancer{}
+	local.LoadBalancerAttribute = model.LoadBalancerAttribute{LoadBalancerName: &ln}
+	remote := &model.LoadBalancer{}
+	remote.LoadBalancerAttribute = model.LoadBalancerAttribute{LoadBalancerName: &rn}
+
+	changeName(local, remote)
+
+	t.Logf("local name: %s,remote name: %s", *local.LoadBalancerAttribute.LoadBalancerName,
+		*remote.LoadBalancerAttribute.LoadBalancerName)
+
+}
+
+func changeName(local *model.LoadBalancer, remote *model.LoadBalancer) {
+	*local.LoadBalancerAttribute.LoadBalancerName = "local2"
+
+	*remote.LoadBalancerAttribute.LoadBalancerName = "remote2"
+
 }

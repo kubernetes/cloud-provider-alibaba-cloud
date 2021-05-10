@@ -73,7 +73,7 @@ type LoadBalancer struct {
 	NamespacedName        types.NamespacedName
 	LoadBalancerAttribute LoadBalancerAttribute
 	Listeners             []ListenerAttribute
-	Backends              []BackendAttribute
+	VServerGroups         []VServerGroup
 }
 
 type LoadBalancerAttribute struct {
@@ -108,12 +108,11 @@ type LoadBalancerAttribute struct {
 type ListenerAttribute struct {
 	IsUserManaged bool
 
-	// values can be modified by annotation
-	LoadBalancerId string
-	Description    string
-	ListenerPort   int
-	Protocol       string
+	Description  string
+	ListenerPort int
+	Protocol     string
 
+	// values can be modified by annotation
 	Bandwidth          int
 	Scheduler          string
 	PersistenceTimeout int
@@ -136,7 +135,9 @@ type ListenerAttribute struct {
 	ConnectionDrain        string
 	ConnectionDrainTimeout int
 
-	VGroup VServerGroup
+	// VServerGroup
+	VGroupName string
+	VGroupId   string
 }
 
 type VServerGroup struct {

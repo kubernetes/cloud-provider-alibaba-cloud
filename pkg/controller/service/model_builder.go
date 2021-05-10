@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"github.com/aliyun/alibaba-cloud-sdk-go/services/slb"
 	v1 "k8s.io/api/core/v1"
@@ -44,13 +45,20 @@ func (c clusterModelBuilder) Build() (*model.LoadBalancer, error) {
 	if err := c.buildLoadBalancerAttribute(lbMdl); err != nil {
 		return nil, fmt.Errorf("build slb attribute error: %s", err.Error())
 	}
-	//if err := c.buildBackend(lbMdl); err != nil {
-	//	return nil, fmt.Errorf("build slb backend error: %s", err.Error())
-	//}
+
+	if err := c.buildVServerGroups(lbMdl); err != nil {
+		return nil, fmt.Errorf("builid vserver groups error: %s", err.Error())
+	}
+
 	if err := c.buildListener(lbMdl); err != nil {
 		return nil, fmt.Errorf("build slb listener error: %s", err.Error())
 	}
-	klog.Infof("cluster build: %v", lbMdl.Listeners)
+
+	lbMdlJson, err := json.Marshal(lbMdl)
+	if err != nil {
+		return nil, fmt.Errorf("marshal lbmdl error: %s", err.Error())
+	}
+	klog.Infof("cluster build: %s", lbMdlJson)
 	return lbMdl, nil
 }
 
@@ -83,37 +91,59 @@ func (c clusterModelBuilder) buildLoadBalancerAttribute(m *model.LoadBalancer) e
 	return nil
 }
 
-func (c clusterModelBuilder) buildBackend(mdl *model.LoadBalancer) error {
-	ctx := context.TODO()
+func (c clusterModelBuilder) buildVServerGroups(m *model.LoadBalancer) error {
+	var vgs []model.VServerGroup
+
+	for _, port := range c.svc.Spec.Ports {
+		vg, err := buildVGroup(c, port)
+		if err != nil {
+			return err
+		}
+		vgs = append(vgs, vg)
+	}
+	m.VServerGroups = vgs
+	return nil
+}
+
+func buildVGroup(c clusterModelBuilder, port v1.ServicePort) (model.VServerGroup, error) {
+	vg := model.VServerGroup{
+		VGroupName: fmt.Sprintf("%s/%d/%s/%s/%s", "k8s", port.Port, c.svc.Name, c.svc.Namespace, "clusterid"),
+	}
 
 	nodes := v1.NodeList{}
-	err := c.kubeClient.List(ctx, &nodes)
+	err := c.kubeClient.List(c.ctx, &nodes)
 	if err != nil {
-		return fmt.Errorf("get nodes from k8s error: %s", err.Error())
+		return vg, fmt.Errorf("get nodes from k8s error: %s", err.Error())
 	}
-	nds, err := filterNodes(nodes.Items, *c.anno.Get(BackendLabel))
-	if err != nil {
-		return fmt.Errorf("filter nodes error: %s", err.Error())
+	nds := nodes.Items
+	if c.anno.Get(BackendLabel) != nil {
+		nds, err = filterNodes(nodes.Items, *c.anno.Get(BackendLabel))
+		if err != nil {
+			return vg, fmt.Errorf("filter nodes error: %s", err.Error())
+		}
 	}
 
 	eps := &v1.Endpoints{}
-	err = c.kubeClient.Get(ctx, util.NamespacedName(c.svc), eps)
+	err = c.kubeClient.Get(c.ctx, util.NamespacedName(c.svc), eps)
 	if err != nil {
 		if !strings.Contains(err.Error(), "not found") {
-			return fmt.Errorf("get endpoints %s from k8s error: %s", util.Key(c.svc), err.Error())
+			return vg, fmt.Errorf("get endpoints %s from k8s error: %s", util.Key(c.svc), err.Error())
 		}
 		klog.Warningf("endpoint not found: %s", util.Key(c.svc))
 	}
 
-	backends, err := getBackends(c, c.svc, eps, nds)
+	backends, err := getBackends(c, c.svc, eps, nds, port)
 	if err != nil {
-		return fmt.Errorf("build backends error: %s", err.Error())
+		return vg, fmt.Errorf("get backends error: %s", err.Error())
 	}
-	mdl.Backends = backends
-	return nil
+	// TODO set weight for backends
+
+	vg.Backends = backends
+	return vg, nil
+
 }
 
-func getBackends(c clusterModelBuilder, svc *v1.Service, eps *v1.Endpoints, nodes []v1.Node) ([]model.BackendAttribute, error) {
+func getBackends(c clusterModelBuilder, svc *v1.Service, eps *v1.Endpoints, nodes []v1.Node, port v1.ServicePort) ([]model.BackendAttribute, error) {
 	var backends []model.BackendAttribute
 	// ENI mode
 	if isENIBackendType(svc) {
@@ -166,6 +196,7 @@ func getBackends(c clusterModelBuilder, svc *v1.Service, eps *v1.Endpoints, node
 						ServerId: id,
 						Weight:   DEFAULT_SERVER_WEIGHT,
 						Type:     "ecs",
+						Port:     int(port.NodePort),
 					},
 				)
 			}
@@ -251,12 +282,7 @@ func (c clusterModelBuilder) buildListener(mdl *model.LoadBalancer) error {
 		listener := model.ListenerAttribute{
 			Protocol:     string(port.Protocol),
 			ListenerPort: int(port.Port),
-			VGroup: model.VServerGroup{
-				// TODO new func
-				VGroupName: fmt.Sprintf("%s/%d/%s/%s/%s", "k8s", port.Port, c.svc.Name, c.svc.Namespace, "clusterid"),
-				// TODO remove me, just for test
-				VGroupId: "rsp-bp1c1bw0yw3hi",
-			},
+			VGroupName:   fmt.Sprintf("%s/%d/%s/%s/%s", "k8s", port.Port, c.svc.Name, c.svc.Namespace, "clusterid"),
 		}
 		mdl.Listeners = append(mdl.Listeners, listener)
 	}
@@ -287,23 +313,35 @@ type cloudModelBuilder struct {
 }
 
 func (c cloudModelBuilder) Build() (*model.LoadBalancer, error) {
-	lb := &model.LoadBalancer{
+	lbMdl := &model.LoadBalancer{
 		NamespacedName: util.NamespacedName(c.svc),
 	}
 
-	_, lb, err := c.buildLoadBalancerAttribute(lb)
+	exist, err := c.buildLoadBalancerAttribute(lbMdl)
 	if err != nil {
 		return nil, fmt.Errorf("can not get load balancer attribute from cloud, error: %s", err.Error())
 	}
-	//buildBackend(svc, lb)
-	lb, err = c.buildListener(lb)
-	if err != nil {
+	if !exist {
+		return lbMdl, nil
+	}
+
+	if err := c.buildVServerGroups(lbMdl); err != nil {
+		return nil, fmt.Errorf("build backend from remote error: %s", err.Error())
+	}
+
+	if err := c.buildListener(lbMdl); err != nil {
 		return nil, fmt.Errorf("can not build listener attribute from cloud, error: %s", err.Error())
 	}
-	return lb, nil
+
+	lbMdlJson, err := json.Marshal(lbMdl)
+	if err != nil {
+		return nil, fmt.Errorf("marshal lbmdl error: %s", err.Error())
+	}
+	klog.Infof("cloud model build: %s", lbMdlJson)
+	return lbMdl, nil
 }
 
-func (c cloudModelBuilder) buildLoadBalancerAttribute(lb *model.LoadBalancer) (bool, *model.LoadBalancer, error) {
+func (c cloudModelBuilder) buildLoadBalancerAttribute(lb *model.LoadBalancer) (bool, error) {
 	// Initialize the slb model to find the slb associated with the svc
 	// 1. set loadbalancer id
 	if c.anno.Get(LoadBalancerId) != nil {
@@ -322,9 +360,22 @@ func (c cloudModelBuilder) buildLoadBalancerAttribute(lb *model.LoadBalancer) (b
 	return c.cloud.FindSLB(c.ctx, lb)
 }
 
-func (c cloudModelBuilder) buildListener(mdl *model.LoadBalancer) (*model.LoadBalancer, error) {
+func (c cloudModelBuilder) buildVServerGroups(remote *model.LoadBalancer) error {
+	vgs, err := c.cloud.DescribeVServerGroups(c.ctx, remote.LoadBalancerAttribute.LoadBalancerId)
+	if err != nil {
+		return fmt.Errorf("DescribeVServerGroups error: %s", err.Error())
+	}
+	remote.VServerGroups = vgs
+	return nil
+}
 
-	return c.cloud.DescribeLoadBalancerListeners(c.ctx, mdl)
+func (c cloudModelBuilder) buildListener(remote *model.LoadBalancer) error {
+	listeners, err := c.cloud.DescribeLoadBalancerListeners(c.ctx, remote.LoadBalancerAttribute.LoadBalancerId)
+	if err != nil {
+		return fmt.Errorf("DescribeLoadBalancerListeners error:%s", err.Error())
+	}
+	remote.Listeners = listeners
+	return nil
 }
 
 func genVGroupPortName(servicePort v1.ServicePort, isENI bool) string {

@@ -143,16 +143,16 @@ func validate(svc *v1.Service, anno *AnnotationRequest) error {
 
 func (m *ReconcileService) cleanupLoadBalancerResources(ctx context.Context, svc *v1.Service, anno *AnnotationRequest) error {
 	// TODO
-	//if k8s.HasFinalizer(svc, serviceFinalizer) {
-	//	_, _, err := r.buildAndDeployModel(ctx, svc)
-	//	if err != nil {
-	//		return err
-	//	}
-	//	if err := r.finalizerManager.RemoveFinalizers(ctx, svc, serviceFinalizer); err != nil {
-	//		r.eventRecorder.Event(svc, corev1.EventTypeWarning, k8s.ServiceEventReasonFailedRemoveFinalizer, fmt.Sprintf("Failed remove finalizer due to %v", err))
-	//		return err
-	//	}
-	//}
+	if helper.HasFinalizer(svc, serviceFinalizer) {
+		//_, _, err := r.buildAndDeployModel(ctx, svc)
+		//if err != nil {
+		//	return err
+		//}
+		if err := m.finalizerManager.RemoveFinalizers(ctx, svc, serviceFinalizer); err != nil {
+			m.record.Eventf(svc, v1.EventTypeWarning, helper.ServiceEventReasonFailedRemoveFinalizer, fmt.Sprintf("Failed remove finalizer due to %v", err))
+			return err
+		}
+	}
 	return nil
 }
 
@@ -190,7 +190,10 @@ func (m *ReconcileService) buildAndApplyModel(ctx context.Context, svc *v1.Servi
 		return nil, fmt.Errorf("build slb cloud model error: %s", err.Error())
 	}
 	// apply model
-	return NewLBModelApplier(ctx, m.cloud, svc, anno).Apply(clusterModel, cloudModel)
+	if err := NewLBModelApplier(ctx, m.cloud, svc, anno).Apply(clusterModel, cloudModel); err != nil {
+		return nil, fmt.Errorf("apply model error: %s", err.Error())
+	}
+	return cloudModel, nil
 }
 
 func (m *ReconcileService) updateServiceStatus(ctx context.Context, svc *v1.Service, lb *model.LoadBalancer) error {

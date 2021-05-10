@@ -10,8 +10,8 @@ func init() {
 	//Adds = append(Adds, node.Add)
 	//Adds = append(Adds, route.Add)
 	Adds = append(Adds, service.Add)
-	//Adds = append(Adds, ingress.Add)
-	//Adds = append(Adds, pvtz.Add)
+//	Adds = append(Adds, ingress.Add)
+//	Adds = append(Adds, pvtz.Add)
 }
 
 // Adds is a list of functions to add all Controllers to the Manager

@@ -26,29 +26,49 @@ type modelApplier struct {
 	anno  *AnnotationRequest
 }
 
-func (m *modelApplier) Apply(local *model.LoadBalancer, remote *model.LoadBalancer) (*model.LoadBalancer, error) {
+func (m *modelApplier) Apply(local *model.LoadBalancer, remote *model.LoadBalancer) error {
 
-	local, err := m.updateLoadBalancerAttribute(local, remote)
-	if err != nil {
-		return local, fmt.Errorf("update lb attribute error: %s", err.Error())
+	if err := m.updateLoadBalancerAttribute(local, remote); err != nil {
+		return fmt.Errorf("update lb attribute error: %s", err.Error())
 	}
-	//_, err = m.updateBackend(local, remote)
-	//if err != nil {
-	//	return local, fmt.Errorf("update lb backends error: %s", err.Error())
-	//}
-	_, err = m.updateListener(local, remote)
-	if err != nil {
-		return local, fmt.Errorf("update lb listeners error: %s", err.Error())
+
+	if err := m.updateBackend(local, remote); err != nil {
+		return fmt.Errorf("update lb backends error: %s", err.Error())
 	}
-	return local, nil
+
+	if err := m.updateListener(local, remote); err != nil {
+		return fmt.Errorf("update lb listeners error: %s", err.Error())
+	}
+
+	if err := m.cleanup(local, remote); err != nil {
+		return fmt.Errorf("update lb listeners error: %s", err.Error())
+	}
+
+	return nil
 }
 
-func (m *modelApplier) updateLoadBalancerAttribute(local *model.LoadBalancer, remote *model.LoadBalancer) (*model.LoadBalancer, error) {
+func (m *modelApplier) updateLoadBalancerAttribute(local *model.LoadBalancer, remote *model.LoadBalancer) error {
+	var err error
+	if local == nil {
+		return fmt.Errorf("local model is nil")
+	}
+	if remote == nil {
+		return fmt.Errorf("remote model is nil")
+	}
 
-	if remote == nil || remote.LoadBalancerAttribute.LoadBalancerId == "" {
+	if remote.LoadBalancerAttribute.LoadBalancerId == "" {
 		setModelDefaultValue(local, m.anno)
-		klog.Info("not found load balancer, try to create slb. model [%v]", local)
-		return m.cloud.CreateSLB(m.ctx, local)
+		klog.Info("not found load balancer, try to create slb")
+		err = m.cloud.CreateSLB(m.ctx, local)
+		if err != nil {
+			return fmt.Errorf("create slb error: %s", err.Error())
+		}
+		remote.LoadBalancerAttribute.LoadBalancerId = local.LoadBalancerAttribute.LoadBalancerId
+		err = m.cloud.DescribeSLB(m.ctx, remote)
+		if err != nil {
+			return fmt.Errorf("describe slb error: %s", err.Error())
+		}
+		return nil
 	}
 
 	klog.Infof("found load balancer, try to update load balancer attribute")
@@ -64,7 +84,7 @@ func (m *modelApplier) updateLoadBalancerAttribute(local *model.LoadBalancer, re
 	//	m.cloud.CreateSLB()
 	//
 	//}
-	return local, nil
+	return nil
 
 }
 
@@ -92,27 +112,143 @@ func setModelDefaultValue(mdl *model.LoadBalancer, anno *AnnotationRequest) {
 		v := anno.GetDefaultValue(Spec)
 		mdl.LoadBalancerAttribute.LoadBalancerSpec = &v
 	}
-
-	if mdl.LoadBalancerAttribute.DeleteProtection == nil {
-		v := anno.GetDefaultValue(DeleteProtection)
-		mdl.LoadBalancerAttribute.DeleteProtection = &v
-	}
-
-	if mdl.LoadBalancerAttribute.ModificationProtectionStatus == nil {
-		v := anno.GetDefaultValue(ModificationProtection)
-		mdl.LoadBalancerAttribute.ModificationProtectionStatus = &v
-		mdl.LoadBalancerAttribute.ModificationProtectionReason = ModificationProtectionReason
-	}
+	// TODO remove me
+	//if mdl.LoadBalancerAttribute.DeleteProtection == nil {
+	//	v := anno.GetDefaultValue(DeleteProtection)
+	//	mdl.LoadBalancerAttribute.DeleteProtection = &v
+	//}
+	//
+	//if mdl.LoadBalancerAttribute.ModificationProtectionStatus == nil {
+	//	v := anno.GetDefaultValue(ModificationProtection)
+	//	mdl.LoadBalancerAttribute.ModificationProtectionStatus = &v
+	//	mdl.LoadBalancerAttribute.ModificationProtectionReason = ModificationProtectionReason
+	//}
 
 	mdl.LoadBalancerAttribute.Tags = append(mdl.LoadBalancerAttribute.Tags, anno.GetDefaultTags()...)
 }
 
-func (m *modelApplier) updateBackend(local *model.LoadBalancer, remote *model.LoadBalancer) (*model.LoadBalancer, error) {
-	return nil, nil
+func (m *modelApplier) updateBackend(local *model.LoadBalancer, remote *model.LoadBalancer) error {
+	for i := range local.VServerGroups {
+		found := false
+		for j := range remote.VServerGroups {
+			if local.VServerGroups[i].VGroupName == remote.VServerGroups[j].VGroupName {
+				found = true
 
+				add, del, update := diff(local.VServerGroups[i], remote.VServerGroups[j])
+				if len(add) == 0 && len(del) == 0 && len(update) == 0 {
+					klog.Infof("update: no backend need to be added for vgroupid")
+				}
+				//if len(add) > 0 {
+				//	if err := batchAddVServerGroupBackendServers(ctx, add); err != nil {
+				//		break
+				//	}
+				//}
+				//if len(del) > 0 {
+				//	if err := batchRemoveVServerGroupBackendServers(ctx, del); err != nil {
+				//		break
+				//	}
+				//}
+				//if len(update) > 0 {
+				//	batchUpdateVServerGroupBackendServers(ctx, update)
+				//}
+
+				local.VServerGroups[i].VGroupId = remote.VServerGroups[j].VGroupId
+			}
+		}
+
+		// if not exist, create
+		if !found {
+			if err := m.cloud.CreateVServerGroup(m.ctx,
+				&local.VServerGroups[i], remote.LoadBalancerAttribute.LoadBalancerId); err != nil {
+				return fmt.Errorf("create vserver group error: %s", err.Error())
+			}
+			remote.VServerGroups = append(remote.VServerGroups, local.VServerGroups[i])
+		}
+	}
+
+	return nil
 }
 
-func (m *modelApplier) updateListener(local *model.LoadBalancer, remote *model.LoadBalancer) (*model.LoadBalancer, error) {
+func diff(remote, local model.VServerGroup) (
+	[]model.BackendAttribute, []model.BackendAttribute, []model.BackendAttribute) {
+
+	var (
+		addition  []model.BackendAttribute
+		deletions []model.BackendAttribute
+		updates   []model.BackendAttribute
+	)
+
+	for _, r := range remote.Backends {
+		//// skip nodes which does not belong to the cluster
+		//if isUserManagedNode(api.Description, v.NamedKey.Key()) {
+		//	continue
+		//}
+		found := false
+		for _, l := range local.Backends {
+			if l.Type == "eni" {
+				if r.ServerId == l.ServerId &&
+					r.ServerIp == l.ServerIp {
+					found = true
+					break
+				}
+			} else {
+				if r.ServerId == l.ServerId {
+					found = true
+					break
+				}
+			}
+
+		}
+		if !found {
+			deletions = append(deletions, r)
+		}
+	}
+	for _, l := range local.Backends {
+		found := false
+		for _, r := range remote.Backends {
+			if l.Type == "eni" {
+				if r.ServerId == l.ServerId &&
+					r.ServerIp == l.ServerIp {
+					found = true
+					break
+				}
+			} else {
+				if r.ServerId == l.ServerId {
+					found = true
+					break
+				}
+			}
+
+		}
+		if !found {
+			addition = append(addition, l)
+		}
+	}
+	for _, l := range local.Backends {
+		for _, r := range remote.Backends {
+			//if isUserManagedNode(api.Description, v.NamedKey.Key()) {
+			//	continue
+			//}
+			if l.Type == "eni" {
+				if l.ServerId == r.ServerId &&
+					l.ServerIp == r.ServerIp &&
+					l.Weight != r.Weight {
+					updates = append(updates, l)
+					break
+				}
+			} else {
+				if l.ServerId == r.ServerId &&
+					l.Weight != r.Weight {
+					updates = append(updates, l)
+					break
+				}
+			}
+		}
+	}
+	return addition, deletions, updates
+}
+
+func (m *modelApplier) updateListener(local *model.LoadBalancer, remote *model.LoadBalancer) error {
 	klog.Infof("try to update listener. local: [%v], remote: [%v]", local.Listeners, remote.Listeners)
 	// make https come first.
 	// ensure https listeners to be created first for http forward
@@ -136,9 +272,9 @@ func (m *modelApplier) updateListener(local *model.LoadBalancer, remote *model.L
 	//	},
 	//)
 	var (
-		addition []*model.ListenerAttribute
-		updation []*model.ListenerAttribute
-		deletion []*model.ListenerAttribute
+		addition []model.ListenerAttribute
+		updation []model.ListenerAttribute
+		deletion []model.ListenerAttribute
 	)
 
 	for _, rlis := range remote.Listeners {
@@ -159,7 +295,7 @@ func (m *modelApplier) updateListener(local *model.LoadBalancer, remote *model.L
 				//	}
 
 				// do update operate
-				updation = append(updation, &llis)
+				updation = append(updation, llis)
 				klog.Infof("found listener with port & protocol match, do update")
 			} else {
 				//// protocol not match, need to recreate
@@ -171,7 +307,7 @@ func (m *modelApplier) updateListener(local *model.LoadBalancer, remote *model.L
 			}
 		}
 		if !found {
-			deletion = append(deletion, &rlis)
+			deletion = append(deletion, rlis)
 			klog.Infof("not found listener, do delete")
 		} else {
 			klog.Infof("port [%d] not managed by my service [%s/%s], skip processing.", rlis.ListenerPort)
@@ -182,7 +318,6 @@ func (m *modelApplier) updateListener(local *model.LoadBalancer, remote *model.L
 	// For additions
 	for _, llis := range local.Listeners {
 		found := false
-		klog.Infof("local port: %d", llis.ListenerPort)
 		for _, rlis := range remote.Listeners {
 			if llis.ListenerPort == rlis.ListenerPort {
 				// port match
@@ -196,24 +331,66 @@ func (m *modelApplier) updateListener(local *model.LoadBalancer, remote *model.L
 			}
 		}
 		if !found {
-			addition = append(addition, &llis)
-			klog.Infof("add new listener %d", llis.ListenerPort)
+			addition = append(addition, llis)
 		}
 	}
 
 	for _, l := range addition {
-		// TODO
-		l.LoadBalancerId = remote.LoadBalancerAttribute.LoadBalancerId
-		if err := m.cloud.CreateLoadBalancerTCPListener(m.ctx, l); err != nil {
-			return nil, fmt.Errorf("create tcp listener error: %s", err.Error())
+		klog.Infof("add new listener %d", l.ListenerPort)
+		lbId := remote.LoadBalancerAttribute.LoadBalancerId
+		if err := findVServerGroup(local.VServerGroups, &l); err != nil {
+			return err
 		}
-		if err := m.cloud.StartLoadBalancerListener(m.ctx, l.LoadBalancerId, l.ListenerPort); err != nil {
-			return nil, fmt.Errorf("start tcp listener error: %s", err.Error())
+		if err := m.cloud.CreateLoadBalancerTCPListener(m.ctx, lbId, &l); err != nil {
+			return fmt.Errorf("create tcp listener [%d] error: %s", l.ListenerPort, err.Error())
 		}
-
+		if err := m.cloud.StartLoadBalancerListener(m.ctx, lbId, l.ListenerPort); err != nil {
+			return fmt.Errorf("start tcp listener [%d] error: %s", l.ListenerPort, err.Error())
+		}
 	}
+	return nil
+}
 
-	//
+func (m *modelApplier) cleanup(local *model.LoadBalancer, remote *model.LoadBalancer) error {
+	// clean up vservergroup
+	/*lbId := remote.LoadBalancerAttribute.LoadBalancerId
+	vgs, err := m.cloud.DescribeVServerGroups(m.ctx, lbId)
+	if err != nil {
+		return err
+	}
+	for _, vg := range vgs {
+		if vg != local.NamespacedName.Name ||
+			vg.NamedKey.Namespace != service.Namespace ||
+			vg.NamedKey.CID != CLUSTER_ID {
+			// skip those which does not belong to this service
+			continue
+		}
+		found := false
+		for _, l := range local.VServerGroups {
+			if vg.NamedKey.Port == l.VGroupName {
+				found = true
+				break
+			}
+		}
+		if !found {
+			rem.Logf("try to remove unused vserver group, [%s][%s]", rem.NamedKey.Key(), rem.VGroupId)
+			err := rem.Remove(ctx)
+			if err != nil {
+				rem.Logf("Error: cleanup vgroup warining: "+
+					"failed to remove vgroup[%s]. wait for next try. %s", rem.NamedKey.Key(), err.Error())
+				return err
+			}
+		}
+	}*/
+	return nil
+}
 
-	return nil, nil
+func findVServerGroup(vgs []model.VServerGroup, port *model.ListenerAttribute) error {
+	for _, vg := range vgs {
+		if vg.VGroupName == port.VGroupName {
+			port.VGroupId = vg.VGroupId
+			return nil
+		}
+	}
+	return fmt.Errorf("can not find vgroup by name %s", port.VGroupName)
 }
