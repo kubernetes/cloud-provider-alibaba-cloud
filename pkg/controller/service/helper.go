@@ -12,53 +12,20 @@ import (
 	"strings"
 )
 
-func filterNodes(nodes []v1.Node, labels string) ([]v1.Node, error) {
-	nodes, err := filterOutByLabel(nodes, labels)
-	return nodes, err
-}
-
-func filterOutByLabel(nodes []v1.Node, labels string) ([]v1.Node, error) {
-	if labels == "" {
-		return nodes, nil
-	}
-	var result []v1.Node
-	lbl := strings.Split(labels, ",")
-	var records []string
-	for _, node := range nodes {
-		found := true
-		for _, v := range lbl {
-			l := strings.Split(v, "=")
-			if len(l) < 2 {
-				return []v1.Node{}, fmt.Errorf("parse backend label: %s, [k1=v1,k2=v2]", v)
-			}
-			if nv, exist := node.Labels[l[0]]; !exist || nv != l[1] {
-				found = false
-				break
-			}
-		}
-		if found {
-			result = append(result, node)
-			records = append(records, node.Name)
-		}
-	}
-	klog.V(4).Infof("accept nodes backend labels[%s], %v", labels, records)
-	return result, nil
-}
-
 func isLocalModeService(svc *v1.Service) bool {
 	return svc.Spec.ExternalTrafficPolicy == v1.ServiceExternalTrafficPolicyTypeLocal
 }
 
 func isENIBackendType(svc *v1.Service) bool {
-	if svc.Annotations[util.BACKEND_TYPE_LABEL] != "" {
-		return svc.Annotations[util.BACKEND_TYPE_LABEL] == util.BACKEND_TYPE_ENI
+	if svc.Annotations[BACKEND_TYPE_LABEL] != "" {
+		return svc.Annotations[BACKEND_TYPE_LABEL] == BACKEND_TYPE_ENI
 	}
 
 	if os.Getenv("SERVICE_FORCE_BACKEND_ENI") != "" {
 		return os.Getenv("SERVICE_FORCE_BACKEND_ENI") == "true"
 	}
 
-	return ctx2.CFG.Global.ServiceBackendType == util.BACKEND_TYPE_ENI
+	return ctx2.CFG.Global.ServiceBackendType == BACKEND_TYPE_ENI
 }
 
 func isSLBNeeded(svc *v1.Service) bool {

@@ -11,6 +11,8 @@ import (
 	prvd "k8s.io/cloud-provider-alibaba-cloud/pkg/provider"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/metadata"
 	"k8s.io/klog"
+	"reflect"
+	"strconv"
 )
 
 func NewLBProvider(
@@ -171,28 +173,12 @@ func (p ProviderSLB) DescribeLoadBalancerListeners(ctx context.Context, lbId str
 			Description:  lis.Description,
 			ListenerPort: lis.ListenerPort,
 			Protocol:     lis.ListenerProtocol,
-			Bandwidth:    lis.Bandwidth,
-			Scheduler:    lis.Scheduler,
+			Bandwidth:    &lis.Bandwidth,
+			Scheduler:    &lis.Scheduler,
 			VGroupId:     lis.VServerGroupId,
 		})
 	}
 	return listeners, nil
-}
-
-func (p ProviderSLB) CreateLoadBalancerTCPListener(ctx context.Context, lbId string, port *model.ListenerAttribute) error {
-	req := slb.CreateCreateLoadBalancerTCPListenerRequest()
-	req.LoadBalancerId = lbId
-	setCreateTCPListenerReqFromModel(req, port)
-	_, err := p.auth.SLB.CreateLoadBalancerTCPListener(req)
-	return err
-}
-
-func setCreateTCPListenerReqFromModel(req *slb.CreateLoadBalancerTCPListenerRequest, port *model.ListenerAttribute) {
-	req.ListenerPort = requests.NewInteger(port.ListenerPort)
-	req.Bandwidth = requests.NewInteger(model.DEFAULT_LISTENER_BANDWIDTH)
-	req.VServerGroupId = port.VGroupId
-	// TODO
-
 }
 
 func (p ProviderSLB) StartLoadBalancerListener(ctx context.Context, loadBalancerId string, port int) error {
@@ -288,4 +274,150 @@ func (p ProviderSLB) DescribeVServerGroups(ctx context.Context, lbId string) ([]
 		vgs = append(vgs, vg)
 	}
 	return vgs, nil
+}
+
+func (p ProviderSLB) DeleteLoadBalancerListener(ctx context.Context, lbId string, port int) error {
+	req := slb.CreateDeleteLoadBalancerListenerRequest()
+	req.LoadBalancerId = lbId
+	req.ListenerPort = requests.NewInteger(port)
+
+	_, err := p.auth.SLB.DeleteLoadBalancerListener(req)
+	return err
+}
+
+func (p ProviderSLB) StopLoadBalancerListener(ctx context.Context, lbId string, port int) error {
+	req := slb.CreateStopLoadBalancerListenerRequest()
+	req.LoadBalancerId = lbId
+	req.ListenerPort = requests.NewInteger(port)
+	_, err := p.auth.SLB.StopLoadBalancerListener(req)
+	return err
+}
+
+func (p ProviderSLB) CreateLoadBalancerTCPListener(ctx context.Context, lbId string, port *model.ListenerAttribute) error {
+	req := slb.CreateCreateLoadBalancerTCPListenerRequest()
+	req.LoadBalancerId = lbId
+	setGenericListenerValue(req, port)
+	_, err := p.auth.SLB.CreateLoadBalancerTCPListener(req)
+	return err
+}
+
+func (p ProviderSLB) SetLoadBalancerTCPListenerAttribute(ctx context.Context, lbId string, port *model.ListenerAttribute) error {
+	req := slb.CreateSetLoadBalancerTCPListenerAttributeRequest()
+	req.LoadBalancerId = lbId
+	setGenericListenerValue(req, port)
+	_, err := p.auth.SLB.SetLoadBalancerTCPListenerAttribute(req)
+	return err
+}
+
+func (p ProviderSLB) CreateLoadBalancerUDPListener(ctx context.Context, lbId string, port *model.ListenerAttribute) error {
+	req := slb.CreateCreateLoadBalancerUDPListenerRequest()
+	req.LoadBalancerId = lbId
+	setGenericListenerValue(req, port)
+	_, err := p.auth.SLB.CreateLoadBalancerUDPListener(req)
+	return err
+}
+
+func (p ProviderSLB) SetLoadBalancerUDPListenerAttribute(ctx context.Context, lbId string, port *model.ListenerAttribute) error {
+	req := slb.CreateSetLoadBalancerUDPListenerAttributeRequest()
+	req.LoadBalancerId = lbId
+	setGenericListenerValue(req, port)
+	_, err := p.auth.SLB.SetLoadBalancerUDPListenerAttribute(req)
+	return err
+}
+func (p ProviderSLB) CreateLoadBalancerHTTPListener(ctx context.Context, lbId string, port *model.ListenerAttribute) error {
+	req := slb.CreateCreateLoadBalancerHTTPListenerRequest()
+	req.LoadBalancerId = lbId
+	setGenericListenerValue(req, port)
+	_, err := p.auth.SLB.CreateLoadBalancerHTTPListener(req)
+	return err
+}
+func (p ProviderSLB) SetLoadBalancerHTTPListenerAttribute(ctx context.Context, lbId string, port *model.ListenerAttribute) error {
+	req := slb.CreateSetLoadBalancerHTTPListenerAttributeRequest()
+	req.LoadBalancerId = lbId
+	setGenericListenerValue(req, port)
+	_, err := p.auth.SLB.SetLoadBalancerHTTPListenerAttribute(req)
+	return err
+}
+func (p ProviderSLB) CreateLoadBalancerHTTPSListener(ctx context.Context, lbId string, port *model.ListenerAttribute) error {
+	req := slb.CreateCreateLoadBalancerHTTPSListenerRequest()
+	req.LoadBalancerId = lbId
+	setGenericListenerValue(req, port)
+	if port.CertId != nil {
+		req.ServerCertificateId = *port.CertId
+	}
+	_, err := p.auth.SLB.CreateLoadBalancerHTTPSListener(req)
+	return err
+}
+func (p ProviderSLB) SetLoadBalancerHTTPSListenerAttribute(ctx context.Context, lbId string, port *model.ListenerAttribute) error {
+	req := slb.CreateSetLoadBalancerHTTPSListenerAttributeRequest()
+	req.LoadBalancerId = lbId
+	setGenericListenerValue(req, port)
+	_, err := p.auth.SLB.SetLoadBalancerHTTPSListenerAttribute(req)
+	return err
+}
+
+func setGenericListenerValue(req interface{}, port *model.ListenerAttribute) {
+	v := reflect.ValueOf(req).Elem()
+
+	listenerPort := v.FieldByName("ListenerPort")
+	listenerPort.SetString(strconv.Itoa(port.ListenerPort))
+
+	vGroupId := v.FieldByName("VServerGroupId")
+	vGroupId.SetString(port.VGroupId)
+
+	description := v.FieldByName("Description")
+	description.SetString(port.Description)
+
+	if port.Bandwidth != nil {
+		bandwidth := v.FieldByName("Bandwidth")
+		bandwidth.SetString(strconv.Itoa(*port.Bandwidth))
+	}
+	if port.Scheduler != nil {
+		scheduler := v.FieldByName("Scheduler")
+		scheduler.SetString(*port.Scheduler)
+	}
+	if port.HealthyThreshold != nil {
+		healthyThreshold := v.FieldByName("HealthyThreshold")
+		healthyThreshold.SetString(strconv.Itoa(*port.HealthyThreshold))
+	}
+	if port.UnhealthyThreshold != nil {
+		unhealthyThreshold := v.FieldByName("UnhealthyThreshold")
+		unhealthyThreshold.SetString(strconv.Itoa(*port.UnhealthyThreshold))
+	}
+	if port.HealthCheckConnectTimeout != nil {
+		connectTimeout := v.FieldByName("HealthCheckConnectTimeout")
+		connectTimeout.SetString(strconv.Itoa(*port.HealthCheckConnectTimeout))
+	}
+	if port.HealthCheckConnectPort != nil {
+		connectPort := v.FieldByName("HealthCheckConnectPort")
+		connectPort.SetString(strconv.Itoa(*port.HealthCheckConnectPort))
+	}
+	if port.HealthCheckInterval != nil {
+		interval := v.FieldByName("HealthCheckInterval")
+		interval.SetString(strconv.Itoa(*port.HealthCheckInterval))
+	}
+	if port.HealthCheckDomain != nil {
+		domain := v.FieldByName("HealthCheckDomain")
+		domain.SetString(*port.HealthCheckDomain)
+	}
+	if port.HealthCheckURI != nil {
+		uri := v.FieldByName("HealthCheckURI")
+		uri.SetString(*port.HealthCheckURI)
+	}
+	if port.HealthCheckHttpCode != nil {
+		httpCode := v.FieldByName("HealthCheckHttpCode")
+		httpCode.SetString(*port.HealthCheckHttpCode)
+	}
+	if port.HealthCheckType != nil {
+		healthCheckType := v.FieldByName("HealthCheckType")
+		healthCheckType.SetString(*port.HealthCheckType)
+	}
+	if port.AclType != nil {
+		aclType := v.FieldByName("AclType")
+		aclType.SetString(*port.AclType)
+	}
+	if port.AclStatus != nil {
+		aclStatus := v.FieldByName("AclStatus")
+		aclStatus.SetString(*port.AclStatus)
+	}
 }

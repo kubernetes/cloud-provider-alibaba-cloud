@@ -179,21 +179,21 @@ func (m *ReconcileService) reconcileLoadBalancerResources(ctx context.Context, s
 }
 
 func (m *ReconcileService) buildAndApplyModel(ctx context.Context, svc *v1.Service, anno *AnnotationRequest) (*model.LoadBalancer, error) {
-	// build cluster model
-	clusterModel, err := NewClusterModelBuilder(ctx, m.kubeClient, m.cloud, svc, anno).Build()
+	// build local model
+	localModel, err := NewModelBuilder(ctx, m.kubeClient, m.cloud, svc, anno, LOCAL_MODEL).Build()
 	if err != nil {
 		return nil, fmt.Errorf("build slb cluster model error: %s", err.Error())
 	}
-	// build cloud model
-	cloudModel, err := NewCloudModelBuilder(ctx, m.cloud, svc, anno).Build()
+	// build remote model
+	remoteModel, err := NewModelBuilder(ctx, m.kubeClient, m.cloud, svc, anno, REMOTE_MODEL).Build()
 	if err != nil {
 		return nil, fmt.Errorf("build slb cloud model error: %s", err.Error())
 	}
 	// apply model
-	if err := NewLBModelApplier(ctx, m.cloud, svc, anno).Apply(clusterModel, cloudModel); err != nil {
+	if err := NewLBModelApplier(ctx, m.cloud, svc, anno).Apply(localModel, remoteModel); err != nil {
 		return nil, fmt.Errorf("apply model error: %s", err.Error())
 	}
-	return cloudModel, nil
+	return localModel, nil
 }
 
 func (m *ReconcileService) updateServiceStatus(ctx context.Context, svc *v1.Service, lb *model.LoadBalancer) error {

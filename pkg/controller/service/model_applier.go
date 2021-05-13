@@ -249,7 +249,13 @@ func diff(remote, local model.VServerGroup) (
 }
 
 func (m *modelApplier) updateListener(local *model.LoadBalancer, remote *model.LoadBalancer) error {
-	klog.Infof("try to update listener. local: [%v], remote: [%v]", local.Listeners, remote.Listeners)
+
+	updates, err := buildActionsForListeners(m, local, remote)
+	if err != nil {
+		return fmt.Errorf("merge listener: %s", err.Error())
+	}
+	klog.Infof("ensure listener: %d updates for %s", len(updates), remote.LoadBalancerAttribute.LoadBalancerId)
+
 	// make https come first.
 	// ensure https listeners to be created first for http forward
 	//sort.SliceStable(
@@ -271,84 +277,15 @@ func (m *modelApplier) updateListener(local *model.LoadBalancer, remote *model.L
 	//		return false
 	//	},
 	//)
-	var (
-		addition []model.ListenerAttribute
-		updation []model.ListenerAttribute
-		deletion []model.ListenerAttribute
-	)
-
-	for _, rlis := range remote.Listeners {
-		found := false
-		for _, llis := range local.Listeners {
-			if rlis.ListenerPort == llis.ListenerPort {
-				found = true
-				// port matched. that is where the conflict case begin.
-				// 1. check protocol match.
-				//if isProtocolMatch(local, remote) {
-				//	// protocol match, need to do update operate no matter managed by whom
-				//	// consider override annotation & user defined loadbalancer
-				//	if !override && isUserDefinedLoadBalancer(svc) {
-				//		// port conflict with user managed slb or listener.
-				//		return nil, fmt.Errorf("PortProtocolConflict] port matched, but conflict with user managed listener. "+
-				//			"Port:%d, ListenerName:%s, svc: %s. Protocol:[source:%s dst:%s]",
-				//			remote.Port, remote.Name, local.NamedKey.Key(), remote.TransforedProto, local.TransforedProto)
-				//	}
-
-				// do update operate
-				updation = append(updation, llis)
-				klog.Infof("found listener with port & protocol match, do update")
-			} else {
-				//// protocol not match, need to recreate
-				//if !override && isUserDefinedLoadBalancer(svc) {
-				//	return nil, fmt.Errorf("[PortProtocolConflict] port matched, "+
-				//		"while protocol does not. force override listener %t. source[%v], target[%v]", override, local.NamedKey, remote.NamedKey)
-				//}
-				klog.Infof("found listener with protocol match, need recreate")
-			}
-		}
-		if !found {
-			deletion = append(deletion, rlis)
-			klog.Infof("not found listener, do delete")
-		} else {
-			klog.Infof("port [%d] not managed by my service [%s/%s], skip processing.", rlis.ListenerPort)
-		}
-	}
-
-	// +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-	// For additions
-	for _, llis := range local.Listeners {
-		found := false
-		for _, rlis := range remote.Listeners {
-			if llis.ListenerPort == rlis.ListenerPort {
-				// port match
-				//if !isProtocolMatch(remote, local) {
-				//	// protocol does not match, do add listener
-				//	break
-				//}
-				//// port matched. updated . skip
-				found = true
-				break
-			}
-		}
-		if !found {
-			addition = append(addition, llis)
-		}
-	}
-
-	for _, l := range addition {
-		klog.Infof("add new listener %d", l.ListenerPort)
-		lbId := remote.LoadBalancerAttribute.LoadBalancerId
-		if err := findVServerGroup(local.VServerGroups, &l); err != nil {
-			return err
-		}
-		if err := m.cloud.CreateLoadBalancerTCPListener(m.ctx, lbId, &l); err != nil {
-			return fmt.Errorf("create tcp listener [%d] error: %s", l.ListenerPort, err.Error())
-		}
-		if err := m.cloud.StartLoadBalancerListener(m.ctx, lbId, l.ListenerPort); err != nil {
-			return fmt.Errorf("start tcp listener [%d] error: %s", l.ListenerPort, err.Error())
+	// do update/add/delete
+	for _, up := range updates {
+		err := up.Apply(m.ctx)
+		if err != nil {
+			return fmt.Errorf("ensure listener: %s", err.Error())
 		}
 	}
 	return nil
+
 }
 
 func (m *modelApplier) cleanup(local *model.LoadBalancer, remote *model.LoadBalancer) error {
@@ -383,14 +320,4 @@ func (m *modelApplier) cleanup(local *model.LoadBalancer, remote *model.LoadBala
 		}
 	}*/
 	return nil
-}
-
-func findVServerGroup(vgs []model.VServerGroup, port *model.ListenerAttribute) error {
-	for _, vg := range vgs {
-		if vg.VGroupName == port.VGroupName {
-			port.VGroupId = vg.VGroupId
-			return nil
-		}
-	}
-	return fmt.Errorf("can not find vgroup by name %s", port.VGroupName)
 }

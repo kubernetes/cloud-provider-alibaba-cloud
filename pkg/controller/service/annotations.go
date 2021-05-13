@@ -88,9 +88,9 @@ const (
 	// ServiceAnnotationLoadBalancerHealthCheckConnectPort health check connect port
 	HealthCheckConnectPort = AnnotationLoadBalancerPrefix + "health-check-connect-port"
 	// ServiceAnnotationLoadBalancerHealthCheckHealthyThreshold health check healthy thresh hold
-	HealthCheckHealthyThreshold = AnnotationLoadBalancerPrefix + "healthy-threshold"
+	HealthyThreshold = AnnotationLoadBalancerPrefix + "healthy-threshold"
 	// ServiceAnnotationLoadBalancerHealthCheckUnhealthyThreshold health check unhealthy thresh hold
-	HealthCheckUnhealthyThreshold = AnnotationLoadBalancerPrefix + "unhealthy-threshold"
+	UnhealthyThreshold = AnnotationLoadBalancerPrefix + "unhealthy-threshold"
 	// ServiceAnnotationLoadBalancerHealthCheckInterval health check interval
 	HealthCheckInterval = AnnotationLoadBalancerPrefix + "health-check-interval"
 	// ServiceAnnotationLoadBalancerHealthCheckConnectTimeout health check connect timeout
@@ -111,12 +111,19 @@ const (
 	Cookie = AnnotationLoadBalancerPrefix + "cookie"
 	// ServiceAnnotationLoadBalancerPersistenceTimeout persistence timeout
 	PersistenceTimeout = AnnotationLoadBalancerPrefix + "persistence-timeout"
+	// ConnectionDrain connection drain
+	ConnectionDrain = AnnotationLoadBalancerPrefix + "connection-drain"
+	// ConnectionDrainTimeout connection drain timeout
+	ConnectionDrainTimeout = AnnotationLoadBalancerPrefix + "connection-drain-timeout"
 
 	// VServerBackend Attribute
 	// ServiceAnnotationLoadBalancerBackendLabel backend labels
 	BackendLabel = AnnotationLoadBalancerPrefix + "backend-label"
 	// ServiceAnnotationLoadBalancerBackendType backend type
 	BackendType = "service.beta.kubernetes.io/backend-type"
+
+	// RemoveUnscheduled remove unscheduled node from backends
+	RemoveUnscheduled = AnnotationLoadBalancerPrefix + "remove-unscheduled-backend"
 )
 
 const (

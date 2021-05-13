@@ -5,6 +5,7 @@ import (
 	"github.com/aliyun/alibaba-cloud-sdk-go/sdk/utils"
 	"github.com/aliyun/alibaba-cloud-sdk-go/services/slb"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/model"
+	"reflect"
 	"testing"
 )
 
@@ -78,4 +79,23 @@ func changeName(local *model.LoadBalancer, remote *model.LoadBalancer) {
 
 	*remote.LoadBalancerAttribute.LoadBalancerName = "remote2"
 
+}
+
+type dog struct {
+	LegCount int
+}
+
+func TestProviderSLB_CreateLoadBalancerHTTPListener(t *testing.T) {
+	req := slb.CreateSetLoadBalancerTCPListenerAttributeRequest()
+	port := &model.ListenerAttribute{}
+	port.VGroupId = "12345"
+	setV(req, port)
+	t.Logf("vgroup id %s", req.VServerGroupId)
+
+}
+
+func setV(req interface{}, port *model.ListenerAttribute) {
+	v := reflect.ValueOf(req).Elem()
+	vgroup := v.FieldByName("VServerGroupId")
+	vgroup.SetString(port.VGroupId)
 }

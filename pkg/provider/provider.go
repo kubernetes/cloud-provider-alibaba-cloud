@@ -49,8 +49,18 @@ type ILoadBalancer interface {
 	DeleteSLB(ctx context.Context, slb *model.LoadBalancer) error
 	// Listener
 	DescribeLoadBalancerListeners(ctx context.Context, lbId string) ([]model.ListenerAttribute, error)
+	StartLoadBalancerListener(ctx context.Context, lbId string, port int) error
+	StopLoadBalancerListener(ctx context.Context, lbId string, port int) error
+	DeleteLoadBalancerListener(ctx context.Context, lbId string, port int) error
 	CreateLoadBalancerTCPListener(ctx context.Context, lbId string, port *model.ListenerAttribute) error
-	StartLoadBalancerListener(ctx context.Context, loadBalancerId string, port int) error
+	SetLoadBalancerTCPListenerAttribute(ctx context.Context, lbId string, port *model.ListenerAttribute) error
+	CreateLoadBalancerUDPListener(ctx context.Context, lbId string, port *model.ListenerAttribute) error
+	SetLoadBalancerUDPListenerAttribute(ctx context.Context, lbId string, port *model.ListenerAttribute) error
+	CreateLoadBalancerHTTPListener(ctx context.Context, lbId string, port *model.ListenerAttribute) error
+	SetLoadBalancerHTTPListenerAttribute(ctx context.Context, lbId string, port *model.ListenerAttribute) error
+	CreateLoadBalancerHTTPSListener(ctx context.Context, lbId string, port *model.ListenerAttribute) error
+	SetLoadBalancerHTTPSListenerAttribute(ctx context.Context, lbId string, port *model.ListenerAttribute) error
+
 	// VServerGroup
 	CreateVServerGroup(ctx context.Context, vg *model.VServerGroup, lbId string) error
 	DescribeVServerGroups(ctx context.Context, lbId string) ([]model.VServerGroup, error)

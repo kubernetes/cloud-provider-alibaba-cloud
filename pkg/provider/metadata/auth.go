@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"k8s.io/klog"
 	"path/filepath"
 	"strings"
 	"time"
@@ -39,6 +40,9 @@ import (
 )
 
 var KUBERNETES_CLOUD_CONTROLLER_MANAGER = "ack.ccm"
+
+// CLUSTER_ID default cluster id if it is not specified.
+var CLUSTER_ID = "clusterid"
 
 // TOKEN_RESYNC_PERIOD default Token sync period
 var TOKEN_RESYNC_PERIOD = 10 * time.Minute
@@ -117,6 +121,12 @@ func (mgr *ClientAuth) Start(
 			log.Warnf("load config fail: %s", err.Error())
 			return
 		}
+
+		if ctx2.CFG.Global.ClusterID != "" {
+			CLUSTER_ID = ctx2.CFG.Global.ClusterID
+			klog.Infof("use clusterid %s", CLUSTER_ID)
+		}
+
 		// refresh client Token periodically
 		token, err := mgr.Token().NextToken()
 		if err != nil {
