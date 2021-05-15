@@ -152,29 +152,29 @@ var DefaultValue = map[string]string{
 
 type AnnotationRequest struct{ svc *v1.Service }
 
-func (n *AnnotationRequest) Get(k string) *string {
+func (n *AnnotationRequest) Get(k string) string {
 	if n.svc == nil {
 		klog.Infof("extract annotation %s from empty service", k)
-		return nil
+		return ""
 	}
 
 	if n.svc.Annotations == nil {
-		return nil
+		return ""
 	}
 
 	key := composite(AnnotationPrefix, k)
 	v, ok := n.svc.Annotations[key]
 	if ok {
-		return &v
+		return v
 	}
 
 	lkey := composite(AnnotationLegacyPrefix, k)
 	v, ok = n.svc.Annotations[lkey]
 	if ok {
-		return &v
+		return v
 	}
 
-	return nil
+	return ""
 }
 
 func (n *AnnotationRequest) GetRaw(k string) string {
@@ -211,4 +211,39 @@ func (n *AnnotationRequest) GetDefaultLoadBalancerName() string {
 
 func composite(p, k string) string {
 	return fmt.Sprintf("%s-%s", p, k)
+}
+
+// getLoadBalancerAdditionalTags converts the comma separated list of key-value
+// pairs in the ServiceAnnotationLoadBalancerAdditionalTags annotation and returns
+// it as a map.
+func (n *AnnotationRequest) GetLoadBalancerAdditionalTags() []slb.Tag {
+	additionalTags := make(map[string]string)
+	additionalTagsList := n.Get(AdditionalTags)
+	if additionalTagsList != "" {
+		additionalTagsList = strings.TrimSpace(additionalTagsList)
+		// Break up list of "Key1=Val,Key2=Val2"
+		tagList := strings.Split(additionalTagsList, ",")
+
+		// Break up "Key=Val"
+		for _, tagSet := range tagList {
+			tag := strings.Split(strings.TrimSpace(tagSet), "=")
+
+			// Accept "Key=val" or "Key=" or just "Key"
+			if len(tag) >= 2 && len(tag[0]) != 0 {
+				// There is a key and a value, so save it
+				additionalTags[tag[0]] = tag[1]
+			} else if len(tag) == 1 && len(tag[0]) != 0 {
+				// Just "Key"
+				additionalTags[tag[0]] = ""
+			}
+		}
+	}
+	var tags []slb.Tag
+	for k, v := range additionalTags {
+		tags = append(tags, slb.Tag{
+			TagValue: v,
+			TagKey:   k,
+		})
+	}
+	return tags
 }

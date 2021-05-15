@@ -10,13 +10,7 @@ import (
 
 type ListenerStatus string
 
-const (
-	Starting    = ListenerStatus("starting")
-	Running     = ListenerStatus("running")
-	Configuring = ListenerStatus("configuring")
-	Stopping    = ListenerStatus("stopping")
-	Stopped     = ListenerStatus("stopped")
-)
+const Stopped = ListenerStatus("stopped")
 
 type AddressType string
 
@@ -27,10 +21,7 @@ const (
 
 type InternetChargeType string
 
-const (
-	PayByBandwidth = InternetChargeType("paybybandwidth")
-	PayByTraffic   = InternetChargeType("paybytraffic")
-)
+const PayByBandwidth = InternetChargeType("paybybandwidth")
 
 type AddressIPVersionType string
 
@@ -41,28 +32,11 @@ const (
 
 type LoadBalancerSpecType string
 
-const (
-	S1Small  = "slb.s1.small"
-	S2Small  = "slb.s2.small"
-	S2Medium = "slb.s2.medium"
-	S3Small  = "slb.s3.small"
-	S3Medium = "slb.s3.medium"
-	S3Large  = "slb.s3.large"
-)
+const S1Small = "slb.s1.small"
 
 type ModificationProtectionType string
 
-const (
-	NonProtection     = ModificationProtectionType("NonProtection")
-	ConsoleProtection = ModificationProtectionType("ConsoleProtection")
-)
-
-type SchedulerType string
-
-const (
-	WRRScheduler = SchedulerType("wrr")
-	WLCScheduler = SchedulerType("wlc")
-)
+const ConsoleProtection = ModificationProtectionType("ConsoleProtection")
 
 type FlagType string
 
@@ -71,21 +45,14 @@ const (
 	OffFlag = FlagType("off")
 )
 
-type StickySessionType string
-
-const (
-	InsertStickySessionType = StickySessionType("insert")
-	ServerStickySessionType = StickySessionType("server")
-)
-
-type Protocol string
-
 const (
 	HTTP  = "http"
 	HTTPS = "https"
 	TCP   = "tcp"
 	UDP   = "udp"
 )
+
+const ModificationProtectionReason = "managed.by.ack"
 
 // LoadBalancer represents a AlibabaCloud LoadBalancer.
 type LoadBalancer struct {
@@ -98,23 +65,24 @@ type LoadBalancer struct {
 type LoadBalancerAttribute struct {
 	IsUserManaged bool
 
-	// values can be modified by annotation
-	LoadBalancerName             *string
-	AddressType                  *string
-	VSwitchId                    *string
-	NetworkType                  *string
-	Bandwidth                    *int
-	InternetChargeType           *string
-	DeleteProtection             *string
-	ModificationProtectionStatus *string
-	ResourceGroupId              *string
-	LoadBalancerSpec             *string
-	MasterZoneId                 *string
-	SlaveZoneId                  *string
-	AddressIPVersion             *string
+	// parameters can be modified by annotation
+	// values of these parameters can not be set to the default value, no need to use ptr type
+	LoadBalancerName             string
+	AddressType                  AddressType
+	VSwitchId                    string
+	NetworkType                  string
+	Bandwidth                    int
+	InternetChargeType           InternetChargeType
+	DeleteProtection             FlagType
+	ModificationProtectionStatus ModificationProtectionType
+	ResourceGroupId              string
+	LoadBalancerSpec             LoadBalancerSpecType
+	MasterZoneId                 string
+	SlaveZoneId                  string
+	AddressIPVersion             AddressIPVersionType
 	Tags                         []slb.Tag
 
-	// values are immutable
+	// parameters are immutable
 	RegionId                     string
 	LoadBalancerId               string
 	LoadBalancerStatus           string
@@ -128,58 +96,54 @@ type ListenerAttribute struct {
 	IsUserManaged bool
 	NamedKey      *ListenerNamedKey
 
-	Description     string
-	ListenerForward string
+	// parameters are immutable
 	ListenerPort    int
-	Protocol        string
-	Status          string
+	Description     string
+	Status          ListenerStatus
+	ListenerForward FlagType
 
-	// VServerGroup
 	VGroupName string
 	VGroupId   string
 
+	// parameters can be modified by annotation
+	// values of these parameters can not be set to the default value, no need to use ptr type
+	Protocol                  string
+	Bandwidth                 int // values: -1 or 1~5120
+	Scheduler                 string
+	CertId                    string
+	ForwardPort               int
+	EnableHttp2               FlagType
+	Cookie                    string
+	CookieTimeout             int // values: 1~86400
+	StickySession             FlagType
+	StickySessionType         string
+	XForwardedFor             FlagType
+	XForwardedForProto        FlagType
+	AclId                     string
+	AclType                   string
+	AclStatus                 FlagType
+	HealthCheck               FlagType
+	HealthCheckType           string
+	HealthCheckDomain         string
+	HealthCheckURI            string
+	HealthCheckConnectPort    int
+	HealthyThreshold          int // values: 2~10
+	UnhealthyThreshold        int // values: 2~10
+	HealthCheckConnectTimeout int // values: 1~300
+	HealthCheckInterval       int // values: 1-50
+	HealthCheckHttpCode       string
+	ConnectionDrain           FlagType
+	ConnectionDrainTimeout    int // values: 10~900
+
 	// The following parameters can be changed by annotation
-	// Use pointer types to distinguish between real default values and user settings as default values
-	Bandwidth          *int
-	Scheduler          *string
+	// parameters can be set to the default value.
+	// Use the pointer type to distinguish. If the user does not set the param, the param is nil
 	PersistenceTimeout *int
-	CertId             *string
-	EnableHttp2        *string
-	ForwardPort        *int
-
-	Cookie            *string
-	CookieTimeout     *int
-	StickySession     *string
-	StickySessionType *string
-
-	// XForwardedFor
-	XForwardedFor      *string
-	XForwardedForProto *string
-
-	// ACL
-	AclId     *string
-	AclType   *string
-	AclStatus *string
-
-	// health check
-	HealthCheck               *string
-	HealthCheckType           *string
-	HealthCheckDomain         *string
-	HealthCheckURI            *string
-	HealthCheckConnectPort    *int
-	HealthyThreshold          *int
-	UnhealthyThreshold        *int
-	HealthCheckConnectTimeout *int
-	HealthCheckInterval       *int
-	HealthCheckHttpCode       *string
-
-	// connection drain
-	ConnectionDrain        *string
-	ConnectionDrainTimeout *int
 }
 
 type VServerGroup struct {
-	NamedKey *VGroupNamedKey
+	IsUserManaged bool
+	NamedKey      *VGroupNamedKey
 
 	VGroupId   string
 	VGroupName string

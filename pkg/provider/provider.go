@@ -43,28 +43,36 @@ type Route interface {
 }
 
 type ILoadBalancer interface {
-	FindSLB(ctx context.Context, slb *model.LoadBalancer) (bool, error)
-	CreateSLB(ctx context.Context, slb *model.LoadBalancer) error
-	DescribeSLB(ctx context.Context, slb *model.LoadBalancer) error
-	DeleteSLB(ctx context.Context, slb *model.LoadBalancer) error
+	// LoadBalancer
+	FindLoadBalancer(ctx context.Context, mdl *model.LoadBalancer) error
+	CreateLoadBalancer(ctx context.Context, mdl *model.LoadBalancer) error
+	DescribeLoadBalancer(ctx context.Context, mdl *model.LoadBalancer) error
+	DeleteLoadBalancer(ctx context.Context, mdl *model.LoadBalancer) error
+	ModifyLoadBalancerInstanceSpec(ctx context.Context, lbId string, spec string) error
+	SetLoadBalancerDeleteProtection(ctx context.Context, lbId string, flag string) error
+	SetLoadBalancerName(ctx context.Context, lbId string, name string) error
+	ModifyLoadBalancerInternetSpec(ctx context.Context, lbId string, chargeType string, bandwidth int) error
+	SetLoadBalancerModificationProtection(ctx context.Context, lbId string, flag string) error
+
 	// Listener
 	DescribeLoadBalancerListeners(ctx context.Context, lbId string) ([]model.ListenerAttribute, error)
 	StartLoadBalancerListener(ctx context.Context, lbId string, port int) error
 	StopLoadBalancerListener(ctx context.Context, lbId string, port int) error
 	DeleteLoadBalancerListener(ctx context.Context, lbId string, port int) error
-	CreateLoadBalancerTCPListener(ctx context.Context, lbId string, port *model.ListenerAttribute) error
-	SetLoadBalancerTCPListenerAttribute(ctx context.Context, lbId string, port *model.ListenerAttribute) error
-	CreateLoadBalancerUDPListener(ctx context.Context, lbId string, port *model.ListenerAttribute) error
-	SetLoadBalancerUDPListenerAttribute(ctx context.Context, lbId string, port *model.ListenerAttribute) error
-	CreateLoadBalancerHTTPListener(ctx context.Context, lbId string, port *model.ListenerAttribute) error
-	SetLoadBalancerHTTPListenerAttribute(ctx context.Context, lbId string, port *model.ListenerAttribute) error
-	CreateLoadBalancerHTTPSListener(ctx context.Context, lbId string, port *model.ListenerAttribute) error
-	SetLoadBalancerHTTPSListenerAttribute(ctx context.Context, lbId string, port *model.ListenerAttribute) error
+	CreateLoadBalancerTCPListener(ctx context.Context, lbId string, listener model.ListenerAttribute) error
+	SetLoadBalancerTCPListenerAttribute(ctx context.Context, lbId string, listener model.ListenerAttribute) error
+	CreateLoadBalancerUDPListener(ctx context.Context, lbId string, listener model.ListenerAttribute) error
+	SetLoadBalancerUDPListenerAttribute(ctx context.Context, lbId string, listener model.ListenerAttribute) error
+	CreateLoadBalancerHTTPListener(ctx context.Context, lbId string, listener model.ListenerAttribute) error
+	SetLoadBalancerHTTPListenerAttribute(ctx context.Context, lbId string, listener model.ListenerAttribute) error
+	CreateLoadBalancerHTTPSListener(ctx context.Context, lbId string, listener model.ListenerAttribute) error
+	SetLoadBalancerHTTPSListenerAttribute(ctx context.Context, lbId string, listener model.ListenerAttribute) error
 
 	// VServerGroup
-	CreateVServerGroup(ctx context.Context, vg *model.VServerGroup, lbId string) error
 	DescribeVServerGroups(ctx context.Context, lbId string) ([]model.VServerGroup, error)
+	CreateVServerGroup(ctx context.Context, vg *model.VServerGroup, lbId string) error
 	DescribeVServerGroupAttribute(ctx context.Context, vGroupId string) (*model.VServerGroup, error)
+	DeleteVServerGroup(ctx context.Context, vGroupId string) error
 
 	//DeleteVServerGroup(ctx context.Context, vGroupId string) (err error)
 	//SetVServerGroupAttribute(ctx context.Context, args *slb.SetVServerGroupAttributeArgs) (response *slb.SetVServerGroupAttributeResponse, err error)

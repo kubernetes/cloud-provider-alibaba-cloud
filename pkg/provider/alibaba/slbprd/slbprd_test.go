@@ -1,4 +1,4 @@
-package alibaba
+package slbprd
 
 import (
 	"github.com/aliyun/alibaba-cloud-sdk-go/sdk/requests"
@@ -86,11 +86,11 @@ type dog struct {
 }
 
 func TestProviderSLB_CreateLoadBalancerHTTPListener(t *testing.T) {
-	req := slb.CreateSetLoadBalancerTCPListenerAttributeRequest()
-	port := &model.ListenerAttribute{}
-	port.VGroupId = "12345"
-	setV(req, port)
-	t.Logf("vgroup id %s", req.VServerGroupId)
+	n1 := "123"
+	n2 := "123"
+	local := model.LoadBalancerAttribute{LoadBalancerName: &n1}
+	remote := model.LoadBalancerAttribute{LoadBalancerName: &n2}
+	t.Logf("equal: %v", *local.LoadBalancerName == *remote.LoadBalancerName)
 
 }
 

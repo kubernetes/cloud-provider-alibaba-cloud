@@ -1,12 +1,10 @@
 package service
 
 import (
-	"context"
 	"fmt"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/model"
-	prvd "k8s.io/cloud-provider-alibaba-cloud/pkg/provider"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/metadata"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/util"
 	"k8s.io/klog"
@@ -14,158 +12,105 @@ import (
 	"strings"
 )
 
+type CreateAction struct {
+	lbId     string
+	listener model.ListenerAttribute
+}
+
+type UpdateAction struct {
+	lbId   string
+	local  model.ListenerAttribute
+	remote model.ListenerAttribute
+}
+
+type DeleteAction struct {
+	lbId     string
+	listener model.ListenerAttribute
+}
+
 // IListener listener interface
 type IListener interface {
-	Describe(ctx context.Context) error
-	Add(ctx context.Context) error
-	Remove(ctx context.Context) error
-	Update(ctx context.Context) error
+	Create(action CreateAction) error
+	Update(action UpdateAction) error
 }
 
-type Listener struct {
-	cloud    prvd.Provider
-	namedKey *model.ListenerNamedKey
-	lbId     string
-	port     int
-	protocol string
-
-	// Action indicate the operate method. ADD UPDATE DELETE
-	action string
-
-	local  *model.ListenerAttribute
-	remote *model.ListenerAttribute
+type tcp struct {
+	reqCtx *RequestContext
 }
 
-var (
-	// ACTION_ADD actions add
-	ACTION_ADD = "ADD"
-
-	// ACTION_UPDATE update
-	ACTION_UPDATE = "UPDATE"
-
-	// ACTION_DELETE delete
-	ACTION_DELETE = "DELETE"
-)
-
-// Instance  listener instance
-func (n *Listener) Instance() IListener {
-	switch strings.ToLower(n.protocol) {
-	case model.TCP:
-		return &tcp{n}
-	case model.UDP:
-		return &udp{n}
-	case model.HTTP:
-		return &http{n}
-	case model.HTTPS:
-		return &https{n}
-	}
-	return &tcp{n}
-}
-
-// Apply apply listener operate . add/update/delete etc.
-func (n *Listener) Apply(ctx context.Context) error {
-	klog.Infof("apply %s listener for %v with trans protocol %s", n.action, n.namedKey, n.protocol)
-	switch n.action {
-	case ACTION_UPDATE:
-		return n.Instance().Update(ctx)
-	case ACTION_ADD:
-		err := n.Instance().Add(ctx)
-		if err != nil {
-			return err
-		}
-		return n.Start(ctx)
-	case ACTION_DELETE:
-		return n.Instance().Remove(ctx)
-	}
-	return fmt.Errorf("UnKnownAction: %s, %s", n.action, n.namedKey)
-}
-
-// Start start listener
-func (n *Listener) Start(ctx context.Context) error {
-	return n.cloud.StartLoadBalancerListener(ctx, n.lbId, n.port)
-}
-
-// Describe describe listener
-func (n *Listener) Describe(ctx context.Context) error {
-	return fmt.Errorf("unimplemented")
-}
-
-// Remove remove Listener
-func (n *Listener) Remove(ctx context.Context) error {
-	err := n.cloud.StopLoadBalancerListener(ctx, n.lbId, n.port)
+func (t *tcp) Create(action CreateAction) error {
+	setDefaultValueForListener(&action.listener)
+	err := t.reqCtx.cloud.CreateLoadBalancerTCPListener(t.reqCtx.ctx, action.lbId, action.listener)
 	if err != nil {
-		return err
+		return fmt.Errorf("create tcp listener %d error: %s", action.listener.ListenerPort, err.Error())
 	}
-	return n.cloud.DeleteLoadBalancerListener(ctx, n.lbId, n.port)
+	return t.reqCtx.cloud.StartLoadBalancerListener(t.reqCtx.ctx, action.lbId, action.listener.ListenerPort)
 }
 
-type tcp struct{ *Listener }
-
-func (t *tcp) Describe(ctx context.Context) error {
-	return fmt.Errorf("unimplemented")
-}
-
-func (t *tcp) Add(ctx context.Context) error {
-	setDefaultValueForListener(t.local)
-	return t.cloud.CreateLoadBalancerTCPListener(ctx, t.lbId, t.local)
-}
-
-func (t *tcp) Update(ctx context.Context) error {
-	if t.remote.Status == string(model.Stopped) {
-		if err := t.cloud.StartLoadBalancerListener(ctx, t.lbId, t.port); err != nil {
+func (t *tcp) Update(action UpdateAction) error {
+	if action.remote.Status == model.Stopped {
+		err := t.reqCtx.cloud.StartLoadBalancerListener(t.reqCtx.ctx, action.lbId, action.local.ListenerPort)
+		if err != nil {
 			return fmt.Errorf("start tcp listener error: %s", err.Error())
 		}
 	}
-	if !isNeedUpdate(t.local, t.remote) {
-		klog.Infof("tcp listener did not change, skip [update], port=[%d]", t.port)
+	if !isNeedUpdate(action.local, &action.remote) {
+		klog.Infof("tcp listener did not change, skip [update], port=[%d]", action.local.ListenerPort)
 		// no recreate needed.  skip
 		return nil
 	}
-	//return t.cloud.SetLoadBalancerTCPListenerAttribute(ctx, t.lbId, t.remote)
+	// TODO fix me
+	//return t.reqCtx.cloud.SetLoadBalancerTCPListenerAttribute(t.reqCtx.ctx, action.lbId, action.remote)
 	return nil
 }
 
-type udp struct{ *Listener }
-
-func (t *udp) Describe(ctx context.Context) error {
-	return fmt.Errorf("unimplemented")
+type udp struct {
+	reqCtx *RequestContext
 }
 
-func (t *udp) Add(ctx context.Context) error {
-	setDefaultValueForListener(t.local)
-	return t.cloud.CreateLoadBalancerUDPListener(ctx, t.lbId, t.local)
+func (t *udp) Create(action CreateAction) error {
+	setDefaultValueForListener(&action.listener)
+	err := t.reqCtx.cloud.CreateLoadBalancerUDPListener(t.reqCtx.ctx, action.lbId, action.listener)
+	if err != nil {
+		return fmt.Errorf("create udp listener %d error: %s", action.listener.ListenerPort, err.Error())
+	}
+	return t.reqCtx.cloud.StartLoadBalancerListener(t.reqCtx.ctx, action.lbId, action.listener.ListenerPort)
 }
 
-func (t *udp) Update(ctx context.Context) error {
-	if t.remote.Status == string(model.Stopped) {
-		if err := t.cloud.StartLoadBalancerListener(ctx, t.lbId, t.port); err != nil {
-			return fmt.Errorf("start udp listener error: %s", err.Error())
+func (t *udp) Update(action UpdateAction) error {
+	if action.remote.Status == model.Stopped {
+		err := t.reqCtx.cloud.StartLoadBalancerListener(t.reqCtx.ctx, action.lbId, action.local.ListenerPort)
+		if err != nil {
+			return fmt.Errorf("start tcp listener error: %s", err.Error())
 		}
 	}
-	if !isNeedUpdate(t.local, t.remote) {
-		klog.Infof("udp listener did not change, skip [update], port=[%d]", t.port)
+	if !isNeedUpdate(action.local, &action.remote) {
+		klog.Infof("udp listener did not change, skip [update], port=[%d]", action.local.ListenerPort)
 		// no recreate needed.  skip
 		return nil
 	}
-	return t.cloud.SetLoadBalancerUDPListenerAttribute(ctx, t.lbId, t.remote)
+	return t.reqCtx.cloud.SetLoadBalancerUDPListenerAttribute(t.reqCtx.ctx, action.lbId, action.remote)
 }
 
-type http struct{ *Listener }
-
-func (t *http) Describe(ctx context.Context) error {
-	return fmt.Errorf("unimplemented")
+type http struct {
+	reqCtx *RequestContext
 }
 
-func (t *http) Add(ctx context.Context) error {
-	setDefaultValueForListener(t.local)
-	return t.cloud.CreateLoadBalancerHTTPListener(ctx, t.lbId, t.local)
+func (t *http) Create(action CreateAction) error {
+	setDefaultValueForListener(&action.listener)
+	err := t.reqCtx.cloud.CreateLoadBalancerHTTPListener(t.reqCtx.ctx, action.lbId, action.listener)
+	if err != nil {
+		return fmt.Errorf("create http listener %d error: %s", action.listener.ListenerPort, err.Error())
+	}
+	return t.reqCtx.cloud.StartLoadBalancerListener(t.reqCtx.ctx, action.lbId, action.listener.ListenerPort)
+
 }
 
-func (t *http) Update(ctx context.Context) error {
-
-	if t.remote.Status == string(model.Stopped) {
-		if err := t.cloud.StartLoadBalancerListener(ctx, t.lbId, t.port); err != nil {
-			return fmt.Errorf("start http listener error: %s", err.Error())
+func (t *http) Update(action UpdateAction) error {
+	if action.remote.Status == model.Stopped {
+		err := t.reqCtx.cloud.StartLoadBalancerListener(t.reqCtx.ctx, action.lbId, action.local.ListenerPort)
+		if err != nil {
+			return fmt.Errorf("start tcp listener error: %s", err.Error())
 		}
 	}
 	// TODO forward
@@ -219,190 +164,49 @@ func (t *http) Update(ctx context.Context) error {
 	//	return t.Client.StartLoadBalancerListener(ctx, t.LoadBalancerID, int(t.Port))
 	//}
 
-	if t.remote.ListenerForward == string(model.OnFlag) {
-		klog.Infof("http %d ListenerForward is on, cannot update listener", t.port)
+	if action.remote.ListenerForward == model.OnFlag {
+		klog.Infof("http %d ListenerForward is on, cannot update listener", action.local.ListenerPort)
 		// no update needed.  skip
 		return nil
 	}
 
-	if !isNeedUpdate(t.local, t.remote) {
-		klog.Infof("http listener did not change, skip [update], port=[%d]", t.port)
+	if !isNeedUpdate(action.local, &action.remote) {
+		klog.Infof("http listener did not change, skip [update], port=[%d]", action.local.ListenerPort)
 		// no recreate needed.  skip
 		return nil
 	}
 
-	return t.cloud.SetLoadBalancerHTTPListenerAttribute(ctx, t.lbId, t.remote)
+	return t.reqCtx.cloud.SetLoadBalancerHTTPListenerAttribute(t.reqCtx.ctx, action.lbId, action.remote)
 
 }
 
-type https struct{ *Listener }
-
-func (t *https) Describe(ctx context.Context) error {
-	return fmt.Errorf("unimplemented")
+type https struct {
+	reqCtx *RequestContext
 }
 
-func (t *https) Add(ctx context.Context) error {
-	setDefaultValueForListener(t.local)
-	return t.cloud.CreateLoadBalancerHTTPSListener(ctx, t.lbId, t.local)
-}
-
-func (t *https) Update(ctx context.Context) error {
-	if t.remote.Status == string(model.Stopped) {
-		if err := t.cloud.StartLoadBalancerListener(ctx, t.lbId, t.port); err != nil {
-			return fmt.Errorf("start https listener error: %s", err.Error())
-		}
-	}
-	if !isNeedUpdate(t.local, t.remote) {
-		klog.Infof("https listener did not change, skip [update], port=[%d]", t.port)
-		// no recreate needed.  skip
-		return nil
-	}
-	return t.cloud.SetLoadBalancerHTTPSListenerAttribute(ctx, t.lbId, t.remote)
-}
-
-// ==========================================================================================
-func buildListenersFromService(c localModel, port v1.ServicePort) (model.ListenerAttribute, error) {
-	listener := model.ListenerAttribute{
-		NamedKey: &model.ListenerNamedKey{
-			Prefix:      model.DEFAULT_PREFIX,
-			CID:         metadata.CLUSTER_ID,
-			Namespace:   c.svc.Namespace,
-			ServiceName: c.svc.Name,
-			Port:        port.Port,
-		},
-		ListenerPort: int(port.Port),
-	}
-
-	listener.Description = listener.NamedKey.Key()
-	listener.VGroupName = getVGroupNamedKey(c.svc, port).Key()
-
-	proto, err := protocol(c.anno.Get(ProtocolPort), port)
+func (t *https) Create(action CreateAction) error {
+	setDefaultValueForListener(&action.listener)
+	err := t.reqCtx.cloud.CreateLoadBalancerHTTPSListener(t.reqCtx.ctx, action.lbId, action.listener)
 	if err != nil {
-		return listener, err
+		return fmt.Errorf("create https listener %d error: %s", action.listener.ListenerPort, err.Error())
 	}
-	listener.Protocol = proto
+	return t.reqCtx.cloud.StartLoadBalancerListener(t.reqCtx.ctx, action.lbId, action.listener.ListenerPort)
 
-	if c.anno.Get(Scheduler) != nil {
-		listener.Scheduler = c.anno.Get(Scheduler)
-	}
+}
 
-	if c.anno.Get(PersistenceTimeout) != nil {
-		timeout, err := strconv.Atoi(*c.anno.Get(PersistenceTimeout))
+func (t *https) Update(action UpdateAction) error {
+	if action.remote.Status == model.Stopped {
+		err := t.reqCtx.cloud.StartLoadBalancerListener(t.reqCtx.ctx, action.lbId, action.local.ListenerPort)
 		if err != nil {
-			return listener, fmt.Errorf("annotation persistence timeout must be integer, but got [%s]. message=[%s]\n",
-				*c.anno.Get(PersistenceTimeout), err.Error())
+			return fmt.Errorf("start tcp listener error: %s", err.Error())
 		}
-		listener.PersistenceTimeout = &timeout
 	}
-
-	if c.anno.Get(CertID) != nil {
-		listener.CertId = c.anno.Get(CertID)
+	if !isNeedUpdate(action.local, &action.remote) {
+		klog.Infof("https listener did not change, skip [update], port=[%d]", action.local.ListenerPort)
+		// no recreate needed.  skip
+		return nil
 	}
-
-	if c.anno.Get(ForwardPort) != nil && listener.Protocol == model.HTTP {
-		forward := forwardPort(*c.anno.Get(ForwardPort), int(port.Port))
-		listener.ForwardPort = &forward
-
-	}
-
-	// acl
-	if c.anno.Get(AclStatus) != nil {
-		listener.AclStatus = c.anno.Get(AclStatus)
-	}
-	if c.anno.Get(AclType) != nil {
-		listener.AclType = c.anno.Get(AclType)
-	}
-	if c.anno.Get(AclID) != nil {
-		listener.AclId = c.anno.Get(AclID)
-	}
-
-	// connection drain
-	if c.anno.Get(ConnectionDrain) != nil {
-		listener.ConnectionDrain = c.anno.Get(ConnectionDrain)
-	}
-	if c.anno.Get(ConnectionDrainTimeout) != nil {
-		timeout, err := strconv.Atoi(*c.anno.Get(ConnectionDrainTimeout))
-		if err != nil {
-			return listener, fmt.Errorf("annotation ConnectionDrainTimeout must be integer, but got [%s]. message=[%s]\n",
-				*c.anno.Get(ConnectionDrainTimeout), err.Error())
-		}
-		listener.ConnectionDrainTimeout = &timeout
-	}
-
-	// cookie
-	if c.anno.Get(Cookie) != nil {
-		listener.Cookie = c.anno.Get(Cookie)
-	}
-	if c.anno.Get(CookieTimeout) != nil {
-		timeout, err := strconv.Atoi(*c.anno.Get(CookieTimeout))
-		if err != nil {
-			return listener, fmt.Errorf("annotation CookieTimeout must be integer, but got [%s]. message=[%s]\n",
-				*c.anno.Get(CookieTimeout), err.Error())
-		}
-		listener.CookieTimeout = &timeout
-	}
-	if c.anno.Get(SessionStick) != nil {
-		listener.StickySession = c.anno.Get(SessionStick)
-	}
-	if c.anno.Get(SessionStickType) != nil {
-		listener.StickySessionType = c.anno.Get(SessionStickType)
-	}
-
-	// health check
-	if c.anno.Get(HealthyThreshold) != nil {
-		t, err := strconv.Atoi(*c.anno.Get(HealthyThreshold))
-		if err != nil {
-			return listener, fmt.Errorf("annotation HealthyThreshold must be integer, but got [%s]. message=[%s]\n",
-				*c.anno.Get(HealthyThreshold), err.Error())
-		}
-		listener.HealthyThreshold = &t
-	}
-	if c.anno.Get(UnhealthyThreshold) != nil {
-		t, err := strconv.Atoi(*c.anno.Get(UnhealthyThreshold))
-		if err != nil {
-			return listener, fmt.Errorf("annotation UnhealthyThreshold must be integer, but got [%s]. message=[%s]\n",
-				*c.anno.Get(UnhealthyThreshold), err.Error())
-		}
-		listener.UnhealthyThreshold = &t
-	}
-	if c.anno.Get(HealthCheckConnectTimeout) != nil {
-		timeout, err := strconv.Atoi(*c.anno.Get(HealthCheckConnectTimeout))
-		if err != nil {
-			return listener, fmt.Errorf("annotation HealthCheckConnectTimeout must be integer, but got [%s]. message=[%s]\n",
-				*c.anno.Get(HealthCheckConnectTimeout), err.Error())
-		}
-		listener.HealthCheckConnectTimeout = &timeout
-	}
-	if c.anno.Get(HealthCheckConnectPort) != nil {
-		port, err := strconv.Atoi(*c.anno.Get(HealthCheckConnectPort))
-		if err != nil {
-			return listener, fmt.Errorf("annotation HealthCheckConnectPort must be integer, but got [%s]. message=[%s]\n",
-				*c.anno.Get(HealthCheckConnectPort), err.Error())
-		}
-		listener.HealthCheckConnectPort = &port
-	}
-	if c.anno.Get(HealthCheckInterval) != nil {
-		t, err := strconv.Atoi(*c.anno.Get(HealthCheckInterval))
-		if err != nil {
-			return listener, fmt.Errorf("annotation HealthCheckInterval must be integer, but got [%s]. message=[%s]\n",
-				*c.anno.Get(HealthCheckInterval), err.Error())
-		}
-		listener.HealthCheckInterval = &t
-	}
-	if c.anno.Get(HealthCheckDomain) != nil {
-		listener.HealthCheckDomain = c.anno.Get(HealthCheckDomain)
-	}
-	if c.anno.Get(HealthCheckURI) != nil {
-		listener.HealthCheckURI = c.anno.Get(HealthCheckURI)
-	}
-	if c.anno.Get(HealthCheckHTTPCode) != nil {
-		listener.HealthCheckHttpCode = c.anno.Get(HealthCheckHTTPCode)
-	}
-	if c.anno.Get(HealthCheckType) != nil {
-		listener.HealthCheckType = c.anno.Get(HealthCheckType)
-	}
-
-	return listener, nil
+	return t.reqCtx.cloud.SetLoadBalancerHTTPSListenerAttribute(t.reqCtx.ctx, action.lbId, action.remote)
 }
 
 func forwardPort(port string, target int) int {
@@ -434,46 +238,23 @@ func forwardPort(port string, target int) int {
 	return 0
 }
 
-type Listeners []*Listener
-
-func buildActionsForListeners(m *modelApplier, local *model.LoadBalancer, remote *model.LoadBalancer) (Listeners, error) {
+func buildActionsForListeners(local *model.LoadBalancer, remote *model.LoadBalancer) ([]CreateAction, []UpdateAction, []DeleteAction, error) {
 	klog.Infof("try to update listener. local: [%v], remote: [%v]", util.PrettyJson(local.Listeners), util.PrettyJson(remote.Listeners))
-	// make https come first.
-	// ensure https listeners to be created first for http forward
-	//sort.SliceStable(
-	//	updates,
-	//	func(i, j int) bool {
-	//		// 1. https comes first.
-	//		// 2. DELETE action comes before https
-	//		if isDeleteAction(updates[i].Action) {
-	//			return true
-	//		}
-	//		if isDeleteAction(updates[j].Action) {
-	//			return false
-	//		}
-	//		if strings.ToUpper(
-	//			updates[i].TransforedProto,
-	//		) == "HTTPS" {
-	//			return true
-	//		}
-	//		return false
-	//	},
-	//)
 	var (
-		addition Listeners
-		updation Listeners
-		deletion Listeners
+		createActions []CreateAction
+		updateActions []UpdateAction
+		deleteActions []DeleteAction
 	)
 	for i := range local.Listeners {
 		if err := findVServerGroup(remote.VServerGroups, &local.Listeners[i]); err != nil {
-			return nil, fmt.Errorf("find vservergroup error: %s", err.Error())
+			return createActions, updateActions, deleteActions, fmt.Errorf("find vservergroup error: %s", err.Error())
 		}
 	}
 
 	// For updations and deletions
-	for i, rlis := range remote.Listeners {
+	for _, rlis := range remote.Listeners {
 		found := false
-		for j, llis := range local.Listeners {
+		for _, llis := range local.Listeners {
 			if rlis.ListenerPort == llis.ListenerPort {
 				found = true
 				// port matched. that is where the conflict case begin.
@@ -489,16 +270,11 @@ func buildActionsForListeners(m *modelApplier, local *model.LoadBalancer, remote
 					//}
 
 					// do update operate
-					updation = append(updation,
-						&Listener{
-							cloud:    m.cloud,
-							namedKey: llis.NamedKey,
-							lbId:     remote.LoadBalancerAttribute.LoadBalancerId,
-							port:     llis.ListenerPort,
-							protocol: llis.Protocol,
-							local:    &local.Listeners[j],
-							remote:   &remote.Listeners[i],
-							action:   ACTION_UPDATE,
+					updateActions = append(updateActions,
+						UpdateAction{
+							lbId:   remote.LoadBalancerAttribute.LoadBalancerId,
+							local:  llis,
+							remote: rlis,
 						})
 					klog.Infof("found listener %d with port & protocol match, do update", llis.ListenerPort)
 				}
@@ -531,21 +307,16 @@ func buildActionsForListeners(m *modelApplier, local *model.LoadBalancer, remote
 			//} else {
 			//	utils.Logf(svc, "port [%d] not managed by my service [%s/%s], skip processing.", remote.Port, svc.Namespace, svc.Name)
 			//}
-			deletion = append(deletion, &Listener{
-				cloud:    m.cloud,
-				namedKey: rlis.NamedKey,
+			deleteActions = append(deleteActions, DeleteAction{
 				lbId:     remote.LoadBalancerAttribute.LoadBalancerId,
-				port:     rlis.ListenerPort,
-				protocol: rlis.Protocol,
-				remote:   &remote.Listeners[i],
-				action:   ACTION_DELETE,
+				listener: rlis,
 			})
 			klog.Infof("not found listener [%d], do delete", rlis.ListenerPort)
 		}
 	}
 
 	// For additions
-	for i, llis := range local.Listeners {
+	for _, llis := range local.Listeners {
 		found := false
 		for _, rlis := range remote.Listeners {
 			if llis.ListenerPort == rlis.ListenerPort {
@@ -559,29 +330,23 @@ func buildActionsForListeners(m *modelApplier, local *model.LoadBalancer, remote
 			}
 		}
 		if !found {
-			addition = append(addition, &Listener{
-				cloud:    m.cloud,
-				namedKey: llis.NamedKey,
+			createActions = append(createActions, CreateAction{
 				lbId:     remote.LoadBalancerAttribute.LoadBalancerId,
-				port:     llis.ListenerPort,
-				protocol: llis.Protocol,
-				local:    &local.Listeners[i],
-				action:   ACTION_ADD,
+				listener: llis,
 			})
 		}
 	}
-	// Pls be careful of the sequence. deletion first,then addition, last updation
-	return append(append(deletion, addition...), updation...), nil
+	return createActions, updateActions, deleteActions, nil
 }
 
 // Protocol for protocol transform
-func protocol(annotation *string, port v1.ServicePort) (string, error) {
+func protocol(annotation string, port v1.ServicePort) (string, error) {
 
-	if annotation == nil {
+	if annotation == "" {
 		klog.Infof("transfor protocol, empty annotation %d/%s", port.Port, port.Protocol)
 		return strings.ToLower(string(port.Protocol)), nil
 	}
-	for _, v := range strings.Split(*annotation, ",") {
+	for _, v := range strings.Split(annotation, ",") {
 		pp := strings.Split(v, ":")
 		if len(pp) < 2 {
 			return "", fmt.Errorf("port and "+
@@ -625,13 +390,13 @@ func getVGroupNamedKey(svc *v1.Service, servicePort v1.ServicePort) *model.VGrou
 }
 
 func setDefaultValueForListener(n *model.ListenerAttribute) {
-	if n.Bandwidth == nil {
-		defaultBandwidth := DEFAULT_LISTENER_BANDWIDTH
-		n.Bandwidth = &defaultBandwidth
+	if n.Bandwidth == 0 {
+		n.Bandwidth = DEFAULT_LISTENER_BANDWIDTH
 	}
 }
 
-func isNeedUpdate(local *model.ListenerAttribute, remote *model.ListenerAttribute) bool {
+// todo return update content, do not use remote directly
+func isNeedUpdate(local model.ListenerAttribute, remote *model.ListenerAttribute) bool {
 	needUpdate := false
 
 	if remote.VGroupId != local.VGroupId {
@@ -639,59 +404,59 @@ func isNeedUpdate(local *model.ListenerAttribute, remote *model.ListenerAttribut
 		remote.VGroupId = local.VGroupId
 	}
 	// acl
-	if local.AclStatus != nil &&
+	if local.AclStatus != "" &&
 		remote.AclStatus != local.AclStatus {
 		needUpdate = true
 		remote.AclStatus = local.AclStatus
 	}
-	if local.AclId != nil &&
+	if local.AclId != "" &&
 		remote.AclId != local.AclId {
 		needUpdate = true
 		remote.AclId = local.AclId
 	}
-	if local.AclType != nil &&
+	if local.AclType != "" &&
 		remote.AclType != local.AclType {
 		needUpdate = true
 		remote.AclType = local.AclType
 	}
-	if local.Scheduler != nil &&
+	if local.Scheduler != "" &&
 		remote.Scheduler != local.Scheduler {
 		needUpdate = true
 		remote.Scheduler = local.Scheduler
 	}
 	// health check
-	if local.HealthCheckType != nil &&
+	if local.HealthCheckType != "" &&
 		remote.HealthCheckType != local.HealthCheckType {
 		needUpdate = true
 		remote.HealthCheckType = local.HealthCheckType
 	}
 
-	if local.HealthCheckURI != nil &&
+	if local.HealthCheckURI != "" &&
 		remote.HealthCheckURI != local.HealthCheckURI {
 		needUpdate = true
 		remote.HealthCheckURI = local.HealthCheckURI
 	}
-	if local.HealthCheckConnectPort != nil &&
+	if local.HealthCheckConnectPort != 0 &&
 		remote.HealthCheckConnectPort != local.HealthCheckConnectPort {
 		needUpdate = true
 		remote.HealthCheckConnectPort = local.HealthCheckConnectPort
 	}
-	if local.HealthyThreshold != nil &&
+	if local.HealthyThreshold != 0 &&
 		remote.HealthyThreshold != local.HealthyThreshold {
 		needUpdate = true
 		remote.HealthyThreshold = local.HealthyThreshold
 	}
-	if local.UnhealthyThreshold != nil &&
+	if local.UnhealthyThreshold != 0 &&
 		remote.UnhealthyThreshold != local.UnhealthyThreshold {
 		needUpdate = true
 		remote.UnhealthyThreshold = local.UnhealthyThreshold
 	}
-	if local.HealthCheckConnectTimeout != nil &&
+	if local.HealthCheckConnectTimeout != 0 &&
 		remote.HealthCheckConnectTimeout != local.HealthCheckConnectTimeout {
 		needUpdate = true
 		remote.HealthCheckConnectTimeout = local.HealthCheckConnectTimeout
 	}
-	if local.HealthCheckInterval != nil &&
+	if local.HealthCheckInterval != 0 &&
 		remote.HealthCheckInterval != local.HealthCheckInterval {
 		needUpdate = true
 		remote.HealthCheckInterval = local.HealthCheckInterval
@@ -701,12 +466,12 @@ func isNeedUpdate(local *model.ListenerAttribute, remote *model.ListenerAttribut
 		needUpdate = true
 		remote.PersistenceTimeout = local.PersistenceTimeout
 	}
-	if local.HealthCheckHttpCode != nil &&
+	if local.HealthCheckHttpCode != "" &&
 		remote.HealthCheckHttpCode != local.HealthCheckHttpCode {
 		needUpdate = true
 		remote.HealthCheckHttpCode = local.HealthCheckHttpCode
 	}
-	if local.HealthCheckDomain != nil &&
+	if local.HealthCheckDomain != "" &&
 		remote.HealthCheckDomain != local.HealthCheckDomain {
 		needUpdate = true
 		remote.HealthCheckDomain = local.HealthCheckDomain
@@ -723,4 +488,204 @@ func findVServerGroup(vgs []model.VServerGroup, port *model.ListenerAttribute) e
 		}
 	}
 	return fmt.Errorf("can not find vgroup by name %s", port.VGroupName)
+}
+
+// ==========================================================================================
+
+func (reqCtx *RequestContext) BuildListenersFromService(mdl *model.LoadBalancer) error {
+	for _, port := range reqCtx.svc.Spec.Ports {
+		listener, err := buildListenerFromServicePort(reqCtx, port)
+		if err != nil {
+			return fmt.Errorf("build listener from servicePort %d error: %s", port.Port, err.Error())
+		}
+		mdl.Listeners = append(mdl.Listeners, listener)
+	}
+	return nil
+}
+
+func (reqCtx *RequestContext) BuildListenersFromCloud(mdl *model.LoadBalancer) error {
+	listeners, err := reqCtx.cloud.DescribeLoadBalancerListeners(reqCtx.ctx, mdl.LoadBalancerAttribute.LoadBalancerId)
+	if err != nil {
+		return fmt.Errorf("DescribeLoadBalancerListeners error:%s", err.Error())
+	}
+	mdl.Listeners = listeners
+	return nil
+}
+
+func (reqCtx *RequestContext) EnsureListenerCreated(action CreateAction) error {
+	switch strings.ToLower(action.listener.Protocol) {
+	case model.TCP:
+		return (&tcp{reqCtx}).Create(action)
+	case model.UDP:
+		return (&udp{reqCtx}).Create(action)
+	case model.HTTP:
+		return (&http{reqCtx}).Create(action)
+	case model.HTTPS:
+		return (&https{reqCtx}).Create(action)
+	default:
+		return fmt.Errorf("%s protocol is not supported", action.listener.Protocol)
+	}
+
+}
+
+func (reqCtx *RequestContext) EnsureListenerDeleted(action DeleteAction) error {
+	return reqCtx.cloud.DeleteLoadBalancerListener(reqCtx.ctx, action.lbId, action.listener.ListenerPort)
+}
+
+func (reqCtx *RequestContext) EnsureListenerUpdated(action UpdateAction) error {
+	switch strings.ToLower(action.local.Protocol) {
+	case model.TCP:
+		return (&tcp{reqCtx}).Update(action)
+	case model.UDP:
+		return (&udp{reqCtx}).Update(action)
+	case model.HTTP:
+		return (&http{reqCtx}).Update(action)
+	case model.HTTPS:
+		return (&https{reqCtx}).Update(action)
+	default:
+		return fmt.Errorf("%s protocol is not supported", action.local.Protocol)
+	}
+}
+
+func buildListenerFromServicePort(req *RequestContext, port v1.ServicePort) (model.ListenerAttribute, error) {
+	listener := model.ListenerAttribute{
+		NamedKey: &model.ListenerNamedKey{
+			Prefix:      model.DEFAULT_PREFIX,
+			CID:         metadata.CLUSTER_ID,
+			Namespace:   req.svc.Namespace,
+			ServiceName: req.svc.Name,
+			Port:        port.Port,
+		},
+		ListenerPort: int(port.Port),
+	}
+
+	listener.Description = listener.NamedKey.Key()
+	listener.VGroupName = getVGroupNamedKey(req.svc, port).Key()
+
+	proto, err := protocol(req.anno.Get(ProtocolPort), port)
+	if err != nil {
+		return listener, err
+	}
+	listener.Protocol = proto
+
+	if req.anno.Get(Scheduler) != "" {
+		listener.Scheduler = req.anno.Get(Scheduler)
+	}
+
+	if req.anno.Get(PersistenceTimeout) != "" {
+		timeout, err := strconv.Atoi(req.anno.Get(PersistenceTimeout))
+		if err != nil {
+			return listener, fmt.Errorf("annotation persistence timeout must be integer, but got [%s]. message=[%s]\n",
+				req.anno.Get(PersistenceTimeout), err.Error())
+		}
+		listener.PersistenceTimeout = &timeout
+	}
+
+	if req.anno.Get(CertID) != "" {
+		listener.CertId = req.anno.Get(CertID)
+	}
+
+	if req.anno.Get(ForwardPort) != "" && listener.Protocol == model.HTTP {
+		listener.ForwardPort = forwardPort(req.anno.Get(ForwardPort), int(port.Port))
+
+	}
+
+	// acl
+	if req.anno.Get(AclStatus) != "" {
+		listener.AclStatus = model.FlagType(req.anno.Get(AclStatus))
+	}
+	if req.anno.Get(AclType) != "" {
+		listener.AclType = req.anno.Get(AclType)
+	}
+	if req.anno.Get(AclID) != "" {
+		listener.AclId = req.anno.Get(AclID)
+	}
+
+	// connection drain
+	if req.anno.Get(ConnectionDrain) != "" {
+		listener.ConnectionDrain = model.FlagType(req.anno.Get(ConnectionDrain))
+	}
+	if req.anno.Get(ConnectionDrainTimeout) != "" {
+		timeout, err := strconv.Atoi(req.anno.Get(ConnectionDrainTimeout))
+		if err != nil {
+			return listener, fmt.Errorf("annotation ConnectionDrainTimeout must be integer, but got [%s]. message=[%s]\n",
+				req.anno.Get(ConnectionDrainTimeout), err.Error())
+		}
+		listener.ConnectionDrainTimeout = timeout
+	}
+
+	// cookie
+	if req.anno.Get(Cookie) != "" {
+		listener.Cookie = req.anno.Get(Cookie)
+	}
+	if req.anno.Get(CookieTimeout) != "" {
+		timeout, err := strconv.Atoi(req.anno.Get(CookieTimeout))
+		if err != nil {
+			return listener, fmt.Errorf("annotation CookieTimeout must be integer, but got [%s]. message=[%s]\n",
+				req.anno.Get(CookieTimeout), err.Error())
+		}
+		listener.CookieTimeout = timeout
+	}
+	if req.anno.Get(SessionStick) != "" {
+		listener.StickySession = model.FlagType(req.anno.Get(SessionStick))
+	}
+	if req.anno.Get(SessionStickType) != "" {
+		listener.StickySessionType = req.anno.Get(SessionStickType)
+	}
+
+	// health check
+	if req.anno.Get(HealthyThreshold) != "" {
+		t, err := strconv.Atoi(req.anno.Get(HealthyThreshold))
+		if err != nil {
+			return listener, fmt.Errorf("annotation HealthyThreshold must be integer, but got [%s]. message=[%s]\n",
+				req.anno.Get(HealthyThreshold), err.Error())
+		}
+		listener.HealthyThreshold = t
+	}
+	if req.anno.Get(UnhealthyThreshold) != "" {
+		t, err := strconv.Atoi(req.anno.Get(UnhealthyThreshold))
+		if err != nil {
+			return listener, fmt.Errorf("annotation UnhealthyThreshold must be integer, but got [%s]. message=[%s]\n",
+				req.anno.Get(UnhealthyThreshold), err.Error())
+		}
+		listener.UnhealthyThreshold = t
+	}
+	if req.anno.Get(HealthCheckConnectTimeout) != "" {
+		timeout, err := strconv.Atoi(req.anno.Get(HealthCheckConnectTimeout))
+		if err != nil {
+			return listener, fmt.Errorf("annotation HealthCheckConnectTimeout must be integer, but got [%s]. message=[%s]\n",
+				req.anno.Get(HealthCheckConnectTimeout), err.Error())
+		}
+		listener.HealthCheckConnectTimeout = timeout
+	}
+	if req.anno.Get(HealthCheckConnectPort) != "" {
+		port, err := strconv.Atoi(req.anno.Get(HealthCheckConnectPort))
+		if err != nil {
+			return listener, fmt.Errorf("annotation HealthCheckConnectPort must be integer, but got [%s]. message=[%s]\n",
+				req.anno.Get(HealthCheckConnectPort), err.Error())
+		}
+		listener.HealthCheckConnectPort = port
+	}
+	if req.anno.Get(HealthCheckInterval) != "" {
+		t, err := strconv.Atoi(req.anno.Get(HealthCheckInterval))
+		if err != nil {
+			return listener, fmt.Errorf("annotation HealthCheckInterval must be integer, but got [%s]. message=[%s]\n",
+				req.anno.Get(HealthCheckInterval), err.Error())
+		}
+		listener.HealthCheckInterval = t
+	}
+	if req.anno.Get(HealthCheckDomain) != "" {
+		listener.HealthCheckDomain = req.anno.Get(HealthCheckDomain)
+	}
+	if req.anno.Get(HealthCheckURI) != "" {
+		listener.HealthCheckURI = req.anno.Get(HealthCheckURI)
+	}
+	if req.anno.Get(HealthCheckHTTPCode) != "" {
+		listener.HealthCheckHttpCode = req.anno.Get(HealthCheckHTTPCode)
+	}
+	if req.anno.Get(HealthCheckType) != "" {
+		listener.HealthCheckType = req.anno.Get(HealthCheckType)
+	}
+
+	return listener, nil
 }

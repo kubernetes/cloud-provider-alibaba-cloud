@@ -32,31 +32,72 @@ type EndpointWithENI struct {
 	Endpoints *v1.Endpoints
 }
 
-func buildVGroupsFromService(c localModel) ([]model.VServerGroup, error) {
+func (reqCtx *RequestContext) BuildVGroupsFromService(m *model.LoadBalancer) error {
 	var vgs []model.VServerGroup
-
-	nodes, err := getNodes(c.ctx, c.kubeClient, c.anno)
+	nodes, err := getNodes(reqCtx.ctx, reqCtx.kubeClient, reqCtx.anno)
 	if err != nil {
-		return vgs, fmt.Errorf("build vserver group error: %s", err.Error())
+		return fmt.Errorf("get nodes error: %s", err.Error())
 	}
 
-	eps, err := getEndpoints(c.ctx, c.kubeClient, c.svc)
+	eps, err := getEndpoints(reqCtx.ctx, reqCtx.kubeClient, reqCtx.svc)
+	if err != nil {
+		return fmt.Errorf("get endpoints error: %s", err.Error())
+	}
 
 	candidates := EndpointWithENI{
-		LocalMode:      isLocalModeService(c.svc),
-		BackendTypeENI: isENIBackendType(c.svc),
+		LocalMode:      isLocalModeService(reqCtx.svc),
+		BackendTypeENI: isENIBackendType(reqCtx.svc),
 		Nodes:          nodes,
 		Endpoints:      eps,
 	}
 
-	for _, port := range c.svc.Spec.Ports {
-		vg, err := buildVGroup(c, port, &candidates)
+	for _, port := range reqCtx.svc.Spec.Ports {
+		vg, err := buildVGroup(reqCtx, port, &candidates)
 		if err != nil {
-			return vgs, err
+			return fmt.Errorf("build vgroup for port %d error: %s", port.Port, err.Error())
 		}
 		vgs = append(vgs, vg)
 	}
-	return vgs, nil
+	m.VServerGroups = vgs
+	return nil
+}
+
+func (reqCtx *RequestContext) BuildVGroupsFromCloud(m *model.LoadBalancer) error {
+	vgs, err := reqCtx.cloud.DescribeVServerGroups(reqCtx.ctx, m.LoadBalancerAttribute.LoadBalancerId)
+	if err != nil {
+		return fmt.Errorf("DescribeVServerGroups error: %s", err.Error())
+	}
+	m.VServerGroups = vgs
+	return nil
+}
+
+func (reqCtx *RequestContext) EnsureVGroupCreated(vg *model.VServerGroup, lbId string) error {
+	return reqCtx.cloud.CreateVServerGroup(reqCtx.ctx, vg, lbId)
+}
+
+func (reqCtx *RequestContext) EnsureVGroupDeleted(vGroupId string) error {
+	return reqCtx.cloud.DeleteVServerGroup(reqCtx.ctx, vGroupId)
+}
+
+func (reqCtx *RequestContext) EnsureVGroupUpdated(old, new model.VServerGroup) error {
+	add, del, update := diff(old, new)
+	if len(add) == 0 && len(del) == 0 && len(update) == 0 {
+		klog.Infof("update: no backend need to be added for vgroupid")
+	}
+	//if len(add) > 0 {
+	//	if err := batchCreateVServerGroupBackendServers(ctx, del); err != nil {
+	//		break
+	//	}
+	//}
+	//if len(del) > 0 {
+	//	if err := batchRemoveVServerGroupBackendServers(ctx, del); err != nil {
+	//		break
+	//	}
+	//}
+	//if len(update) > 0 {
+	//	batchUpdateVServerGroupBackendServers(ctx, update)
+	//}
+	return nil
 }
 
 func getNodes(ctx context.Context, client client.Client, anno *AnnotationRequest) ([]v1.Node, error) {
@@ -68,8 +109,8 @@ func getNodes(ctx context.Context, client client.Client, anno *AnnotationRequest
 
 	// 1. filter by label
 	items := nodeList.Items
-	if anno.Get(BackendLabel) != nil {
-		items, err = filterOutByLabel(nodeList.Items, *anno.Get(BackendLabel))
+	if anno.Get(BackendLabel) != "" {
+		items, err = filterOutByLabel(nodeList.Items, anno.Get(BackendLabel))
 		if err != nil {
 			return nil, fmt.Errorf("filter nodes by label error: %s", err.Error())
 		}
@@ -78,8 +119,8 @@ func getNodes(ctx context.Context, client client.Client, anno *AnnotationRequest
 	var nodes []v1.Node
 	for _, n := range items {
 		// 2. filter unscheduled node
-		if n.Spec.Unschedulable && anno.Get(RemoveUnscheduled) != nil {
-			if *anno.Get(RemoveUnscheduled) == string(model.OnFlag) {
+		if n.Spec.Unschedulable && anno.Get(RemoveUnscheduled) != "" {
+			if anno.Get(RemoveUnscheduled) == string(model.OnFlag) {
 				klog.Infof("ignore node %s with unschedulable condition", n.Name)
 				continue
 			}
@@ -161,13 +202,13 @@ func getEndpoints(ctx context.Context, client client.Client, svc *v1.Service) (*
 	return eps, nil
 }
 
-func buildVGroup(c localModel, port v1.ServicePort, candidates *EndpointWithENI) (model.VServerGroup, error) {
+func buildVGroup(req *RequestContext, port v1.ServicePort, candidates *EndpointWithENI) (model.VServerGroup, error) {
 	vg := model.VServerGroup{
-		NamedKey: getVGroupNamedKey(c.svc, port),
+		NamedKey: getVGroupNamedKey(req.svc, port),
 	}
 	vg.VGroupName = vg.NamedKey.Key()
 
-	backends, err := getBackends(c, candidates, port)
+	backends, err := getBackends(req, candidates, port)
 	if err != nil {
 		return vg, fmt.Errorf("get backends error: %s", err.Error())
 	}
@@ -177,7 +218,7 @@ func buildVGroup(c localModel, port v1.ServicePort, candidates *EndpointWithENI)
 	return vg, nil
 }
 
-func getBackends(c localModel, candidates *EndpointWithENI, port v1.ServicePort) ([]model.BackendAttribute, error) {
+func getBackends(req *RequestContext, candidates *EndpointWithENI, port v1.ServicePort) ([]model.BackendAttribute, error) {
 	var backends []model.BackendAttribute
 	nodes := candidates.Nodes
 	eps := candidates.Endpoints
@@ -185,17 +226,17 @@ func getBackends(c localModel, candidates *EndpointWithENI, port v1.ServicePort)
 	// ENI mode
 	if candidates.BackendTypeENI {
 		if len(eps.Subsets) == 0 {
-			klog.Warningf("%s endpoint is nil in eni mode", util.Key(c.svc))
+			klog.Warningf("%s endpoint is nil in eni mode", util.Key(req.svc))
 			return nil, nil
 		}
-		klog.Infof("[ENI] mode service: %s", util.Key(c.svc))
+		klog.Infof("[ENI] mode service: %s", util.Key(req.svc))
 		var privateIpAddress []string
 		for _, ep := range eps.Subsets {
 			for _, addr := range ep.Addresses {
 				privateIpAddress = append(privateIpAddress, addr.IP)
 			}
 		}
-		err := Batch(privateIpAddress, 40, buildFunc(c, &backends))
+		err := Batch(privateIpAddress, 40, buildFunc(req, &backends))
 		if err != nil {
 			return backends, fmt.Errorf("batch process eni fail: %s", err.Error())
 		}
@@ -203,16 +244,16 @@ func getBackends(c localModel, candidates *EndpointWithENI, port v1.ServicePort)
 	// Local mode
 	if candidates.LocalMode {
 		if len(eps.Subsets) == 0 {
-			klog.Warningf("%s endpoint is nil in local mode", util.Key(c.svc))
+			klog.Warningf("%s endpoint is nil in local mode", util.Key(req.svc))
 			return nil, nil
 		}
-		klog.Infof("[Local] mode service: %s", util.Key(c.svc))
+		klog.Infof("[Local] mode service: %s", util.Key(req.svc))
 		// 1. add duplicate ecs backends
 		for _, sub := range eps.Subsets {
 			for _, add := range sub.Addresses {
 				if add.NodeName == nil {
 					return nil, fmt.Errorf("add ecs backends for service[%s] error, NodeName is nil for ip %s ",
-						util.Key(c.svc), add.IP)
+						util.Key(req.svc), add.IP)
 				}
 				node := findNodeByNodeName(nodes, *add.NodeName)
 				if node == nil {
@@ -245,7 +286,7 @@ func getBackends(c localModel, candidates *EndpointWithENI, port v1.ServicePort)
 
 	// Cluster mode
 	// When ecs and eci are deployed in a cluster, add ecs first and then add eci
-	klog.Infof("[Cluster] mode service: %s", util.Key(c.svc))
+	klog.Infof("[Cluster] mode service: %s", util.Key(req.svc))
 	// 1. add ecs backends
 	for _, node := range nodes {
 		if isExcludeNode(&node) {
@@ -278,7 +319,7 @@ func addECIBackends(backends []model.BackendAttribute) ([]model.BackendAttribute
 
 }
 
-func buildFunc(c localModel, backend *[]model.BackendAttribute) func(o []interface{}) error {
+func buildFunc(req *RequestContext, backend *[]model.BackendAttribute) func(o []interface{}) error {
 
 	// backend build function
 	return func(o []interface{}) error {
@@ -291,7 +332,7 @@ func buildFunc(c localModel, backend *[]model.BackendAttribute) func(o []interfa
 			ips = append(ips, ip)
 		}
 		// TODO FIX ME
-		resp, err := c.cloud.DescribeNetworkInterfaces(ctx2.CFG.Global.VpcID, &ips)
+		resp, err := req.cloud.DescribeNetworkInterfaces(ctx2.CFG.Global.VpcID, &ips)
 		if err != nil {
 			return fmt.Errorf("call DescribeNetworkInterfaces: %s", err.Error())
 		}
@@ -312,4 +353,83 @@ func buildFunc(c localModel, backend *[]model.BackendAttribute) func(o []interfa
 		}
 		return nil
 	}
+}
+
+func diff(remote, local model.VServerGroup) (
+	[]model.BackendAttribute, []model.BackendAttribute, []model.BackendAttribute) {
+
+	var (
+		addition  []model.BackendAttribute
+		deletions []model.BackendAttribute
+		updates   []model.BackendAttribute
+	)
+
+	for _, r := range remote.Backends {
+		//// skip nodes which does not belong to the cluster
+		//if isUserManagedNode(api.Description, v.NamedKey.Key()) {
+		//	continue
+		//}
+		found := false
+		for _, l := range local.Backends {
+			if l.Type == "eni" {
+				if r.ServerId == l.ServerId &&
+					r.ServerIp == l.ServerIp {
+					found = true
+					break
+				}
+			} else {
+				if r.ServerId == l.ServerId {
+					found = true
+					break
+				}
+			}
+
+		}
+		if !found {
+			deletions = append(deletions, r)
+		}
+	}
+	for _, l := range local.Backends {
+		found := false
+		for _, r := range remote.Backends {
+			if l.Type == "eni" {
+				if r.ServerId == l.ServerId &&
+					r.ServerIp == l.ServerIp {
+					found = true
+					break
+				}
+			} else {
+				if r.ServerId == l.ServerId {
+					found = true
+					break
+				}
+			}
+
+		}
+		if !found {
+			addition = append(addition, l)
+		}
+	}
+	for _, l := range local.Backends {
+		for _, r := range remote.Backends {
+			//if isUserManagedNode(api.Description, v.NamedKey.Key()) {
+			//	continue
+			//}
+			if l.Type == "eni" {
+				if l.ServerId == r.ServerId &&
+					l.ServerIp == r.ServerIp &&
+					l.Weight != r.Weight {
+					updates = append(updates, l)
+					break
+				}
+			} else {
+				if l.ServerId == r.ServerId &&
+					l.Weight != r.Weight {
+					updates = append(updates, l)
+					break
+				}
+			}
+		}
+	}
+	return addition, deletions, updates
 }

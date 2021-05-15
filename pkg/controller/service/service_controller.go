@@ -91,6 +91,16 @@ func (m *ReconcileService) Reconcile(_ context.Context, request reconcile.Reques
 	return reconcile.Result{}, m.reconcile(request)
 }
 
+type RequestContext struct {
+	ctx  context.Context
+	svc  *v1.Service
+	anno *AnnotationRequest
+
+	// client
+	cloud      prvd.Provider
+	kubeClient client.Client
+}
+
 func (m *ReconcileService) reconcile(request reconcile.Request) error {
 	// new context for each request
 	ctx := context.Background()
@@ -115,11 +125,19 @@ func (m *ReconcileService) reconcile(request reconcile.Request) error {
 		return fmt.Errorf("validate svc error: %s", err.Error())
 	}
 
+	reqContext := &RequestContext{
+		ctx:        ctx,
+		svc:        svc,
+		anno:       anno,
+		cloud:      m.cloud,
+		kubeClient: m.kubeClient,
+	}
+
 	// 1. check to see whither if loadbalancer deletion is needed
 	if !isSLBNeeded(svc) {
-		return m.cleanupLoadBalancerResources(ctx, svc, anno)
+		return m.cleanupLoadBalancerResources(reqContext)
 	}
-	err = m.reconcileLoadBalancerResources(ctx, svc, anno)
+	err = m.reconcileLoadBalancerResources(reqContext)
 	if err != nil {
 		klog.Infof("reconcile loadbalancer error: %s", err.Error())
 	}
@@ -133,7 +151,7 @@ func validate(svc *v1.Service, anno *AnnotationRequest) error {
 	}
 
 	// disable public address
-	if anno.Get(AddressType) == nil || *anno.Get(AddressType) == "internet" {
+	if anno.Get(AddressType) == "" || anno.Get(AddressType) == "internet" {
 		if ctx2.CFG.Global.DisablePublicSLB {
 			return fmt.Errorf("PublicAddress SLB is Not allowed")
 		}
@@ -141,66 +159,71 @@ func validate(svc *v1.Service, anno *AnnotationRequest) error {
 	return nil
 }
 
-func (m *ReconcileService) cleanupLoadBalancerResources(ctx context.Context, svc *v1.Service, anno *AnnotationRequest) error {
+func (m *ReconcileService) cleanupLoadBalancerResources(req *RequestContext) error {
 	// TODO
-	if helper.HasFinalizer(svc, serviceFinalizer) {
-		//_, _, err := r.buildAndDeployModel(ctx, svc)
-		//if err != nil {
-		//	return err
-		//}
-		if err := m.finalizerManager.RemoveFinalizers(ctx, svc, serviceFinalizer); err != nil {
-			m.record.Eventf(svc, v1.EventTypeWarning, helper.ServiceEventReasonFailedRemoveFinalizer, fmt.Sprintf("Failed remove finalizer due to %v", err))
+	if helper.HasFinalizer(req.svc, serviceFinalizer) {
+		mdl, err := NewModelBuilder(req, REMOTE_MODEL).Build()
+		if err != nil {
+			return err
+		}
+		if err := req.EnsureLoadBalancerDeleted(mdl);
+			err != nil {
+			return err
+		}
+
+		if err := m.finalizerManager.RemoveFinalizers(req.ctx, req.svc, serviceFinalizer); err != nil {
+			m.record.Eventf(req.svc, v1.EventTypeWarning, helper.ServiceEventReasonFailedRemoveFinalizer, fmt.Sprintf("Failed remove finalizer due to %v", err))
 			return err
 		}
 	}
 	return nil
 }
 
-func (m *ReconcileService) reconcileLoadBalancerResources(ctx context.Context, svc *v1.Service, anno *AnnotationRequest) error {
+func (m *ReconcileService) reconcileLoadBalancerResources(req *RequestContext) error {
 
-	if err := m.finalizerManager.AddFinalizers(ctx, svc, serviceFinalizer); err != nil {
-		m.record.Event(svc, v1.EventTypeWarning, helper.ServiceEventReasonFailedAddFinalizer, fmt.Sprintf("Failed add finalizer due to %v", err))
+	if err := m.finalizerManager.AddFinalizers(req.ctx, req.svc, serviceFinalizer); err != nil {
+		m.record.Event(req.svc, v1.EventTypeWarning, helper.ServiceEventReasonFailedAddFinalizer, fmt.Sprintf("Failed add finalizer due to %v", err))
 		return err
 	}
 
-	lb, err := m.buildAndApplyModel(ctx, svc, anno)
+	lb, err := m.buildAndApplyModel(req)
 	if err != nil {
-		m.record.Event(svc, v1.EventTypeWarning, helper.ServiceEventReasonFailedReconciled, fmt.Sprintf("Failed reconcile due to %s", err.Error()))
+		m.record.Event(req.svc, v1.EventTypeWarning, helper.ServiceEventReasonFailedReconciled, fmt.Sprintf("Failed reconcile due to %s", err.Error()))
 		return err
 	}
 
-	if err := m.updateServiceStatus(ctx, svc, lb); err != nil {
-		m.record.Event(svc, v1.EventTypeWarning, helper.ServiceEventReasonFailedUpdateStatus, fmt.Sprintf("Failed update status due to %v", err))
+	if err := m.updateServiceStatus(req.ctx, req.svc, lb); err != nil {
+		m.record.Event(req.svc, v1.EventTypeWarning, helper.ServiceEventReasonFailedUpdateStatus, fmt.Sprintf("Failed update status due to %v", err))
 		return err
 	}
 
-	m.record.Event(svc, v1.EventTypeNormal, helper.ServiceEventReasonSuccessfullyReconciled, "Successfully reconciled")
+	m.record.Event(req.svc, v1.EventTypeNormal, helper.ServiceEventReasonSuccessfullyReconciled, "Successfully reconciled")
 	return nil
 }
 
-func (m *ReconcileService) buildAndApplyModel(ctx context.Context, svc *v1.Service, anno *AnnotationRequest) (*model.LoadBalancer, error) {
+func (m *ReconcileService) buildAndApplyModel(req *RequestContext) (*model.LoadBalancer, error) {
 	// build local model
-	localModel, err := NewModelBuilder(ctx, m.kubeClient, m.cloud, svc, anno, LOCAL_MODEL).Build()
+	localModel, err := NewModelBuilder(req, LOCAL_MODEL).Build()
 	if err != nil {
 		return nil, fmt.Errorf("build slb cluster model error: %s", err.Error())
 	}
 	// build remote model
-	remoteModel, err := NewModelBuilder(ctx, m.kubeClient, m.cloud, svc, anno, REMOTE_MODEL).Build()
+	remoteModel, err := NewModelBuilder(req, REMOTE_MODEL).Build()
 	if err != nil {
 		return nil, fmt.Errorf("build slb cloud model error: %s", err.Error())
 	}
 	// apply model
-	if err := NewLBModelApplier(ctx, m.cloud, svc, anno).Apply(localModel, remoteModel); err != nil {
+	if err := NewLBModelApplier(req).Apply(localModel, remoteModel); err != nil {
 		return nil, fmt.Errorf("apply model error: %s", err.Error())
 	}
-	return localModel, nil
+	return remoteModel, nil
 }
 
 func (m *ReconcileService) updateServiceStatus(ctx context.Context, svc *v1.Service, lb *model.LoadBalancer) error {
 
 	// TODO
 	if len(svc.Status.LoadBalancer.Ingress) != 1 ||
-		svc.Status.LoadBalancer.Ingress[0].IP != "" {
+		svc.Status.LoadBalancer.Ingress[0].IP == "" {
 		svcOld := svc.DeepCopy()
 		svc.Status.LoadBalancer.Ingress = []v1.LoadBalancerIngress{
 			{

@@ -5,7 +5,6 @@ const (
 
 	CCM_CLASS = "service.beta.kubernetes.io/class"
 
-	ModificationProtectionReason = "managed.by.ack"
 
 	LabelNodeRoleMaster = "node-role.kubernetes.io/master"
 

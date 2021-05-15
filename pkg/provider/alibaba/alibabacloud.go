@@ -3,6 +3,7 @@ package alibaba
 import (
 	log "github.com/sirupsen/logrus"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/slbprd"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/metadata"
 )
 
@@ -21,7 +22,7 @@ func NewAlibabaCloud() prvd.Provider {
 	return &AlibabaCloud{
 		Auth:          auth,
 		EcsProvider:   NewEcsProvider(auth),
-		ProviderSLB:   NewLBProvider(auth),
+		ProviderSLB:   slbprd.NewLBProvider(auth),
 		PVTZProvider:  NewPVTZProvider(auth),
 		RouteProvider: NewRouteProvider(auth),
 	}
@@ -33,6 +34,6 @@ type AlibabaCloud struct {
 	*EcsProvider
 	*PVTZProvider
 	*RouteProvider
-	*ProviderSLB
+	*slbprd.ProviderSLB
 	Auth *metadata.ClientAuth
 }
