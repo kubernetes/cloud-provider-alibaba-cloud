@@ -101,6 +101,21 @@ type RequestContext struct {
 	kubeClient client.Client
 }
 
+func (reqCtx *RequestContext) GetAnnotation() *AnnotationRequest { return reqCtx.anno }
+
+func (reqCtx *RequestContext) SetService(svc *v1.Service) { reqCtx.svc = svc }
+
+func NewRequestContext(ctx context.Context, svc *v1.Service, anno *AnnotationRequest,
+	cloud prvd.Provider, kubeClient client.Client) *RequestContext {
+	return &RequestContext{
+		ctx:        ctx,
+		svc:        svc,
+		anno:       anno,
+		cloud:      cloud,
+		kubeClient: kubeClient,
+	}
+}
+
 func (m *ReconcileService) reconcile(request reconcile.Request) error {
 	// new context for each request
 	ctx := context.Background()
@@ -160,14 +175,10 @@ func validate(svc *v1.Service, anno *AnnotationRequest) error {
 }
 
 func (m *ReconcileService) cleanupLoadBalancerResources(req *RequestContext) error {
-	// TODO
 	if helper.HasFinalizer(req.svc, serviceFinalizer) {
-		mdl, err := NewModelBuilder(req, REMOTE_MODEL).Build()
+		_, err := m.buildAndApplyModel(req)
 		if err != nil {
-			return err
-		}
-		if err := req.EnsureLoadBalancerDeleted(mdl);
-			err != nil {
+			m.record.Event(req.svc, v1.EventTypeWarning, helper.ServiceEventReasonFailedReconciled, fmt.Sprintf("Failed reconcile due to %s", err.Error()))
 			return err
 		}
 

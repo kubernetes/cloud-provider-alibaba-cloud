@@ -54,14 +54,13 @@ func (t *tcp) Update(action UpdateAction) error {
 			return fmt.Errorf("start tcp listener error: %s", err.Error())
 		}
 	}
-	if !isNeedUpdate(action.local, &action.remote) {
+	needUpdate, update := isNeedUpdate(action.local, action.remote)
+	if !needUpdate {
 		klog.Infof("tcp listener did not change, skip [update], port=[%d]", action.local.ListenerPort)
 		// no recreate needed.  skip
 		return nil
 	}
-	// TODO fix me
-	//return t.reqCtx.cloud.SetLoadBalancerTCPListenerAttribute(t.reqCtx.ctx, action.lbId, action.remote)
-	return nil
+	return t.reqCtx.cloud.SetLoadBalancerTCPListenerAttribute(t.reqCtx.ctx, action.lbId, update)
 }
 
 type udp struct {
@@ -84,12 +83,13 @@ func (t *udp) Update(action UpdateAction) error {
 			return fmt.Errorf("start tcp listener error: %s", err.Error())
 		}
 	}
-	if !isNeedUpdate(action.local, &action.remote) {
+	needUpdate, update := isNeedUpdate(action.local, action.remote)
+	if !needUpdate {
 		klog.Infof("udp listener did not change, skip [update], port=[%d]", action.local.ListenerPort)
 		// no recreate needed.  skip
 		return nil
 	}
-	return t.reqCtx.cloud.SetLoadBalancerUDPListenerAttribute(t.reqCtx.ctx, action.lbId, action.remote)
+	return t.reqCtx.cloud.SetLoadBalancerUDPListenerAttribute(t.reqCtx.ctx, action.lbId, update)
 }
 
 type http struct {
@@ -113,56 +113,37 @@ func (t *http) Update(action UpdateAction) error {
 			return fmt.Errorf("start tcp listener error: %s", err.Error())
 		}
 	}
-	// TODO forward
-	//forward := forwardPort(def.ForwardPort, t.Port)
-	//if forward != 0 {
-	//	if response.ListenerForward != slb.OnFlag {
-	//		needRecreate = true
-	//		config.ListenerForward = slb.OnFlag
-	//	}
-	//} else {
-	//	if response.ListenerForward != slb.OffFlag {
-	//		needRecreate = true
-	//		config.ListenerForward = slb.OffFlag
-	//	}
-	//}
-	//config.ForwardPort = int(forward)
-	//if !isNeedUpdate(t.local, t.remote) {
-	//	klog.Infof("tcp listener did not change, skip [update], port=[%d]", t.port)
-	//	// no recreate needed.  skip
-	//	return nil
-	//}
-	//
-	//if needRecreate {
-	//
-	//	config.BackendServerPort = int(t.NodePort)
-	//	utils.Logf(t.Service, "HTTP listener checker [BackendServerPort]"+
-	//		" changed, request=%d. response=%d. Recreate http listener.", t.NodePort, response.BackendServerPort)
-	//	// The listener description has changed. It may be that multiple services reuse the same port of the same slb, and needs to record event.
-	//	if response.Description != config.Description {
-	//		record, err := utils.GetRecorderFromContext(ctx)
-	//		if err != nil {
-	//			klog.Warningf("get recorder error: %s", err.Error())
-	//		} else {
-	//			record.Eventf(
-	//				t.Service,
-	//				v1.EventTypeNormal,
-	//				"RecreateListener",
-	//				"Recreate HTTP listener [%s] -> [%s]",
-	//				response.Description, config.Description,
-	//			)
-	//		}
-	//	}
-	//	err := t.Client.DeleteLoadBalancerListener(ctx, t.LoadBalancerID, int(t.Port))
-	//	if err != nil {
-	//		return err
-	//	}
-	//	err = t.Client.CreateLoadBalancerHTTPListener(ctx, (*slb.CreateLoadBalancerHTTPListenerArgs)(config))
-	//	if err != nil {
-	//		return err
-	//	}
-	//	return t.Client.StartLoadBalancerListener(ctx, t.LoadBalancerID, int(t.Port))
-	//}
+	/*
+	* The forwarding rule could not be updated. If the rule is changed, it needs to be recreated.
+	 */
+	needRecreate := false
+	if action.local.ListenerPort != 0 {
+		if action.remote.ListenerForward != model.OnFlag ||
+			action.remote.ForwardPort != action.local.ForwardPort {
+			needRecreate = true
+		}
+	} else {
+		if action.remote.ListenerForward != model.OffFlag {
+			needRecreate = true
+			action.local.ListenerForward = model.OffFlag
+		}
+	}
+
+	if needRecreate {
+		klog.Infof("http listener [%d] need recreate", action.local.ListenerPort)
+		err := t.reqCtx.EnsureListenerDeleted(DeleteAction{
+			lbId:     action.lbId,
+			listener: action.remote,
+		})
+		if err != nil {
+			return fmt.Errorf("delete port [%d] error: %s", action.remote.ListenerPort, err.Error())
+		}
+
+		return t.Create(CreateAction{
+			lbId:     action.lbId,
+			listener: action.local,
+		})
+	}
 
 	if action.remote.ListenerForward == model.OnFlag {
 		klog.Infof("http %d ListenerForward is on, cannot update listener", action.local.ListenerPort)
@@ -170,13 +151,14 @@ func (t *http) Update(action UpdateAction) error {
 		return nil
 	}
 
-	if !isNeedUpdate(action.local, &action.remote) {
+	needUpdate, update := isNeedUpdate(action.local, action.remote)
+	if !needUpdate {
 		klog.Infof("http listener did not change, skip [update], port=[%d]", action.local.ListenerPort)
 		// no recreate needed.  skip
 		return nil
 	}
 
-	return t.reqCtx.cloud.SetLoadBalancerHTTPListenerAttribute(t.reqCtx.ctx, action.lbId, action.remote)
+	return t.reqCtx.cloud.SetLoadBalancerHTTPListenerAttribute(t.reqCtx.ctx, action.lbId, update)
 
 }
 
@@ -201,12 +183,13 @@ func (t *https) Update(action UpdateAction) error {
 			return fmt.Errorf("start tcp listener error: %s", err.Error())
 		}
 	}
-	if !isNeedUpdate(action.local, &action.remote) {
+	needUpdate, update := isNeedUpdate(action.local, action.remote)
+	if !needUpdate {
 		klog.Infof("https listener did not change, skip [update], port=[%d]", action.local.ListenerPort)
 		// no recreate needed.  skip
 		return nil
 	}
-	return t.reqCtx.cloud.SetLoadBalancerHTTPSListenerAttribute(t.reqCtx.ctx, action.lbId, action.remote)
+	return t.reqCtx.cloud.SetLoadBalancerHTTPSListenerAttribute(t.reqCtx.ctx, action.lbId, update)
 }
 
 func forwardPort(port string, target int) int {
@@ -239,7 +222,6 @@ func forwardPort(port string, target int) int {
 }
 
 func buildActionsForListeners(local *model.LoadBalancer, remote *model.LoadBalancer) ([]CreateAction, []UpdateAction, []DeleteAction, error) {
-	klog.Infof("try to update listener. local: [%v], remote: [%v]", util.PrettyJson(local.Listeners), util.PrettyJson(remote.Listeners))
 	var (
 		createActions []CreateAction
 		updateActions []UpdateAction
@@ -250,6 +232,7 @@ func buildActionsForListeners(local *model.LoadBalancer, remote *model.LoadBalan
 			return createActions, updateActions, deleteActions, fmt.Errorf("find vservergroup error: %s", err.Error())
 		}
 	}
+	klog.Infof("try to update listener. local: [%v], remote: [%v]", util.PrettyJson(local.Listeners), util.PrettyJson(remote.Listeners))
 
 	// For updations and deletions
 	for _, rlis := range remote.Listeners {
@@ -260,15 +243,6 @@ func buildActionsForListeners(local *model.LoadBalancer, remote *model.LoadBalan
 				// port matched. that is where the conflict case begin.
 				//1. check protocol match.
 				if rlis.Protocol == llis.Protocol {
-					// protocol match, need to do update operate no matter managed by whom
-					// consider override annotation & user defined loadbalancer
-					//if !override && isUserDefinedLoadBalancer(svc) {
-					//	// port conflict with user managed slb or listener.
-					//	return nil, fmt.Errorf("PortProtocolConflict] port matched, but conflict with user managed listener. "+
-					//		"Port:%d, ListenerName:%s, svc: %s. Protocol:[source:%s dst:%s]",
-					//		remote.Port, remote.Name, local.NamedKey.Key(), remote.TransforedProto, local.TransforedProto)
-					//}
-
 					// do update operate
 					updateActions = append(updateActions,
 						UpdateAction{
@@ -277,41 +251,41 @@ func buildActionsForListeners(local *model.LoadBalancer, remote *model.LoadBalan
 							remote: rlis,
 						})
 					klog.Infof("found listener %d with port & protocol match, do update", llis.ListenerPort)
+				} else {
+					// protocol not match, need to recreate
+					deleteActions = append(deleteActions,
+						DeleteAction{
+							lbId:     remote.LoadBalancerAttribute.LoadBalancerId,
+							listener: rlis,
+						})
+					klog.Infof("found listener with port match while protocol not, do delete & add %s", llis.NamedKey)
 				}
-			} else {
-				//// protocol not match, need to recreate
-				//if !override && isUserDefinedLoadBalancer(svc) {
-				//	return nil, fmt.Errorf("[PortProtocolConflict] port matched, "+
-				//		"while protocol does not. force override listener %t. source[%v], target[%v]", override, local.NamedKey, remote.NamedKey)
-				//}
-				klog.Infof("found listener with protocol match, need recreate")
 			}
 		}
 		// Do not delete any listener that no longer managed by my service
 		// for safety. Only conflict case is taking care.
 		if !found {
-			//if isManagedByMyService(svc, remote) {
-			//	// port has user managed nodes, do not delete
-			//	hasUserNode, err := remote.listenerHasUserManagedNode(ctx)
-			//	if err != nil {
-			//		return nil, fmt.Errorf("check if listener has user managed node, error: %s", err.Error())
-			//	}
-			//	if hasUserNode {
-			//		utils.Logf(svc, "svc %s do not delete port %d, because backends have user managed nodes", remote.NamedKey.Key(), remote.Port)
-			//		continue
-			//	}
-			//	remote.Action = ACTION_DELETE
-			//	deletion = append(deletion, remote)
-			//	utils.Logf(svc, "found listener[%s] which is no longer needed "+
-			//		"by my service[%s/%s], do delete", remote.NamedKey.Key(), svc.Namespace, svc.Name)
-			//} else {
-			//	utils.Logf(svc, "port [%d] not managed by my service [%s/%s], skip processing.", remote.Port, svc.Namespace, svc.Name)
+			if local.LoadBalancerAttribute.IsUserManaged &&
+				!isManagedByMyService(local, rlis) {
+				klog.Infof("port [%d] not managed by my service [%s], skip processing.", rlis.ListenerPort, rlis.NamedKey)
+				continue
+			}
+
+			//// port has user managed nodes, do not delete
+			//hasUserNode, err := remote.listenerHasUserManagedNode(ctx)
+			//if err != nil {
+			//	return nil, fmt.Errorf("check if listener has user managed node, error: %s", err.Error())
+			//}
+			//if hasUserNode {
+			//	utils.Logf(svc, "svc %s do not delete port %d, because backends have user managed nodes", remote.NamedKey.Key(), remote.Port)
+			//	continue
 			//}
 			deleteActions = append(deleteActions, DeleteAction{
 				lbId:     remote.LoadBalancerAttribute.LoadBalancerId,
 				listener: rlis,
 			})
-			klog.Infof("not found listener [%d], do delete", rlis.ListenerPort)
+			klog.Infof("found listener[%s] which is no longer needed "+
+				"by my service[%s], do delete", rlis.ListenerPort, rlis.NamedKey)
 		}
 	}
 
@@ -390,93 +364,114 @@ func getVGroupNamedKey(svc *v1.Service, servicePort v1.ServicePort) *model.VGrou
 }
 
 func setDefaultValueForListener(n *model.ListenerAttribute) {
-	if n.Bandwidth == 0 {
-		n.Bandwidth = DEFAULT_LISTENER_BANDWIDTH
+	if n.Protocol == model.TCP || n.Protocol == model.UDP || n.Protocol == model.HTTPS {
+		if n.Bandwidth == 0 {
+			n.Bandwidth = DEFAULT_LISTENER_BANDWIDTH
+		}
+	}
+
+	if n.Protocol == model.HTTP || n.Protocol == model.HTTPS {
+		if n.HealthCheck == "" {
+			n.HealthCheck = model.OffFlag
+		}
+		if n.StickySession == "" {
+			n.StickySession = model.OffFlag
+		}
 	}
 }
 
-// todo return update content, do not use remote directly
-func isNeedUpdate(local model.ListenerAttribute, remote *model.ListenerAttribute) bool {
+func isNeedUpdate(local model.ListenerAttribute, remote model.ListenerAttribute) (bool, model.ListenerAttribute) {
+	update := model.ListenerAttribute{
+		ListenerPort: local.ListenerPort,
+	}
 	needUpdate := false
 
+	if remote.Description != local.Description {
+		needUpdate = true
+		update.Description = local.Description
+	}
 	if remote.VGroupId != local.VGroupId {
 		needUpdate = true
-		remote.VGroupId = local.VGroupId
+		update.VGroupId = local.VGroupId
 	}
 	// acl
 	if local.AclStatus != "" &&
 		remote.AclStatus != local.AclStatus {
 		needUpdate = true
-		remote.AclStatus = local.AclStatus
+		update.AclStatus = local.AclStatus
 	}
 	if local.AclId != "" &&
 		remote.AclId != local.AclId {
 		needUpdate = true
-		remote.AclId = local.AclId
+		update.AclId = local.AclId
 	}
 	if local.AclType != "" &&
 		remote.AclType != local.AclType {
 		needUpdate = true
-		remote.AclType = local.AclType
+		update.AclType = local.AclType
 	}
 	if local.Scheduler != "" &&
 		remote.Scheduler != local.Scheduler {
 		needUpdate = true
-		remote.Scheduler = local.Scheduler
+		update.Scheduler = local.Scheduler
 	}
 	// health check
 	if local.HealthCheckType != "" &&
 		remote.HealthCheckType != local.HealthCheckType {
 		needUpdate = true
-		remote.HealthCheckType = local.HealthCheckType
+		update.HealthCheckType = local.HealthCheckType
 	}
-
 	if local.HealthCheckURI != "" &&
 		remote.HealthCheckURI != local.HealthCheckURI {
 		needUpdate = true
-		remote.HealthCheckURI = local.HealthCheckURI
+		update.HealthCheckURI = local.HealthCheckURI
 	}
 	if local.HealthCheckConnectPort != 0 &&
 		remote.HealthCheckConnectPort != local.HealthCheckConnectPort {
 		needUpdate = true
-		remote.HealthCheckConnectPort = local.HealthCheckConnectPort
+		update.HealthCheckConnectPort = local.HealthCheckConnectPort
 	}
 	if local.HealthyThreshold != 0 &&
 		remote.HealthyThreshold != local.HealthyThreshold {
 		needUpdate = true
-		remote.HealthyThreshold = local.HealthyThreshold
+		update.HealthyThreshold = local.HealthyThreshold
 	}
 	if local.UnhealthyThreshold != 0 &&
 		remote.UnhealthyThreshold != local.UnhealthyThreshold {
 		needUpdate = true
-		remote.UnhealthyThreshold = local.UnhealthyThreshold
+		update.UnhealthyThreshold = local.UnhealthyThreshold
 	}
 	if local.HealthCheckConnectTimeout != 0 &&
 		remote.HealthCheckConnectTimeout != local.HealthCheckConnectTimeout {
 		needUpdate = true
-		remote.HealthCheckConnectTimeout = local.HealthCheckConnectTimeout
+		update.HealthCheckConnectTimeout = local.HealthCheckConnectTimeout
 	}
 	if local.HealthCheckInterval != 0 &&
 		remote.HealthCheckInterval != local.HealthCheckInterval {
 		needUpdate = true
-		remote.HealthCheckInterval = local.HealthCheckInterval
+		update.HealthCheckInterval = local.HealthCheckInterval
 	}
 	if local.PersistenceTimeout != nil &&
 		remote.PersistenceTimeout != local.PersistenceTimeout {
 		needUpdate = true
-		remote.PersistenceTimeout = local.PersistenceTimeout
+		update.PersistenceTimeout = local.PersistenceTimeout
 	}
 	if local.HealthCheckHttpCode != "" &&
 		remote.HealthCheckHttpCode != local.HealthCheckHttpCode {
 		needUpdate = true
-		remote.HealthCheckHttpCode = local.HealthCheckHttpCode
+		update.HealthCheckHttpCode = local.HealthCheckHttpCode
 	}
 	if local.HealthCheckDomain != "" &&
 		remote.HealthCheckDomain != local.HealthCheckDomain {
 		needUpdate = true
-		remote.HealthCheckDomain = local.HealthCheckDomain
+		update.HealthCheckDomain = local.HealthCheckDomain
 	}
-	return needUpdate
+	if local.HealthCheckTimeout != 0 &&
+		remote.HealthCheckTimeout != local.HealthCheckTimeout {
+		needUpdate = true
+		update.HealthCheckTimeout = local.HealthCheckTimeout
+	}
+	return needUpdate, update
 
 }
 
@@ -492,7 +487,7 @@ func findVServerGroup(vgs []model.VServerGroup, port *model.ListenerAttribute) e
 
 // ==========================================================================================
 
-func (reqCtx *RequestContext) BuildListenersFromService(mdl *model.LoadBalancer) error {
+func (reqCtx *RequestContext) BuildListenersForLocalModel(mdl *model.LoadBalancer) error {
 	for _, port := range reqCtx.svc.Spec.Ports {
 		listener, err := buildListenerFromServicePort(reqCtx, port)
 		if err != nil {
@@ -503,7 +498,7 @@ func (reqCtx *RequestContext) BuildListenersFromService(mdl *model.LoadBalancer)
 	return nil
 }
 
-func (reqCtx *RequestContext) BuildListenersFromCloud(mdl *model.LoadBalancer) error {
+func (reqCtx *RequestContext) BuildListenersForRemoteModel(mdl *model.LoadBalancer) error {
 	listeners, err := reqCtx.cloud.DescribeLoadBalancerListeners(reqCtx.ctx, mdl.LoadBalancerAttribute.LoadBalancerId)
 	if err != nil {
 		return fmt.Errorf("DescribeLoadBalancerListeners error:%s", err.Error())
@@ -587,7 +582,7 @@ func buildListenerFromServicePort(req *RequestContext, port v1.ServicePort) (mod
 
 	if req.anno.Get(ForwardPort) != "" && listener.Protocol == model.HTTP {
 		listener.ForwardPort = forwardPort(req.anno.Get(ForwardPort), int(port.Port))
-
+		listener.ListenerForward = model.OnFlag
 	}
 
 	// acl
@@ -688,4 +683,10 @@ func buildListenerFromServicePort(req *RequestContext, port v1.ServicePort) (mod
 	}
 
 	return listener, nil
+}
+
+func isManagedByMyService(local *model.LoadBalancer, n model.ListenerAttribute) bool {
+	return n.NamedKey.ServiceName == local.NamespacedName.Name &&
+		n.NamedKey.Namespace == local.NamespacedName.Namespace &&
+		n.NamedKey.CID == metadata.CLUSTER_ID
 }

@@ -21,15 +21,15 @@ const (
 )
 
 type ModelBuilder struct {
-	req   *RequestContext
-	model string
+	reqCtx *RequestContext
+	model  string
 }
 
 // NewDefaultModelBuilder construct a new defaultModelBuilder
 func NewModelBuilder(req *RequestContext, model string) *ModelBuilder {
 	return &ModelBuilder{
-		req:   req,
-		model: model,
+		reqCtx: req,
+		model:  model,
 	}
 }
 
@@ -52,15 +52,22 @@ type localModel struct{ *ModelBuilder }
 
 func (c localModel) Build() (*model.LoadBalancer, error) {
 	lbMdl := &model.LoadBalancer{
-		NamespacedName: util.NamespacedName(c.req.svc),
+		NamespacedName: util.NamespacedName(c.reqCtx.svc),
 	}
-	if err := c.req.BuildLoadBalancerAttributeFromService(lbMdl); err != nil {
+	// if the service do not need loadbalancer any more, return directly.
+	if !isSLBNeeded(c.reqCtx.svc) {
+		if c.reqCtx.anno.Get(LoadBalancerId) != "" {
+			lbMdl.LoadBalancerAttribute.IsUserManaged = true
+		}
+		return lbMdl, nil
+	}
+	if err := c.reqCtx.BuildLoadBalancerAttributeForLocalModel(lbMdl); err != nil {
 		return nil, fmt.Errorf("build slb attribute error: %s", err.Error())
 	}
-	if err := c.req.BuildVGroupsFromService(lbMdl); err != nil {
+	if err := c.reqCtx.BuildVGroupsForLocalModel(lbMdl); err != nil {
 		return nil, fmt.Errorf("builid vserver groups error: %s", err.Error())
 	}
-	if err := c.req.BuildListenersFromService(lbMdl); err != nil {
+	if err := c.reqCtx.BuildListenersForLocalModel(lbMdl); err != nil {
 		return nil, fmt.Errorf("build slb listener error: %s", err.Error())
 	}
 
@@ -77,10 +84,10 @@ type remoteModel struct{ *ModelBuilder }
 
 func (c remoteModel) Build() (*model.LoadBalancer, error) {
 	lbMdl := &model.LoadBalancer{
-		NamespacedName: util.NamespacedName(c.req.svc),
+		NamespacedName: util.NamespacedName(c.reqCtx.svc),
 	}
 
-	err := c.req.BuildLoadBalancerAttributeFromCloud(lbMdl)
+	err := c.reqCtx.BuildLoadBalancerAttributeForRemoteModel(lbMdl)
 	if err != nil {
 		return nil, fmt.Errorf("can not get load balancer attribute from cloud, error: %s", err.Error())
 	}
@@ -88,11 +95,11 @@ func (c remoteModel) Build() (*model.LoadBalancer, error) {
 		return lbMdl, nil
 	}
 
-	if err := c.req.BuildVGroupsFromCloud(lbMdl); err != nil {
+	if err := c.reqCtx.BuildVGroupsForRemoteModel(lbMdl); err != nil {
 		return nil, fmt.Errorf("build backend from remote error: %s", err.Error())
 	}
 
-	if err := c.req.BuildListenersFromCloud(lbMdl); err != nil {
+	if err := c.reqCtx.BuildListenersForRemoteModel(lbMdl); err != nil {
 		return nil, fmt.Errorf("can not build listener attribute from cloud, error: %s", err.Error())
 	}
 

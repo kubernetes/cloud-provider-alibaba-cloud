@@ -3,7 +3,9 @@ package service
 import (
 	"fmt"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/model"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/metadata"
 	"k8s.io/klog"
+	"sort"
 )
 
 func NewLBModelApplier(reqCtx *RequestContext) *modelApplier {
@@ -21,9 +23,12 @@ func (m *modelApplier) Apply(local *model.LoadBalancer, remote *model.LoadBalanc
 	if err := m.applyLoadBalancerAttribute(local, remote); err != nil {
 		return fmt.Errorf("update lb attribute error: %s", err.Error())
 	}
+	// if remote slb is not exist, return
+	if remote.LoadBalancerAttribute.LoadBalancerId == "" {
+		return nil
+	}
 
-	if err := m.applyVGroups(local, remote);
-		err != nil {
+	if err := m.applyVGroups(local, remote); err != nil {
 		return fmt.Errorf("update lb backends error: %s", err.Error())
 	}
 
@@ -50,6 +55,20 @@ func (m *modelApplier) applyLoadBalancerAttribute(local *model.LoadBalancer, rem
 			local.NamespacedName, remote.NamespacedName)
 	}
 
+	// delete slb
+	if !isSLBNeeded(m.reqCtx.svc) {
+		if !local.LoadBalancerAttribute.IsUserManaged {
+			err := m.reqCtx.EnsureLoadBalancerDeleted(remote)
+			if err != nil {
+				return fmt.Errorf("EnsureLoadBalancerDeleted [%s] error: %s",
+					remote.LoadBalancerAttribute.LoadBalancerId, err.Error())
+			}
+			remote.LoadBalancerAttribute.LoadBalancerId = ""
+			return nil
+		}
+	}
+
+	// create slb
 	if remote.LoadBalancerAttribute.LoadBalancerId == "" {
 		if err := m.reqCtx.EnsureLoadBalancerCreated(local); err != nil {
 			return fmt.Errorf("EnsureLoadBalancerCreated error: %s", err.Error())
@@ -63,20 +82,6 @@ func (m *modelApplier) applyLoadBalancerAttribute(local *model.LoadBalancer, rem
 		return nil
 	}
 
-	klog.Infof("found load balancer [%s], try to update load balancer attribute",
-		remote.LoadBalancerAttribute.LoadBalancerId)
-
-	//if cluster.LoadBalancerAttribute.RefLoadBalancerId != nil &&
-	//	*cluster.LoadBalancerAttribute.RefLoadBalancerId != cloud.LoadBalancerAttribute.LoadBalancerId {
-	//	return fmt.Errorf("can not found slb according to user defined loadbalancer id [%s]",
-	//		*cluster.LoadBalancerAttribute.RefLoadBalancerId)
-	//}
-	//
-	//if cluster.LoadBalancerAttribute.LoadBalancerName != nil &&
-	//	*cluster.LoadBalancerAttribute.LoadBalancerName != *cloud.LoadBalancerAttribute.LoadBalancerName {
-	//	m.cloud.CreateSLB()
-	//
-	//}
 	return m.reqCtx.EnsureLoadBalancerUpdated(local, remote)
 
 }
@@ -108,32 +113,39 @@ func (m *modelApplier) applyVGroups(local *model.LoadBalancer, remote *model.Loa
 }
 
 func (m *modelApplier) applyListeners(local *model.LoadBalancer, remote *model.LoadBalancer) error {
-
+	if local.LoadBalancerAttribute.IsUserManaged {
+		if m.reqCtx.anno.isForceOverride() {
+			klog.Infof("[%s] override is false, skip reconcile listeners", local.NamespacedName)
+			return nil
+		}
+	}
+	klog.Infof("not user defined loadbalancer[%s], start to apply listener.", remote.LoadBalancerAttribute.LoadBalancerId)
 	createActions, updateActions, deleteActions, err := buildActionsForListeners(local, remote)
 	if err != nil {
 		return fmt.Errorf("merge listener: %s", err.Error())
 	}
 	// make https come first.
 	// ensure https listeners to be created first for http forward
-	//sort.SliceStable(
-	//	updates,
-	//	func(i, j int) bool {
-	//		// 1. https comes first.
-	//		// 2. DELETE action comes before https
-	//		if isDeleteAction(updates[i].Action) {
-	//			return true
-	//		}
-	//		if isDeleteAction(updates[j].Action) {
-	//			return false
-	//		}
-	//		if strings.ToUpper(
-	//			updates[i].TransforedProto,
-	//		) == "HTTPS" {
-	//			return true
-	//		}
-	//		return false
-	//	},
-	//)
+	sort.SliceStable(
+		createActions,
+		func(i, j int) bool {
+			if createActions[i].listener.Protocol == model.HTTPS {
+				return true
+			}
+			return false
+		},
+	)
+	// make https at last.
+	// ensure https listeners to be deleted late for http forward
+	sort.SliceStable(
+		deleteActions,
+		func(i, j int) bool {
+			if deleteActions[i].listener.Protocol == model.HTTPS {
+				return false
+			}
+			return true
+		},
+	)
 
 	// Pls be careful of the sequence. deletion first,then addition, last updation
 	for _, action := range deleteActions {
@@ -160,36 +172,33 @@ func (m *modelApplier) applyListeners(local *model.LoadBalancer, remote *model.L
 	return nil
 }
 
+// TODO notes
 func (m *modelApplier) cleanup(local *model.LoadBalancer, remote *model.LoadBalancer) error {
 	// clean up vservergroup
-	/*lbId := remote.LoadBalancerAttribute.LoadBalancerId
-	vgs, err := m.cloud.DescribeVServerGroups(m.ctx, lbId)
-	if err != nil {
-		return err
-	}
+	vgs := remote.VServerGroups
 	for _, vg := range vgs {
-		if vg != local.NamespacedName.Name ||
-			vg.NamedKey.Namespace != service.Namespace ||
-			vg.NamedKey.CID != CLUSTER_ID {
+		if vg.NamedKey.ServiceName != local.NamespacedName.Name ||
+			vg.NamedKey.Namespace != local.NamespacedName.Namespace ||
+			vg.NamedKey.CID != metadata.CLUSTER_ID {
 			// skip those which does not belong to this service
 			continue
 		}
 		found := false
 		for _, l := range local.VServerGroups {
-			if vg.NamedKey.Port == l.VGroupName {
+			if vg.VGroupId == l.VGroupId {
 				found = true
 				break
 			}
 		}
 		if !found {
-			rem.Logf("try to remove unused vserver group, [%s][%s]", rem.NamedKey.Key(), rem.VGroupId)
-			err := rem.Remove(ctx)
+			klog.Infof("try to remove unused vserver group, [%s][%s]", vg.NamedKey.Key(), vg.VGroupId)
+			err := m.reqCtx.EnsureVGroupDeleted(vg.VGroupId)
 			if err != nil {
-				rem.Logf("Error: cleanup vgroup warining: "+
-					"failed to remove vgroup[%s]. wait for next try. %s", rem.NamedKey.Key(), err.Error())
+				klog.Infof("Error: cleanup vgroup warining: "+
+					"failed to remove vgroup[%s]. wait for next try. %s", vg.NamedKey.Key(), err.Error())
 				return err
 			}
 		}
-	}*/
+	}
 	return nil
 }

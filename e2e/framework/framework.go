@@ -15,6 +15,7 @@ import (
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/service"
 	prvd "k8s.io/cloud-provider-alibaba-cloud/pkg/provider"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba"
 	"reflect"
@@ -28,12 +29,12 @@ type OptionsFunc func(f *FrameWorkE2E)
 
 //FrameWorkE2E e2e backup
 type FrameWorkE2E struct {
-	Desribe string
-	Cloud   prvd.Provider
-	Client  kubernetes.Interface
+	Description string
+	Cloud       prvd.Provider
+	Client      kubernetes.Interface
 }
 
-var TestContext Config
+var TestConfig Config
 
 type Config struct {
 	Host                  string
@@ -54,25 +55,30 @@ type Config struct {
 	ResourceGroupID       string
 }
 
-var Defaultsvc = &v1.Service{
-	ObjectMeta: metav1.ObjectMeta{
-		Name:      "basic-service",
-		Namespace: NameSpace,
-	},
-	Spec: v1.ServiceSpec{
-		Ports: []v1.ServicePort{
-			{
-				Port:       80,
-				TargetPort: intstr.FromInt(80),
-				Protocol:   v1.ProtocolTCP,
+func NewBaseSVC(anno map[string]string) *v1.Service {
+	return &v1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        "basic-service",
+			Namespace:   NameSpace,
+			Annotations: anno,
+		},
+		Spec: v1.ServiceSpec{
+			Ports: []v1.ServicePort{
+				{
+					Port:       80,
+					TargetPort: intstr.FromInt(80),
+					Protocol:   v1.ProtocolTCP,
+				},
 			},
+			Type:            v1.ServiceTypeLoadBalancer,
+			SessionAffinity: v1.ServiceAffinityNone,
+			Selector:        map[string]string{"run": "nginx"},
 		},
-		Type:            v1.ServiceTypeLoadBalancer,
-		SessionAffinity: v1.ServiceAffinityNone,
-		Selector: map[string]string{
-			"run": "nginx",
-		},
-	},
+	}
+}
+
+func NewNamedFrameWork(name string) *FrameWorkE2E {
+	return NewFrameWork(func(f *FrameWorkE2E) { f.Description = name })
 }
 
 func NewFrameWork(
@@ -89,12 +95,37 @@ func NewFrameWork(
 
 type ServiceMutator func(service *v1.Service) error
 
+func NewTestUnit(
+	svc *v1.Service,
+	mutate ServiceMutator,
+	expect func(m *Expectation) (bool, error),
+	description string,
+) *TestUnit {
+	if svc == nil {
+		svc = NewBaseSVC(nil)
+	}
+	return &TestUnit{
+		Service:     svc,
+		Mutator:     mutate,
+		ExpectOK:    expect,
+		Description: description,
+	}
+}
+
 type TestUnit struct {
 	Service     *v1.Service
+	ReqCtx      *service.RequestContext
 	Description string
 	Mutator     ServiceMutator
-	//Service  *v1.Service
-	ExpectOK func(m *Expectation) error
+	ExpectOK    func(m *Expectation) (bool, error)
+}
+
+func (t *TestUnit) NewReqContext(cloud prvd.Provider) {
+	reqContext := service.NewRequestContext(
+		context.Background(), t.Service,
+		service.NewAnnotationRequest(t.Service), cloud, nil,
+	)
+	t.ReqCtx = reqContext
 }
 
 func NewExpection(mcase *TestUnit, e2e *FrameWorkE2E) *Expectation {
@@ -102,24 +133,21 @@ func NewExpection(mcase *TestUnit, e2e *FrameWorkE2E) *Expectation {
 }
 
 type Expectation struct {
-	Endpoint *v1.Endpoints
-	Nodes    []v1.Node
-	Svc      *v1.Service
-	Case     *TestUnit
-	E2E      *FrameWorkE2E
+	Case *TestUnit
+	E2E  *FrameWorkE2E
 }
 
-func (m *Expectation) ExpectOK() error {
+func (m *Expectation) ExpectOK() (bool, error) {
 	if m.Case == nil || m.Case.ExpectOK == nil {
 		// no expectation found, default to succeed
-		return nil
+		return true, nil
 	}
 	return m.Case.ExpectOK(m)
 }
 
 func (f *FrameWorkE2E) SetUp() { f.BeforeEach() }
 
-func (f *FrameWorkE2E) CleanUp() { f.CleanUp() }
+func (f *FrameWorkE2E) CleanUp() { f.AfterEach() }
 
 func (f *FrameWorkE2E) BeforeEach() {
 	setup := func() (done bool, err error) {
@@ -200,7 +228,7 @@ func WaitServiceMutate(
 	mutate ServiceMutator,
 ) (*v1.Service, error) {
 	var newm *v1.Service
-	return newm, wait.PollImmediate(
+	err := wait.PollImmediate(
 		3*time.Second,
 		1*time.Minute,
 		func() (done bool, err error) {
@@ -213,6 +241,7 @@ func WaitServiceMutate(
 			return true, nil
 		},
 	)
+	return newm, err
 }
 
 func CreateOrUpdate(
@@ -271,9 +300,9 @@ func ToPTR(a []v1.Node) []*v1.Node {
 }
 
 func LoadConfig() (*restclient.Config, error) {
-	c, err := clientcmd.LoadFromFile(TestContext.KubeConfig)
+	c, err := clientcmd.LoadFromFile(TestConfig.KubeConfig)
 	if err != nil {
-		if TestContext.KubeConfig == "" {
+		if TestConfig.KubeConfig == "" {
 			return restclient.InClusterConfig()
 		}
 		return nil, err
@@ -283,7 +312,7 @@ func LoadConfig() (*restclient.Config, error) {
 		*c,
 		&clientcmd.ConfigOverrides{
 			ClusterInfo: clientcmdapi.Cluster{
-				Server: TestContext.Host,
+				Server: TestConfig.Host,
 			},
 		},
 	).ClientConfig()
@@ -348,8 +377,8 @@ func RunNginxDeployment(
 		Logf("nginx already exist: %s", err.Error())
 	}
 	return wait.Poll(
-		1*time.Second,
-		20*time.Second,
+		3*time.Second,
+		1*time.Minute,
 		func() (done bool, err error) {
 			pods, err := client.CoreV1().Pods(nginx.Namespace).List(context.Background(), metav1.ListOptions{LabelSelector: "run=nginx"})
 			if err != nil {

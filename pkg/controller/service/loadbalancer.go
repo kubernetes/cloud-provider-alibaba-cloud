@@ -1,8 +1,8 @@
 package service
 
 import (
+	"encoding/json"
 	"fmt"
-	"github.com/aliyun/alibaba-cloud-sdk-go/services/slb"
 	ctx2 "k8s.io/cloud-provider-alibaba-cloud/pkg/context"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/model"
 	"k8s.io/klog"
@@ -10,6 +10,12 @@ import (
 )
 
 func (reqCtx *RequestContext) FindLoadBalancer(mdl *model.LoadBalancer) error {
+	if reqCtx == nil {
+		klog.Infof("reqCtx is nil")
+	}
+	if reqCtx.anno == nil {
+		klog.Infof("anno is nil")
+	}
 	// 1. set load balancer id
 	if reqCtx.anno.Get(LoadBalancerId) != "" {
 		mdl.LoadBalancerAttribute.LoadBalancerId = reqCtx.anno.Get(LoadBalancerId)
@@ -20,16 +26,11 @@ func (reqCtx *RequestContext) FindLoadBalancer(mdl *model.LoadBalancer) error {
 	mdl.LoadBalancerAttribute.LoadBalancerName = reqCtx.anno.GetDefaultLoadBalancerName()
 
 	// 3. set default loadbalancer tag
-	mdl.LoadBalancerAttribute.Tags = []slb.Tag{
-		{
-			TagKey:   TAGKEY,
-			TagValue: mdl.LoadBalancerAttribute.LoadBalancerName,
-		},
-	}
+	mdl.LoadBalancerAttribute.Tags = reqCtx.anno.GetDefaultTags()
 	return reqCtx.cloud.FindLoadBalancer(reqCtx.ctx, mdl)
 }
 
-func (reqCtx *RequestContext) BuildLoadBalancerAttributeFromService(mdl *model.LoadBalancer) error {
+func (reqCtx *RequestContext) BuildLoadBalancerAttributeForLocalModel(mdl *model.LoadBalancer) error {
 	mdl.LoadBalancerAttribute.AddressType = model.AddressType(reqCtx.anno.Get(AddressType))
 	mdl.LoadBalancerAttribute.InternetChargeType = model.InternetChargeType(reqCtx.anno.Get(ChargeType))
 	bandwidth := reqCtx.anno.Get(Bandwidth)
@@ -57,7 +58,7 @@ func (reqCtx *RequestContext) BuildLoadBalancerAttributeFromService(mdl *model.L
 	return nil
 }
 
-func (reqCtx *RequestContext) BuildLoadBalancerAttributeFromCloud(mdl *model.LoadBalancer) error {
+func (reqCtx *RequestContext) BuildLoadBalancerAttributeForRemoteModel(mdl *model.LoadBalancer) error {
 	return reqCtx.FindLoadBalancer(mdl)
 }
 
@@ -67,25 +68,20 @@ func (reqCtx *RequestContext) EnsureLoadBalancerCreated(local *model.LoadBalance
 	if err != nil {
 		return fmt.Errorf("create slb error: %s", err.Error())
 	}
-	return nil
+
+	tags, err := json.Marshal(local.LoadBalancerAttribute.Tags)
+	if err != nil {
+		return fmt.Errorf("marshal tags error: %s", err.Error())
+	}
+	return reqCtx.cloud.AddTags(reqCtx.ctx, local.LoadBalancerAttribute.LoadBalancerId, string(tags))
 }
 
 func (reqCtx *RequestContext) EnsureLoadBalancerDeleted(mdl *model.LoadBalancer) error {
-	err := reqCtx.cloud.FindLoadBalancer(reqCtx.ctx, mdl)
-	if err != nil {
-		return err
-	}
 	if mdl.LoadBalancerAttribute.LoadBalancerId == "" {
 		return nil
 	}
 
-	//// skip delete user defined loadbalancer
-	//if isUserDefinedLoadBalancer(service) {
-	//	utils.Logf(service, "user managed loadbalancer will not be deleted by cloudprovider.")
-	//	return EnsureListenersDeleted(ctx, s.c, service, lb, BuildVirtualGroupFromService(s, service, lb))
-	//}
-
-	//// set delete protection off
+	// set delete protection off
 	if mdl.LoadBalancerAttribute.DeleteProtection == model.OnFlag {
 		if err := reqCtx.cloud.SetLoadBalancerDeleteProtection(
 			reqCtx.ctx,
@@ -103,6 +99,7 @@ func (reqCtx *RequestContext) EnsureLoadBalancerDeleted(mdl *model.LoadBalancer)
 
 func (reqCtx *RequestContext) EnsureLoadBalancerUpdated(local, remote *model.LoadBalancer) error {
 	lbId := remote.LoadBalancerAttribute.LoadBalancerId
+	klog.Infof("found load balancer [%s], try to update load balancer attribute", lbId)
 
 	if local.LoadBalancerAttribute.MasterZoneId != "" &&
 		local.LoadBalancerAttribute.MasterZoneId != remote.LoadBalancerAttribute.MasterZoneId {
@@ -234,4 +231,3 @@ func setModelDefaultValue(mdl *model.LoadBalancer, anno *AnnotationRequest) {
 
 	mdl.LoadBalancerAttribute.Tags = append(mdl.LoadBalancerAttribute.Tags, anno.GetDefaultTags()...)
 }
-

@@ -53,6 +53,7 @@ type ILoadBalancer interface {
 	SetLoadBalancerName(ctx context.Context, lbId string, name string) error
 	ModifyLoadBalancerInternetSpec(ctx context.Context, lbId string, chargeType string, bandwidth int) error
 	SetLoadBalancerModificationProtection(ctx context.Context, lbId string, flag string) error
+	AddTags(ctx context.Context, lbId string, tags string) error
 
 	// Listener
 	DescribeLoadBalancerListeners(ctx context.Context, lbId string) ([]model.ListenerAttribute, error)
@@ -71,10 +72,10 @@ type ILoadBalancer interface {
 	// VServerGroup
 	DescribeVServerGroups(ctx context.Context, lbId string) ([]model.VServerGroup, error)
 	CreateVServerGroup(ctx context.Context, vg *model.VServerGroup, lbId string) error
-	DescribeVServerGroupAttribute(ctx context.Context, vGroupId string) (*model.VServerGroup, error)
+	DescribeVServerGroupAttribute(ctx context.Context, vGroupId string) (model.VServerGroup, error)
 	DeleteVServerGroup(ctx context.Context, vGroupId string) error
-
-	//DeleteVServerGroup(ctx context.Context, vGroupId string) (err error)
-	//SetVServerGroupAttribute(ctx context.Context, args *slb.SetVServerGroupAttributeArgs) (response *slb.SetVServerGroupAttributeResponse, err error)
-	//ModifyVServerGroupBackendServers(ctx context.Context, args *slb.ModifyVServerGroupBackendServersArgs) (response *slb.ModifyVServerGroupBackendServersResponse, err error)
+	AddVServerGroupBackendServers(ctx context.Context, vGroupId string, backends string) error
+	RemoveVServerGroupBackendServers(ctx context.Context, vGroupId string, backends string) error
+	SetVServerGroupAttribute(ctx context.Context, vGroupId string, backends string) error
+	ModifyVServerGroupBackendServers(ctx context.Context, vGroupId string, old string, new string) error
 }

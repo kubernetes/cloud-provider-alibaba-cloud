@@ -157,6 +157,13 @@ func (p ProviderSLB) SetLoadBalancerModificationProtection(ctx context.Context, 
 	return err
 }
 
+func (p ProviderSLB) AddTags(ctx context.Context, lbId string, tags string) error {
+	req := slb.CreateAddTagsRequest()
+	req.LoadBalancerId = lbId
+	req.Tags = tags
+	_, err := p.auth.SLB.AddTags(req)
+	return err
+}
 func setRequest(request *slb.CreateLoadBalancerRequest, mdl *model.LoadBalancer) {
 	if mdl.LoadBalancerAttribute.AddressType != "" {
 		request.AddressType = string(mdl.LoadBalancerAttribute.AddressType)

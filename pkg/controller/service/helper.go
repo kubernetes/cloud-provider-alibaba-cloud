@@ -29,7 +29,6 @@ func isENIBackendType(svc *v1.Service) bool {
 }
 
 func isSLBNeeded(svc *v1.Service) bool {
-	// finalizer must be supported
 	return svc.DeletionTimestamp == nil && svc.Spec.Type == v1.ServiceTypeLoadBalancer
 }
 
@@ -127,4 +126,20 @@ func Batch(m interface{}, cnt int, batch Func) error {
 
 	klog.Infof("batch process ,total length %d last section", len(target))
 	return batch(target)
+}
+
+type RecursiveFunc func(params ...interface{}) (string, error)
+
+// Recurse recursive query with func `func`
+// for general purpose
+func Recurse(f RecursiveFunc, nextToken string, params ...interface{}) error {
+	nextToken, err := f(params)
+	if err != nil {
+		return err
+	}
+	if nextToken == "" {
+		return nil
+	}
+
+	return Recurse(f, nextToken, params)
 }

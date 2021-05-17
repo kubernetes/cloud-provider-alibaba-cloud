@@ -1,11 +1,11 @@
 package slbprd
 
 import (
+	"encoding/json"
 	"github.com/aliyun/alibaba-cloud-sdk-go/sdk/requests"
 	"github.com/aliyun/alibaba-cloud-sdk-go/sdk/utils"
 	"github.com/aliyun/alibaba-cloud-sdk-go/services/slb"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/model"
-	"reflect"
 	"testing"
 )
 
@@ -29,16 +29,31 @@ func TestNewLBProvider_CreateSLB(t *testing.T) {
 }
 
 func TestProviderSLB_DeleteSLB(t *testing.T) {
-	client, err := slb.NewClientWithAccessKey("cn-hangzhou", "key", "secret")
+	key := ""
+	secert := ""
+	client, err := slb.NewClientWithAccessKey("cn-hangzhou", key, secert)
 	if err != nil {
 		t.Fatalf(err.Error())
-
 	}
 
-	request := slb.CreateDeleteLoadBalancerRequest()
-	request.LoadBalancerId = "lb-xxx"
-	if _, err = client.DeleteLoadBalancer(request); err != nil {
-		t.Fatalf(err.Error())
+	lbIds := []string{
+		"lb-xxx",
+		"lb-xxxx",
+	}
+	for _, id := range lbIds {
+		req := slb.CreateSetLoadBalancerDeleteProtectionRequest()
+		req.LoadBalancerId = id
+		req.DeleteProtection = "off"
+		_, err := client.SetLoadBalancerDeleteProtection(req)
+		if err != nil {
+			t.Fatalf(err.Error())
+		}
+
+		request := slb.CreateDeleteLoadBalancerRequest()
+		request.LoadBalancerId = id
+		if _, err = client.DeleteLoadBalancer(request); err != nil {
+			t.Fatalf(err.Error())
+		}
 	}
 }
 
@@ -59,43 +74,39 @@ func TestProviderSLB_DescribeLoadBalancerListeners(t *testing.T) {
 	t.Logf("%v", resp)
 }
 
-func TestNewLBProvider(t *testing.T) {
-	ln := "local"
-	rn := "remote"
-	local := &model.LoadBalancer{}
-	local.LoadBalancerAttribute = model.LoadBalancerAttribute{LoadBalancerName: &ln}
-	remote := &model.LoadBalancer{}
-	remote.LoadBalancerAttribute = model.LoadBalancerAttribute{LoadBalancerName: &rn}
+func TestProviderSLB_DescribeVServerGroups(t *testing.T) {
+	key := ""
+	secert := ""
+	client, err := slb.NewClientWithAccessKey("cn-hangzhou", key, secert)
+	if err != nil {
+		t.Fatalf(err.Error())
+	}
 
-	changeName(local, remote)
+	req := slb.CreateDescribeVServerGroupsRequest()
+	req.LoadBalancerId = "lb-xxxx"
+	resp, err := client.DescribeVServerGroups(req)
+	if err != nil {
+		t.Fatalf(err.Error())
+	}
+	var vgs []model.VServerGroup
+	for _, v := range resp.VServerGroups.VServerGroup {
 
-	t.Logf("local name: %s,remote name: %s", *local.LoadBalancerAttribute.LoadBalancerName,
-		*remote.LoadBalancerAttribute.LoadBalancerName)
+		req := slb.CreateDescribeVServerGroupAttributeRequest()
+		req.VServerGroupId = v.VServerGroupId
+		resp, err := client.DescribeVServerGroupAttribute(req)
+		if err != nil {
+			t.Fatalf(err.Error())
+		}
+		vg := setVServerGroupFromResponse(resp)
 
-}
+		namedKey, err := model.LoadVGroupNamedKey(vg.VGroupName)
+		if err != nil {
+			t.Fatalf(err.Error())
+		}
+		vg.NamedKey = namedKey
+		vgs = append(vgs, vg)
+	}
 
-func changeName(local *model.LoadBalancer, remote *model.LoadBalancer) {
-	*local.LoadBalancerAttribute.LoadBalancerName = "local2"
-
-	*remote.LoadBalancerAttribute.LoadBalancerName = "remote2"
-
-}
-
-type dog struct {
-	LegCount int
-}
-
-func TestProviderSLB_CreateLoadBalancerHTTPListener(t *testing.T) {
-	n1 := "123"
-	n2 := "123"
-	local := model.LoadBalancerAttribute{LoadBalancerName: &n1}
-	remote := model.LoadBalancerAttribute{LoadBalancerName: &n2}
-	t.Logf("equal: %v", *local.LoadBalancerName == *remote.LoadBalancerName)
-
-}
-
-func setV(req interface{}, port *model.ListenerAttribute) {
-	v := reflect.ValueOf(req).Elem()
-	vgroup := v.FieldByName("VServerGroupId")
-	vgroup.SetString(port.VGroupId)
+	jsonStr, err := json.Marshal(vgs)
+	t.Logf(string(jsonStr))
 }

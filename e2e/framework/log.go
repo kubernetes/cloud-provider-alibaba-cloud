@@ -3,7 +3,7 @@ package framework
 import (
 	"bytes"
 	"fmt"
-	"github.com/onsi/ginkgo"
+	"k8s.io/klog"
 	e2eginkgowrapper "k8s.io/kubernetes/test/e2e/framework/ginkgowrapper"
 	"regexp"
 	"runtime/debug"
@@ -15,7 +15,8 @@ func nowStamp() string {
 }
 
 func log(level string, format string, args ...interface{}) {
-	_, _ = fmt.Fprintf(ginkgo.GinkgoWriter, nowStamp()+": "+level+": "+format+"\n", args...)
+	//_, _ = fmt.Fprintf(ginkgo.GinkgoWriter, nowStamp()+": "+level+": "+format+"\n", args...)
+	klog.Infof(format, args...)
 }
 
 // Logf logs the info.

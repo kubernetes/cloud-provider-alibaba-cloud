@@ -129,6 +129,7 @@ type ListenerAttribute struct {
 	HealthCheckConnectPort    int
 	HealthyThreshold          int // values: 2~10
 	UnhealthyThreshold        int // values: 2~10
+	HealthCheckTimeout        int // values: 1~300
 	HealthCheckConnectTimeout int // values: 1~300
 	HealthCheckInterval       int // values: 1-50
 	HealthCheckHttpCode       string

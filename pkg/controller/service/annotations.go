@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"github.com/aliyun/alibaba-cloud-sdk-go/services/slb"
 	v1 "k8s.io/api/core/v1"
-	ctx2 "k8s.io/cloud-provider-alibaba-cloud/pkg/context"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/model"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/metadata"
 	"k8s.io/klog"
 	"strings"
 )
@@ -29,101 +29,55 @@ const (
 	AnnotationLoadBalancerPrefix = "loadbalancer-"
 
 	// Load Balancer Attribute
-	// ServiceAnnotationLoadBalancerAddressType loadbalancer address type
-	AddressType = AnnotationLoadBalancerPrefix + "address-type"
-	// ServiceAnnotationLoadBalancerVswitch loadbalancer vswitch id
-	VswitchId = AnnotationLoadBalancerPrefix + "vswitch-id"
-	// ServiceAnnotationLoadBalancerSLBNetworkType loadbalancer network type
-	SLBNetworkType = AnnotationLoadBalancerPrefix + "slb-network-type"
-	// ServiceAnnotationLoadBalancerChargeType lb charge type
-	ChargeType = AnnotationLoadBalancerPrefix + "charge-type"
-	// ServiceAnnotationLoadBalancerId lb id
-	LoadBalancerId = AnnotationLoadBalancerPrefix + "id"
-	// ServiceAnnotationLoadBalancerOverrideListener force override listeners
-	OverrideListener = AnnotationLoadBalancerPrefix + "force-override-listeners"
-	//ServiceAnnotationLoadBalancerName slb name
-	LoadBalancerName = AnnotationLoadBalancerPrefix + "name"
-	// ServiceAnnotationLoadBalancerMasterZoneID master zone id
-	MasterZoneID = AnnotationLoadBalancerPrefix + "master-zoneid"
-	// ServiceAnnotationLoadBalancerSlaveZoneID slave zone id
-	SlaveZoneID = AnnotationLoadBalancerPrefix + "slave-zoneid"
-	// ServiceAnnotationLoadBalancerBandwidth bandwidth
-	Bandwidth = AnnotationLoadBalancerPrefix + "bandwidth"
-	// ServiceAnnotationLoadBalancerAdditionalTags For example: "Key1=Val1,Key2=Val2,KeyNoVal1=,KeyNoVal2",same with aws
-	AdditionalTags = AnnotationLoadBalancerPrefix + "additional-resource-tags"
-	// ServiceAnnotationLoadBalancerSpec slb spec
-	Spec = AnnotationLoadBalancerPrefix + "spec"
-	// ServiceAnnotationLoadBalancerScheduler slb scheduler
-	Scheduler = AnnotationLoadBalancerPrefix + "scheduler"
-	//ServiceAnnotationLoadBalancerIPVersion ip version
-	IPVersion = AnnotationLoadBalancerPrefix + "ip-version"
-	// ServiceAnnotationLoadBalancerResourceGroupId resource group id
-	ResourceGroupId = AnnotationLoadBalancerPrefix + "resource-group-id"
-	// ServiceAnnotationLoadBalancerDeleteProtection delete protection
-	DeleteProtection = AnnotationLoadBalancerPrefix + "delete-protection"
-	// ServiceAnnotationLoadBalancerModificationProtection modification type
-	ModificationProtection = AnnotationLoadBalancerPrefix + "modification-protection"
-	// ServiceAnnotationLoadBalancerBackendType external ip type
-	ExternalIPType = AnnotationLoadBalancerPrefix + "external-ip-type"
+	AddressType            = AnnotationLoadBalancerPrefix + "address-type"             // AddressType loadbalancer address type
+	VswitchId              = AnnotationLoadBalancerPrefix + "vswitch-id"               // VswitchId loadbalancer vswitch id
+	SLBNetworkType         = AnnotationLoadBalancerPrefix + "slb-network-type"         // SLBNetworkType loadbalancer network type
+	ChargeType             = AnnotationLoadBalancerPrefix + "charge-type"              // ChargeType lb charge type
+	LoadBalancerId         = AnnotationLoadBalancerPrefix + "id"                       // LoadBalancerId lb id
+	OverrideListener       = AnnotationLoadBalancerPrefix + "force-override-listeners" // OverrideListener force override listeners
+	LoadBalancerName       = AnnotationLoadBalancerPrefix + "name"                     // LoadBalancerName slb name
+	MasterZoneID           = AnnotationLoadBalancerPrefix + "master-zoneid"            // MasterZoneID master zone id
+	SlaveZoneID            = AnnotationLoadBalancerPrefix + "slave-zoneid"             // SlaveZoneID slave zone id
+	Bandwidth              = AnnotationLoadBalancerPrefix + "bandwidth"                // Bandwidth bandwidth
+	AdditionalTags         = AnnotationLoadBalancerPrefix + "additional-resource-tags" // AdditionalTags For example: "Key1=Val1,Key2=Val2,KeyNoVal1=,KeyNoVal2",same with aws
+	Spec                   = AnnotationLoadBalancerPrefix + "spec"                     // Spec slb spec
+	Scheduler              = AnnotationLoadBalancerPrefix + "scheduler"                // Scheduler slb scheduler
+	IPVersion              = AnnotationLoadBalancerPrefix + "ip-version"               // IPVersion ip version
+	ResourceGroupId        = AnnotationLoadBalancerPrefix + "resource-group-id"        // ResourceGroupId resource group id
+	DeleteProtection       = AnnotationLoadBalancerPrefix + "delete-protection"        // DeleteProtection delete protection
+	ModificationProtection = AnnotationLoadBalancerPrefix + "modification-protection"  // ModificationProtection modification type
+	ExternalIPType         = AnnotationLoadBalancerPrefix + "external-ip-type"         // ExternalIPType external ip type
 
 	// Listener Attribute
-	// ServiceAnnotationLoadBalancerAclStatus enable or disable acl on all listener
-	AclStatus = AnnotationLoadBalancerPrefix + "acl-status"
-	// ServiceAnnotationLoadBalancerAclID acl id
-	AclID = AnnotationLoadBalancerPrefix + "acl-id"
-	// ServiceAnnotationLoadBalancerAclType acl type, black or white
-	AclType = AnnotationLoadBalancerPrefix + "acl-type"
-	// ServiceAnnotationLoadBalancerProtocolPort protocol port
-	ProtocolPort = AnnotationLoadBalancerPrefix + "protocol-port"
-	// ServiceAnnotationLoadBalancerForwardPort loadbalancer forward port
-	ForwardPort = AnnotationLoadBalancerPrefix + "forward-port"
-	// ServiceAnnotationLoadBalancerCertID cert id
-	CertID = AnnotationLoadBalancerPrefix + "cert-id"
-	// ServiceAnnotationLoadBalancerHealthCheckFlag health check flag
-	HealthCheckFlag = AnnotationLoadBalancerPrefix + "health-check-flag"
-	// ServiceAnnotationLoadBalancerHealthCheckType health check type
-	HealthCheckType = AnnotationLoadBalancerPrefix + "health-check-type"
-	// ServiceAnnotationLoadBalancerHealthCheckURI health check uri
-	HealthCheckURI = AnnotationLoadBalancerPrefix + "health-check-uri"
-	// ServiceAnnotationLoadBalancerHealthCheckConnectPort health check connect port
-	HealthCheckConnectPort = AnnotationLoadBalancerPrefix + "health-check-connect-port"
-	// ServiceAnnotationLoadBalancerHealthCheckHealthyThreshold health check healthy thresh hold
-	HealthyThreshold = AnnotationLoadBalancerPrefix + "healthy-threshold"
-	// ServiceAnnotationLoadBalancerHealthCheckUnhealthyThreshold health check unhealthy thresh hold
-	UnhealthyThreshold = AnnotationLoadBalancerPrefix + "unhealthy-threshold"
-	// ServiceAnnotationLoadBalancerHealthCheckInterval health check interval
-	HealthCheckInterval = AnnotationLoadBalancerPrefix + "health-check-interval"
-	// ServiceAnnotationLoadBalancerHealthCheckConnectTimeout health check connect timeout
-	HealthCheckConnectTimeout = AnnotationLoadBalancerPrefix + "health-check-connect-timeout"
-	// ServiceAnnotationLoadBalancerHealthCheckTimeout health check timeout
-	HealthCheckTimeout = AnnotationLoadBalancerPrefix + "health-check-timeout"
-	// ServiceAnnotationLoadBalancerHealthCheckDomain health check domain
-	HealthCheckDomain = AnnotationLoadBalancerPrefix + "health-check-domain"
-	// ServiceAnnotationLoadBalancerHealthCheckHTTPCode health check http code
-	HealthCheckHTTPCode = AnnotationLoadBalancerPrefix + "health-check-httpcode"
-	// ServiceAnnotationLoadBalancerSessionStick sticky session
-	SessionStick = AnnotationLoadBalancerPrefix + "sticky-session"
-	// ServiceAnnotationLoadBalancerSessionStickType session sticky type
-	SessionStickType = AnnotationLoadBalancerPrefix + "sticky-session-type"
-	// ServiceAnnotationLoadBalancerCookieTimeout cookie timeout
-	CookieTimeout = AnnotationLoadBalancerPrefix + "cookie-timeout"
-	//ServiceAnnotationLoadBalancerCookie lb cookie
-	Cookie = AnnotationLoadBalancerPrefix + "cookie"
-	// ServiceAnnotationLoadBalancerPersistenceTimeout persistence timeout
-	PersistenceTimeout = AnnotationLoadBalancerPrefix + "persistence-timeout"
-	// ConnectionDrain connection drain
-	ConnectionDrain = AnnotationLoadBalancerPrefix + "connection-drain"
-	// ConnectionDrainTimeout connection drain timeout
-	ConnectionDrainTimeout = AnnotationLoadBalancerPrefix + "connection-drain-timeout"
+	AclStatus                 = AnnotationLoadBalancerPrefix + "acl-status"                   // AclStatus enable or disable acl on all listener
+	AclID                     = AnnotationLoadBalancerPrefix + "acl-id"                       // AclID acl id
+	AclType                   = AnnotationLoadBalancerPrefix + "acl-type"                     // AclType acl type, black or white
+	ProtocolPort              = AnnotationLoadBalancerPrefix + "protocol-port"                // ProtocolPort protocol port
+	ForwardPort               = AnnotationLoadBalancerPrefix + "forward-port"                 // ForwardPort loadbalancer forward port
+	CertID                    = AnnotationLoadBalancerPrefix + "cert-id"                      // CertID cert id
+	HealthCheckFlag           = AnnotationLoadBalancerPrefix + "health-check-flag"            // HealthCheckFlag health check flag
+	HealthCheckType           = AnnotationLoadBalancerPrefix + "health-check-type"            // HealthCheckType health check type
+	HealthCheckURI            = AnnotationLoadBalancerPrefix + "health-check-uri"             // HealthCheckURI health check uri
+	HealthCheckConnectPort    = AnnotationLoadBalancerPrefix + "health-check-connect-port"    // HealthCheckConnectPort health check connect port
+	HealthyThreshold          = AnnotationLoadBalancerPrefix + "healthy-threshold"            // HealthyThreshold health check healthy thresh hold
+	UnhealthyThreshold        = AnnotationLoadBalancerPrefix + "unhealthy-threshold"          // UnhealthyThreshold health check unhealthy thresh hold
+	HealthCheckInterval       = AnnotationLoadBalancerPrefix + "health-check-interval"        // HealthCheckInterval health check interval
+	HealthCheckConnectTimeout = AnnotationLoadBalancerPrefix + "health-check-connect-timeout" // HealthCheckConnectTimeout health check connect timeout
+	HealthCheckTimeout        = AnnotationLoadBalancerPrefix + "health-check-timeout"         // HealthCheckTimeout health check timeout
+	HealthCheckDomain         = AnnotationLoadBalancerPrefix + "health-check-domain"          // HealthCheckDomain health check domain
+	HealthCheckHTTPCode       = AnnotationLoadBalancerPrefix + "health-check-httpcode"        // HealthCheckHTTPCode health check http code
+	SessionStick              = AnnotationLoadBalancerPrefix + "sticky-session"               // SessionStick sticky session
+	SessionStickType          = AnnotationLoadBalancerPrefix + "sticky-session-type"          // SessionStickType session sticky type
+	CookieTimeout             = AnnotationLoadBalancerPrefix + "cookie-timeout"               // CookieTimeout cookie timeout
+	Cookie                    = AnnotationLoadBalancerPrefix + "cookie"                       // Cookie lb cookie
+	PersistenceTimeout        = AnnotationLoadBalancerPrefix + "persistence-timeout"          // PersistenceTimeout persistence timeout
+	ConnectionDrain           = AnnotationLoadBalancerPrefix + "connection-drain"             // ConnectionDrain connection drain
+	ConnectionDrainTimeout    = AnnotationLoadBalancerPrefix + "connection-drain-timeout"     // ConnectionDrainTimeout connection drain timeout
 
 	// VServerBackend Attribute
-	// ServiceAnnotationLoadBalancerBackendLabel backend labels
-	BackendLabel = AnnotationLoadBalancerPrefix + "backend-label"
-	// ServiceAnnotationLoadBalancerBackendType backend type
-	BackendType = "service.beta.kubernetes.io/backend-type"
-
-	// RemoveUnscheduled remove unscheduled node from backends
-	RemoveUnscheduled = AnnotationLoadBalancerPrefix + "remove-unscheduled-backend"
+	BackendLabel      = AnnotationLoadBalancerPrefix + "backend-label"              // BackendLabel backend labels
+	BackendType       = "service.beta.kubernetes.io/backend-type"                   // BackendType backend type
+	RemoveUnscheduled = AnnotationLoadBalancerPrefix + "remove-unscheduled-backend" // RemoveUnscheduled remove unscheduled node from backends
 )
 
 const (
@@ -152,6 +106,11 @@ var DefaultValue = map[string]string{
 
 type AnnotationRequest struct{ svc *v1.Service }
 
+func NewAnnotationRequest(svc *v1.Service) *AnnotationRequest {
+	return &AnnotationRequest{svc}
+}
+
+// TODO get all annotations value from Get()
 func (n *AnnotationRequest) Get(k string) string {
 	if n.svc == nil {
 		klog.Infof("extract annotation %s from empty service", k)
@@ -182,6 +141,9 @@ func (n *AnnotationRequest) GetRaw(k string) string {
 }
 
 func (n *AnnotationRequest) GetDefaultValue(k string) string {
+	if k == LoadBalancerName {
+		return n.GetDefaultLoadBalancerName()
+	}
 	return DefaultValue[composite(AnnotationPrefix, k)]
 }
 
@@ -189,11 +151,11 @@ func (n *AnnotationRequest) GetDefaultTags() []slb.Tag {
 	return []slb.Tag{
 		{
 			TagKey:   TAGKEY,
-			TagValue: n.GetDefaultValue(LoadBalancerName),
+			TagValue: n.GetDefaultLoadBalancerName(),
 		},
 		{
 			TagKey:   ACKKEY,
-			TagValue: ctx2.CFG.Global.ClusterID,
+			TagValue: metadata.CLUSTER_ID,
 		},
 	}
 }
@@ -211,6 +173,10 @@ func (n *AnnotationRequest) GetDefaultLoadBalancerName() string {
 
 func composite(p, k string) string {
 	return fmt.Sprintf("%s-%s", p, k)
+}
+
+func Annotation(k string) string {
+	return composite(AnnotationPrefix, k)
 }
 
 // getLoadBalancerAdditionalTags converts the comma separated list of key-value
@@ -246,4 +212,8 @@ func (n *AnnotationRequest) GetLoadBalancerAdditionalTags() []slb.Tag {
 		})
 	}
 	return tags
+}
+
+func (n *AnnotationRequest) isForceOverride() bool {
+	return n.Get(OverrideListener) == "" || n.Get(OverrideListener) == string(model.OffFlag)
 }

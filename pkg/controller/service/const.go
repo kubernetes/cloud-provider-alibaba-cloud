@@ -5,7 +5,6 @@ const (
 
 	CCM_CLASS = "service.beta.kubernetes.io/class"
 
-
 	LabelNodeRoleMaster = "node-role.kubernetes.io/master"
 
 	DEFAULT_SERVER_WEIGHT      = 100

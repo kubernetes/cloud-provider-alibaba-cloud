@@ -3,12 +3,25 @@ package framework
 import (
 	"context"
 	"fmt"
+	"github.com/pkg/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"math/rand"
 	"strings"
 	"time"
 )
+
+func NewErrorRetry(err error) *ErrorRetry {
+	return &ErrorRetry{Err: err}
+}
+
+type ErrorRetry struct {
+	Err error
+}
+
+func (m *ErrorRetry) Error() string {
+	return fmt.Sprintf("NeedRetry: [%v]", m.Err)
+}
 
 func NewDefaultAction(u *TestUnit) Action {
 	return &DefaultAction{TestUnit: u}
@@ -26,33 +39,32 @@ func (u *DefaultAction) RunAction(f *FrameWorkE2E) error {
 	if err != nil {
 		return fmt.Errorf("mutator service: %s", err.Error())
 	}
+	// TODO: need rewrite?
 	u.Service = newm
-	nodes, err := f.Client.CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
-	if err != nil {
-		return fmt.Errorf("get node: %s", err.Error())
-	}
-	svc, err := f.
-		Client.
-		CoreV1().
-		Services(u.Service.Namespace).
-		Get(context.Background(), u.Service.Name, metav1.GetOptions{})
-	if err != nil {
-		return fmt.Errorf("get service: %s", err.Error())
-	}
-	expect := NewExpection(u.TestUnit, f)
-	expect.Nodes = nodes.Items
-	expect.Svc = svc
+	u.NewReqContext(f.Cloud)
+	return WaitExpection(f, u.TestUnit)
+}
 
-	endps, err := f.
-		Client.
-		CoreV1().
-		Endpoints(u.Service.Namespace).
-		Get(context.Background(), u.Service.Name, metav1.GetOptions{})
-	if err != nil {
-		return fmt.Errorf("get endpoints: %s", err.Error())
-	}
-	expect.Endpoint = endps
-	return WaitTimeout(expect)
+func WaitExpection(f *FrameWorkE2E, u *TestUnit) error {
+	return wait.PollImmediate(
+		4*time.Second,
+		1*time.Minute,
+		func() (done bool, err error) {
+			expect := NewExpection(u, f)
+			ok, err := expect.ExpectOK()
+			if err != nil {
+				merr, eok := err.(*ErrorRetry)
+				if eok {
+					Logf("retry on expectation: %s", merr.Error())
+					return false, nil
+				}
+				return false, errors.Wrap(err, expect.Case.Description)
+			}
+
+			ExpectEqual(ok, true, "expect failed: %s", expect.Case.Description)
+			return true, nil
+		},
+	)
 }
 
 func NewDeleteAction(u *TestUnit) *DeleteAction {
@@ -82,27 +94,9 @@ func (u *DeleteAction) RunAction(f *FrameWorkE2E) error {
 	if err != nil {
 		return fmt.Errorf("delete service: %s", err.Error())
 	}
-	expect := NewExpection(u.TestUnit, f)
-	expect.Svc = svc
-	return WaitTimeout(expect)
-}
-
-func WaitTimeout(
-	expect *Expectation,
-) error {
-
-	return wait.PollImmediate(
-		4*time.Second,
-		1*time.Minute,
-		func() (done bool, err error) {
-			err = expect.ExpectOK()
-			if err != nil {
-				Logf("WaitFor Expectation(%s) Timeout: %s, %s", expect.Case.Description, time.Now(), err.Error())
-				return false, nil
-			}
-			return true, nil
-		},
-	)
+	u.Service = svc
+	u.NewReqContext(f.Cloud)
+	return WaitExpection(f, u.TestUnit)
 }
 
 func NewRandomAction(rand []Action) Action {

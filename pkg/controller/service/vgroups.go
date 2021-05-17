@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	v1 "k8s.io/api/core/v1"
 	ctx2 "k8s.io/cloud-provider-alibaba-cloud/pkg/context"
@@ -32,7 +33,7 @@ type EndpointWithENI struct {
 	Endpoints *v1.Endpoints
 }
 
-func (reqCtx *RequestContext) BuildVGroupsFromService(m *model.LoadBalancer) error {
+func (reqCtx *RequestContext) BuildVGroupsForLocalModel(m *model.LoadBalancer) error {
 	var vgs []model.VServerGroup
 	nodes, err := getNodes(reqCtx.ctx, reqCtx.kubeClient, reqCtx.anno)
 	if err != nil {
@@ -62,7 +63,7 @@ func (reqCtx *RequestContext) BuildVGroupsFromService(m *model.LoadBalancer) err
 	return nil
 }
 
-func (reqCtx *RequestContext) BuildVGroupsFromCloud(m *model.LoadBalancer) error {
+func (reqCtx *RequestContext) BuildVGroupsForRemoteModel(m *model.LoadBalancer) error {
 	vgs, err := reqCtx.cloud.DescribeVServerGroups(reqCtx.ctx, m.LoadBalancerAttribute.LoadBalancerId)
 	if err != nil {
 		return fmt.Errorf("DescribeVServerGroups error: %s", err.Error())
@@ -79,24 +80,24 @@ func (reqCtx *RequestContext) EnsureVGroupDeleted(vGroupId string) error {
 	return reqCtx.cloud.DeleteVServerGroup(reqCtx.ctx, vGroupId)
 }
 
-func (reqCtx *RequestContext) EnsureVGroupUpdated(old, new model.VServerGroup) error {
-	add, del, update := diff(old, new)
+func (reqCtx *RequestContext) EnsureVGroupUpdated(local, remote model.VServerGroup) error {
+	add, del, update := diff(remote, local)
 	if len(add) == 0 && len(del) == 0 && len(update) == 0 {
 		klog.Infof("update: no backend need to be added for vgroupid")
 	}
-	//if len(add) > 0 {
-	//	if err := batchCreateVServerGroupBackendServers(ctx, del); err != nil {
-	//		break
-	//	}
-	//}
-	//if len(del) > 0 {
-	//	if err := batchRemoveVServerGroupBackendServers(ctx, del); err != nil {
-	//		break
-	//	}
-	//}
-	//if len(update) > 0 {
-	//	batchUpdateVServerGroupBackendServers(ctx, update)
-	//}
+	if len(add) > 0 {
+		if err := BatchAddVServerGroupBackendServers(reqCtx, local, add); err != nil {
+			return err
+		}
+	}
+	if len(del) > 0 {
+		if err := BatchRemoveVServerGroupBackendServers(reqCtx, remote, del); err != nil {
+			return err
+		}
+	}
+	if len(update) > 0 {
+		return BatchUpdateVServerGroupBackendServers(reqCtx, remote, update)
+	}
 	return nil
 }
 
@@ -432,4 +433,43 @@ func diff(remote, local model.VServerGroup) (
 		}
 	}
 	return addition, deletions, updates
+}
+
+func BatchAddVServerGroupBackendServers(reqCtx *RequestContext, vGroup model.VServerGroup, add interface{}) error {
+	return Batch(add, MAX_BACKEND_NUM,
+		func(list []interface{}) error {
+			additions, err := json.Marshal(list)
+			if err != nil {
+				return fmt.Errorf("error marshal backends: %s, %v", err.Error(), list)
+			}
+			klog.Infof("update: try to update vserver group[%s],"+
+				" backend add[%s]", vGroup.NamedKey.Key(), string(additions))
+			return reqCtx.cloud.AddVServerGroupBackendServers(reqCtx.ctx, vGroup.VGroupId, string(additions))
+		})
+}
+
+func BatchRemoveVServerGroupBackendServers(reqCtx *RequestContext, vGroup model.VServerGroup, del interface{}) error {
+	return Batch(del, MAX_BACKEND_NUM,
+		func(list []interface{}) error {
+			deletions, err := json.Marshal(list)
+			if err != nil {
+				return fmt.Errorf("error marshal backends: %s, %v", err.Error(), list)
+			}
+			klog.Infof("update: try to update vserver group[%s],"+
+				" backend del[%s]", vGroup.NamedKey.Key(), string(deletions))
+			return reqCtx.cloud.RemoveVServerGroupBackendServers(reqCtx.ctx, vGroup.VGroupId, string(deletions))
+		})
+}
+
+func BatchUpdateVServerGroupBackendServers(reqCtx *RequestContext, vGroup model.VServerGroup, update interface{}) error {
+	return Batch(update, MAX_BACKEND_NUM,
+		func(list []interface{}) error {
+			updateJson, err := json.Marshal(list)
+			if err != nil {
+				return fmt.Errorf("error marshal backends: %s, %v", err.Error(), list)
+			}
+			klog.Infof("update: try to update vserver group[%s],"+
+				" backend update[%s]", vGroup.NamedKey.Key(), string(updateJson))
+			return reqCtx.cloud.SetVServerGroupAttribute(reqCtx.ctx, vGroup.VGroupId, string(updateJson))
+		})
 }
