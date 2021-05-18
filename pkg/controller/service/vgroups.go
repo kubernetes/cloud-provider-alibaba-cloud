@@ -7,6 +7,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	ctx2 "k8s.io/cloud-provider-alibaba-cloud/pkg/context"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/model"
+	prvd "k8s.io/cloud-provider-alibaba-cloud/pkg/provider"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/util"
 	"k8s.io/klog"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -16,44 +17,75 @@ import (
 // EndpointWithENI
 // Currently, EndpointWithENI accept two kind of backend
 // normal nodes of type []*v1.Node, and endpoints of type *v1.Endpoints
+type TrafficPolicy string
+
+const (
+	// Local externalTrafficPolicy=Local
+	LocalTrafficPolicy = TrafficPolicy("Local")
+	// Cluster externalTrafficPolicy=Cluster
+	ClusterTrafficPolicy = TrafficPolicy("Cluster")
+	// ENI external traffic is forwarded to pod directly
+	ENITrafficPolicy = TrafficPolicy("ENI")
+)
+
 type EndpointWithENI struct {
-	// LocalMode externalTraffic=Local
-	LocalMode bool
-	// BackendTypeENI
-	// whether it is an eni backend
-	BackendTypeENI bool
+	// TrafficPolicy external traffic policy
+	TrafficPolicy TrafficPolicy
 	// Nodes
 	// contains all the candidate nodes consider of LoadBalance Backends.
 	// Cloud implementation has the right to make any filter on it.
 	Nodes []v1.Node
-
 	// Endpoints
 	// It is the direct pod location information which cloud implementation
 	// may needed for some kind of filtering. eg. direct ENI attach.
 	Endpoints *v1.Endpoints
 }
 
-func (reqCtx *RequestContext) BuildVGroupsForLocalModel(m *model.LoadBalancer) error {
+func (e *EndpointWithENI) setTrafficPolicy(reqCtx *RequestContext) {
+	if isENIBackendType(reqCtx.Service) {
+		e.TrafficPolicy = ENITrafficPolicy
+		return
+	}
+	if isLocalModeService(reqCtx.Service) {
+		e.TrafficPolicy = LocalTrafficPolicy
+		return
+	}
+	e.TrafficPolicy = ClusterTrafficPolicy
+	return
+}
+
+func NewVGroupManager(kubeClient client.Client, cloud prvd.Provider) *VGroupManager {
+	return &VGroupManager{
+		kubeClient: kubeClient,
+		cloud:      cloud,
+	}
+}
+
+type VGroupManager struct {
+	kubeClient client.Client
+	cloud      prvd.Provider
+}
+
+func (mgr *VGroupManager) BuildLocalModel(reqCtx *RequestContext, m *model.LoadBalancer) error {
 	var vgs []model.VServerGroup
-	nodes, err := getNodes(reqCtx.ctx, reqCtx.kubeClient, reqCtx.anno)
+	nodes, err := getNodes(reqCtx.Ctx, mgr.kubeClient, reqCtx.Anno)
 	if err != nil {
 		return fmt.Errorf("get nodes error: %s", err.Error())
 	}
 
-	eps, err := getEndpoints(reqCtx.ctx, reqCtx.kubeClient, reqCtx.svc)
+	eps, err := getEndpoints(reqCtx.Ctx, mgr.kubeClient, reqCtx.Service)
 	if err != nil {
 		return fmt.Errorf("get endpoints error: %s", err.Error())
 	}
 
-	candidates := EndpointWithENI{
-		LocalMode:      isLocalModeService(reqCtx.svc),
-		BackendTypeENI: isENIBackendType(reqCtx.svc),
-		Nodes:          nodes,
-		Endpoints:      eps,
+	candidates := &EndpointWithENI{
+		Nodes:     nodes,
+		Endpoints: eps,
 	}
+	candidates.setTrafficPolicy(reqCtx)
 
-	for _, port := range reqCtx.svc.Spec.Ports {
-		vg, err := buildVGroup(reqCtx, port, &candidates)
+	for _, port := range reqCtx.Service.Spec.Ports {
+		vg, err := mgr.buildVGroupForServicePort(reqCtx, port, candidates)
 		if err != nil {
 			return fmt.Errorf("build vgroup for port %d error: %s", port.Port, err.Error())
 		}
@@ -63,8 +95,8 @@ func (reqCtx *RequestContext) BuildVGroupsForLocalModel(m *model.LoadBalancer) e
 	return nil
 }
 
-func (reqCtx *RequestContext) BuildVGroupsForRemoteModel(m *model.LoadBalancer) error {
-	vgs, err := reqCtx.cloud.DescribeVServerGroups(reqCtx.ctx, m.LoadBalancerAttribute.LoadBalancerId)
+func (mgr *VGroupManager) BuildRemoteModel(reqCtx *RequestContext, m *model.LoadBalancer) error {
+	vgs, err := mgr.DescribeVServerGroups(reqCtx, m.LoadBalancerAttribute.LoadBalancerId)
 	if err != nil {
 		return fmt.Errorf("DescribeVServerGroups error: %s", err.Error())
 	}
@@ -72,33 +104,155 @@ func (reqCtx *RequestContext) BuildVGroupsForRemoteModel(m *model.LoadBalancer) 
 	return nil
 }
 
-func (reqCtx *RequestContext) EnsureVGroupCreated(vg *model.VServerGroup, lbId string) error {
-	return reqCtx.cloud.CreateVServerGroup(reqCtx.ctx, vg, lbId)
+func (mgr *VGroupManager) CreateVServerGroup(reqCtx *RequestContext, vg *model.VServerGroup, lbId string) error {
+	return mgr.cloud.CreateVServerGroup(reqCtx.Ctx, vg, lbId)
 }
 
-func (reqCtx *RequestContext) EnsureVGroupDeleted(vGroupId string) error {
-	return reqCtx.cloud.DeleteVServerGroup(reqCtx.ctx, vGroupId)
+func (mgr *VGroupManager) DeleteVServerGroup(reqCtx *RequestContext, vGroupId string) error {
+	return mgr.cloud.DeleteVServerGroup(reqCtx.Ctx, vGroupId)
 }
 
-func (reqCtx *RequestContext) EnsureVGroupUpdated(local, remote model.VServerGroup) error {
+func (mgr *VGroupManager) UpdateVServerGroup(reqCtx *RequestContext, local, remote model.VServerGroup) error {
 	add, del, update := diff(remote, local)
 	if len(add) == 0 && len(del) == 0 && len(update) == 0 {
 		klog.Infof("update: no backend need to be added for vgroupid")
 	}
 	if len(add) > 0 {
-		if err := BatchAddVServerGroupBackendServers(reqCtx, local, add); err != nil {
+		if err := mgr.BatchAddVServerGroupBackendServers(reqCtx, local, add); err != nil {
 			return err
 		}
 	}
 	if len(del) > 0 {
-		if err := BatchRemoveVServerGroupBackendServers(reqCtx, remote, del); err != nil {
+		if err := mgr.BatchRemoveVServerGroupBackendServers(reqCtx, remote, del); err != nil {
 			return err
 		}
 	}
 	if len(update) > 0 {
-		return BatchUpdateVServerGroupBackendServers(reqCtx, remote, update)
+		return mgr.BatchUpdateVServerGroupBackendServers(reqCtx, remote, update)
 	}
 	return nil
+}
+
+func (mgr *VGroupManager) DescribeVServerGroups(reqCtx *RequestContext, lbId string) ([]model.VServerGroup, error) {
+	return mgr.cloud.DescribeVServerGroups(reqCtx.Ctx, lbId)
+}
+
+func (mgr *VGroupManager) BatchAddVServerGroupBackendServers(reqCtx *RequestContext, vGroup model.VServerGroup, add interface{}) error {
+	return Batch(add, MAX_BACKEND_NUM,
+		func(list []interface{}) error {
+			additions, err := json.Marshal(list)
+			if err != nil {
+				return fmt.Errorf("error marshal backends: %s, %v", err.Error(), list)
+			}
+			klog.Infof("update: try to update vserver group[%s],"+
+				" backend add[%s]", vGroup.NamedKey.Key(), string(additions))
+			return mgr.cloud.AddVServerGroupBackendServers(reqCtx.Ctx, vGroup.VGroupId, string(additions))
+		})
+}
+
+func (mgr *VGroupManager) BatchRemoveVServerGroupBackendServers(reqCtx *RequestContext, vGroup model.VServerGroup, del interface{}) error {
+	return Batch(del, MAX_BACKEND_NUM,
+		func(list []interface{}) error {
+			deletions, err := json.Marshal(list)
+			if err != nil {
+				return fmt.Errorf("error marshal backends: %s, %v", err.Error(), list)
+			}
+			klog.Infof("update: try to update vserver group[%s],"+
+				" backend del[%s]", vGroup.NamedKey.Key(), string(deletions))
+			return mgr.cloud.RemoveVServerGroupBackendServers(reqCtx.Ctx, vGroup.VGroupId, string(deletions))
+		})
+}
+
+func (mgr *VGroupManager) BatchUpdateVServerGroupBackendServers(reqCtx *RequestContext, vGroup model.VServerGroup, update interface{}) error {
+	return Batch(update, MAX_BACKEND_NUM,
+		func(list []interface{}) error {
+			updateJson, err := json.Marshal(list)
+			if err != nil {
+				return fmt.Errorf("error marshal backends: %s, %v", err.Error(), list)
+			}
+			klog.Infof("update: try to update vserver group[%s],"+
+				" backend update[%s]", vGroup.NamedKey.Key(), string(updateJson))
+			return mgr.cloud.SetVServerGroupAttribute(reqCtx.Ctx, vGroup.VGroupId, string(updateJson))
+		})
+}
+
+func diff(remote, local model.VServerGroup) (
+	[]model.BackendAttribute, []model.BackendAttribute, []model.BackendAttribute) {
+
+	var (
+		addition  []model.BackendAttribute
+		deletions []model.BackendAttribute
+		updates   []model.BackendAttribute
+	)
+
+	for _, r := range remote.Backends {
+		//// skip nodes which does not belong to the cluster
+		//if isUserManagedNode(api.Description, v.NamedKey.Key()) {
+		//	continue
+		//}
+		found := false
+		for _, l := range local.Backends {
+			if l.Type == "eni" {
+				if r.ServerId == l.ServerId &&
+					r.ServerIp == l.ServerIp {
+					found = true
+					break
+				}
+			} else {
+				if r.ServerId == l.ServerId {
+					found = true
+					break
+				}
+			}
+
+		}
+		if !found {
+			deletions = append(deletions, r)
+		}
+	}
+	for _, l := range local.Backends {
+		found := false
+		for _, r := range remote.Backends {
+			if l.Type == "eni" {
+				if r.ServerId == l.ServerId &&
+					r.ServerIp == l.ServerIp {
+					found = true
+					break
+				}
+			} else {
+				if r.ServerId == l.ServerId {
+					found = true
+					break
+				}
+			}
+
+		}
+		if !found {
+			addition = append(addition, l)
+		}
+	}
+	for _, l := range local.Backends {
+		for _, r := range remote.Backends {
+			//if isUserManagedNode(api.Description, v.NamedKey.Key()) {
+			//	continue
+			//}
+			if l.Type == "eni" {
+				if l.ServerId == r.ServerId &&
+					l.ServerIp == r.ServerIp &&
+					l.Weight != r.Weight {
+					updates = append(updates, l)
+					break
+				}
+			} else {
+				if l.ServerId == r.ServerId &&
+					l.Weight != r.Weight {
+					updates = append(updates, l)
+					break
+				}
+			}
+		}
+	}
+	return addition, deletions, updates
 }
 
 func getNodes(ctx context.Context, client client.Client, anno *AnnotationRequest) ([]v1.Node, error) {
@@ -203,93 +357,114 @@ func getEndpoints(ctx context.Context, client client.Client, svc *v1.Service) (*
 	return eps, nil
 }
 
-func buildVGroup(req *RequestContext, port v1.ServicePort, candidates *EndpointWithENI) (model.VServerGroup, error) {
+func (mgr *VGroupManager) buildVGroupForServicePort(reqCtx *RequestContext, port v1.ServicePort, candidates *EndpointWithENI) (model.VServerGroup, error) {
 	vg := model.VServerGroup{
-		NamedKey: getVGroupNamedKey(req.svc, port),
+		NamedKey: getVGroupNamedKey(reqCtx.Service, port),
 	}
 	vg.VGroupName = vg.NamedKey.Key()
-
-	backends, err := getBackends(req, candidates, port)
-	if err != nil {
-		return vg, fmt.Errorf("get backends error: %s", err.Error())
+	// build backends
+	var (
+		backends []model.BackendAttribute
+		err      error
+	)
+	switch candidates.TrafficPolicy {
+	case ENITrafficPolicy:
+		klog.Infof("[ENI] mode service: %s", vg.NamedKey)
+		backends, err = mgr.buildENIBackends(reqCtx, candidates, port)
+		if err != nil {
+			return vg, err
+		}
+	case LocalTrafficPolicy:
+		klog.Infof("[Local] mode service: %s", vg.NamedKey)
+		backends, err = mgr.buildLocalBackends(reqCtx, candidates, port)
+		if err != nil {
+			return vg, err
+		}
+	case ClusterTrafficPolicy:
+		klog.Infof("[Cluster] mode service: %s", vg.NamedKey)
+		backends, err = mgr.buildClusterBackends(reqCtx, candidates, port)
+		if err != nil {
+			return vg, err
+		}
+	default:
+		return vg, fmt.Errorf("not supported traffic policy [%s]", candidates.TrafficPolicy)
 	}
-	// TODO set weight for backends
 
 	vg.Backends = backends
 	return vg, nil
 }
 
-func getBackends(req *RequestContext, candidates *EndpointWithENI, port v1.ServicePort) ([]model.BackendAttribute, error) {
+func (mgr *VGroupManager) buildENIBackends(reqCtx *RequestContext, candidates *EndpointWithENI, port v1.ServicePort) ([]model.BackendAttribute, error) {
 	var backends []model.BackendAttribute
-	nodes := candidates.Nodes
-	eps := candidates.Endpoints
-
-	// ENI mode
-	if candidates.BackendTypeENI {
-		if len(eps.Subsets) == 0 {
-			klog.Warningf("%s endpoint is nil in eni mode", util.Key(req.svc))
-			return nil, nil
-		}
-		klog.Infof("[ENI] mode service: %s", util.Key(req.svc))
-		var privateIpAddress []string
-		for _, ep := range eps.Subsets {
-			for _, addr := range ep.Addresses {
-				privateIpAddress = append(privateIpAddress, addr.IP)
-			}
-		}
-		err := Batch(privateIpAddress, 40, buildFunc(req, &backends))
-		if err != nil {
-			return backends, fmt.Errorf("batch process eni fail: %s", err.Error())
+	if len(candidates.Endpoints.Subsets) == 0 {
+		klog.Warningf("%s endpoint is nil in eni mode", util.Key(reqCtx.Service))
+		return nil, nil
+	}
+	klog.Infof("[ENI] mode service: %s", util.Key(reqCtx.Service))
+	var privateIpAddress []string
+	for _, ep := range candidates.Endpoints.Subsets {
+		for _, addr := range ep.Addresses {
+			privateIpAddress = append(privateIpAddress, addr.IP)
 		}
 	}
-	// Local mode
-	if candidates.LocalMode {
-		if len(eps.Subsets) == 0 {
-			klog.Warningf("%s endpoint is nil in local mode", util.Key(req.svc))
-			return nil, nil
-		}
-		klog.Infof("[Local] mode service: %s", util.Key(req.svc))
-		// 1. add duplicate ecs backends
-		for _, sub := range eps.Subsets {
-			for _, add := range sub.Addresses {
-				if add.NodeName == nil {
-					return nil, fmt.Errorf("add ecs backends for service[%s] error, NodeName is nil for ip %s ",
-						util.Key(req.svc), add.IP)
-				}
-				node := findNodeByNodeName(nodes, *add.NodeName)
-				if node == nil {
-					klog.Warningf("can not find correspond node %s for endpoint %s", *add.NodeName, add.IP)
-					continue
-				}
-				if isExcludeNode(node) {
-					// filter vk node
-					continue
-				}
-				_, id, err := nodeFromProviderID(node.Spec.ProviderID)
-				if err != nil {
-					return backends, fmt.Errorf("parse providerid: %s. "+
-						"expected: ${regionid}.${nodeid}, %s", node.Spec.ProviderID, err.Error())
-				}
-				backends = append(
-					backends,
-					model.BackendAttribute{
-						ServerId: id,
-						Weight:   DEFAULT_SERVER_WEIGHT,
-						Type:     "ecs",
-						Port:     int(port.NodePort),
-					},
-				)
-			}
-		}
-		// 2. add eci backends
-		return addECIBackends(backends)
+	err := Batch(privateIpAddress, 40, buildFunc(mgr, &backends))
+	if err != nil {
+		return backends, fmt.Errorf("batch process eni fail: %s", err.Error())
 	}
+	return backends, nil
+}
 
-	// Cluster mode
-	// When ecs and eci are deployed in a cluster, add ecs first and then add eci
-	klog.Infof("[Cluster] mode service: %s", util.Key(req.svc))
-	// 1. add ecs backends
-	for _, node := range nodes {
+func (mgr *VGroupManager) buildLocalBackends(reqCtx *RequestContext, candidates *EndpointWithENI, port v1.ServicePort) ([]model.BackendAttribute, error) {
+	var backends []model.BackendAttribute
+	if len(candidates.Endpoints.Subsets) == 0 {
+		klog.Warningf("%s endpoint is nil in local mode", util.Key(reqCtx.Service))
+		return nil, nil
+	}
+	klog.Infof("[Local] mode service: %s", util.Key(reqCtx.Service))
+	// 1. add duplicate ecs backends
+	for _, sub := range candidates.Endpoints.Subsets {
+		for _, add := range sub.Addresses {
+			if add.NodeName == nil {
+				return nil, fmt.Errorf("add ecs backends for service[%s] error, NodeName is nil for ip %s ",
+					util.Key(reqCtx.Service), add.IP)
+			}
+			node := findNodeByNodeName(candidates.Nodes, *add.NodeName)
+			if node == nil {
+				klog.Warningf("can not find correspond node %s for endpoint %s", *add.NodeName, add.IP)
+				continue
+			}
+			if isExcludeNode(node) {
+				// filter vk node
+				continue
+			}
+			_, id, err := nodeFromProviderID(node.Spec.ProviderID)
+			if err != nil {
+				return backends, fmt.Errorf("parse providerid: %s. "+
+					"expected: ${regionid}.${nodeid}, %s", node.Spec.ProviderID, err.Error())
+			}
+			backends = append(
+				backends,
+				model.BackendAttribute{
+					ServerId: id,
+					Weight:   DEFAULT_SERVER_WEIGHT,
+					Type:     "ecs",
+					Port:     int(port.NodePort),
+				},
+			)
+		}
+	}
+	// 2. add eci backends
+	ecis, err := mgr.addECIBackends(reqCtx, backends)
+	if err != nil {
+		return backends, err
+	}
+	backends = append(backends, ecis...)
+	return backends, nil
+}
+
+func (mgr *VGroupManager) buildClusterBackends(reqCtx *RequestContext, candidates *EndpointWithENI, port v1.ServicePort) ([]model.BackendAttribute, error) {
+	var backends []model.BackendAttribute
+	for _, node := range candidates.Nodes {
 		if isExcludeNode(&node) {
 			continue
 		}
@@ -309,18 +484,21 @@ func getBackends(req *RequestContext, candidates *EndpointWithENI, port v1.Servi
 		)
 	}
 	// 2. add eci backends
-	return addECIBackends(backends)
-
+	ecis, err := mgr.addECIBackends(reqCtx, backends)
+	if err != nil {
+		return backends, err
+	}
+	backends = append(backends, ecis...)
+	return backends, nil
 }
 
-func addECIBackends(backends []model.BackendAttribute) ([]model.BackendAttribute, error) {
+func (mgr *VGroupManager) addECIBackends(reqCtx *RequestContext, backends []model.BackendAttribute) ([]model.BackendAttribute, error) {
 	// TODO
 	klog.Infof("implement me!")
 	return backends, nil
-
 }
 
-func buildFunc(req *RequestContext, backend *[]model.BackendAttribute) func(o []interface{}) error {
+func buildFunc(mgr *VGroupManager, backend *[]model.BackendAttribute) func(o []interface{}) error {
 
 	// backend build function
 	return func(o []interface{}) error {
@@ -333,7 +511,7 @@ func buildFunc(req *RequestContext, backend *[]model.BackendAttribute) func(o []
 			ips = append(ips, ip)
 		}
 		// TODO FIX ME
-		resp, err := req.cloud.DescribeNetworkInterfaces(ctx2.CFG.Global.VpcID, &ips)
+		resp, err := mgr.cloud.DescribeNetworkInterfaces(ctx2.CFG.Global.VpcID, &ips)
 		if err != nil {
 			return fmt.Errorf("call DescribeNetworkInterfaces: %s", err.Error())
 		}
@@ -354,122 +532,4 @@ func buildFunc(req *RequestContext, backend *[]model.BackendAttribute) func(o []
 		}
 		return nil
 	}
-}
-
-func diff(remote, local model.VServerGroup) (
-	[]model.BackendAttribute, []model.BackendAttribute, []model.BackendAttribute) {
-
-	var (
-		addition  []model.BackendAttribute
-		deletions []model.BackendAttribute
-		updates   []model.BackendAttribute
-	)
-
-	for _, r := range remote.Backends {
-		//// skip nodes which does not belong to the cluster
-		//if isUserManagedNode(api.Description, v.NamedKey.Key()) {
-		//	continue
-		//}
-		found := false
-		for _, l := range local.Backends {
-			if l.Type == "eni" {
-				if r.ServerId == l.ServerId &&
-					r.ServerIp == l.ServerIp {
-					found = true
-					break
-				}
-			} else {
-				if r.ServerId == l.ServerId {
-					found = true
-					break
-				}
-			}
-
-		}
-		if !found {
-			deletions = append(deletions, r)
-		}
-	}
-	for _, l := range local.Backends {
-		found := false
-		for _, r := range remote.Backends {
-			if l.Type == "eni" {
-				if r.ServerId == l.ServerId &&
-					r.ServerIp == l.ServerIp {
-					found = true
-					break
-				}
-			} else {
-				if r.ServerId == l.ServerId {
-					found = true
-					break
-				}
-			}
-
-		}
-		if !found {
-			addition = append(addition, l)
-		}
-	}
-	for _, l := range local.Backends {
-		for _, r := range remote.Backends {
-			//if isUserManagedNode(api.Description, v.NamedKey.Key()) {
-			//	continue
-			//}
-			if l.Type == "eni" {
-				if l.ServerId == r.ServerId &&
-					l.ServerIp == r.ServerIp &&
-					l.Weight != r.Weight {
-					updates = append(updates, l)
-					break
-				}
-			} else {
-				if l.ServerId == r.ServerId &&
-					l.Weight != r.Weight {
-					updates = append(updates, l)
-					break
-				}
-			}
-		}
-	}
-	return addition, deletions, updates
-}
-
-func BatchAddVServerGroupBackendServers(reqCtx *RequestContext, vGroup model.VServerGroup, add interface{}) error {
-	return Batch(add, MAX_BACKEND_NUM,
-		func(list []interface{}) error {
-			additions, err := json.Marshal(list)
-			if err != nil {
-				return fmt.Errorf("error marshal backends: %s, %v", err.Error(), list)
-			}
-			klog.Infof("update: try to update vserver group[%s],"+
-				" backend add[%s]", vGroup.NamedKey.Key(), string(additions))
-			return reqCtx.cloud.AddVServerGroupBackendServers(reqCtx.ctx, vGroup.VGroupId, string(additions))
-		})
-}
-
-func BatchRemoveVServerGroupBackendServers(reqCtx *RequestContext, vGroup model.VServerGroup, del interface{}) error {
-	return Batch(del, MAX_BACKEND_NUM,
-		func(list []interface{}) error {
-			deletions, err := json.Marshal(list)
-			if err != nil {
-				return fmt.Errorf("error marshal backends: %s, %v", err.Error(), list)
-			}
-			klog.Infof("update: try to update vserver group[%s],"+
-				" backend del[%s]", vGroup.NamedKey.Key(), string(deletions))
-			return reqCtx.cloud.RemoveVServerGroupBackendServers(reqCtx.ctx, vGroup.VGroupId, string(deletions))
-		})
-}
-
-func BatchUpdateVServerGroupBackendServers(reqCtx *RequestContext, vGroup model.VServerGroup, update interface{}) error {
-	return Batch(update, MAX_BACKEND_NUM,
-		func(list []interface{}) error {
-			updateJson, err := json.Marshal(list)
-			if err != nil {
-				return fmt.Errorf("error marshal backends: %s, %v", err.Error(), list)
-			}
-			klog.Infof("update: try to update vserver group[%s],"+
-				" backend update[%s]", vGroup.NamedKey.Key(), string(updateJson))
-			return reqCtx.cloud.SetVServerGroupAttribute(reqCtx.ctx, vGroup.VGroupId, string(updateJson))
-		})
 }

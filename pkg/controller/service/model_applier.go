@@ -8,19 +8,23 @@ import (
 	"sort"
 )
 
-func NewLBModelApplier(reqCtx *RequestContext) *modelApplier {
-	return &modelApplier{
-		reqCtx,
+func NewModelApplier(slbMgr *LoadBalancerManager, lisMgr *ListenerManager, vGroupMgr *VGroupManager) *ModelApplier {
+	return &ModelApplier{
+		slbMgr:    slbMgr,
+		lisMgr:    lisMgr,
+		vGroupMgr: vGroupMgr,
 	}
 }
 
-type modelApplier struct {
-	reqCtx *RequestContext
+type ModelApplier struct {
+	slbMgr    *LoadBalancerManager
+	lisMgr    *ListenerManager
+	vGroupMgr *VGroupManager
 }
 
-func (m *modelApplier) Apply(local *model.LoadBalancer, remote *model.LoadBalancer) error {
+func (m *ModelApplier) Apply(reqCtx *RequestContext, local *model.LoadBalancer, remote *model.LoadBalancer) error {
 
-	if err := m.applyLoadBalancerAttribute(local, remote); err != nil {
+	if err := m.applyLoadBalancerAttribute(reqCtx, local, remote); err != nil {
 		return fmt.Errorf("update lb attribute error: %s", err.Error())
 	}
 	// if remote slb is not exist, return
@@ -28,22 +32,22 @@ func (m *modelApplier) Apply(local *model.LoadBalancer, remote *model.LoadBalanc
 		return nil
 	}
 
-	if err := m.applyVGroups(local, remote); err != nil {
+	if err := m.applyVGroups(reqCtx, local, remote); err != nil {
 		return fmt.Errorf("update lb backends error: %s", err.Error())
 	}
 
-	if err := m.applyListeners(local, remote); err != nil {
+	if err := m.applyListeners(reqCtx, local, remote); err != nil {
 		return fmt.Errorf("update lb listeners error: %s", err.Error())
 	}
 
-	if err := m.cleanup(local, remote); err != nil {
+	if err := m.cleanup(reqCtx, local, remote); err != nil {
 		return fmt.Errorf("update lb listeners error: %s", err.Error())
 	}
 
 	return nil
 }
 
-func (m *modelApplier) applyLoadBalancerAttribute(local *model.LoadBalancer, remote *model.LoadBalancer) error {
+func (m *ModelApplier) applyLoadBalancerAttribute(reqCtx *RequestContext, local *model.LoadBalancer, remote *model.LoadBalancer) error {
 	if local == nil {
 		return fmt.Errorf("local model is nil")
 	}
@@ -56,9 +60,9 @@ func (m *modelApplier) applyLoadBalancerAttribute(local *model.LoadBalancer, rem
 	}
 
 	// delete slb
-	if !isSLBNeeded(m.reqCtx.svc) {
+	if !isSLBNeeded(reqCtx.Service) {
 		if !local.LoadBalancerAttribute.IsUserManaged {
-			err := m.reqCtx.EnsureLoadBalancerDeleted(remote)
+			err := m.slbMgr.Delete(reqCtx, remote)
 			if err != nil {
 				return fmt.Errorf("EnsureLoadBalancerDeleted [%s] error: %s",
 					remote.LoadBalancerAttribute.LoadBalancerId, err.Error())
@@ -70,30 +74,30 @@ func (m *modelApplier) applyLoadBalancerAttribute(local *model.LoadBalancer, rem
 
 	// create slb
 	if remote.LoadBalancerAttribute.LoadBalancerId == "" {
-		if err := m.reqCtx.EnsureLoadBalancerCreated(local); err != nil {
+		if err := m.slbMgr.Create(reqCtx, local); err != nil {
 			return fmt.Errorf("EnsureLoadBalancerCreated error: %s", err.Error())
 		}
 		// update remote model
 		remote.LoadBalancerAttribute.LoadBalancerId = local.LoadBalancerAttribute.LoadBalancerId
-		if err := m.reqCtx.FindLoadBalancer(remote); err != nil {
+		if err := m.slbMgr.Find(reqCtx, remote); err != nil {
 			return fmt.Errorf("update remote model for lbId %s, error: %s",
 				remote.LoadBalancerAttribute.LoadBalancerId, err.Error())
 		}
 		return nil
 	}
 
-	return m.reqCtx.EnsureLoadBalancerUpdated(local, remote)
+	return m.slbMgr.Update(reqCtx, local, remote)
 
 }
 
-func (m *modelApplier) applyVGroups(local *model.LoadBalancer, remote *model.LoadBalancer) error {
+func (m *ModelApplier) applyVGroups(reqCtx *RequestContext, local *model.LoadBalancer, remote *model.LoadBalancer) error {
 	for i := range local.VServerGroups {
 		found := false
 		for j := range remote.VServerGroups {
 			if local.VServerGroups[i].VGroupName == remote.VServerGroups[j].VGroupName {
 				found = true
 				local.VServerGroups[i].VGroupId = remote.VServerGroups[j].VGroupId
-				if err := m.reqCtx.EnsureVGroupUpdated(local.VServerGroups[i], remote.VServerGroups[j]); err != nil {
+				if err := m.vGroupMgr.UpdateVServerGroup(reqCtx, local.VServerGroups[i], remote.VServerGroups[j]); err != nil {
 					return fmt.Errorf("EnsureVGroupUpdated error: %s", err.Error())
 				}
 			}
@@ -101,7 +105,7 @@ func (m *modelApplier) applyVGroups(local *model.LoadBalancer, remote *model.Loa
 
 		// if not exist, create
 		if !found {
-			err := m.reqCtx.EnsureVGroupCreated(&local.VServerGroups[i], remote.LoadBalancerAttribute.LoadBalancerId)
+			err := m.vGroupMgr.CreateVServerGroup(reqCtx, &local.VServerGroups[i], remote.LoadBalancerAttribute.LoadBalancerId)
 			if err != nil {
 				return fmt.Errorf("EnsureVGroupCreated error: %s", err.Error())
 			}
@@ -112,9 +116,9 @@ func (m *modelApplier) applyVGroups(local *model.LoadBalancer, remote *model.Loa
 	return nil
 }
 
-func (m *modelApplier) applyListeners(local *model.LoadBalancer, remote *model.LoadBalancer) error {
+func (m *ModelApplier) applyListeners(reqCtx *RequestContext, local *model.LoadBalancer, remote *model.LoadBalancer) error {
 	if local.LoadBalancerAttribute.IsUserManaged {
-		if m.reqCtx.anno.isForceOverride() {
+		if reqCtx.Anno.isForceOverride() {
 			klog.Infof("[%s] override is false, skip reconcile listeners", local.NamespacedName)
 			return nil
 		}
@@ -149,21 +153,21 @@ func (m *modelApplier) applyListeners(local *model.LoadBalancer, remote *model.L
 
 	// Pls be careful of the sequence. deletion first,then addition, last updation
 	for _, action := range deleteActions {
-		err := m.reqCtx.EnsureListenerDeleted(action)
+		err := m.lisMgr.Delete(reqCtx, action)
 		if err != nil {
 			return fmt.Errorf("delete listener [%d] error: %s", action.listener.ListenerPort, err.Error())
 		}
 	}
 
 	for _, action := range createActions {
-		err := m.reqCtx.EnsureListenerCreated(action)
+		err := m.lisMgr.Create(reqCtx, action)
 		if err != nil {
 			return fmt.Errorf("create listener [%d] error: %s", action.listener.ListenerPort, err.Error())
 		}
 	}
 
 	for _, action := range updateActions {
-		err := m.reqCtx.EnsureListenerUpdated(action)
+		err := m.lisMgr.Update(reqCtx, action)
 		if err != nil {
 			return fmt.Errorf("update listener [%d] error: %s", action.local.ListenerPort, err.Error())
 		}
@@ -173,7 +177,7 @@ func (m *modelApplier) applyListeners(local *model.LoadBalancer, remote *model.L
 }
 
 // TODO notes
-func (m *modelApplier) cleanup(local *model.LoadBalancer, remote *model.LoadBalancer) error {
+func (m *ModelApplier) cleanup(reqCtx *RequestContext, local *model.LoadBalancer, remote *model.LoadBalancer) error {
 	// clean up vservergroup
 	vgs := remote.VServerGroups
 	for _, vg := range vgs {
@@ -192,7 +196,7 @@ func (m *modelApplier) cleanup(local *model.LoadBalancer, remote *model.LoadBala
 		}
 		if !found {
 			klog.Infof("try to remove unused vserver group, [%s][%s]", vg.NamedKey.Key(), vg.VGroupId)
-			err := m.reqCtx.EnsureVGroupDeleted(vg.VGroupId)
+			err := m.vGroupMgr.DeleteVServerGroup(reqCtx, vg.VGroupId)
 			if err != nil {
 				klog.Infof("Error: cleanup vgroup warining: "+
 					"failed to remove vgroup[%s]. wait for next try. %s", vg.NamedKey.Key(), err.Error())

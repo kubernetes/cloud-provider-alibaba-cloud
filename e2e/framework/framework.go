@@ -30,6 +30,7 @@ type OptionsFunc func(f *FrameWorkE2E)
 //FrameWorkE2E e2e backup
 type FrameWorkE2E struct {
 	Description string
+	SlbManager  *service.LoadBalancerManager
 	Cloud       prvd.Provider
 	Client      kubernetes.Interface
 }
@@ -90,6 +91,7 @@ func NewFrameWork(
 	}
 	frame.Client = NewClientOrDie()
 	frame.Cloud = alibaba.NewAlibabaCloud()
+	frame.SlbManager = service.NewLoadBalancerManager(frame.Cloud)
 	return frame
 }
 
@@ -121,11 +123,11 @@ type TestUnit struct {
 }
 
 func (t *TestUnit) NewReqContext(cloud prvd.Provider) {
-	reqContext := service.NewRequestContext(
-		context.Background(), t.Service,
-		service.NewAnnotationRequest(t.Service), cloud, nil,
-	)
-	t.ReqCtx = reqContext
+	t.ReqCtx = &service.RequestContext{
+		Ctx:     context.Background(),
+		Service: t.Service,
+		Anno:    service.NewAnnotationRequest(t.Service),
+	}
 }
 
 func NewExpection(mcase *TestUnit, e2e *FrameWorkE2E) *Expectation {

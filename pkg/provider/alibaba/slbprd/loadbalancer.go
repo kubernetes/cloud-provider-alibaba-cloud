@@ -47,11 +47,14 @@ func (p ProviderSLB) FindLoadBalancer(ctx context.Context, mdl *model.LoadBalanc
 	if err != nil {
 		return fmt.Errorf("[%s] find loadbalancer by tag error: %s", mdl.NamespacedName, err.Error())
 	}
+
 	num := len(resp.LoadBalancers.LoadBalancer)
 	if num > 0 {
 		if len(resp.LoadBalancers.LoadBalancer) > 1 {
 			klog.Infof("[%s] find [%d] load balances, use the first one", mdl.NamespacedName, num)
 		}
+		// TODO Remove DescribeLoadBalancer
+		//  because DescribeLoadBalances do not return deleteprotection param, we need to call DescribeLoadBalancer() func
 		mdl.LoadBalancerAttribute.LoadBalancerId = resp.LoadBalancers.LoadBalancer[0].LoadBalancerId
 		return p.DescribeLoadBalancer(ctx, mdl)
 	}
@@ -75,6 +78,8 @@ func (p ProviderSLB) FindLoadBalancer(ctx context.Context, mdl *model.LoadBalanc
 			klog.Infof("[%s] find [%d] load balances, use the first one", mdl.NamespacedName, num)
 		}
 		mdl.LoadBalancerAttribute.LoadBalancerId = resp.LoadBalancers.LoadBalancer[0].LoadBalancerId
+		// TODO Remove DescribeLoadBalancer
+		//  because DescribeLoadBalances do not return deleteprotection param, we need to call DescribeLoadBalancer() func
 		return p.DescribeLoadBalancer(ctx, mdl)
 	}
 

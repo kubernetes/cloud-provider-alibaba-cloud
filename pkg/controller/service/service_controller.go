@@ -34,6 +34,12 @@ func newReconciler(mgr manager.Manager, ctx *shared.SharedContext) reconcile.Rec
 		record:           mgr.GetEventRecorderFor("service-controller"),
 		finalizerManager: helper.NewDefaultFinalizerManager(mgr.GetClient()),
 	}
+
+	slbManager := NewLoadBalancerManager(recon.cloud)
+	listenerManager := NewListenerManager(recon.cloud)
+	vGroupManager := NewVGroupManager(recon.kubeClient, recon.cloud)
+	recon.builder = NewModelBuilder(slbManager, listenerManager, vGroupManager)
+	recon.applier = NewModelApplier(slbManager, listenerManager, vGroupManager)
 	return recon
 }
 
@@ -73,7 +79,9 @@ var _ reconcile.Reconciler = &ReconcileService{}
 
 // ReconcileService reconciles a AutoRepair object
 type ReconcileService struct {
-	scheme *runtime.Scheme
+	scheme  *runtime.Scheme
+	builder *ModelBuilder
+	applier *ModelApplier
 
 	// client
 	cloud      prvd.Provider
@@ -92,28 +100,9 @@ func (m *ReconcileService) Reconcile(_ context.Context, request reconcile.Reques
 }
 
 type RequestContext struct {
-	ctx  context.Context
-	svc  *v1.Service
-	anno *AnnotationRequest
-
-	// client
-	cloud      prvd.Provider
-	kubeClient client.Client
-}
-
-func (reqCtx *RequestContext) GetAnnotation() *AnnotationRequest { return reqCtx.anno }
-
-func (reqCtx *RequestContext) SetService(svc *v1.Service) { reqCtx.svc = svc }
-
-func NewRequestContext(ctx context.Context, svc *v1.Service, anno *AnnotationRequest,
-	cloud prvd.Provider, kubeClient client.Client) *RequestContext {
-	return &RequestContext{
-		ctx:        ctx,
-		svc:        svc,
-		anno:       anno,
-		cloud:      cloud,
-		kubeClient: kubeClient,
-	}
+	Ctx     context.Context
+	Service *v1.Service
+	Anno    *AnnotationRequest
 }
 
 func (m *ReconcileService) reconcile(request reconcile.Request) error {
@@ -141,11 +130,9 @@ func (m *ReconcileService) reconcile(request reconcile.Request) error {
 	}
 
 	reqContext := &RequestContext{
-		ctx:        ctx,
-		svc:        svc,
-		anno:       anno,
-		cloud:      m.cloud,
-		kubeClient: m.kubeClient,
+		Ctx:     ctx,
+		Service: svc,
+		Anno:    anno,
 	}
 
 	// 1. check to see whither if loadbalancer deletion is needed
@@ -175,15 +162,15 @@ func validate(svc *v1.Service, anno *AnnotationRequest) error {
 }
 
 func (m *ReconcileService) cleanupLoadBalancerResources(req *RequestContext) error {
-	if helper.HasFinalizer(req.svc, serviceFinalizer) {
+	if helper.HasFinalizer(req.Service, serviceFinalizer) {
 		_, err := m.buildAndApplyModel(req)
 		if err != nil {
-			m.record.Event(req.svc, v1.EventTypeWarning, helper.ServiceEventReasonFailedReconciled, fmt.Sprintf("Failed reconcile due to %s", err.Error()))
+			m.record.Event(req.Service, v1.EventTypeWarning, helper.ServiceEventReasonFailedReconciled, fmt.Sprintf("Failed reconcile due to %s", err.Error()))
 			return err
 		}
 
-		if err := m.finalizerManager.RemoveFinalizers(req.ctx, req.svc, serviceFinalizer); err != nil {
-			m.record.Eventf(req.svc, v1.EventTypeWarning, helper.ServiceEventReasonFailedRemoveFinalizer, fmt.Sprintf("Failed remove finalizer due to %v", err))
+		if err := m.finalizerManager.RemoveFinalizers(req.Ctx, req.Service, serviceFinalizer); err != nil {
+			m.record.Eventf(req.Service, v1.EventTypeWarning, helper.ServiceEventReasonFailedRemoveFinalizer, fmt.Sprintf("Failed remove finalizer due to %v", err))
 			return err
 		}
 	}
@@ -192,39 +179,40 @@ func (m *ReconcileService) cleanupLoadBalancerResources(req *RequestContext) err
 
 func (m *ReconcileService) reconcileLoadBalancerResources(req *RequestContext) error {
 
-	if err := m.finalizerManager.AddFinalizers(req.ctx, req.svc, serviceFinalizer); err != nil {
-		m.record.Event(req.svc, v1.EventTypeWarning, helper.ServiceEventReasonFailedAddFinalizer, fmt.Sprintf("Failed add finalizer due to %v", err))
+	if err := m.finalizerManager.AddFinalizers(req.Ctx, req.Service, serviceFinalizer); err != nil {
+		m.record.Event(req.Service, v1.EventTypeWarning, helper.ServiceEventReasonFailedAddFinalizer, fmt.Sprintf("Failed add finalizer due to %v", err))
 		return err
 	}
 
 	lb, err := m.buildAndApplyModel(req)
 	if err != nil {
-		m.record.Event(req.svc, v1.EventTypeWarning, helper.ServiceEventReasonFailedReconciled, fmt.Sprintf("Failed reconcile due to %s", err.Error()))
+		m.record.Event(req.Service, v1.EventTypeWarning, helper.ServiceEventReasonFailedReconciled, fmt.Sprintf("Failed reconcile due to %s", err.Error()))
 		return err
 	}
 
-	if err := m.updateServiceStatus(req.ctx, req.svc, lb); err != nil {
-		m.record.Event(req.svc, v1.EventTypeWarning, helper.ServiceEventReasonFailedUpdateStatus, fmt.Sprintf("Failed update status due to %v", err))
+	if err := m.updateServiceStatus(req.Ctx, req.Service, lb); err != nil {
+		m.record.Event(req.Service, v1.EventTypeWarning, helper.ServiceEventReasonFailedUpdateStatus, fmt.Sprintf("Failed update status due to %v", err))
 		return err
 	}
 
-	m.record.Event(req.svc, v1.EventTypeNormal, helper.ServiceEventReasonSuccessfullyReconciled, "Successfully reconciled")
+	m.record.Event(req.Service, v1.EventTypeNormal, helper.ServiceEventReasonSuccessfullyReconciled, "Successfully reconciled")
 	return nil
 }
 
-func (m *ReconcileService) buildAndApplyModel(req *RequestContext) (*model.LoadBalancer, error) {
+func (m *ReconcileService) buildAndApplyModel(reqCtx *RequestContext) (*model.LoadBalancer, error) {
+
 	// build local model
-	localModel, err := NewModelBuilder(req, LOCAL_MODEL).Build()
+	localModel, err := m.builder.BuildModel(reqCtx, LOCAL_MODEL)
 	if err != nil {
 		return nil, fmt.Errorf("build slb cluster model error: %s", err.Error())
 	}
 	// build remote model
-	remoteModel, err := NewModelBuilder(req, REMOTE_MODEL).Build()
+	remoteModel, err := m.builder.BuildModel(reqCtx, REMOTE_MODEL)
 	if err != nil {
 		return nil, fmt.Errorf("build slb cloud model error: %s", err.Error())
 	}
 	// apply model
-	if err := NewLBModelApplier(req).Apply(localModel, remoteModel); err != nil {
+	if err := m.applier.Apply(reqCtx, localModel, remoteModel); err != nil {
 		return nil, fmt.Errorf("apply model error: %s", err.Error())
 	}
 	return remoteModel, nil

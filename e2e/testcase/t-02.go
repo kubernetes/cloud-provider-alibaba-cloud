@@ -66,7 +66,7 @@ func ExpectSpecTypeOK(m *framework.Expectation) (bool, error) {
 		NamespacedName: util.NamespacedName(m.Case.Service),
 	}
 
-	err := m.Case.ReqCtx.BuildLoadBalancerAttributeForRemoteModel(lbMdl)
+	err := m.E2E.SlbManager.Find(m.Case.ReqCtx, lbMdl)
 	if err != nil {
 		// TODO if err, need retry
 		return false, framework.NewErrorRetry(err)
@@ -75,7 +75,7 @@ func ExpectSpecTypeOK(m *framework.Expectation) (bool, error) {
 		return false, framework.NewErrorRetry(err)
 	}
 
-	spec := m.Case.ReqCtx.GetAnnotation().Get(req.Spec)
+	spec := m.Case.ReqCtx.Anno.Get(req.Spec)
 
 	klog.Infof("expect spec type ok: %s", spec)
 	if string(lbMdl.LoadBalancerAttribute.LoadBalancerSpec) != spec {
