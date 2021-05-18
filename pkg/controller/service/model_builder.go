@@ -23,17 +23,17 @@ const (
 )
 
 type ModelBuilder struct {
-	slbMgr    *LoadBalancerManager
-	lisMgr    *ListenerManager
-	vGroupMgr *VGroupManager
+	LoadBalancerMgr *LoadBalancerManager
+	ListenerMgr     *ListenerManager
+	VGroupMgr       *VGroupManager
 }
 
 // NewDefaultModelBuilder construct a new defaultModelBuilder
 func NewModelBuilder(slbMgr *LoadBalancerManager, lisMgr *ListenerManager, vGroupMgr *VGroupManager) *ModelBuilder {
 	return &ModelBuilder{
-		slbMgr:    slbMgr,
-		lisMgr:    lisMgr,
-		vGroupMgr: vGroupMgr,
+		LoadBalancerMgr: slbMgr,
+		ListenerMgr:     lisMgr,
+		VGroupMgr:       vGroupMgr,
 	}
 }
 
@@ -65,13 +65,13 @@ func (c localModel) Build(reqCtx *RequestContext) (*model.LoadBalancer, error) {
 		}
 		return lbMdl, nil
 	}
-	if err := c.slbMgr.BuildLocalModel(reqCtx, lbMdl); err != nil {
+	if err := c.LoadBalancerMgr.BuildLocalModel(reqCtx, lbMdl); err != nil {
 		return nil, fmt.Errorf("build slb attribute error: %s", err.Error())
 	}
-	if err := c.vGroupMgr.BuildLocalModel(reqCtx, lbMdl); err != nil {
+	if err := c.VGroupMgr.BuildLocalModel(reqCtx, lbMdl); err != nil {
 		return nil, fmt.Errorf("build slb listener error: %s", err.Error())
 	}
-	if err := c.lisMgr.BuildLocalModel(reqCtx, lbMdl); err != nil {
+	if err := c.ListenerMgr.BuildLocalModel(reqCtx, lbMdl); err != nil {
 		return nil, fmt.Errorf("builid vserver groups error: %s", err.Error())
 	}
 
@@ -91,7 +91,7 @@ func (c remoteModel) Build(reqCtx *RequestContext) (*model.LoadBalancer, error) 
 		NamespacedName: util.NamespacedName(reqCtx.Service),
 	}
 
-	err := c.slbMgr.BuildRemoteModel(reqCtx, lbMdl)
+	err := c.LoadBalancerMgr.BuildRemoteModel(reqCtx, lbMdl)
 	if err != nil {
 		return nil, fmt.Errorf("can not get load balancer attribute from cloud, error: %s", err.Error())
 	}
@@ -99,11 +99,11 @@ func (c remoteModel) Build(reqCtx *RequestContext) (*model.LoadBalancer, error) 
 		return lbMdl, nil
 	}
 
-	if err := c.vGroupMgr.BuildRemoteModel(reqCtx, lbMdl); err != nil {
+	if err := c.VGroupMgr.BuildRemoteModel(reqCtx, lbMdl); err != nil {
 		return nil, fmt.Errorf("build backend from remote error: %s", err.Error())
 	}
 
-	if err := c.lisMgr.BuildRemoteModel(reqCtx, lbMdl); err != nil {
+	if err := c.ListenerMgr.BuildRemoteModel(reqCtx, lbMdl); err != nil {
 		return nil, fmt.Errorf("can not build listener attribute from cloud, error: %s", err.Error())
 	}
 

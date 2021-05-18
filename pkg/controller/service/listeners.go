@@ -331,7 +331,7 @@ func (t *http) Update(reqCtx *RequestContext, action UpdateAction) error {
 
 	// The forwarding rule could not be updated. If the rule is changed, it needs to be recreated.
 	needRecreate := false
-	if action.local.ListenerPort != 0 {
+	if action.local.ForwardPort != 0 {
 		if action.remote.ListenerForward != model.OnFlag ||
 			action.remote.ForwardPort != action.local.ForwardPort {
 			needRecreate = true

@@ -3,6 +3,7 @@ package model
 import (
 	"fmt"
 	"github.com/aliyun/alibaba-cloud-sdk-go/services/slb"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"strconv"
 	"strings"
@@ -50,6 +51,11 @@ const (
 	HTTPS = "https"
 	TCP   = "tcp"
 	UDP   = "udp"
+)
+
+const (
+	ECSBackendType = "ecs"
+	ENIBackendType = "eni"
 )
 
 const ModificationProtectionReason = "managed.by.ack"
@@ -145,6 +151,7 @@ type ListenerAttribute struct {
 type VServerGroup struct {
 	IsUserManaged bool
 	NamedKey      *VGroupNamedKey
+	ServicePort   v1.ServicePort
 
 	VGroupId   string
 	VGroupName string
@@ -153,12 +160,14 @@ type VServerGroup struct {
 
 type BackendAttribute struct {
 	IsUserManaged bool
-	Description   string
-	ServerId      string
-	ServerIp      string
-	Weight        int
-	Port          int
-	Type          string
+	NodeName      *string
+
+	Description string
+	ServerId    string
+	ServerIp    string
+	Weight      int
+	Port        int
+	Type        string
 }
 
 // DEFAULT_PREFIX default prefix for listener

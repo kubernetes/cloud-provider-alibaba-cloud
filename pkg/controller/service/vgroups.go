@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	ctx2 "k8s.io/cloud-provider-alibaba-cloud/pkg/context"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/model"
 	prvd "k8s.io/cloud-provider-alibaba-cloud/pkg/provider"
@@ -359,7 +360,8 @@ func getEndpoints(ctx context.Context, client client.Client, svc *v1.Service) (*
 
 func (mgr *VGroupManager) buildVGroupForServicePort(reqCtx *RequestContext, port v1.ServicePort, candidates *EndpointWithENI) (model.VServerGroup, error) {
 	vg := model.VServerGroup{
-		NamedKey: getVGroupNamedKey(reqCtx.Service, port),
+		NamedKey:    getVGroupNamedKey(reqCtx.Service, port),
+		ServicePort: port,
 	}
 	vg.VGroupName = vg.NamedKey.Key()
 	// build backends
@@ -369,20 +371,20 @@ func (mgr *VGroupManager) buildVGroupForServicePort(reqCtx *RequestContext, port
 	)
 	switch candidates.TrafficPolicy {
 	case ENITrafficPolicy:
-		klog.Infof("[ENI] mode service: %s", vg.NamedKey)
-		backends, err = mgr.buildENIBackends(reqCtx, candidates, port)
+		reqCtx.Log.Infof("eni mode, build backends for %s", vg.NamedKey)
+		backends, err = mgr.buildENIBackends(reqCtx, candidates, vg)
 		if err != nil {
 			return vg, err
 		}
 	case LocalTrafficPolicy:
-		klog.Infof("[Local] mode service: %s", vg.NamedKey)
-		backends, err = mgr.buildLocalBackends(reqCtx, candidates, port)
+		reqCtx.Log.Infof("local mode, build backends for %s", vg.NamedKey)
+		backends, err = mgr.buildLocalBackends(reqCtx, candidates, vg)
 		if err != nil {
 			return vg, err
 		}
 	case ClusterTrafficPolicy:
-		klog.Infof("[Cluster] mode service: %s", vg.NamedKey)
-		backends, err = mgr.buildClusterBackends(reqCtx, candidates, port)
+		reqCtx.Log.Infof("cluster mode, build backends for %s", vg.NamedKey)
+		backends, err = mgr.buildClusterBackends(reqCtx, candidates, vg)
 		if err != nil {
 			return vg, err
 		}
@@ -394,107 +396,171 @@ func (mgr *VGroupManager) buildVGroupForServicePort(reqCtx *RequestContext, port
 	return vg, nil
 }
 
-func (mgr *VGroupManager) buildENIBackends(reqCtx *RequestContext, candidates *EndpointWithENI, port v1.ServicePort) ([]model.BackendAttribute, error) {
-	var backends []model.BackendAttribute
+func (mgr *VGroupManager) buildENIBackends(reqCtx *RequestContext, candidates *EndpointWithENI, vgroup model.VServerGroup) ([]model.BackendAttribute, error) {
 	if len(candidates.Endpoints.Subsets) == 0 {
-		klog.Warningf("%s endpoint is nil in eni mode", util.Key(reqCtx.Service))
+		reqCtx.Log.Warningf("vgroup %s endpoint is nil", vgroup.VGroupName)
 		return nil, nil
 	}
-	klog.Infof("[ENI] mode service: %s", util.Key(reqCtx.Service))
-	var privateIpAddress []string
+
+	backends := setGenericBackendAttribute(candidates, vgroup)
+
+	//err := Batch(backends, 40, v.buildFunc(ctx, &backend, g))
+	//if err != nil {
+	//	return backend, fmt.Errorf("batch process eni fail: %s", err.Error())
+	//
+	//}
+
+	// set weight
+	for i := range backends {
+		backends[i].Weight = DEFAULT_SERVER_WEIGHT
+	}
+	return backends, nil
+}
+
+func setGenericBackendAttribute(candidates *EndpointWithENI, vgroup model.VServerGroup) []model.BackendAttribute {
+	var backends []model.BackendAttribute
+
 	for _, ep := range candidates.Endpoints.Subsets {
+		var backendPort int
+		if vgroup.ServicePort.TargetPort.Type == intstr.String {
+			for _, p := range ep.Ports {
+				if p.Name == "" || p.Name == vgroup.NamedKey.VGroupPort {
+					backendPort = int(p.Port)
+					break
+				}
+			}
+		} else {
+			backendPort = int(vgroup.ServicePort.TargetPort.IntVal)
+		}
+
 		for _, addr := range ep.Addresses {
-			privateIpAddress = append(privateIpAddress, addr.IP)
+			backends = append(backends, model.BackendAttribute{
+				NodeName: addr.NodeName,
+				ServerIp: addr.IP,
+				// set backend port to targetPort by default
+				// if backend type is ecs, update backend port to nodePort
+				Port:        backendPort,
+				Description: vgroup.VGroupName,
+			})
 		}
 	}
-	err := Batch(privateIpAddress, 40, buildFunc(mgr, &backends))
-	if err != nil {
-		return backends, fmt.Errorf("batch process eni fail: %s", err.Error())
-	}
-	return backends, nil
+	return backends
 }
 
-func (mgr *VGroupManager) buildLocalBackends(reqCtx *RequestContext, candidates *EndpointWithENI, port v1.ServicePort) ([]model.BackendAttribute, error) {
-	var backends []model.BackendAttribute
+func (mgr *VGroupManager) buildLocalBackends(reqCtx *RequestContext, candidates *EndpointWithENI, vgroup model.VServerGroup) ([]model.BackendAttribute, error) {
 	if len(candidates.Endpoints.Subsets) == 0 {
-		klog.Warningf("%s endpoint is nil in local mode", util.Key(reqCtx.Service))
+		reqCtx.Log.Warningf("vgroup %s endpoint is nil", vgroup.VGroupName)
 		return nil, nil
 	}
-	klog.Infof("[Local] mode service: %s", util.Key(reqCtx.Service))
-	// 1. add duplicate ecs backends
-	for _, sub := range candidates.Endpoints.Subsets {
-		for _, add := range sub.Addresses {
-			if add.NodeName == nil {
-				return nil, fmt.Errorf("add ecs backends for service[%s] error, NodeName is nil for ip %s ",
-					util.Key(reqCtx.Service), add.IP)
-			}
-			node := findNodeByNodeName(candidates.Nodes, *add.NodeName)
-			if node == nil {
-				klog.Warningf("can not find correspond node %s for endpoint %s", *add.NodeName, add.IP)
-				continue
-			}
-			if isExcludeNode(node) {
-				// filter vk node
-				continue
-			}
-			_, id, err := nodeFromProviderID(node.Spec.ProviderID)
-			if err != nil {
-				return backends, fmt.Errorf("parse providerid: %s. "+
-					"expected: ${regionid}.${nodeid}, %s", node.Spec.ProviderID, err.Error())
-			}
-			backends = append(
-				backends,
-				model.BackendAttribute{
-					ServerId: id,
-					Weight:   DEFAULT_SERVER_WEIGHT,
-					Type:     "ecs",
-					Port:     int(port.NodePort),
-				},
-			)
-		}
-	}
-	// 2. add eci backends
-	ecis, err := mgr.addECIBackends(reqCtx, backends)
+
+	backends := setGenericBackendAttribute(candidates, vgroup)
+
+	// 1. update ECS backends
+	backends, eciBackends, err := updateECSBackends(reqCtx, vgroup.ServicePort, candidates, backends)
 	if err != nil {
-		return backends, err
+		return backends, fmt.Errorf("update ecs backends error: %s", err.Error())
 	}
-	backends = append(backends, ecis...)
+
+	// 2. update ECI backends
+	if len(eciBackends) != 0 {
+		eciBackends, err := updateECIBackends(reqCtx, eciBackends)
+		if err != nil {
+			return backends, fmt.Errorf("update eci backends error: %s", err.Error())
+		}
+		backends = append(backends, eciBackends...)
+	}
+
+	return setWeightForLocalBackends(backends), nil
+}
+
+func setWeightForLocalBackends(backends []model.BackendAttribute) []model.BackendAttribute {
+	ecsPods := make(map[string]int)
+	for _, b := range backends {
+		ecsPods[b.ServerId] += 1
+	}
+	for i := range backends {
+		backends[i].Weight = ecsPods[backends[i].ServerId]
+	}
+	return backends
+}
+
+func (mgr *VGroupManager) buildClusterBackends(reqCtx *RequestContext, candidates *EndpointWithENI, vgroup model.VServerGroup) ([]model.BackendAttribute, error) {
+	if len(candidates.Endpoints.Subsets) == 0 {
+		reqCtx.Log.Warningf("vgroup %s endpoint is nil", vgroup.VGroupName)
+		return nil, nil
+	}
+
+	backends := setGenericBackendAttribute(candidates, vgroup)
+
+	// 1. update ECS backends
+	backends, eciBackends, err := updateECSBackends(reqCtx, vgroup.ServicePort, candidates, backends)
+	if err != nil {
+		return backends, fmt.Errorf("update ecs backends error: %s", err.Error())
+	}
+
+	// 2. update ECI backends
+	if len(eciBackends) != 0 {
+		eciBackends, err := updateECIBackends(reqCtx, eciBackends)
+		if err != nil {
+			return backends, fmt.Errorf("update eci backends error: %s", err.Error())
+		}
+		backends = append(backends, eciBackends...)
+	}
+
+	// set weight
+	for i := range backends {
+		backends[i].Weight = DEFAULT_SERVER_WEIGHT
+	}
+
 	return backends, nil
 }
 
-func (mgr *VGroupManager) buildClusterBackends(reqCtx *RequestContext, candidates *EndpointWithENI, port v1.ServicePort) ([]model.BackendAttribute, error) {
-	var backends []model.BackendAttribute
-	for _, node := range candidates.Nodes {
-		if isExcludeNode(&node) {
+func updateECSBackends(
+	reqCtx *RequestContext,
+	port v1.ServicePort,
+	candidates *EndpointWithENI,
+	backends []model.BackendAttribute) ([]model.BackendAttribute, []model.BackendAttribute, error) {
+	var ecsBackends []model.BackendAttribute
+	var eciBackends []model.BackendAttribute
+	for _, backend := range backends {
+		if backend.NodeName == nil {
+			return nil, nil, fmt.Errorf("add ecs backends for service[%s] error, NodeName is nil for ip %s ",
+				util.Key(reqCtx.Service), backend.ServerIp)
+		}
+		node := findNodeByNodeName(candidates.Nodes, *backend.NodeName)
+		if node == nil {
+			reqCtx.Log.Warningf("can not find correspond node %s for endpoint %s", *backend.NodeName, backend.ServerIp)
+			continue
+		}
+
+		// check if the node is ECI
+		if node.Labels["type"] == ECINodeLabel {
+			eciBackends = append(eciBackends, backend)
+			continue
+		}
+
+		if isExcludeNode(node) {
+			// filter vk node
 			continue
 		}
 		_, id, err := nodeFromProviderID(node.Spec.ProviderID)
 		if err != nil {
-			return backends, fmt.Errorf("normal parse providerid: %s. "+
+			return ecsBackends, eciBackends, fmt.Errorf("parse providerid: %s. "+
 				"expected: ${regionid}.${nodeid}, %s", node.Spec.ProviderID, err.Error())
 		}
+		backend.ServerId = id
+		backend.Type = model.ECSBackendType
+		// for ECS backend type, port should be set to NodePort
+		backend.Port = int(port.NodePort)
+		ecsBackends = append(ecsBackends, backend)
+	}
 
-		backends = append(
-			backends,
-			model.BackendAttribute{
-				ServerId: id,
-				Weight:   DEFAULT_SERVER_WEIGHT,
-				Type:     "ecs",
-			},
-		)
-	}
-	// 2. add eci backends
-	ecis, err := mgr.addECIBackends(reqCtx, backends)
-	if err != nil {
-		return backends, err
-	}
-	backends = append(backends, ecis...)
-	return backends, nil
+	return ecsBackends, eciBackends, nil
 }
 
-func (mgr *VGroupManager) addECIBackends(reqCtx *RequestContext, backends []model.BackendAttribute) ([]model.BackendAttribute, error) {
-	// TODO
-	klog.Infof("implement me!")
+func updateECIBackends(reqCtx *RequestContext, backends []model.BackendAttribute) ([]model.BackendAttribute, error) {
+	reqCtx.Log.Infof("add eciBackends")
+	// TODO update ecis
 	return backends, nil
 }
 

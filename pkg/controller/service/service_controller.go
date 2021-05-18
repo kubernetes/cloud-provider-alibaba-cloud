@@ -103,6 +103,7 @@ type RequestContext struct {
 	Ctx     context.Context
 	Service *v1.Service
 	Anno    *AnnotationRequest
+	Log     *util.Log
 }
 
 func (m *ReconcileService) reconcile(request reconcile.Request) error {
@@ -133,6 +134,7 @@ func (m *ReconcileService) reconcile(request reconcile.Request) error {
 		Ctx:     ctx,
 		Service: svc,
 		Anno:    anno,
+		Log:     util.NewReqLog(fmt.Sprintf("[%s] ", request.String())),
 	}
 
 	// 1. check to see whither if loadbalancer deletion is needed

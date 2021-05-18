@@ -66,7 +66,7 @@ func ExpectSpecTypeOK(m *framework.Expectation) (bool, error) {
 		NamespacedName: util.NamespacedName(m.Case.Service),
 	}
 
-	err := m.E2E.SlbManager.Find(m.Case.ReqCtx, lbMdl)
+	err := m.E2E.ModelBuilder.LoadBalancerMgr.Find(m.Case.ReqCtx, lbMdl)
 	if err != nil {
 		// TODO if err, need retry
 		return false, framework.NewErrorRetry(err)

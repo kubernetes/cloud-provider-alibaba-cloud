@@ -19,6 +19,7 @@ import (
 	prvd "k8s.io/cloud-provider-alibaba-cloud/pkg/provider"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba"
 	"reflect"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"strings"
 	"time"
 )
@@ -29,10 +30,10 @@ type OptionsFunc func(f *FrameWorkE2E)
 
 //FrameWorkE2E e2e backup
 type FrameWorkE2E struct {
-	Description string
-	SlbManager  *service.LoadBalancerManager
-	Cloud       prvd.Provider
-	Client      kubernetes.Interface
+	Description  string
+	ModelBuilder service.ModelBuilder
+	Cloud        prvd.Provider
+	Client       kubernetes.Interface
 }
 
 var TestConfig Config
@@ -91,7 +92,12 @@ func NewFrameWork(
 	}
 	frame.Client = NewClientOrDie()
 	frame.Cloud = alibaba.NewAlibabaCloud()
-	frame.SlbManager = service.NewLoadBalancerManager(frame.Cloud)
+	runtimeClient := NewRuntimeClient()
+	frame.ModelBuilder = service.ModelBuilder{
+		LoadBalancerMgr: service.NewLoadBalancerManager(frame.Cloud),
+		ListenerMgr:     service.NewListenerManager(frame.Cloud),
+		VGroupMgr:       service.NewVGroupManager(runtimeClient, frame.Cloud),
+	}
 	return frame
 }
 
@@ -330,6 +336,19 @@ func NewClientOrDie() kubernetes.Interface {
 		panic(fmt.Sprintf("new client : %s", err.Error()))
 	}
 	return client
+}
+
+func NewRuntimeClient() client.Client {
+	config, err := LoadConfig()
+	if err != nil {
+		panic(fmt.Sprintf("error creating Client: %v", err.Error()))
+	}
+
+	apiReader, err := client.New(config, client.Options{})
+	if err != nil {
+		panic(fmt.Sprintf("new runtime client error: %s", err.Error()))
+	}
+	return apiReader
 }
 
 func RunNginxDeployment(
