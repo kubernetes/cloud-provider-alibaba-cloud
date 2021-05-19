@@ -5,7 +5,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/context/node"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider"
-	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/metadata"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/auth"
 )
 
 /*
@@ -13,13 +13,13 @@ import (
 	"alibaba:DeleteInstance", "alibaba:RunCommand",
 */
 func NewMockECS(
-	auth *metadata.ClientAuth,
+	auth *auth.ClientAuth,
 ) *MockECS {
 	return &MockECS{auth: auth}
 }
 
 type MockECS struct {
-	auth *metadata.ClientAuth
+	auth *auth.ClientAuth
 }
 
 var _ prvd.Instance = &MockECS{}

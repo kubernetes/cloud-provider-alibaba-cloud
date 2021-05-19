@@ -2,9 +2,9 @@ package service
 
 import (
 	"fmt"
-	"github.com/aliyun/alibaba-cloud-sdk-go/services/ecs"
 	v1 "k8s.io/api/core/v1"
 	ctx2 "k8s.io/cloud-provider-alibaba-cloud/pkg/context"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/model"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/util"
 	"k8s.io/klog"
 	"os"
@@ -18,29 +18,18 @@ func isLocalModeService(svc *v1.Service) bool {
 
 func isENIBackendType(svc *v1.Service) bool {
 	if svc.Annotations[BACKEND_TYPE_LABEL] != "" {
-		return svc.Annotations[BACKEND_TYPE_LABEL] == BACKEND_TYPE_ENI
+		return svc.Annotations[BACKEND_TYPE_LABEL] == model.ENIBackendType
 	}
 
 	if os.Getenv("SERVICE_FORCE_BACKEND_ENI") != "" {
 		return os.Getenv("SERVICE_FORCE_BACKEND_ENI") == "true"
 	}
 
-	return ctx2.CFG.Global.ServiceBackendType == BACKEND_TYPE_ENI
+	return ctx2.CFG.Global.ServiceBackendType == model.ENIBackendType
 }
 
 func isSLBNeeded(svc *v1.Service) bool {
 	return svc.DeletionTimestamp == nil && svc.Spec.Type == v1.ServiceTypeLoadBalancer
-}
-
-func findENIbyAddrIP(resp *ecs.DescribeNetworkInterfacesResponse, addrIP string) (string, error) {
-	for _, eni := range resp.NetworkInterfaceSets.NetworkInterfaceSet {
-		for _, privateIpType := range eni.PrivateIpSets.PrivateIpSet {
-			if addrIP == privateIpType.PrivateIpAddress {
-				return eni.NetworkInterfaceId, nil
-			}
-		}
-	}
-	return "", fmt.Errorf("private ip address not found in openapi %s", addrIP)
 }
 
 func findNodeByNodeName(nodes []v1.Node, nodeName string) *v1.Node {

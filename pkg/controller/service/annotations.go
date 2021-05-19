@@ -5,7 +5,7 @@ import (
 	"github.com/aliyun/alibaba-cloud-sdk-go/services/slb"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/model"
-	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/metadata"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba"
 	"k8s.io/klog"
 	"strings"
 )
@@ -155,7 +155,7 @@ func (n *AnnotationRequest) GetDefaultTags() []slb.Tag {
 		},
 		{
 			TagKey:   ACKKEY,
-			TagValue: metadata.CLUSTER_ID,
+			TagValue: alibaba.CLUSTER_ID,
 		},
 	}
 }

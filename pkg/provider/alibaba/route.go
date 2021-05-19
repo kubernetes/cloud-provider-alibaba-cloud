@@ -1,15 +1,13 @@
 package alibaba
 
-import "k8s.io/cloud-provider-alibaba-cloud/pkg/provider/metadata"
-
 func NewRouteProvider(
-	auth *metadata.ClientAuth,
+	auth *ClientAuth,
 ) *RouteProvider {
 	return &RouteProvider{auth: auth}
 }
 
 type RouteProvider struct {
-	auth *metadata.ClientAuth
+	auth *ClientAuth
 }
 
 func (*RouteProvider) CreateRoute() {

@@ -14,14 +14,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package metadata
+package alibaba
 
 import (
 	b64 "encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"k8s.io/klog"
+	prvd "k8s.io/cloud-provider-alibaba-cloud/pkg/provider"
 	"path/filepath"
 	"strings"
 	"time"
@@ -41,9 +41,6 @@ import (
 
 var KUBERNETES_CLOUD_CONTROLLER_MANAGER = "ack.ccm"
 
-// CLUSTER_ID default cluster id if it is not specified.
-var CLUSTER_ID = "clusterid"
-
 // TOKEN_RESYNC_PERIOD default Token sync period
 var TOKEN_RESYNC_PERIOD = 10 * time.Minute
 
@@ -51,7 +48,7 @@ var TOKEN_RESYNC_PERIOD = 10 * time.Minute
 type ClientAuth struct {
 	stop <-chan struct{}
 
-	Meta IMetaData
+	Meta prvd.IMetaData
 	ECS  *ecs.Client
 	VPC  *vpc.Client
 	SLB  *slb.Client
@@ -60,14 +57,20 @@ type ClientAuth struct {
 
 // NewClientMgr return a new client manager
 func NewClientAuth() (*ClientAuth, error) {
-	meta := NewMetaData()
-	// ctx2.CFG.Region might be nil,
-	// but it is ok to have empty value.
-	// because region will be filled in the next token refresh
+	log.Infof("load cfg from file: %s", ctx2.GlobalFlag.CloudConfig)
+	// reload config while token refresh
+	err := LoadCfg(ctx2.GlobalFlag.CloudConfig)
+	if err != nil {
+		log.Warnf("load config fail: %s", err.Error())
+		return nil, err
+	}
 
-	// TODO FIX ME
-	region := ctx2.CFG.Global.Region
-	log.Infof("new provider in region: [%s]", region)
+	meta := NewMetaData()
+
+	region, err := meta.Region()
+	if err != nil {
+		return nil, fmt.Errorf("can not determin region: %s", err.Error())
+	}
 	ecli, err := ecs.NewClientWithStsToken(
 		region, "key", "secret", "",
 	)
@@ -120,11 +123,6 @@ func (mgr *ClientAuth) Start(
 		if err != nil {
 			log.Warnf("load config fail: %s", err.Error())
 			return
-		}
-
-		if ctx2.CFG.Global.ClusterID != "" {
-			CLUSTER_ID = ctx2.CFG.Global.ClusterID
-			klog.Infof("use clusterid %s", CLUSTER_ID)
 		}
 
 		// refresh client Token periodically
@@ -244,9 +242,6 @@ func setVPCEndpoint(mgr *ClientAuth) {
 	mgr.PVTZ.Network = "vpc"
 }
 
-// MetaData return MetaData client
-func (mgr *ClientAuth) MetaData() IMetaData { return mgr.Meta }
-
 // Token base Token info
 type Token struct {
 	Region       string `json:"region,omitempty"`
@@ -267,7 +262,7 @@ type AkAuthToken struct{ ak *Token }
 func (f *AkAuthToken) NextToken() (*Token, error) { return f.ak, nil }
 
 type RamRoleToken struct {
-	meta IMetaData
+	meta prvd.IMetaData
 }
 
 func (f *RamRoleToken) NextToken() (*Token, error) {
@@ -319,139 +314,4 @@ func (f *ServiceToken) NextToken() (*Token, error) {
 		return token, nil
 	}
 	return nil, fmt.Errorf("unmarshal Token: %s, %s, %s", err.Error(), status.Stdout, status.Stderr)
-}
-
-// IMetaData metadata interface
-type IMetaData interface {
-	HostName() (string, error)
-	ImageID() (string, error)
-	InstanceID() (string, error)
-	Mac() (string, error)
-	NetworkType() (string, error)
-	OwnerAccountID() (string, error)
-	PrivateIPv4() (string, error)
-	Region() (string, error)
-	SerialNumber() (string, error)
-	SourceAddress() (string, error)
-	VpcCIDRBlock() (string, error)
-	VpcID() (string, error)
-	VswitchCIDRBlock() (string, error)
-	Zone() (string, error)
-	NTPConfigServers() ([]string, error)
-	RoleName() (string, error)
-	RamRoleToken(role string) (RoleAuth, error)
-	VswitchID() (string, error)
-}
-
-// NewMetaData return new metadata
-func NewMetaData() IMetaData {
-	if false {
-		// use mocked Meta depend
-		log.Infof("use mocked metadata server.")
-		return &fakeMetaData{base: NewBaseMetaData(nil)}
-	}
-	return NewBaseMetaData(nil)
-}
-
-type fakeMetaData struct {
-	base IMetaData
-}
-
-func (m *fakeMetaData) HostName() (string, error) {
-
-	return "", fmt.Errorf("unimplemented")
-}
-
-func (m *fakeMetaData) ImageID() (string, error) {
-
-	return "", fmt.Errorf("unimplemented")
-}
-
-func (m *fakeMetaData) InstanceID() (string, error) {
-
-	return "fakedInstanceid", nil
-}
-
-func (m *fakeMetaData) Mac() (string, error) {
-
-	return "", fmt.Errorf("unimplemented")
-}
-
-func (m *fakeMetaData) NetworkType() (string, error) {
-
-	return "", fmt.Errorf("unimplemented")
-}
-
-func (m *fakeMetaData) OwnerAccountID() (string, error) {
-
-	return "", fmt.Errorf("unimplemented")
-}
-
-func (m *fakeMetaData) PrivateIPv4() (string, error) {
-
-	return "", fmt.Errorf("unimplemented")
-}
-
-func (m *fakeMetaData) Region() (string, error) {
-	return m.base.Region()
-}
-
-func (m *fakeMetaData) SerialNumber() (string, error) {
-
-	return "", fmt.Errorf("unimplemented")
-}
-
-func (m *fakeMetaData) SourceAddress() (string, error) {
-
-	return "", fmt.Errorf("unimplemented")
-
-}
-
-func (m *fakeMetaData) VpcCIDRBlock() (string, error) {
-
-	return "", fmt.Errorf("unimplemented")
-}
-
-func (m *fakeMetaData) VpcID() (string, error) {
-	return m.base.VpcID()
-}
-
-func (m *fakeMetaData) VswitchCIDRBlock() (string, error) {
-
-	return "", fmt.Errorf("unimplemented")
-}
-
-// zone1:vswitchid1,zone2:vswitch2
-func (m *fakeMetaData) VswitchID() (string, error) {
-
-	return "", fmt.Errorf("unimplemented")
-}
-
-func (m *fakeMetaData) EIPv4() (string, error) {
-
-	return "", fmt.Errorf("unimplemented")
-}
-
-func (m *fakeMetaData) DNSNameServers() ([]string, error) {
-
-	return []string{""}, fmt.Errorf("unimplemented")
-}
-
-func (m *fakeMetaData) NTPConfigServers() ([]string, error) {
-
-	return []string{""}, fmt.Errorf("unimplemented")
-}
-
-func (m *fakeMetaData) Zone() (string, error) {
-	return m.base.Zone()
-}
-
-func (m *fakeMetaData) RoleName() (string, error) {
-
-	return m.base.RoleName()
-}
-
-func (m *fakeMetaData) RamRoleToken(role string) (RoleAuth, error) {
-
-	return m.base.RamRoleToken(role)
 }

@@ -1,4 +1,4 @@
-package slbprd
+package alibaba
 
 import (
 	"context"
@@ -14,13 +14,24 @@ import (
 func (p ProviderSLB) DescribeLoadBalancerListeners(ctx context.Context, lbId string) ([]model.ListenerAttribute, error) {
 	req := slb.CreateDescribeLoadBalancerListenersRequest()
 	req.LoadBalancerId = &[]string{lbId}
-	// TODO token
-	resp, err := p.auth.SLB.DescribeLoadBalancerListeners(req)
-	if err != nil {
-		return nil, err
+	req.MaxResults = requests.NewInteger(1)
+
+	var respListeners []slb.ListenerInDescribeLoadBalancerListeners
+	for {
+		resp, err := p.auth.SLB.DescribeLoadBalancerListeners(req)
+		if err != nil {
+			return nil, err
+		}
+		respListeners = append(respListeners, resp.Listeners...)
+
+		if resp.NextToken == "" {
+			break
+		}
+		req.NextToken = resp.NextToken
 	}
+
 	var listeners []model.ListenerAttribute
-	for _, lis := range resp.Listeners {
+	for _, lis := range respListeners {
 		n := model.ListenerAttribute{
 			Description:  lis.Description,
 			ListenerPort: lis.ListenerPort,

@@ -1,4 +1,4 @@
-package metadata
+package alibaba
 
 import (
 	"encoding/json"
@@ -6,7 +6,10 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	ctx2 "k8s.io/cloud-provider-alibaba-cloud/pkg/context"
+	prvd "k8s.io/cloud-provider-alibaba-cloud/pkg/provider"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/util"
+	"k8s.io/klog"
 	"net"
 	"net/http"
 	"net/url"
@@ -45,6 +48,8 @@ const (
 	RAM_SECURITY       = "Ram/security-credentials"
 )
 
+var CLUSTER_ID = "clusterid"
+
 type IMetaDataRequest interface {
 	Version(version string) IMetaDataRequest
 	ResourceType(rtype string) IMetaDataRequest
@@ -54,40 +59,42 @@ type IMetaDataRequest interface {
 	Do(api interface{}) error
 }
 
-type MetaData struct {
+// NewMetaData return new metadata
+func NewMetaData() prvd.IMetaData {
+	if ctx2.CFG.Global.VpcID != "" &&
+		ctx2.CFG.Global.VswitchID != "" {
+		klog.V(2).Infof("use mocked metadata server.")
+		return &CfgMetaData{base: NewBaseMetaData(nil)}
+	}
+	return NewBaseMetaData(nil)
+}
+
+var _ prvd.IMetaData = &BaseMetaData{}
+
+type BaseMetaData struct {
 	// mock for unit test.
 	mock requestMock
 
 	client *http.Client
 }
 
-func NewBaseMetaData(client *http.Client) *MetaData {
+func NewBaseMetaData(client *http.Client) *BaseMetaData {
 	if client == nil {
 		client = &http.Client{}
 	}
-	return &MetaData{
+	return &BaseMetaData{
 		client: client,
 	}
 }
 
-func NewMockMetaData(client *http.Client, sendRequest requestMock) *MetaData {
-	if client == nil {
-		client = &http.Client{}
-	}
-	return &MetaData{
-		client: client,
-		mock:   sendRequest,
-	}
-}
-
-func (m *MetaData) New() *MetaDataRequest {
+func (m *BaseMetaData) New() *MetaDataRequest {
 	return &MetaDataRequest{
 		client:      m.client,
 		sendRequest: m.mock,
 	}
 }
 
-func (m *MetaData) HostName() (string, error) {
+func (m *BaseMetaData) HostName() (string, error) {
 	var hostname ResultList
 	err := m.New().Resource(HOSTNAME).Do(&hostname)
 	if err != nil {
@@ -96,7 +103,7 @@ func (m *MetaData) HostName() (string, error) {
 	return hostname.result[0], nil
 }
 
-func (m *MetaData) ImageID() (string, error) {
+func (m *BaseMetaData) ImageID() (string, error) {
 	var image ResultList
 	err := m.New().Resource(IMAGE_ID).Do(&image)
 	if err != nil {
@@ -105,7 +112,7 @@ func (m *MetaData) ImageID() (string, error) {
 	return image.result[0], err
 }
 
-func (m *MetaData) InstanceID() (string, error) {
+func (m *BaseMetaData) InstanceID() (string, error) {
 	var instanceid ResultList
 	err := m.New().Resource(INSTANCE_ID).Do(&instanceid)
 	if err != nil {
@@ -114,7 +121,7 @@ func (m *MetaData) InstanceID() (string, error) {
 	return instanceid.result[0], err
 }
 
-func (m *MetaData) Mac() (string, error) {
+func (m *BaseMetaData) Mac() (string, error) {
 	var mac ResultList
 	err := m.New().Resource(MAC).Do(&mac)
 	if err != nil {
@@ -123,7 +130,7 @@ func (m *MetaData) Mac() (string, error) {
 	return mac.result[0], nil
 }
 
-func (m *MetaData) NetworkType() (string, error) {
+func (m *BaseMetaData) NetworkType() (string, error) {
 	var network ResultList
 	err := m.New().Resource(NETWORK_TYPE).Do(&network)
 	if err != nil {
@@ -132,7 +139,7 @@ func (m *MetaData) NetworkType() (string, error) {
 	return network.result[0], nil
 }
 
-func (m *MetaData) OwnerAccountID() (string, error) {
+func (m *BaseMetaData) OwnerAccountID() (string, error) {
 	var owner ResultList
 	err := m.New().Resource(OWNER_ACCOUNT_ID).Do(&owner)
 	if err != nil {
@@ -141,7 +148,7 @@ func (m *MetaData) OwnerAccountID() (string, error) {
 	return owner.result[0], nil
 }
 
-func (m *MetaData) PrivateIPv4() (string, error) {
+func (m *BaseMetaData) PrivateIPv4() (string, error) {
 	var private ResultList
 	err := m.New().Resource(PRIVATE_IPV4).Do(&private)
 	if err != nil {
@@ -150,7 +157,7 @@ func (m *MetaData) PrivateIPv4() (string, error) {
 	return private.result[0], nil
 }
 
-func (m *MetaData) Region() (string, error) {
+func (m *BaseMetaData) Region() (string, error) {
 	var region ResultList
 	err := m.New().Resource(REGION).Do(&region)
 	if err != nil {
@@ -159,7 +166,7 @@ func (m *MetaData) Region() (string, error) {
 	return region.result[0], nil
 }
 
-func (m *MetaData) SerialNumber() (string, error) {
+func (m *BaseMetaData) SerialNumber() (string, error) {
 	var serial ResultList
 	err := m.New().Resource(SERIAL_NUMBER).Do(&serial)
 	if err != nil {
@@ -168,7 +175,7 @@ func (m *MetaData) SerialNumber() (string, error) {
 	return serial.result[0], nil
 }
 
-func (m *MetaData) SourceAddress() (string, error) {
+func (m *BaseMetaData) SourceAddress() (string, error) {
 	var source ResultList
 	err := m.New().Resource(SOURCE_ADDRESS).Do(&source)
 	if err != nil {
@@ -178,7 +185,7 @@ func (m *MetaData) SourceAddress() (string, error) {
 
 }
 
-func (m *MetaData) VpcCIDRBlock() (string, error) {
+func (m *BaseMetaData) VpcCIDRBlock() (string, error) {
 	var vpcCIDR ResultList
 	err := m.New().Resource(VPC_CIDR_BLOCK).Do(&vpcCIDR)
 	if err != nil {
@@ -187,7 +194,7 @@ func (m *MetaData) VpcCIDRBlock() (string, error) {
 	return vpcCIDR.result[0], err
 }
 
-func (m *MetaData) VpcID() (string, error) {
+func (m *BaseMetaData) VpcID() (string, error) {
 	var vpcId ResultList
 	err := m.New().Resource(VPC_ID).Do(&vpcId)
 	if err != nil {
@@ -196,7 +203,7 @@ func (m *MetaData) VpcID() (string, error) {
 	return vpcId.result[0], err
 }
 
-func (m *MetaData) VswitchCIDRBlock() (string, error) {
+func (m *BaseMetaData) VswitchCIDRBlock() (string, error) {
 	var cidr ResultList
 	err := m.New().Resource(VSWITCH_CIDR_BLOCK).Do(&cidr)
 	if err != nil {
@@ -205,7 +212,7 @@ func (m *MetaData) VswitchCIDRBlock() (string, error) {
 	return cidr.result[0], err
 }
 
-func (m *MetaData) VswitchID() (string, error) {
+func (m *BaseMetaData) VswitchID() (string, error) {
 	var vswithcid ResultList
 	err := m.New().Resource(VSWITCH_ID).Do(&vswithcid)
 	if err != nil {
@@ -214,7 +221,7 @@ func (m *MetaData) VswitchID() (string, error) {
 	return vswithcid.result[0], err
 }
 
-func (m *MetaData) EIPv4() (string, error) {
+func (m *BaseMetaData) EIPv4() (string, error) {
 	var eip ResultList
 	err := m.New().Resource(EIPV4).Do(&eip)
 	if err != nil {
@@ -223,7 +230,7 @@ func (m *MetaData) EIPv4() (string, error) {
 	return eip.result[0], nil
 }
 
-func (m *MetaData) DNSNameServers() ([]string, error) {
+func (m *BaseMetaData) DNSNameServers() ([]string, error) {
 	var data ResultList
 	err := m.New().Resource(DNS_NAMESERVERS).Do(&data)
 	if err != nil {
@@ -232,7 +239,7 @@ func (m *MetaData) DNSNameServers() ([]string, error) {
 	return data.result, nil
 }
 
-func (m *MetaData) NTPConfigServers() ([]string, error) {
+func (m *BaseMetaData) NTPConfigServers() ([]string, error) {
 	var data ResultList
 	err := m.New().Resource(NTP_CONF_SERVERS).Do(&data)
 	if err != nil {
@@ -241,7 +248,7 @@ func (m *MetaData) NTPConfigServers() ([]string, error) {
 	return data.result, nil
 }
 
-func (m *MetaData) Zone() (string, error) {
+func (m *BaseMetaData) Zone() (string, error) {
 	var zone ResultList
 	err := m.New().Resource(ZONE).Do(&zone)
 	if err != nil {
@@ -250,7 +257,7 @@ func (m *MetaData) Zone() (string, error) {
 	return zone.result[0], nil
 }
 
-func (m *MetaData) RoleName() (string, error) {
+func (m *BaseMetaData) RoleName() (string, error) {
 	var roleName ResultList
 	err := m.New().Resource("ram/security-credentials/").Do(&roleName)
 	if err != nil {
@@ -259,18 +266,24 @@ func (m *MetaData) RoleName() (string, error) {
 	return roleName.result[0], nil
 }
 
-func (m *MetaData) RamRoleToken(role string) (RoleAuth, error) {
-	var roleauth RoleAuth
+func (m *BaseMetaData) RamRoleToken(role string) (prvd.RoleAuth, error) {
+	var roleauth prvd.RoleAuth
 	err := m.New().Resource(RAM_SECURITY).SubResource(role).Do(&roleauth)
 	if err != nil {
-		return RoleAuth{}, err
+		return prvd.RoleAuth{}, err
 	}
 	return roleauth, nil
 }
 
+func (m *BaseMetaData) ClusterID() string {
+	if ctx2.CFG.Global.ClusterID != "" {
+		return ctx2.CFG.Global.ClusterID
+	}
+	return CLUSTER_ID
+}
+
 type requestMock func(resource string) (string, error)
 
-//
 type MetaDataRequest struct {
 	version      string
 	resourceType string
@@ -355,7 +368,7 @@ func (vpc *MetaDataRequest) Decode(data string, api interface{}) error {
 	case *ResultList:
 		api.(*ResultList).result = strings.Split(data, "\n")
 		return nil
-	case *RoleAuth:
+	case *prvd.RoleAuth:
 		return json.Unmarshal([]byte(data), api)
 	default:
 		return errors.New(fmt.Sprintf("metadata: unknow type to decode, type=%s\n", reflect.TypeOf(api)))
@@ -436,11 +449,151 @@ type ResultList struct {
 	result []string
 }
 
-type RoleAuth struct {
-	AccessKeyId     string
-	AccessKeySecret string
-	Expiration      time.Time
-	SecurityToken   string
-	LastUpdated     time.Time
-	Code            string
+// render meta data from cloud config file
+var _ prvd.IMetaData = &CfgMetaData{}
+
+type CfgMetaData struct {
+	base prvd.IMetaData
+}
+
+func (m *CfgMetaData) HostName() (string, error) {
+
+	return "", fmt.Errorf("unimplemented")
+}
+
+func (m *CfgMetaData) ImageID() (string, error) {
+
+	return "", fmt.Errorf("unimplemented")
+}
+
+func (m *CfgMetaData) InstanceID() (string, error) {
+
+	return "fakedInstanceid", nil
+}
+
+func (m *CfgMetaData) Mac() (string, error) {
+
+	return "", fmt.Errorf("unimplemented")
+}
+
+func (m *CfgMetaData) NetworkType() (string, error) {
+
+	return "", fmt.Errorf("unimplemented")
+}
+
+func (m *CfgMetaData) OwnerAccountID() (string, error) {
+
+	return "", fmt.Errorf("unimplemented")
+}
+
+func (m *CfgMetaData) PrivateIPv4() (string, error) {
+
+	return "", fmt.Errorf("unimplemented")
+}
+
+func (m *CfgMetaData) Region() (string, error) {
+	if ctx2.CFG.Global.Region != "" {
+		return ctx2.CFG.Global.Region, nil
+	}
+	return m.base.Region()
+}
+
+func (m *CfgMetaData) SerialNumber() (string, error) {
+
+	return "", fmt.Errorf("unimplemented")
+}
+
+func (m *CfgMetaData) SourceAddress() (string, error) {
+
+	return "", fmt.Errorf("unimplemented")
+
+}
+
+func (m *CfgMetaData) VpcCIDRBlock() (string, error) {
+
+	return "", fmt.Errorf("unimplemented")
+}
+
+func (m *CfgMetaData) VpcID() (string, error) {
+	if ctx2.CFG.Global.VpcID != "" {
+		return ctx2.CFG.Global.VpcID, nil
+	}
+	return m.base.VpcID()
+}
+
+func (m *CfgMetaData) VswitchCIDRBlock() (string, error) {
+
+	return "", fmt.Errorf("unimplemented")
+}
+
+// zone1:vswitchid1,zone2:vswitch2
+func (m *CfgMetaData) VswitchID() (string, error) {
+	if ctx2.CFG.Global.VswitchID == "" {
+		// get vswitch id from meta server
+		return m.base.VswitchID()
+	}
+	zlist := strings.Split(ctx2.CFG.Global.VswitchID, ",")
+	if len(zlist) == 1 {
+		vSwitchs := strings.Split(ctx2.CFG.Global.VswitchID, ":")
+		if len(vSwitchs) == 2 {
+			klog.Infof("only one vswitchid mode, %s", vSwitchs[1])
+			return vSwitchs[1], nil
+		}
+		klog.Infof("simple vswitchid mode, %s", ctx2.CFG.Global.VswitchID)
+		return ctx2.CFG.Global.VswitchID, nil
+	}
+	mzone, err := m.Zone()
+	if err != nil {
+		return "", fmt.Errorf("retrieve vswitchid error for %s", err.Error())
+	}
+	for _, zone := range zlist {
+		vs := strings.Split(zone, ":")
+		if len(vs) != 2 {
+			return "", fmt.Errorf("cloud-config vswitch format error: %s", ctx2.CFG.Global.VswitchID)
+		}
+		if vs[0] == "" || vs[0] == mzone {
+			return vs[1], nil
+		}
+	}
+	klog.Infof("zone[%s] match failed, fallback with simple vswitch id mode, [%s]", mzone, ctx2.CFG.Global.VswitchID)
+	return ctx2.CFG.Global.VswitchID, nil
+}
+
+func (m *CfgMetaData) EIPv4() (string, error) {
+
+	return "", fmt.Errorf("unimplemented")
+}
+
+func (m *CfgMetaData) DNSNameServers() ([]string, error) {
+
+	return []string{""}, fmt.Errorf("unimplemented")
+}
+
+func (m *CfgMetaData) NTPConfigServers() ([]string, error) {
+
+	return []string{""}, fmt.Errorf("unimplemented")
+}
+
+func (m *CfgMetaData) Zone() (string, error) {
+	if ctx2.CFG.Global.ZoneID != "" {
+		return ctx2.CFG.Global.ZoneID, nil
+	}
+	return m.base.Zone()
+}
+
+func (m *CfgMetaData) RoleName() (string, error) {
+
+	return m.base.RoleName()
+}
+
+func (m *CfgMetaData) RamRoleToken(role string) (prvd.RoleAuth, error) {
+
+	return m.base.RamRoleToken(role)
+}
+
+func (m *CfgMetaData) ClusterID() string {
+	if ctx2.CFG.Global.ClusterID != "" {
+		CLUSTER_ID = ctx2.CFG.Global.ClusterID
+	}
+	return CLUSTER_ID
 }

@@ -8,8 +8,9 @@ mkdir -p ${WORKINGDIR}
 echo "
 前置条件：
   1. 手动拷贝一个待测试的客户集群的公网kubeconfig文件，保存为${WORKINGDIR}/config
-  2. 通过环境变量设置用户账号的AK及Region信息。DefaultRegion=cn-shenzhen.
-     export KEY= SECRET= REGION=
+  2. 通过环境变量设置用户账号的AK、Region、vpc、vswitch信息。DefaultRegion=cn-shenzhen.
+     export KEY= SECRET= REGION= VPC= VSW=
+  注意：vsw的格式为zoneId:vswId, e.g. cn-hangzhou-b:vsw-bpxxxxxx
 "
 
 if [[ ! -f ${WORKINGDIR}/config ]];
@@ -17,9 +18,9 @@ then
   echo "kubeconfig file must exist[${WORKINGDIR}/config]. public access is needed"; exit 2
 fi
 
-if [[ -z ${KEY} || -z ${SECRET} ]];
+if [[ -z ${KEY} || -z ${SECRET} || -z ${VPC} || -z ${VSW}  ]];
 then
-  echo "AccessKey & AccessKeySecret must be specified. export KEY= SECRET= REGION="; exit 2
+  echo "AccessKey & AccessKeySecret & VPC & VSW must be specified.  export KEY= SECRET= REGION= VPC= VSW="; exit 2
 fi
 
 if [[ -z $REGION ]];
@@ -33,6 +34,8 @@ cat > ${WORKINGDIR}/cloud-config << EOF
 {
   "Global": {
     "region": "${REGION}",
+    "vpcid": "${VPC}",
+    "vswitchid": "${VSW}",
     "routeTableIDs": "",
     "accessKeyID": "$(echo -n "${KEY}"|base64)",
     "accessKeySecret": "$(echo -n "${SECRET}"|base64)",

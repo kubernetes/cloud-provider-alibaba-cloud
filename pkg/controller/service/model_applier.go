@@ -3,7 +3,7 @@ package service
 import (
 	"fmt"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/model"
-	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/metadata"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba"
 	"k8s.io/klog"
 	"sort"
 )
@@ -183,7 +183,7 @@ func (m *ModelApplier) cleanup(reqCtx *RequestContext, local *model.LoadBalancer
 	for _, vg := range vgs {
 		if vg.NamedKey.ServiceName != local.NamespacedName.Name ||
 			vg.NamedKey.Namespace != local.NamespacedName.Namespace ||
-			vg.NamedKey.CID != metadata.CLUSTER_ID {
+			vg.NamedKey.CID != alibaba.CLUSTER_ID {
 			// skip those which does not belong to this service
 			continue
 		}

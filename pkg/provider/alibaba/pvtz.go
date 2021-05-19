@@ -12,7 +12,6 @@ import (
 	util_errors "k8s.io/apimachinery/pkg/util/errors"
 	ctx2 "k8s.io/cloud-provider-alibaba-cloud/pkg/context"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider"
-	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/metadata"
 )
 
 const (
@@ -26,7 +25,7 @@ type PVTZProvider struct {
 	zoneId string
 }
 
-func NewPVTZProvider(auth *metadata.ClientAuth) *PVTZProvider {
+func NewPVTZProvider(auth *ClientAuth) *PVTZProvider {
 	return &PVTZProvider{
 		client: auth.PVTZ,
 		zoneId: ctx2.CFG.Global.PrivateZoneID,

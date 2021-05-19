@@ -3,17 +3,17 @@ package vmock
 import (
 	"context"
 	prvd "k8s.io/cloud-provider-alibaba-cloud/pkg/provider"
-	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/metadata"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/auth"
 )
 
 func NewMockCLB(
-	auth *metadata.ClientAuth,
+	auth *auth.ClientAuth,
 ) *MockCLB {
 	return &MockCLB{auth: auth}
 }
 
 type MockCLB struct {
-	auth *metadata.ClientAuth
+	auth *auth.ClientAuth
 }
 
 func (MockCLB) FindSLB(ctx context.Context, id string) ([]prvd.SLB, error) {

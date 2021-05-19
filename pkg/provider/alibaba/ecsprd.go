@@ -9,7 +9,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/context/node"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider"
-	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/metadata"
 	"strings"
 )
 
@@ -18,7 +17,7 @@ import (
 	"alibaba:DeleteInstance", "alibaba:RunCommand",
 */
 func NewEcsProvider(
-	auth *metadata.ClientAuth,
+	auth *ClientAuth,
 ) *EcsProvider {
 	return &EcsProvider{auth: auth}
 }
@@ -26,7 +25,7 @@ func NewEcsProvider(
 var _ prvd.Instance = &EcsProvider{}
 
 type EcsProvider struct {
-	auth *metadata.ClientAuth
+	auth *ClientAuth
 }
 
 func (e *EcsProvider) ListInstances(ctx *node.NodeContext, ids []string) (map[string]*prvd.NodeAttribute, error) {
@@ -101,12 +100,12 @@ func (e *EcsProvider) SetInstanceTags(
 	return err
 }
 
-func (e *EcsProvider) DescribeNetworkInterfaces(vpcId string, ips *[]string) (*ecs.DescribeNetworkInterfacesResponse, error) {
+func (e *EcsProvider) DescribeNetworkInterfaces(vpcId string, ips *[]string, nextToken string) (*ecs.DescribeNetworkInterfacesResponse, error) {
 	req := ecs.CreateDescribeNetworkInterfacesRequest()
 	req.VpcId = vpcId
 	req.PrivateIpAddress = ips
-	req.PageSize = requests.Integer(100)
-
+	req.NextToken = nextToken
+	req.MaxResults = requests.NewInteger(100)
 	return e.auth.ECS.DescribeNetworkInterfaces(req)
 }
 

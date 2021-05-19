@@ -6,6 +6,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/context/node"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/model"
+	"time"
 )
 
 type DetailECS struct {
@@ -14,10 +15,45 @@ type DetailECS struct {
 }
 
 type Provider interface {
+	IMetaData
 	Instance
 	Route
 	ILoadBalancer
 	PrivateZone
+}
+
+type RoleAuth struct {
+	AccessKeyId     string
+	AccessKeySecret string
+	Expiration      time.Time
+	SecurityToken   string
+	LastUpdated     time.Time
+	Code            string
+}
+
+// IMetaData metadata interface
+type IMetaData interface {
+	// values from metadata server
+	HostName() (string, error)
+	ImageID() (string, error)
+	InstanceID() (string, error)
+	Mac() (string, error)
+	NetworkType() (string, error)
+	OwnerAccountID() (string, error)
+	PrivateIPv4() (string, error)
+	Region() (string, error)
+	SerialNumber() (string, error)
+	SourceAddress() (string, error)
+	VpcCIDRBlock() (string, error)
+	VpcID() (string, error)
+	VswitchCIDRBlock() (string, error)
+	Zone() (string, error)
+	NTPConfigServers() ([]string, error)
+	RoleName() (string, error)
+	RamRoleToken(role string) (RoleAuth, error)
+	VswitchID() (string, error)
+	// values from cloud config file
+	ClusterID() string
 }
 
 // NodeAttribute node attribute from cloud instance
@@ -33,7 +69,7 @@ type Instance interface {
 	ListInstances(ctx *node.NodeContext, ids []string) (map[string]*NodeAttribute, error)
 	SetInstanceTags(ctx *node.NodeContext, id string, tags map[string]string) error
 	// DescribeNetworkInterfaces query one or more elastic network interfaces (ENIs)
-	DescribeNetworkInterfaces(vpcId string, ips *[]string) (*ecs.DescribeNetworkInterfacesResponse, error)
+	DescribeNetworkInterfaces(vpcId string, ips *[]string, nextToken string) (*ecs.DescribeNetworkInterfacesResponse, error)
 }
 
 type Route interface {

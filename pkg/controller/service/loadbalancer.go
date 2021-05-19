@@ -3,7 +3,6 @@ package service
 import (
 	"encoding/json"
 	"fmt"
-	ctx2 "k8s.io/cloud-provider-alibaba-cloud/pkg/context"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/model"
 	prvd "k8s.io/cloud-provider-alibaba-cloud/pkg/provider"
 	"k8s.io/klog"
@@ -36,7 +35,9 @@ func (mgr *LoadBalancerManager) Find(reqCtx *RequestContext, mdl *model.LoadBala
 }
 
 func (mgr *LoadBalancerManager) Create(reqCtx *RequestContext, local *model.LoadBalancer) error {
-	setModelDefaultValue(local, reqCtx.Anno)
+	if err := setModelDefaultValue(mgr, local, reqCtx.Anno); err != nil {
+		return fmt.Errorf("set model default value error: %s", err.Error())
+	}
 	err := mgr.cloud.CreateLoadBalancer(reqCtx.Ctx, local)
 	if err != nil {
 		return fmt.Errorf("create slb error: %s", err.Error())
@@ -205,7 +206,7 @@ func equalsAddressIPVersion(local, remote model.AddressIPVersionType) bool {
 	return local == remote
 }
 
-func setModelDefaultValue(mdl *model.LoadBalancer, anno *AnnotationRequest) {
+func setModelDefaultValue(mgr *LoadBalancerManager, mdl *model.LoadBalancer, anno *AnnotationRequest) error {
 	if mdl.LoadBalancerAttribute.AddressType == "" {
 		mdl.LoadBalancerAttribute.AddressType = model.AddressType(anno.GetDefaultValue(AddressType))
 	}
@@ -214,11 +215,18 @@ func setModelDefaultValue(mdl *model.LoadBalancer, anno *AnnotationRequest) {
 		mdl.LoadBalancerAttribute.LoadBalancerName = anno.GetDefaultLoadBalancerName()
 	}
 
-	// TODO ecs模式下获取vpc id & vsw id
 	if mdl.LoadBalancerAttribute.AddressType == model.IntranetAddressType {
-		mdl.LoadBalancerAttribute.VpcId = ctx2.CFG.Global.VpcID
+		vpcId, err := mgr.cloud.VpcID()
+		if err != nil {
+			return fmt.Errorf("get vpc id from metadata error: %s", err.Error())
+		}
+		mdl.LoadBalancerAttribute.VpcId = vpcId
 		if mdl.LoadBalancerAttribute.VSwitchId == "" {
-			mdl.LoadBalancerAttribute.VSwitchId = ctx2.CFG.Global.VswitchID
+			vswId, err := mgr.cloud.VswitchID()
+			if err != nil {
+				return fmt.Errorf("get vsw id from metadata error: %s", err.Error())
+			}
+			mdl.LoadBalancerAttribute.VSwitchId = vswId
 		}
 	}
 
@@ -236,4 +244,5 @@ func setModelDefaultValue(mdl *model.LoadBalancer, anno *AnnotationRequest) {
 	}
 
 	mdl.LoadBalancerAttribute.Tags = append(mdl.LoadBalancerAttribute.Tags, anno.GetDefaultTags()...)
+	return nil
 }

@@ -1,4 +1,4 @@
-package slbprd
+package alibaba
 
 import (
 	"context"
@@ -9,12 +9,11 @@ import (
 	"github.com/aliyun/alibaba-cloud-sdk-go/services/slb"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/model"
 	prvd "k8s.io/cloud-provider-alibaba-cloud/pkg/provider"
-	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/metadata"
 	"k8s.io/klog"
 )
 
 func NewLBProvider(
-	auth *metadata.ClientAuth,
+	auth *ClientAuth,
 ) *ProviderSLB {
 	return &ProviderSLB{auth: auth}
 }
@@ -22,7 +21,7 @@ func NewLBProvider(
 var _ prvd.ILoadBalancer = &ProviderSLB{}
 
 type ProviderSLB struct {
-	auth *metadata.ClientAuth
+	auth *ClientAuth
 }
 
 func (p ProviderSLB) FindLoadBalancer(ctx context.Context, mdl *model.LoadBalancer) error {
