@@ -1,0 +1,157 @@
+TestCase:  
+  Annotation_SLB:
+    - testname: "Create a public network type of load balancing"
+      casenumber: CCM-Service-IT-Annotation-SLB-001
+      description: "Create a public network type of load balancing,Expect CCM to manage SLB configuration, listening and back-end service groups ok"
+    - testname: "Create a private network type of load balancing"
+      casenumber: CCM-Service-IT-Annotation-SLB-002
+      description: ""
+    - testname: "Create load balancing of HTTP type"
+      casenumber: CCM-Service-IT-Annotation-SLB-003
+      description: ""
+    - testname: "Create load balancing of HTTPS type"
+      casenumber: CCM-Service-IT-Annotation-SLB-004
+      description: ""
+    - testname: "Specify load balancing specifications"
+      casenumber: CCM-Service-IT-Annotation-SLB-005
+      description: ""
+    - testname: "Using existing load balancing"
+      casenumber: CCM-Service-IT-Annotation-SLB-006
+      description: ""
+    - testname: "Using existing load balancing - overlay listening"
+      casenumber: CCM-Service-IT-Annotation-SLB-007
+      description: ""
+    - testname: "Temporarily add additional tags with existing load balancing"
+      casenumber: CCM-Service-IT-Annotation-SLB-008
+      description: "Expect：failed"
+    - testname: "When creating load balancing, specify the active and standby zones"
+      casenumber: CCM-Service-IT-Annotation-SLB-009
+      description: ""
+    - testname: "Create a pay per bandwidth load balancing public network type load balancing instance"
+      casenumber: CCM-Service-IT-Annotation-SLB-0010
+      description: ""
+    - testname: "Create a load balance for pay by traffic public network type load balancing instance"
+      casenumber: CCM-Service-IT-Annotation-SLB-0011
+      description: ""
+    - testname: "Create a pay per bandwidth load balancing private network type load balancing instance"
+      casenumber: CCM-Service-IT-Annotation-SLB-0012
+      description: "Expect: failed"
+    - testname: "Create a TCP type health check load balancing"
+      casenumber: CCM-Service-IT-Annotation-SLB-0013
+      description: ""
+    - testname: "Create a HTTP type health check load balancing"
+      casenumber: CCM-Service-IT-Annotation-SLB-0014
+      description: ""
+    - testname: "Setting scheduling algorithm for load balancing-rr"
+      casenumber: CCM-Service-IT-Annotation-SLB-0015
+      description: ""
+    - testname: "Setting scheduling algorithm for load balancing-wrr"
+      casenumber: CCM-Service-IT-Annotation-SLB-0016
+      description: ""
+    - testname: "Setting scheduling algorithm for load balancing-wlc"
+      casenumber: CCM-Service-IT-Annotation-SLB-0017
+      description: ""
+    - testname: "Specifying virtual switches for load balancing"
+      casenumber: CCM-Service-IT-Annotation-SLB-0018
+      description: ""
+    - testname: "Add additional tags to load balancing"
+      casenumber: CCM-Service-IT-Annotation-SLB-0019
+      description: ""
+    - testname: "Creating IPv6 type load balancing"
+      casenumber: CCM-Service-IT-Annotation-SLB-0020
+      description: "The Kube proxy mode of cluster should be IPVS,The IP type cannot be changed after creation"
+    - testname: "Creating IPv4 type load balancing"
+      casenumber: CCM-Service-IT-Annotation-SLB-0021
+      description: "The Kube proxy mode of cluster should be IPVS,The IP type cannot be changed after creation"
+    - testname: "Config delete Protection for load balancing"
+      casenumber: CCM-Service-IT-Annotation-SLB-0022
+      description: ""
+    - testname: "Configuration modification protection for load balancing"
+      casenumber: CCM-Service-IT-Annotation-SLB-0023
+      description: ""
+    - testname: "Specify the load balancing name"
+      casenumber: CCM-Service-IT-Annotation-SLB-0024
+      description: ""
+    - testname: "Specifies the resource group to which load balancing belongs"
+      casenumber: CCM-Service-IT-Annotation-SLB-0025
+      description: ""
+  Annotation_monitor:
+    - testname: "Configure session hold time for TCP type load balancing"
+      casenumber: CCM-Service-IT-Annotation-Monitor-001
+      description: ""
+    - testname: "Configure session retention for load balancing for HTTP  protocols"
+      casenumber: CCM-Service-IT-Annotation-Monitor-002
+      description: ""
+    - testname: "Configure session retention for load balancing for HTTPS protocols"
+      casenumber: CCM-Service-IT-Annotation-Monitor-003
+      description: ""
+    - testname: "Configure access control policy groups for load balancing - acl-type: white"
+      casenumber: CCM-Service-IT-Annotation-Monitor-004
+      description: ""
+    - testname: "Configure access control policy groups for load balancing - acl-type: black"
+      casenumber: CCM-Service-IT-Annotation-Monitor-005
+      description: ""
+    - testname: "Specify forwarding port for load balancing"
+      casenumber: CCM-Service-IT-Annotation-Monitor-006
+      description: ""
+  Annotation_BESG:
+    - testname: "Use the worker node of the specified label as the back-end server"
+      casenumber: CCM-Service-IT-Annotation-BackServerGroup-001
+      description: ""
+    - testname: "External traffic policy is in cluster mode，Take the node where pod is located as the back-end server."
+      casenumber: CCM-Service-IT-Annotation-BackServerGroup-002
+      description: ""
+    - testname: "External traffic policy is in Local mode，Take the node where pod is located as the back-end server."
+      casenumber: CCM-Service-IT-Annotation-BackServerGroup-003
+      description: "The local mode needs to set the scheduling policy as weighted polling WRR"
+    - testname: "Remove the node in state unschedulable of SLB backend"
+      casenumber: CCM-Service-IT-Annotation-BackServerGroup-004
+      description: ""
+    - testname: "Mount pod Eni directly to SLB back end"
+      casenumber: CCM-Service-IT-Annotation-BackServerGroup-005
+      description: ""
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
