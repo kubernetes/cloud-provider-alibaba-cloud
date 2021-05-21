@@ -19,7 +19,7 @@ var _ = ginkgo.Describe("Test CCM Annotation slb function", func() {
 	//defer f.CleanUp()
 
 	// uncomment if u want to run initialize at each iteration
-	//ginkgo.AfterSuite(f.AfterEach)
+	ginkgo.AfterSuite(f.AfterEach)
 	ginkgo.BeforeSuite(f.BeforeEach)
 
 	ginkgo.By("slb test start")
@@ -300,7 +300,7 @@ var _ = ginkgo.Describe("Test CCM Annotation slb function", func() {
 		err := framework.RunActions(
 			f,
 			framework.NewDefaultAction(dspec),
-			//framework.NewDeleteAction(dspec),
+			framework.NewDeleteAction(dspec),
 		)
 		framework.ExpectNoError(err)
 		framework.Logf("Test Create a HTTP type health check load balancing finished %v", dspec)
