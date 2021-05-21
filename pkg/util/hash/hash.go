@@ -4,7 +4,6 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
-	"fmt"
 	log "github.com/sirupsen/logrus"
 	"reflect"
 	"strings"
@@ -29,38 +28,6 @@ func HashObject(o interface{}) string {
 	remove(&a)
 	return computeHash(PrettyYaml(a))
 }
-
-// HashObjects
-func HashObjects(slices []interface{}) (string, error) {
-	var hashStr string
-	for _, item := range slices {
-		m := make(map[string]interface{})
-		s, err := json.Marshal(item)
-		if err != nil {
-			return "", fmt.Errorf("hash marshal error: %s", err)
-		}
-		if err := json.Unmarshal(s, &m); err != nil {
-			return "", fmt.Errorf("hash marshal error: %s", err)
-		}
-		RemoveEmptyValues(m)
-		hashStr += PrettyYaml(m)
-	}
-	return computeHash(hashStr), nil
-}
-
-// TODO change to remove
-func RemoveEmptyValues(m map[string]interface{}) {
-	for k, v := range m {
-		if subM, ok := v.(map[string]interface{}); ok {
-			RemoveEmptyValues(subM)
-		}
-
-		if isUnderlyingTypeZero(v) {
-			delete(m, k)
-		}
-	}
-}
-
 func HashString(o interface{}) string {
 	data, _ := json.Marshal(o)
 	var a interface{}

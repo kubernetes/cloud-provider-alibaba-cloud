@@ -56,8 +56,7 @@ func (p ProviderSLB) DescribeLoadBalancerListeners(ctx context.Context, lbId str
 		default:
 			return listeners, fmt.Errorf("not support protocol %s", n.Protocol)
 		}
-		// TODO wait slb return http port description when forward is on
-		// now forward cannot work as expected
+
 		namedKey, err := model.LoadListenerNamedKey(lis.Description)
 		if err != nil {
 			klog.Warningf("listener description [%s], not expected format. skip user managed port", lis.Description, err.Error())

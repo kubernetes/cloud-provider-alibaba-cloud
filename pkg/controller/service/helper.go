@@ -6,7 +6,6 @@ import (
 	ctx2 "k8s.io/cloud-provider-alibaba-cloud/pkg/context"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/model"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/util"
-	"k8s.io/cloud-provider-alibaba-cloud/pkg/util/hash"
 	"k8s.io/klog"
 	"os"
 	"reflect"
@@ -118,20 +117,3 @@ func Batch(m interface{}, cnt int, batch Func) error {
 	return batch(target)
 }
 
-func isServiceHashChanged(service *v1.Service) (bool, error) {
-	if oldHash, ok := service.Labels[LabelServiceHash]; ok {
-		newHash, err := getServiceHash(service)
-		if err != nil {
-			return true, err
-		}
-		if strings.Compare(newHash, oldHash) == 0 {
-			klog.Infof("service %s/%s hash label not changed, skip", service.Namespace, service.Name)
-			return false, nil
-		}
-	}
-	return true, nil
-}
-
-func getServiceHash(service *v1.Service) (string, error) {
-	return hash.HashObjects([]interface{}{service.Spec, service.Annotations})
-}

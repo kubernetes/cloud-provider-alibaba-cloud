@@ -49,9 +49,9 @@ func (m *MapEnqueue) FanIN(o client.Object) []reconcile.Request {
 
 func (m *MapEnqueue) mapNode(o *v1.Node) []reconcile.Request {
 	var request []reconcile.Request
-	// 1. node label & condition filter.
-	if !isHashChanged(o) {
-		return []reconcile.Request{}
+	if isExcludeNode(o) {
+		klog.Infof("node %s is exclude, skip", o.Name)
+		return request
 	}
 
 	// node change would cause all service object reconcile
@@ -79,19 +79,12 @@ func (m *MapEnqueue) mapNode(o *v1.Node) []reconcile.Request {
 
 func (m *MapEnqueue) mapEndpoint(o *v1.Endpoints) []reconcile.Request {
 
-	if !isHashChanged(o) {
-		return []reconcile.Request{}
-	}
-
 	return []reconcile.Request{
 		{NamespacedName: client.ObjectKey{Namespace: o.GetNamespace(), Name: o.GetName()}},
 	}
 }
 
 func (m *MapEnqueue) mapService(o *v1.Service) []reconcile.Request {
-	if !isHashChanged(o) {
-		return []reconcile.Request{}
-	}
 	return []reconcile.Request{
 		{NamespacedName: client.ObjectKey{Namespace: o.GetNamespace(), Name: o.GetName()}},
 	}
@@ -102,26 +95,18 @@ func (m *MapEnqueue) InjectClient(c client.Client) error {
 	return nil
 }
 
-func isHashChanged(o interface{}) bool {
-	var (
-		op  []interface{}
-		lbl map[string]string
-	)
-	switch o.(type) {
-	case *v1.Service:
-		n := o.(*v1.Service)
-		lbl = n.Labels
-		op = append(op, n.Spec, n.Annotations)
-	case *v1.Node:
-		n := o.(*v1.Node)
-		lbl = n.Labels
-		op = append(op, n.Status.Conditions, n.Labels, n.Spec.Unschedulable)
-	case *v1.Endpoints:
-		e := o.(*v1.Endpoints)
-		lbl = e.Labels
-		op = append(op, e.Subsets, e.Labels)
+func getServiceHash(svc *v1.Service) string {
+	var op []interface{}
+	op = append(op, svc.Spec, svc.Annotations, svc.DeletionTimestamp)
+	return hash.HashObject(op)
+}
+
+func isServiceHashChanged(service *v1.Service) bool {
+	if oldHash, ok := service.Labels[LabelServiceHash]; ok {
+		newHash := getServiceHash(service)
+		return !strings.EqualFold(oldHash, newHash)
 	}
-	return !strings.EqualFold(hash.HashObject(op), getPreHash(lbl))
+	return true
 }
 
 func dropLeaseEndpoint(req []reconcile.Request) []reconcile.Request {

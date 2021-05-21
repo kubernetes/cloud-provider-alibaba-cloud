@@ -22,10 +22,8 @@ type ModelApplier struct {
 }
 
 func (m *ModelApplier) Apply(reqCtx *RequestContext, local *model.LoadBalancer, remote *model.LoadBalancer) error {
-	serviceHashChanged, err := isServiceHashChanged(reqCtx.Service)
-	if err != nil {
-		return fmt.Errorf("compute svc hash error :%s", err.Error())
-	}
+	serviceHashChanged := isServiceHashChanged(reqCtx.Service)
+
 	// apply sequence can not change
 	if serviceHashChanged {
 		if err := m.applyLoadBalancerAttribute(reqCtx, local, remote); err != nil {

@@ -1,11 +1,9 @@
 package service
 
 import (
-	"encoding/json"
 	"fmt"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/model"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/util"
-	"k8s.io/klog"
 )
 
 type IModelBuilder interface {
@@ -75,11 +73,6 @@ func (c localModel) Build(reqCtx *RequestContext) (*model.LoadBalancer, error) {
 		return nil, fmt.Errorf("builid vserver groups error: %s", err.Error())
 	}
 
-	lbMdlJson, err := json.Marshal(lbMdl)
-	if err != nil {
-		return nil, fmt.Errorf("marshal lbmdl error: %s", err.Error())
-	}
-	klog.Infof("cluster build: %s", lbMdlJson)
 	return lbMdl, nil
 }
 
@@ -107,10 +100,5 @@ func (c remoteModel) Build(reqCtx *RequestContext) (*model.LoadBalancer, error) 
 		return nil, fmt.Errorf("can not build listener attribute from cloud, error: %s", err.Error())
 	}
 
-	lbMdlJson, err := json.Marshal(lbMdl)
-	if err != nil {
-		return nil, fmt.Errorf("marshal lbmdl error: %s", err.Error())
-	}
-	klog.Infof("cloud model build: %s", lbMdlJson)
 	return lbMdl, nil
 }

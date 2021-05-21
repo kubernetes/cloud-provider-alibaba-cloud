@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -216,11 +217,23 @@ func (m *ReconcileService) buildAndApplyModel(reqCtx *RequestContext) (*model.Lo
 	if err != nil {
 		return nil, fmt.Errorf("build slb cluster model error: %s", err.Error())
 	}
+	mdlJson, err := json.Marshal(localModel)
+	if err != nil {
+		return nil, fmt.Errorf("marshal lbmdl error: %s", err.Error())
+	}
+	klog.Infof("local build: %s", mdlJson)
+
 	// build remote model
 	remoteModel, err := m.builder.BuildModel(reqCtx, REMOTE_MODEL)
 	if err != nil {
 		return nil, fmt.Errorf("build slb cloud model error: %s", err.Error())
 	}
+	mdlJson, err = json.Marshal(remoteModel)
+	if err != nil {
+		return nil, fmt.Errorf("marshal lbmdl error: %s", err.Error())
+	}
+	klog.Infof("remote build: %s", mdlJson)
+
 	// apply model
 	if err := m.applier.Apply(reqCtx, localModel, remoteModel); err != nil {
 		return nil, fmt.Errorf("apply model error: %s", err.Error())
@@ -252,12 +265,8 @@ func (m *ReconcileService) addServiceHash(svc *v1.Service) error {
 	if updated.Labels == nil {
 		updated.Labels = make(map[string]string)
 	}
-	serviceHash, err := getServiceHash(svc)
-	if err != nil {
-		return fmt.Errorf("compute service hash: %s", err.Error())
-	}
+	serviceHash := getServiceHash(svc)
 	updated.Labels[LabelServiceHash] = serviceHash
-
 	if err := m.kubeClient.Status().Patch(context.Background(), updated, client.MergeFrom(svc)); err != nil {
 		return fmt.Errorf("%s failed to add service hash:, error: %s", util.Key(svc), err.Error())
 	}
