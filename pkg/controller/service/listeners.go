@@ -127,6 +127,14 @@ func (mgr *ListenerManager) buildListenerFromServicePort(reqCtx *RequestContext,
 	}
 	listener.Protocol = proto
 
+	if reqCtx.Anno.Get(PortVGroup) != "" {
+		vGroupId, err := vgroup(reqCtx.Anno.Get(PortVGroup), port)
+		if err != nil {
+			return listener, err
+		}
+		listener.VGroupId = vGroupId
+	}
+
 	if reqCtx.Anno.Get(Scheduler) != "" {
 		listener.Scheduler = reqCtx.Anno.Get(Scheduler)
 	}
@@ -441,7 +449,11 @@ func buildActionsForListeners(local *model.LoadBalancer, remote *model.LoadBalan
 		updateActions []UpdateAction
 		deleteActions []DeleteAction
 	)
+	// associate listener and vGroup
 	for i := range local.Listeners {
+		if local.Listeners[i].VGroupId != "" {
+			continue
+		}
 		if err := findVServerGroup(remote.VServerGroups, &local.Listeners[i]); err != nil {
 			return createActions, updateActions, deleteActions, fmt.Errorf("find vservergroup error: %s", err.Error())
 		}
@@ -479,21 +491,11 @@ func buildActionsForListeners(local *model.LoadBalancer, remote *model.LoadBalan
 		// Do not delete any listener that no longer managed by my service
 		// for safety. Only conflict case is taking care.
 		if !found {
-			if local.LoadBalancerAttribute.IsUserManaged &&
-				!isManagedByMyService(local, rlis) {
+			if !isPortManagedByMyService(local, rlis) {
 				klog.Infof("port [%d] not managed by my service [%s], skip processing.", rlis.ListenerPort, rlis.NamedKey)
 				continue
 			}
 
-			//// port has user managed nodes, do not delete
-			//hasUserNode, err := remote.listenerHasUserManagedNode(Ctx)
-			//if err != nil {
-			//	return nil, fmt.Errorf("check if listener has user managed node, error: %s", err.Error())
-			//}
-			//if hasUserNode {
-			//	utils.Logf(svc, "svc %s do not delete port %d, because backends have user managed nodes", remote.NamedKey.Key(), remote.Port)
-			//	continue
-			//}
 			deleteActions = append(deleteActions, DeleteAction{
 				lbId:     remote.LoadBalancerAttribute.LoadBalancerId,
 				listener: rlis,
@@ -555,6 +557,23 @@ func protocol(annotation string, port v1.ServicePort) (string, error) {
 		}
 	}
 	return strings.ToLower(string(port.Protocol)), nil
+}
+
+// vgroup find the vGroup id associated with the specific ServicePort
+func vgroup(annotation string, port v1.ServicePort) (string, error) {
+	klog.Infof("vgroup anno: %s", annotation)
+	for _, v := range strings.Split(annotation, ",") {
+		pp := strings.Split(v, ":")
+		if len(pp) < 2 {
+			return "", fmt.Errorf("vgroupid and "+
+				"protocol format must be like '443:vsp-xxx' with colon separated. got=[%+v]", pp)
+		}
+
+		if pp[0] == fmt.Sprintf("%d", port.Port) {
+			return pp[1], nil
+		}
+	}
+	return "", nil
 }
 
 func getVGroupNamedKey(svc *v1.Service, servicePort v1.ServicePort) *model.VGroupNamedKey {
@@ -701,7 +720,7 @@ func findVServerGroup(vgs []model.VServerGroup, port *model.ListenerAttribute) e
 
 // ==========================================================================================
 
-func isManagedByMyService(local *model.LoadBalancer, n model.ListenerAttribute) bool {
+func isPortManagedByMyService(local *model.LoadBalancer, n model.ListenerAttribute) bool {
 	return n.NamedKey.ServiceName == local.NamespacedName.Name &&
 		n.NamedKey.Namespace == local.NamespacedName.Namespace &&
 		n.NamedKey.CID == alibaba.CLUSTER_ID

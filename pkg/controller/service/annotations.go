@@ -73,11 +73,13 @@ const (
 	PersistenceTimeout        = AnnotationLoadBalancerPrefix + "persistence-timeout"          // PersistenceTimeout persistence timeout
 	ConnectionDrain           = AnnotationLoadBalancerPrefix + "connection-drain"             // ConnectionDrain connection drain
 	ConnectionDrainTimeout    = AnnotationLoadBalancerPrefix + "connection-drain-timeout"     // ConnectionDrainTimeout connection drain timeout
+	PortVGroup                = AnnotationLoadBalancerPrefix + "port-vgroup"                  // VGroupIDs binding user managed vGroup ids to ports
 
 	// VServerBackend Attribute
 	BackendLabel      = AnnotationLoadBalancerPrefix + "backend-label"              // BackendLabel backend labels
 	BackendType       = "service.beta.kubernetes.io/backend-type"                   // BackendType backend type
 	RemoveUnscheduled = AnnotationLoadBalancerPrefix + "remove-unscheduled-backend" // RemoveUnscheduled remove unscheduled node from backends
+	VGroupWeight      = AnnotationLoadBalancerPrefix + "vgroup-weight"              // VGroupWeight total weight of a vGroup
 )
 
 const (
@@ -147,8 +149,8 @@ func (n *AnnotationRequest) GetDefaultValue(k string) string {
 	return DefaultValue[composite(AnnotationPrefix, k)]
 }
 
-func (n *AnnotationRequest) GetDefaultTags() []slb.Tag {
-	return []slb.Tag{
+func (n *AnnotationRequest) GetDefaultTags() []model.Tag {
+	return []model.Tag{
 		{
 			TagKey:   TAGKEY,
 			TagValue: n.GetDefaultLoadBalancerName(),

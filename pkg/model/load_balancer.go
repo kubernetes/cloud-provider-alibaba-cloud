@@ -2,7 +2,6 @@ package model
 
 import (
 	"fmt"
-	"github.com/aliyun/alibaba-cloud-sdk-go/services/slb"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"strconv"
@@ -86,7 +85,7 @@ type LoadBalancerAttribute struct {
 	MasterZoneId                 string
 	SlaveZoneId                  string
 	AddressIPVersion             AddressIPVersionType
-	Tags                         []slb.Tag
+	Tags                         []Tag
 
 	// parameters are immutable
 	RegionId                     string
@@ -153,9 +152,10 @@ type VServerGroup struct {
 	NamedKey      *VGroupNamedKey
 	ServicePort   v1.ServicePort
 
-	VGroupId   string
-	VGroupName string
-	Backends   []BackendAttribute
+	VGroupId     string
+	VGroupName   string
+	VGroupWeight int
+	Backends     []BackendAttribute
 }
 
 type BackendAttribute struct {
@@ -255,4 +255,9 @@ func LoadVGroupNamedKey(key string) (*VGroupNamedKey, error) {
 		ServiceName: metas[2],
 		VGroupPort:  metas[1],
 		Prefix:      DEFAULT_PREFIX}, nil
+}
+
+type Tag struct {
+	TagValue string
+	TagKey   string
 }

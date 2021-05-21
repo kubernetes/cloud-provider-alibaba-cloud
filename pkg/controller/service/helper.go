@@ -6,6 +6,7 @@ import (
 	ctx2 "k8s.io/cloud-provider-alibaba-cloud/pkg/context"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/model"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/util"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/util/hash"
 	"k8s.io/klog"
 	"os"
 	"reflect"
@@ -17,8 +18,8 @@ func isLocalModeService(svc *v1.Service) bool {
 }
 
 func isENIBackendType(svc *v1.Service) bool {
-	if svc.Annotations[BACKEND_TYPE_LABEL] != "" {
-		return svc.Annotations[BACKEND_TYPE_LABEL] == model.ENIBackendType
+	if svc.Annotations[BackendType] != "" {
+		return svc.Annotations[BackendType] == model.ENIBackendType
 	}
 
 	if os.Getenv("SERVICE_FORCE_BACKEND_ENI") != "" {
@@ -117,18 +118,20 @@ func Batch(m interface{}, cnt int, batch Func) error {
 	return batch(target)
 }
 
-type RecursiveFunc func(params ...interface{}) (string, error)
-
-// Recurse recursive query with func `func`
-// for general purpose
-func Recurse(f RecursiveFunc, nextToken string, params ...interface{}) error {
-	nextToken, err := f(params)
-	if err != nil {
-		return err
+func isServiceHashChanged(service *v1.Service) (bool, error) {
+	if oldHash, ok := service.Labels[LabelServiceHash]; ok {
+		newHash, err := getServiceHash(service)
+		if err != nil {
+			return true, err
+		}
+		if strings.Compare(newHash, oldHash) == 0 {
+			klog.Infof("service %s/%s hash label not changed, skip", service.Namespace, service.Name)
+			return false, nil
+		}
 	}
-	if nextToken == "" {
-		return nil
-	}
+	return true, nil
+}
 
-	return Recurse(f, nextToken, params)
+func getServiceHash(service *v1.Service) (string, error) {
+	return hash.HashObjects([]interface{}{service.Spec, service.Annotations})
 }

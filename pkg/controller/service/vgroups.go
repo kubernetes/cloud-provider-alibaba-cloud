@@ -7,9 +7,11 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/model"
 	prvd "k8s.io/cloud-provider-alibaba-cloud/pkg/provider"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/util"
 	"k8s.io/klog"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"strconv"
 	"strings"
 )
 
@@ -185,10 +187,9 @@ func diff(remote, local model.VServerGroup) (
 	)
 
 	for _, r := range remote.Backends {
-		//// skip nodes which does not belong to the cluster
-		//if isUserManagedNode(api.Description, v.NamedKey.Key()) {
-		//	continue
-		//}
+		if !isBackendManagedByMyService(r, local) {
+			continue
+		}
 		found := false
 		for _, l := range local.Backends {
 			if l.Type == "eni" {
@@ -232,9 +233,9 @@ func diff(remote, local model.VServerGroup) (
 	}
 	for _, l := range local.Backends {
 		for _, r := range remote.Backends {
-			//if isUserManagedNode(api.Description, v.NamedKey.Key()) {
-			//	continue
-			//}
+			if !isBackendManagedByMyService(r, local) {
+				continue
+			}
 			if l.Type == "eni" {
 				if l.ServerId == r.ServerId &&
 					l.ServerIp == r.ServerIp &&
@@ -252,6 +253,20 @@ func diff(remote, local model.VServerGroup) (
 		}
 	}
 	return addition, deletions, updates
+}
+
+func isBackendManagedByMyService(remoteBackend model.BackendAttribute, local model.VServerGroup) bool {
+	return remoteBackend.Description == local.VGroupName
+}
+
+func isVGroupManagedByMyService(remote model.VServerGroup, service *v1.Service) bool {
+	if remote.IsUserManaged || remote.NamedKey == nil {
+		return false
+	}
+
+	return remote.NamedKey.ServiceName == service.Name &&
+		remote.NamedKey.Namespace == service.Namespace &&
+		remote.NamedKey.CID == alibaba.CLUSTER_ID
 }
 
 func getNodes(ctx context.Context, client client.Client, anno *AnnotationRequest) ([]v1.Node, error) {
@@ -362,6 +377,26 @@ func (mgr *VGroupManager) buildVGroupForServicePort(reqCtx *RequestContext, port
 		ServicePort: port,
 	}
 	vg.VGroupName = vg.NamedKey.Key()
+
+	if reqCtx.Anno.Get(PortVGroup) != "" {
+		vgroupId, err := vgroup(reqCtx.Anno.Get(PortVGroup), port)
+		if err != nil {
+			reqCtx.Log.Warningf("vgroupid parse error: %s", err.Error())
+		}
+		if vgroupId != "" {
+			klog.Infof("vgroupId %s, port %d", vgroupId, port.Port)
+			vg.VGroupId = vgroupId
+			vg.IsUserManaged = true
+		}
+	}
+
+	if reqCtx.Anno.Get(VGroupWeight) != "" {
+		w, err := strconv.Atoi(reqCtx.Anno.Get(VGroupWeight))
+		if err != nil {
+			reqCtx.Log.Warningf("weight must be integer, got [%s], error: %s", reqCtx.Anno.Get(VGroupWeight), err.Error())
+		}
+		vg.VGroupWeight = w
+	}
 	// build backends
 	var (
 		backends []model.BackendAttribute
@@ -433,11 +468,7 @@ func (mgr *VGroupManager) buildENIBackends(reqCtx *RequestContext, candidates *E
 		return backends, err
 	}
 
-	// set weight
-	for i := range backends {
-		backends[i].Weight = DEFAULT_SERVER_WEIGHT
-	}
-	return backends, nil
+	return setWeightBackends(ENITrafficPolicy, backends, vgroup.VGroupWeight), nil
 }
 
 func (mgr *VGroupManager) buildLocalBackends(reqCtx *RequestContext, candidates *EndpointWithENI, vgroup model.VServerGroup) ([]model.BackendAttribute, error) {
@@ -500,21 +531,10 @@ func (mgr *VGroupManager) buildLocalBackends(reqCtx *RequestContext, candidates 
 	backends := append(ecsBackends, eciBackends...)
 
 	// 3. set weight
-	backends = setWeightForLocalBackends(backends)
+	backends = setWeightBackends(LocalTrafficPolicy, backends, vgroup.VGroupWeight)
 
 	// 4. remove duplicated ecs
 	return remoteDuplicatedECS(backends), nil
-}
-
-func setWeightForLocalBackends(backends []model.BackendAttribute) []model.BackendAttribute {
-	ecsPods := make(map[string]int)
-	for _, b := range backends {
-		ecsPods[b.ServerId] += 1
-	}
-	for i := range backends {
-		backends[i].Weight = ecsPods[backends[i].ServerId]
-	}
-	return backends
 }
 
 func remoteDuplicatedECS(backends []model.BackendAttribute) []model.BackendAttribute {
@@ -594,12 +614,7 @@ func (mgr *VGroupManager) buildClusterBackends(reqCtx *RequestContext, candidate
 
 	backends := append(ecsBackends, eciBackends...)
 
-	// 3. set weight
-	for i := range backends {
-		backends[i].Weight = DEFAULT_SERVER_WEIGHT
-	}
-
-	return backends, nil
+	return setWeightBackends(ENITrafficPolicy, backends, vgroup.VGroupWeight), nil
 }
 
 func updateENIBackends(mgr *VGroupManager, backends []model.BackendAttribute) ([]model.BackendAttribute, error) {
@@ -645,4 +660,75 @@ func updateENIBackends(mgr *VGroupManager, backends []model.BackendAttribute) ([
 		backends[i].Type = model.ENIBackendType
 	}
 	return backends, nil
+}
+
+func setWeightBackends(mode TrafficPolicy, backends []model.BackendAttribute, weight int) []model.BackendAttribute {
+	// use default
+	if weight == 0 {
+		return podNumberAlgorithm(mode, backends)
+	}
+
+	return podPercentAlgorithm(mode, backends, weight)
+
+}
+
+// weight algorithm
+// podNumberAlgorithm (default algorithm)
+/*
+	Calculate node weight by pod.
+	ClusterMode:  nodeWeight = 1
+	ENIMode:      podWeight = 1
+	LocalMode:    node_weight = nodePodNum
+*/
+func podNumberAlgorithm(mode TrafficPolicy, backends []model.BackendAttribute) []model.BackendAttribute {
+	if mode == ENITrafficPolicy || mode == ClusterTrafficPolicy {
+		for i := range backends {
+			backends[i].Weight = 1
+		}
+		return backends
+	}
+
+	// LocalTrafficPolicy
+	ecsPods := make(map[string]int)
+	for _, b := range backends {
+		ecsPods[b.ServerId] += 1
+	}
+	for i := range backends {
+		backends[i].Weight = ecsPods[backends[i].ServerId]
+	}
+	return backends
+}
+
+// podPercentAlgorithm
+/*
+	Calculate node weight by percent.
+	ClusterMode:  node_weight = weightSum/nodesNum
+	ENIMode:      pod_weight = weightSum/podsNum
+	LocalMode:    node_weight = node_pod_num/pods_num *weightSum
+*/
+func podPercentAlgorithm(mode TrafficPolicy, backends []model.BackendAttribute, weight int) []model.BackendAttribute {
+	if mode == ENITrafficPolicy || mode == ClusterTrafficPolicy {
+		per := weight / len(backends)
+		if weight < 1 {
+			weight = 1
+		}
+
+		for i := range backends {
+			backends[i].Weight = per
+		}
+		return backends
+	}
+
+	// LocalTrafficPolicy
+	ecsPods := make(map[string]int)
+	for _, b := range backends {
+		ecsPods[b.ServerId] += 1
+	}
+	for i := range backends {
+		backends[i].Weight = weight * ecsPods[backends[i].ServerId] / len(backends)
+		if backends[i].Weight < 1 {
+			backends[i].Weight = 1
+		}
+	}
+	return backends
 }

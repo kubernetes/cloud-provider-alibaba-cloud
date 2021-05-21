@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"github.com/aliyun/alibaba-cloud-sdk-go/services/slb"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/model"
-	"k8s.io/klog"
 )
 
 func (p ProviderSLB) DescribeVServerGroups(ctx context.Context, lbId string) ([]model.VServerGroup, error) {
@@ -24,10 +23,8 @@ func (p ProviderSLB) DescribeVServerGroups(ctx context.Context, lbId string) ([]
 
 		namedKey, err := model.LoadVGroupNamedKey(vg.VGroupName)
 		if err != nil {
-			klog.Warningf("we just en-counted an "+
-				"unexpected vserver group name: [%s]. Assume user managed "+
-				"vserver group, It is ok to skip this vgroup.", vg.VGroupName)
-			continue
+			// add to vgs, for reusing vGroupId
+			vg.IsUserManaged = true
 		}
 		vg.NamedKey = namedKey
 		vgs = append(vgs, vg)

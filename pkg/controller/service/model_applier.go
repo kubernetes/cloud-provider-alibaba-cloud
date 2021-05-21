@@ -3,7 +3,6 @@ package service
 import (
 	"fmt"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/model"
-	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba"
 	"k8s.io/klog"
 	"sort"
 )
@@ -23,21 +22,29 @@ type ModelApplier struct {
 }
 
 func (m *ModelApplier) Apply(reqCtx *RequestContext, local *model.LoadBalancer, remote *model.LoadBalancer) error {
-
-	if err := m.applyLoadBalancerAttribute(reqCtx, local, remote); err != nil {
-		return fmt.Errorf("update lb attribute error: %s", err.Error())
+	serviceHashChanged, err := isServiceHashChanged(reqCtx.Service)
+	if err != nil {
+		return fmt.Errorf("compute svc hash error :%s", err.Error())
 	}
-	// if remote slb is not exist, return
-	if remote.LoadBalancerAttribute.LoadBalancerId == "" {
-		return nil
+	// apply sequence can not change
+	if serviceHashChanged {
+		if err := m.applyLoadBalancerAttribute(reqCtx, local, remote); err != nil {
+			return fmt.Errorf("update lb attribute error: %s", err.Error())
+		}
+		// if remote slb is not exist, return
+		if remote.LoadBalancerAttribute.LoadBalancerId == "" {
+			return nil
+		}
 	}
 
 	if err := m.applyVGroups(reqCtx, local, remote); err != nil {
 		return fmt.Errorf("update lb backends error: %s", err.Error())
 	}
 
-	if err := m.applyListeners(reqCtx, local, remote); err != nil {
-		return fmt.Errorf("update lb listeners error: %s", err.Error())
+	if serviceHashChanged {
+		if err := m.applyListeners(reqCtx, local, remote); err != nil {
+			return fmt.Errorf("update lb listeners error: %s", err.Error())
+		}
 	}
 
 	if err := m.cleanup(reqCtx, local, remote); err != nil {
@@ -91,19 +98,35 @@ func (m *ModelApplier) applyLoadBalancerAttribute(reqCtx *RequestContext, local 
 }
 
 func (m *ModelApplier) applyVGroups(reqCtx *RequestContext, local *model.LoadBalancer, remote *model.LoadBalancer) error {
+	// TODO update local model vgroup id
 	for i := range local.VServerGroups {
 		found := false
-		for j := range remote.VServerGroups {
-			if local.VServerGroups[i].VGroupName == remote.VServerGroups[j].VGroupName {
+		var old model.VServerGroup
+		for _, rv := range remote.VServerGroups {
+			// find by vgroup id first
+			if local.VServerGroups[i].VGroupId != "" &&
+				local.VServerGroups[i].VGroupId == rv.VGroupId {
 				found = true
-				local.VServerGroups[i].VGroupId = remote.VServerGroups[j].VGroupId
-				if err := m.vGroupMgr.UpdateVServerGroup(reqCtx, local.VServerGroups[i], remote.VServerGroups[j]); err != nil {
-					return fmt.Errorf("EnsureVGroupUpdated error: %s", err.Error())
-				}
+				old = rv
+				break
+			}
+			// find by vgroup name
+			if local.VServerGroups[i].VGroupName == rv.VGroupName {
+				found = true
+				local.VServerGroups[i].VGroupId = rv.VGroupId
+				old = rv
+				break
 			}
 		}
 
-		// if not exist, create
+		// if found, update
+		if found {
+			if err := m.vGroupMgr.UpdateVServerGroup(reqCtx, local.VServerGroups[i], old); err != nil {
+				return fmt.Errorf("EnsureVGroupUpdated error: %s", err.Error())
+			}
+		}
+
+		// if not found, create
 		if !found {
 			err := m.vGroupMgr.CreateVServerGroup(reqCtx, &local.VServerGroups[i], remote.LoadBalancerAttribute.LoadBalancerId)
 			if err != nil {
@@ -181,10 +204,8 @@ func (m *ModelApplier) cleanup(reqCtx *RequestContext, local *model.LoadBalancer
 	// clean up vservergroup
 	vgs := remote.VServerGroups
 	for _, vg := range vgs {
-		if vg.NamedKey.ServiceName != local.NamespacedName.Name ||
-			vg.NamedKey.Namespace != local.NamespacedName.Namespace ||
-			vg.NamedKey.CID != alibaba.CLUSTER_ID {
-			// skip those which does not belong to this service
+		if !isVGroupManagedByMyService(vg, reqCtx.Service) {
+			klog.Infof("vgroup [%s] description [%s] is managed by user, skip delete", vg.VGroupName, vg.VGroupId)
 			continue
 		}
 		found := false

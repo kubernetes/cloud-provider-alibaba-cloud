@@ -30,7 +30,13 @@ func (mgr *LoadBalancerManager) Find(reqCtx *RequestContext, mdl *model.LoadBala
 	mdl.LoadBalancerAttribute.LoadBalancerName = reqCtx.Anno.GetDefaultLoadBalancerName()
 
 	// 3. set default loadbalancer tag
-	mdl.LoadBalancerAttribute.Tags = reqCtx.Anno.GetDefaultTags()
+	// filter tags using logic operator OR, so only TAGKEY tag can be added
+	mdl.LoadBalancerAttribute.Tags = []model.Tag{
+		{
+			TagKey:   TAGKEY,
+			TagValue: reqCtx.Anno.GetDefaultLoadBalancerName(),
+		},
+	}
 	return mgr.cloud.FindLoadBalancer(reqCtx.Ctx, mdl)
 }
 

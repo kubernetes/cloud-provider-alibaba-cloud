@@ -171,6 +171,10 @@ func (m *ReconcileService) cleanupLoadBalancerResources(req *RequestContext) err
 			return err
 		}
 
+		if err := m.removeServiceHash(req.Service); err != nil {
+			return err
+		}
+
 		if err := m.finalizerManager.RemoveFinalizers(req.Ctx, req.Service, serviceFinalizer); err != nil {
 			m.record.Eventf(req.Service, v1.EventTypeWarning, helper.ServiceEventReasonFailedRemoveFinalizer, fmt.Sprintf("Failed remove finalizer due to %v", err))
 			return err
@@ -189,6 +193,10 @@ func (m *ReconcileService) reconcileLoadBalancerResources(req *RequestContext) e
 	lb, err := m.buildAndApplyModel(req)
 	if err != nil {
 		m.record.Event(req.Service, v1.EventTypeWarning, helper.ServiceEventReasonFailedReconciled, fmt.Sprintf("Failed reconcile due to %s", err.Error()))
+		return err
+	}
+
+	if err := m.addServiceHash(req.Service); err != nil {
 		return err
 	}
 
@@ -237,4 +245,32 @@ func (m *ReconcileService) updateServiceStatus(ctx context.Context, svc *v1.Serv
 	}
 	return nil
 
+}
+
+func (m *ReconcileService) addServiceHash(svc *v1.Service) error {
+	updated := svc.DeepCopy()
+	if updated.Labels == nil {
+		updated.Labels = make(map[string]string)
+	}
+	serviceHash, err := getServiceHash(svc)
+	if err != nil {
+		return fmt.Errorf("compute service hash: %s", err.Error())
+	}
+	updated.Labels[LabelServiceHash] = serviceHash
+
+	if err := m.kubeClient.Status().Patch(context.Background(), updated, client.MergeFrom(svc)); err != nil {
+		return fmt.Errorf("%s failed to add service hash:, error: %s", util.Key(svc), err.Error())
+	}
+	return nil
+}
+
+func (m *ReconcileService) removeServiceHash(svc *v1.Service) error {
+	updated := svc.DeepCopy()
+	if _, ok := updated.Labels[LabelServiceHash]; ok {
+		delete(updated.Labels, LabelServiceHash)
+		if err := m.kubeClient.Status().Patch(context.Background(), updated, client.MergeFrom(svc)); err != nil {
+			return fmt.Errorf("%s failed to remove service hash:, error: %s", util.Key(svc), err.Error())
+		}
+	}
+	return nil
 }
