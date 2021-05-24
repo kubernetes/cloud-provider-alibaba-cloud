@@ -31,6 +31,7 @@ type Flags struct {
 	LogLevel           string
 	CloudConfig        string
 	EnableLeaderSelect bool
+	EnableControllers []string
 }
 
 var GlobalFlag = &Flags{}
