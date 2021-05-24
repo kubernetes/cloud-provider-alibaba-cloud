@@ -3,17 +3,17 @@ package vmock
 import (
 	"context"
 	prvd "k8s.io/cloud-provider-alibaba-cloud/pkg/provider"
-	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/auth"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba"
 )
 
 func NewPVTZProvider(
-	auth *auth.ClientAuth,
+	auth *alibaba.ClientAuth,
 ) *MockPVTZ {
 	return &MockPVTZ{auth: auth}
 }
 
 type MockPVTZ struct {
-	auth *auth.ClientAuth
+	auth *alibaba.ClientAuth
 }
 
 func (p *MockPVTZ) ListPVTZ(ctx context.Context) ([]*prvd.PvtzEndpoint, error) {

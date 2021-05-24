@@ -5,7 +5,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/context/node"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider"
-	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/auth"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba"
 )
 
 /*
@@ -13,13 +13,13 @@ import (
 	"alibaba:DeleteInstance", "alibaba:RunCommand",
 */
 func NewMockECS(
-	auth *auth.ClientAuth,
+	auth *alibaba.ClientAuth,
 ) *MockECS {
 	return &MockECS{auth: auth}
 }
 
 type MockECS struct {
-	auth *auth.ClientAuth
+	auth *alibaba.ClientAuth
 }
 
 var _ prvd.Instance = &MockECS{}
@@ -44,4 +44,8 @@ func (d *MockECS) RunCommand(ctx *node.NodeContext, cmd string) (*ecs.Invocation
 func (d *MockECS) ReplaceSystemDisk(ctx *node.NodeContext) error {
 	log.Infof("replace system disk done")
 	return nil
+}
+
+func (d *MockECS) DescribeNetworkInterfaces(vpcId string, ips *[]string, nextToken string) (*ecs.DescribeNetworkInterfacesResponse, error) {
+	return nil, nil
 }

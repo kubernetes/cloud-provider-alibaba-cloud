@@ -1,15 +1,15 @@
 package vmock
 
-import "k8s.io/cloud-provider-alibaba-cloud/pkg/provider/auth"
+import "k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba"
 
 func NewRouteProvider(
-	auth *auth.ClientAuth,
+	auth *alibaba.ClientAuth,
 ) *RouteProvider {
 	return &RouteProvider{auth: auth}
 }
 
 type RouteProvider struct {
-	auth *auth.ClientAuth
+	auth *alibaba.ClientAuth
 }
 
 func (*RouteProvider) CreateRoute() {

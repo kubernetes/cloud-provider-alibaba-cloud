@@ -3,13 +3,12 @@ package vmock
 import (
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba"
-	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/auth"
 )
 
-func NewMockCloud(auth *auth.ClientAuth) prvd.Provider {
+func NewMockCloud(auth *alibaba.ClientAuth) prvd.Provider {
 
 	return &MockCloud{
-		Auth:          auth,
+		IMetaData:     auth.Meta,
 		MockECS:       NewMockECS(auth),
 		MockCLB:       NewMockCLB(auth),
 		MockPVTZ:      NewPVTZProvider(auth),
@@ -25,5 +24,5 @@ type MockCloud struct {
 	*MockPVTZ
 	*RouteProvider
 	*MockCLB
-	Auth *auth.ClientAuth
+	prvd.IMetaData
 }
