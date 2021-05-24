@@ -271,7 +271,7 @@ var _ = ginkgo.Describe("Test CCM Annotation slb function", func() {
 		framework.ExpectNoError(err)
 		framework.Logf("Test Create a TCP type health check load balancing finished %v", dspec)
 	})
-	ginkgo.FIt("CCM-Service-IT-Annotation-SLB-0014", func() {
+	ginkgo.It("CCM-Service-IT-Annotation-SLB-0014", func() {
 		ginkgo.By("Create a HTTP type health check load balancing")
 		base := framework.NewBaseSVC(map[string]string{
 			req.Annotation(req.HealthCheckFlag):     "on",
@@ -341,7 +341,7 @@ var _ = ginkgo.Describe("Test CCM Annotation slb function", func() {
 		framework.ExpectNoError(err)
 		framework.Logf("Test Setting scheduling algorithm for load balancing-wrr finished %v", dspec)
 	})
-	ginkgo.It("CCM-Service-IT-Annotation-SLB-0017", func() {
+	ginkgo.FIt("CCM-Service-IT-Annotation-SLB-0017", func() {
 		ginkgo.By("Setting scheduling algorithm for load balancing-wlc")
 		base := framework.NewBaseSVC(map[string]string{
 			req.Annotation(req.Scheduler): "wlc",
@@ -362,7 +362,7 @@ var _ = ginkgo.Describe("Test CCM Annotation slb function", func() {
 		framework.ExpectNoError(err)
 		framework.Logf("Test Setting scheduling algorithm for load balancing-wlc finished %v", dspec)
 	})
-	ginkgo.It("CCM-Service-IT-Annotation-SLB-0018", func() {
+	ginkgo.FIt("CCM-Service-IT-Annotation-SLB-0018", func() {
 		ginkgo.By("Specifying virtual switches for load balancing")
 		base := framework.NewBaseSVC(map[string]string{
 			req.Annotation(req.AddressType): "intranet",

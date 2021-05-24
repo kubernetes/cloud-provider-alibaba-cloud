@@ -13,6 +13,15 @@ import (
 	"time"
 )
 
+// Test results flag
+type result struct {
+	slbResult bool
+	listenResult bool
+	testResult bool
+}
+
+var test result
+
 func ExpectSLBExistAndEqual(m *framework.Expectation) (bool, error) {
 	lbMdl := &model.LoadBalancer{
 		NamespacedName: util.NamespacedName(m.Case.Service),
@@ -21,15 +30,21 @@ func ExpectSLBExistAndEqual(m *framework.Expectation) (bool, error) {
 
 	//init LoadBalancerMgr
 	err := m.E2E.ModelBuilder.LoadBalancerMgr.Find(m.Case.ReqCtx, lbMdl)
-
 	if err != nil {
 		// TODO if err, need retry
 		return false, framework.NewErrorRetry(err)
 	}
-	if lbMdl.LoadBalancerAttribute.LoadBalancerId == "" {
+
+	//-------------------
+	if lbMdl.LoadBalancerAttribute.LoadBalancerId == ""{
 		return false, framework.NewErrorRetry(err)
 	}
-	//-------------------
+	if lbMdl.LoadBalancerAttribute.LoadBalancerId != ""{
+		framework.Logf("start test LoadBalancerAttribute %+v",lbMdl.LoadBalancerAttribute)
+		slbResult,_ := SLBEqual(m, lbMdl.LoadBalancerAttribute)
+		test.slbResult = slbResult
+	}
+
 
 	// init listenMgr
 	err = m.E2E.ModelBuilder.ListenerMgr.BuildLocalModel(m.Case.ReqCtx, lbMdl)
@@ -54,7 +69,10 @@ func ExpectSLBExistAndEqual(m *framework.Expectation) (bool, error) {
 				return false, framework.NewErrorRetry(err)
 			} else if strings.ToLower(string(p.Protocol)) == v.Protocol || pro == v.Protocol && int(p.Port) == v.ListenerPort {
 				framework.Logf("Start testing configuration consistency: %+v", v)
-				return ListenerEqual(m, v)
+				listenResult,_ := ListenerEqual(m, v)
+				test.listenResult = listenResult
+
+
 			}else {
 				klog.Info("unknown err，please check!")
 				framework.Logf("p---%+v\n",p)
@@ -65,8 +83,11 @@ func ExpectSLBExistAndEqual(m *framework.Expectation) (bool, error) {
 		}
 
 	}
+	if test.slbResult && test.listenResult{
+		test.testResult = true
+	}
 
-	return SLBEqual(m, lbMdl.LoadBalancerAttribute)
+	return test.testResult,nil
 }
 func ListenerEqual(m *framework.Expectation, listen model.ListenerAttribute) (done bool, err error) {
 	if CertID := m.Case.ReqCtx.Anno.Get(req.CertID); CertID != "" {
@@ -84,6 +105,7 @@ func ListenerEqual(m *framework.Expectation, listen model.ListenerAttribute) (do
 			return false, framework.NewErrorRetry(err)
 		}
 	}
+
 	if HealthCheckType := m.Case.ReqCtx.Anno.Get(req.HealthCheckType); HealthCheckType != "" {
 		klog.Infof("expect listen.HealthCheckType  ok:%s", HealthCheckType)
 		if listen.HealthCheckType != HealthCheckType {
@@ -156,7 +178,6 @@ func ListenerEqual(m *framework.Expectation, listen model.ListenerAttribute) (do
 		}
 	}
 
-
 	return true, err
 }
 func SLBEqual(m *framework.Expectation, slb model.LoadBalancerAttribute) (done bool, err error) {
@@ -198,7 +219,7 @@ func SLBEqual(m *framework.Expectation, slb model.LoadBalancerAttribute) (done b
 	if VSwitchId := m.Case.ReqCtx.Anno.Get(req.VswitchId); VSwitchId != "" {
 		klog.Infof("expect VSwitchId  ok:", VSwitchId)
 		if string(slb.VSwitchId) != VSwitchId {
-			klog.Info("expected: waiting slb LoadBalancerName change: ", slb.VSwitchId)
+			klog.Info("expected: waiting slb VswitchId change: ", slb.VSwitchId)
 			return false, framework.NewErrorRetry(err)
 		}
 	}
