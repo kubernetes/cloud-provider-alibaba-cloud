@@ -15,7 +15,7 @@ var _ = ginkgo.Describe("Test CCM Annotation slb function", func() {
 	//defer f.CleanUp()
 
 	// uncomment if u want to run initialize at each iteration
-	//ginkgo.AfterSuite(f.AfterEach)
+	ginkgo.AfterSuite(f.AfterEach)
 	ginkgo.BeforeSuite(f.BeforeEach)
 
 	ginkgo.By("slb test start")
@@ -287,14 +287,14 @@ var _ = ginkgo.Describe("Test CCM Annotation slb function", func() {
 		dspec := &framework.TestUnit{
 			Service: base, Description: "Initializes an SVC of the specified type", ExpectOK: ExpectSLBExistAndEqual,
 		}
-		//del := &framework.TestUnit{
-		//	Service: base, Description: "Delete test svc", ExpectOK: EnsureDeleteSVC,
-		//}
+		del := &framework.TestUnit{
+			Service: base, Description: "Delete test svc", ExpectOK: EnsureDeleteSVC,
+		}
 
 		err := framework.RunActions(
 			f,
 			framework.NewDefaultAction(dspec),
-			//framework.NewDeleteAction(del),
+			framework.NewDeleteAction(del),
 		)
 		framework.ExpectNoError(err)
 		framework.Logf("Test Create a HTTP type health check load balancing finished %v\n", dspec)
