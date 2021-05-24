@@ -21,9 +21,7 @@ TestCase:
     - testname: "Using existing load balancing - overlay listening"
       casenumber: CCM-Service-IT-Annotation-SLB-007
       description: ""
-    - testname: "Temporarily add additional tags with existing load balancing"
-      casenumber: CCM-Service-IT-Annotation-SLB-008
-      description: "Expect：failed"
+
     - testname: "When creating load balancing, specify the active and standby zones"
       casenumber: CCM-Service-IT-Annotation-SLB-009
       description: ""
@@ -33,9 +31,7 @@ TestCase:
     - testname: "Create a load balance for pay by traffic public network type load balancing instance"
       casenumber: CCM-Service-IT-Annotation-SLB-0011
       description: ""
-    - testname: "Create a pay per bandwidth load balancing private network type load balancing instance"
-      casenumber: CCM-Service-IT-Annotation-SLB-0012
-      description: "Expect: failed"
+
     - testname: "Create a TCP type health check load balancing"
       casenumber: CCM-Service-IT-Annotation-SLB-0013
       description: ""
