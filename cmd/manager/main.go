@@ -5,13 +5,14 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"k8s.io/cloud-provider-alibaba-cloud/pkg/apis"
-	"k8s.io/cloud-provider-alibaba-cloud/pkg/context/shared"
-	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba"
 	"net/http"
 	"os"
 	"runtime"
 	"time"
+
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/apis"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/context/shared"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba"
 
 	"github.com/operator-framework/operator-sdk/pkg/k8sutil"
 	"github.com/operator-framework/operator-sdk/pkg/leader"
@@ -73,6 +74,12 @@ func main() {
 		true,
 		"enable leader select or not",
 	)
+	pflag.CommandLine.StringSliceVar(
+		&ctx2.GlobalFlag.EnableControllers,
+		"enable-controllers",
+		[]string{},
+		"controllers to enable, e.g., node, route, service, ingress, pvtz, default ['node','route','service']",
+		)
 	// Add flags registered by imported packages (e.g. glog and
 	// controller-runtime)
 	pflag.CommandLine.AddGoFlagSet(flag.CommandLine)
@@ -151,9 +158,11 @@ func main() {
 
 	ctx := shared.NewSharedContext(alibaba.NewAlibabaCloud())
 	// Setup all Controllers
-	if err := controller.AddToManager(mgr, ctx); err != nil {
+	if err := controller.AddToManager(mgr, ctx, ctx2.GlobalFlag.EnableControllers); err != nil {
 		log.Errorf("add controller: %s", err.Error())
 		os.Exit(1)
+	} else {
+		log.Infof("Loaded controllers: %s\n", ctx2.GlobalFlag.EnableControllers)
 	}
 
 	// Add the Metrics Service
