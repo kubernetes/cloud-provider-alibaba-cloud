@@ -11,7 +11,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	util_errors "k8s.io/apimachinery/pkg/util/errors"
 	ctx2 "k8s.io/cloud-provider-alibaba-cloud/pkg/context"
-	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/model"
 )
 
 const (
@@ -31,11 +31,11 @@ func NewPVTZProvider(auth *ClientAuth) *PVTZProvider {
 		zoneId: ctx2.CFG.Global.PrivateZoneID,
 	}
 }
-func (p *PVTZProvider) ListPVTZ(ctx context.Context) ([]*prvd.PvtzEndpoint, error) {
-	return p.SearchPVTZ(ctx, &prvd.PvtzEndpoint{}, false)
+func (p *PVTZProvider) ListPVTZ(ctx context.Context) ([]*model.PvtzEndpoint, error) {
+	return p.SearchPVTZ(ctx, &model.PvtzEndpoint{}, false)
 }
 
-func (p *PVTZProvider) SearchPVTZ(ctx context.Context, ep *prvd.PvtzEndpoint, exact bool) ([]*prvd.PvtzEndpoint, error) {
+func (p *PVTZProvider) SearchPVTZ(ctx context.Context, ep *model.PvtzEndpoint, exact bool) ([]*model.PvtzEndpoint, error) {
 	req := pvtz.CreateDescribeZoneRecordsRequest()
 	req.ZoneId = p.zoneId
 	req.PageSize = requests.NewInteger(DescribeZoneRecordPageSize)
@@ -71,16 +71,16 @@ func (p *PVTZProvider) SearchPVTZ(ctx context.Context, ep *prvd.PvtzEndpoint, ex
 		}
 	}
 	// transform raw zone records into endpoints
-	typedEndpointsMap := make(map[string]map[string]*prvd.PvtzEndpoint)
+	typedEndpointsMap := make(map[string]map[string]*model.PvtzEndpoint)
 	for _, record := range records {
 		if endpointsMap := typedEndpointsMap[record.Type]; endpointsMap == nil {
-			typedEndpointsMap[record.Type] = make(map[string]*prvd.PvtzEndpoint)
+			typedEndpointsMap[record.Type] = make(map[string]*model.PvtzEndpoint)
 		}
 
 		if rrMap := typedEndpointsMap[record.Type][record.Rr]; rrMap == nil {
-			typedEndpointsMap[record.Type][record.Rr] = &prvd.PvtzEndpoint{
+			typedEndpointsMap[record.Type][record.Rr] = &model.PvtzEndpoint{
 				Rr: record.Rr,
-				Values: []prvd.PvtzValue{{
+				Values: []model.PvtzValue{{
 					Data:     record.Value,
 					RecordId: record.RecordId,
 				}},
@@ -88,13 +88,13 @@ func (p *PVTZProvider) SearchPVTZ(ctx context.Context, ep *prvd.PvtzEndpoint, ex
 				Type: record.Type,
 			}
 		} else {
-			typedEndpointsMap[record.Type][record.Rr].Values = append(typedEndpointsMap[record.Type][record.Rr].Values, prvd.PvtzValue{
+			typedEndpointsMap[record.Type][record.Rr].Values = append(typedEndpointsMap[record.Type][record.Rr].Values, model.PvtzValue{
 				Data:     record.Value,
 				RecordId: record.RecordId,
 			})
 		}
 	}
-	totalEndpoints := make([]*prvd.PvtzEndpoint, 0)
+	totalEndpoints := make([]*model.PvtzEndpoint, 0)
 	for _, endpointsMap := range typedEndpointsMap {
 		for _, endpoint := range endpointsMap {
 			totalEndpoints = append(totalEndpoints, endpoint)
@@ -103,10 +103,10 @@ func (p *PVTZProvider) SearchPVTZ(ctx context.Context, ep *prvd.PvtzEndpoint, ex
 	return totalEndpoints, nil
 }
 
-func (p *PVTZProvider) UpdatePVTZ(ctx context.Context, ep *prvd.PvtzEndpoint) error {
+func (p *PVTZProvider) UpdatePVTZ(ctx context.Context, ep *model.PvtzEndpoint) error {
 	rlog := log.WithFields(log.Fields{"endpointRr": ep.Rr, "endpointType": ep.Type})
 	newValues := ep.Values
-	oldValues := make([]prvd.PvtzValue, 0)
+	oldValues := make([]model.PvtzValue, 0)
 	err := p.record(context.TODO(), ep)
 	if err != nil {
 		return errors.Wrap(err, "UpdatePVTZ query old zone records error")
@@ -142,7 +142,7 @@ func (p *PVTZProvider) UpdatePVTZ(ctx context.Context, ep *prvd.PvtzEndpoint) er
 	return errors.Wrap(util_errors.NewAggregate(errs), "UpdatePVTZ update zone records error")
 }
 
-func (p *PVTZProvider) DeletePVTZ(ctx context.Context, ep *prvd.PvtzEndpoint) error {
+func (p *PVTZProvider) DeletePVTZ(ctx context.Context, ep *model.PvtzEndpoint) error {
 	err := p.record(context.TODO(), ep)
 	if err != nil {
 		return errors.Wrap(err, "DeletePVTZ query old zone records error")
@@ -167,14 +167,14 @@ func (p *PVTZProvider) filterUnmanagedDNSRecord(record pvtz.Record) bool {
 
 func (p *PVTZProvider) filterUnsupportedDNSRecordTypes(record pvtz.Record) bool {
 	switch record.Type {
-	case prvd.RecordTypeA, prvd.RecordTypeCNAME, prvd.RecordTypePTR, prvd.RecordTypeSRV, prvd.RecordTypeTXT:
+	case model.RecordTypeA, model.RecordTypeCNAME, model.RecordTypePTR, model.RecordTypeSRV, model.RecordTypeTXT:
 		return false
 	default:
 		return true
 	}
 }
 
-func (p *PVTZProvider) record(ctx context.Context, ep *prvd.PvtzEndpoint) error {
+func (p *PVTZProvider) record(ctx context.Context, ep *model.PvtzEndpoint) error {
 	if ep.Rr == "" {
 		return fmt.Errorf("endpoint %s %s not found", ep.Rr, ep.Type)
 	}
@@ -191,7 +191,7 @@ func (p *PVTZProvider) record(ctx context.Context, ep *prvd.PvtzEndpoint) error 
 		}
 	}
 	// not found, setting result ep to empty
-	ep.Values = []prvd.PvtzValue{}
+	ep.Values = []model.PvtzValue{}
 	return nil
 }
 

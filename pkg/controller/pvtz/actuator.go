@@ -14,6 +14,7 @@ import (
 	util_errors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	ctx2 "k8s.io/cloud-provider-alibaba-cloud/pkg/context"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/model"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -34,8 +35,8 @@ func NewActuator(c client.Client, p prvd.Provider) *Actuator {
 }
 
 func (a *Actuator) UpdateService(svc *corev1.Service) error {
-	eps := make([]*prvd.PvtzEndpoint, 0)
-	desiredFuncs := []func(svc *corev1.Service) ([]*prvd.PvtzEndpoint, error){
+	eps := make([]*model.PvtzEndpoint, 0)
+	desiredFuncs := []func(svc *corev1.Service) ([]*model.PvtzEndpoint, error){
 		a.desiredAandAAAA,
 		a.desiredSRV,
 		a.desiredCNAME,
@@ -63,9 +64,9 @@ func (a *Actuator) UpdateService(svc *corev1.Service) error {
 func (a *Actuator) DeleteService(svcName types.NamespacedName) error {
 	if eps, exist := a.cacheMap.Get(serviceRrByName(svcName)); exist {
 		errs := make([]error, 0)
-		remains := make([]*prvd.PvtzEndpoint, 0)
-		for _, ep := range eps.([]*prvd.PvtzEndpoint) {
-			err := a.provider.DeletePVTZ(context.TODO(), &prvd.PvtzEndpoint{
+		remains := make([]*model.PvtzEndpoint, 0)
+		for _, ep := range eps.([]*model.PvtzEndpoint) {
+			err := a.provider.DeletePVTZ(context.TODO(), &model.PvtzEndpoint{
 				Rr: ep.Rr,
 			})
 			if err != nil {
@@ -82,7 +83,7 @@ func (a *Actuator) DeleteService(svcName types.NamespacedName) error {
 		}
 		return errors.Wrap(util_errors.NewAggregate(errs), "DeleteService error")
 	} else {
-		ep := &prvd.PvtzEndpoint{
+		ep := &model.PvtzEndpoint{
 			Rr: serviceRrByName(svcName),
 		}
 		return a.provider.DeletePVTZ(context.TODO(), ep)
@@ -100,7 +101,7 @@ func (a *Actuator) getEndpoints(epName types.NamespacedName) (*corev1.Endpoints,
 
 // desiredEndpoints should applies to Kubernetes DNS Spec
 // https://github.com/kubernetes/dns/blob/master/docs/specification.md
-func (a *Actuator) desiredAandAAAA(svc *corev1.Service) ([]*prvd.PvtzEndpoint, error) {
+func (a *Actuator) desiredAandAAAA(svc *corev1.Service) ([]*model.PvtzEndpoint, error) {
 	var ipsV4 []string
 	var ipsV6 []string
 
@@ -164,15 +165,15 @@ func (a *Actuator) desiredAandAAAA(svc *corev1.Service) ([]*prvd.PvtzEndpoint, e
 			}
 		}
 	}
-	var eps []*prvd.PvtzEndpoint
+	var eps []*model.PvtzEndpoint
 
-	epTemplate := prvd.NewPvtzEndpointBuilder()
+	epTemplate := model.NewPvtzEndpointBuilder()
 	epTemplate.WithRr(serviceRr(svc))
 	epTemplate.WithTtl(ctx2.CFG.Global.PrivateZoneRecordTTL)
 
 	if len(ipsV4) != 0 {
 		epb := epTemplate.DeepCopy()
-		epb.WithType(prvd.RecordTypeA)
+		epb.WithType(model.RecordTypeA)
 		for _, ip := range ipsV4 {
 			epb.WithValueData(ip)
 		}
@@ -180,7 +181,7 @@ func (a *Actuator) desiredAandAAAA(svc *corev1.Service) ([]*prvd.PvtzEndpoint, e
 	}
 	if len(ipsV6) != 0 {
 		epb := epTemplate.DeepCopy()
-		epb.WithType(prvd.RecordTypeAAAA)
+		epb.WithType(model.RecordTypeAAAA)
 		for _, ip := range ipsV6 {
 			epb.WithValueData(ip)
 		}
@@ -189,17 +190,17 @@ func (a *Actuator) desiredAandAAAA(svc *corev1.Service) ([]*prvd.PvtzEndpoint, e
 	return eps, nil
 }
 
-func (a *Actuator) desiredSRV(svc *corev1.Service) ([]*prvd.PvtzEndpoint, error) {
+func (a *Actuator) desiredSRV(svc *corev1.Service) ([]*model.PvtzEndpoint, error) {
 	rawEps, err := a.getEndpoints(types.NamespacedName{Namespace: svc.Namespace, Name: svc.Name})
 	if err != nil {
 		return nil, fmt.Errorf("getting endpoints error: %s", err)
 	}
 	namedPortmap := NewNamedPortMap(rawEps)
 
-	eps := make([]*prvd.PvtzEndpoint, 0)
-	epTemplate := prvd.NewPvtzEndpointBuilder()
+	eps := make([]*model.PvtzEndpoint, 0)
+	epTemplate := model.NewPvtzEndpointBuilder()
 	epTemplate.WithTtl(ctx2.CFG.Global.PrivateZoneRecordTTL)
-	epTemplate.WithType(prvd.RecordTypeSRV)
+	epTemplate.WithType(model.RecordTypeSRV)
 	svcName := svc.Name
 	ns := svc.Namespace
 	for _, servicePort := range svc.Spec.Ports {
@@ -224,10 +225,10 @@ func (a *Actuator) desiredSRV(svc *corev1.Service) ([]*prvd.PvtzEndpoint, error)
 	return eps, nil
 }
 
-func (a *Actuator) desiredPTR(svc *corev1.Service) ([]*prvd.PvtzEndpoint, error) {
-	epb := prvd.NewPvtzEndpointBuilder()
+func (a *Actuator) desiredPTR(svc *corev1.Service) ([]*model.PvtzEndpoint, error) {
+	epb := model.NewPvtzEndpointBuilder()
 	epb.WithTtl(ctx2.CFG.Global.PrivateZoneRecordTTL)
-	epb.WithType(prvd.RecordTypePTR)
+	epb.WithType(model.RecordTypePTR)
 	epb.WithValueData(serviceRr(svc))
 	switch svc.Spec.Type {
 	case corev1.ServiceTypeLoadBalancer:
@@ -281,24 +282,24 @@ func (a *Actuator) desiredPTR(svc *corev1.Service) ([]*prvd.PvtzEndpoint, error)
 			}
 		}
 	}
-	eps := make([]*prvd.PvtzEndpoint, 0)
+	eps := make([]*model.PvtzEndpoint, 0)
 	if ep := epb.Build(); ep != nil {
 		eps = append(eps, ep)
 	}
 	return eps, nil
 }
 
-func (a *Actuator) desiredCNAME(svc *corev1.Service) ([]*prvd.PvtzEndpoint, error) {
-	epb := prvd.NewPvtzEndpointBuilder()
+func (a *Actuator) desiredCNAME(svc *corev1.Service) ([]*model.PvtzEndpoint, error) {
+	epb := model.NewPvtzEndpointBuilder()
 	epb.WithRr(serviceRr(svc))
 	epb.WithTtl(ctx2.CFG.Global.PrivateZoneRecordTTL)
-	epb.WithType(prvd.RecordTypeCNAME)
+	epb.WithType(model.RecordTypeCNAME)
 	if svc.Spec.Type == corev1.ServiceTypeExternalName {
 		if ip := net.ParseIP(svc.Spec.ExternalName); ip == nil {
 			epb.WithValueData(svc.Spec.ExternalName)
 		}
 	}
-	eps := make([]*prvd.PvtzEndpoint, 0)
+	eps := make([]*model.PvtzEndpoint, 0)
 	if ep := epb.Build(); ep != nil {
 		eps = append(eps, ep)
 	}

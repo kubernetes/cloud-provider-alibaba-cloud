@@ -22,6 +22,7 @@ require (
 	k8s.io/client-go v12.0.0+incompatible
 	k8s.io/cloud-provider v0.20.5
 	k8s.io/klog v1.0.0
+	k8s.io/klog/v2 v2.4.0
 	k8s.io/kubernetes v1.20.0
 	sigs.k8s.io/controller-runtime v0.8.3
 )

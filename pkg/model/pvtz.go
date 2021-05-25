@@ -1,7 +1,6 @@
-package prvd
+package model
 
 import (
-	"context"
 	"sort"
 	"strings"
 )
@@ -14,13 +13,6 @@ const (
 	RecordTypePTR   = "PTR"
 	RecordTypeSRV   = "SRV"
 )
-
-type PrivateZone interface {
-	ListPVTZ(ctx context.Context) ([]*PvtzEndpoint, error)
-	SearchPVTZ(ctx context.Context, ep *PvtzEndpoint, exact bool) ([]*PvtzEndpoint, error)
-	UpdatePVTZ(ctx context.Context, ep *PvtzEndpoint) error
-	DeletePVTZ(ctx context.Context, ep *PvtzEndpoint) error
-}
 
 type PvtzValue struct {
 	Data     string
