@@ -115,3 +115,10 @@ type ILoadBalancer interface {
 	SetVServerGroupAttribute(ctx context.Context, vGroupId string, backends string) error
 	ModifyVServerGroupBackendServers(ctx context.Context, vGroupId string, old string, new string) error
 }
+
+type PrivateZone interface {
+	ListPVTZ(ctx context.Context) ([]*model.PvtzEndpoint, error)
+	SearchPVTZ(ctx context.Context, ep *model.PvtzEndpoint, exact bool) ([]*model.PvtzEndpoint, error)
+	UpdatePVTZ(ctx context.Context, ep *model.PvtzEndpoint) error
+	DeletePVTZ(ctx context.Context, ep *model.PvtzEndpoint) error
+}
