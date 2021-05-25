@@ -67,6 +67,7 @@ func NewBaseSVC(anno map[string]string) *v1.Service {
 		Spec: v1.ServiceSpec{
 			Ports: []v1.ServicePort{
 				{
+
 					Port:       80,
 					TargetPort: intstr.FromInt(80),
 					Protocol:   v1.ProtocolTCP,
@@ -354,7 +355,7 @@ func NewRuntimeClient() client.Client {
 func RunNginxDeployment(
 	client kubernetes.Interface,
 ) error {
-	var replica int32 = 4
+	var replica int32 = 3
 	nginx := &v12.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "nginx",
@@ -419,4 +420,31 @@ func RunNginxDeployment(
 			return true, nil
 		},
 	)
+}
+func (f *FrameWorkE2E) EnsureDeleteSVC() {
+	destroy := func() (done bool, err error) {
+		result, err := f.Client.
+			CoreV1().
+			Namespaces().
+			Get(context.Background(), NameSpace, metav1.GetOptions{})
+		if err != nil && strings.Contains(err.Error(), "not found") {
+			Logf("[namespace] %s deleted ", NameSpace)
+			return true, nil
+		}
+		if err == nil {
+			if result.Status.Phase == "Terminating" {
+				Logf("[namespace] namespace still in [%s] state, %s", result.Status.Phase, time.Now())
+				return false, nil
+			}
+			err := f.Client.
+				CoreV1().
+				Namespaces().
+				Delete(context.Background(), NameSpace, metav1.DeleteOptions{})
+			Logf("delete namespace, try again from error %v", err)
+			return false, nil
+		}
+		Logf("delete namespace, poll error, namespace status unknown. %s", err.Error())
+		return false, nil
+	}
+	ExpectNoError(wait.PollImmediate(6*time.Second, 2*time.Minute, destroy))
 }
