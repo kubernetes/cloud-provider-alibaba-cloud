@@ -16,10 +16,10 @@ type DetailECS struct {
 
 type Provider interface {
 	IMetaData
-	Instance
-	Route
+	IInstance
+	IVPC
 	ILoadBalancer
-	PrivateZone
+	IPrivateZone
 }
 
 type RoleAuth struct {
@@ -65,17 +65,18 @@ type NodeAttribute struct {
 	Region       string
 }
 
-type Instance interface {
+type IInstance interface {
 	ListInstances(ctx *node.NodeContext, ids []string) (map[string]*NodeAttribute, error)
 	SetInstanceTags(ctx *node.NodeContext, id string, tags map[string]string) error
 	// DescribeNetworkInterfaces query one or more elastic network interfaces (ENIs)
 	DescribeNetworkInterfaces(vpcId string, ips *[]string, nextToken string) (*ecs.DescribeNetworkInterfacesResponse, error)
 }
 
-type Route interface {
+type IVPC interface {
 	CreateRoute()
 	DeleteRoute()
 	ListRoute()
+	DescribeEipAddresses(ctx context.Context, instanceType string, instanceId string) ([]string, error)
 }
 
 type ILoadBalancer interface {
@@ -116,7 +117,7 @@ type ILoadBalancer interface {
 	ModifyVServerGroupBackendServers(ctx context.Context, vGroupId string, old string, new string) error
 }
 
-type PrivateZone interface {
+type IPrivateZone interface {
 	ListPVTZ(ctx context.Context) ([]*model.PvtzEndpoint, error)
 	SearchPVTZ(ctx context.Context, ep *model.PvtzEndpoint, exact bool) ([]*model.PvtzEndpoint, error)
 	UpdatePVTZ(ctx context.Context, ep *model.PvtzEndpoint) error

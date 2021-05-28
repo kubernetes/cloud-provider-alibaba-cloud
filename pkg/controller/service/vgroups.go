@@ -1,10 +1,10 @@
 package service
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/helper"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/model"
 	prvd "k8s.io/cloud-provider-alibaba-cloud/pkg/provider"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba"
@@ -69,12 +69,12 @@ type VGroupManager struct {
 
 func (mgr *VGroupManager) BuildLocalModel(reqCtx *RequestContext, m *model.LoadBalancer) error {
 	var vgs []model.VServerGroup
-	nodes, err := getNodes(reqCtx.Ctx, mgr.kubeClient, reqCtx.Anno)
+	nodes, err := getNodes(reqCtx, mgr.kubeClient)
 	if err != nil {
 		return fmt.Errorf("get nodes error: %s", err.Error())
 	}
 
-	eps, err := getEndpoints(reqCtx.Ctx, mgr.kubeClient, reqCtx.Service)
+	eps, err := getEndpoints(reqCtx, mgr.kubeClient)
 	if err != nil {
 		return fmt.Errorf("get endpoints error: %s", err.Error())
 	}
@@ -269,17 +269,17 @@ func isVGroupManagedByMyService(remote model.VServerGroup, service *v1.Service) 
 		remote.NamedKey.CID == alibaba.CLUSTER_ID
 }
 
-func getNodes(ctx context.Context, client client.Client, anno *AnnotationRequest) ([]v1.Node, error) {
+func getNodes(reqCtx *RequestContext, client client.Client) ([]v1.Node, error) {
 	nodeList := v1.NodeList{}
-	err := client.List(ctx, &nodeList)
+	err := client.List(reqCtx.Ctx, &nodeList)
 	if err != nil {
 		return nil, fmt.Errorf("get nodes error: %s", err.Error())
 	}
 
 	// 1. filter by label
 	items := nodeList.Items
-	if anno.Get(BackendLabel) != "" {
-		items, err = filterOutByLabel(nodeList.Items, anno.Get(BackendLabel))
+	if reqCtx.Anno.Get(BackendLabel) != "" {
+		items, err = filterOutByLabel(nodeList.Items, reqCtx.Anno.Get(BackendLabel))
 		if err != nil {
 			return nil, fmt.Errorf("filter nodes by label error: %s", err.Error())
 		}
@@ -287,44 +287,9 @@ func getNodes(ctx context.Context, client client.Client, anno *AnnotationRequest
 
 	var nodes []v1.Node
 	for _, n := range items {
-		// 2. filter unscheduled node
-		if n.Spec.Unschedulable && anno.Get(RemoveUnscheduled) != "" {
-			if anno.Get(RemoveUnscheduled) == string(model.OnFlag) {
-				klog.Infof("ignore node %s with unschedulable condition", n.Name)
-				continue
-			}
-		}
-
-		// As of 1.6, we will taint the master, but not necessarily mark
-		// it unschedulable. Recognize nodes labeled as master, and filter
-		// them also, as we were doing previously.
-		if _, isMaster := n.Labels[LabelNodeRoleMaster]; isMaster {
+		if needExcludeFromLB(reqCtx, &n) {
 			continue
 		}
-
-		// ignore eci node condition check
-		if label, ok := n.Labels["type"]; ok && label == ECINodeLabel {
-			klog.Infof("ignoring eci node %v condition check", n.Name)
-			nodes = append(nodes, n)
-			continue
-		}
-
-		// If we have no info, don't accept
-		if len(n.Status.Conditions) == 0 {
-			continue
-		}
-
-		for _, cond := range n.Status.Conditions {
-			// We consider the node for load balancing only when its NodeReady
-			// condition status is ConditionTrue
-			if cond.Type == v1.NodeReady &&
-				cond.Status != v1.ConditionTrue {
-				klog.Infof("ignoring node %v with %v condition "+
-					"status %v", n.Name, cond.Type, cond.Status)
-				continue
-			}
-		}
-
 		nodes = append(nodes, n)
 	}
 
@@ -359,14 +324,63 @@ func filterOutByLabel(nodes []v1.Node, labels string) ([]v1.Node, error) {
 	return result, nil
 }
 
-func getEndpoints(ctx context.Context, client client.Client, svc *v1.Service) (*v1.Endpoints, error) {
+func needExcludeFromLB(reqCtx *RequestContext, node *v1.Node) bool {
+	if helper.HasExcludeLabel(node) {
+		klog.Infof("[%s] node %s has exclude label, skip adding it to lb", util.Key(reqCtx.Service), node.Name)
+		return true
+	}
+
+	// exclude node which has exclude balancer label
+	if _, exclude := node.Labels[LabelNodeExcludeBalancer]; exclude {
+		return true
+	}
+
+	if isMasterNode(node) {
+		klog.Infof("[%s] node %s is master node, skip adding it to lb", util.Key(reqCtx.Service), node.Name)
+		return true
+	}
+
+	// filter unscheduled node
+	if node.Spec.Unschedulable && reqCtx.Anno.Get(RemoveUnscheduled) != "" {
+		if reqCtx.Anno.Get(RemoveUnscheduled) == string(model.OnFlag) {
+			klog.Infof("[%s] node %s is unschedulable, skip adding to lb", util.Key(reqCtx.Service), node.Name)
+			return true
+		}
+	}
+
+	// ignore vk node condition check.
+	// Even if the vk node is NotReady, it still can be added to lb. Because the eci pod that actually joins the lb, not a vk node
+	if label, ok := node.Labels["type"]; ok && label == LabelNodeTypeVK {
+		return false
+	}
+
+	// If we have no info, don't accept
+	if len(node.Status.Conditions) == 0 {
+		return true
+	}
+
+	for _, cond := range node.Status.Conditions {
+		// We consider the node for load balancing only when its NodeReady
+		// condition status is ConditionTrue
+		if cond.Type == v1.NodeReady &&
+			cond.Status != v1.ConditionTrue {
+			klog.Infof("[%s] node %v with %v condition "+
+				"status %v", util.Key(reqCtx.Service), node.Name, cond.Type, cond.Status)
+			return true
+		}
+	}
+
+	return false
+}
+
+func getEndpoints(reqCtx *RequestContext, client client.Client) (*v1.Endpoints, error) {
 	eps := &v1.Endpoints{}
-	err := client.Get(ctx, util.NamespacedName(svc), eps)
+	err := client.Get(reqCtx.Ctx, util.NamespacedName(reqCtx.Service), eps)
 	if err != nil {
 		if !strings.Contains(err.Error(), "not found") {
-			return eps, fmt.Errorf("get endpoints %s from k8s error: %s", util.Key(svc), err.Error())
+			return eps, fmt.Errorf("get endpoints from k8s error: %s", err.Error())
 		}
-		klog.Warningf("endpoint not found: %s", util.Key(svc))
+		reqCtx.Log.Warningf("endpoint not found: %s")
 	}
 	return eps, nil
 }
@@ -381,22 +395,22 @@ func (mgr *VGroupManager) buildVGroupForServicePort(reqCtx *RequestContext, port
 	if reqCtx.Anno.Get(PortVGroup) != "" {
 		vgroupId, err := vgroup(reqCtx.Anno.Get(PortVGroup), port)
 		if err != nil {
-			reqCtx.Log.Warningf("vgroupid parse error: %s", err.Error())
+			return vg, fmt.Errorf("vgroupid parse error: %s", err.Error())
 		}
 		if vgroupId != "" {
-			klog.Infof("vgroupId %s, port %d", vgroupId, port.Port)
+			reqCtx.Log.Infof("user managed vgroupId %s for port %d", vgroupId, port.Port)
 			vg.VGroupId = vgroupId
 			vg.IsUserManaged = true
 		}
 	}
-
 	if reqCtx.Anno.Get(VGroupWeight) != "" {
 		w, err := strconv.Atoi(reqCtx.Anno.Get(VGroupWeight))
 		if err != nil {
-			reqCtx.Log.Warningf("weight must be integer, got [%s], error: %s", reqCtx.Anno.Get(VGroupWeight), err.Error())
+			return vg, fmt.Errorf("weight must be integer, got [%s], error: %s", reqCtx.Anno.Get(VGroupWeight), err.Error())
 		}
 		vg.VGroupWeight = w
 	}
+
 	// build backends
 	var (
 		backends []model.BackendAttribute
@@ -497,8 +511,8 @@ func (mgr *VGroupManager) buildLocalBackends(reqCtx *RequestContext, candidates 
 			continue
 		}
 
-		// check if the node is ECI
-		if node.Labels["type"] == ECINodeLabel {
+		// check if the node is VK
+		if node.Labels["type"] == LabelNodeTypeVK {
 			eciBackends = append(eciBackends, backend)
 			continue
 		}
@@ -578,7 +592,7 @@ func (mgr *VGroupManager) buildClusterBackends(reqCtx *RequestContext, candidate
 			ecsBackends,
 			model.BackendAttribute{
 				ServerId:    id,
-				Weight:      DEFAULT_SERVER_WEIGHT,
+				Weight:      DefaultServerWeight,
 				Port:        int(vgroup.ServicePort.NodePort),
 				Type:        model.ECSBackendType,
 				Description: vgroup.VGroupName,
@@ -598,8 +612,8 @@ func (mgr *VGroupManager) buildClusterBackends(reqCtx *RequestContext, candidate
 			continue
 		}
 
-		// check if the node is ECI
-		if node.Labels["type"] == ECINodeLabel {
+		// check if the node is VK
+		if node.Labels["type"] == LabelNodeTypeVK {
 			eciBackends = append(eciBackends, backend)
 			continue
 		}

@@ -79,7 +79,7 @@ func main() {
 		"enable-controllers",
 		[]string{},
 		"controllers to enable, e.g., node, route, service, ingress, pvtz, default ['node','route','service']",
-		)
+	)
 	// Add flags registered by imported packages (e.g. glog and
 	// controller-runtime)
 	pflag.CommandLine.AddGoFlagSet(flag.CommandLine)

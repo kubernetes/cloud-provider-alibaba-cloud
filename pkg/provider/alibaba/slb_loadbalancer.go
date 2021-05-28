@@ -216,6 +216,7 @@ func loadResponse(resp *slb.DescribeLoadBalancerAttributeResponse, lb *model.Loa
 	lb.LoadBalancerAttribute.LoadBalancerName = resp.LoadBalancerName
 	lb.LoadBalancerAttribute.Address = resp.Address
 	lb.LoadBalancerAttribute.AddressType = model.AddressType(resp.AddressType)
+	lb.LoadBalancerAttribute.AddressIPVersion = model.AddressIPVersionType(resp.AddressIPVersion)
 	lb.LoadBalancerAttribute.NetworkType = resp.NetworkType
 	lb.LoadBalancerAttribute.VpcId = resp.VpcId
 	lb.LoadBalancerAttribute.VSwitchId = resp.VSwitchId

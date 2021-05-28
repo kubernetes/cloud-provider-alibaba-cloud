@@ -18,11 +18,11 @@ func NewAlibabaCloud() prvd.Provider {
 		log.Warnf("refresh token: %s", err.Error())
 	}
 	return &AlibabaCloud{
-		IMetaData:     auth.Meta,
-		EcsProvider:   NewEcsProvider(auth),
-		ProviderSLB:   NewLBProvider(auth),
-		PVTZProvider:  NewPVTZProvider(auth),
-		RouteProvider: NewRouteProvider(auth),
+		IMetaData:    auth.Meta,
+		EcsProvider:  NewEcsProvider(auth),
+		ProviderSLB:  NewLBProvider(auth),
+		PVTZProvider: NewPVTZProvider(auth),
+		VPCProvider:  NewVPCProvider(auth),
 	}
 }
 
@@ -31,7 +31,7 @@ var _ prvd.Provider = AlibabaCloud{}
 type AlibabaCloud struct {
 	*EcsProvider
 	*PVTZProvider
-	*RouteProvider
+	*VPCProvider
 	*ProviderSLB
 	prvd.IMetaData
 }

@@ -65,7 +65,7 @@ func (m *ModelApplier) applyLoadBalancerAttribute(reqCtx *RequestContext, local 
 	}
 
 	// delete slb
-	if !isSLBNeeded(reqCtx.Service) {
+	if needDeleteLoadBalancer(reqCtx.Service) {
 		if !local.LoadBalancerAttribute.IsUserManaged {
 			err := m.slbMgr.Delete(reqCtx, remote)
 			if err != nil {

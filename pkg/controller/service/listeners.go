@@ -105,7 +105,6 @@ func (mgr *ListenerManager) BuildRemoteModel(reqCtx *RequestContext, mdl *model.
 	return nil
 }
 
-// private func
 func (mgr *ListenerManager) buildListenerFromServicePort(reqCtx *RequestContext, port v1.ServicePort) (model.ListenerAttribute, error) {
 	listener := model.ListenerAttribute{
 		NamedKey: &model.ListenerNamedKey{
@@ -599,7 +598,7 @@ func getVGroupNamedKey(svc *v1.Service, servicePort v1.ServicePort) *model.VGrou
 func setDefaultValueForListener(n *model.ListenerAttribute) {
 	if n.Protocol == model.TCP || n.Protocol == model.UDP || n.Protocol == model.HTTPS {
 		if n.Bandwidth == 0 {
-			n.Bandwidth = DEFAULT_LISTENER_BANDWIDTH
+			n.Bandwidth = DefaultListenerBandwidth
 		}
 	}
 

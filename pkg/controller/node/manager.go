@@ -20,8 +20,8 @@ import (
 	"fmt"
 	log "github.com/sirupsen/logrus"
 	nctx "k8s.io/cloud-provider-alibaba-cloud/pkg/context/node"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/helper"
 	prvd "k8s.io/cloud-provider-alibaba-cloud/pkg/provider"
-	"k8s.io/cloud-provider-alibaba-cloud/pkg/util"
 	"k8s.io/klog"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"time"
@@ -151,7 +151,7 @@ func nodeConditionReady(kclient client.Client, node *v1.Node) *v1.NodeCondition 
 }
 
 func findCloudECS(
-	ins prvd.Instance, prvdId string,
+	ins prvd.IInstance, prvdId string,
 ) (*prvd.NodeAttribute, error) {
 	nodes, err := ins.ListInstances(nctx.NewEmpty(), []string{prvdId})
 	if err != nil {
@@ -212,7 +212,7 @@ func setFields(node *v1.Node, ins *prvd.NodeAttribute, cfgRoute bool) {
 
 	modifiers = append(modifiers, removeCloudTaints)
 
-	if cfgRoute && !util.IsExcludedNode(node) {
+	if cfgRoute && !helper.HasExcludeLabel(node) {
 
 		modifiers = append(modifiers, setNetworkUnavailable)
 	}
@@ -280,7 +280,7 @@ func NodeList(kclient client.Client) (*v1.NodeList, error) {
 	}
 	var mnodes []v1.Node
 	for _, node := range nodes.Items {
-		if util.IsExcludedNode(&node) {
+		if helper.HasExcludeLabel(&node) {
 			continue
 		}
 		if node.Spec.ProviderID == "" {

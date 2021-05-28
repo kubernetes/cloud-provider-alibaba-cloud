@@ -82,22 +82,6 @@ const (
 	VGroupWeight      = AnnotationLoadBalancerPrefix + "vgroup-weight"              // VGroupWeight total weight of a vGroup
 )
 
-const (
-	// ServiceAnnotationPrivateZonePrefix private zone prefix
-	ServiceAnnotationPrivateZonePrefix = "private-zone-"
-	// ServiceAnnotationLoadBalancerPrivateZoneName private zone name
-	PrivateZoneName = ServiceAnnotationPrivateZonePrefix + "name"
-
-	// ServiceAnnotationLoadBalancerPrivateZoneId private zone id
-	PrivateZoneId = ServiceAnnotationPrivateZonePrefix + "id"
-
-	// ServiceAnnotationLoadBalancerPrivateZoneRecordName private zone record name
-	PrivateZoneRecordName = ServiceAnnotationPrivateZonePrefix + "record-name"
-
-	// ServiceAnnotationLoadBalancerPrivateZoneRecordTTL private zone record ttl
-	PrivateZoneRecordTTL = ServiceAnnotationPrivateZonePrefix + "record-ttl"
-)
-
 var DefaultValue = map[string]string{
 	composite(AnnotationPrefix, AddressType):            string(model.InternetAddressType),
 	composite(AnnotationPrefix, Spec):                   model.S1Small,
@@ -136,10 +120,6 @@ func (n *AnnotationRequest) Get(k string) string {
 	}
 
 	return ""
-}
-
-func (n *AnnotationRequest) GetRaw(k string) string {
-	return n.svc.Annotations[k]
 }
 
 func (n *AnnotationRequest) GetDefaultValue(k string) string {

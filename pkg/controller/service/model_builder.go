@@ -57,20 +57,20 @@ func (c localModel) Build(reqCtx *RequestContext) (*model.LoadBalancer, error) {
 		NamespacedName: util.NamespacedName(reqCtx.Service),
 	}
 	// if the service do not need loadbalancer any more, return directly.
-	if !isSLBNeeded(reqCtx.Service) {
+	if needDeleteLoadBalancer(reqCtx.Service) {
 		if reqCtx.Anno.Get(LoadBalancerId) != "" {
 			lbMdl.LoadBalancerAttribute.IsUserManaged = true
 		}
 		return lbMdl, nil
 	}
 	if err := c.LoadBalancerMgr.BuildLocalModel(reqCtx, lbMdl); err != nil {
-		return nil, fmt.Errorf("build slb attribute error: %s", err.Error())
+		return nil, fmt.Errorf("build lb attribute error: %s", err.Error())
 	}
 	if err := c.VGroupMgr.BuildLocalModel(reqCtx, lbMdl); err != nil {
-		return nil, fmt.Errorf("build slb listener error: %s", err.Error())
+		return nil, fmt.Errorf("build vserver groups error: %s", err.Error())
 	}
 	if err := c.ListenerMgr.BuildLocalModel(reqCtx, lbMdl); err != nil {
-		return nil, fmt.Errorf("builid vserver groups error: %s", err.Error())
+		return nil, fmt.Errorf("builid lb listener error: %s", err.Error())
 	}
 
 	return lbMdl, nil

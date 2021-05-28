@@ -8,11 +8,11 @@ import (
 func NewMockCloud(auth *alibaba.ClientAuth) prvd.Provider {
 
 	return &MockCloud{
-		IMetaData:     auth.Meta,
-		MockECS:       NewMockECS(auth),
-		MockCLB:       NewMockCLB(auth),
-		MockPVTZ:      NewPVTZProvider(auth),
-		RouteProvider: NewRouteProvider(auth),
+		IMetaData: auth.Meta,
+		MockECS:   NewMockECS(auth),
+		MockCLB:   NewMockCLB(auth),
+		MockPVTZ:  NewMockPVTZ(auth),
+		MockVPC:   NewMockVPC(auth),
 	}
 }
 
@@ -22,7 +22,7 @@ var _ prvd.Provider = alibaba.AlibabaCloud{}
 type MockCloud struct {
 	*MockECS
 	*MockPVTZ
-	*RouteProvider
+	*MockVPC
 	*MockCLB
 	prvd.IMetaData
 }

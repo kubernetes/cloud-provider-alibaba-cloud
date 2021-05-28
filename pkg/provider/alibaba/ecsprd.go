@@ -22,7 +22,7 @@ func NewEcsProvider(
 	return &EcsProvider{auth: auth}
 }
 
-var _ prvd.Instance = &EcsProvider{}
+var _ prvd.IInstance = &EcsProvider{}
 
 type EcsProvider struct {
 	auth *ClientAuth

@@ -170,3 +170,19 @@ func PatchM(
 	}
 	return nil
 }
+
+const (
+	// LabelNodeExcludeNodeDeprecated specifies that the node should be exclude from CCM
+	LabelNodeExcludeNodeDeprecated = "service.beta.kubernetes.io/exclude-node"
+	LabelNodeExcludeNode           = "service.alibabacloud.com/exclude-node"
+)
+
+func HasExcludeLabel(node *corev1.Node) bool {
+	if _, exclude := node.Labels[LabelNodeExcludeNodeDeprecated]; exclude {
+		return true
+	}
+	if _, exclude := node.Labels[LabelNodeExcludeNode]; exclude {
+		return true
+	}
+	return false
+}
