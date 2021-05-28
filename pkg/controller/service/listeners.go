@@ -141,7 +141,7 @@ func (mgr *ListenerManager) buildListenerFromServicePort(reqCtx *RequestContext,
 	if reqCtx.Anno.Get(PersistenceTimeout) != "" {
 		timeout, err := strconv.Atoi(reqCtx.Anno.Get(PersistenceTimeout))
 		if err != nil {
-			return listener, fmt.Errorf("Annotation persistence timeout must be integer, but got [%s]. message=[%s]\n",
+			return listener, fmt.Errorf("Annotation persistence timeout must be integer, but got [%s]. message=[%s] ",
 				reqCtx.Anno.Get(PersistenceTimeout), err.Error())
 		}
 		listener.PersistenceTimeout = &timeout
@@ -174,7 +174,7 @@ func (mgr *ListenerManager) buildListenerFromServicePort(reqCtx *RequestContext,
 	if reqCtx.Anno.Get(ConnectionDrainTimeout) != "" {
 		timeout, err := strconv.Atoi(reqCtx.Anno.Get(ConnectionDrainTimeout))
 		if err != nil {
-			return listener, fmt.Errorf("Annotation ConnectionDrainTimeout must be integer, but got [%s]. message=[%s]\n",
+			return listener, fmt.Errorf("Annotation ConnectionDrainTimeout must be integer, but got [%s]. message=[%s] ",
 				reqCtx.Anno.Get(ConnectionDrainTimeout), err.Error())
 		}
 		listener.ConnectionDrainTimeout = timeout
@@ -187,7 +187,7 @@ func (mgr *ListenerManager) buildListenerFromServicePort(reqCtx *RequestContext,
 	if reqCtx.Anno.Get(CookieTimeout) != "" {
 		timeout, err := strconv.Atoi(reqCtx.Anno.Get(CookieTimeout))
 		if err != nil {
-			return listener, fmt.Errorf("Annotation CookieTimeout must be integer, but got [%s]. message=[%s]\n",
+			return listener, fmt.Errorf("Annotation CookieTimeout must be integer, but got [%s]. message=[%s] ",
 				reqCtx.Anno.Get(CookieTimeout), err.Error())
 		}
 		listener.CookieTimeout = timeout
@@ -203,7 +203,7 @@ func (mgr *ListenerManager) buildListenerFromServicePort(reqCtx *RequestContext,
 	if reqCtx.Anno.Get(HealthyThreshold) != "" {
 		t, err := strconv.Atoi(reqCtx.Anno.Get(HealthyThreshold))
 		if err != nil {
-			return listener, fmt.Errorf("Annotation HealthyThreshold must be integer, but got [%s]. message=[%s]\n",
+			return listener, fmt.Errorf("Annotation HealthyThreshold must be integer, but got [%s]. message=[%s] ",
 				reqCtx.Anno.Get(HealthyThreshold), err.Error())
 		}
 		listener.HealthyThreshold = t
@@ -211,7 +211,7 @@ func (mgr *ListenerManager) buildListenerFromServicePort(reqCtx *RequestContext,
 	if reqCtx.Anno.Get(UnhealthyThreshold) != "" {
 		t, err := strconv.Atoi(reqCtx.Anno.Get(UnhealthyThreshold))
 		if err != nil {
-			return listener, fmt.Errorf("Annotation UnhealthyThreshold must be integer, but got [%s]. message=[%s]\n",
+			return listener, fmt.Errorf("Annotation UnhealthyThreshold must be integer, but got [%s]. message=[%s] ",
 				reqCtx.Anno.Get(UnhealthyThreshold), err.Error())
 		}
 		listener.UnhealthyThreshold = t
@@ -219,7 +219,7 @@ func (mgr *ListenerManager) buildListenerFromServicePort(reqCtx *RequestContext,
 	if reqCtx.Anno.Get(HealthCheckConnectTimeout) != "" {
 		timeout, err := strconv.Atoi(reqCtx.Anno.Get(HealthCheckConnectTimeout))
 		if err != nil {
-			return listener, fmt.Errorf("Annotation HealthCheckConnectTimeout must be integer, but got [%s]. message=[%s]\n",
+			return listener, fmt.Errorf("Annotation HealthCheckConnectTimeout must be integer, but got [%s]. message=[%s] ",
 				reqCtx.Anno.Get(HealthCheckConnectTimeout), err.Error())
 		}
 		listener.HealthCheckConnectTimeout = timeout
@@ -227,7 +227,7 @@ func (mgr *ListenerManager) buildListenerFromServicePort(reqCtx *RequestContext,
 	if reqCtx.Anno.Get(HealthCheckConnectPort) != "" {
 		port, err := strconv.Atoi(reqCtx.Anno.Get(HealthCheckConnectPort))
 		if err != nil {
-			return listener, fmt.Errorf("Annotation HealthCheckConnectPort must be integer, but got [%s]. message=[%s]\n",
+			return listener, fmt.Errorf("Annotation HealthCheckConnectPort must be integer, but got [%s]. message=[%s] ",
 				reqCtx.Anno.Get(HealthCheckConnectPort), err.Error())
 		}
 		listener.HealthCheckConnectPort = port
@@ -235,7 +235,7 @@ func (mgr *ListenerManager) buildListenerFromServicePort(reqCtx *RequestContext,
 	if reqCtx.Anno.Get(HealthCheckInterval) != "" {
 		t, err := strconv.Atoi(reqCtx.Anno.Get(HealthCheckInterval))
 		if err != nil {
-			return listener, fmt.Errorf("Annotation HealthCheckInterval must be integer, but got [%s]. message=[%s]\n",
+			return listener, fmt.Errorf("Annotation HealthCheckInterval must be integer, but got [%s]. message=[%s] ",
 				reqCtx.Anno.Get(HealthCheckInterval), err.Error())
 		}
 		listener.HealthCheckInterval = t
@@ -251,6 +251,17 @@ func (mgr *ListenerManager) buildListenerFromServicePort(reqCtx *RequestContext,
 	}
 	if reqCtx.Anno.Get(HealthCheckType) != "" {
 		listener.HealthCheckType = reqCtx.Anno.Get(HealthCheckType)
+	}
+	if reqCtx.Anno.Get(HealthCheckFlag) != "" {
+		listener.HealthCheck = model.FlagType(reqCtx.Anno.Get(HealthCheckFlag))
+	}
+	if reqCtx.Anno.Get(HealthCheckTimeout) != "" {
+		timeout, err := strconv.Atoi(reqCtx.Anno.Get(HealthCheckTimeout))
+		if err != nil {
+			return listener, fmt.Errorf("Annotation HealthCheckTimeout must be integer, but got [%s]. message=[%s] ",
+				reqCtx.Anno.Get(HealthCheckTimeout), err.Error())
+		}
+		listener.HealthCheckTimeout = timeout
 	}
 
 	return listener, nil

@@ -227,6 +227,15 @@ func setGenericListenerValue(req interface{}, listener *model.ListenerAttribute)
 		connectPort.SetString(strconv.Itoa(listener.HealthCheckConnectPort))
 	}
 
+	if listener.HealthyThreshold != 0 {
+		healthyThreshold := v.FieldByName("HealthyThreshold")
+		healthyThreshold.SetString(strconv.Itoa(listener.HealthyThreshold))
+	}
+
+	if listener.UnhealthyThreshold != 0 {
+		unHealthyThreshold := v.FieldByName("UnhealthyThreshold")
+		unHealthyThreshold.SetString(strconv.Itoa(listener.UnhealthyThreshold))
+	}
 }
 
 func setTCPListenerValue(req interface{}, listener *model.ListenerAttribute) {
@@ -261,15 +270,14 @@ func setTCPListenerValue(req interface{}, listener *model.ListenerAttribute) {
 		healthCheckInterval.SetString(strconv.Itoa(listener.HealthCheckInterval))
 	}
 
-	// TODO slb not support now
-	//if listener.ConnectionDrain != "" {
-	//	connectionDrain := v.FieldByName("ConnectionDrain")
-	//	connectionDrain.SetString(string(listener.ConnectionDrain))
-	//}
-	//if listener.ConnectionDrainTimeout != 0 {
-	//	connectionDrainTimeout := v.FieldByName("ConnectionDrainTimeout")
-	//	connectionDrainTimeout.SetString(strconv.Itoa(listener.ConnectionDrainTimeout))
-	//}
+	if listener.ConnectionDrain != "" {
+		connectionDrain := v.FieldByName("ConnectionDrain")
+		connectionDrain.SetString(string(listener.ConnectionDrain))
+	}
+	if listener.ConnectionDrainTimeout != 0 {
+		connectionDrainTimeout := v.FieldByName("ConnectionDrainTimeout")
+		connectionDrainTimeout.SetString(strconv.Itoa(listener.ConnectionDrainTimeout))
+	}
 }
 
 func setUDPListenerValue(req interface{}, listener *model.ListenerAttribute) {
@@ -390,6 +398,8 @@ func setHTTPSListenerValue(req interface{}, listener *model.ListenerAttribute) {
 func loadTCPListener(config slb.TCPListenerConfig, listener *model.ListenerAttribute) {
 	persistenceTimeout := config.PersistenceTimeout
 	listener.PersistenceTimeout = &persistenceTimeout
+	listener.ConnectionDrain = model.FlagType(config.ConnectionDrain)
+	listener.ConnectionDrainTimeout = config.ConnectionDrainTimeout
 	listener.HealthyThreshold = config.HealthyThreshold
 	listener.HealthCheckConnectTimeout = config.HealthCheckConnectTimeout
 	listener.HealthCheckConnectPort = config.HealthCheckConnectPort
