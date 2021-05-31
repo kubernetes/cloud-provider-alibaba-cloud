@@ -22,7 +22,7 @@ type MockECS struct {
 	auth *alibaba.ClientAuth
 }
 
-var _ prvd.Instance = &MockECS{}
+var _ prvd.IInstance = &MockECS{}
 
 func (d *MockECS) ListInstances(ctx *node.NodeContext, ids []string) (map[string]*prvd.NodeAttribute, error) {
 	return nil, nil

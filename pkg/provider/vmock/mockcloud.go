@@ -12,7 +12,7 @@ func NewMockCloud(auth *alibaba.ClientAuth) prvd.Provider {
 		MockECS:   NewMockECS(auth),
 		MockCLB:   NewMockCLB(auth),
 		MockPVTZ:  NewMockPVTZ(auth),
-		MockVPC:   NewMockVPC(auth),
+		MockVPC:   NewMockVPC(auth, nil),
 	}
 }
 

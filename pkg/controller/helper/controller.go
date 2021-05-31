@@ -17,14 +17,14 @@ import (
 func FindCondition(
 	conds []corev1.NodeCondition,
 	typ corev1.NodeConditionType,
-) (corev1.NodeCondition, bool) {
+) (*corev1.NodeCondition, bool) {
 	for i := range conds {
 		if conds[i].Type == typ {
-			return conds[i], true
+			return &conds[i], true
 		}
 	}
 	// condition not found, do not trigger repair
-	return corev1.NodeCondition{}, false
+	return &corev1.NodeCondition{}, false
 }
 
 func NewDelay(d int) reconcile.Result {

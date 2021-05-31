@@ -139,6 +139,10 @@ func nodeFromProviderID(providerID string) (string, string, error) {
 	return name[0], name[1], nil
 }
 
+func providerIDFromInstance(region, instance string) string {
+	return fmt.Sprintf("%s.%s", region, instance)
+}
+
 func findAddress(instance *ecs.Instance) []v1.NodeAddress {
 	var addrs []v1.NodeAddress
 
