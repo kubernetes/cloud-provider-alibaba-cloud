@@ -73,9 +73,11 @@ type IInstance interface {
 }
 
 type IVPC interface {
-	CreateRoute()
-	DeleteRoute()
-	ListRoute()
+	CreateRoute(ctx context.Context, table string, provideID string, destinationCIDR string) (*model.Route, error)
+	DeleteRoute(ctx context.Context, table, provideID, destinationCIDR string) error
+	ListRoute(ctx context.Context, table string) ([]*model.Route, error)
+	FindRoute(ctx context.Context, table, pvid, cidr string) (*model.Route, error)
+	ListRouteTables(ctx context.Context, vpcID string) ([]string, error)
 	DescribeEipAddresses(ctx context.Context, instanceType string, instanceId string) ([]string, error)
 }
 
