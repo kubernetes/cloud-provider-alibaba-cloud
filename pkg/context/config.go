@@ -17,6 +17,10 @@ type CloudConfig struct {
 		RouteTableIDS        string `json:"routeTableIDs"`
 		ServiceBackendType   string `json:"serviceBackendType"`
 
+		ConfigureCloudRoutes      bool   `json:"configureCloudRoutes"`
+		RouteReconciliationPeriod string `json:"routeReconciliationPeriod"`
+		ClusterCidr               string `json:"clusterCidr"`
+
 		DisablePublicSLB bool `json:"disablePublicSLB"`
 
 		PrivateZoneID        string `json:"privateZoneId"`
@@ -31,7 +35,7 @@ type Flags struct {
 	LogLevel           string
 	CloudConfig        string
 	EnableLeaderSelect bool
-	EnableControllers []string
+	EnableControllers  []string
 }
 
 var GlobalFlag = &Flags{}

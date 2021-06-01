@@ -6,20 +6,23 @@ import (
 	"net"
 )
 
-func getIPv4RouteForNode(node *v1.Node) (string, error) {
-	var ipv4CIDR string
+func getIPv4RouteForNode(node *v1.Node) (*net.IPNet, string, error) {
+	var (
+		ipv4CIDR    *net.IPNet
+		ipv4CIDRStr string
+	)
 	for _, podCidr := range append(node.Spec.PodCIDRs, node.Spec.PodCIDR) {
 		if podCidr != "" {
-			_, cidr, err := net.ParseCIDR(podCidr)
+			_, ipv4CIDR, err := net.ParseCIDR(podCidr)
 			if err != nil {
-				return "", fmt.Errorf("invalid pod cidr on node spec: %v", podCidr)
+				return nil, "", fmt.Errorf("invalid pod cidr on node spec: %v", podCidr)
 			}
-			ipv4CIDR = cidr.String()
-			if len(cidr.Mask) == net.IPv4len {
-				ipv4CIDR = cidr.String()
+			ipv4CIDRStr = ipv4CIDR.String()
+			if len(ipv4CIDR.Mask) == net.IPv4len {
+				ipv4CIDRStr = ipv4CIDR.String()
 				break
 			}
 		}
 	}
-	return ipv4CIDR, nil
+	return ipv4CIDR, ipv4CIDRStr, nil
 }
