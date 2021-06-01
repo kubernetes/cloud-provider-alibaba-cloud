@@ -39,7 +39,7 @@ func TestGetIPv4RouteForNode(t *testing.T) {
 		},
 	}
 	for _, testcase := range testNodeGrid {
-		cidr, err := getIPv4RouteForNode(&testcase.node)
+		_, cidr, err := getIPv4RouteForNode(&testcase.node)
 		assert.Equal(t, testcase.expectCidr, cidr)
 		assert.Equal(t, testcase.err, err != nil)
 	}
