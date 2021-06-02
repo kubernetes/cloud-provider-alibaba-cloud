@@ -99,12 +99,12 @@ func (r *ReconcileRoute) syncTableRoutes(ctx context.Context, table string, node
 			continue
 		}
 		if confilctWithNodes(route.DestinationCIDR, nodes) {
-			klog.Infof("delete route %s %s", route.Name, route.DestinationCIDR)
+			klog.Infof("delete route %s, %s", route.Name, route.DestinationCIDR)
 			if err = deleteRouteForInstance(ctx, table, route.ProviderId, route.DestinationCIDR, r.cloud); err != nil {
 				klog.Errorf("Could not delete route %s %s from table %s, %s", route.Name, route.DestinationCIDR, table, err.Error())
 				continue
 			}
-			klog.Infof("Delete route %s %s from table %s SUCCESS.", route.Name, route.DestinationCIDR, table)
+			klog.Infof("Delete route %s, %s from table %s SUCCESS.", route.Name, route.DestinationCIDR, table)
 		}
 	}
 	for _, node := range nodes.Items {
