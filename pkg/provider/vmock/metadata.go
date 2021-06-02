@@ -9,6 +9,13 @@ var _ prvd.IMetaData = &MockMetaData{}
 
 type MockMetaData struct {
 	base prvd.IMetaData
+	vpcID string
+}
+
+func NewMockMetaData(vpcID string) prvd.IMetaData {
+	return &MockMetaData{
+		vpcID: vpcID,
+	}
 }
 
 func (m *MockMetaData) HostName() (string, error) {
@@ -69,7 +76,7 @@ func (m *MockMetaData) VpcCIDRBlock() (string, error) {
 
 func (m *MockMetaData) VpcID() (string, error) {
 
-	return "", fmt.Errorf("unimplemented")
+	return m.vpcID, nil
 }
 
 func (m *MockMetaData) VswitchCIDRBlock() (string, error) {

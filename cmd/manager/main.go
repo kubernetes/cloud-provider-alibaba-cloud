@@ -106,7 +106,7 @@ func main() {
 	printVersion()
 
 	if ctx2.GlobalFlag.CloudConfig == "" {
-		log.Errorf("config file must be provided for ak. --config")
+		log.Errorf("config file must be provided for ak. --cloud-config")
 		os.Exit(1)
 	}
 	// Get a config to talk to the api-server
