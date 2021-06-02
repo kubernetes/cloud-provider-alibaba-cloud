@@ -3,7 +3,6 @@ package service
 import (
 	"fmt"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/model"
-	"k8s.io/klog"
 	"sort"
 )
 
@@ -24,7 +23,7 @@ type ModelApplier struct {
 func (m *ModelApplier) Apply(reqCtx *RequestContext, local *model.LoadBalancer, remote *model.LoadBalancer) error {
 	serviceHashChanged := isServiceHashChanged(reqCtx.Service)
 
-	// apply sequence can not change
+	// apply sequence can not change, apply lb first, then vgroup, listener at last
 	if serviceHashChanged {
 		if err := m.applyLoadBalancerAttribute(reqCtx, local, remote); err != nil {
 			return fmt.Errorf("update lb attribute error: %s", err.Error())
@@ -69,10 +68,11 @@ func (m *ModelApplier) applyLoadBalancerAttribute(reqCtx *RequestContext, local 
 		if !local.LoadBalancerAttribute.IsUserManaged {
 			err := m.slbMgr.Delete(reqCtx, remote)
 			if err != nil {
-				return fmt.Errorf("EnsureLoadBalancerDeleted [%s] error: %s",
+				return fmt.Errorf("delete loadbalancer [%s] error: %s",
 					remote.LoadBalancerAttribute.LoadBalancerId, err.Error())
 			}
 			remote.LoadBalancerAttribute.LoadBalancerId = ""
+			reqCtx.Log.Infof("successfully delete slb %s", remote.LoadBalancerAttribute.LoadBalancerId)
 			return nil
 		}
 	}
@@ -80,8 +80,9 @@ func (m *ModelApplier) applyLoadBalancerAttribute(reqCtx *RequestContext, local 
 	// create slb
 	if remote.LoadBalancerAttribute.LoadBalancerId == "" {
 		if err := m.slbMgr.Create(reqCtx, local); err != nil {
-			return fmt.Errorf("EnsureLoadBalancerCreated error: %s", err.Error())
+			return fmt.Errorf("create lb error: %s", err.Error())
 		}
+		reqCtx.Log.Infof("successfully create lb %s", local.LoadBalancerAttribute.LoadBalancerId)
 		// update remote model
 		remote.LoadBalancerAttribute.LoadBalancerId = local.LoadBalancerAttribute.LoadBalancerId
 		if err := m.slbMgr.Find(reqCtx, remote); err != nil {
@@ -96,7 +97,6 @@ func (m *ModelApplier) applyLoadBalancerAttribute(reqCtx *RequestContext, local 
 }
 
 func (m *ModelApplier) applyVGroups(reqCtx *RequestContext, local *model.LoadBalancer, remote *model.LoadBalancer) error {
-	// TODO update local model vgroup id
 	for i := range local.VServerGroups {
 		found := false
 		var old model.VServerGroup
@@ -140,12 +140,11 @@ func (m *ModelApplier) applyVGroups(reqCtx *RequestContext, local *model.LoadBal
 func (m *ModelApplier) applyListeners(reqCtx *RequestContext, local *model.LoadBalancer, remote *model.LoadBalancer) error {
 	if local.LoadBalancerAttribute.IsUserManaged {
 		if reqCtx.Anno.isForceOverride() {
-			klog.Infof("[%s] override is false, skip reconcile listeners", local.NamespacedName)
+			reqCtx.Log.Infof("listener override is false, skip reconcile listeners", local.NamespacedName)
 			return nil
 		}
 	}
-	klog.Infof("not user defined loadbalancer[%s], start to apply listener.", remote.LoadBalancerAttribute.LoadBalancerId)
-	createActions, updateActions, deleteActions, err := buildActionsForListeners(local, remote)
+	createActions, updateActions, deleteActions, err := buildActionsForListeners(reqCtx, local, remote)
 	if err != nil {
 		return fmt.Errorf("merge listener: %s", err.Error())
 	}
@@ -197,13 +196,12 @@ func (m *ModelApplier) applyListeners(reqCtx *RequestContext, local *model.LoadB
 	return nil
 }
 
-// TODO notes
 func (m *ModelApplier) cleanup(reqCtx *RequestContext, local *model.LoadBalancer, remote *model.LoadBalancer) error {
-	// clean up vservergroup
+	// clean up vServerGroup
 	vgs := remote.VServerGroups
 	for _, vg := range vgs {
 		if !isVGroupManagedByMyService(vg, reqCtx.Service) {
-			klog.Infof("vgroup [%s] description [%s] is managed by user, skip delete", vg.VGroupName, vg.VGroupId)
+			reqCtx.Log.Infof("delete vgroup: [%s] description [%s] is managed by user, skip delete", vg.VGroupName, vg.VGroupId)
 			continue
 		}
 		found := false
@@ -214,12 +212,10 @@ func (m *ModelApplier) cleanup(reqCtx *RequestContext, local *model.LoadBalancer
 			}
 		}
 		if !found {
-			klog.Infof("try to remove unused vserver group, [%s][%s]", vg.NamedKey.Key(), vg.VGroupId)
+			reqCtx.Log.Infof("delete vgroup: [%s], [%s]", vg.NamedKey.Key(), vg.VGroupId)
 			err := m.vGroupMgr.DeleteVServerGroup(reqCtx, vg.VGroupId)
 			if err != nil {
-				klog.Infof("Error: cleanup vgroup warining: "+
-					"failed to remove vgroup[%s]. wait for next try. %s", vg.NamedKey.Key(), err.Error())
-				return err
+				return fmt.Errorf("delete vgroup %s failed, error: %s", vg.VGroupId, err.Error())
 			}
 		}
 	}

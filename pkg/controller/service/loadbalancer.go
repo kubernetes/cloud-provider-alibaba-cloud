@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/model"
 	prvd "k8s.io/cloud-provider-alibaba-cloud/pkg/provider"
-	"k8s.io/klog"
 	"strconv"
 )
 
@@ -79,7 +78,7 @@ func (mgr *LoadBalancerManager) Delete(reqCtx *RequestContext, remote *model.Loa
 
 func (mgr *LoadBalancerManager) Update(reqCtx *RequestContext, local, remote *model.LoadBalancer) error {
 	lbId := remote.LoadBalancerAttribute.LoadBalancerId
-	klog.Infof("found load balancer [%s], try to update load balancer attribute", lbId)
+	reqCtx.Log.Infof("found load balancer [%s], try to update load balancer attribute", lbId)
 
 	if local.LoadBalancerAttribute.MasterZoneId != "" &&
 		local.LoadBalancerAttribute.MasterZoneId != remote.LoadBalancerAttribute.MasterZoneId {
@@ -107,7 +106,7 @@ func (mgr *LoadBalancerManager) Update(reqCtx *RequestContext, local, remote *mo
 		local.LoadBalancerAttribute.InternetChargeType != remote.LoadBalancerAttribute.InternetChargeType {
 		needUpdate = true
 		charge = local.LoadBalancerAttribute.InternetChargeType
-		klog.Infof("internet chargeType changed([%s] -> [%s]), update loadbalancer [%s]",
+		reqCtx.Log.Infof("update lb: internet chargeType changed([%s] -> [%s]), update loadbalancer [%s]",
 			remote.LoadBalancerAttribute.InternetChargeType, local.LoadBalancerAttribute.InternetChargeType, lbId)
 	}
 	if local.LoadBalancerAttribute.Bandwidth != 0 &&
@@ -115,22 +114,22 @@ func (mgr *LoadBalancerManager) Update(reqCtx *RequestContext, local, remote *mo
 		local.LoadBalancerAttribute.InternetChargeType == model.PayByBandwidth {
 		needUpdate = true
 		bandwidth = local.LoadBalancerAttribute.Bandwidth
-		klog.Infof("bandwidth changed([%d] -> [%d]), update loadbalancer[%s]",
+		reqCtx.Log.Infof("update lb: bandwidth changed([%d] -> [%d]), update loadbalancer[%s]",
 			remote.LoadBalancerAttribute.Bandwidth, local.LoadBalancerAttribute.Bandwidth, lbId)
 	}
 	if needUpdate {
 		if remote.LoadBalancerAttribute.AddressType == model.InternetAddressType {
-			klog.Infof("modify loadbalancer: chargeType=%s, bandwidth=%d", charge, bandwidth)
+			reqCtx.Log.Infof("update lb: modify loadbalancer: chargeType=%s, bandwidth=%d", charge, bandwidth)
 			return mgr.cloud.ModifyLoadBalancerInternetSpec(reqCtx.Ctx, lbId, string(charge), bandwidth)
 		} else {
-			klog.Warningf("only internet loadbalancer is allowed to modify bandwidth and pay type")
+			reqCtx.Log.Infof("update lb: only internet loadbalancer is allowed to modify bandwidth and pay type")
 		}
 	}
 
 	// update instance spec
 	if local.LoadBalancerAttribute.LoadBalancerSpec != "" &&
 		local.LoadBalancerAttribute.LoadBalancerSpec != remote.LoadBalancerAttribute.LoadBalancerSpec {
-		klog.Infof("alicloud: loadbalancerSpec changed ([%s] -> [%s]), update loadbalancer [%s]",
+		reqCtx.Log.Infof("update lb: loadbalancerSpec changed ([%s] -> [%s]), update loadbalancer [%s]",
 			remote.LoadBalancerAttribute.LoadBalancerSpec, local.LoadBalancerAttribute.LoadBalancerSpec, lbId)
 		return mgr.cloud.ModifyLoadBalancerInstanceSpec(reqCtx.Ctx, lbId, string(local.LoadBalancerAttribute.LoadBalancerSpec))
 	}
@@ -138,7 +137,7 @@ func (mgr *LoadBalancerManager) Update(reqCtx *RequestContext, local, remote *mo
 	// update slb delete protection
 	if local.LoadBalancerAttribute.DeleteProtection != "" &&
 		local.LoadBalancerAttribute.DeleteProtection != remote.LoadBalancerAttribute.DeleteProtection {
-		klog.Infof("delete protection changed([%s] -> [%s]), update loadbalancer [%s]",
+		reqCtx.Log.Infof("update lb: delete protection changed([%s] -> [%s]), update loadbalancer [%s]",
 			remote.LoadBalancerAttribute.DeleteProtection, local.LoadBalancerAttribute.DeleteProtection, lbId)
 		return mgr.cloud.SetLoadBalancerDeleteProtection(reqCtx.Ctx, lbId, string(local.LoadBalancerAttribute.DeleteProtection))
 	}
@@ -146,7 +145,7 @@ func (mgr *LoadBalancerManager) Update(reqCtx *RequestContext, local, remote *mo
 	// update modification protection
 	if local.LoadBalancerAttribute.ModificationProtectionStatus != "" &&
 		local.LoadBalancerAttribute.ModificationProtectionStatus != remote.LoadBalancerAttribute.ModificationProtectionStatus {
-		klog.Infof("alicloud: loadbalancer modification protection changed([%s] -> [%s]) changed, update loadbalancer [%s]",
+		reqCtx.Log.Infof("update lb: loadbalancer modification protection changed([%s] -> [%s]) changed, update loadbalancer [%s]",
 			remote.LoadBalancerAttribute.ModificationProtectionStatus, local.LoadBalancerAttribute.ModificationProtectionStatus,
 			remote.LoadBalancerAttribute.LoadBalancerId)
 		return mgr.cloud.SetLoadBalancerModificationProtection(reqCtx.Ctx, lbId, string(local.LoadBalancerAttribute.ModificationProtectionStatus))

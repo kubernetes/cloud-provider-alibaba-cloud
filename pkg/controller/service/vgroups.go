@@ -106,17 +106,19 @@ func (mgr *VGroupManager) BuildRemoteModel(reqCtx *RequestContext, m *model.Load
 }
 
 func (mgr *VGroupManager) CreateVServerGroup(reqCtx *RequestContext, vg *model.VServerGroup, lbId string) error {
+	reqCtx.Log.Infof("create vgroup %s", vg.VGroupName)
 	return mgr.cloud.CreateVServerGroup(reqCtx.Ctx, vg, lbId)
 }
 
 func (mgr *VGroupManager) DeleteVServerGroup(reqCtx *RequestContext, vGroupId string) error {
+	reqCtx.Log.Infof("delete vgroup %s", vGroupId)
 	return mgr.cloud.DeleteVServerGroup(reqCtx.Ctx, vGroupId)
 }
 
 func (mgr *VGroupManager) UpdateVServerGroup(reqCtx *RequestContext, local, remote model.VServerGroup) error {
 	add, del, update := diff(remote, local)
 	if len(add) == 0 && len(del) == 0 && len(update) == 0 {
-		klog.Infof("update: no backend need to be added for vgroupid")
+		reqCtx.Log.Infof("update vgroup [%s]: no change, skip reconcile", remote.VGroupId)
 	}
 	if len(add) > 0 {
 		if err := mgr.BatchAddVServerGroupBackendServers(reqCtx, local, add); err != nil {
@@ -145,8 +147,7 @@ func (mgr *VGroupManager) BatchAddVServerGroupBackendServers(reqCtx *RequestCont
 			if err != nil {
 				return fmt.Errorf("error marshal backends: %s, %v", err.Error(), list)
 			}
-			klog.Infof("update: try to update vserver group[%s],"+
-				" backend add[%s]", vGroup.NamedKey.Key(), string(additions))
+			reqCtx.Log.Infof("update vgroup [%s]: backend add [%s]", vGroup.VGroupId, string(additions))
 			return mgr.cloud.AddVServerGroupBackendServers(reqCtx.Ctx, vGroup.VGroupId, string(additions))
 		})
 }
@@ -158,8 +159,7 @@ func (mgr *VGroupManager) BatchRemoveVServerGroupBackendServers(reqCtx *RequestC
 			if err != nil {
 				return fmt.Errorf("error marshal backends: %s, %v", err.Error(), list)
 			}
-			klog.Infof("update: try to update vserver group[%s],"+
-				" backend del[%s]", vGroup.NamedKey.Key(), string(deletions))
+			reqCtx.Log.Infof("update vgroup [%s]: backend del [%s]", vGroup.VGroupId, string(deletions))
 			return mgr.cloud.RemoveVServerGroupBackendServers(reqCtx.Ctx, vGroup.VGroupId, string(deletions))
 		})
 }
@@ -171,8 +171,7 @@ func (mgr *VGroupManager) BatchUpdateVServerGroupBackendServers(reqCtx *RequestC
 			if err != nil {
 				return fmt.Errorf("error marshal backends: %s, %v", err.Error(), list)
 			}
-			klog.Infof("update: try to update vserver group[%s],"+
-				" backend update[%s]", vGroup.NamedKey.Key(), string(updateJson))
+			reqCtx.Log.Infof("update vgroup [%s]: backend update [%s]", vGroup.VGroupId, string(updateJson))
 			return mgr.cloud.SetVServerGroupAttribute(reqCtx.Ctx, vGroup.VGroupId, string(updateJson))
 		})
 }
@@ -325,10 +324,8 @@ func filterOutByLabel(nodes []v1.Node, labels string) ([]v1.Node, error) {
 }
 
 func needExcludeFromLB(reqCtx *RequestContext, node *v1.Node) bool {
-	if helper.HasExcludeLabel(node) {
-		klog.Infof("[%s] node %s has exclude label, skip adding it to lb", util.Key(reqCtx.Service), node.Name)
-		return true
-	}
+	// need to keep the node who has exclude label in order to be compatible with vk node
+	// It's safe because these nodes will be filtered in build backends func
 
 	// exclude node which has exclude balancer label
 	if _, exclude := node.Labels[LabelNodeExcludeBalancer]; exclude {
@@ -517,7 +514,7 @@ func (mgr *VGroupManager) buildLocalBackends(reqCtx *RequestContext, candidates 
 			continue
 		}
 
-		if isExcludeNode(node) {
+		if helper.HasExcludeLabel(node) {
 			continue
 		}
 
@@ -579,7 +576,7 @@ func (mgr *VGroupManager) buildClusterBackends(reqCtx *RequestContext, candidate
 
 	// 1. add ecs backends. add all cluster nodes.
 	for _, node := range candidates.Nodes {
-		if isExcludeNode(&node) {
+		if helper.HasExcludeLabel(&node) {
 			continue
 		}
 		_, id, err := nodeFromProviderID(node.Spec.ProviderID)

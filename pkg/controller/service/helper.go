@@ -45,6 +45,7 @@ func nodeFromProviderID(providerID string) (string, string, error) {
 	return name[0], name[1], nil
 }
 
+// only for node event
 func isExcludeNode(node *v1.Node) bool {
 	if node == nil || node.Labels == nil {
 		return false

@@ -14,7 +14,7 @@ import (
 func (p ProviderSLB) DescribeLoadBalancerListeners(ctx context.Context, lbId string) ([]model.ListenerAttribute, error) {
 	req := slb.CreateDescribeLoadBalancerListenersRequest()
 	req.LoadBalancerId = &[]string{lbId}
-	req.MaxResults = requests.NewInteger(1)
+	req.MaxResults = requests.NewInteger(50)
 
 	var respListeners []slb.ListenerInDescribeLoadBalancerListeners
 	for {
@@ -401,6 +401,7 @@ func loadTCPListener(config slb.TCPListenerConfig, listener *model.ListenerAttri
 	listener.ConnectionDrain = model.FlagType(config.ConnectionDrain)
 	listener.ConnectionDrainTimeout = config.ConnectionDrainTimeout
 	listener.HealthyThreshold = config.HealthyThreshold
+	listener.UnhealthyThreshold = config.UnhealthyThreshold
 	listener.HealthCheckConnectTimeout = config.HealthCheckConnectTimeout
 	listener.HealthCheckConnectPort = config.HealthCheckConnectPort
 	listener.HealthCheckInterval = config.HealthCheckInterval

@@ -7,7 +7,6 @@ import (
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/model"
 	prvd "k8s.io/cloud-provider-alibaba-cloud/pkg/provider"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba"
-	"k8s.io/cloud-provider-alibaba-cloud/pkg/util"
 	"k8s.io/klog"
 	"strconv"
 	"strings"
@@ -62,6 +61,7 @@ func (mgr *ListenerManager) Create(reqCtx *RequestContext, action CreateAction) 
 }
 
 func (mgr *ListenerManager) Delete(reqCtx *RequestContext, action DeleteAction) error {
+	reqCtx.Log.Infof("delete listener %d", action.listener.ListenerPort)
 	return mgr.cloud.DeleteLoadBalancerListener(reqCtx.Ctx, action.lbId, action.listener.ListenerPort)
 }
 
@@ -277,6 +277,7 @@ func (t *tcp) Create(reqCtx *RequestContext, action CreateAction) error {
 	if err != nil {
 		return fmt.Errorf("create tcp listener %d error: %s", action.listener.ListenerPort, err.Error())
 	}
+	reqCtx.Log.Infof("create listener tcp [%d]", action.listener.ListenerPort)
 	return t.mgr.cloud.StartLoadBalancerListener(reqCtx.Ctx, action.lbId, action.listener.ListenerPort)
 }
 
@@ -284,15 +285,15 @@ func (t *tcp) Update(reqCtx *RequestContext, action UpdateAction) error {
 	if action.remote.Status == model.Stopped {
 		err := t.mgr.cloud.StartLoadBalancerListener(reqCtx.Ctx, action.lbId, action.local.ListenerPort)
 		if err != nil {
-			return fmt.Errorf("start tcp listener error: %s", err.Error())
+			return fmt.Errorf("start tcp listener %d error: %s", action.local.ListenerPort, err.Error())
 		}
 	}
 	needUpdate, update := isNeedUpdate(action.local, action.remote)
 	if !needUpdate {
-		klog.Infof("tcp listener did not change, skip [update], port=[%d]", action.local.ListenerPort)
-		// no recreate needed.  skip
+		reqCtx.Log.Infof("update listener: tcp [%d] did not change, skip", action.local.ListenerPort)
 		return nil
 	}
+	reqCtx.Log.Infof("update listener: tcp [%d] updated [%v]", update.ListenerPort, update)
 	return t.mgr.cloud.SetLoadBalancerTCPListenerAttribute(reqCtx.Ctx, action.lbId, update)
 }
 
@@ -306,6 +307,7 @@ func (t *udp) Create(reqCtx *RequestContext, action CreateAction) error {
 	if err != nil {
 		return fmt.Errorf("create udp listener %d error: %s", action.listener.ListenerPort, err.Error())
 	}
+	reqCtx.Log.Infof("create listener udp [%d]", action.listener.ListenerPort)
 	return t.mgr.cloud.StartLoadBalancerListener(reqCtx.Ctx, action.lbId, action.listener.ListenerPort)
 }
 
@@ -313,15 +315,15 @@ func (t *udp) Update(reqCtx *RequestContext, action UpdateAction) error {
 	if action.remote.Status == model.Stopped {
 		err := t.mgr.cloud.StartLoadBalancerListener(reqCtx.Ctx, action.lbId, action.local.ListenerPort)
 		if err != nil {
-			return fmt.Errorf("start tcp listener error: %s", err.Error())
+			return fmt.Errorf("start udp listener %d error: %s", action.local.ListenerPort, err.Error())
 		}
 	}
 	needUpdate, update := isNeedUpdate(action.local, action.remote)
 	if !needUpdate {
-		klog.Infof("udp listener did not change, skip [update], port=[%d]", action.local.ListenerPort)
-		// no recreate needed.  skip
+		reqCtx.Log.Infof("update listener: udp [%d] did not change, skip", action.local.ListenerPort)
 		return nil
 	}
+	reqCtx.Log.Infof("update listener: udp [%d] updated [%v]", update.ListenerPort, update)
 	return t.mgr.cloud.SetLoadBalancerUDPListenerAttribute(reqCtx.Ctx, action.lbId, update)
 }
 
@@ -335,6 +337,7 @@ func (t *http) Create(reqCtx *RequestContext, action CreateAction) error {
 	if err != nil {
 		return fmt.Errorf("create http listener %d error: %s", action.listener.ListenerPort, err.Error())
 	}
+	reqCtx.Log.Infof("create listener http [%d]", action.listener.ListenerPort)
 	return t.mgr.cloud.StartLoadBalancerListener(reqCtx.Ctx, action.lbId, action.listener.ListenerPort)
 
 }
@@ -343,7 +346,7 @@ func (t *http) Update(reqCtx *RequestContext, action UpdateAction) error {
 	if action.remote.Status == model.Stopped {
 		err := t.mgr.cloud.StartLoadBalancerListener(reqCtx.Ctx, action.lbId, action.local.ListenerPort)
 		if err != nil {
-			return fmt.Errorf("start tcp listener error: %s", err.Error())
+			return fmt.Errorf("start http listener %d error: %s", action.local.ListenerPort, err.Error())
 		}
 	}
 
@@ -362,7 +365,7 @@ func (t *http) Update(reqCtx *RequestContext, action UpdateAction) error {
 	}
 
 	if needRecreate {
-		klog.Infof("http listener [%d] need recreate", action.local.ListenerPort)
+		reqCtx.Log.Infof("port [%d] forward policy changed, need recreate", action.local.ListenerPort)
 		err := t.mgr.Delete(reqCtx, DeleteAction{
 			lbId:     action.lbId,
 			listener: action.remote,
@@ -378,18 +381,16 @@ func (t *http) Update(reqCtx *RequestContext, action UpdateAction) error {
 	}
 
 	if action.remote.ListenerForward == model.OnFlag {
-		klog.Infof("http %d ListenerForward is on, cannot update listener", action.local.ListenerPort)
-		// no update needed.  skip
+		reqCtx.Log.Infof("update listener: http [%d] ListenerForward is on, skip update listener", action.local.ListenerPort)
 		return nil
 	}
 
 	needUpdate, update := isNeedUpdate(action.local, action.remote)
 	if !needUpdate {
-		klog.Infof("http listener did not change, skip [update], port=[%d]", action.local.ListenerPort)
-		// no recreate needed.  skip
+		reqCtx.Log.Infof("update listener: http [%d] did not change, skip", action.local.ListenerPort)
 		return nil
 	}
-
+	reqCtx.Log.Infof("update listener: http [%d] updated [%v]", update.ListenerPort, update)
 	return t.mgr.cloud.SetLoadBalancerHTTPListenerAttribute(reqCtx.Ctx, action.lbId, update)
 
 }
@@ -404,6 +405,7 @@ func (t *https) Create(reqCtx *RequestContext, action CreateAction) error {
 	if err != nil {
 		return fmt.Errorf("create https listener %d error: %s", action.listener.ListenerPort, err.Error())
 	}
+	reqCtx.Log.Infof("create listener https [%d]", action.listener.ListenerPort)
 	return t.mgr.cloud.StartLoadBalancerListener(reqCtx.Ctx, action.lbId, action.listener.ListenerPort)
 
 }
@@ -412,15 +414,15 @@ func (t *https) Update(reqCtx *RequestContext, action UpdateAction) error {
 	if action.remote.Status == model.Stopped {
 		err := t.mgr.cloud.StartLoadBalancerListener(reqCtx.Ctx, action.lbId, action.local.ListenerPort)
 		if err != nil {
-			return fmt.Errorf("start tcp listener error: %s", err.Error())
+			return fmt.Errorf("start https listener %d error: %s", action.local.ListenerPort, err.Error())
 		}
 	}
 	needUpdate, update := isNeedUpdate(action.local, action.remote)
 	if !needUpdate {
-		klog.Infof("https listener did not change, skip [update], port=[%d]", action.local.ListenerPort)
-		// no recreate needed.  skip
+		reqCtx.Log.Infof("update listener: https [%d] did not change, skip", action.local.ListenerPort)
 		return nil
 	}
+	reqCtx.Log.Infof("update listener: https [%d] updated [%v]", update.ListenerPort, update)
 	return t.mgr.cloud.SetLoadBalancerHTTPSListenerAttribute(reqCtx.Ctx, action.lbId, update)
 }
 
@@ -453,7 +455,7 @@ func forwardPort(port string, target int) int {
 	return 0
 }
 
-func buildActionsForListeners(local *model.LoadBalancer, remote *model.LoadBalancer) ([]CreateAction, []UpdateAction, []DeleteAction, error) {
+func buildActionsForListeners(reqCtx *RequestContext, local *model.LoadBalancer, remote *model.LoadBalancer) ([]CreateAction, []UpdateAction, []DeleteAction, error) {
 	var (
 		createActions []CreateAction
 		updateActions []UpdateAction
@@ -468,7 +470,6 @@ func buildActionsForListeners(local *model.LoadBalancer, remote *model.LoadBalan
 			return createActions, updateActions, deleteActions, fmt.Errorf("find vservergroup error: %s", err.Error())
 		}
 	}
-	klog.Infof("try to update listener. local: [%v], remote: [%v]", util.PrettyJson(local.Listeners), util.PrettyJson(remote.Listeners))
 
 	// For updations and deletions
 	for _, rlis := range remote.Listeners {
@@ -476,17 +477,14 @@ func buildActionsForListeners(local *model.LoadBalancer, remote *model.LoadBalan
 		for _, llis := range local.Listeners {
 			if rlis.ListenerPort == llis.ListenerPort {
 				found = true
-				// port matched. that is where the conflict case begin.
-				//1. check protocol match.
+				// protocol match, do update
 				if rlis.Protocol == llis.Protocol {
-					// do update operate
 					updateActions = append(updateActions,
 						UpdateAction{
 							lbId:   remote.LoadBalancerAttribute.LoadBalancerId,
 							local:  llis,
 							remote: rlis,
 						})
-					klog.Infof("found listener %d with port & protocol match, do update", llis.ListenerPort)
 				} else {
 					// protocol not match, need to recreate
 					deleteActions = append(deleteActions,
@@ -494,7 +492,7 @@ func buildActionsForListeners(local *model.LoadBalancer, remote *model.LoadBalan
 							lbId:     remote.LoadBalancerAttribute.LoadBalancerId,
 							listener: rlis,
 						})
-					klog.Infof("found listener with port match while protocol not, do delete & add %s", llis.NamedKey)
+					reqCtx.Log.Infof("update listener: port [%d] match while protocol not, do delete & add", llis.ListenerPort)
 				}
 			}
 		}
@@ -502,7 +500,7 @@ func buildActionsForListeners(local *model.LoadBalancer, remote *model.LoadBalan
 		// for safety. Only conflict case is taking care.
 		if !found {
 			if !isPortManagedByMyService(local, rlis) {
-				klog.Infof("port [%d] not managed by my service [%s], skip processing.", rlis.ListenerPort, rlis.NamedKey)
+				reqCtx.Log.Infof("update listener: port [%d] namekey [%s] is managed by user, skip reconcile", rlis.ListenerPort, rlis.NamedKey)
 				continue
 			}
 
@@ -510,8 +508,6 @@ func buildActionsForListeners(local *model.LoadBalancer, remote *model.LoadBalan
 				lbId:     remote.LoadBalancerAttribute.LoadBalancerId,
 				listener: rlis,
 			})
-			klog.Infof("found listener[%s] which is no longer needed "+
-				"by my service[%s], do delete", rlis.ListenerPort, rlis.NamedKey)
 		}
 	}
 

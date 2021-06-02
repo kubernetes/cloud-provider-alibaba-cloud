@@ -176,7 +176,7 @@ func setRequest(request *slb.CreateLoadBalancerRequest, mdl *model.LoadBalancer)
 		request.InternetChargeType = string(mdl.LoadBalancerAttribute.InternetChargeType)
 	}
 	if mdl.LoadBalancerAttribute.Bandwidth != 0 {
-		request.Bandwidth = requests.Integer(mdl.LoadBalancerAttribute.Bandwidth)
+		request.Bandwidth = requests.NewInteger(mdl.LoadBalancerAttribute.Bandwidth)
 	}
 	if mdl.LoadBalancerAttribute.LoadBalancerName != "" {
 		request.LoadBalancerName = mdl.LoadBalancerAttribute.LoadBalancerName

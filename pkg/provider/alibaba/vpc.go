@@ -46,8 +46,8 @@ func (p *VPCProvider) DescribeEipAddresses(ctx context.Context, instanceType str
 	}
 
 	for {
-		req.PageSize = requests.Integer(next.PageSize)
-		req.PageNumber = requests.Integer(next.PageNumber)
+		req.PageSize = requests.NewInteger(next.PageSize)
+		req.PageNumber = requests.NewInteger(next.PageNumber)
 		resp, err := p.auth.VPC.DescribeEipAddresses(req)
 		if err != nil {
 			return nil, err

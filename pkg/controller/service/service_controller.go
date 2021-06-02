@@ -165,7 +165,7 @@ func (m *ReconcileService) cleanupLoadBalancerResources(reqCtx *RequestContext) 
 	if helper.HasFinalizer(reqCtx.Service, ServiceFinalizer) {
 		_, err := m.buildAndApplyModel(reqCtx)
 		if err != nil {
-			m.record.Event(reqCtx.Service, v1.EventTypeWarning, helper.FailedDeleteLB,
+			m.record.Event(reqCtx.Service, v1.EventTypeWarning, helper.FailedCleanLB,
 				fmt.Sprintf("Error deleting load balancer: %s", err.Error()))
 			return err
 		}
@@ -182,6 +182,7 @@ func (m *ReconcileService) cleanupLoadBalancerResources(reqCtx *RequestContext) 
 			return err
 		}
 	}
+	m.record.Event(reqCtx.Service, v1.EventTypeNormal, helper.SucceedCleanLB, "Clean load balancer")
 	return nil
 }
 
