@@ -104,7 +104,7 @@ func (r *VPCProvider) CreateRoute(ctx context.Context, table string, provideID s
 		return nil, fmt.Errorf("error create route entry for %s, %s, error: %v", provideID, destinationCIDR, err)
 	}
 	return &model.Route{
-		Name:            fmt.Sprintf("%-%", provideID, destinationCIDR),
+		Name:            fmt.Sprintf("%s-%s", provideID, destinationCIDR),
 		DestinationCIDR: destinationCIDR,
 		ProviderId:      provideID,
 	}, nil
@@ -167,7 +167,7 @@ func (r *VPCProvider) listRouteBatch(table, nextToken string, routes *[]*model.R
 			return err
 		}
 		route := &model.Route{
-			Name:            fmt.Sprintf("%-%", pvid, e.DestinationCidrBlock),
+			Name:            fmt.Sprintf("%s-%s", pvid, e.DestinationCidrBlock),
 			DestinationCIDR: e.DestinationCidrBlock,
 			ProviderId:      pvid,
 		}
