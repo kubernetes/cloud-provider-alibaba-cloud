@@ -179,7 +179,7 @@ func (r *ReconcileRoute) syncCloudRoute(ctx context.Context, node *corev1.Node) 
 		return r.updateNetworkingCondition(ctx, node, false)
 	} else {
 		networkCondition, ok := helper.FindCondition(node.Status.Conditions, corev1.NodeNetworkUnavailable)
-		if ok && networkCondition.Status != corev1.ConditionFalse {
+		if ok && networkCondition.Status == corev1.ConditionFalse {
 			// Update condition only if it doesn't reflect the current state.
 			return nil
 		}
