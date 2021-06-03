@@ -94,6 +94,11 @@ func (m *ModelApplier) applyLoadBalancerAttribute(reqCtx *RequestContext, local 
 
 	// create slb
 	if remote.LoadBalancerAttribute.LoadBalancerId == "" {
+		if isServiceOwnIngress(reqCtx.Service) {
+			return fmt.Errorf("alicloud: not able to find loadbalancer, but it's defined in service.loaderbalancer.ingress [%v]"+
+				"this may happen when you delete the loadbalancer", reqCtx.Service.Status.LoadBalancer.Ingress)
+		}
+
 		if err := m.slbMgr.Create(reqCtx, local); err != nil {
 			return fmt.Errorf("create lb error: %s", err.Error())
 		}
@@ -105,6 +110,18 @@ func (m *ModelApplier) applyLoadBalancerAttribute(reqCtx *RequestContext, local 
 				remote.LoadBalancerAttribute.LoadBalancerId, err.Error())
 		}
 		return nil
+	}
+
+	// update slb
+	if local.LoadBalancerAttribute.IsUserManaged {
+		tags, err := m.slbMgr.cloud.DescribeTags(reqCtx.Ctx, remote.LoadBalancerAttribute.LoadBalancerId)
+		if err != nil {
+			return fmt.Errorf("describe slb tags error: %s", err.Error())
+		}
+
+		if ok, reason := isLoadBalancerReusable(tags); !ok {
+			return fmt.Errorf("alicloud: the loadbalancer %s can not be reused, %s", remote.LoadBalancerAttribute.LoadBalancerId, reason)
+		}
 	}
 
 	return m.slbMgr.Update(reqCtx, local, remote)
@@ -132,14 +149,14 @@ func (m *ModelApplier) applyVGroups(reqCtx *RequestContext, local *model.LoadBal
 			}
 		}
 
-		// if found, update
+		// update
 		if found {
 			if err := m.vGroupMgr.UpdateVServerGroup(reqCtx, local.VServerGroups[i], old); err != nil {
 				return fmt.Errorf("EnsureVGroupUpdated error: %s", err.Error())
 			}
 		}
 
-		// if not found, create
+		// create
 		if !found {
 			err := m.vGroupMgr.CreateVServerGroup(reqCtx, &local.VServerGroups[i], remote.LoadBalancerAttribute.LoadBalancerId)
 			if err != nil {

@@ -168,6 +168,24 @@ func (p ProviderSLB) AddTags(ctx context.Context, lbId string, tags string) erro
 	_, err := p.auth.SLB.AddTags(req)
 	return formatErrorMessage(err)
 }
+
+func (p ProviderSLB) DescribeTags(ctx context.Context, lbId string) ([]model.Tag, error) {
+	req := slb.CreateDescribeTagsRequest()
+	req.LoadBalancerId = lbId
+	resp, err := p.auth.SLB.DescribeTags(req)
+	if err != nil {
+		return nil, formatErrorMessage(err)
+	}
+	var tags []model.Tag
+	for _, tag := range resp.TagSets.TagSet {
+		tags = append(tags, model.Tag{
+			TagValue: tag.TagValue,
+			TagKey:   tag.TagKey,
+		})
+	}
+	return tags, nil
+}
+
 func setRequest(request *slb.CreateLoadBalancerRequest, mdl *model.LoadBalancer) {
 	if mdl.LoadBalancerAttribute.AddressType != "" {
 		request.AddressType = string(mdl.LoadBalancerAttribute.AddressType)

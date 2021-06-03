@@ -23,6 +23,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
+	"strings"
 	"time"
 )
 
@@ -164,8 +165,8 @@ func (m *ReconcileService) cleanupLoadBalancerResources(reqCtx *RequestContext) 
 	reqCtx.Log.Infof("service do not need lb any more, try to delete it")
 	if helper.HasFinalizer(reqCtx.Service, ServiceFinalizer) {
 		_, err := m.buildAndApplyModel(reqCtx)
-		if err != nil {
-			m.record.Event(reqCtx.Service, v1.EventTypeWarning, helper.FailedCleanLB,
+		if err != nil && !strings.Contains(err.Error(), "LoadBalancerId does not exist") {
+			m.record.Eventf(reqCtx.Service, v1.EventTypeWarning, helper.FailedCleanLB,
 				fmt.Sprintf("Error deleting load balancer: %s", helper.GetLogMessage(err)))
 			return err
 		}
@@ -307,7 +308,6 @@ func (m *ReconcileService) updateServiceStatus(reqCtx *RequestContext, svc *v1.S
 			svc,
 		)
 	}
-	//Logf(svc, "not persisting unchanged LoadBalancerStatus for service to registry.")
 	return nil
 
 }

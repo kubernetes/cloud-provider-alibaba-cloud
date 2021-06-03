@@ -107,6 +107,26 @@ func isServiceHashChanged(service *v1.Service) bool {
 	return true
 }
 
+func isLoadBalancerReusable(tags []model.Tag) (bool, string) {
+	for _, tag := range tags {
+		if tag.TagKey == TAGKEY || tag.TagKey == ACKKEY {
+			return false, "can not reuse loadbalancer created by kubernetes."
+		}
+	}
+	return true, ""
+}
+
+// check if the service exists in service definition
+func isServiceOwnIngress(service *v1.Service) bool {
+	if service == nil {
+		return false
+	}
+	if len(service.Status.LoadBalancer.Ingress) == 0 {
+		return false
+	}
+	return true
+}
+
 // MAX_BACKEND_NUM max batch backend num
 const MAX_BACKEND_NUM = 39
 

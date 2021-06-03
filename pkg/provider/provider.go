@@ -93,6 +93,7 @@ type ILoadBalancer interface {
 	ModifyLoadBalancerInternetSpec(ctx context.Context, lbId string, chargeType string, bandwidth int) error
 	SetLoadBalancerModificationProtection(ctx context.Context, lbId string, flag string) error
 	AddTags(ctx context.Context, lbId string, tags string) error
+	DescribeTags(ctx context.Context, lbId string) ([]model.Tag, error)
 
 	// Listener
 	DescribeLoadBalancerListeners(ctx context.Context, lbId string) ([]model.ListenerAttribute, error)

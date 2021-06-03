@@ -47,6 +47,10 @@ func (m *MockCLB) AddTags(ctx context.Context, lbId string, tags string) error {
 	return nil
 }
 
+func (m *MockCLB) DescribeTags(ctx context.Context, lbId string) ([]model.Tag, error) {
+	return nil, nil
+}
+
 // Listener
 func (m *MockCLB) DescribeLoadBalancerListeners(ctx context.Context, lbId string) ([]model.ListenerAttribute, error) {
 	return nil, nil
