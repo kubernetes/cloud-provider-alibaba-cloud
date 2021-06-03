@@ -20,7 +20,7 @@ func (p ProviderSLB) DescribeLoadBalancerListeners(ctx context.Context, lbId str
 	for {
 		resp, err := p.auth.SLB.DescribeLoadBalancerListeners(req)
 		if err != nil {
-			return nil, err
+			return nil, formatErrorMessage(err)
 		}
 		respListeners = append(respListeners, resp.Listeners...)
 
@@ -59,7 +59,7 @@ func (p ProviderSLB) DescribeLoadBalancerListeners(ctx context.Context, lbId str
 
 		namedKey, err := model.LoadListenerNamedKey(lis.Description)
 		if err != nil {
-			klog.Warningf("listener description [%s], not expected format. skip user managed port", lis.Description, err.Error())
+			klog.Warningf("listener description [%s], not expected format. skip user managed port", lis.Description)
 			continue
 		}
 		n.NamedKey = namedKey
@@ -74,7 +74,7 @@ func (p ProviderSLB) StartLoadBalancerListener(ctx context.Context, lbId string,
 	req.LoadBalancerId = lbId
 	req.ListenerPort = requests.NewInteger(port)
 	_, err := p.auth.SLB.StartLoadBalancerListener(req)
-	return err
+	return formatErrorMessage(err)
 }
 
 func (p ProviderSLB) StopLoadBalancerListener(ctx context.Context, lbId string, port int) error {
@@ -82,7 +82,7 @@ func (p ProviderSLB) StopLoadBalancerListener(ctx context.Context, lbId string, 
 	req.LoadBalancerId = lbId
 	req.ListenerPort = requests.NewInteger(port)
 	_, err := p.auth.SLB.StopLoadBalancerListener(req)
-	return err
+	return formatErrorMessage(err)
 }
 
 func (p ProviderSLB) DeleteLoadBalancerListener(ctx context.Context, lbId string, port int) error {
@@ -91,7 +91,7 @@ func (p ProviderSLB) DeleteLoadBalancerListener(ctx context.Context, lbId string
 	req.ListenerPort = requests.NewInteger(port)
 
 	_, err := p.auth.SLB.DeleteLoadBalancerListener(req)
-	return err
+	return formatErrorMessage(err)
 
 }
 
@@ -103,7 +103,7 @@ func (p ProviderSLB) CreateLoadBalancerTCPListener(
 	// set params only for tcp
 	setTCPListenerValue(req, &listener)
 	_, err := p.auth.SLB.CreateLoadBalancerTCPListener(req)
-	return err
+	return formatErrorMessage(err)
 }
 
 func (p ProviderSLB) SetLoadBalancerTCPListenerAttribute(
@@ -115,7 +115,7 @@ func (p ProviderSLB) SetLoadBalancerTCPListenerAttribute(
 	// set params only for tcp
 	setTCPListenerValue(req, &listener)
 	_, err := p.auth.SLB.SetLoadBalancerTCPListenerAttribute(req)
-	return err
+	return formatErrorMessage(err)
 }
 
 func (p ProviderSLB) CreateLoadBalancerUDPListener(
@@ -126,7 +126,7 @@ func (p ProviderSLB) CreateLoadBalancerUDPListener(
 	// set params only for udp
 	setUDPListenerValue(req, &listener)
 	_, err := p.auth.SLB.CreateLoadBalancerUDPListener(req)
-	return err
+	return formatErrorMessage(err)
 }
 
 func (p ProviderSLB) SetLoadBalancerUDPListenerAttribute(
@@ -138,7 +138,7 @@ func (p ProviderSLB) SetLoadBalancerUDPListenerAttribute(
 	// set params only for udp
 	setUDPListenerValue(req, &listener)
 	_, err := p.auth.SLB.SetLoadBalancerUDPListenerAttribute(req)
-	return err
+	return formatErrorMessage(err)
 }
 
 func (p ProviderSLB) CreateLoadBalancerHTTPListener(
@@ -149,7 +149,7 @@ func (p ProviderSLB) CreateLoadBalancerHTTPListener(
 	// set params only for http
 	setHTTPListenerValue(req, &listener)
 	_, err := p.auth.SLB.CreateLoadBalancerHTTPListener(req)
-	return err
+	return formatErrorMessage(err)
 }
 
 func (p ProviderSLB) SetLoadBalancerHTTPListenerAttribute(
@@ -161,7 +161,7 @@ func (p ProviderSLB) SetLoadBalancerHTTPListenerAttribute(
 	// set params only for http
 	setHTTPListenerValue(req, &listener)
 	_, err := p.auth.SLB.SetLoadBalancerHTTPListenerAttribute(req)
-	return err
+	return formatErrorMessage(err)
 }
 
 func (p ProviderSLB) CreateLoadBalancerHTTPSListener(
@@ -172,7 +172,7 @@ func (p ProviderSLB) CreateLoadBalancerHTTPSListener(
 	// set params only for https
 	setHTTPSListenerValue(req, &listener)
 	_, err := p.auth.SLB.CreateLoadBalancerHTTPSListener(req)
-	return err
+	return formatErrorMessage(err)
 }
 
 func (p ProviderSLB) SetLoadBalancerHTTPSListenerAttribute(
@@ -184,7 +184,7 @@ func (p ProviderSLB) SetLoadBalancerHTTPSListenerAttribute(
 	// set params only for https
 	setHTTPSListenerValue(req, &listener)
 	_, err := p.auth.SLB.SetLoadBalancerHTTPSListenerAttribute(req)
-	return err
+	return formatErrorMessage(err)
 }
 
 func setGenericListenerValue(req interface{}, listener *model.ListenerAttribute) {

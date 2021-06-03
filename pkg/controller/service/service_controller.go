@@ -155,7 +155,7 @@ func (m *ReconcileService) reconcile(request reconcile.Request) error {
 	}
 	err = m.reconcileLoadBalancerResources(reqContext)
 	if err != nil {
-		klog.Infof("reconcile loadbalancer error: %s", err.Error())
+		klog.Errorf("[%s]: reconcile loadbalancer error: %s", request.NamespacedName, err.Error())
 	}
 	return err
 }
@@ -166,7 +166,7 @@ func (m *ReconcileService) cleanupLoadBalancerResources(reqCtx *RequestContext) 
 		_, err := m.buildAndApplyModel(reqCtx)
 		if err != nil {
 			m.record.Event(reqCtx.Service, v1.EventTypeWarning, helper.FailedCleanLB,
-				fmt.Sprintf("Error deleting load balancer: %s", err.Error()))
+				fmt.Sprintf("Error deleting load balancer: %s", helper.GetLogMessage(err)))
 			return err
 		}
 
@@ -197,7 +197,7 @@ func (m *ReconcileService) reconcileLoadBalancerResources(req *RequestContext) e
 	lb, err := m.buildAndApplyModel(req)
 	if err != nil {
 		m.record.Event(req.Service, v1.EventTypeWarning, helper.FailedSyncLB,
-			fmt.Sprintf("Error syncing load balancer: %s", err.Error()))
+			fmt.Sprintf("Error syncing load balancer: %s", helper.GetLogMessage(err)))
 		return err
 	}
 
@@ -230,19 +230,9 @@ func (m *ReconcileService) buildAndApplyModel(reqCtx *RequestContext) (*model.Lo
 	}
 	klog.V(5).Infof("local build: %s", mdlJson)
 
-	// build remote model
-	remoteModel, err := m.builder.BuildModel(reqCtx, REMOTE_MODEL)
-	if err != nil {
-		return nil, fmt.Errorf("build lb remote model error: %s", err.Error())
-	}
-	mdlJson, err = json.Marshal(remoteModel)
-	if err != nil {
-		return nil, fmt.Errorf("marshal lbmdl error: %s", err.Error())
-	}
-	klog.V(5).Infof("remote build: %s", mdlJson)
-
 	// apply model
-	if err := m.applier.Apply(reqCtx, localModel, remoteModel); err != nil {
+	remoteModel, err := m.applier.Apply(reqCtx, localModel)
+	if err != nil {
 		return nil, fmt.Errorf("apply model error: %s", err.Error())
 	}
 	return remoteModel, nil

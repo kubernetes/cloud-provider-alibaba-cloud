@@ -12,13 +12,13 @@ func (p ProviderSLB) DescribeVServerGroups(ctx context.Context, lbId string) ([]
 	req.LoadBalancerId = lbId
 	resp, err := p.auth.SLB.DescribeVServerGroups(req)
 	if err != nil {
-		return nil, err
+		return nil, formatErrorMessage(err)
 	}
 	var vgs []model.VServerGroup
 	for _, v := range resp.VServerGroups.VServerGroup {
 		vg, err := p.DescribeVServerGroupAttribute(ctx, v.VServerGroupId)
 		if err != nil {
-			return vgs, err
+			return vgs, formatErrorMessage(err)
 		}
 
 		namedKey, err := model.LoadVGroupNamedKey(vg.VGroupName)
@@ -43,7 +43,7 @@ func (p ProviderSLB) CreateVServerGroup(ctx context.Context, vg *model.VServerGr
 	req.BackendServers = string(backendJson)
 	resp, err := p.auth.SLB.CreateVServerGroup(req)
 	if err != nil {
-		return err
+		return formatErrorMessage(err)
 	}
 	vg.VGroupId = resp.VServerGroupId
 	return nil
@@ -54,7 +54,7 @@ func (p ProviderSLB) DescribeVServerGroupAttribute(ctx context.Context, vGroupId
 	req.VServerGroupId = vGroupId
 	resp, err := p.auth.SLB.DescribeVServerGroupAttribute(req)
 	if err != nil {
-		return model.VServerGroup{}, err
+		return model.VServerGroup{}, formatErrorMessage(err)
 	}
 	vg := setVServerGroupFromResponse(resp)
 	return vg, nil
@@ -65,7 +65,7 @@ func (p ProviderSLB) DeleteVServerGroup(ctx context.Context, vGroupId string) er
 	req := slb.CreateDeleteVServerGroupRequest()
 	req.VServerGroupId = vGroupId
 	_, err := p.auth.SLB.DeleteVServerGroup(req)
-	return err
+	return formatErrorMessage(err)
 }
 
 func (p ProviderSLB) AddVServerGroupBackendServers(ctx context.Context, vGroupId string, backends string) error {
@@ -73,7 +73,7 @@ func (p ProviderSLB) AddVServerGroupBackendServers(ctx context.Context, vGroupId
 	req.VServerGroupId = vGroupId
 	req.BackendServers = backends
 	_, err := p.auth.SLB.AddVServerGroupBackendServers(req)
-	return err
+	return formatErrorMessage(err)
 
 }
 
@@ -82,7 +82,7 @@ func (p ProviderSLB) RemoveVServerGroupBackendServers(ctx context.Context, vGrou
 	req.VServerGroupId = vGroupId
 	req.BackendServers = backends
 	_, err := p.auth.SLB.RemoveVServerGroupBackendServers(req)
-	return err
+	return formatErrorMessage(err)
 }
 
 func (p ProviderSLB) SetVServerGroupAttribute(ctx context.Context, vGroupId string, backends string) error {
@@ -90,7 +90,7 @@ func (p ProviderSLB) SetVServerGroupAttribute(ctx context.Context, vGroupId stri
 	req.VServerGroupId = vGroupId
 	req.BackendServers = backends
 	_, err := p.auth.SLB.SetVServerGroupAttribute(req)
-	return err
+	return formatErrorMessage(err)
 }
 
 func (p ProviderSLB) ModifyVServerGroupBackendServers(ctx context.Context, vGroupId string, old string, new string) error {
@@ -99,7 +99,7 @@ func (p ProviderSLB) ModifyVServerGroupBackendServers(ctx context.Context, vGrou
 	req.OldBackendServers = old
 	req.NewBackendServers = new
 	_, err := p.auth.SLB.ModifyVServerGroupBackendServers(req)
-	return err
+	return formatErrorMessage(err)
 }
 
 func setVServerGroupFromResponse(resp *slb.DescribeVServerGroupAttributeResponse) model.VServerGroup {

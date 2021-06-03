@@ -3,6 +3,7 @@ package service
 import (
 	"fmt"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/model"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/util"
 	"sort"
 )
 
@@ -20,35 +21,49 @@ type ModelApplier struct {
 	vGroupMgr *VGroupManager
 }
 
-func (m *ModelApplier) Apply(reqCtx *RequestContext, local *model.LoadBalancer, remote *model.LoadBalancer) error {
-	serviceHashChanged := isServiceHashChanged(reqCtx.Service)
+func (m *ModelApplier) Apply(reqCtx *RequestContext, local *model.LoadBalancer) (*model.LoadBalancer, error) {
+	remote := &model.LoadBalancer{
+		NamespacedName: util.NamespacedName(reqCtx.Service),
+	}
 
+	err := m.slbMgr.BuildRemoteModel(reqCtx, remote)
+	if err != nil {
+		return remote, fmt.Errorf("get load balancer attribute from cloud, error: %s", err.Error())
+	}
+
+	serviceHashChanged := isServiceHashChanged(reqCtx.Service)
 	// apply sequence can not change, apply lb first, then vgroup, listener at last
 	if serviceHashChanged {
 		if err := m.applyLoadBalancerAttribute(reqCtx, local, remote); err != nil {
-			return fmt.Errorf("update lb attribute error: %s", err.Error())
+			return remote, fmt.Errorf("update lb attribute error: %s", err.Error())
 		}
 		// if remote slb is not exist, return
 		if remote.LoadBalancerAttribute.LoadBalancerId == "" {
-			return nil
+			return remote, nil
 		}
 	}
 
+	if err := m.vGroupMgr.BuildRemoteModel(reqCtx, remote); err != nil {
+		return remote, fmt.Errorf("get lb backend from remote error: %s", err.Error())
+	}
 	if err := m.applyVGroups(reqCtx, local, remote); err != nil {
-		return fmt.Errorf("update lb backends error: %s", err.Error())
+		return remote, fmt.Errorf("update lb backends error: %s", err.Error())
 	}
 
 	if serviceHashChanged {
+		if err := m.vGroupMgr.BuildRemoteModel(reqCtx, remote); err != nil {
+			return remote, fmt.Errorf("get lb listeners from cloud, error: %s", err.Error())
+		}
 		if err := m.applyListeners(reqCtx, local, remote); err != nil {
-			return fmt.Errorf("update lb listeners error: %s", err.Error())
+			return remote, fmt.Errorf("update lb listeners error: %s", err.Error())
 		}
 	}
 
 	if err := m.cleanup(reqCtx, local, remote); err != nil {
-		return fmt.Errorf("update lb listeners error: %s", err.Error())
+		return remote, fmt.Errorf("update lb listeners error: %s", err.Error())
 	}
 
-	return nil
+	return remote, nil
 }
 
 func (m *ModelApplier) applyLoadBalancerAttribute(reqCtx *RequestContext, local *model.LoadBalancer, remote *model.LoadBalancer) error {

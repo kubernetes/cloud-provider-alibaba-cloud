@@ -6,6 +6,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/helper"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/util"
 	"k8s.io/klog"
 	"reflect"
@@ -159,7 +160,7 @@ func needUpdate(oldSvc, newSvc *v1.Service, recorder record.EventRecorder) bool 
 		recorder.Eventf(
 			newSvc,
 			v1.EventTypeNormal,
-			"TypeChanged",
+			helper.TypeChanged,
 			"%v->%v",
 			oldSvc.Spec.Type,
 			newSvc.Spec.Type,
@@ -177,7 +178,7 @@ func needUpdate(oldSvc, newSvc *v1.Service, recorder record.EventRecorder) bool 
 		recorder.Eventf(
 			newSvc,
 			v1.EventTypeNormal,
-			"AnnotationChanged",
+			helper.AnnoChanged,
 			"The service will be updated because the annotations has been changed.",
 		)
 		return true
@@ -188,7 +189,7 @@ func needUpdate(oldSvc, newSvc *v1.Service, recorder record.EventRecorder) bool 
 		recorder.Eventf(
 			newSvc,
 			v1.EventTypeNormal,
-			"SpecChanged",
+			helper.SpecChanged,
 			"The service will be updated because the spec has been changed.",
 		)
 		return true
@@ -200,7 +201,7 @@ func needUpdate(oldSvc, newSvc *v1.Service, recorder record.EventRecorder) bool 
 		recorder.Eventf(
 			newSvc,
 			v1.EventTypeNormal,
-			"DeleteTimestampChanged",
+			helper.DeleteTimestampChanged,
 			"The service will be updated because the delete timestamp has been changed.",
 		)
 		return true

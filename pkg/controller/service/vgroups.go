@@ -418,22 +418,31 @@ func (mgr *VGroupManager) buildVGroupForServicePort(reqCtx *RequestContext, port
 		reqCtx.Log.Infof("eni mode, build backends for %s", vg.NamedKey)
 		backends, err = mgr.buildENIBackends(reqCtx, candidates, vg)
 		if err != nil {
-			return vg, err
+			return vg, fmt.Errorf("build eni backends error: %s", err.Error())
 		}
 	case LocalTrafficPolicy:
 		reqCtx.Log.Infof("local mode, build backends for %s", vg.NamedKey)
 		backends, err = mgr.buildLocalBackends(reqCtx, candidates, vg)
 		if err != nil {
-			return vg, err
+			return vg, fmt.Errorf("build local backends error: %s", err.Error())
 		}
 	case ClusterTrafficPolicy:
 		reqCtx.Log.Infof("cluster mode, build backends for %s", vg.NamedKey)
 		backends, err = mgr.buildClusterBackends(reqCtx, candidates, vg)
 		if err != nil {
-			return vg, err
+			return vg, fmt.Errorf("build cluster backends error: %s", err.Error())
 		}
 	default:
 		return vg, fmt.Errorf("not supported traffic policy [%s]", candidates.TrafficPolicy)
+	}
+
+	if len(backends) == 0 {
+		reqCtx.Recorder.Eventf(
+			reqCtx.Service,
+			v1.EventTypeNormal,
+			helper.UnAvailableBackends,
+			"There are no available nodes for LoadBalancer",
+		)
 	}
 
 	vg.Backends = backends
