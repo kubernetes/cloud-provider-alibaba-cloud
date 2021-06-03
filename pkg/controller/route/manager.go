@@ -132,6 +132,11 @@ func (r *ReconcileRoute) syncTableRoutes(ctx context.Context, table string, node
 		if err != nil {
 			klog.Errorf("try create route error: %s", err.Error())
 			r.record.Eventf(&node, v1.EventTypeWarning, "CreateRouteFailed", "Create Route Failed for %s reason: %s", table, err)
+			continue
+		}
+		networkCondition, ok := helper.FindCondition(node.Status.Conditions, v1.NodeNetworkUnavailable)
+		if !ok || networkCondition.Status != v1.ConditionFalse {
+			r.updateNetworkingCondition(ctx, &node, true)
 		}
 	}
 	return nil

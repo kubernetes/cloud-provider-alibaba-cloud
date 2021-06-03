@@ -65,7 +65,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		"route-controller", mgr,
 		controller.Options{
 			Reconciler:              r,
-			MaxConcurrentReconciles: 1,
+			MaxConcurrentReconciles: 2,
 		},
 	)
 	if err != nil {
@@ -176,7 +176,8 @@ func (r *ReconcileRoute) syncCloudRoute(ctx context.Context, node *corev1.Node) 
 		}
 	}
 	if utilerrors.NewAggregate(tablesErr) != nil {
-		return r.updateNetworkingCondition(ctx, node, false)
+		r.updateNetworkingCondition(ctx, node, false)
+		return utilerrors.NewAggregate(tablesErr)
 	} else {
 		networkCondition, ok := helper.FindCondition(node.Status.Conditions, corev1.NodeNetworkUnavailable)
 		if ok && networkCondition.Status == corev1.ConditionFalse {
