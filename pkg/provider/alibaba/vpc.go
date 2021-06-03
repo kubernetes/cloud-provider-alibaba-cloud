@@ -121,6 +121,10 @@ func (r *VPCProvider) DeleteRoute(ctx context.Context, table, provideID, destina
 	deleteRouteEntryRequest.NextHopId = instance
 	_, err = r.auth.VPC.DeleteRouteEntry(deleteRouteEntryRequest)
 	if err != nil {
+		if strings.Contains(err.Error(), "InvalidRouteEntry.NotFound") {
+			// route already removed
+			return nil
+		}
 		return fmt.Errorf("error delete route entry for %s, %s, error: %v", provideID, destinationCIDR, err)
 	}
 	return nil
