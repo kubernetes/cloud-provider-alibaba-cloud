@@ -2,14 +2,15 @@ package service
 
 import (
 	"fmt"
+	"strconv"
+	"strings"
+
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/model"
 	prvd "k8s.io/cloud-provider-alibaba-cloud/pkg/provider"
-	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/base"
 	"k8s.io/klog"
-	"strconv"
-	"strings"
 )
 
 // IListener listener interface
@@ -109,7 +110,7 @@ func (mgr *ListenerManager) buildListenerFromServicePort(reqCtx *RequestContext,
 	listener := model.ListenerAttribute{
 		NamedKey: &model.ListenerNamedKey{
 			Prefix:      model.DEFAULT_PREFIX,
-			CID:         alibaba.CLUSTER_ID,
+			CID:         base.CLUSTER_ID,
 			Namespace:   reqCtx.Service.Namespace,
 			ServiceName: reqCtx.Service.Name,
 			Port:        port.Port,
@@ -597,7 +598,7 @@ func getVGroupNamedKey(svc *v1.Service, servicePort v1.ServicePort) *model.VGrou
 	return &model.VGroupNamedKey{
 		Prefix:      model.DEFAULT_PREFIX,
 		Namespace:   svc.Namespace,
-		CID:         alibaba.CLUSTER_ID,
+		CID:         base.CLUSTER_ID,
 		VGroupPort:  vGroupPort,
 		ServiceName: svc.Name}
 }
@@ -729,5 +730,5 @@ func findVServerGroup(vgs []model.VServerGroup, port *model.ListenerAttribute) e
 func isPortManagedByMyService(local *model.LoadBalancer, n model.ListenerAttribute) bool {
 	return n.NamedKey.ServiceName == local.NamespacedName.Name &&
 		n.NamedKey.Namespace == local.NamespacedName.Namespace &&
-		n.NamedKey.CID == alibaba.CLUSTER_ID
+		n.NamedKey.CID == base.CLUSTER_ID
 }

@@ -1,19 +1,23 @@
-package alibaba
+package slb
 
 import (
 	"context"
 	"encoding/json"
 	"fmt"
+
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/model"
+	prvd "k8s.io/cloud-provider-alibaba-cloud/pkg/provider"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/base"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/util"
+	"k8s.io/klog"
+
 	"github.com/aliyun/alibaba-cloud-sdk-go/sdk/requests"
 	"github.com/aliyun/alibaba-cloud-sdk-go/sdk/utils"
 	"github.com/aliyun/alibaba-cloud-sdk-go/services/slb"
-	"k8s.io/cloud-provider-alibaba-cloud/pkg/model"
-	prvd "k8s.io/cloud-provider-alibaba-cloud/pkg/provider"
-	"k8s.io/klog"
 )
 
 func NewLBProvider(
-	auth *ClientAuth,
+	auth *base.ClientAuth,
 ) *ProviderSLB {
 	return &ProviderSLB{auth: auth}
 }
@@ -21,7 +25,7 @@ func NewLBProvider(
 var _ prvd.ILoadBalancer = &ProviderSLB{}
 
 type ProviderSLB struct {
-	auth *ClientAuth
+	auth *base.ClientAuth
 }
 
 func (p ProviderSLB) FindLoadBalancer(ctx context.Context, mdl *model.LoadBalancer) error {
@@ -44,7 +48,7 @@ func (p ProviderSLB) FindLoadBalancer(ctx context.Context, mdl *model.LoadBalanc
 	req.Tags = string(items)
 	resp, err := p.auth.SLB.DescribeLoadBalancers(req)
 	if err != nil {
-		return fmt.Errorf("[%s] find loadbalancer by tag error: %s", mdl.NamespacedName, formatErrorMessage(err))
+		return fmt.Errorf("[%s] find loadbalancer by tag error: %s", mdl.NamespacedName, util.FormatErrorMessage(err))
 	}
 
 	num := len(resp.LoadBalancers.LoadBalancer)
@@ -69,7 +73,7 @@ func (p ProviderSLB) FindLoadBalancer(ctx context.Context, mdl *model.LoadBalanc
 	req.LoadBalancerName = mdl.LoadBalancerAttribute.LoadBalancerName
 	resp, err = p.auth.SLB.DescribeLoadBalancers(req)
 	if err != nil {
-		return fmt.Errorf("[%s] find loadbalancer by name error: %s", mdl.NamespacedName, formatErrorMessage(err))
+		return fmt.Errorf("[%s] find loadbalancer by name error: %s", mdl.NamespacedName, util.FormatErrorMessage(err))
 	}
 	num = len(resp.LoadBalancers.LoadBalancer)
 	if num > 0 {
@@ -91,7 +95,7 @@ func (p ProviderSLB) CreateLoadBalancer(ctx context.Context, mdl *model.LoadBala
 	req.ClientToken = utils.GetUUID()
 	resp, err := p.auth.SLB.CreateLoadBalancer(req)
 	if err != nil {
-		return formatErrorMessage(err)
+		return util.FormatErrorMessage(err)
 	}
 	mdl.LoadBalancerAttribute.LoadBalancerId = resp.LoadBalancerId
 	mdl.LoadBalancerAttribute.Address = resp.Address
@@ -104,7 +108,7 @@ func (p ProviderSLB) DescribeLoadBalancer(ctx context.Context, mdl *model.LoadBa
 	req.LoadBalancerId = mdl.LoadBalancerAttribute.LoadBalancerId
 	resp, err := p.auth.SLB.DescribeLoadBalancerAttribute(req)
 	if err != nil {
-		return formatErrorMessage(err)
+		return util.FormatErrorMessage(err)
 	}
 	loadResponse(resp, mdl)
 	return nil
@@ -114,7 +118,7 @@ func (p ProviderSLB) DeleteLoadBalancer(ctx context.Context, mdl *model.LoadBala
 	req := slb.CreateDeleteLoadBalancerRequest()
 	req.LoadBalancerId = mdl.LoadBalancerAttribute.LoadBalancerId
 	_, err := p.auth.SLB.DeleteLoadBalancer(req)
-	return formatErrorMessage(err)
+	return util.FormatErrorMessage(err)
 }
 
 func (p ProviderSLB) SetLoadBalancerDeleteProtection(ctx context.Context, lbId string, flag string) error {
@@ -122,7 +126,7 @@ func (p ProviderSLB) SetLoadBalancerDeleteProtection(ctx context.Context, lbId s
 	req.LoadBalancerId = lbId
 	req.DeleteProtection = flag
 	_, err := p.auth.SLB.SetLoadBalancerDeleteProtection(req)
-	return formatErrorMessage(err)
+	return util.FormatErrorMessage(err)
 }
 
 func (p ProviderSLB) ModifyLoadBalancerInstanceSpec(ctx context.Context, lbId string, spec string) error {
@@ -130,7 +134,7 @@ func (p ProviderSLB) ModifyLoadBalancerInstanceSpec(ctx context.Context, lbId st
 	req.LoadBalancerId = lbId
 	req.LoadBalancerSpec = spec
 	_, err := p.auth.SLB.ModifyLoadBalancerInstanceSpec(req)
-	return formatErrorMessage(err)
+	return util.FormatErrorMessage(err)
 }
 
 func (p ProviderSLB) SetLoadBalancerName(ctx context.Context, lbId string, name string) error {
@@ -138,7 +142,7 @@ func (p ProviderSLB) SetLoadBalancerName(ctx context.Context, lbId string, name 
 	req.LoadBalancerId = lbId
 	req.LoadBalancerName = name
 	_, err := p.auth.SLB.SetLoadBalancerName(req)
-	return formatErrorMessage(err)
+	return util.FormatErrorMessage(err)
 }
 
 func (p ProviderSLB) ModifyLoadBalancerInternetSpec(ctx context.Context, lbId string, chargeType string, bandwidth int) error {
@@ -147,7 +151,7 @@ func (p ProviderSLB) ModifyLoadBalancerInternetSpec(ctx context.Context, lbId st
 	req.InternetChargeType = chargeType
 	req.Bandwidth = requests.NewInteger(bandwidth)
 	_, err := p.auth.SLB.ModifyLoadBalancerInternetSpec(req)
-	return formatErrorMessage(err)
+	return util.FormatErrorMessage(err)
 }
 
 func (p ProviderSLB) SetLoadBalancerModificationProtection(ctx context.Context, lbId string, flag string) error {
@@ -158,7 +162,7 @@ func (p ProviderSLB) SetLoadBalancerModificationProtection(ctx context.Context, 
 		req.ModificationProtectionReason = model.ModificationProtectionReason
 	}
 	_, err := p.auth.SLB.SetLoadBalancerModificationProtection(req)
-	return formatErrorMessage(err)
+	return util.FormatErrorMessage(err)
 }
 
 func (p ProviderSLB) AddTags(ctx context.Context, lbId string, tags string) error {
@@ -166,7 +170,7 @@ func (p ProviderSLB) AddTags(ctx context.Context, lbId string, tags string) erro
 	req.LoadBalancerId = lbId
 	req.Tags = tags
 	_, err := p.auth.SLB.AddTags(req)
-	return formatErrorMessage(err)
+	return util.FormatErrorMessage(err)
 }
 
 func (p ProviderSLB) DescribeTags(ctx context.Context, lbId string) ([]model.Tag, error) {
@@ -174,7 +178,7 @@ func (p ProviderSLB) DescribeTags(ctx context.Context, lbId string) ([]model.Tag
 	req.LoadBalancerId = lbId
 	resp, err := p.auth.SLB.DescribeTags(req)
 	if err != nil {
-		return nil, formatErrorMessage(err)
+		return nil, util.FormatErrorMessage(err)
 	}
 	var tags []model.Tag
 	for _, tag := range resp.TagSets.TagSet {

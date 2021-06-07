@@ -2,18 +2,19 @@ package vmock
 
 import (
 	"context"
+
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/model"
-	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/base"
 )
 
 func NewMockCLB(
-	auth *alibaba.ClientAuth,
+	auth *base.ClientAuth,
 ) *MockCLB {
 	return &MockCLB{auth: auth}
 }
 
 type MockCLB struct {
-	auth *alibaba.ClientAuth
+	auth *base.ClientAuth
 }
 
 func (m *MockCLB) FindLoadBalancer(ctx context.Context, mdl *model.LoadBalancer) error {

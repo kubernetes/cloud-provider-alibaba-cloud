@@ -2,12 +2,14 @@ package service
 
 import (
 	"fmt"
-	"github.com/aliyun/alibaba-cloud-sdk-go/services/slb"
+	"strings"
+
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/model"
-	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/base"
 	"k8s.io/klog"
-	"strings"
+
+	"github.com/aliyun/alibaba-cloud-sdk-go/services/slb"
 )
 
 // prefix
@@ -137,7 +139,7 @@ func (n *AnnotationRequest) GetDefaultTags() []model.Tag {
 		},
 		{
 			TagKey:   ACKKEY,
-			TagValue: alibaba.CLUSTER_ID,
+			TagValue: base.CLUSTER_ID,
 		},
 	}
 }
