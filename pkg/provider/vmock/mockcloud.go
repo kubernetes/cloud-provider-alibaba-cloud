@@ -3,9 +3,10 @@ package vmock
 import (
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/base"
 )
 
-func NewMockCloud(auth *alibaba.ClientAuth) prvd.Provider {
+func NewMockCloud(auth *base.ClientAuth) prvd.Provider {
 
 	return &MockCloud{
 		IMetaData: auth.Meta,

@@ -1,12 +1,14 @@
-package alibaba
+package slb
 
 import (
 	"encoding/json"
+	"testing"
+
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/model"
+
 	"github.com/aliyun/alibaba-cloud-sdk-go/sdk/requests"
 	"github.com/aliyun/alibaba-cloud-sdk-go/sdk/utils"
 	"github.com/aliyun/alibaba-cloud-sdk-go/services/slb"
-	"k8s.io/cloud-provider-alibaba-cloud/pkg/model"
-	"testing"
 )
 
 func TestNewLBProvider_CreateSLB(t *testing.T) {

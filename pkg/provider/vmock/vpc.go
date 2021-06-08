@@ -3,19 +3,20 @@ package vmock
 import (
 	"context"
 	"fmt"
+
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/model"
-	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/base"
 )
 
 func NewMockVPC(
-	auth *alibaba.ClientAuth,
+	auth *base.ClientAuth,
 	tables []string,
 ) *MockVPC {
 	return &MockVPC{auth: auth, routetables: tables}
 }
 
 type MockVPC struct {
-	auth *alibaba.ClientAuth
+	auth        *base.ClientAuth
 	routetables []string
 }
 

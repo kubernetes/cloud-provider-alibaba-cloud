@@ -1,15 +1,19 @@
-package alibaba
+package ecs
 
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/aliyun/alibaba-cloud-sdk-go/sdk/requests"
-	"github.com/aliyun/alibaba-cloud-sdk-go/services/ecs"
-	log "github.com/sirupsen/logrus"
+	"strings"
+
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/context/node"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider"
-	"strings"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/base"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/util"
+
+	"github.com/aliyun/alibaba-cloud-sdk-go/sdk/requests"
+	"github.com/aliyun/alibaba-cloud-sdk-go/services/ecs"
+	log "github.com/sirupsen/logrus"
 )
 
 /*
@@ -17,7 +21,7 @@ import (
 	"alibaba:DeleteInstance", "alibaba:RunCommand",
 */
 func NewEcsProvider(
-	auth *ClientAuth,
+	auth *base.ClientAuth,
 ) *EcsProvider {
 	return &EcsProvider{auth: auth}
 }
@@ -25,13 +29,13 @@ func NewEcsProvider(
 var _ prvd.IInstance = &EcsProvider{}
 
 type EcsProvider struct {
-	auth *ClientAuth
+	auth *base.ClientAuth
 }
 
 func (e *EcsProvider) ListInstances(ctx *node.NodeContext, ids []string) (map[string]*prvd.NodeAttribute, error) {
 	nodeRegionMap := make(map[string][]string)
 	for _, id := range ids {
-		regionID, nodeID, err := nodeFromProviderID(id)
+		regionID, nodeID, err := util.NodeFromProviderID(id)
 		if err != nil {
 			return nil, err
 		}
@@ -118,30 +122,6 @@ const (
 	InstanceDefaultTimeout = 120
 	DefaultWaitForInterval = 5
 )
-
-// providerID
-// 1) the id of the instance in the alicloud API. Use '.' to separate providerID which looks like 'cn-hangzhou.i-v98dklsmnxkkgiiil7'. The format of "REGION.NODEID"
-// 2) the id for an instance in the kubernetes API, which has 'alicloud://' prefix. e.g. alicloud://cn-hangzhou.i-v98dklsmnxkkgiiil7
-func nodeFromProviderID(providerID string) (string, string, error) {
-	if strings.HasPrefix(providerID, "alicloud://") {
-		k8sName := strings.Split(providerID, "://")
-		if len(k8sName) < 2 {
-			return "", "", fmt.Errorf("alicloud: unable to split instanceid and region from providerID, error unexpected providerID=%s", providerID)
-		} else {
-			providerID = k8sName[1]
-		}
-	}
-
-	name := strings.Split(providerID, ".")
-	if len(name) < 2 {
-		return "", "", fmt.Errorf("alicloud: unable to split instanceid and region from providerID, error unexpected providerID=%s", providerID)
-	}
-	return name[0], name[1], nil
-}
-
-func providerIDFromInstance(region, instance string) string {
-	return fmt.Sprintf("%s.%s", region, instance)
-}
 
 func findAddress(instance *ecs.Instance) []v1.NodeAddress {
 	var addrs []v1.NodeAddress

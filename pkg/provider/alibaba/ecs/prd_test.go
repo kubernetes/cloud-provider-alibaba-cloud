@@ -1,10 +1,11 @@
-package alibaba
+package ecs
 
 import (
 	"encoding/base64"
 	"fmt"
-	"github.com/aliyun/alibaba-cloud-sdk-go/services/ecs"
 	"testing"
+
+	"github.com/aliyun/alibaba-cloud-sdk-go/services/ecs"
 )
 
 func modifyUserData(client *ecs.Client, id, data string) error {

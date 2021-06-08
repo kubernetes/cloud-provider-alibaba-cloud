@@ -1,14 +1,18 @@
-package alibaba
+package vpc
 
 import (
 	"context"
 	"fmt"
-	"github.com/aliyun/alibaba-cloud-sdk-go/sdk/requests"
-	"github.com/aliyun/alibaba-cloud-sdk-go/services/vpc"
+	"strings"
+
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/model"
 	prvd "k8s.io/cloud-provider-alibaba-cloud/pkg/provider"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/base"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/util"
 	"k8s.io/klog"
-	"strings"
+
+	"github.com/aliyun/alibaba-cloud-sdk-go/sdk/requests"
+	"github.com/aliyun/alibaba-cloud-sdk-go/services/vpc"
 )
 
 type AssociatedInstanceType string
@@ -16,7 +20,7 @@ type AssociatedInstanceType string
 const SlbInstance = AssociatedInstanceType("SlbInstance")
 
 func NewVPCProvider(
-	auth *ClientAuth,
+	auth *base.ClientAuth,
 ) *VPCProvider {
 	return &VPCProvider{auth: auth}
 }
@@ -24,7 +28,7 @@ func NewVPCProvider(
 var _ prvd.IVPC = &VPCProvider{}
 
 type VPCProvider struct {
-	auth   *ClientAuth
+	auth   *base.ClientAuth
 	region string
 }
 
@@ -48,7 +52,7 @@ func (r *VPCProvider) FindRoute(ctx context.Context, table, provID, cidr string)
 	describeRouteEntryRequest.MaxResult = requests.NewInteger(model.RouteMaxQueryRouteEntry)
 	describeRouteEntryRequest.RouteEntryType = model.RouteEntryTypeCustom
 	if provID != "" {
-		_, instance, err := nodeFromProviderID(provID)
+		_, instance, err := util.NodeFromProviderID(provID)
 		if err != nil {
 			return nil, fmt.Errorf("invalid provide id: %v, err: %v", provID, err)
 		}
@@ -86,7 +90,7 @@ func (r *VPCProvider) providerIDFromInstanceId(instanceID string) (pvid string, 
 			return "", fmt.Errorf("error get region id for route entry: %v", err)
 		}
 	}
-	return providerIDFromInstance(r.region, instanceID), nil
+	return util.ProviderIDFromInstance(r.region, instanceID), nil
 }
 
 func (r *VPCProvider) CreateRoute(ctx context.Context, table string, provideID string, destinationCIDR string) (*model.Route, error) {
@@ -94,7 +98,7 @@ func (r *VPCProvider) CreateRoute(ctx context.Context, table string, provideID s
 	createRouteEntryRequest.RouteTableId = table
 	createRouteEntryRequest.DestinationCidrBlock = destinationCIDR
 	createRouteEntryRequest.NextHopType = model.RouteNextHopTypeInstance
-	_, instance, err := nodeFromProviderID(provideID)
+	_, instance, err := util.NodeFromProviderID(provideID)
 	if err != nil {
 		return nil, fmt.Errorf("invalid provide id: %v, err: %v", provideID, err)
 	}
@@ -114,7 +118,7 @@ func (r *VPCProvider) DeleteRoute(ctx context.Context, table, provideID, destina
 	deleteRouteEntryRequest := vpc.CreateDeleteRouteEntryRequest()
 	deleteRouteEntryRequest.RouteTableId = table
 	deleteRouteEntryRequest.DestinationCidrBlock = destinationCIDR
-	_, instance, err := nodeFromProviderID(provideID)
+	_, instance, err := util.NodeFromProviderID(provideID)
 	if err != nil {
 		return fmt.Errorf("invalid provide id: %v, err: %v", provideID, err)
 	}
@@ -188,7 +192,7 @@ func (p *VPCProvider) DescribeEipAddresses(ctx context.Context, instanceType str
 	req.AssociatedInstanceType = instanceType
 	req.AssociatedInstanceId = instanceId
 	var ips []string
-	next := &Pagination{
+	next := &util.Pagination{
 		PageNumber: 1,
 		PageSize:   10,
 	}
@@ -205,7 +209,7 @@ func (p *VPCProvider) DescribeEipAddresses(ctx context.Context, instanceType str
 			ips = append(ips, eip.IpAddress)
 		}
 
-		pageResult := &PaginationResult{
+		pageResult := &util.PaginationResult{
 			PageNumber: resp.PageNumber,
 			PageSize:   resp.PageSize,
 			TotalCount: resp.TotalCount,

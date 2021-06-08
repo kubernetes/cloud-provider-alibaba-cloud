@@ -3,16 +3,17 @@ package service
 import (
 	"encoding/json"
 	"fmt"
+	"strconv"
+	"strings"
+
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/helper"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/model"
 	prvd "k8s.io/cloud-provider-alibaba-cloud/pkg/provider"
-	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/base"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/util"
 	"k8s.io/klog"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"strconv"
-	"strings"
 )
 
 // EndpointWithENI
@@ -265,7 +266,7 @@ func isVGroupManagedByMyService(remote model.VServerGroup, service *v1.Service) 
 
 	return remote.NamedKey.ServiceName == service.Name &&
 		remote.NamedKey.Namespace == service.Namespace &&
-		remote.NamedKey.CID == alibaba.CLUSTER_ID
+		remote.NamedKey.CID == base.CLUSTER_ID
 }
 
 func getNodes(reqCtx *RequestContext, client client.Client) ([]v1.Node, error) {

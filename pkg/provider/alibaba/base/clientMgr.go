@@ -14,14 +14,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package alibaba
+package base
 
 import (
 	b64 "encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	prvd "k8s.io/cloud-provider-alibaba-cloud/pkg/provider"
 	"path/filepath"
 	"strings"
 	"time"
@@ -33,9 +32,10 @@ import (
 	"github.com/ghodss/yaml"
 	"github.com/go-cmd/cmd"
 	log "github.com/sirupsen/logrus"
-	"k8s.io/apimachinery/pkg/util/wait"
 
+	"k8s.io/apimachinery/pkg/util/wait"
 	ctx2 "k8s.io/cloud-provider-alibaba-cloud/pkg/context"
+	prvd "k8s.io/cloud-provider-alibaba-cloud/pkg/provider"
 	"k8s.io/cloud-provider-alibaba-cloud/version"
 )
 

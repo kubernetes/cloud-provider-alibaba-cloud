@@ -1,17 +1,19 @@
-package alibaba
+package pvtz
 
 import (
 	"context"
 	"fmt"
 	"strings"
 
+	util_errors "k8s.io/apimachinery/pkg/util/errors"
+	ctx2 "k8s.io/cloud-provider-alibaba-cloud/pkg/context"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/model"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/base"
+
 	"github.com/aliyun/alibaba-cloud-sdk-go/sdk/requests"
 	"github.com/aliyun/alibaba-cloud-sdk-go/services/pvtz"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
-	util_errors "k8s.io/apimachinery/pkg/util/errors"
-	ctx2 "k8s.io/cloud-provider-alibaba-cloud/pkg/context"
-	"k8s.io/cloud-provider-alibaba-cloud/pkg/model"
 )
 
 const (
@@ -25,7 +27,7 @@ type PVTZProvider struct {
 	zoneId string
 }
 
-func NewPVTZProvider(auth *ClientAuth) *PVTZProvider {
+func NewPVTZProvider(auth *base.ClientAuth) *PVTZProvider {
 	return &PVTZProvider{
 		client: auth.PVTZ,
 		zoneId: ctx2.CFG.Global.PrivateZoneID,

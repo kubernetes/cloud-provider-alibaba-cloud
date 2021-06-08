@@ -1,11 +1,12 @@
 package vmock
 
 import (
-	"github.com/aliyun/alibaba-cloud-sdk-go/services/ecs"
-	log "github.com/sirupsen/logrus"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/context/node"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider"
-	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/base"
+
+	"github.com/aliyun/alibaba-cloud-sdk-go/services/ecs"
+	log "github.com/sirupsen/logrus"
 )
 
 /*
@@ -13,13 +14,13 @@ import (
 	"alibaba:DeleteInstance", "alibaba:RunCommand",
 */
 func NewMockECS(
-	auth *alibaba.ClientAuth,
+	auth *base.ClientAuth,
 ) *MockECS {
 	return &MockECS{auth: auth}
 }
 
 type MockECS struct {
-	auth *alibaba.ClientAuth
+	auth *base.ClientAuth
 }
 
 var _ prvd.IInstance = &MockECS{}
