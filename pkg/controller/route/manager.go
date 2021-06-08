@@ -149,6 +149,9 @@ func confilctWithNodes(route string, nodes *v1.NodeList) bool {
 			klog.Errorf("error get ipv4 cidr from node: %v", node.Name)
 			continue
 		}
+		if ipv4Cidr == nil {
+			continue
+		}
 		_, contains, err := containsRoute(ipv4Cidr, route)
 		if err != nil {
 			klog.Errorf("error get conflict state from node: %v and route: %v", node.Name, route)

@@ -65,7 +65,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		"route-controller", mgr,
 		controller.Options{
 			Reconciler:              r,
-			MaxConcurrentReconciles: 2,
+			MaxConcurrentReconciles: 1,
 		},
 	)
 	if err != nil {
