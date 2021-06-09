@@ -6,6 +6,6 @@ FROM alpine:3.11.6
 
 RUN apk add --no-cache --update ca-certificates
 
-COPY alibaba-cloud-ccm /cloud-controller-manager
+COPY bin/cloud-controller-manager /cloud-controller-manager
 
 ENTRYPOINT  ["/cloud-controller-manager"]

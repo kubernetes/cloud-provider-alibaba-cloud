@@ -20,8 +20,8 @@ REPO_ROOT:=${CURDIR}
 # autodetect host GOOS and GOARCH by default, even if go is not installed
 GOOS?=linux
 GOARCH?=amd64
-REGISTRY?=registry.cn-hangzhou.aliyuncs.com/aoxn/cloud-controller-manager-amd64
-TAG?=$(shell hack/util/tag.sh)
+REGISTRY?=registry.cn-hangzhou.aliyuncs.com/acs/cloud-controller-manager-amd64
+TAG?=$(shell git describe --tags)
 
 # make install will place binaries here
 # the default path attempst to mimic go install
@@ -88,7 +88,7 @@ cloud-controller-manager: make-cache out-dir
 		--user $(UID):$(GID) \
 		$(GO_IMAGE) \
 		go build -v -o /out/$(KIND_BINARY_NAME) \
-		    -ldflags "-X k8s.io/cloud-provider-alibaba-cloud/version.Version=$(TAG)" .
+		    -ldflags "-X k8s.io/cloud-provider-alibaba-cloud/version.Version=$(TAG)" cmd/manager/main.go
 	@echo + Built cloud-controller-manager binary to $(OUT_DIR)/$(KIND_BINARY_NAME)
 
 # alias for building cloud-controller-manager
@@ -96,10 +96,10 @@ build: cloud-controller-manager
 
 
 image: build
-	docker build -t $(REGISTRY):$(TAG) build/
+	docker build -t $(REGISTRY):$(TAG) -f Dockerfile .
 
 bimage: ccm-linux
-	docker build --no-cache -t $(REGISTRY):$(TAG) build/
+	docker build --no-cache -t $(REGISTRY):$(TAG) -f Dockerfile .
 
 push: bimage
 	docker push $(REGISTRY):$(TAG)
