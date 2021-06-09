@@ -41,12 +41,12 @@ const (
 	REGION             = "region-id"
 	SERIAL_NUMBER      = "serial-number"
 	SOURCE_ADDRESS     = "source-address"
-	VPC_CIDR_BLOCK     = "alibaba-cidr-block"
-	VPC_ID             = "alibaba-id"
+	VPC_CIDR_BLOCK     = "vpc-cidr-block"
+	VPC_ID             = "vpc-id"
 	VSWITCH_CIDR_BLOCK = "vswitch-cidr-block"
 	VSWITCH_ID         = "vswitch-id"
 	ZONE               = "zone-id"
-	RAM_SECURITY       = "Ram/security-credentials"
+	RAM_SECURITY       = "ram/security-credentials"
 )
 
 var CLUSTER_ID = "clusterid"
@@ -363,7 +363,7 @@ func (vpc *MetaDataRequest) Do(api interface{}) (err error) {
 func (vpc *MetaDataRequest) Decode(data string, api interface{}) error {
 	if data == "" {
 		url, _ := vpc.Url()
-		return errors.New(fmt.Sprintf("metadata: alivpc decode data must not be nil. url=[%s]\n", url))
+		return fmt.Errorf("metadata: alivpc decode data must not be nil. url=[%s]\n", url)
 	}
 	switch api.(type) {
 	case *ResultList:
@@ -372,7 +372,7 @@ func (vpc *MetaDataRequest) Decode(data string, api interface{}) error {
 	case *prvd.RoleAuth:
 		return json.Unmarshal([]byte(data), api)
 	default:
-		return errors.New(fmt.Sprintf("metadata: unknow type to decode, type=%s\n", reflect.TypeOf(api)))
+		return fmt.Errorf("metadata: unknow type to decode, type=%s\n", reflect.TypeOf(api))
 	}
 }
 
