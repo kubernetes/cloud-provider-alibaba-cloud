@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
@@ -18,6 +19,7 @@ import (
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/model"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/vpc"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/dryrun"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/util"
 	"k8s.io/klog"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
@@ -52,6 +54,12 @@ func newReconciler(mgr manager.Manager, ctx *shared.SharedContext) reconcile.Rec
 
 // add adds a new Controller to mgr with r as the reconcile.Reconciler
 func add(mgr manager.Manager, r reconcile.Reconciler) error {
+
+	if ctx2.GlobalFlag.DryRun {
+		if err := initMap(mgr.GetClient()); err != nil {
+		}
+	}
+
 	// Create a new controller
 	c, err := controller.New(
 		"service-controller", mgr,
@@ -113,11 +121,23 @@ type RequestContext struct {
 }
 
 func (m *ReconcileService) reconcile(request reconcile.Request) error {
-	// new context for each request
-	ctx := context.Background()
+
+	defer func() {
+		if ctx2.GlobalFlag.DryRun {
+			initial.Store(request, 1)
+			if mapfull() {
+				klog.Infof("ccm initial process finished.")
+				err := dryrun.ResultEvent(m.kubeClient, dryrun.SUCCESS, "ccm initial process finished")
+				if err != nil {
+					klog.Errorf("write precheck event fail: %s", err.Error())
+				}
+				os.Exit(0)
+			}
+		}
+	}()
 
 	svc := &v1.Service{}
-	err := m.kubeClient.Get(ctx, request.NamespacedName, svc)
+	err := m.kubeClient.Get(context.Background(), request.NamespacedName, svc)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			klog.Infof("service %s not found, skip", request.NamespacedName)
@@ -141,6 +161,10 @@ func (m *ReconcileService) reconcile(request reconcile.Request) error {
 			return nil
 		}
 	}
+
+	// new context for each request
+	ctx := context.Background()
+	ctx = context.WithValue(ctx, dryrun.ContextService, svc)
 
 	reqContext := &RequestContext{
 		Ctx:      ctx,

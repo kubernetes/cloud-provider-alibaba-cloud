@@ -36,6 +36,7 @@ type Flags struct {
 	CloudConfig        string
 	EnableLeaderSelect bool
 	EnableControllers  []string
+	DryRun             bool
 }
 
 var GlobalFlag = &Flags{}

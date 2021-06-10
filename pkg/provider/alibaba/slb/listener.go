@@ -14,7 +14,7 @@ import (
 	"github.com/aliyun/alibaba-cloud-sdk-go/services/slb"
 )
 
-func (p ProviderSLB) DescribeLoadBalancerListeners(ctx context.Context, lbId string) ([]model.ListenerAttribute, error) {
+func (p SLBProvider) DescribeLoadBalancerListeners(ctx context.Context, lbId string) ([]model.ListenerAttribute, error) {
 	req := slb.CreateDescribeLoadBalancerListenersRequest()
 	req.LoadBalancerId = &[]string{lbId}
 	req.MaxResults = requests.NewInteger(50)
@@ -72,7 +72,7 @@ func (p ProviderSLB) DescribeLoadBalancerListeners(ctx context.Context, lbId str
 	return listeners, nil
 }
 
-func (p ProviderSLB) StartLoadBalancerListener(ctx context.Context, lbId string, port int) error {
+func (p SLBProvider) StartLoadBalancerListener(ctx context.Context, lbId string, port int) error {
 	req := slb.CreateStartLoadBalancerListenerRequest()
 	req.LoadBalancerId = lbId
 	req.ListenerPort = requests.NewInteger(port)
@@ -80,7 +80,7 @@ func (p ProviderSLB) StartLoadBalancerListener(ctx context.Context, lbId string,
 	return util.FormatErrorMessage(err)
 }
 
-func (p ProviderSLB) StopLoadBalancerListener(ctx context.Context, lbId string, port int) error {
+func (p SLBProvider) StopLoadBalancerListener(ctx context.Context, lbId string, port int) error {
 	req := slb.CreateStopLoadBalancerListenerRequest()
 	req.LoadBalancerId = lbId
 	req.ListenerPort = requests.NewInteger(port)
@@ -88,7 +88,7 @@ func (p ProviderSLB) StopLoadBalancerListener(ctx context.Context, lbId string, 
 	return util.FormatErrorMessage(err)
 }
 
-func (p ProviderSLB) DeleteLoadBalancerListener(ctx context.Context, lbId string, port int) error {
+func (p SLBProvider) DeleteLoadBalancerListener(ctx context.Context, lbId string, port int) error {
 	req := slb.CreateDeleteLoadBalancerListenerRequest()
 	req.LoadBalancerId = lbId
 	req.ListenerPort = requests.NewInteger(port)
@@ -98,7 +98,7 @@ func (p ProviderSLB) DeleteLoadBalancerListener(ctx context.Context, lbId string
 
 }
 
-func (p ProviderSLB) CreateLoadBalancerTCPListener(
+func (p SLBProvider) CreateLoadBalancerTCPListener(
 	ctx context.Context, lbId string, listener model.ListenerAttribute) error {
 	req := slb.CreateCreateLoadBalancerTCPListenerRequest()
 	req.LoadBalancerId = lbId
@@ -109,7 +109,7 @@ func (p ProviderSLB) CreateLoadBalancerTCPListener(
 	return util.FormatErrorMessage(err)
 }
 
-func (p ProviderSLB) SetLoadBalancerTCPListenerAttribute(
+func (p SLBProvider) SetLoadBalancerTCPListenerAttribute(
 	ctx context.Context, lbId string, listener model.ListenerAttribute) error {
 	req := slb.CreateSetLoadBalancerTCPListenerAttributeRequest()
 	req.LoadBalancerId = lbId
@@ -121,7 +121,7 @@ func (p ProviderSLB) SetLoadBalancerTCPListenerAttribute(
 	return util.FormatErrorMessage(err)
 }
 
-func (p ProviderSLB) CreateLoadBalancerUDPListener(
+func (p SLBProvider) CreateLoadBalancerUDPListener(
 	ctx context.Context, lbId string, listener model.ListenerAttribute) error {
 	req := slb.CreateCreateLoadBalancerUDPListenerRequest()
 	req.LoadBalancerId = lbId
@@ -132,7 +132,7 @@ func (p ProviderSLB) CreateLoadBalancerUDPListener(
 	return util.FormatErrorMessage(err)
 }
 
-func (p ProviderSLB) SetLoadBalancerUDPListenerAttribute(
+func (p SLBProvider) SetLoadBalancerUDPListenerAttribute(
 	ctx context.Context, lbId string, listener model.ListenerAttribute) error {
 	req := slb.CreateSetLoadBalancerUDPListenerAttributeRequest()
 	req.LoadBalancerId = lbId
@@ -144,7 +144,7 @@ func (p ProviderSLB) SetLoadBalancerUDPListenerAttribute(
 	return util.FormatErrorMessage(err)
 }
 
-func (p ProviderSLB) CreateLoadBalancerHTTPListener(
+func (p SLBProvider) CreateLoadBalancerHTTPListener(
 	ctx context.Context, lbId string, listener model.ListenerAttribute) error {
 	req := slb.CreateCreateLoadBalancerHTTPListenerRequest()
 	req.LoadBalancerId = lbId
@@ -155,7 +155,7 @@ func (p ProviderSLB) CreateLoadBalancerHTTPListener(
 	return util.FormatErrorMessage(err)
 }
 
-func (p ProviderSLB) SetLoadBalancerHTTPListenerAttribute(
+func (p SLBProvider) SetLoadBalancerHTTPListenerAttribute(
 	ctx context.Context, lbId string, listener model.ListenerAttribute) error {
 	req := slb.CreateSetLoadBalancerHTTPListenerAttributeRequest()
 	req.LoadBalancerId = lbId
@@ -167,7 +167,7 @@ func (p ProviderSLB) SetLoadBalancerHTTPListenerAttribute(
 	return util.FormatErrorMessage(err)
 }
 
-func (p ProviderSLB) CreateLoadBalancerHTTPSListener(
+func (p SLBProvider) CreateLoadBalancerHTTPSListener(
 	ctx context.Context, lbId string, listener model.ListenerAttribute) error {
 	req := slb.CreateCreateLoadBalancerHTTPSListenerRequest()
 	req.LoadBalancerId = lbId
@@ -178,7 +178,7 @@ func (p ProviderSLB) CreateLoadBalancerHTTPSListener(
 	return util.FormatErrorMessage(err)
 }
 
-func (p ProviderSLB) SetLoadBalancerHTTPSListenerAttribute(
+func (p SLBProvider) SetLoadBalancerHTTPSListenerAttribute(
 	ctx context.Context, lbId string, listener model.ListenerAttribute) error {
 	req := slb.CreateSetLoadBalancerHTTPSListenerAttributeRequest()
 	req.LoadBalancerId = lbId

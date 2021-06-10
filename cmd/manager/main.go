@@ -5,14 +5,12 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/dryrun"
 	"net/http"
 	"os"
 	"runtime"
 	"time"
-
-	"k8s.io/cloud-provider-alibaba-cloud/pkg/apis"
-	"k8s.io/cloud-provider-alibaba-cloud/pkg/context/shared"
-	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba"
 
 	"github.com/operator-framework/operator-sdk/pkg/k8sutil"
 	"github.com/operator-framework/operator-sdk/pkg/leader"
@@ -25,6 +23,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 	"k8s.io/client-go/rest"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/apis"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/context/shared"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 	ctrl "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
@@ -80,6 +80,12 @@ func main() {
 		[]string{},
 		"controllers to enable, e.g., node, route, service, ingress, pvtz, default ['node','route','service']",
 	)
+	pflag.CommandLine.BoolVar(
+		&ctx2.GlobalFlag.DryRun,
+		"dry-run",
+		false,
+		"dry run",
+	)
 	// Add flags registered by imported packages (e.g. glog and
 	// controller-runtime)
 	pflag.CommandLine.AddGoFlagSet(flag.CommandLine)
@@ -132,9 +138,12 @@ func main() {
 	}
 
 	// Set default manager options
-	options := manager.Options{
-		MetricsBindAddress:     fmt.Sprintf("%s:%d", metricsHost, metricsPort),
-		HealthProbeBindAddress: healthAddr,
+	options := manager.Options{}
+	if !ctx2.GlobalFlag.DryRun {
+		options = manager.Options{
+			MetricsBindAddress:     fmt.Sprintf("%s:%d", metricsHost, metricsPort),
+			HealthProbeBindAddress: healthAddr,
+		}
 	}
 
 	// Set ReSync period
@@ -156,7 +165,13 @@ func main() {
 		os.Exit(1)
 	}
 
-	ctx := shared.NewSharedContext(alibaba.NewAlibabaCloud())
+	var ctx *shared.SharedContext
+	if ctx2.GlobalFlag.DryRun {
+		ctx = shared.NewSharedContext(dryrun.NewDryRunCloud())
+	} else {
+		ctx = shared.NewSharedContext(alibaba.NewAlibabaCloud())
+	}
+
 	// Setup all Controllers
 	if err := controller.AddToManager(mgr, ctx, ctx2.GlobalFlag.EnableControllers); err != nil {
 		log.Errorf("add controller: %s", err.Error())

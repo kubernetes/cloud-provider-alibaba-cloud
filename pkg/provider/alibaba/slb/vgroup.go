@@ -10,7 +10,7 @@ import (
 	"github.com/aliyun/alibaba-cloud-sdk-go/services/slb"
 )
 
-func (p ProviderSLB) DescribeVServerGroups(ctx context.Context, lbId string) ([]model.VServerGroup, error) {
+func (p SLBProvider) DescribeVServerGroups(ctx context.Context, lbId string) ([]model.VServerGroup, error) {
 	req := slb.CreateDescribeVServerGroupsRequest()
 	req.LoadBalancerId = lbId
 	resp, err := p.auth.SLB.DescribeVServerGroups(req)
@@ -35,7 +35,7 @@ func (p ProviderSLB) DescribeVServerGroups(ctx context.Context, lbId string) ([]
 	return vgs, nil
 }
 
-func (p ProviderSLB) CreateVServerGroup(ctx context.Context, vg *model.VServerGroup, lbId string) error {
+func (p SLBProvider) CreateVServerGroup(ctx context.Context, vg *model.VServerGroup, lbId string) error {
 	req := slb.CreateCreateVServerGroupRequest()
 	req.LoadBalancerId = lbId
 	req.VServerGroupName = vg.VGroupName
@@ -52,7 +52,7 @@ func (p ProviderSLB) CreateVServerGroup(ctx context.Context, vg *model.VServerGr
 	return nil
 }
 
-func (p ProviderSLB) DescribeVServerGroupAttribute(ctx context.Context, vGroupId string) (model.VServerGroup, error) {
+func (p SLBProvider) DescribeVServerGroupAttribute(ctx context.Context, vGroupId string) (model.VServerGroup, error) {
 	req := slb.CreateDescribeVServerGroupAttributeRequest()
 	req.VServerGroupId = vGroupId
 	resp, err := p.auth.SLB.DescribeVServerGroupAttribute(req)
@@ -64,14 +64,14 @@ func (p ProviderSLB) DescribeVServerGroupAttribute(ctx context.Context, vGroupId
 
 }
 
-func (p ProviderSLB) DeleteVServerGroup(ctx context.Context, vGroupId string) error {
+func (p SLBProvider) DeleteVServerGroup(ctx context.Context, vGroupId string) error {
 	req := slb.CreateDeleteVServerGroupRequest()
 	req.VServerGroupId = vGroupId
 	_, err := p.auth.SLB.DeleteVServerGroup(req)
 	return util.FormatErrorMessage(err)
 }
 
-func (p ProviderSLB) AddVServerGroupBackendServers(ctx context.Context, vGroupId string, backends string) error {
+func (p SLBProvider) AddVServerGroupBackendServers(ctx context.Context, vGroupId string, backends string) error {
 	req := slb.CreateAddVServerGroupBackendServersRequest()
 	req.VServerGroupId = vGroupId
 	req.BackendServers = backends
@@ -80,7 +80,7 @@ func (p ProviderSLB) AddVServerGroupBackendServers(ctx context.Context, vGroupId
 
 }
 
-func (p ProviderSLB) RemoveVServerGroupBackendServers(ctx context.Context, vGroupId string, backends string) error {
+func (p SLBProvider) RemoveVServerGroupBackendServers(ctx context.Context, vGroupId string, backends string) error {
 	req := slb.CreateRemoveVServerGroupBackendServersRequest()
 	req.VServerGroupId = vGroupId
 	req.BackendServers = backends
@@ -88,7 +88,7 @@ func (p ProviderSLB) RemoveVServerGroupBackendServers(ctx context.Context, vGrou
 	return util.FormatErrorMessage(err)
 }
 
-func (p ProviderSLB) SetVServerGroupAttribute(ctx context.Context, vGroupId string, backends string) error {
+func (p SLBProvider) SetVServerGroupAttribute(ctx context.Context, vGroupId string, backends string) error {
 	req := slb.CreateSetVServerGroupAttributeRequest()
 	req.VServerGroupId = vGroupId
 	req.BackendServers = backends
@@ -96,7 +96,7 @@ func (p ProviderSLB) SetVServerGroupAttribute(ctx context.Context, vGroupId stri
 	return util.FormatErrorMessage(err)
 }
 
-func (p ProviderSLB) ModifyVServerGroupBackendServers(ctx context.Context, vGroupId string, old string, new string) error {
+func (p SLBProvider) ModifyVServerGroupBackendServers(ctx context.Context, vGroupId string, old string, new string) error {
 	req := slb.CreateModifyVServerGroupBackendServersRequest()
 	req.VServerGroupId = vGroupId
 	req.OldBackendServers = old

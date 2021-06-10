@@ -187,7 +187,7 @@ func (r *VPCProvider) listRouteBatch(table, nextToken string, routes *[]*model.R
 	return nil
 }
 
-func (p *VPCProvider) DescribeEipAddresses(ctx context.Context, instanceType string, instanceId string) ([]string, error) {
+func (r *VPCProvider) DescribeEipAddresses(ctx context.Context, instanceType string, instanceId string) ([]string, error) {
 	req := vpc.CreateDescribeEipAddressesRequest()
 	req.AssociatedInstanceType = instanceType
 	req.AssociatedInstanceId = instanceId
@@ -200,7 +200,7 @@ func (p *VPCProvider) DescribeEipAddresses(ctx context.Context, instanceType str
 	for {
 		req.PageSize = requests.NewInteger(next.PageSize)
 		req.PageNumber = requests.NewInteger(next.PageNumber)
-		resp, err := p.auth.VPC.DescribeEipAddresses(req)
+		resp, err := r.auth.VPC.DescribeEipAddresses(req)
 		if err != nil {
 			return nil, err
 		}
