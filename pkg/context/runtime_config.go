@@ -10,7 +10,8 @@ import (
 const (
 	flagKubeconfig              = "kubeconfig"
 	flagAddress                 = "address"
-	flagPort                    = "port"
+	flagMetricsPort             = "metrics-port"
+	flagHealthProbePort         = "health-probe-port"
 	flagEnableLeaderElection    = "enable-leader-election"
 	flagLeaderElectionID        = "leader-election-id"
 	flagLeaderElectionNamespace = "leader-election-namespace"
@@ -20,7 +21,8 @@ const (
 
 	defaultKubeConfig              = ""
 	defaultAddress                 = "127.0.0.1"
-	defaultPort                    = 10258
+	defaultMetricsPort             = 10259
+	defaultHealthProbePort         = 10258
 	defaultLeaderElectionID        = "ccm"
 	defaultLeaderElectionNamespace = "kube-system"
 	defaultSyncPeriod              = 60 * time.Minute
@@ -32,7 +34,8 @@ const (
 type RuntimeConfig struct {
 	KubeConfig              string
 	Address                 string
-	Port                    int32
+	MetricsPort             int32
+	HealthProbePort         int
 	EnableLeaderElection    bool
 	LeaderElectionID        string
 	LeaderElectionNamespace string
@@ -46,8 +49,10 @@ func (c *RuntimeConfig) BindFlags(fs *pflag.FlagSet) {
 		"Path to the kubeconfig file containing authorization and API server information.")
 	fs.StringVar(&c.Address, flagAddress, defaultAddress,
 		"The IP address to serve on (set to 0.0.0.0 for all interfaces).")
-	fs.Int32Var(&c.Port, flagPort, defaultPort,
+	fs.Int32Var(&c.MetricsPort, flagMetricsPort, defaultMetricsPort,
 		"The port the metric endpoints binds to.")
+	fs.IntVar(&c.HealthProbePort, flagHealthProbePort, defaultHealthProbePort,
+		"The port the health probe endpoints binds to.")
 	fs.BoolVar(&c.EnableLeaderElection, flagEnableLeaderElection, true,
 		"Enable leader election for controller manager. "+
 			"Enabling this will ensure there is only one active controller manager.")
@@ -63,8 +68,8 @@ func (c *RuntimeConfig) BindFlags(fs *pflag.FlagSet) {
 
 func BuildRuntimeOptions(rtCfg RuntimeConfig) manager.Options {
 	return manager.Options{
-		MetricsBindAddress:      fmt.Sprintf("%s:%d", rtCfg.Address, rtCfg.Port),
-		HealthProbeBindAddress:  fmt.Sprintf(":%d", rtCfg.Port),
+		MetricsBindAddress:      fmt.Sprintf("%s:%d", rtCfg.Address, rtCfg.MetricsPort),
+		HealthProbeBindAddress:  fmt.Sprintf(":%d", rtCfg.HealthProbePort),
 		LeaderElection:          rtCfg.EnableLeaderElection,
 		LeaderElectionID:        rtCfg.LeaderElectionID,
 		LeaderElectionNamespace: rtCfg.LeaderElectionNamespace,
