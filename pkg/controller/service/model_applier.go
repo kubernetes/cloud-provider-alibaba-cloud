@@ -3,7 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
-	ctx2 "k8s.io/cloud-provider-alibaba-cloud/pkg/context"
+	ctrlCtx "k8s.io/cloud-provider-alibaba-cloud/pkg/context"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/model"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/dryrun"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/util"
@@ -36,7 +36,7 @@ func (m *ModelApplier) Apply(reqCtx *RequestContext, local *model.LoadBalancer) 
 
 	serviceHashChanged := isServiceHashChanged(reqCtx.Service)
 	// apply sequence can not change, apply lb first, then vgroup, listener at last
-	if serviceHashChanged || ctx2.GlobalFlag.DryRun {
+	if serviceHashChanged || ctrlCtx.ControllerCFG.DryRun {
 		if err := m.applyLoadBalancerAttribute(reqCtx, local, remote); err != nil {
 			return remote, fmt.Errorf("update lb attribute error: %s", err.Error())
 		}
@@ -54,7 +54,7 @@ func (m *ModelApplier) Apply(reqCtx *RequestContext, local *model.LoadBalancer) 
 		return remote, fmt.Errorf("update lb backends error: %s", err.Error())
 	}
 
-	if serviceHashChanged || ctx2.GlobalFlag.DryRun {
+	if serviceHashChanged || ctrlCtx.ControllerCFG.DryRun {
 		if err := m.lisMgr.BuildRemoteModel(reqCtx, remote); err != nil {
 			return remote, fmt.Errorf("get lb listeners from cloud, error: %s", err.Error())
 		}

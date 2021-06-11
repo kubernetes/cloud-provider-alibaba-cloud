@@ -5,7 +5,7 @@ import (
 	"fmt"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
-	globalCtx "k8s.io/cloud-provider-alibaba-cloud/pkg/context"
+	ctrlCtx "k8s.io/cloud-provider-alibaba-cloud/pkg/context"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/helper"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/model"
 	prvd "k8s.io/cloud-provider-alibaba-cloud/pkg/provider"
@@ -59,17 +59,17 @@ func getRouteTables(ctx context.Context, providerIns prvd.Provider) ([]string, e
 	if err != nil {
 		return nil, fmt.Errorf("get vpc id from metadata error: %s", err.Error())
 	}
-	if globalCtx.CFG.Global.RouteTableIDS != "" {
-		return strings.Split(globalCtx.CFG.Global.RouteTableIDS, ","), nil
+	if ctrlCtx.ClougCFG.Global.RouteTableIDS != "" {
+		return strings.Split(ctrlCtx.ClougCFG.Global.RouteTableIDS, ","), nil
 	}
 	tables, err := providerIns.ListRouteTables(ctx, vpcId)
 	if err != nil {
 		return nil, fmt.Errorf("alicloud: "+
-			"can not found routetable by id[%s], error: %v", globalCtx.CFG.Global.VpcID, err)
+			"can not found routetable by id[%s], error: %v", ctrlCtx.ClougCFG.Global.VpcID, err)
 	}
 	if len(tables) > 1 {
 		return nil, fmt.Errorf("alicloud: "+
-			"multiple vpc found by id[%s], length(vpcs)=%d", globalCtx.CFG.Global.VpcID, len(tables))
+			"multiple vpc found by id[%s], length(vpcs)=%d",  ctrlCtx.ClougCFG.Global.VpcID, len(tables))
 	}
 	return tables, nil
 }
@@ -82,10 +82,10 @@ func (r *ReconcileRoute) syncTableRoutes(ctx context.Context, table string, node
 	}
 
 	var clusterCIDR *net.IPNet
-	if globalCtx.CFG.Global.ClusterCidr != "" {
-		_, clusterCIDR, err = net.ParseCIDR(globalCtx.CFG.Global.ClusterCidr)
+	if  ctrlCtx.ClougCFG.Global.ClusterCidr != "" {
+		_, clusterCIDR, err = net.ParseCIDR( ctrlCtx.ClougCFG.Global.ClusterCidr)
 		if err != nil {
-			return fmt.Errorf("error parse cluster cidr %s: %s", globalCtx.CFG.Global.ClusterCidr, err)
+			return fmt.Errorf("error parse cluster cidr %s: %s", ctrlCtx.ClougCFG.Global.ClusterCidr, err)
 		}
 	}
 

@@ -34,7 +34,7 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	"k8s.io/apimachinery/pkg/util/wait"
-	ctx2 "k8s.io/cloud-provider-alibaba-cloud/pkg/context"
+	ctrlCtx "k8s.io/cloud-provider-alibaba-cloud/pkg/context"
 	prvd "k8s.io/cloud-provider-alibaba-cloud/pkg/provider"
 	"k8s.io/cloud-provider-alibaba-cloud/version"
 )
@@ -57,9 +57,9 @@ type ClientAuth struct {
 
 // NewClientMgr return a new client manager
 func NewClientAuth() (*ClientAuth, error) {
-	log.Infof("load cfg from file: %s", ctx2.GlobalFlag.CloudConfig)
+	log.Infof("load cfg from file: %s", ctrlCtx.ControllerCFG.CloudConfig)
 	// reload config while token refresh
-	err := LoadCfg(ctx2.GlobalFlag.CloudConfig)
+	err := LoadCfg( ctrlCtx.ControllerCFG.CloudConfig)
 	if err != nil {
 		log.Warnf("load config fail: %s", err.Error())
 		return nil, err
@@ -117,9 +117,9 @@ func (mgr *ClientAuth) Start(
 ) error {
 	initialized := false
 	tokenfunc := func() {
-		log.Infof("load cfg from file: %s", ctx2.GlobalFlag.CloudConfig)
+		log.Infof("load cfg from file: %s",  ctrlCtx.ControllerCFG.CloudConfig)
 		// reload config while token refresh
-		err := LoadCfg(ctx2.GlobalFlag.CloudConfig)
+		err := LoadCfg( ctrlCtx.ControllerCFG.CloudConfig)
 		if err != nil {
 			log.Warnf("load config fail: %s", err.Error())
 			return
@@ -162,15 +162,15 @@ func LoadCfg(cfg string) error {
 	if err != nil {
 		return fmt.Errorf("read config file: %s", content)
 	}
-	return yaml.Unmarshal(content, ctx2.CFG)
+	return yaml.Unmarshal(content, ctrlCtx.ClougCFG)
 }
 
 func (mgr *ClientAuth) Token() TokenAuth {
-	key, err := b64.StdEncoding.DecodeString(ctx2.CFG.Global.AccessKeyID)
+	key, err := b64.StdEncoding.DecodeString(ctrlCtx.ClougCFG.Global.AccessKeyID)
 	if err != nil {
 		panic(fmt.Sprintf("ak key must be base64 encoded: %s", err.Error()))
 	}
-	secret, err := b64.StdEncoding.DecodeString(ctx2.CFG.Global.AccessKeySecret)
+	secret, err := b64.StdEncoding.DecodeString(ctrlCtx.ClougCFG.Global.AccessKeySecret)
 	if err != nil {
 		panic(fmt.Sprintf("ak secret must be base64 encoded: %s", err.Error()))
 	}
@@ -179,7 +179,7 @@ func (mgr *ClientAuth) Token() TokenAuth {
 		log.Infof("ccm: use ramrole Token mode without ak.")
 		return &RamRoleToken{meta: mgr.Meta}
 	}
-	region := ctx2.CFG.Global.Region
+	region := ctrlCtx.ClougCFG.Global.Region
 	if region == "" {
 		region, err = mgr.Meta.Region()
 		if err != nil {
@@ -189,7 +189,7 @@ func (mgr *ClientAuth) Token() TokenAuth {
 	inittoken := &Token{
 		AccessKey:    string(key),
 		AccessSecret: string(secret),
-		UID:          ctx2.CFG.Global.UID,
+		UID:          ctrlCtx.ClougCFG.Global.UID,
 		Region:       region,
 	}
 	if inittoken.UID == "" {
@@ -275,7 +275,7 @@ func (f *RamRoleToken) NextToken() (*Token, error) {
 	if err != nil {
 		return nil, fmt.Errorf("ramrole Token retrieve: %s", err.Error())
 	}
-	region := ctx2.CFG.Global.Region
+	region := ctrlCtx.ClougCFG.Global.Region
 	if region == "" {
 		region, err = f.meta.Region()
 		if err != nil {

@@ -4,7 +4,7 @@ import (
 	"fmt"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
-	ctx2 "k8s.io/cloud-provider-alibaba-cloud/pkg/context"
+	ctrlCtx "k8s.io/cloud-provider-alibaba-cloud/pkg/context"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/helper"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/model"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/util/hash"
@@ -82,7 +82,7 @@ func isENIBackendType(svc *v1.Service) bool {
 		return os.Getenv("SERVICE_FORCE_BACKEND_ENI") == "true"
 	}
 
-	return ctx2.CFG.Global.ServiceBackendType == model.ENIBackendType
+	return ctrlCtx.ClougCFG.Global.ServiceBackendType == model.ENIBackendType
 }
 
 func needDeleteLoadBalancer(svc *v1.Service) bool {

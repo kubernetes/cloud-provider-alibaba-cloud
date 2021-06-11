@@ -13,7 +13,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/record"
-	ctx2 "k8s.io/cloud-provider-alibaba-cloud/pkg/context"
+	ctrlCtx "k8s.io/cloud-provider-alibaba-cloud/pkg/context"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/context/shared"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/helper"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/model"
@@ -55,7 +55,7 @@ func newReconciler(mgr manager.Manager, ctx *shared.SharedContext) reconcile.Rec
 // add adds a new Controller to mgr with r as the reconcile.Reconciler
 func add(mgr manager.Manager, r reconcile.Reconciler) error {
 
-	if ctx2.GlobalFlag.DryRun {
+	if ctrlCtx.ControllerCFG.DryRun {
 		if err := initMap(mgr.GetClient()); err != nil {
 		}
 	}
@@ -123,7 +123,7 @@ type RequestContext struct {
 func (m *ReconcileService) reconcile(request reconcile.Request) error {
 
 	defer func() {
-		if ctx2.GlobalFlag.DryRun {
+		if ctrlCtx.ControllerCFG.DryRun {
 			initial.Store(request, 1)
 			if mapfull() {
 				klog.Infof("ccm initial process finished.")
@@ -155,7 +155,7 @@ func (m *ReconcileService) reconcile(request reconcile.Request) error {
 	// disable public address
 	if anno.Get(AddressType) == "" ||
 		anno.Get(AddressType) == string(model.InternetAddressType) {
-		if ctx2.CFG.Global.DisablePublicSLB {
+		if ctrlCtx.ClougCFG.Global.DisablePublicSLB {
 			m.record.Event(svc, v1.EventTypeWarning, helper.FailedSyncLB, "create public address slb is not allowed")
 			// do not support create public address slb, return and don't requeue
 			return nil

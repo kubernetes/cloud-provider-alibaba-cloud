@@ -9,11 +9,6 @@ import (
 	"time"
 )
 
-type DetailECS struct {
-	// ImageID alibaba image id
-	ImageID string
-}
-
 type Provider interface {
 	IMetaData
 	IInstance

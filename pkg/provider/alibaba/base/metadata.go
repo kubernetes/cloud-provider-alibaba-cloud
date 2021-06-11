@@ -14,7 +14,7 @@ import (
 	"strings"
 	"time"
 
-	ctx2 "k8s.io/cloud-provider-alibaba-cloud/pkg/context"
+	ctrlCtx "k8s.io/cloud-provider-alibaba-cloud/pkg/context"
 	prvd "k8s.io/cloud-provider-alibaba-cloud/pkg/provider"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/util"
 	"k8s.io/klog"
@@ -62,8 +62,8 @@ type IMetaDataRequest interface {
 
 // NewMetaData return new metadata
 func NewMetaData() prvd.IMetaData {
-	if ctx2.CFG.Global.VpcID != "" &&
-		ctx2.CFG.Global.VswitchID != "" {
+	if ctrlCtx.ClougCFG.Global.VpcID != "" &&
+		ctrlCtx.ClougCFG.Global.VswitchID != "" {
 		klog.V(2).Infof("use mocked metadata server.")
 		return &CfgMetaData{base: NewBaseMetaData(nil)}
 	}
@@ -277,8 +277,8 @@ func (m *BaseMetaData) RamRoleToken(role string) (prvd.RoleAuth, error) {
 }
 
 func (m *BaseMetaData) ClusterID() string {
-	if ctx2.CFG.Global.ClusterID != "" {
-		return ctx2.CFG.Global.ClusterID
+	if ctrlCtx.ClougCFG.Global.ClusterID != "" {
+		return ctrlCtx.ClougCFG.Global.ClusterID
 	}
 	return CLUSTER_ID
 }
@@ -493,8 +493,8 @@ func (m *CfgMetaData) PrivateIPv4() (string, error) {
 }
 
 func (m *CfgMetaData) Region() (string, error) {
-	if ctx2.CFG.Global.Region != "" {
-		return ctx2.CFG.Global.Region, nil
+	if ctrlCtx.ClougCFG.Global.Region != "" {
+		return ctrlCtx.ClougCFG.Global.Region, nil
 	}
 	return m.base.Region()
 }
@@ -516,8 +516,8 @@ func (m *CfgMetaData) VpcCIDRBlock() (string, error) {
 }
 
 func (m *CfgMetaData) VpcID() (string, error) {
-	if ctx2.CFG.Global.VpcID != "" {
-		return ctx2.CFG.Global.VpcID, nil
+	if ctrlCtx.ClougCFG.Global.VpcID != "" {
+		return ctrlCtx.ClougCFG.Global.VpcID, nil
 	}
 	return m.base.VpcID()
 }
@@ -529,19 +529,19 @@ func (m *CfgMetaData) VswitchCIDRBlock() (string, error) {
 
 // zone1:vswitchid1,zone2:vswitch2
 func (m *CfgMetaData) VswitchID() (string, error) {
-	if ctx2.CFG.Global.VswitchID == "" {
+	if ctrlCtx.ClougCFG.Global.VswitchID == "" {
 		// get vswitch id from meta server
 		return m.base.VswitchID()
 	}
-	zlist := strings.Split(ctx2.CFG.Global.VswitchID, ",")
+	zlist := strings.Split(ctrlCtx.ClougCFG.Global.VswitchID, ",")
 	if len(zlist) == 1 {
-		vSwitchs := strings.Split(ctx2.CFG.Global.VswitchID, ":")
+		vSwitchs := strings.Split(ctrlCtx.ClougCFG.Global.VswitchID, ":")
 		if len(vSwitchs) == 2 {
 			klog.Infof("only one vswitchid mode, %s", vSwitchs[1])
 			return vSwitchs[1], nil
 		}
-		klog.Infof("simple vswitchid mode, %s", ctx2.CFG.Global.VswitchID)
-		return ctx2.CFG.Global.VswitchID, nil
+		klog.Infof("simple vswitchid mode, %s", ctrlCtx.ClougCFG.Global.VswitchID)
+		return ctrlCtx.ClougCFG.Global.VswitchID, nil
 	}
 	mzone, err := m.Zone()
 	if err != nil {
@@ -550,14 +550,14 @@ func (m *CfgMetaData) VswitchID() (string, error) {
 	for _, zone := range zlist {
 		vs := strings.Split(zone, ":")
 		if len(vs) != 2 {
-			return "", fmt.Errorf("cloud-config vswitch format error: %s", ctx2.CFG.Global.VswitchID)
+			return "", fmt.Errorf("cloud-config vswitch format error: %s", ctrlCtx.ClougCFG.Global.VswitchID)
 		}
 		if vs[0] == "" || vs[0] == mzone {
 			return vs[1], nil
 		}
 	}
-	klog.Infof("zone[%s] match failed, fallback with simple vswitch id mode, [%s]", mzone, ctx2.CFG.Global.VswitchID)
-	return ctx2.CFG.Global.VswitchID, nil
+	klog.Infof("zone[%s] match failed, fallback with simple vswitch id mode, [%s]", mzone, ctrlCtx.ClougCFG.Global.VswitchID)
+	return ctrlCtx.ClougCFG.Global.VswitchID, nil
 }
 
 func (m *CfgMetaData) EIPv4() (string, error) {
@@ -576,8 +576,8 @@ func (m *CfgMetaData) NTPConfigServers() ([]string, error) {
 }
 
 func (m *CfgMetaData) Zone() (string, error) {
-	if ctx2.CFG.Global.ZoneID != "" {
-		return ctx2.CFG.Global.ZoneID, nil
+	if ctrlCtx.ClougCFG.Global.ZoneID != "" {
+		return ctrlCtx.ClougCFG.Global.ZoneID, nil
 	}
 	return m.base.Zone()
 }
@@ -593,8 +593,8 @@ func (m *CfgMetaData) RamRoleToken(role string) (prvd.RoleAuth, error) {
 }
 
 func (m *CfgMetaData) ClusterID() string {
-	if ctx2.CFG.Global.ClusterID != "" {
-		CLUSTER_ID = ctx2.CFG.Global.ClusterID
+	if ctrlCtx.ClougCFG.Global.ClusterID != "" {
+		CLUSTER_ID = ctrlCtx.ClougCFG.Global.ClusterID
 	}
 	return CLUSTER_ID
 }

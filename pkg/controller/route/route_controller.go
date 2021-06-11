@@ -10,7 +10,7 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/record"
-	globalCtx "k8s.io/cloud-provider-alibaba-cloud/pkg/context"
+	ctrlCtx "k8s.io/cloud-provider-alibaba-cloud/pkg/context"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/context/shared"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/helper"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/node"
@@ -39,11 +39,11 @@ func newReconciler(mgr manager.Manager, ctx *shared.SharedContext) reconcile.Rec
 		scheme:       mgr.GetScheme(),
 		record:       mgr.GetEventRecorderFor("Route"),
 		nodeCache:    cmap.New(),
-		configRoutes: globalCtx.CFG.Global.ConfigureCloudRoutes,
+		configRoutes:  ctrlCtx.ClougCFG.Global.ConfigureCloudRoutes,
 	}
 
-	if globalCtx.CFG.Global.RouteReconciliationPeriod != "" {
-		duration, err := time.ParseDuration(globalCtx.CFG.Global.RouteReconciliationPeriod)
+	if  ctrlCtx.ClougCFG.Global.RouteReconciliationPeriod != "" {
+		duration, err := time.ParseDuration( ctrlCtx.ClougCFG.Global.RouteReconciliationPeriod)
 		if err == nil || duration != 0 {
 			recon.reconcilePeriod = duration
 		}
