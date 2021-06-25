@@ -80,28 +80,12 @@ type Routes interface {
 	// DeleteRoute deletes the specified managed route
 	// Route should be as returned by ListRoutes
 	DeleteRoute(ctx context.Context, clusterName string, table string, route *cloudprovider.Route) error
-
-	// ListPublishedRoutes list published routes
-	ListPublishedRoutes(
-		ctx context.Context,
-		clusterName string,
-		tableid string,
-	) ([]*cloudprovider.Route, error)
-
-	// PublishRoute publish route to cen
-	PublishRoute(
-		ctx context.Context,
-		clusterName string,
-		tableid string,
-		route *cloudprovider.Route,
-	) error
 }
 
 // RouteController response for route reconcile
 type RouteController struct {
 	routes           Routes
 	kubeClient       clientset.Interface
-	cenid            string
 	clusterName      string
 	clusterCIDR      *net.IPNet
 	nodeLister       corelisters.NodeLister
@@ -123,14 +107,10 @@ type RouteController struct {
 const NODE_QUEUE = "node.queue"
 
 // New new route controller
-func New(
-	routes Routes,
+func New(routes Routes,
 	kubeClient clientset.Interface,
 	nodeInformer coreinformers.NodeInformer,
-	clusterName string,
-	clusterCIDR *net.IPNet,
-	cenid string,
-) (*RouteController, error) {
+	clusterName string, clusterCIDR *net.IPNet) (*RouteController, error) {
 
 	if kubeClient != nil && kubeClient.CoreV1().RESTClient().GetRateLimiter() != nil {
 		err := metrics.RegisterMetricAndTrackRateLimiterUsage(
@@ -157,7 +137,6 @@ func New(
 		nodeListerSynced: nodeInformer.Informer().HasSynced,
 		broadcaster:      caster,
 		recorder:         eventer,
-		cenid:            cenid,
 		queues: map[string]queue.DelayingInterface{
 			NODE_QUEUE: workqueue.NewNamedDelayingQueue(NODE_QUEUE),
 		},
@@ -320,54 +299,8 @@ func (rc *RouteController) reconcile() error {
 		if err := rc.sync(ctx, table, nodes, routeList); err != nil {
 			return fmt.Errorf("reconcile route for table [%s] error: %s", table, err.Error())
 		}
-		if rc.cenid != "" {
-			// if cenid is configured , try to publish route into CEN
-			err := rc.syncPublishedRoutes(ctx, table, nodes, routeList)
-			if err != nil {
-				klog.Errorf("error on publish route: %s", err.Error())
-			}
-		}
 	}
 	metric.RouteLatency.WithLabelValues("reconcile").Observe(metric.MsSince(start))
-	return nil
-}
-
-func (rc *RouteController) syncPublishedRoutes(
-	ctx context.Context,
-	table string,
-	nodes []*v1.Node,
-	routes []*cloudprovider.Route,
-) error {
-	proutes, err := rc.routes.ListPublishedRoutes(ctx, rc.clusterName, table)
-	if err != nil {
-		return fmt.Errorf("sync published routes: %s", err.Error())
-	}
-	for _, r := range routes {
-		found := false
-		for _, pr := range proutes {
-			if r.DestinationCIDR == pr.DestinationCIDR {
-				found = true
-				break
-			}
-		}
-		if found {
-			klog.V(5).Infof("route has been published: %s, %s", table, r.DestinationCIDR)
-			// route has been published, skip
-			continue
-		}
-		err := rc.routes.PublishRoute(ctx, rc.clusterName, table, r)
-		if err != nil {
-			klog.Errorf("publish route: %s, continue next", err.Error())
-			if strings.Contains(
-				err.Error(),
-				"InvalidOperation.UnsupportRouteTableType",
-			) {
-				//unsupported route table type, fail fast
-				klog.Warningf("[%s] is not system route table, skip publish route.", table)
-				return nil
-			}
-		}
-	}
 	return nil
 }
 

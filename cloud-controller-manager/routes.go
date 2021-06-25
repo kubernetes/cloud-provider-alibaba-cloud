@@ -39,10 +39,6 @@ type RoutesClient struct {
 	region string
 	vpc    vpc
 	client RouteSDK
-
-	cenid string
-	// cen is the client interface to access CEN api
-	cen CEN
 }
 
 //RouteSDK define route sdk interface
@@ -55,8 +51,6 @@ type RouteSDK interface {
 	WaitForAllRouteEntriesAvailable(ctx context.Context, vrouterId string, routeTableId string, timeout int) error
 	DescribeRouteEntryList(ctx context.Context, args *ecs.DescribeRouteEntryListArgs) (response *ecs.DescribeRouteEntryListResponse, err error)
 }
-
-func (r *RoutesClient) WithCEN(id string) { r.cenid = id }
 
 //WithVPC set vpc id and and route table ids.
 func (r *RoutesClient) WithVPC(ctx context.Context, vpcid string, tableids string) error {
