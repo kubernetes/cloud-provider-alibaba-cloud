@@ -659,6 +659,7 @@ func (c *Cloud) ListPublishedRoutes(
 			PageNumber: i,
 			PageSize:   50,
 		}
+		args.Pagination = page
 		res, err := c.climgr.Routes().cen.
 			DescribePublishedRouteEntries(ctx, args)
 		if err != nil {
@@ -682,7 +683,7 @@ func (c *Cloud) ListPublishedRoutes(
 				},
 			)
 		}
-		if res.TotalCount < page.PageSize {
+		if res.TotalCount < page.PageSize * i {
 			break
 		}
 		klog.Infof("continue to list paged published routes: %s", tableid)
