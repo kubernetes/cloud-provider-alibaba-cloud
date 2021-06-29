@@ -7,7 +7,7 @@ TAG?=$(shell git describe --tags)
 ARCH?=amd64
 
 # Registry used for publishing images
-REGISTRY?=registry.cn-hangzhou.aliyuncs.com/acs/cloud-controller-manager-$(ARCH)
+REGISTRY?=quay.xiaodiankeji.net/acs/cloud-controller-manager-$(ARCH)
 
 CGO_ENABLED=1
 # Set the (cross) compiler to use for different architectures
@@ -107,7 +107,7 @@ cloud-controller-manager-$(ARCH): pre-requisite
 	docker run -e CC=$(CC) -e GOARM=$(GOARM) -e GOARCH=$(ARCH) -e CGO_ENABLED=$(CGO_ENABLED) \
 		-v $(SOURCE):/go/src/k8s.io/cloud-provider-alibaba-cloud \
 		-v $(HOME)/mod:/go/pkg/mod \
-		golang:1.14.1 /bin/bash -c '\
+		golang:1.16 /bin/bash -c '\
 		cd /go/src/k8s.io/cloud-provider-alibaba-cloud && \
 		TAG=$(TAG) ARCH=$(ARCH) make -e cloud-controller-manager'
 

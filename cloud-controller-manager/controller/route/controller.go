@@ -29,6 +29,7 @@ import (
 	"time"
 
 	"strings"
+	"encoding/json"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -58,7 +59,13 @@ const (
 
 	// Maximum number of retries of node status update.
 	updateNodeStatusMaxRetries int = 3
+
+	ovnNodeSubnets = "k8s.ovn.org/node-subnets"
 )
+
+type annotationNotSetError struct {
+	msg string
+}
 
 // Routes is an abstract, pluggable interface for advanced routing rules.
 type Routes interface {
@@ -229,10 +236,18 @@ func (rc *RouteController) Run(stopCh <-chan struct{}, syncPeriod time.Duration)
 }
 
 func (rc *RouteController) syncd(node *v1.Node) error {
+	var nodeSubnet string
+	ipnet, err := GetOVNNodeHostSubnet(node)
+	if err == nil {
+		nodeSubnet = ipnet[0].String()
+	} else {
+		nodeSubnet = node.Spec.PodCIDR
+	}
+
 	if utils.IsExcludedNode(node) {
 		return nil
 	}
-	if node.Spec.PodCIDR == "" {
+	if nodeSubnet == "" {
 		klog.Warningf("Node %s PodCIDR is nil, skip delete route", node.Name)
 		return nil
 	}
@@ -250,7 +265,7 @@ func (rc *RouteController) syncd(node *v1.Node) error {
 		route := &cloudprovider.Route{
 			Name:            node.Spec.ProviderID,
 			TargetNode:      types.NodeName(node.Spec.ProviderID),
-			DestinationCIDR: node.Spec.PodCIDR,
+			DestinationCIDR: nodeSubnet,
 		}
 		if err := rc.routes.DeleteRoute(
 			ctx, rc.clusterName, table, route,
@@ -317,7 +332,16 @@ func (rc *RouteController) sync(ctx context.Context, table string, nodes []*v1.N
 		if utils.IsExcludedNode(node) {
 			continue
 		}
-		if node.Spec.PodCIDR == "" {
+
+		var nodeSubnet string
+		ipnet, err := GetOVNNodeHostSubnet(node)
+		if err == nil {
+			nodeSubnet = ipnet[0].String()
+		} else {
+			nodeSubnet = node.Spec.PodCIDR
+		}
+
+		if nodeSubnet == "" {
 			err := rc.updateNetworkingCondition(types.NodeName(node.Name), false)
 			if err != nil {
 				klog.Errorf("route, update network condition error: %s", err.Error())
@@ -329,7 +353,7 @@ func (rc *RouteController) sync(ctx context.Context, table string, nodes []*v1.N
 			continue
 		}
 		// ignore error return. Try it next time anyway.
-		err := rc.tryCreateRoute(ctx, table, node, cached)
+		err = rc.tryCreateRoute(ctx, table, node, cached)
 		if err != nil {
 			klog.Errorf("try create route error: %s", err.Error())
 		}
@@ -363,7 +387,15 @@ func (rc *RouteController) tryCreateRoute(
 		return nil
 	}
 
-	if node.Spec.PodCIDR == "" {
+	var nodeSubnet string
+	ipnet, err := GetOVNNodeHostSubnet(node)
+	if err == nil {
+		nodeSubnet = ipnet[0].String()
+	} else {
+		nodeSubnet = node.Spec.PodCIDR
+	}
+
+	if nodeSubnet == "" {
 		return rc.updateNetworkingCondition(types.NodeName(node.Name), false)
 	}
 
@@ -372,16 +404,16 @@ func (rc *RouteController) tryCreateRoute(
 		return nil
 	}
 	providerID := node.Spec.ProviderID
-	destinationCIDR := node.Spec.PodCIDR
+	destinationCIDR := nodeSubnet
 	// Check if we have a route for this node w/ the correct CIDR.
 	routeKey := fmt.Sprintf("%s-%s", providerID, destinationCIDR)
 	r := cache[routeKey]
-	if r == nil || r.DestinationCIDR != node.Spec.PodCIDR {
+	if r == nil || r.DestinationCIDR != nodeSubnet {
 		start := time.Now()
 		// If not, create the route.
 		route := &cloudprovider.Route{
 			TargetNode:      types.NodeName(providerID),
-			DestinationCIDR: node.Spec.PodCIDR,
+			DestinationCIDR: nodeSubnet,
 		}
 
 		backoff := wait.Backoff{
@@ -427,12 +459,12 @@ func (rc *RouteController) tryCreateRoute(
 				v1.EventTypeNormal,
 				"CreatedRoute",
 				"Created route for %s with %s -> %s successfully",
-				table, node.Name, node.Spec.PodCIDR,
+				table, node.Name, nodeSubnet,
 			)
-			klog.Infof("Created route for %s with %s -> %s", table, node.Name, node.Spec.PodCIDR)
+			klog.Infof("Created route for %s with %s -> %s", table, node.Name, nodeSubnet)
 		}
 		metric.RouteLatency.WithLabelValues("create").Observe(metric.MsSince(start))
-		klog.Infof("Created route for %s with %s -> %s", table, node.Name, node.Spec.PodCIDR)
+		klog.Infof("Created route for %s with %s -> %s", table, node.Name, nodeSubnet)
 		return rc.updateNetworkingCondition(types.NodeName(node.Name), err == nil)
 	}
 	// Update condition only if it doesn't reflect the current state.
@@ -446,17 +478,24 @@ func (rc *RouteController) tryCreateRoute(
 
 func (rc *RouteController) isRouteConflicted(nodes []*v1.Node, route *cloudprovider.Route) bool {
 	for _, node := range nodes {
+		var nodeSubnet string
+		ipnet, err := GetOVNNodeHostSubnet(node)
+		if err == nil {
+			nodeSubnet = ipnet[0].String()
+		} else {
+			nodeSubnet = node.Spec.PodCIDR
+		}
 		// skip node without podcidr
-		if node.Spec.PodCIDR == "" {
+		if nodeSubnet == "" {
 			continue
 		}
 
-		if node.Spec.PodCIDR == route.DestinationCIDR &&
+		if nodeSubnet == route.DestinationCIDR &&
 			!strings.Contains(node.Spec.ProviderID, string(route.TargetNode)) {
 			// conflicted with exist route.
 			return true
 		}
-		contains, err := RealContainsCidr(node.Spec.PodCIDR, route.DestinationCIDR)
+		contains, err := RealContainsCidr(nodeSubnet, route.DestinationCIDR)
 		if err != nil {
 			// record event an error out.
 			if rc.recorder != nil {
@@ -473,8 +512,8 @@ func (rc *RouteController) isRouteConflicted(nodes []*v1.Node, route *cloudprovi
 					err.Error(),
 				)
 			}
-			klog.Errorf("route conflicted: node.Spec.PodCIDR=%s -> "+
-				"route.CIDR=%s, %s", node.Spec.PodCIDR, route.DestinationCIDR, err.Error())
+			klog.Errorf("route conflicted: NodeSubnet=%s -> "+
+				"route.CIDR=%s, %s", nodeSubnet, route.DestinationCIDR, err.Error())
 			return false
 		}
 		if contains {
@@ -542,4 +581,47 @@ func broadcaster() (record.EventRecorder, record.EventBroadcaster) {
 	caster.StartLogging(klog.Infof)
 	source := v1.EventSource{Component: ROUTE_CONTROLLER}
 	return caster.NewRecorder(scheme.Scheme, source), caster
+}
+
+func (anse annotationNotSetError) Error() string {
+	return anse.msg
+}
+// newAnnotationNotSetError returns an error for an annotation that is not set
+func newAnnotationNotSetError(format string, args ...interface{}) error {
+	return annotationNotSetError{msg: fmt.Sprintf(format, args...)}
+}
+
+//Get Node Host Subnet with ovn network
+func GetOVNNodeHostSubnet(node *v1.Node) ([]*net.IPNet, error) {
+	annotation, ok := node.Annotations[ovnNodeSubnets]
+	if !ok {
+		return nil, newAnnotationNotSetError("node %q has no %q annotation", node.Name, ovnNodeSubnets)
+	}
+	var subnets []string
+	subnetsDual := make(map[string][]string)
+	if err := json.Unmarshal([]byte(annotation), &subnetsDual); err == nil {
+		subnets, ok = subnetsDual["default"]
+	} else {
+		subnetsSingle := make(map[string]string)
+		if err := json.Unmarshal([]byte(annotation), &subnetsSingle); err != nil {
+			return nil, fmt.Errorf("could not parse %q annotation %q as either single-stack or dual-stack",
+			ovnNodeSubnets, annotation)
+		}
+		subnets = make([]string, 1)
+		subnets[0], ok = subnetsSingle["default"]
+	}
+	if !ok {
+		return nil, fmt.Errorf("%q annotation %q has no default network", ovnNodeSubnets, annotation)
+	}
+
+	var ipnets []*net.IPNet
+	for _, subnet := range subnets {
+		_, ipnet, err := net.ParseCIDR(subnet)
+		if err != nil {
+			return nil, fmt.Errorf("error parsing %q value: %v", ovnNodeSubnets, err)
+		}
+		ipnets = append(ipnets, ipnet)
+	}
+
+	return ipnets, nil
 }
