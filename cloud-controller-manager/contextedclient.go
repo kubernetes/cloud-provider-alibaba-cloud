@@ -2,6 +2,7 @@ package alicloud
 
 import (
 	"context"
+	"github.com/denverdino/aliyungo/cen"
 	"github.com/denverdino/aliyungo/common"
 	"github.com/denverdino/aliyungo/ecs"
 	"github.com/denverdino/aliyungo/pvtz"
@@ -413,4 +414,28 @@ func (c *ContextedClientRoute) CreateRouteEntry(ctx context.Context, args *ecs.C
 }
 func (c *ContextedClientRoute) WaitForAllRouteEntriesAvailable(ctx context.Context, vrouterId string, routeTableId string, timeout int) error {
 	return c.ecs.WaitForAllRouteEntriesAvailable(vrouterId, routeTableId, timeout)
+}
+
+func NewContextedClientCEN(key, secret, region string) *ContextedClientCEN {
+	return &ContextedClientCEN{
+		BaseClient: BaseClient{},
+		cen:        cen.NewCENClientWithSecurityToken4RegionalDomain(key, secret, "", common.Region(region)),
+	}
+}
+
+type ContextedClientCEN struct {
+	BaseClient
+	// base slb client
+	cen *cen.Client
+}
+
+func (c *ContextedClientCEN) PublishRouteEntries(ctx context.Context, args *cen.PublishRouteEntriesArgs) error {
+	return c.cen.PublishRouteEntries(args)
+}
+
+func (c *ContextedClientCEN) DescribePublishedRouteEntries(
+	ctx context.Context,
+	args *cen.DescribePublishedRouteEntriesArgs,
+) (response *cen.DescribePublishedRouteEntriesResponse, err error) {
+	return c.cen.DescribePublishedRouteEntries(args)
 }
