@@ -172,8 +172,9 @@ func setFields(node *v1.Node, ins *prvd.NodeAttribute, cfgRoute bool) {
 
 	var modifiers []nodeModifier
 	if ins.InstanceType != "" {
-		log.Infof(
-			"Adding node label from cloud provider: %s=%s, %s=%s",
+		klog.V(5).Infof(
+			"node %s, Adding node label from cloud provider: %s=%s, %s=%s",
+			node.Name,
 			v1.LabelInstanceType, ins.InstanceType,
 			v1.LabelInstanceTypeStable, ins.InstanceType,
 		)
@@ -185,8 +186,9 @@ func setFields(node *v1.Node, ins *prvd.NodeAttribute, cfgRoute bool) {
 	}
 
 	if ins.Zone != "" {
-		log.Infof(
-			"Adding node label from cloud provider: %s=%s, %s=%s",
+		klog.V(5).Infof(
+			"node %s, Adding node label from cloud provider: %s=%s, %s=%s",
+			node.Name,
 			v1.LabelZoneFailureDomain, ins.Zone,
 			v1.LabelZoneFailureDomainStable, ins.Zone,
 		)
@@ -198,8 +200,9 @@ func setFields(node *v1.Node, ins *prvd.NodeAttribute, cfgRoute bool) {
 	}
 
 	if ins.Region != "" {
-		log.Infof(
-			"Adding node label from cloud provider: %s=%s, %s=%s",
+		klog.V(5).Infof(
+			"node %s,Adding node label from cloud provider: %s=%s, %s=%s",
+			node.Name,
 			v1.LabelZoneRegion, ins.Region,
 			v1.LabelZoneRegionStable, ins.Region,
 		)
@@ -245,7 +248,7 @@ func removeCloudTaints(node *v1.Node) {
 	// make sure only cloud node is processed
 	cloudTaint := findCloudTaint(node.Spec.Taints)
 	if cloudTaint == nil {
-		log.Infof("node %s is registered without "+
+		klog.V(5).Infof("node %s is registered without "+
 			"cloud taint. skip.", node.Name)
 		return
 	}

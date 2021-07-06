@@ -27,10 +27,7 @@ import (
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller"
 )
 
-// Change below variables to serve metric on different host or port.
-var (
-	log = klogr.New()
-)
+var log = klogr.New()
 
 func printVersion() {
 	log.Info(fmt.Sprintf("Operator Version: %s", version.Version))

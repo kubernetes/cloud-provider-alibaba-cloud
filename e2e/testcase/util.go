@@ -2,6 +2,7 @@ package testcase
 
 import (
 	"context"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/cloud-provider-alibaba-cloud/e2e/framework"
 	req "k8s.io/cloud-provider-alibaba-cloud/pkg/controller/service"
@@ -15,9 +16,9 @@ import (
 
 // Test results flag
 type result struct {
-	slbResult bool
+	slbResult    bool
 	listenResult bool
-	testResult bool
+	testResult   bool
 }
 
 var test result
@@ -36,15 +37,14 @@ func ExpectSLBExistAndEqual(m *framework.Expectation) (bool, error) {
 	}
 
 	//-------------------
-	if lbMdl.LoadBalancerAttribute.LoadBalancerId == ""{
+	if lbMdl.LoadBalancerAttribute.LoadBalancerId == "" {
 		return false, framework.NewErrorRetry(err)
 	}
-	if lbMdl.LoadBalancerAttribute.LoadBalancerId != ""{
-		framework.Logf("start test LoadBalancerAttribute %+v",lbMdl.LoadBalancerAttribute)
-		slbResult,_ := SLBEqual(m, lbMdl.LoadBalancerAttribute)
+	if lbMdl.LoadBalancerAttribute.LoadBalancerId != "" {
+		framework.Logf("start test LoadBalancerAttribute %+v", lbMdl.LoadBalancerAttribute)
+		slbResult, _ := SLBEqual(m, lbMdl.LoadBalancerAttribute)
 		test.slbResult = slbResult
 	}
-
 
 	// init listenMgr
 	err = m.E2E.ModelBuilder.ListenerMgr.BuildLocalModel(m.Case.ReqCtx, lbMdl)
@@ -57,37 +57,35 @@ func ExpectSLBExistAndEqual(m *framework.Expectation) (bool, error) {
 	for _, p := range m.Case.Service.Spec.Ports {
 		for _, v := range lbMdl.Listeners {
 			pro := ""
-			if ProtocolPort := m.Case.ReqCtx.Anno.Get(req.ProtocolPort);ProtocolPort != ""{
-				framework.Logf("ProtocolPort:%+v",ProtocolPort)
-				g := strings.Split(ProtocolPort,":")
+			if ProtocolPort := m.Case.ReqCtx.Anno.Get(req.ProtocolPort); ProtocolPort != "" {
+				framework.Logf("ProtocolPort:%+v", ProtocolPort)
+				g := strings.Split(ProtocolPort, ":")
 				pro = g[0]
 			}
-
 
 			if v.Protocol == "" || string(v.ListenerPort) == "" {
 				framework.Logf("get slb Protocol and ListenerPort empty: %+v\n", lbMdl.Listeners)
 				return false, framework.NewErrorRetry(err)
 			} else if strings.ToLower(string(p.Protocol)) == v.Protocol || pro == v.Protocol && int(p.Port) == v.ListenerPort {
 				framework.Logf("Start testing configuration consistency: %+v", v)
-				listenResult,_ := ListenerEqual(m, v)
+				listenResult, _ := ListenerEqual(m, v)
 				test.listenResult = listenResult
 
-
-			}else {
+			} else {
 				klog.Info("unknown err，please check!")
-				framework.Logf("p---%+v\n",p)
-				framework.Logf("v---%+v\n",v)
+				framework.Logf("p---%+v\n", p)
+				framework.Logf("v---%+v\n", v)
 				return false, framework.NewErrorRetry(err)
 			}
 
 		}
 
 	}
-	if test.slbResult && test.listenResult{
+	if test.slbResult && test.listenResult {
 		test.testResult = true
 	}
 
-	return test.testResult,nil
+	return test.testResult, nil
 }
 func ListenerEqual(m *framework.Expectation, listen model.ListenerAttribute) (done bool, err error) {
 	if CertID := m.Case.ReqCtx.Anno.Get(req.CertID); CertID != "" {
@@ -277,7 +275,7 @@ func EnsureDeleteSVC(m *framework.Expectation) (done bool, err error) {
 	result, err := m.E2E.Client.
 		CoreV1().
 		Services(m.Case.Service.Namespace).Get(context.Background(), m.Case.Service.Name, metav1.GetOptions{})
-	if err != nil && strings.Contains(err.Error(), "not found") {
+	if err != nil && errors.IsNotFound(err) {
 		framework.Logf("namespace: %s service: %s delete finished .", m.Case.Service.Namespace, m.Case.Service.Name)
 		return true, nil
 	}

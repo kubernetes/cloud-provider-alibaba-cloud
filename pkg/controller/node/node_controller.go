@@ -13,6 +13,7 @@ import (
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/context/shared"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/helper"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider"
+	"k8s.io/klog"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
@@ -32,7 +33,7 @@ func Add(mgr manager.Manager, ctx *shared.SharedContext) error {
 func newReconciler(mgr manager.Manager, ctx *shared.SharedContext) reconcile.Reconciler {
 	recon := &ReconcileNode{
 		monitorPeriod:   5 * time.Minute,
-		statusFrequency: 5 * time.Minute,
+		statusFrequency: 1 * time.Minute,
 		// provider
 		cloud:  ctx.Provider(),
 		client: mgr.GetClient(),
@@ -91,13 +92,12 @@ type ReconcileNode struct {
 func (m *ReconcileNode) Reconcile(
 	ctx context.Context, request reconcile.Request,
 ) (reconcile.Result, error) {
-	rlog := log.WithFields(log.Fields{"Node": request.NamespacedName})
-	rlog.Infof("watch node change")
+	klog.V(5).Infof("reconcile node: %s", request.NamespacedName)
 	node := &corev1.Node{}
 	err := m.client.Get(context.TODO(), request.NamespacedName, node)
 	if err != nil {
 		if errors.IsNotFound(err) {
-			rlog.Infof("node not found, skip")
+			klog.Infof("node not found, skip")
 			// Request object not found, could have been deleted
 			// after reconcile request.
 			// Owned objects are automatically garbage collected.
@@ -113,7 +113,7 @@ func (m *ReconcileNode) Reconcile(
 func (m *ReconcileNode) syncCloudNode(node *corev1.Node) error {
 	cloudTaint := findCloudTaint(node.Spec.Taints)
 	if cloudTaint == nil {
-		log.Infof("node %s is registered without cloud taint. return ok", node.Name)
+		klog.V(5).Info("node %s is registered without cloud taint. return ok", node.Name)
 		return nil
 	}
 	return m.doAddCloudNode(node)
@@ -221,8 +221,6 @@ func (m *ReconcileNode) syncNodeAddress(nodes []corev1.Node) error {
 			cloudNode.Addresses = []corev1.NodeAddress{*nodeIP}
 		}
 
-		log.Infof("try patch node address for %s", node.Spec.ProviderID)
-
 		diff := func(copy runtime.Object) (client.Object, error) {
 			nins := copy.(*corev1.Node)
 			nins.Status.Addresses = cloudNode.Addresses
@@ -231,6 +229,20 @@ func (m *ReconcileNode) syncNodeAddress(nodes []corev1.Node) error {
 		err := helper.PatchM(m.client, node, diff, helper.PatchStatus)
 		if err != nil {
 			log.Errorf("wait for next retry, patch node address error: %s", err.Error())
+			m.record.Eventf(
+				node, corev1.EventTypeWarning, "SyncNodeFailed", err.Error(),
+			)
+		}
+
+		diff = func(copy runtime.Object) (client.Object, error) {
+			nins := copy.(*corev1.Node)
+			setFields(nins, cloudNode, m.configCloudRoute)
+			return nins, nil
+		}
+
+		err = helper.PatchM(m.client, node, diff, helper.PatchAll)
+		if err != nil {
+			log.Errorf("wait for next retry, patch node label error: %s", err.Error())
 			m.record.Eventf(
 				node, corev1.EventTypeWarning, "SyncNodeFailed", err.Error(),
 			)

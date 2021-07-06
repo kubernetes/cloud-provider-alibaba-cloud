@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	v1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/record"
@@ -96,20 +97,25 @@ func (m *MapEnqueue) InjectClient(c client.Client) error {
 }
 
 func dropLeaseEndpoint(req []reconcile.Request) []reconcile.Request {
+
+	var reqs []reconcile.Request
+	for _, r := range req {
+		if isLeaseEndpoint(r.String()) {
+			continue
+		}
+		reqs = append(reqs, r)
+	}
+	return reqs
+}
+
+func isLeaseEndpoint(epNamespacedName string) bool {
 	e := sets.Empty{}
 	avoid := sets.String{
 		"kube-system/kube-scheduler":          e,
 		"kube-system/ccm":                     e,
 		"kube-system/kube-controller-manager": e,
 	}
-	var reqs []reconcile.Request
-	for _, r := range req {
-		if avoid.Has(r.String()) {
-			continue
-		}
-		reqs = append(reqs, r)
-	}
-	return reqs
+	return avoid.Has(epNamespacedName)
 }
 
 // PredicateForServiceEvent, filter service event
@@ -281,7 +287,7 @@ func isEndpointProcessNeeded(ep *v1.Endpoints, client client.Client) bool {
 			Name:      ep.GetName(),
 		}, svc)
 	if err != nil {
-		if !strings.Contains(err.Error(), "not found") {
+		if apierrors.IsNotFound(err) && !isLeaseEndpoint(util.NamespacedName(ep).String()) {
 			klog.Warningf("can not get service %s/%s, error: %s", ep.Namespace, ep.Name, err.Error())
 		}
 		return false
@@ -327,7 +333,7 @@ func (p *predicateForNodeEvent) Update(e event.UpdateEvent) bool {
 		nodeSpecChanged(oldNode, newNode) {
 		// label and schedulable changed .
 		// status healthy should be considered
-		klog.Infof("controller: node %s update event", oldNode.Namespace, oldNode.Name)
+		klog.Infof("controller: node %s update event", util.Key(oldNode))
 		return true
 	}
 	return false
