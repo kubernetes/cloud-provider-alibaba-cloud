@@ -4,10 +4,10 @@ import (
 	"context"
 	"fmt"
 	"github.com/pkg/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"math/rand"
-	"strings"
 	"time"
 )
 
@@ -81,7 +81,7 @@ func (u *DeleteAction) RunAction(f *FrameWorkE2E) error {
 		Services(u.Service.Namespace).
 		Get(context.Background(), u.Service.Name, metav1.GetOptions{})
 	if err != nil {
-		if strings.Contains(err.Error(), "not found") {
+		if apierrors.IsNotFound(err){
 			Logf("service not found, expected")
 			return nil
 		}

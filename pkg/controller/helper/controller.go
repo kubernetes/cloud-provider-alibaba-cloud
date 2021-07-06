@@ -155,7 +155,7 @@ func PatchM(
 	if resource == PatchSpec || resource == PatchAll {
 		err := mclient.Patch(
 			context.TODO(), ntarget,
-			client.RawPatch(types.MergePatchType, patchBytes),
+			client.RawPatch(types.StrategicMergePatchType, patchBytes),
 		)
 		if err != nil {
 			return fmt.Errorf("patch spec: %s", err.Error())
@@ -165,7 +165,7 @@ func PatchM(
 	if resource == PatchStatus || resource == PatchAll {
 		return mclient.Status().Patch(
 			context.TODO(), ntarget,
-			client.RawPatch(types.MergePatchType, patchBytes),
+			client.RawPatch(types.StrategicMergePatchType, patchBytes),
 		)
 	}
 	return nil

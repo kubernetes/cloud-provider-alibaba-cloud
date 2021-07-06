@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	v1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/record"
@@ -281,7 +282,7 @@ func isEndpointProcessNeeded(ep *v1.Endpoints, client client.Client) bool {
 			Name:      ep.GetName(),
 		}, svc)
 	if err != nil {
-		if !strings.Contains(err.Error(), "not found") {
+		if apierrors.IsNotFound(err) {
 			klog.Warningf("can not get service %s/%s, error: %s", ep.Namespace, ep.Name, err.Error())
 		}
 		return false

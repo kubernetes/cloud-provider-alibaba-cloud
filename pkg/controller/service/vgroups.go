@@ -3,6 +3,7 @@ package service
 import (
 	"encoding/json"
 	"fmt"
+	"k8s.io/apimachinery/pkg/api/errors"
 	"strconv"
 	"strings"
 
@@ -375,7 +376,7 @@ func getEndpoints(reqCtx *RequestContext, client client.Client) (*v1.Endpoints, 
 	eps := &v1.Endpoints{}
 	err := client.Get(reqCtx.Ctx, util.NamespacedName(reqCtx.Service), eps)
 	if err != nil {
-		if !strings.Contains(err.Error(), "not found") {
+		if errors.IsNotFound(err) {
 			return eps, fmt.Errorf("get endpoints from k8s error: %s", err.Error())
 		}
 		reqCtx.Log.Warningf("endpoint not found: %s")

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/util/wait"
 	ctrlCtx "k8s.io/cloud-provider-alibaba-cloud/pkg/context"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/helper"
@@ -33,7 +34,7 @@ func createRouteForInstance(ctx context.Context, table, providerID, cidr string,
 	err := wait.ExponentialBackoff(createBackoff, func() (bool, error) {
 		route, innerErr = providerIns.CreateRoute(ctx, table, providerID, cidr)
 		if innerErr != nil {
-			if strings.Contains(innerErr.Error(), "not found") {
+			if errors.IsNotFound(innerErr) {
 				klog.Infof("not found route %s", innerErr.Error())
 				return true, nil
 			}
@@ -69,7 +70,7 @@ func getRouteTables(ctx context.Context, providerIns prvd.Provider) ([]string, e
 	}
 	if len(tables) > 1 {
 		return nil, fmt.Errorf("alicloud: "+
-			"multiple vpc found by id[%s], length(vpcs)=%d",  ctrlCtx.ClougCFG.Global.VpcID, len(tables))
+			"multiple vpc found by id[%s], length(vpcs)=%d", ctrlCtx.ClougCFG.Global.VpcID, len(tables))
 	}
 	return tables, nil
 }
@@ -82,8 +83,8 @@ func (r *ReconcileRoute) syncTableRoutes(ctx context.Context, table string, node
 	}
 
 	var clusterCIDR *net.IPNet
-	if  ctrlCtx.ClougCFG.Global.ClusterCidr != "" {
-		_, clusterCIDR, err = net.ParseCIDR( ctrlCtx.ClougCFG.Global.ClusterCidr)
+	if ctrlCtx.ClougCFG.Global.ClusterCidr != "" {
+		_, clusterCIDR, err = net.ParseCIDR(ctrlCtx.ClougCFG.Global.ClusterCidr)
 		if err != nil {
 			return fmt.Errorf("error parse cluster cidr %s: %s", ctrlCtx.ClougCFG.Global.ClusterCidr, err)
 		}

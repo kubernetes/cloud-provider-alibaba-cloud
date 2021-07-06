@@ -6,6 +6,7 @@ import (
 	"fmt"
 	v12 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -194,7 +195,7 @@ func (f *FrameWorkE2E) AfterEach() {
 			CoreV1().
 			Namespaces().
 			Get(context.Background(), NameSpace, metav1.GetOptions{})
-		if err != nil && strings.Contains(err.Error(), "not found") {
+		if err != nil && errors.IsNotFound(err) {
 			Logf("[namespace] %s deleted ", NameSpace)
 			return true, nil
 		}
@@ -260,7 +261,7 @@ func CreateOrUpdate(
 ) (*v1.Service, error) {
 	o, err := client.CoreV1().Services(svc.Namespace).Get(context.Background(), svc.Name, metav1.GetOptions{})
 	if err != nil {
-		if strings.Contains(err.Error(), "not found") {
+		if errors.IsNotFound(err) {
 			if mutate != nil {
 				err := mutate(svc)
 				if err != nil {
@@ -427,7 +428,7 @@ func (f *FrameWorkE2E) EnsureDeleteSVC() {
 			CoreV1().
 			Namespaces().
 			Get(context.Background(), NameSpace, metav1.GetOptions{})
-		if err != nil && strings.Contains(err.Error(), "not found") {
+		if err != nil && errors.IsNotFound(err) {
 			Logf("[namespace] %s deleted ", NameSpace)
 			return true, nil
 		}
