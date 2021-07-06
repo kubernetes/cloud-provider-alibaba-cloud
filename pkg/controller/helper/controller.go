@@ -7,6 +7,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
+	"k8s.io/klog"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -152,6 +153,8 @@ func PatchM(
 	if string(patchBytes) == "{}" {
 		return nil
 	}
+
+	klog.Infof("try to patch %s/%s, %s ", target.GetNamespace(), target.GetName(), string(patchBytes))
 	if resource == PatchSpec || resource == PatchAll {
 		err := mclient.Patch(
 			context.TODO(), ntarget,

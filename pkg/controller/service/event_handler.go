@@ -97,20 +97,25 @@ func (m *MapEnqueue) InjectClient(c client.Client) error {
 }
 
 func dropLeaseEndpoint(req []reconcile.Request) []reconcile.Request {
+
+	var reqs []reconcile.Request
+	for _, r := range req {
+		if isLeaseEndpoint(r.String()) {
+			continue
+		}
+		reqs = append(reqs, r)
+	}
+	return reqs
+}
+
+func isLeaseEndpoint(epNamespacedName string) bool {
 	e := sets.Empty{}
 	avoid := sets.String{
 		"kube-system/kube-scheduler":          e,
 		"kube-system/ccm":                     e,
 		"kube-system/kube-controller-manager": e,
 	}
-	var reqs []reconcile.Request
-	for _, r := range req {
-		if avoid.Has(r.String()) {
-			continue
-		}
-		reqs = append(reqs, r)
-	}
-	return reqs
+	return avoid.Has(epNamespacedName)
 }
 
 // PredicateForServiceEvent, filter service event
@@ -282,7 +287,7 @@ func isEndpointProcessNeeded(ep *v1.Endpoints, client client.Client) bool {
 			Name:      ep.GetName(),
 		}, svc)
 	if err != nil {
-		if apierrors.IsNotFound(err) {
+		if apierrors.IsNotFound(err) && !isLeaseEndpoint(util.NamespacedName(ep).String()) {
 			klog.Warningf("can not get service %s/%s, error: %s", ep.Namespace, ep.Name, err.Error())
 		}
 		return false
@@ -328,7 +333,7 @@ func (p *predicateForNodeEvent) Update(e event.UpdateEvent) bool {
 		nodeSpecChanged(oldNode, newNode) {
 		// label and schedulable changed .
 		// status healthy should be considered
-		klog.Infof("controller: node %s update event", oldNode.Namespace, oldNode.Name)
+		klog.Infof("controller: node %s update event", util.Key(oldNode))
 		return true
 	}
 	return false
