@@ -21,8 +21,9 @@ const (
 )
 
 const (
-	TAGKEY = "kubernetes.do.not.delete"
-	ACKKEY = "ack.aliyun.com"
+	TAGKEY   = "kubernetes.do.not.delete"
+	ACKKEY   = "ack.aliyun.com"
+	REUSEKEY = "kubernetes.reused.by.user"
 )
 
 // load balancer annotations
