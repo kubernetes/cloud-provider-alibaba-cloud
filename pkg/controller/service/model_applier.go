@@ -117,19 +117,19 @@ func (m *ModelApplier) applyLoadBalancerAttribute(reqCtx *RequestContext, local 
 	}
 
 	// update slb
-	if local.LoadBalancerAttribute.IsUserManaged {
-		tags, err := m.slbMgr.cloud.DescribeTags(reqCtx.Ctx, remote.LoadBalancerAttribute.LoadBalancerId)
-		if err != nil {
-			return fmt.Errorf("describe slb tags error: %s", err.Error())
-		}
+	tags, err := m.slbMgr.cloud.DescribeTags(reqCtx.Ctx, remote.LoadBalancerAttribute.LoadBalancerId)
+	if err != nil {
+		return fmt.Errorf("describe slb tags error: %s", err.Error())
+	}
+	remote.LoadBalancerAttribute.Tags = tags
 
-		if ok, reason := isLoadBalancerReusable(tags); !ok {
+	if local.LoadBalancerAttribute.IsUserManaged {
+		if ok, reason := isLoadBalancerReusable(reqCtx.Service, tags, remote.LoadBalancerAttribute.Address); !ok {
 			return fmt.Errorf("alicloud: the loadbalancer %s can not be reused, %s", remote.LoadBalancerAttribute.LoadBalancerId, reason)
 		}
 	}
 
 	return m.slbMgr.Update(reqCtx, local, remote)
-
 }
 
 func (m *ModelApplier) applyVGroups(reqCtx *RequestContext, local *model.LoadBalancer, remote *model.LoadBalancer) error {

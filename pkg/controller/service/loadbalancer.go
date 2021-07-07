@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/model"
 	prvd "k8s.io/cloud-provider-alibaba-cloud/pkg/provider"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/util"
 	"strconv"
 )
 
@@ -80,6 +81,10 @@ func (mgr *LoadBalancerManager) Update(reqCtx *RequestContext, local, remote *mo
 	lbId := remote.LoadBalancerAttribute.LoadBalancerId
 	reqCtx.Log.Infof("found load balancer [%s], try to update load balancer attribute", lbId)
 
+	if err := updateLBDefaultTag(mgr, reqCtx, local, remote); err != nil {
+		return fmt.Errorf("alicloud: update lb tag error: %s", err.Error())
+	}
+
 	if local.LoadBalancerAttribute.MasterZoneId != "" &&
 		local.LoadBalancerAttribute.MasterZoneId != remote.LoadBalancerAttribute.MasterZoneId {
 		return fmt.Errorf("alicloud: can not change LoadBalancer master zone id once created")
@@ -152,16 +157,10 @@ func (mgr *LoadBalancerManager) Update(reqCtx *RequestContext, local, remote *mo
 	}
 
 	// update slb name
-	// only user defined slb or slb which has "kubernetes.do.not.delete" tag can update name
 	if local.LoadBalancerAttribute.LoadBalancerName != "" &&
 		local.LoadBalancerAttribute.LoadBalancerName != remote.LoadBalancerAttribute.LoadBalancerName {
-		//if isLoadBalancerHasTag(tags) || isUserDefinedLoadBalancer(service) {
-		//	klog.Infof("alicloud: LoadBalancer name (%s -> %s) changed, update loadbalancer [%s]",
-		//		remote.LoadBalancerAttribute.LoadBalancerName, local.LoadBalancerAttribute.LoadBalancerName, lbId)
-		//	if err := slbClient.SetLoadBalancerName(context, lbId, local.LoadBalancerAttribute.LoadBalancerName); err != nil {
-		//		return err
-		//	}
-		//}
+		reqCtx.Log.Infof("update lb: lb name changed([%s] -> [%s]), update loadbalancer [%s]",
+			remote.LoadBalancerAttribute.LoadBalancerName, local.LoadBalancerAttribute.LoadBalancerName, lbId)
 		return mgr.cloud.SetLoadBalancerName(reqCtx.Ctx, lbId, local.LoadBalancerAttribute.LoadBalancerName)
 	}
 	return nil
@@ -250,4 +249,35 @@ func setModelDefaultValue(mgr *LoadBalancerManager, mdl *model.LoadBalancer, ann
 
 	mdl.LoadBalancerAttribute.Tags = append(mdl.LoadBalancerAttribute.Tags, anno.GetDefaultTags()...)
 	return nil
+}
+
+func updateLBDefaultTag(mgr *LoadBalancerManager, reqCtx *RequestContext, local, remote *model.LoadBalancer) error {
+	newTags := append([]model.Tag{}, remote.LoadBalancerAttribute.Tags...)
+	if local.LoadBalancerAttribute.IsUserManaged {
+		for _, tag := range remote.LoadBalancerAttribute.Tags {
+			if tag.TagKey == REUSEKEY {
+				return nil
+			}
+		}
+		if len(newTags) < SLBMaxTagNum {
+			newTags = append(newTags, model.Tag{TagKey: REUSEKEY, TagValue: "true"})
+		}
+	} else {
+		for _, tag := range remote.LoadBalancerAttribute.Tags {
+			if tag.TagKey == TAGKEY {
+				return nil
+			}
+		}
+		if len(newTags) < SLBMaxTagNum {
+			newTags = append(newTags, model.Tag{TagKey: TAGKEY, TagValue: reqCtx.Anno.GetDefaultLoadBalancerName()})
+		}
+	}
+
+	newTagsBytes, err := json.Marshal(newTags)
+	if err != nil {
+		return fmt.Errorf("marshal tags error: %s", err.Error())
+	}
+
+	reqCtx.Log.Infof("[%s] try to update slb [%s] tag: %s", util.Key(reqCtx.Service), remote.LoadBalancerAttribute.LoadBalancerId, string(newTagsBytes))
+	return mgr.cloud.AddTags(reqCtx.Ctx, remote.LoadBalancerAttribute.LoadBalancerId, string(newTagsBytes))
 }

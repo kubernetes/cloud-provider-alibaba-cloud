@@ -5,6 +5,7 @@ const (
 	ServiceFinalizer = "service.k8s.alibaba/resources"
 	CCMClass         = "service.beta.kubernetes.io/class"
 	LabelServiceHash = "service.beta.kubernetes.io/hash"
+	SLBMaxTagNum     = 10
 )
 
 // Node related

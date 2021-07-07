@@ -107,12 +107,26 @@ func isServiceHashChanged(service *v1.Service) bool {
 	return true
 }
 
-func isLoadBalancerReusable(tags []model.Tag) (bool, string) {
+func isLoadBalancerReusable(service *v1.Service, tags []model.Tag, lbIp string) (bool, string) {
 	for _, tag := range tags {
 		if tag.TagKey == TAGKEY || tag.TagKey == ACKKEY {
 			return false, "can not reuse loadbalancer created by kubernetes."
 		}
 	}
+
+	if len(service.Status.LoadBalancer.Ingress) > 0 {
+		found := false
+		for _, ingress := range service.Status.LoadBalancer.Ingress {
+			if ingress.IP == lbIp {
+				found = true
+			}
+		}
+		if !found {
+			return false, fmt.Sprintf("service has been associated with ip [%v], cannot be bound to ip [%s]",
+				service.Status.LoadBalancer.Ingress[0].IP, lbIp)
+		}
+	}
+
 	return true, ""
 }
 
