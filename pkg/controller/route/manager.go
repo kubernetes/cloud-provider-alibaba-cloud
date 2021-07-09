@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/util/wait"
 	ctrlCtx "k8s.io/cloud-provider-alibaba-cloud/pkg/context"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/helper"
@@ -34,7 +33,7 @@ func createRouteForInstance(ctx context.Context, table, providerID, cidr string,
 	err := wait.ExponentialBackoff(createBackoff, func() (bool, error) {
 		route, innerErr = providerIns.CreateRoute(ctx, table, providerID, cidr)
 		if innerErr != nil {
-			if errors.IsNotFound(innerErr) {
+			if strings.Contains(innerErr.Error(), "not found") {
 				klog.Infof("not found route %s", innerErr.Error())
 				return true, nil
 			}
