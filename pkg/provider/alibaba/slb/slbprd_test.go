@@ -31,9 +31,7 @@ func TestNewLBProvider_CreateSLB(t *testing.T) {
 }
 
 func TestProviderSLB_DeleteSLB(t *testing.T) {
-	key := ""
-	secert := ""
-	client, err := slb.NewClientWithAccessKey("cn-hangzhou", key, secert)
+	client, err := slb.NewClientWithAccessKey("cn-hangzhou", "key", "secert")
 	if err != nil {
 		t.Fatalf(err.Error())
 	}
