@@ -1,7 +1,9 @@
 package service
 
 import (
+	"context"
 	"fmt"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/dryrun"
 	"strconv"
 	"strings"
 
@@ -289,7 +291,7 @@ func (t *tcp) Update(reqCtx *RequestContext, action UpdateAction) error {
 			return fmt.Errorf("start tcp listener %d error: %s", action.local.ListenerPort, err.Error())
 		}
 	}
-	needUpdate, update := isNeedUpdate(action.local, action.remote)
+	needUpdate, update := isNeedUpdate(reqCtx, action.local, action.remote)
 	if !needUpdate {
 		reqCtx.Log.Info(fmt.Sprintf("update listener: tcp [%d] did not change, skip", action.local.ListenerPort))
 		return nil
@@ -319,7 +321,7 @@ func (t *udp) Update(reqCtx *RequestContext, action UpdateAction) error {
 			return fmt.Errorf("start udp listener %d error: %s", action.local.ListenerPort, err.Error())
 		}
 	}
-	needUpdate, update := isNeedUpdate(action.local, action.remote)
+	needUpdate, update := isNeedUpdate(reqCtx, action.local, action.remote)
 	if !needUpdate {
 		reqCtx.Log.Info(fmt.Sprintf("update listener: udp [%d] did not change, skip", action.local.ListenerPort))
 		return nil
@@ -386,7 +388,7 @@ func (t *http) Update(reqCtx *RequestContext, action UpdateAction) error {
 		return nil
 	}
 
-	needUpdate, update := isNeedUpdate(action.local, action.remote)
+	needUpdate, update := isNeedUpdate(reqCtx, action.local, action.remote)
 	if !needUpdate {
 		reqCtx.Log.Info(fmt.Sprintf("update listener: http [%d] did not change, skip", action.local.ListenerPort))
 		return nil
@@ -418,7 +420,7 @@ func (t *https) Update(reqCtx *RequestContext, action UpdateAction) error {
 			return fmt.Errorf("start https listener %d error: %s", action.local.ListenerPort, err.Error())
 		}
 	}
-	needUpdate, update := isNeedUpdate(action.local, action.remote)
+	needUpdate, update := isNeedUpdate(reqCtx, action.local, action.remote)
 	if !needUpdate {
 		reqCtx.Log.Info(fmt.Sprintf("update listener: https [%d] did not change, skip", action.local.ListenerPort))
 		return nil
@@ -620,99 +622,137 @@ func setDefaultValueForListener(n *model.ListenerAttribute) {
 	}
 }
 
-func isNeedUpdate(local model.ListenerAttribute, remote model.ListenerAttribute) (bool, model.ListenerAttribute) {
+func isNeedUpdate(reqCtx *RequestContext, local model.ListenerAttribute, remote model.ListenerAttribute) (bool, model.ListenerAttribute) {
 	update := model.ListenerAttribute{
 		ListenerPort: local.ListenerPort,
 	}
 	needUpdate := false
+	updateDetail := ""
 
 	if remote.Description != local.Description {
 		needUpdate = true
 		update.Description = local.Description
+		updateDetail += fmt.Sprintf("Description changed: %v -> %v ;",
+			remote.Description, local.Description)
 	}
 	if remote.VGroupId != local.VGroupId {
 		needUpdate = true
 		update.VGroupId = local.VGroupId
+		updateDetail += fmt.Sprintf("VGroupId changed: %v -> %v ;",
+			remote.VGroupId, local.VGroupId)
 	}
 	// acl
 	if local.AclStatus != "" &&
 		remote.AclStatus != local.AclStatus {
 		needUpdate = true
 		update.AclStatus = local.AclStatus
+		updateDetail += fmt.Sprintf("AclStatus changed: %v -> %v ;",
+			remote.AclStatus, local.AclStatus)
 	}
-	if local.AclId != "" &&
+	if local.AclStatus == model.OnFlag &&
+		local.AclId != "" &&
 		remote.AclId != local.AclId {
 		needUpdate = true
 		update.AclId = local.AclId
+		updateDetail += fmt.Sprintf("AclId changed: %v -> %v ;",
+			remote.AclId, local.AclId)
 	}
-	if local.AclType != "" &&
+	if local.AclStatus == model.OnFlag &&
+		local.AclType != "" &&
 		remote.AclType != local.AclType {
 		needUpdate = true
 		update.AclType = local.AclType
+		updateDetail += fmt.Sprintf("AclType changed: %v -> %v ;",
+			remote.AclType, local.AclType)
 	}
 	if local.Scheduler != "" &&
 		remote.Scheduler != local.Scheduler {
 		needUpdate = true
 		update.Scheduler = local.Scheduler
+		updateDetail += fmt.Sprintf("Scheduler changed: %v -> %v ;",
+			remote.Scheduler, local.Scheduler)
 	}
 	// health check
 	if local.HealthCheckType != "" &&
 		remote.HealthCheckType != local.HealthCheckType {
 		needUpdate = true
 		update.HealthCheckType = local.HealthCheckType
+		updateDetail += fmt.Sprintf("HealthCheckType changed: %v -> %v ;",
+			remote.HealthCheckType, local.HealthCheckType)
 	}
 	if local.HealthCheckURI != "" &&
 		remote.HealthCheckURI != local.HealthCheckURI {
 		needUpdate = true
 		update.HealthCheckURI = local.HealthCheckURI
+		updateDetail += fmt.Sprintf("HealthCheckURI changed: %v -> %v ;",
+			remote.HealthCheckURI, local.HealthCheckURI)
 	}
 	if local.HealthCheckConnectPort != 0 &&
 		remote.HealthCheckConnectPort != local.HealthCheckConnectPort {
 		needUpdate = true
 		update.HealthCheckConnectPort = local.HealthCheckConnectPort
+		updateDetail += fmt.Sprintf("HealthCheckConnectPort changed: %v -> %v ;",
+			remote.HealthCheckConnectPort, local.HealthCheckConnectPort)
 	}
 	if local.HealthyThreshold != 0 &&
 		remote.HealthyThreshold != local.HealthyThreshold {
 		needUpdate = true
 		update.HealthyThreshold = local.HealthyThreshold
+		updateDetail += fmt.Sprintf("HealthyThreshold changed: %v -> %v ;",
+			remote.HealthyThreshold, local.HealthyThreshold)
 	}
 	if local.UnhealthyThreshold != 0 &&
 		remote.UnhealthyThreshold != local.UnhealthyThreshold {
 		needUpdate = true
 		update.UnhealthyThreshold = local.UnhealthyThreshold
+		updateDetail += fmt.Sprintf("UnhealthyThreshold changed: %v -> %v ;",
+			remote.UnhealthyThreshold, local.UnhealthyThreshold)
 	}
 	if local.HealthCheckConnectTimeout != 0 &&
 		remote.HealthCheckConnectTimeout != local.HealthCheckConnectTimeout {
 		needUpdate = true
 		update.HealthCheckConnectTimeout = local.HealthCheckConnectTimeout
+		updateDetail += fmt.Sprintf("HealthCheckConnectTimeout changed: %v -> %v ;",
+			remote.HealthCheckConnectTimeout, local.HealthCheckConnectTimeout)
 	}
 	if local.HealthCheckInterval != 0 &&
 		remote.HealthCheckInterval != local.HealthCheckInterval {
 		needUpdate = true
 		update.HealthCheckInterval = local.HealthCheckInterval
+		updateDetail += fmt.Sprintf("HealthCheckInterval changed: %v -> %v ;",
+			remote.HealthCheckInterval, local.HealthCheckInterval)
 	}
 	if local.PersistenceTimeout != nil &&
 		remote.PersistenceTimeout != local.PersistenceTimeout {
 		needUpdate = true
 		update.PersistenceTimeout = local.PersistenceTimeout
+		updateDetail += fmt.Sprintf("PersistenceTimeout changed: %v -> %v ;",
+			remote.PersistenceTimeout, local.PersistenceTimeout)
 	}
 	if local.HealthCheckHttpCode != "" &&
 		remote.HealthCheckHttpCode != local.HealthCheckHttpCode {
 		needUpdate = true
 		update.HealthCheckHttpCode = local.HealthCheckHttpCode
+		updateDetail += fmt.Sprintf("HealthCheckHttpCode changed: %v -> %v ;",
+			remote.HealthCheckHttpCode, local.HealthCheckHttpCode)
 	}
 	if local.HealthCheckDomain != "" &&
 		remote.HealthCheckDomain != local.HealthCheckDomain {
 		needUpdate = true
 		update.HealthCheckDomain = local.HealthCheckDomain
+		updateDetail += fmt.Sprintf("HealthCheckDomain changed: %v -> %v ;",
+			remote.HealthCheckDomain, local.HealthCheckDomain)
 	}
 	if local.HealthCheckTimeout != 0 &&
 		remote.HealthCheckTimeout != local.HealthCheckTimeout {
 		needUpdate = true
 		update.HealthCheckTimeout = local.HealthCheckTimeout
+		updateDetail += fmt.Sprintf("HealthCheckTimeout changed: %v -> %v ;",
+			remote.HealthCheckTimeout, local.HealthCheckTimeout)
 	}
+	reqCtx.Ctx = context.WithValue(reqCtx.Ctx, dryrun.ContextMessage, updateDetail)
+	reqCtx.Log.Info(fmt.Sprintf("%d listener update: %s", local.ListenerPort, updateDetail))
 	return needUpdate, update
-
 }
 
 func findVServerGroup(vgs []model.VServerGroup, port *model.ListenerAttribute) error {

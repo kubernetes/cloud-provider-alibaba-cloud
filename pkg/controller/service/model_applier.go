@@ -252,7 +252,8 @@ func (m *ModelApplier) cleanup(reqCtx *RequestContext, local *model.LoadBalancer
 			reqCtx.Log.Info(fmt.Sprintf("delete vgroup: [%s], [%s]", vg.NamedKey.Key(), vg.VGroupId))
 			err := m.vGroupMgr.DeleteVServerGroup(reqCtx, vg.VGroupId)
 			if err != nil {
-				return fmt.Errorf("delete vgroup %s failed, error: %s", vg.VGroupId, err.Error())
+				return fmt.Errorf("lb [%s] delete vgroup %s failed, error: %s",
+					remote.LoadBalancerAttribute.LoadBalancerId, vg.VGroupId, err.Error())
 			}
 		}
 	}

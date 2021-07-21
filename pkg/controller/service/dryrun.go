@@ -2,10 +2,10 @@ package service
 
 import (
 	"context"
-	"fmt"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/dryrun"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/util"
+	"k8s.io/klog"
 	"os"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sync"
@@ -13,11 +13,12 @@ import (
 
 var initial = sync.Map{}
 
-func initMap(client client.Client) error {
+func initMap(client client.Client) {
 	svcs := v1.ServiceList{}
 	err := client.List(context.TODO(), &svcs)
 	if err != nil {
-		return fmt.Errorf("init map fail: %s", err.Error())
+		klog.Infof("init Map error: %s", err.Error())
+		os.Exit(1)
 	}
 
 	length := 0
@@ -31,15 +32,14 @@ func initMap(client client.Client) error {
 		length++
 		initial.Store(util.Key(&m), 0)
 	}
+	util.ServiceLog.Info("ccm initial process finished.", "length", length)
 	if length == 0 {
-		util.ServiceLog.Info("ccm initial process finished.")
 		err := dryrun.ResultEvent(client, dryrun.SUCCESS, "ccm initial process finished")
 		if err != nil {
 			util.ServiceLog.Error(err, "fail to write precheck event")
 		}
 		os.Exit(0)
 	}
-	return nil
 }
 
 func mapfull() bool {

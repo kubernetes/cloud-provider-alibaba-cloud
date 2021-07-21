@@ -36,7 +36,7 @@ func Add(mgr manager.Manager, ctx *shared.SharedContext) error {
 }
 
 // newReconciler returns a new reconcile.Reconciler
-func newReconciler(mgr manager.Manager, ctx *shared.SharedContext) reconcile.Reconciler {
+func newReconciler(mgr manager.Manager, ctx *shared.SharedContext) *ReconcileService {
 	recon := &ReconcileService{
 		cloud:            ctx.Provider(),
 		kubeClient:       mgr.GetClient(),
@@ -54,16 +54,22 @@ func newReconciler(mgr manager.Manager, ctx *shared.SharedContext) reconcile.Rec
 	return recon
 }
 
-// add adds a new Controller to mgr with r as the reconcile.Reconciler
-func add(mgr manager.Manager, r reconcile.Reconciler) error {
+type serviceController struct {
+	c     controller.Controller
+	recon *ReconcileService
+}
 
+func (svcC serviceController) Start(ctx context.Context) error {
 	if ctrlCtx.ControllerCFG.DryRun {
-		if err := initMap(mgr.GetClient()); err != nil {
-		}
+		initMap(svcC.recon.kubeClient)
 	}
+	return svcC.c.Start(ctx)
+}
 
+// add adds a new Controller to mgr with r as the reconcile.Reconciler
+func add(mgr manager.Manager, r *ReconcileService) error {
 	// Create a new controller
-	c, err := controller.New(
+	c, err := controller.NewUnmanaged(
 		"service-controller", mgr,
 		controller.Options{
 			Reconciler:              r,
@@ -88,7 +94,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		NewPredicateForNodeEvent(mgr.GetEventRecorderFor("service-controller"))); err != nil {
 		return fmt.Errorf("watch resource node error: %s", err.Error())
 	}
-	return nil
+	return mgr.Add(&serviceController{c: c, recon: r})
 }
 
 // ReconcileService implements reconcile.Reconciler

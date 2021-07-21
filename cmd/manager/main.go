@@ -68,6 +68,7 @@ func main() {
 
 	var cloud prvd.Provider
 	if ctrlCtx.ControllerCFG.DryRun {
+		log.Info("using DryRun Mode")
 		cloud = dryrun.NewDryRunCloud()
 	} else {
 		cloud = alibaba.NewAlibabaCloud()
@@ -108,6 +109,7 @@ func main() {
 		log.Error(err, "Manager exited non-zero: %s", err.Error())
 		os.Exit(1)
 	}
+
 }
 
 func loadControllerConfig() error {
