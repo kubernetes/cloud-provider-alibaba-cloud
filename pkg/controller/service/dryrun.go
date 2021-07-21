@@ -6,7 +6,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/dryrun"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/util"
-	"k8s.io/klog"
 	"os"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sync"
@@ -33,10 +32,10 @@ func initMap(client client.Client) error {
 		initial.Store(util.Key(&m), 0)
 	}
 	if length == 0 {
-		klog.Infof("ccm initial process finished.")
+		util.ServiceLog.Info("ccm initial process finished.")
 		err := dryrun.ResultEvent(client, dryrun.SUCCESS, "ccm initial process finished")
 		if err != nil {
-			klog.Errorf("write precheck event fail: %s", err.Error())
+			util.ServiceLog.Error(err, "fail to write precheck event")
 		}
 		os.Exit(0)
 	}
@@ -44,7 +43,7 @@ func initMap(client client.Client) error {
 }
 
 func mapfull() bool {
-	total, unsynd := 0, 0
+	total, unsync := 0, 0
 	initial.Range(
 		func(key, value interface{}) bool {
 			val, ok := value.(int)
@@ -53,13 +52,12 @@ func mapfull() bool {
 				return true
 			}
 			if val != 1 {
-				unsynd += 1
+				unsync += 1
 			}
 			total += 1
 			return true
 		},
 	)
-	klog.Infof("Reconcile process: total [%d], unsynd [%d]", total, unsynd)
-	return unsynd == 0
+	util.ServiceLog.Info("Reconcile process", "total", total, "unsync", unsync)
+	return unsync == 0
 }
-

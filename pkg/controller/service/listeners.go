@@ -62,7 +62,7 @@ func (mgr *ListenerManager) Create(reqCtx *RequestContext, action CreateAction) 
 }
 
 func (mgr *ListenerManager) Delete(reqCtx *RequestContext, action DeleteAction) error {
-	reqCtx.Log.Infof("delete listener %d", action.listener.ListenerPort)
+	reqCtx.Log.Info(fmt.Sprintf("delete listener %d", action.listener.ListenerPort))
 	return mgr.cloud.DeleteLoadBalancerListener(reqCtx.Ctx, action.lbId, action.listener.ListenerPort)
 }
 
@@ -278,7 +278,7 @@ func (t *tcp) Create(reqCtx *RequestContext, action CreateAction) error {
 	if err != nil {
 		return fmt.Errorf("create tcp listener %d error: %s", action.listener.ListenerPort, err.Error())
 	}
-	reqCtx.Log.Infof("create listener tcp [%d]", action.listener.ListenerPort)
+	reqCtx.Log.Info(fmt.Sprintf("create listener tcp [%d]", action.listener.ListenerPort))
 	return t.mgr.cloud.StartLoadBalancerListener(reqCtx.Ctx, action.lbId, action.listener.ListenerPort)
 }
 
@@ -291,10 +291,10 @@ func (t *tcp) Update(reqCtx *RequestContext, action UpdateAction) error {
 	}
 	needUpdate, update := isNeedUpdate(action.local, action.remote)
 	if !needUpdate {
-		reqCtx.Log.Infof("update listener: tcp [%d] did not change, skip", action.local.ListenerPort)
+		reqCtx.Log.Info(fmt.Sprintf("update listener: tcp [%d] did not change, skip", action.local.ListenerPort))
 		return nil
 	}
-	reqCtx.Log.Infof("update listener: tcp [%d] updated [%v]", update.ListenerPort, update)
+	reqCtx.Log.Info(fmt.Sprintf("update listener: tcp [%d] updated [%v]", update.ListenerPort, update))
 	return t.mgr.cloud.SetLoadBalancerTCPListenerAttribute(reqCtx.Ctx, action.lbId, update)
 }
 
@@ -308,7 +308,7 @@ func (t *udp) Create(reqCtx *RequestContext, action CreateAction) error {
 	if err != nil {
 		return fmt.Errorf("create udp listener %d error: %s", action.listener.ListenerPort, err.Error())
 	}
-	reqCtx.Log.Infof("create listener udp [%d]", action.listener.ListenerPort)
+	reqCtx.Log.Info(fmt.Sprintf("create listener udp [%d]", action.listener.ListenerPort))
 	return t.mgr.cloud.StartLoadBalancerListener(reqCtx.Ctx, action.lbId, action.listener.ListenerPort)
 }
 
@@ -321,10 +321,10 @@ func (t *udp) Update(reqCtx *RequestContext, action UpdateAction) error {
 	}
 	needUpdate, update := isNeedUpdate(action.local, action.remote)
 	if !needUpdate {
-		reqCtx.Log.Infof("update listener: udp [%d] did not change, skip", action.local.ListenerPort)
+		reqCtx.Log.Info(fmt.Sprintf("update listener: udp [%d] did not change, skip", action.local.ListenerPort))
 		return nil
 	}
-	reqCtx.Log.Infof("update listener: udp [%d] updated [%v]", update.ListenerPort, update)
+	reqCtx.Log.Info(fmt.Sprintf("update listener: udp [%d] updated [%v]", update.ListenerPort, update))
 	return t.mgr.cloud.SetLoadBalancerUDPListenerAttribute(reqCtx.Ctx, action.lbId, update)
 }
 
@@ -338,7 +338,7 @@ func (t *http) Create(reqCtx *RequestContext, action CreateAction) error {
 	if err != nil {
 		return fmt.Errorf("create http listener %d error: %s", action.listener.ListenerPort, err.Error())
 	}
-	reqCtx.Log.Infof("create listener http [%d]", action.listener.ListenerPort)
+	reqCtx.Log.Info(fmt.Sprintf("create listener http [%d]", action.listener.ListenerPort))
 	return t.mgr.cloud.StartLoadBalancerListener(reqCtx.Ctx, action.lbId, action.listener.ListenerPort)
 
 }
@@ -366,7 +366,7 @@ func (t *http) Update(reqCtx *RequestContext, action UpdateAction) error {
 	}
 
 	if needRecreate {
-		reqCtx.Log.Infof("port [%d] forward policy changed, need recreate", action.local.ListenerPort)
+		reqCtx.Log.Info(fmt.Sprintf("port [%d] forward policy changed, need recreate", action.local.ListenerPort))
 		err := t.mgr.Delete(reqCtx, DeleteAction{
 			lbId:     action.lbId,
 			listener: action.remote,
@@ -382,16 +382,16 @@ func (t *http) Update(reqCtx *RequestContext, action UpdateAction) error {
 	}
 
 	if action.remote.ListenerForward == model.OnFlag {
-		reqCtx.Log.Infof("update listener: http [%d] ListenerForward is on, skip update listener", action.local.ListenerPort)
+		reqCtx.Log.Info(fmt.Sprintf("update listener: http [%d] ListenerForward is on, skip update listener", action.local.ListenerPort))
 		return nil
 	}
 
 	needUpdate, update := isNeedUpdate(action.local, action.remote)
 	if !needUpdate {
-		reqCtx.Log.Infof("update listener: http [%d] did not change, skip", action.local.ListenerPort)
+		reqCtx.Log.Info(fmt.Sprintf("update listener: http [%d] did not change, skip", action.local.ListenerPort))
 		return nil
 	}
-	reqCtx.Log.Infof("update listener: http [%d] updated [%v]", update.ListenerPort, update)
+	reqCtx.Log.Info(fmt.Sprintf("update listener: http [%d] updated [%v]", update.ListenerPort, update))
 	return t.mgr.cloud.SetLoadBalancerHTTPListenerAttribute(reqCtx.Ctx, action.lbId, update)
 
 }
@@ -406,7 +406,7 @@ func (t *https) Create(reqCtx *RequestContext, action CreateAction) error {
 	if err != nil {
 		return fmt.Errorf("create https listener %d error: %s", action.listener.ListenerPort, err.Error())
 	}
-	reqCtx.Log.Infof("create listener https [%d]", action.listener.ListenerPort)
+	reqCtx.Log.Info(fmt.Sprintf("create listener https [%d]", action.listener.ListenerPort))
 	return t.mgr.cloud.StartLoadBalancerListener(reqCtx.Ctx, action.lbId, action.listener.ListenerPort)
 
 }
@@ -420,10 +420,10 @@ func (t *https) Update(reqCtx *RequestContext, action UpdateAction) error {
 	}
 	needUpdate, update := isNeedUpdate(action.local, action.remote)
 	if !needUpdate {
-		reqCtx.Log.Infof("update listener: https [%d] did not change, skip", action.local.ListenerPort)
+		reqCtx.Log.Info(fmt.Sprintf("update listener: https [%d] did not change, skip", action.local.ListenerPort))
 		return nil
 	}
-	reqCtx.Log.Infof("update listener: https [%d] updated [%v]", update.ListenerPort, update)
+	reqCtx.Log.Info(fmt.Sprintf("update listener: https [%d] updated [%v]", update.ListenerPort, update))
 	return t.mgr.cloud.SetLoadBalancerHTTPSListenerAttribute(reqCtx.Ctx, action.lbId, update)
 }
 
@@ -493,7 +493,7 @@ func buildActionsForListeners(reqCtx *RequestContext, local *model.LoadBalancer,
 							lbId:     remote.LoadBalancerAttribute.LoadBalancerId,
 							listener: rlis,
 						})
-					reqCtx.Log.Infof("update listener: port [%d] match while protocol not, do delete & add", llis.ListenerPort)
+					reqCtx.Log.Info(fmt.Sprintf("update listener: port [%d] match while protocol not, do delete & add", llis.ListenerPort))
 				}
 			}
 		}
@@ -501,7 +501,7 @@ func buildActionsForListeners(reqCtx *RequestContext, local *model.LoadBalancer,
 		// for safety. Only conflict case is taking care.
 		if !found {
 			if !isPortManagedByMyService(local, rlis) {
-				reqCtx.Log.Infof("update listener: port [%d] namekey [%s] is managed by user, skip reconcile", rlis.ListenerPort, rlis.NamedKey)
+				reqCtx.Log.Info(fmt.Sprintf("update listener: port [%d] namekey [%s] is managed by user, skip reconcile", rlis.ListenerPort, rlis.NamedKey))
 				continue
 			}
 

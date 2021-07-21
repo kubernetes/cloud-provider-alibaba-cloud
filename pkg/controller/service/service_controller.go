@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/go-logr/logr"
 	"os"
 	"strings"
 	"time"
@@ -21,8 +22,8 @@ import (
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/vpc"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/dryrun"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/util"
-	"k8s.io/klog"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
@@ -40,6 +41,7 @@ func newReconciler(mgr manager.Manager, ctx *shared.SharedContext) reconcile.Rec
 		cloud:            ctx.Provider(),
 		kubeClient:       mgr.GetClient(),
 		scheme:           mgr.GetScheme(),
+		logger:           ctrl.Log.WithName("controller").WithName("service-controller"),
 		record:           mgr.GetEventRecorderFor("service-controller"),
 		finalizerManager: helper.NewDefaultFinalizerManager(mgr.GetClient()),
 	}
@@ -102,13 +104,14 @@ type ReconcileService struct {
 	cloud      prvd.Provider
 	kubeClient client.Client
 
+	logger logr.Logger
+
 	//record event recorder
 	record           record.EventRecorder
 	finalizerManager helper.FinalizerManager
 }
 
 func (m *ReconcileService) Reconcile(_ context.Context, request reconcile.Request) (reconcile.Result, error) {
-	klog.Infof("do reconcile service %s", request.NamespacedName)
 	return reconcile.Result{}, m.reconcile(request)
 }
 
@@ -116,7 +119,7 @@ type RequestContext struct {
 	Ctx      context.Context
 	Service  *v1.Service
 	Anno     *AnnotationRequest
-	Log      *util.Log
+	Log      logr.Logger
 	Recorder record.EventRecorder
 }
 
@@ -126,10 +129,10 @@ func (m *ReconcileService) reconcile(request reconcile.Request) error {
 		if ctrlCtx.ControllerCFG.DryRun {
 			initial.Store(request, 1)
 			if mapfull() {
-				klog.Infof("ccm initial process finished.")
+				util.ServiceLog.Info("ccm initial process finished.")
 				err := dryrun.ResultEvent(m.kubeClient, dryrun.SUCCESS, "ccm initial process finished")
 				if err != nil {
-					klog.Errorf("write precheck event fail: %s", err.Error())
+					util.ServiceLog.Error(err, "write precheck event failed")
 				}
 				os.Exit(0)
 			}
@@ -140,7 +143,7 @@ func (m *ReconcileService) reconcile(request reconcile.Request) error {
 	err := m.kubeClient.Get(context.Background(), request.NamespacedName, svc)
 	if err != nil {
 		if errors.IsNotFound(err) {
-			klog.Infof("service %s not found, skip", request.NamespacedName)
+			util.ServiceLog.Info("service not found, skip")
 			// Request object not found, could have been deleted
 			// after reconcile request.
 			// Owned objects are automatically garbage collected.
@@ -170,24 +173,24 @@ func (m *ReconcileService) reconcile(request reconcile.Request) error {
 		Ctx:      ctx,
 		Service:  svc,
 		Anno:     anno,
-		Log:      util.NewReqLog(fmt.Sprintf("[%s] ", request.String())),
+		Log:      util.ServiceLog.WithValues("service", util.Key(svc)),
 		Recorder: m.record,
 	}
 
-	reqContext.Log.Infof("ensure loadbalancer with service details, \n%+v", util.PrettyJson(svc))
+	reqContext.Log.Info(fmt.Sprintf("ensure loadbalancer with service details, %v", svc.String()))
 	// check to see whither if loadbalancer deletion is needed
 	if needDeleteLoadBalancer(svc) {
 		return m.cleanupLoadBalancerResources(reqContext)
 	}
 	err = m.reconcileLoadBalancerResources(reqContext)
 	if err != nil {
-		klog.Errorf("[%s]: reconcile loadbalancer error: %s", request.NamespacedName, err.Error())
+		util.ServiceLog.Error(err, "reconcile loadbalancer failed")
 	}
 	return err
 }
 
 func (m *ReconcileService) cleanupLoadBalancerResources(reqCtx *RequestContext) error {
-	reqCtx.Log.Infof("service do not need lb any more, try to delete it")
+	reqCtx.Log.Info("service do not need lb any more, try to delete it")
 	if helper.HasFinalizer(reqCtx.Service, ServiceFinalizer) {
 		_, err := m.buildAndApplyModel(reqCtx)
 		if err != nil && !strings.Contains(err.Error(), "LoadBalancerId does not exist") {
@@ -246,7 +249,7 @@ func (m *ReconcileService) reconcileLoadBalancerResources(req *RequestContext) e
 func (m *ReconcileService) buildAndApplyModel(reqCtx *RequestContext) (*model.LoadBalancer, error) {
 
 	// build local model
-	localModel, err := m.builder.BuildModel(reqCtx, LOCAL_MODEL)
+	localModel, err := m.builder.BuildModel(reqCtx, LocalModel)
 	if err != nil {
 		return nil, fmt.Errorf("build lb local model error: %s", err.Error())
 	}
@@ -254,7 +257,7 @@ func (m *ReconcileService) buildAndApplyModel(reqCtx *RequestContext) (*model.Lo
 	if err != nil {
 		return nil, fmt.Errorf("marshal lbmdl error: %s", err.Error())
 	}
-	klog.V(5).Infof("local build: %s", mdlJson)
+	util.ServiceLog.V(5).Info(fmt.Sprintf("local build: %s", mdlJson))
 
 	// apply model
 	remoteModel, err := m.applier.Apply(reqCtx, localModel)
@@ -289,7 +292,7 @@ func (m *ReconcileService) updateServiceStatus(reqCtx *RequestContext, svc *v1.S
 	// Write the state if changed
 	// TODO: Be careful here ... what if there were other changes to the service?
 	if !v1helper.LoadBalancerStatusEqual(preStatus, newStatus) {
-		klog.Infof("status: [%v] [%v]", preStatus, newStatus)
+		util.ServiceLog.Info(fmt.Sprintf("status: [%v] [%v]", preStatus, newStatus))
 		return retry(
 			&wait.Backoff{
 				Duration: 1 * time.Second,
@@ -306,7 +309,7 @@ func (m *ReconcileService) updateServiceStatus(reqCtx *RequestContext, svc *v1.S
 				}
 				updated := svcOld.DeepCopy()
 				updated.Status.LoadBalancer = *newStatus
-				klog.Infof("%s, LoadBalancer: %s", util.Key(updated), updated.Status.LoadBalancer)
+				reqCtx.Log.Info(fmt.Sprintf("LoadBalancer: %v", updated.Status.LoadBalancer))
 				err = m.kubeClient.Status().Patch(reqCtx.Ctx, updated, client.MergeFrom(svcOld))
 				if err == nil {
 					return nil
@@ -316,8 +319,7 @@ func (m *ReconcileService) updateServiceStatus(reqCtx *RequestContext, svc *v1.S
 				// out so that we can process the delete, which we should soon be receiving
 				// if we haven't already.
 				if errors.IsNotFound(err) {
-					klog.Warningf("not persisting update to service that no "+
-						"longer exists: %v", err)
+					util.ServiceLog.Error(err, "not persisting update to service that no longer exists")
 					return nil
 				}
 				// TODO: Try to resolve the conflict if the change was unrelated to load
@@ -326,8 +328,8 @@ func (m *ReconcileService) updateServiceStatus(reqCtx *RequestContext, svc *v1.S
 					return fmt.Errorf("not persisting update to service %s that "+
 						"has been changed since we received it: %v", util.Key(svc), err)
 				}
-				klog.Warningf("failed to persist updated LoadBalancerStatus to "+
-					"service %s after creating its load balancer: %v", util.Key(svc), err)
+				reqCtx.Log.Error(err, "failed to persist updated LoadBalancerStatus"+
+					" after creating its load balancer")
 				return fmt.Errorf("retry with %s, %s", err.Error(), TRY_AGAIN)
 			},
 			svc,
@@ -371,7 +373,7 @@ func (m *ReconcileService) setEIPAsExternalIP(ctx context.Context, lbId string) 
 		return nil, fmt.Errorf("slb %s has no eip, svc external ip cannot be set to eip address", lbId)
 	}
 	if len(eips) > 1 {
-		klog.Warningf(" slb %s has multiple eips, len [%d]", lbId, len(eips))
+		util.ServiceLog.Info(fmt.Sprintf(" slb %s has multiple eips, len [%d]", lbId, len(eips)))
 	}
 
 	var ingress []v1.LoadBalancerIngress

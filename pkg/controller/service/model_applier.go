@@ -91,7 +91,7 @@ func (m *ModelApplier) applyLoadBalancerAttribute(reqCtx *RequestContext, local 
 					remote.LoadBalancerAttribute.LoadBalancerId, err.Error())
 			}
 			remote.LoadBalancerAttribute.LoadBalancerId = ""
-			reqCtx.Log.Infof("successfully delete slb %s", remote.LoadBalancerAttribute.LoadBalancerId)
+			reqCtx.Log.Info(fmt.Sprintf("successfully delete slb %s", remote.LoadBalancerAttribute.LoadBalancerId))
 			return nil
 		}
 	}
@@ -106,7 +106,7 @@ func (m *ModelApplier) applyLoadBalancerAttribute(reqCtx *RequestContext, local 
 		if err := m.slbMgr.Create(reqCtx, local); err != nil {
 			return fmt.Errorf("create lb error: %s", err.Error())
 		}
-		reqCtx.Log.Infof("successfully create lb %s", local.LoadBalancerAttribute.LoadBalancerId)
+		reqCtx.Log.Info(fmt.Sprintf("successfully create lb %s", local.LoadBalancerAttribute.LoadBalancerId))
 		// update remote model
 		remote.LoadBalancerAttribute.LoadBalancerId = local.LoadBalancerAttribute.LoadBalancerId
 		if err := m.slbMgr.Find(reqCtx, remote); err != nil {
@@ -176,7 +176,7 @@ func (m *ModelApplier) applyVGroups(reqCtx *RequestContext, local *model.LoadBal
 func (m *ModelApplier) applyListeners(reqCtx *RequestContext, local *model.LoadBalancer, remote *model.LoadBalancer) error {
 	if local.LoadBalancerAttribute.IsUserManaged {
 		if reqCtx.Anno.isForceOverride() {
-			reqCtx.Log.Infof("listener override is false, skip reconcile listeners", local.NamespacedName)
+			reqCtx.Log.Info("listener override is false, skip reconcile listeners")
 			return nil
 		}
 	}
@@ -237,7 +237,8 @@ func (m *ModelApplier) cleanup(reqCtx *RequestContext, local *model.LoadBalancer
 	vgs := remote.VServerGroups
 	for _, vg := range vgs {
 		if !isVGroupManagedByMyService(vg, reqCtx.Service) {
-			reqCtx.Log.Infof("delete vgroup: [%s] description [%s] is managed by user, skip delete", vg.VGroupName, vg.VGroupId)
+			reqCtx.Log.Info(fmt.Sprintf("delete vgroup: [%s] description [%s] is managed by user, skip delete",
+				vg.VGroupName, vg.VGroupId))
 			continue
 		}
 		found := false
@@ -248,7 +249,7 @@ func (m *ModelApplier) cleanup(reqCtx *RequestContext, local *model.LoadBalancer
 			}
 		}
 		if !found {
-			reqCtx.Log.Infof("delete vgroup: [%s], [%s]", vg.NamedKey.Key(), vg.VGroupId)
+			reqCtx.Log.Info(fmt.Sprintf("delete vgroup: [%s], [%s]", vg.NamedKey.Key(), vg.VGroupId))
 			err := m.vGroupMgr.DeleteVServerGroup(reqCtx, vg.VGroupId)
 			if err != nil {
 				return fmt.Errorf("delete vgroup %s failed, error: %s", vg.VGroupId, err.Error())

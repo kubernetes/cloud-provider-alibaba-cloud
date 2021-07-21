@@ -7,7 +7,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/model"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/base"
-	"k8s.io/klog"
 
 	"github.com/aliyun/alibaba-cloud-sdk-go/services/slb"
 )
@@ -102,7 +101,6 @@ func NewAnnotationRequest(svc *v1.Service) *AnnotationRequest {
 // TODO get all annotations value from Get()
 func (n *AnnotationRequest) Get(k string) string {
 	if n.svc == nil {
-		klog.Infof("extract annotation %s from empty service", k)
 		return ""
 	}
 

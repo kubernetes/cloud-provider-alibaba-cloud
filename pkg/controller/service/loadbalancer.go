@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/model"
 	prvd "k8s.io/cloud-provider-alibaba-cloud/pkg/provider"
-	"k8s.io/cloud-provider-alibaba-cloud/pkg/util"
 	"strconv"
 )
 
@@ -79,7 +78,7 @@ func (mgr *LoadBalancerManager) Delete(reqCtx *RequestContext, remote *model.Loa
 
 func (mgr *LoadBalancerManager) Update(reqCtx *RequestContext, local, remote *model.LoadBalancer) error {
 	lbId := remote.LoadBalancerAttribute.LoadBalancerId
-	reqCtx.Log.Infof("found load balancer [%s], try to update load balancer attribute", lbId)
+	reqCtx.Log.Info(fmt.Sprintf("found load balancer [%s], try to update load balancer attribute", lbId))
 
 	if err := updateLBDefaultTag(mgr, reqCtx, local, remote); err != nil {
 		return fmt.Errorf("alicloud: update lb tag error: %s", err.Error())
@@ -111,56 +110,56 @@ func (mgr *LoadBalancerManager) Update(reqCtx *RequestContext, local, remote *mo
 		local.LoadBalancerAttribute.InternetChargeType != remote.LoadBalancerAttribute.InternetChargeType {
 		needUpdate = true
 		charge = local.LoadBalancerAttribute.InternetChargeType
-		reqCtx.Log.Infof("update lb: internet chargeType changed([%s] -> [%s]), update loadbalancer [%s]",
-			remote.LoadBalancerAttribute.InternetChargeType, local.LoadBalancerAttribute.InternetChargeType, lbId)
+		reqCtx.Log.WithName(lbId).Info(fmt.Sprintf("update lb: internet chargeType changed([%s] -> [%s])",
+			remote.LoadBalancerAttribute.InternetChargeType, local.LoadBalancerAttribute.InternetChargeType))
 	}
 	if local.LoadBalancerAttribute.Bandwidth != 0 &&
 		local.LoadBalancerAttribute.Bandwidth != remote.LoadBalancerAttribute.Bandwidth &&
 		local.LoadBalancerAttribute.InternetChargeType == model.PayByBandwidth {
 		needUpdate = true
 		bandwidth = local.LoadBalancerAttribute.Bandwidth
-		reqCtx.Log.Infof("update lb: bandwidth changed([%d] -> [%d]), update loadbalancer[%s]",
-			remote.LoadBalancerAttribute.Bandwidth, local.LoadBalancerAttribute.Bandwidth, lbId)
+		reqCtx.Log.WithName(lbId).Info(fmt.Sprintf("update lb: bandwidth changed([%d] -> [%d])",
+			remote.LoadBalancerAttribute.Bandwidth, local.LoadBalancerAttribute.Bandwidth))
 	}
 	if needUpdate {
 		if remote.LoadBalancerAttribute.AddressType == model.InternetAddressType {
-			reqCtx.Log.Infof("update lb: modify loadbalancer: chargeType=%s, bandwidth=%d", charge, bandwidth)
+			reqCtx.Log.WithName(lbId).Info(fmt.Sprintf("update lb: modify loadbalancer: chargeType=%s, bandwidth=%d", charge, bandwidth))
 			return mgr.cloud.ModifyLoadBalancerInternetSpec(reqCtx.Ctx, lbId, string(charge), bandwidth)
 		} else {
-			reqCtx.Log.Infof("update lb: only internet loadbalancer is allowed to modify bandwidth and pay type")
+			reqCtx.Log.WithName(lbId).Info("update lb: only internet loadbalancer is allowed to modify bandwidth and pay type")
 		}
 	}
 
 	// update instance spec
 	if local.LoadBalancerAttribute.LoadBalancerSpec != "" &&
 		local.LoadBalancerAttribute.LoadBalancerSpec != remote.LoadBalancerAttribute.LoadBalancerSpec {
-		reqCtx.Log.Infof("update lb: loadbalancerSpec changed ([%s] -> [%s]), update loadbalancer [%s]",
-			remote.LoadBalancerAttribute.LoadBalancerSpec, local.LoadBalancerAttribute.LoadBalancerSpec, lbId)
+		reqCtx.Log.WithName(lbId).Info("update lb: loadbalancerSpec changed ([%s] -> [%s])",
+			remote.LoadBalancerAttribute.LoadBalancerSpec, local.LoadBalancerAttribute.LoadBalancerSpec)
 		return mgr.cloud.ModifyLoadBalancerInstanceSpec(reqCtx.Ctx, lbId, string(local.LoadBalancerAttribute.LoadBalancerSpec))
 	}
 
 	// update slb delete protection
 	if local.LoadBalancerAttribute.DeleteProtection != "" &&
 		local.LoadBalancerAttribute.DeleteProtection != remote.LoadBalancerAttribute.DeleteProtection {
-		reqCtx.Log.Infof("update lb: delete protection changed([%s] -> [%s]), update loadbalancer [%s]",
-			remote.LoadBalancerAttribute.DeleteProtection, local.LoadBalancerAttribute.DeleteProtection, lbId)
+		reqCtx.Log.WithName(lbId).Info("update lb: delete protection changed([%s] -> [%s])",
+			remote.LoadBalancerAttribute.DeleteProtection, local.LoadBalancerAttribute.DeleteProtection)
 		return mgr.cloud.SetLoadBalancerDeleteProtection(reqCtx.Ctx, lbId, string(local.LoadBalancerAttribute.DeleteProtection))
 	}
 
 	// update modification protection
 	if local.LoadBalancerAttribute.ModificationProtectionStatus != "" &&
 		local.LoadBalancerAttribute.ModificationProtectionStatus != remote.LoadBalancerAttribute.ModificationProtectionStatus {
-		reqCtx.Log.Infof("update lb: loadbalancer modification protection changed([%s] -> [%s]) changed, update loadbalancer [%s]",
-			remote.LoadBalancerAttribute.ModificationProtectionStatus, local.LoadBalancerAttribute.ModificationProtectionStatus,
-			remote.LoadBalancerAttribute.LoadBalancerId)
+		reqCtx.Log.WithName(lbId).Info("update lb: loadbalancer modification protection changed([%s] -> [%s])",
+			remote.LoadBalancerAttribute.ModificationProtectionStatus, local.LoadBalancerAttribute.ModificationProtectionStatus, )
 		return mgr.cloud.SetLoadBalancerModificationProtection(reqCtx.Ctx, lbId, string(local.LoadBalancerAttribute.ModificationProtectionStatus))
 	}
 
 	// update slb name
+	// only user defined slb or slb which has "kubernetes.do.not.delete" tag can update name
 	if local.LoadBalancerAttribute.LoadBalancerName != "" &&
 		local.LoadBalancerAttribute.LoadBalancerName != remote.LoadBalancerAttribute.LoadBalancerName {
-		reqCtx.Log.Infof("update lb: lb name changed([%s] -> [%s]), update loadbalancer [%s]",
-			remote.LoadBalancerAttribute.LoadBalancerName, local.LoadBalancerAttribute.LoadBalancerName, lbId)
+		reqCtx.Log.WithName(lbId).Info("update lb: loadbalancer name changed([%s]-[%s])",
+			remote.LoadBalancerAttribute.LoadBalancerName, local.LoadBalancerAttribute.LoadBalancerName)
 		return mgr.cloud.SetLoadBalancerName(reqCtx.Ctx, lbId, local.LoadBalancerAttribute.LoadBalancerName)
 	}
 	return nil
@@ -249,35 +248,4 @@ func setModelDefaultValue(mgr *LoadBalancerManager, mdl *model.LoadBalancer, ann
 
 	mdl.LoadBalancerAttribute.Tags = append(mdl.LoadBalancerAttribute.Tags, anno.GetDefaultTags()...)
 	return nil
-}
-
-func updateLBDefaultTag(mgr *LoadBalancerManager, reqCtx *RequestContext, local, remote *model.LoadBalancer) error {
-	newTags := append([]model.Tag{}, remote.LoadBalancerAttribute.Tags...)
-	if local.LoadBalancerAttribute.IsUserManaged {
-		for _, tag := range remote.LoadBalancerAttribute.Tags {
-			if tag.TagKey == REUSEKEY {
-				return nil
-			}
-		}
-		if len(newTags) < SLBMaxTagNum {
-			newTags = append(newTags, model.Tag{TagKey: REUSEKEY, TagValue: "true"})
-		}
-	} else {
-		for _, tag := range remote.LoadBalancerAttribute.Tags {
-			if tag.TagKey == TAGKEY {
-				return nil
-			}
-		}
-		if len(newTags) < SLBMaxTagNum {
-			newTags = append(newTags, model.Tag{TagKey: TAGKEY, TagValue: reqCtx.Anno.GetDefaultLoadBalancerName()})
-		}
-	}
-
-	newTagsBytes, err := json.Marshal(newTags)
-	if err != nil {
-		return fmt.Errorf("marshal tags error: %s", err.Error())
-	}
-
-	reqCtx.Log.Infof("[%s] try to update slb [%s] tag: %s", util.Key(reqCtx.Service), remote.LoadBalancerAttribute.LoadBalancerId, string(newTagsBytes))
-	return mgr.cloud.AddTags(reqCtx.Ctx, remote.LoadBalancerAttribute.LoadBalancerId, string(newTagsBytes))
 }

@@ -14,10 +14,10 @@ type ModelType string
 
 const (
 	// LOCAL_MODEL, model built based on cluster information
-	LOCAL_MODEL = ModelType("local")
+	LocalModel = ModelType("local")
 
 	// REMOTE_MODEL, Model built based on cloud information
-	REMOTE_MODEL = ModelType("remote")
+	RemoteModel = ModelType("remote")
 )
 
 type ModelBuilder struct {
@@ -37,9 +37,9 @@ func NewModelBuilder(slbMgr *LoadBalancerManager, lisMgr *ListenerManager, vGrou
 
 func (builder *ModelBuilder) Instance(modelType ModelType) IModelBuilder {
 	switch modelType {
-	case LOCAL_MODEL:
+	case LocalModel:
 		return &localModel{builder}
-	case REMOTE_MODEL:
+	case RemoteModel:
 		return &remoteModel{builder}
 	}
 	return &localModel{builder}

@@ -42,7 +42,7 @@ func main() {
 		log.Error(err, "unable to load controller config")
 		os.Exit(1)
 	}
-	ctrl.SetLogger(log)
+	ctrl.SetLogger(klogr.New())
 
 	printVersion()
 
