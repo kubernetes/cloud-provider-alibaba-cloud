@@ -164,15 +164,15 @@ func LoadCfg(cfg string) error {
 	if err != nil {
 		return fmt.Errorf("read config file: %s", content)
 	}
-	return yaml.Unmarshal(content, ctrlCtx.ClougCFG)
+	return yaml.Unmarshal(content, ctrlCtx.CloudCFG)
 }
 
 func (mgr *ClientAuth) Token() TokenAuth {
-	key, err := b64.StdEncoding.DecodeString(ctrlCtx.ClougCFG.Global.AccessKeyID)
+	key, err := b64.StdEncoding.DecodeString(ctrlCtx.CloudCFG.Global.AccessKeyID)
 	if err != nil {
 		panic(fmt.Sprintf("ak key must be base64 encoded: %s", err.Error()))
 	}
-	secret, err := b64.StdEncoding.DecodeString(ctrlCtx.ClougCFG.Global.AccessKeySecret)
+	secret, err := b64.StdEncoding.DecodeString(ctrlCtx.CloudCFG.Global.AccessKeySecret)
 	if err != nil {
 		panic(fmt.Sprintf("ak secret must be base64 encoded: %s", err.Error()))
 	}
@@ -181,7 +181,7 @@ func (mgr *ClientAuth) Token() TokenAuth {
 		log.Info("ccm: use ramrole token mode without ak.")
 		return &RamRoleToken{meta: mgr.Meta}
 	}
-	region := ctrlCtx.ClougCFG.Global.Region
+	region := ctrlCtx.CloudCFG.Global.Region
 	if region == "" {
 		region, err = mgr.Meta.Region()
 		if err != nil {
@@ -191,7 +191,7 @@ func (mgr *ClientAuth) Token() TokenAuth {
 	inittoken := &Token{
 		AccessKey:    string(key),
 		AccessSecret: string(secret),
-		UID:          ctrlCtx.ClougCFG.Global.UID,
+		UID:          ctrlCtx.CloudCFG.Global.UID,
 		Region:       region,
 	}
 	if inittoken.UID == "" {
@@ -277,7 +277,7 @@ func (f *RamRoleToken) NextToken() (*Token, error) {
 	if err != nil {
 		return nil, fmt.Errorf("ramrole Token retrieve: %s", err.Error())
 	}
-	region := ctrlCtx.ClougCFG.Global.Region
+	region := ctrlCtx.CloudCFG.Global.Region
 	if region == "" {
 		region, err = f.meta.Region()
 		if err != nil {

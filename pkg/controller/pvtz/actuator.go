@@ -169,7 +169,7 @@ func (a *Actuator) desiredAandAAAA(svc *corev1.Service) ([]*model.PvtzEndpoint, 
 
 	epTemplate := model.NewPvtzEndpointBuilder()
 	epTemplate.WithRr(serviceRr(svc))
-	epTemplate.WithTtl( ctrlCtx.ClougCFG.Global.PrivateZoneRecordTTL)
+	epTemplate.WithTtl( ctrlCtx.CloudCFG.Global.PrivateZoneRecordTTL)
 
 	if len(ipsV4) != 0 {
 		epb := epTemplate.DeepCopy()
@@ -199,7 +199,7 @@ func (a *Actuator) desiredSRV(svc *corev1.Service) ([]*model.PvtzEndpoint, error
 
 	eps := make([]*model.PvtzEndpoint, 0)
 	epTemplate := model.NewPvtzEndpointBuilder()
-	epTemplate.WithTtl(ctrlCtx.ClougCFG.Global.PrivateZoneRecordTTL)
+	epTemplate.WithTtl(ctrlCtx.CloudCFG.Global.PrivateZoneRecordTTL)
 	epTemplate.WithType(model.RecordTypeSRV)
 	svcName := svc.Name
 	ns := svc.Namespace
@@ -227,7 +227,7 @@ func (a *Actuator) desiredSRV(svc *corev1.Service) ([]*model.PvtzEndpoint, error
 
 func (a *Actuator) desiredPTR(svc *corev1.Service) ([]*model.PvtzEndpoint, error) {
 	epb := model.NewPvtzEndpointBuilder()
-	epb.WithTtl( ctrlCtx.ClougCFG.Global.PrivateZoneRecordTTL)
+	epb.WithTtl( ctrlCtx.CloudCFG.Global.PrivateZoneRecordTTL)
 	epb.WithType(model.RecordTypePTR)
 	epb.WithValueData(serviceRr(svc))
 	switch svc.Spec.Type {
@@ -292,7 +292,7 @@ func (a *Actuator) desiredPTR(svc *corev1.Service) ([]*model.PvtzEndpoint, error
 func (a *Actuator) desiredCNAME(svc *corev1.Service) ([]*model.PvtzEndpoint, error) {
 	epb := model.NewPvtzEndpointBuilder()
 	epb.WithRr(serviceRr(svc))
-	epb.WithTtl( ctrlCtx.ClougCFG.Global.PrivateZoneRecordTTL)
+	epb.WithTtl( ctrlCtx.CloudCFG.Global.PrivateZoneRecordTTL)
 	epb.WithType(model.RecordTypeCNAME)
 	if svc.Spec.Type == corev1.ServiceTypeExternalName {
 		if ip := net.ParseIP(svc.Spec.ExternalName); ip == nil {

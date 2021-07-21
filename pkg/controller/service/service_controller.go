@@ -158,7 +158,7 @@ func (m *ReconcileService) reconcile(request reconcile.Request) error {
 	// disable public address
 	if anno.Get(AddressType) == "" ||
 		anno.Get(AddressType) == string(model.InternetAddressType) {
-		if ctrlCtx.ClougCFG.Global.DisablePublicSLB {
+		if ctrlCtx.CloudCFG.Global.DisablePublicSLB {
 			m.record.Event(svc, v1.EventTypeWarning, helper.FailedSyncLB, "create public address slb is not allowed")
 			// do not support create public address slb, return and don't requeue
 			return nil

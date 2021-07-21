@@ -82,7 +82,7 @@ func isENIBackendType(svc *v1.Service) bool {
 		return os.Getenv("SERVICE_FORCE_BACKEND_ENI") == "true"
 	}
 
-	return ctrlCtx.ClougCFG.Global.ServiceBackendType == model.ENIBackendType
+	return ctrlCtx.CloudCFG.Global.ServiceBackendType == model.ENIBackendType
 }
 
 func needDeleteLoadBalancer(svc *v1.Service) bool {

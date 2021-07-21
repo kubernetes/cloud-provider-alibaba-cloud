@@ -35,6 +35,7 @@ type RuntimeConfig struct {
 	EnableLeaderElection    bool
 	LeaderElectionID        string
 	LeaderElectionNamespace string
+	ConfigureCloudRoutes    bool
 	SyncPeriod              time.Duration
 	QPS                     int
 	Burst                   int
@@ -58,6 +59,8 @@ func (c *RuntimeConfig) BindFlags(fs *pflag.FlagSet) {
 		"Period at which the controller forces the repopulation of its local object stores.")
 	fs.IntVar(&c.QPS, flagQPS, defaultQPS, "QPS to use while talking with kubernetes apiserver.")
 	fs.IntVar(&c.Burst, flagBurst, defaultBurst, "Burst to use while talking with kubernetes apiserver.")
+	fs.BoolVar(&c.ConfigureCloudRoutes, flagConfigureCloudRoutes, false,
+		"Enable configure cloud routes.")
 }
 
 func BuildRuntimeOptions(rtCfg RuntimeConfig) manager.Options {

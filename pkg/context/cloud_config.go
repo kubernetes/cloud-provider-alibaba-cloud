@@ -1,6 +1,11 @@
 package context
 
-var ClougCFG = &CloudConfig{}
+var CloudCFG = &CloudConfig{}
+
+const (
+	flagConfigureCloudRoutes    = "configure-cloud-routes"
+	defaultConfigureCloudRoutes = false
+)
 
 // CloudConfig wraps the settings for the Alibaba Cloud provider.
 type CloudConfig struct {
@@ -28,7 +33,6 @@ type CloudConfig struct {
 
 		// route controller
 		RouteTableIDS             string `json:"routeTableIDs"`
-		ConfigureCloudRoutes      bool   `json:"configureCloudRoutes"`
 		RouteReconciliationPeriod string `json:"routeReconciliationPeriod"`
 
 		// pvtz controller
