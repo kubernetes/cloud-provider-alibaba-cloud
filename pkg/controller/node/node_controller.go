@@ -35,7 +35,7 @@ func Add(mgr manager.Manager, ctx *shared.SharedContext) error {
 func newReconciler(mgr manager.Manager, ctx *shared.SharedContext) reconcile.Reconciler {
 	recon := &ReconcileNode{
 		monitorPeriod:   5 * time.Minute,
-		statusFrequency: 1 * time.Minute,
+		statusFrequency: 5 * time.Minute,
 		// provider
 		cloud:  ctx.Provider(),
 		client: mgr.GetClient(),
@@ -131,7 +131,7 @@ func (m *ReconcileNode) doAddCloudNode(node *corev1.Node) error {
 
 	instance, err := findCloudECS(m.cloud, prvdId)
 	if err != nil {
-		if errors.IsNotFound(err) {
+		if err == ErrNotFound {
 			log.Info("cloud instance %s not found", node.Name)
 			return nil
 		}
@@ -239,7 +239,7 @@ func (m *ReconcileNode) syncNodeAddress(nodes []corev1.Node) error {
 
 		diff = func(copy runtime.Object) (client.Object, error) {
 			nins := copy.(*corev1.Node)
-			setFields(nins, cloudNode, m.configCloudRoute)
+			setFields(nins, cloudNode, false)
 			return nins, nil
 		}
 

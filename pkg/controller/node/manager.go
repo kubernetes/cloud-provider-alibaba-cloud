@@ -18,20 +18,19 @@ package node
 import (
 	"context"
 	"fmt"
-	nctx "k8s.io/cloud-provider-alibaba-cloud/pkg/context/node"
-	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/helper"
-	prvd "k8s.io/cloud-provider-alibaba-cloud/pkg/provider"
-	"k8s.io/klog"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-	"time"
-
+	"github.com/pkg/errors"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-
+	nctx "k8s.io/cloud-provider-alibaba-cloud/pkg/context/node"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/helper"
+	prvd "k8s.io/cloud-provider-alibaba-cloud/pkg/provider"
 	"k8s.io/cloud-provider/api"
 	"k8s.io/cloud-provider/node/helpers"
+	"k8s.io/klog"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"time"
 )
 
 const (
@@ -49,6 +48,8 @@ const (
 
 	AnnotationProvidedIPAddr = "alpha.kubernetes.io/provided-node-ip"
 )
+
+var ErrNotFound = errors.New("instance not found")
 
 type nodeModifier func(*v1.Node)
 
@@ -158,7 +159,7 @@ func findCloudECS(
 	}
 	cloudIns, ok := nodes[prvdId]
 	if !ok || cloudIns == nil {
-		return nil, fmt.Errorf("instance not found")
+		return nil, ErrNotFound
 	}
 	return cloudIns, nil
 }

@@ -103,7 +103,6 @@ func (p SLBProvider) CreateLoadBalancerTCPListener(
 	req := slb.CreateCreateLoadBalancerTCPListenerRequest()
 	req.LoadBalancerId = lbId
 	setGenericListenerValue(req, &listener)
-	// set params only for tcp
 	setTCPListenerValue(req, &listener)
 	_, err := p.auth.SLB.CreateLoadBalancerTCPListener(req)
 	return util.FormatErrorMessage(err)
@@ -115,7 +114,6 @@ func (p SLBProvider) SetLoadBalancerTCPListenerAttribute(
 	req.LoadBalancerId = lbId
 	req.VServerGroup = string(model.OnFlag)
 	setGenericListenerValue(req, &listener)
-	// set params only for tcp
 	setTCPListenerValue(req, &listener)
 	_, err := p.auth.SLB.SetLoadBalancerTCPListenerAttribute(req)
 	return util.FormatErrorMessage(err)
@@ -126,7 +124,6 @@ func (p SLBProvider) CreateLoadBalancerUDPListener(
 	req := slb.CreateCreateLoadBalancerUDPListenerRequest()
 	req.LoadBalancerId = lbId
 	setGenericListenerValue(req, &listener)
-	// set params only for udp
 	setUDPListenerValue(req, &listener)
 	_, err := p.auth.SLB.CreateLoadBalancerUDPListener(req)
 	return util.FormatErrorMessage(err)
@@ -138,7 +135,6 @@ func (p SLBProvider) SetLoadBalancerUDPListenerAttribute(
 	req.LoadBalancerId = lbId
 	req.VServerGroup = string(model.OnFlag)
 	setGenericListenerValue(req, &listener)
-	// set params only for udp
 	setUDPListenerValue(req, &listener)
 	_, err := p.auth.SLB.SetLoadBalancerUDPListenerAttribute(req)
 	return util.FormatErrorMessage(err)
@@ -149,8 +145,14 @@ func (p SLBProvider) CreateLoadBalancerHTTPListener(
 	req := slb.CreateCreateLoadBalancerHTTPListenerRequest()
 	req.LoadBalancerId = lbId
 	setGenericListenerValue(req, &listener)
-	// set params only for http
 	setHTTPListenerValue(req, &listener)
+	// set params only for CreateLoadBalancerHTTPListenerRequest
+	if listener.ListenerForward != "" {
+		req.ListenerForward = string(listener.ListenerForward)
+	}
+	if listener.ForwardPort != 0 {
+		req.ForwardPort = requests.NewInteger(listener.ForwardPort)
+	}
 	_, err := p.auth.SLB.CreateLoadBalancerHTTPListener(req)
 	return util.FormatErrorMessage(err)
 }
@@ -161,7 +163,6 @@ func (p SLBProvider) SetLoadBalancerHTTPListenerAttribute(
 	req.LoadBalancerId = lbId
 	req.VServerGroup = string(model.OnFlag)
 	setGenericListenerValue(req, &listener)
-	// set params only for http
 	setHTTPListenerValue(req, &listener)
 	_, err := p.auth.SLB.SetLoadBalancerHTTPListenerAttribute(req)
 	return util.FormatErrorMessage(err)
@@ -172,7 +173,6 @@ func (p SLBProvider) CreateLoadBalancerHTTPSListener(
 	req := slb.CreateCreateLoadBalancerHTTPSListenerRequest()
 	req.LoadBalancerId = lbId
 	setGenericListenerValue(req, &listener)
-	// set params only for https
 	setHTTPSListenerValue(req, &listener)
 	_, err := p.auth.SLB.CreateLoadBalancerHTTPSListener(req)
 	return util.FormatErrorMessage(err)
@@ -184,7 +184,6 @@ func (p SLBProvider) SetLoadBalancerHTTPSListenerAttribute(
 	req.LoadBalancerId = lbId
 	req.VServerGroup = string(model.OnFlag)
 	setGenericListenerValue(req, &listener)
-	// set params only for https
 	setHTTPSListenerValue(req, &listener)
 	_, err := p.auth.SLB.SetLoadBalancerHTTPSListenerAttribute(req)
 	return util.FormatErrorMessage(err)
@@ -338,14 +337,6 @@ func setHTTPListenerValue(req interface{}, listener *model.ListenerAttribute) {
 	if listener.StickySessionType != "" {
 		stickySessionType := v.FieldByName("StickySessionType")
 		stickySessionType.SetString(listener.StickySessionType)
-	}
-	if listener.ListenerForward != "" {
-		listenerForward := v.FieldByName("ListenerForward")
-		listenerForward.SetString(string(listener.ListenerForward))
-	}
-	if listener.ForwardPort != 0 {
-		forwardPort := v.FieldByName("ForwardPort")
-		forwardPort.SetString(strconv.Itoa(listener.ForwardPort))
 	}
 }
 

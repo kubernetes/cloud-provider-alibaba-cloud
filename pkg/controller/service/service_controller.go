@@ -183,7 +183,7 @@ func (m *ReconcileService) reconcile(request reconcile.Request) error {
 		Recorder: m.record,
 	}
 
-	reqContext.Log.Info(fmt.Sprintf("ensure loadbalancer with service details, %v", svc.String()))
+	reqContext.Log.Info(fmt.Sprintf("ensure loadbalancer with service details, %+v", svc.String()))
 	// check to see whither if loadbalancer deletion is needed
 	if needDeleteLoadBalancer(svc) {
 		return m.cleanupLoadBalancerResources(reqContext)

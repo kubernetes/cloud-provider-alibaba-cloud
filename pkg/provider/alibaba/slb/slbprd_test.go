@@ -110,3 +110,22 @@ func TestProviderSLB_DescribeVServerGroups(t *testing.T) {
 	jsonStr, err := json.Marshal(vgs)
 	t.Logf(string(jsonStr))
 }
+
+func TestSLBProvider_AddTags(t *testing.T) {
+	key := ""
+	secert := ""
+	client, err := slb.NewClientWithAccessKey("cn-hangzhou", key, secert)
+	if err != nil {
+		t.Fatalf(err.Error())
+	}
+
+	tags := []model.Tag{{TagKey: "testkey", TagValue: "testvalue"}}
+	tagBytes, _ := json.Marshal(tags)
+	req := slb.CreateAddTagsRequest()
+	req.LoadBalancerId = "lb-xxxxx"
+	req.Tags = string(tagBytes)
+	_, err = client.AddTags(req)
+	if err != nil {
+		panic(err)
+	}
+}

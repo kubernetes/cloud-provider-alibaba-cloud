@@ -143,7 +143,7 @@ func (mgr *VGroupManager) DescribeVServerGroups(reqCtx *RequestContext, lbId str
 }
 
 func (mgr *VGroupManager) BatchAddVServerGroupBackendServers(reqCtx *RequestContext, vGroup model.VServerGroup, add interface{}) error {
-	return Batch(add, MAX_BACKEND_NUM,
+	return Batch(add, MaxBackendNum,
 		func(list []interface{}) error {
 			additions, err := json.Marshal(list)
 			if err != nil {
@@ -155,7 +155,7 @@ func (mgr *VGroupManager) BatchAddVServerGroupBackendServers(reqCtx *RequestCont
 }
 
 func (mgr *VGroupManager) BatchRemoveVServerGroupBackendServers(reqCtx *RequestContext, vGroup model.VServerGroup, del interface{}) error {
-	return Batch(del, MAX_BACKEND_NUM,
+	return Batch(del, MaxBackendNum,
 		func(list []interface{}) error {
 			deletions, err := json.Marshal(list)
 			if err != nil {
@@ -167,7 +167,7 @@ func (mgr *VGroupManager) BatchRemoveVServerGroupBackendServers(reqCtx *RequestC
 }
 
 func (mgr *VGroupManager) BatchUpdateVServerGroupBackendServers(reqCtx *RequestContext, vGroup model.VServerGroup, update interface{}) error {
-	return Batch(update, MAX_BACKEND_NUM,
+	return Batch(update, MaxBackendNum,
 		func(list []interface{}) error {
 			updateJson, err := json.Marshal(list)
 			if err != nil {

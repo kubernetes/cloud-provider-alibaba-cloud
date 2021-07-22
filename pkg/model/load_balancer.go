@@ -118,31 +118,30 @@ type ListenerAttribute struct {
 	CertId                    string
 	ForwardPort               int
 	EnableHttp2               FlagType
-	Cookie                    string
-	CookieTimeout             int // values: 1~86400
 	StickySession             FlagType
 	StickySessionType         string
+	Cookie                    string
+	CookieTimeout             int // values: 1~86400
 	XForwardedFor             FlagType
 	XForwardedForProto        FlagType
 	AclId                     string
 	AclType                   string
 	AclStatus                 FlagType
-	HealthCheck               FlagType
-	HealthCheckType           string
-	HealthCheckDomain         string
-	HealthCheckURI            string
-	HealthCheckConnectPort    int
-	HealthyThreshold          int // values: 2~10
-	UnhealthyThreshold        int // values: 2~10
-	HealthCheckTimeout        int // values: 1~300
-	HealthCheckConnectTimeout int // values: 1~300
-	HealthCheckInterval       int // values: 1-50
-	HealthCheckHttpCode       string
 	ConnectionDrain           FlagType
 	ConnectionDrainTimeout    int // values: 10~900
+	HealthCheckConnectPort    int
+	HealthCheckInterval       int      // values: 1~50
+	HealthyThreshold          int      // values: 2~10
+	UnhealthyThreshold        int      // values: 2~10
+	HealthCheckType           string   // tcp
+	HealthCheckConnectTimeout int      // tcp & udp values: 1~300
+	HealthCheckTimeout        int      // http & https values: 1~300
+	HealthCheck               FlagType // http & https
+	HealthCheckDomain         string   // tcp & http & https
+	HealthCheckURI            string   // tcp & http & https
+	HealthCheckHttpCode       string   // tcp & http & https
 
-	// The following parameters can be changed by annotation
-	// parameters can be set to the default value.
+	// The following parameters can be set to the default value.
 	// Use the pointer type to distinguish. If the user does not set the param, the param is nil
 	PersistenceTimeout *int
 }
