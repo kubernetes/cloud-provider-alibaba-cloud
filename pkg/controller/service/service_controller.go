@@ -198,7 +198,7 @@ func (m *ReconcileService) reconcile(request reconcile.Request) error {
 func (m *ReconcileService) cleanupLoadBalancerResources(reqCtx *RequestContext) error {
 	reqCtx.Log.Info("service do not need lb any more, try to delete it")
 	if helper.HasFinalizer(reqCtx.Service, ServiceFinalizer) {
-		_, err := m.buildAndApplyModel(reqCtx)
+		lb, err := m.buildAndApplyModel(reqCtx)
 		if err != nil && !strings.Contains(err.Error(), "LoadBalancerId does not exist") {
 			m.record.Eventf(reqCtx.Service, v1.EventTypeWarning, helper.FailedCleanLB,
 				fmt.Sprintf("Error deleting load balancer: %s", helper.GetLogMessage(err)))
@@ -208,6 +208,14 @@ func (m *ReconcileService) cleanupLoadBalancerResources(reqCtx *RequestContext) 
 		if err := m.removeServiceHash(reqCtx.Service); err != nil {
 			m.record.Eventf(reqCtx.Service, v1.EventTypeWarning, helper.FailedRemoveHash,
 				fmt.Sprintf("Error removing service hash: %s", err.Error()))
+			return err
+		}
+
+		// When service type changes from LoadBalancer to NodePort,
+		// we need to clean Ingress attribute in service status
+		if err := m.updateServiceStatus(reqCtx, reqCtx.Service, lb); err != nil {
+			m.record.Event(reqCtx.Service, v1.EventTypeWarning, helper.FailedUpdateStatus,
+				fmt.Sprintf("Error removing load balancer status: %s", err.Error()))
 			return err
 		}
 
@@ -288,7 +296,8 @@ func (m *ReconcileService) updateServiceStatus(reqCtx *RequestContext, svc *v1.S
 
 	// SLB ExternalIPType, display the slb ip as service external ip
 	// If the length of elastic ip is 0, display the slb ip
-	if len(newStatus.Ingress) == 0 {
+	if len(newStatus.Ingress) == 0 &&
+		lb.LoadBalancerAttribute.Address != "" {
 		newStatus.Ingress = append(newStatus.Ingress,
 			v1.LoadBalancerIngress{
 				IP: lb.LoadBalancerAttribute.Address,

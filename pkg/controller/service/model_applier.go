@@ -91,6 +91,7 @@ func (m *ModelApplier) applyLoadBalancerAttribute(reqCtx *RequestContext, local 
 					remote.LoadBalancerAttribute.LoadBalancerId, err.Error())
 			}
 			remote.LoadBalancerAttribute.LoadBalancerId = ""
+			remote.LoadBalancerAttribute.Address = ""
 			reqCtx.Log.Info(fmt.Sprintf("successfully delete slb %s", remote.LoadBalancerAttribute.LoadBalancerId))
 			return nil
 		}

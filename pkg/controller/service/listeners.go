@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"github.com/mohae/deepcopy"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/dryrun"
 	"strconv"
 	"strings"
@@ -296,7 +297,7 @@ func (t *tcp) Update(reqCtx *RequestContext, action UpdateAction) error {
 		reqCtx.Log.Info(fmt.Sprintf("update listener: tcp [%d] did not change, skip", action.local.ListenerPort))
 		return nil
 	}
-	reqCtx.Log.Info(fmt.Sprintf("update listener: tcp [%d] updated [%v]", update.ListenerPort, update))
+	reqCtx.Log.Info(fmt.Sprintf("update listener: tcp [%d] try to update [%#v]", update.ListenerPort, update))
 	return t.mgr.cloud.SetLoadBalancerTCPListenerAttribute(reqCtx.Ctx, action.lbId, update)
 }
 
@@ -542,7 +543,7 @@ func buildActionsForListeners(reqCtx *RequestContext, local *model.LoadBalancer,
 func protocol(annotation string, port v1.ServicePort) (string, error) {
 
 	if annotation == "" {
-		klog.Infof("transfor protocol, empty annotation %d/%s", port.Port, port.Protocol)
+		klog.Infof("transfer protocol, empty annotation %d/%s", port.Port, port.Protocol)
 		return strings.ToLower(string(port.Protocol)), nil
 	}
 	for _, v := range strings.Split(annotation, ",") {
@@ -570,7 +571,6 @@ func protocol(annotation string, port v1.ServicePort) (string, error) {
 
 // vgroup find the vGroup id associated with the specific ServicePort
 func vgroup(annotation string, port v1.ServicePort) (string, error) {
-	klog.Infof("vgroup anno: %s", annotation)
 	for _, v := range strings.Split(annotation, ",") {
 		pp := strings.Split(v, ":")
 		if len(pp) < 2 {
@@ -623,9 +623,7 @@ func setDefaultValueForListener(n *model.ListenerAttribute) {
 }
 
 func isNeedUpdate(reqCtx *RequestContext, local model.ListenerAttribute, remote model.ListenerAttribute) (bool, model.ListenerAttribute) {
-	update := model.ListenerAttribute{
-		ListenerPort: local.ListenerPort,
-	}
+	update := deepcopy.Copy(remote).(model.ListenerAttribute)
 	needUpdate := false
 	updateDetail := ""
 
