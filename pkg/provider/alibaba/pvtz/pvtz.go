@@ -30,7 +30,7 @@ type PVTZProvider struct {
 func NewPVTZProvider(auth *base.ClientAuth) *PVTZProvider {
 	return &PVTZProvider{
 		client: auth.PVTZ,
-		zoneId: ctrlCtx.ClougCFG.Global.PrivateZoneID,
+		zoneId: ctrlCtx.CloudCFG.Global.PrivateZoneID,
 	}
 }
 func (p *PVTZProvider) ListPVTZ(ctx context.Context) ([]*model.PvtzEndpoint, error) {

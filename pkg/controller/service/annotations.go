@@ -7,9 +7,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/model"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/base"
-	"k8s.io/klog"
-
-	"github.com/aliyun/alibaba-cloud-sdk-go/services/slb"
 )
 
 // prefix
@@ -102,7 +99,6 @@ func NewAnnotationRequest(svc *v1.Service) *AnnotationRequest {
 // TODO get all annotations value from Get()
 func (n *AnnotationRequest) Get(k string) string {
 	if n.svc == nil {
-		klog.Infof("extract annotation %s from empty service", k)
 		return ""
 	}
 
@@ -167,7 +163,7 @@ func Annotation(k string) string {
 // getLoadBalancerAdditionalTags converts the comma separated list of key-value
 // pairs in the ServiceAnnotationLoadBalancerAdditionalTags annotation and returns
 // it as a map.
-func (n *AnnotationRequest) GetLoadBalancerAdditionalTags() []slb.Tag {
+func (n *AnnotationRequest) GetLoadBalancerAdditionalTags() []model.Tag {
 	additionalTags := make(map[string]string)
 	additionalTagsList := n.Get(AdditionalTags)
 	if additionalTagsList != "" {
@@ -189,9 +185,9 @@ func (n *AnnotationRequest) GetLoadBalancerAdditionalTags() []slb.Tag {
 			}
 		}
 	}
-	var tags []slb.Tag
+	var tags []model.Tag
 	for k, v := range additionalTags {
-		tags = append(tags, slb.Tag{
+		tags = append(tags, model.Tag{
 			TagValue: v,
 			TagKey:   k,
 		})

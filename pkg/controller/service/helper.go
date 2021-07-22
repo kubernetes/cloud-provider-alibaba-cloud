@@ -82,7 +82,7 @@ func isENIBackendType(svc *v1.Service) bool {
 		return os.Getenv("SERVICE_FORCE_BACKEND_ENI") == "true"
 	}
 
-	return ctrlCtx.ClougCFG.Global.ServiceBackendType == model.ENIBackendType
+	return ctrlCtx.CloudCFG.Global.ServiceBackendType == model.ENIBackendType
 }
 
 func needDeleteLoadBalancer(svc *v1.Service) bool {
@@ -142,7 +142,10 @@ func isServiceOwnIngress(service *v1.Service) bool {
 }
 
 // MAX_BACKEND_NUM max batch backend num
-const MAX_BACKEND_NUM = 39
+const (
+	MaxBackendNum = 39
+	MaxLBTagNum   = 10
+)
 
 type Func func([]interface{}) error
 
@@ -150,7 +153,7 @@ type Func func([]interface{}) error
 // for general purpose
 func Batch(m interface{}, cnt int, batch Func) error {
 	if cnt <= 0 {
-		cnt = MAX_BACKEND_NUM
+		cnt = MaxBackendNum
 	}
 	v := reflect.ValueOf(m)
 	if v.Kind() != reflect.Slice {
@@ -209,4 +212,12 @@ func retry(
 			return true, nil
 		},
 	)
+}
+
+func Is7LayerProtocol(protocol string) bool {
+	return protocol == model.HTTP || protocol == model.HTTPS
+}
+
+func Is4LayerProtocol(protocol string) bool {
+	return protocol == model.TCP || protocol == model.UDP
 }

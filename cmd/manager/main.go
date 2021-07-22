@@ -42,7 +42,7 @@ func main() {
 		log.Error(err, "unable to load controller config")
 		os.Exit(1)
 	}
-	ctrl.SetLogger(log)
+	ctrl.SetLogger(klogr.New())
 
 	printVersion()
 
@@ -68,6 +68,7 @@ func main() {
 
 	var cloud prvd.Provider
 	if ctrlCtx.ControllerCFG.DryRun {
+		log.Info("using DryRun Mode")
 		cloud = dryrun.NewDryRunCloud()
 	} else {
 		cloud = alibaba.NewAlibabaCloud()
@@ -108,6 +109,7 @@ func main() {
 		log.Error(err, "Manager exited non-zero: %s", err.Error())
 		os.Exit(1)
 	}
+
 }
 
 func loadControllerConfig() error {

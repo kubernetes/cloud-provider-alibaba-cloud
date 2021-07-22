@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"fmt"
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
@@ -9,7 +10,6 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/helper"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/util"
-	"k8s.io/klog"
 	"reflect"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/event"
@@ -43,7 +43,7 @@ func (m *MapEnqueue) FanIN(o client.Object) []reconcile.Request {
 	case *v1.Service:
 		request = append(request, m.mapService(o.(*v1.Service))...)
 	default:
-		klog.Warningf("unknown object: %s, %v", reflect.TypeOf(o), o)
+		util.ServiceLog.Info(fmt.Sprintf("warning: unknown object: %s, %v", reflect.TypeOf(o), o))
 	}
 	return dropLeaseEndpoint(request)
 }
@@ -54,7 +54,8 @@ func (m *MapEnqueue) mapNode(o *v1.Node) []reconcile.Request {
 	svcs := v1.ServiceList{}
 	err := m.client.List(context.TODO(), &svcs)
 	if err != nil {
-		klog.Errorf("list service cache for node: %s, %s", o, err.Error())
+		util.ServiceLog.Error(err, fmt.Sprintf("fail to list services for node"),
+			"node", o.Name)
 		return request
 	}
 
@@ -65,7 +66,8 @@ func (m *MapEnqueue) mapNode(o *v1.Node) []reconcile.Request {
 		if !isProcessNeeded(&v) {
 			continue
 		}
-		klog.Infof("%s node change: enqueue service.", util.Key(&v))
+		util.ServiceLog.Info(fmt.Sprintf("node change: enqueue service %s", util.Key(&v)),
+			"node", o.Name)
 		req := reconcile.Request{
 			NamespacedName: client.ObjectKey{Namespace: v.Namespace, Name: v.Name},
 		}
@@ -83,7 +85,7 @@ func (m *MapEnqueue) mapEndpoint(o *v1.Endpoints) []reconcile.Request {
 
 func (m *MapEnqueue) mapService(o *v1.Service) []reconcile.Request {
 	if !isProcessNeeded(o) {
-		klog.Infof("%s ccm class not empty, skip process", util.Key(o))
+		util.ServiceLog.Info("ccm class not empty, skip process", "service", util.Key(o))
 		return nil
 	}
 	return []reconcile.Request{
@@ -132,7 +134,7 @@ var _ predicate.Predicate = (*predicateForServiceEvent)(nil)
 func (p *predicateForServiceEvent) Create(e event.CreateEvent) bool {
 	svc, ok := e.Object.(*v1.Service)
 	if ok && needAdd(svc) {
-		klog.Infof("controller: %s service create event", util.Key(svc))
+		util.ServiceLog.Info("controller: service create event", "service", util.Key(svc))
 		return true
 	}
 	return false
@@ -143,7 +145,8 @@ func (p *predicateForServiceEvent) Update(e event.UpdateEvent) bool {
 	newSvc, ok2 := e.ObjectNew.(*v1.Service)
 
 	if ok1 && ok2 && needUpdate(oldSvc, newSvc, p.eventRecorder) {
-		klog.Infof("controller: %s service update event", util.Key(oldSvc))
+		util.ServiceLog.Info("controller: service update event",
+			"service", util.Key(oldSvc))
 		return true
 	}
 	return false
@@ -163,6 +166,8 @@ func needUpdate(oldSvc, newSvc *v1.Service, recorder record.EventRecorder) bool 
 	}
 
 	if needLoadBalancer(oldSvc) != needLoadBalancer(newSvc) {
+		util.ServiceLog.Info(fmt.Sprintf("TypeChanged %v -> %v", oldSvc.Spec.Type, newSvc.Spec.Type),
+			"service", util.Key(oldSvc))
 		recorder.Eventf(
 			newSvc,
 			v1.EventTypeNormal,
@@ -175,12 +180,15 @@ func needUpdate(oldSvc, newSvc *v1.Service, recorder record.EventRecorder) bool 
 	}
 
 	if oldSvc.UID != newSvc.UID {
-		klog.Info("%s UIDChanged: %v -> %v", util.Key(oldSvc), oldSvc.UID, newSvc.UID)
+		util.ServiceLog.Info(fmt.Sprintf("UIDChanged: %v -> %v", oldSvc.UID, newSvc.UID),
+			"service", util.Key(oldSvc))
 		return true
 	}
 
 	if !reflect.DeepEqual(oldSvc.Annotations, newSvc.Annotations) {
-		klog.Infof("%s AnnotationChanged: %v -> %v", util.Key(oldSvc), oldSvc.Annotations, newSvc.Annotations)
+		util.ServiceLog.Info(fmt.Sprintf("AnnotationChanged: %v -> %v",
+			oldSvc.Annotations, newSvc.Annotations),
+			"service", util.Key(oldSvc))
 		recorder.Eventf(
 			newSvc,
 			v1.EventTypeNormal,
@@ -191,7 +199,8 @@ func needUpdate(oldSvc, newSvc *v1.Service, recorder record.EventRecorder) bool 
 	}
 
 	if !reflect.DeepEqual(oldSvc.Spec, newSvc.Spec) {
-		klog.Infof("%s SpecChanged: %v -> %v", util.Key(oldSvc), oldSvc.Spec, newSvc.Spec)
+		util.ServiceLog.Info(fmt.Sprintf("SpecChanged: %v -> %v", oldSvc.Spec, newSvc.Spec),
+			"service", util.Key(oldSvc))
 		recorder.Eventf(
 			newSvc,
 			v1.EventTypeNormal,
@@ -202,8 +211,9 @@ func needUpdate(oldSvc, newSvc *v1.Service, recorder record.EventRecorder) bool 
 	}
 
 	if !reflect.DeepEqual(oldSvc.DeletionTimestamp.IsZero(), newSvc.DeletionTimestamp.IsZero()) {
-		klog.Infof("%s DeleteTimestampChanged: %v -> %v", util.Key(oldSvc),
-			oldSvc.DeletionTimestamp.IsZero(), newSvc.DeletionTimestamp.IsZero())
+		util.ServiceLog.Info(fmt.Sprintf("DeleteTimestampChanged: %v -> %v",
+			oldSvc.DeletionTimestamp.IsZero(), newSvc.DeletionTimestamp.IsZero()),
+			"service", util.Key(oldSvc))
 		recorder.Eventf(
 			newSvc,
 			v1.EventTypeNormal,
@@ -224,7 +234,7 @@ func needAdd(newService *v1.Service) bool {
 	// was LoadBalancer
 	_, ok := newService.Labels[LabelServiceHash]
 	if ok {
-		klog.Infof("%s has hash label, which may was LoadBalancer", util.Key(newService))
+		util.ServiceLog.Info("service has hash label, which may was LoadBalancer", "service", util.Key(newService))
 		return true
 	}
 	return false
@@ -244,7 +254,7 @@ var _ predicate.Predicate = (*predicateForEndpointEvent)(nil)
 func (p *predicateForEndpointEvent) Create(e event.CreateEvent) bool {
 	ep, ok := e.Object.(*v1.Endpoints)
 	if ok && isEndpointProcessNeeded(ep, p.client) {
-		klog.Infof("controller: %s endpoint create event", util.NamespacedName(ep).String())
+		util.ServiceLog.Info("controller: endpoint create event", "endpoint", util.Key(ep))
 		return true
 	}
 	return false
@@ -257,8 +267,9 @@ func (p *predicateForEndpointEvent) Update(e event.UpdateEvent) bool {
 	if ok1 && ok2 &&
 		isEndpointProcessNeeded(ep1, p.client) &&
 		!reflect.DeepEqual(ep1.Subsets, ep2.Subsets) {
-		klog.Infof("controller: %s endpoint update event, before [%v], after [%v]",
-			util.NamespacedName(ep1).String(), ep1.Subsets, ep2.Subsets)
+		util.ServiceLog.Info(fmt.Sprintf(
+			"controller: endpoint update event, before [%v], after [%v]", ep1.Subsets, ep2.Subsets),
+			"endpoint", util.Key(ep1))
 		return true
 	}
 	return false
@@ -266,7 +277,11 @@ func (p *predicateForEndpointEvent) Update(e event.UpdateEvent) bool {
 
 func (p *predicateForEndpointEvent) Delete(e event.DeleteEvent) bool {
 	ep, ok := e.Object.(*v1.Endpoints)
-	return ok && isEndpointProcessNeeded(ep, p.client)
+	if ok && isEndpointProcessNeeded(ep, p.client) {
+		util.ServiceLog.Info("controller: endpoint delete event", "endpoint", util.Key(ep))
+		return true
+	}
+	return false
 }
 
 func (p *predicateForEndpointEvent) Generic(event.GenericEvent) bool {
@@ -288,19 +303,21 @@ func isEndpointProcessNeeded(ep *v1.Endpoints, client client.Client) bool {
 		}, svc)
 	if err != nil {
 		if apierrors.IsNotFound(err) && !isLeaseEndpoint(util.NamespacedName(ep).String()) {
-			klog.Warningf("can not get service %s/%s, error: %s", ep.Namespace, ep.Name, err.Error())
+			util.ServiceLog.Error(err, "fail to get service, skip reconcile", "service", util.Key(ep))
 		}
 		return false
 	}
 
 	if !isProcessNeeded(svc) {
-		klog.Infof("endpoint change: class not empty, skip process")
+		util.ServiceLog.Info("endpoint change: class not empty, skip reconcile",
+			"endpoint", util.Key(ep))
 		return false
 	}
 
 	if !needLoadBalancer(svc) {
-		// we are safe here to skip process syncEnpoint.
-		klog.V(5).Infof("endpoint change: loadBalancer is not needed, skip")
+		// we are safe here to skip process syncEndpoint
+		util.ServiceLog.V(5).Info("endpoint change: loadBalancer is not needed, skip",
+			"endpoint", util.Key(ep))
 		return false
 	}
 	return true
@@ -320,7 +337,7 @@ var _ predicate.Predicate = (*predicateForNodeEvent)(nil)
 func (p *predicateForNodeEvent) Create(e event.CreateEvent) bool {
 	node, ok := e.Object.(*v1.Node)
 	if ok && !isExcludeNode(node) {
-		klog.Infof("controller: node %s create event", e.Object.GetName())
+		util.ServiceLog.Info("controller: node create event", "node", node.Name)
 		return true
 	}
 	return false
@@ -333,7 +350,7 @@ func (p *predicateForNodeEvent) Update(e event.UpdateEvent) bool {
 		nodeSpecChanged(oldNode, newNode) {
 		// label and schedulable changed .
 		// status healthy should be considered
-		klog.Infof("controller: node %s update event", util.Key(oldNode))
+		util.ServiceLog.Info("controller: node update event", "node", oldNode.Name)
 		return true
 	}
 	return false
@@ -342,7 +359,7 @@ func (p *predicateForNodeEvent) Update(e event.UpdateEvent) bool {
 func (p *predicateForNodeEvent) Delete(e event.DeleteEvent) bool {
 	node, ok := e.Object.(*v1.Node)
 	if ok && !isExcludeNode(node) {
-		klog.Infof("controller: node %s delete event", e.Object.GetName())
+		util.ServiceLog.Info("controller: node delete event", "node", node.Name)
 		return true
 	}
 	return false
@@ -357,10 +374,10 @@ func nodeSpecChanged(oldNode, newNode *v1.Node) bool {
 		return true
 	}
 	if oldNode.Spec.Unschedulable != newNode.Spec.Unschedulable {
-		klog.Infof(
+		util.ServiceLog.Info(fmt.Sprintf(
 			"node spec changed: %s, from=%t, to=%t",
-			oldNode.Name, oldNode.Spec.Unschedulable, newNode.Spec.Unschedulable,
-		)
+			oldNode.Name, oldNode.Spec.Unschedulable, newNode.Spec.Unschedulable),
+			"node", oldNode.Name)
 		return true
 	}
 	if nodeConditionChanged(oldNode.Name, oldNode.Status.Conditions, newNode.Status.Conditions) {
@@ -371,7 +388,8 @@ func nodeSpecChanged(oldNode, newNode *v1.Node) bool {
 
 func nodeConditionChanged(name string, oldC, newC []v1.NodeCondition) bool {
 	if len(oldC) != len(newC) {
-		klog.Infof("node condition changed: %s, length not equal, from=%v, to=%v", name, oldC, newC)
+		util.ServiceLog.Info(fmt.Sprintf("node condition changed: length not equal, from=%v, to=%v", oldC, newC),
+			"node", name)
 		return true
 	}
 
@@ -386,10 +404,10 @@ func nodeConditionChanged(name string, oldC, newC []v1.NodeCondition) bool {
 	for i := range oldC {
 		if oldC[i].Type != newC[i].Type ||
 			oldC[i].Status != newC[i].Status {
-			klog.Infof(
-				"node condition changed: %s, type(%s,%s) | status(%s,%s)",
-				name, oldC[i].Type, newC[i].Type, oldC[i].Status, newC[i].Status,
-			)
+			util.ServiceLog.Info(
+				fmt.Sprintf("node condition changed: type(%s,%s) | status(%s,%s)",
+					oldC[i].Type, newC[i].Type, oldC[i].Status, newC[i].Status),
+				"node", name)
 			return true
 		}
 	}
@@ -398,12 +416,15 @@ func nodeConditionChanged(name string, oldC, newC []v1.NodeCondition) bool {
 
 func nodeLabelsChanged(nodeName string, oldL, newL map[string]string) bool {
 	if len(oldL) != len(newL) {
-		klog.Infof("node label changed: %s, size not equal, from=%v, to=%v", nodeName, oldL, newL)
+		util.ServiceLog.Info(fmt.Sprintf("node label changed: size not equal, from=%v, to=%v", oldL, newL),
+			"node", nodeName)
 		return true
 	}
 	for k, v := range oldL {
 		if newL[k] != v {
-			klog.Infof("node label changed: %s, key=%s, value from=%v, to=%v", nodeName, k, oldL[k], newL[k])
+			util.ServiceLog.Info(fmt.Sprintf("node label changed: key=%s, value from=%v, to=%v",
+				k, oldL[k], newL[k]),
+				"node", nodeName)
 			return true
 		}
 	}

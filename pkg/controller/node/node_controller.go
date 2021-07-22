@@ -3,7 +3,6 @@ package node
 import (
 	"context"
 	"fmt"
-	log "github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -14,6 +13,7 @@ import (
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/helper"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider"
 	"k8s.io/klog"
+	"k8s.io/klog/klogr"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
@@ -25,6 +25,8 @@ import (
 	"time"
 )
 
+var log = klogr.New().WithName("node-controller")
+
 func Add(mgr manager.Manager, ctx *shared.SharedContext) error {
 	return add(mgr, newReconciler(mgr, ctx))
 }
@@ -33,7 +35,7 @@ func Add(mgr manager.Manager, ctx *shared.SharedContext) error {
 func newReconciler(mgr manager.Manager, ctx *shared.SharedContext) reconcile.Reconciler {
 	recon := &ReconcileNode{
 		monitorPeriod:   5 * time.Minute,
-		statusFrequency: 1 * time.Minute,
+		statusFrequency: 5 * time.Minute,
 		// provider
 		cloud:  ctx.Provider(),
 		client: mgr.GetClient(),
@@ -123,17 +125,17 @@ func (m *ReconcileNode) syncCloudNode(node *corev1.Node) error {
 func (m *ReconcileNode) doAddCloudNode(node *corev1.Node) error {
 	prvdId := node.Spec.ProviderID
 	if prvdId == "" {
-		log.Warnf("provider id not exist, skip %s initialize", node.Name)
+		log.Info(fmt.Sprintf("warning: provider id not exist, skip %s initialize", node.Name))
 		return nil
 	}
 
 	instance, err := findCloudECS(m.cloud, prvdId)
 	if err != nil {
-		if errors.IsNotFound(err) {
-			log.Warnf("cloud instance not found %s: %v", node.Name, err)
+		if err == ErrNotFound {
+			log.Info("cloud instance %s not found", node.Name)
 			return nil
 		}
-		log.Errorf("find ecs: %s", err.Error())
+		log.Error(err, "fail to find ecs", "providerId", prvdId)
 		return fmt.Errorf("find ecs: %s", err.Error())
 	}
 
@@ -144,7 +146,7 @@ func (m *ReconcileNode) doAddCloudNode(node *corev1.Node) error {
 	}
 
 	initializer := func() (done bool, err error) {
-		log.Infof("try remove cloud taints for %s", node.Name)
+		log.Info("try remove cloud taints", "node", node.Name)
 
 		diff := func(copy runtime.Object) (client.Object, error) {
 			nins := copy.(*corev1.Node)
@@ -153,7 +155,7 @@ func (m *ReconcileNode) doAddCloudNode(node *corev1.Node) error {
 		}
 		err = helper.PatchM(m.client, node, diff, helper.PatchAll)
 		if err != nil {
-			log.Errorf("patch node: %s", err.Error())
+			log.Error(err, "fail to patch node", "node", node.Name)
 			return false, nil
 		}
 		tags := map[string]string{
@@ -163,13 +165,13 @@ func (m *ReconcileNode) doAddCloudNode(node *corev1.Node) error {
 		err = m.cloud.SetInstanceTags(nctx.NewEmpty(), instance.InstanceID, tags)
 		if err != nil {
 			if !strings.Contains(err.Error(), "Forbidden.RAM") {
-				log.Errorf("tag instance %s error: %s", instance.InstanceID, err.Error())
+				log.Error(err, "fail to tag instance", "node", instance.InstanceID)
 				//retry
 				return false, nil
 			}
 		}
 
-		log.Infof("finished remove uninitialized cloud taints for %s", node.Name)
+		log.Info("finished remove uninitialized cloud taints", "node", node.Name)
 		// After adding, call UpdateNodeAddress to set the CloudProvider provided IPAddresses
 		// So that users do not see any significant delay in IP addresses being filled into the node
 		_ = m.syncNodeAddress([]corev1.Node{*node})
@@ -189,7 +191,7 @@ func (m *ReconcileNode) doAddCloudNode(node *corev1.Node) error {
 		node, corev1.EventTypeNormal, "InitializedNode", "Initialize node successfully",
 	)
 
-	log.Infof("Successfully initialized node %s with cloud provider", node.Name)
+	log.Info("Successfully initialized node", "node", node.Name)
 	return nil
 }
 
@@ -205,7 +207,7 @@ func (m *ReconcileNode) syncNodeAddress(nodes []corev1.Node) error {
 		node := &nodes[i]
 		cloudNode := instances[node.Spec.ProviderID]
 		if cloudNode == nil {
-			log.Infof("node %s not found, skip update node address", node.Spec.ProviderID)
+			log.Info("cloud node not found by prvdId, skip update node address", "node", node.Name, "prvdId", node.Spec.ProviderID)
 			continue
 		}
 		cloudNode.Addresses = setHostnameAddress(node, cloudNode.Addresses)
@@ -214,7 +216,8 @@ func (m *ReconcileNode) syncNodeAddress(nodes []corev1.Node) error {
 		nodeIP, ok := isProvidedAddrExist(node, cloudNode.Addresses)
 		if ok {
 			if nodeIP == nil {
-				log.Errorf("user specified ip is not found in cloudprovider: %v", node.Status.Addresses)
+				log.Error(fmt.Errorf("user specified ip is not found in cloudprovider: %v", node.Status.Addresses),
+					"", "node", node.Name)
 				continue
 			}
 			// override addresses
@@ -228,7 +231,7 @@ func (m *ReconcileNode) syncNodeAddress(nodes []corev1.Node) error {
 		}
 		err := helper.PatchM(m.client, node, diff, helper.PatchStatus)
 		if err != nil {
-			log.Errorf("wait for next retry, patch node address error: %s", err.Error())
+			log.Error(err, "patch node address error, wait for next retry", "node", node.Name)
 			m.record.Eventf(
 				node, corev1.EventTypeWarning, "SyncNodeFailed", err.Error(),
 			)
@@ -236,13 +239,13 @@ func (m *ReconcileNode) syncNodeAddress(nodes []corev1.Node) error {
 
 		diff = func(copy runtime.Object) (client.Object, error) {
 			nins := copy.(*corev1.Node)
-			setFields(nins, cloudNode, m.configCloudRoute)
+			setFields(nins, cloudNode, false)
 			return nins, nil
 		}
 
 		err = helper.PatchM(m.client, node, diff, helper.PatchAll)
 		if err != nil {
-			log.Errorf("wait for next retry, patch node label error: %s", err.Error())
+			log.Error(err, "patch node label error, wait for next retry", "node", node.Name)
 			m.record.Eventf(
 				node, corev1.EventTypeWarning, "SyncNodeFailed", err.Error(),
 			)
@@ -262,7 +265,7 @@ func (m *ReconcileNode) syncNodeExists(nodes []corev1.Node) error {
 
 		condition := nodeConditionReady(m.client, node)
 		if condition == nil {
-			log.Infof("node %s condition not ready, wait for next retry", node.Spec.ProviderID)
+			log.Info("node condition not ready, wait for next retry", "node", node.Name)
 			continue
 		}
 
@@ -276,7 +279,7 @@ func (m *ReconcileNode) syncNodeExists(nodes []corev1.Node) error {
 			continue
 		}
 
-		log.Infof("node %s not found, start to delete from meta", node.Spec.ProviderID)
+		log.Info("cloud node not found by prvdId, start to delete from meta", "node", node.Name, "prvdId", node.Spec.ProviderID)
 		// try delete node and ignore error, retry next loop
 		deleteNode(m, node)
 	}
@@ -289,7 +292,7 @@ func (m *ReconcileNode) PeriodicalSync() {
 
 		nodes, err := NodeList(m.client)
 		if err != nil {
-			log.Errorf("address sync: %v", err)
+			log.Error(err, "address sync error")
 			return
 		}
 
@@ -299,14 +302,14 @@ func (m *ReconcileNode) PeriodicalSync() {
 			m.syncNodeAddress,
 		)
 		if err != nil {
-			log.Errorf("periodically update address: %s", err.Error())
+			log.Error(err, "periodically update address error")
 		}
 	}
 	nodeExists := func() {
 
 		nodes, err := NodeList(m.client)
 		if err != nil {
-			log.Errorf("node exists sync: %v", err)
+			log.Error(err, "node exists sync error")
 			return
 		}
 		// ignore return value, retry on error
@@ -315,7 +318,7 @@ func (m *ReconcileNode) PeriodicalSync() {
 			m.syncNodeExists,
 		)
 		if err != nil {
-			log.Errorf("periodically try detect node existence: %s", err.Error())
+			log.Error(err, "periodically try detect node existence error")
 		}
 	}
 

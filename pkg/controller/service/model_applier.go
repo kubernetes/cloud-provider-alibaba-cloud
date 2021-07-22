@@ -91,7 +91,8 @@ func (m *ModelApplier) applyLoadBalancerAttribute(reqCtx *RequestContext, local 
 					remote.LoadBalancerAttribute.LoadBalancerId, err.Error())
 			}
 			remote.LoadBalancerAttribute.LoadBalancerId = ""
-			reqCtx.Log.Infof("successfully delete slb %s", remote.LoadBalancerAttribute.LoadBalancerId)
+			remote.LoadBalancerAttribute.Address = ""
+			reqCtx.Log.Info(fmt.Sprintf("successfully delete slb %s", remote.LoadBalancerAttribute.LoadBalancerId))
 			return nil
 		}
 	}
@@ -99,14 +100,14 @@ func (m *ModelApplier) applyLoadBalancerAttribute(reqCtx *RequestContext, local 
 	// create slb
 	if remote.LoadBalancerAttribute.LoadBalancerId == "" {
 		if isServiceOwnIngress(reqCtx.Service) {
-			return fmt.Errorf("alicloud: not able to find loadbalancer, but it's defined in service.loaderbalancer.ingress [%v]"+
-				"this may happen when you delete the loadbalancer", reqCtx.Service.Status.LoadBalancer.Ingress)
+			return fmt.Errorf("alicloud: can not find loadbalancer, but it's defined in service [%v] "+
+				"this may happen when you delete the loadbalancer", reqCtx.Service.Status.LoadBalancer.Ingress[0].IP)
 		}
 
 		if err := m.slbMgr.Create(reqCtx, local); err != nil {
 			return fmt.Errorf("create lb error: %s", err.Error())
 		}
-		reqCtx.Log.Infof("successfully create lb %s", local.LoadBalancerAttribute.LoadBalancerId)
+		reqCtx.Log.Info(fmt.Sprintf("successfully create lb %s", local.LoadBalancerAttribute.LoadBalancerId))
 		// update remote model
 		remote.LoadBalancerAttribute.LoadBalancerId = local.LoadBalancerAttribute.LoadBalancerId
 		if err := m.slbMgr.Find(reqCtx, remote); err != nil {
@@ -116,20 +117,21 @@ func (m *ModelApplier) applyLoadBalancerAttribute(reqCtx *RequestContext, local 
 		return nil
 	}
 
-	// update slb
 	tags, err := m.slbMgr.cloud.DescribeTags(reqCtx.Ctx, remote.LoadBalancerAttribute.LoadBalancerId)
 	if err != nil {
-		return fmt.Errorf("describe slb tags error: %s", err.Error())
+		return fmt.Errorf("DescribeTags: %s", err.Error())
 	}
 	remote.LoadBalancerAttribute.Tags = tags
-
+	// update slb
 	if local.LoadBalancerAttribute.IsUserManaged {
 		if ok, reason := isLoadBalancerReusable(reqCtx.Service, tags, remote.LoadBalancerAttribute.Address); !ok {
-			return fmt.Errorf("alicloud: the loadbalancer %s can not be reused, %s", remote.LoadBalancerAttribute.LoadBalancerId, reason)
+			return fmt.Errorf("alicloud: the loadbalancer %s can not be reused, %s",
+				remote.LoadBalancerAttribute.LoadBalancerId, reason)
 		}
 	}
 
 	return m.slbMgr.Update(reqCtx, local, remote)
+
 }
 
 func (m *ModelApplier) applyVGroups(reqCtx *RequestContext, local *model.LoadBalancer, remote *model.LoadBalancer) error {
@@ -176,7 +178,7 @@ func (m *ModelApplier) applyVGroups(reqCtx *RequestContext, local *model.LoadBal
 func (m *ModelApplier) applyListeners(reqCtx *RequestContext, local *model.LoadBalancer, remote *model.LoadBalancer) error {
 	if local.LoadBalancerAttribute.IsUserManaged {
 		if reqCtx.Anno.isForceOverride() {
-			reqCtx.Log.Infof("listener override is false, skip reconcile listeners", local.NamespacedName)
+			reqCtx.Log.Info("listener override is false, skip reconcile listeners")
 			return nil
 		}
 	}
@@ -237,7 +239,8 @@ func (m *ModelApplier) cleanup(reqCtx *RequestContext, local *model.LoadBalancer
 	vgs := remote.VServerGroups
 	for _, vg := range vgs {
 		if !isVGroupManagedByMyService(vg, reqCtx.Service) {
-			reqCtx.Log.Infof("delete vgroup: [%s] description [%s] is managed by user, skip delete", vg.VGroupName, vg.VGroupId)
+			reqCtx.Log.Info(fmt.Sprintf("delete vgroup: [%s] description [%s] is managed by user, skip delete",
+				vg.VGroupName, vg.VGroupId))
 			continue
 		}
 		found := false
@@ -248,10 +251,11 @@ func (m *ModelApplier) cleanup(reqCtx *RequestContext, local *model.LoadBalancer
 			}
 		}
 		if !found {
-			reqCtx.Log.Infof("delete vgroup: [%s], [%s]", vg.NamedKey.Key(), vg.VGroupId)
+			reqCtx.Log.Info(fmt.Sprintf("delete vgroup: [%s], [%s]", vg.NamedKey.Key(), vg.VGroupId))
 			err := m.vGroupMgr.DeleteVServerGroup(reqCtx, vg.VGroupId)
 			if err != nil {
-				return fmt.Errorf("delete vgroup %s failed, error: %s", vg.VGroupId, err.Error())
+				return fmt.Errorf("lb [%s] delete vgroup %s failed, error: %s",
+					remote.LoadBalancerAttribute.LoadBalancerId, vg.VGroupId, err.Error())
 			}
 		}
 	}

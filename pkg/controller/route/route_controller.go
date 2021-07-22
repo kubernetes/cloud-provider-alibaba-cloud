@@ -39,11 +39,11 @@ func newReconciler(mgr manager.Manager, ctx *shared.SharedContext) reconcile.Rec
 		scheme:       mgr.GetScheme(),
 		record:       mgr.GetEventRecorderFor("Route"),
 		nodeCache:    cmap.New(),
-		configRoutes:  ctrlCtx.ClougCFG.Global.ConfigureCloudRoutes,
+		configRoutes:  ctrlCtx.ControllerCFG.RuntimeConfig.ConfigureCloudRoutes,
 	}
 
-	if  ctrlCtx.ClougCFG.Global.RouteReconciliationPeriod != "" {
-		duration, err := time.ParseDuration( ctrlCtx.ClougCFG.Global.RouteReconciliationPeriod)
+	if  ctrlCtx.CloudCFG.Global.RouteReconciliationPeriod != "" {
+		duration, err := time.ParseDuration( ctrlCtx.CloudCFG.Global.RouteReconciliationPeriod)
 		if err == nil || duration != 0 {
 			recon.reconcilePeriod = duration
 		}

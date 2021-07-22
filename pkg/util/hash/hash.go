@@ -4,12 +4,11 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
-	log "github.com/sirupsen/logrus"
+	"k8s.io/klog"
 	"reflect"
 	"strings"
 
 	"github.com/ghodss/yaml"
-	"github.com/golang/glog"
 )
 
 const (
@@ -23,7 +22,7 @@ func HashObject(o interface{}) string {
 	var a interface{}
 	err := json.Unmarshal(data, &a)
 	if err != nil {
-		log.Errorf("unmarshal: %s", err.Error())
+		klog.Errorf("unmarshal: %s", err.Error())
 	}
 	remove(&a)
 	return computeHash(PrettyYaml(a))
@@ -33,7 +32,7 @@ func HashString(o interface{}) string {
 	var a interface{}
 	err := json.Unmarshal(data, &a)
 	if err != nil {
-		log.Errorf("unmarshal: %s", err.Error())
+		klog.Errorf("unmarshal: %s", err.Error())
 	}
 	remove(&a)
 	return PrettyYaml(a)
@@ -98,7 +97,7 @@ func isHashLabel(k string) bool {
 func PrettyYaml(obj interface{}) string {
 	bs, err := yaml.Marshal(obj)
 	if err != nil {
-		glog.Errorf("failed to parse yaml, ' %s'", err.Error())
+		klog.Errorf("failed to parse yaml, %v", err.Error())
 	}
 	return string(bs)
 }

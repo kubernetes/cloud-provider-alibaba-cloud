@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"k8s.io/klog/klogr"
 	"path/filepath"
 	"strings"
 	"time"
@@ -31,7 +32,6 @@ import (
 	"github.com/aliyun/alibaba-cloud-sdk-go/services/vpc"
 	"github.com/ghodss/yaml"
 	"github.com/go-cmd/cmd"
-	log "github.com/sirupsen/logrus"
 
 	"k8s.io/apimachinery/pkg/util/wait"
 	ctrlCtx "k8s.io/cloud-provider-alibaba-cloud/pkg/context"
@@ -43,6 +43,8 @@ var KUBERNETES_CLOUD_CONTROLLER_MANAGER = "ack.ccm"
 
 // TOKEN_RESYNC_PERIOD default Token sync period
 var TOKEN_RESYNC_PERIOD = 10 * time.Minute
+
+var log = klogr.New().WithName("clientMgr")
 
 // ClientAuth client manager for aliyun sdk
 type ClientAuth struct {
@@ -57,11 +59,11 @@ type ClientAuth struct {
 
 // NewClientMgr return a new client manager
 func NewClientAuth() (*ClientAuth, error) {
-	log.Infof("load cfg from file: %s", ctrlCtx.ControllerCFG.CloudConfig)
+	log.Info(fmt.Sprintf("load cfg from file: %s", ctrlCtx.ControllerCFG.CloudConfig))
 	// reload config while token refresh
-	err := LoadCfg( ctrlCtx.ControllerCFG.CloudConfig)
+	err := LoadCfg(ctrlCtx.ControllerCFG.CloudConfig)
 	if err != nil {
-		log.Warnf("load config fail: %s", err.Error())
+		log.Error(err, "load config fail")
 		return nil, err
 	}
 
@@ -117,23 +119,23 @@ func (mgr *ClientAuth) Start(
 ) error {
 	initialized := false
 	tokenfunc := func() {
-		log.Infof("load cfg from file: %s",  ctrlCtx.ControllerCFG.CloudConfig)
+		log.Info(fmt.Sprintf("load cfg from file: %s", ctrlCtx.ControllerCFG.CloudConfig))
 		// reload config while token refresh
-		err := LoadCfg( ctrlCtx.ControllerCFG.CloudConfig)
+		err := LoadCfg(ctrlCtx.ControllerCFG.CloudConfig)
 		if err != nil {
-			log.Warnf("load config fail: %s", err.Error())
+			log.Error(err, "load config fail")
 			return
 		}
 
 		// refresh client Token periodically
 		token, err := mgr.Token().NextToken()
 		if err != nil {
-			log.Errorf("return next token: %s", err.Error())
+			log.Error(err, "fail to get next token")
 			return
 		}
 		err = settoken(mgr, token)
 		if err != nil {
-			log.Errorf("set Token: %s", err.Error())
+			log.Error(err, "fail to set token")
 			return
 		}
 		initialized = true
@@ -151,7 +153,7 @@ func (mgr *ClientAuth) Start(
 			Factor:   2,
 		}, func() (done bool, err error) {
 			tokenfunc()
-			log.Infof("wait for Token ready")
+			log.Info("wait for Token ready")
 			return initialized, nil
 		},
 	)
@@ -162,24 +164,24 @@ func LoadCfg(cfg string) error {
 	if err != nil {
 		return fmt.Errorf("read config file: %s", content)
 	}
-	return yaml.Unmarshal(content, ctrlCtx.ClougCFG)
+	return yaml.Unmarshal(content, ctrlCtx.CloudCFG)
 }
 
 func (mgr *ClientAuth) Token() TokenAuth {
-	key, err := b64.StdEncoding.DecodeString(ctrlCtx.ClougCFG.Global.AccessKeyID)
+	key, err := b64.StdEncoding.DecodeString(ctrlCtx.CloudCFG.Global.AccessKeyID)
 	if err != nil {
 		panic(fmt.Sprintf("ak key must be base64 encoded: %s", err.Error()))
 	}
-	secret, err := b64.StdEncoding.DecodeString(ctrlCtx.ClougCFG.Global.AccessKeySecret)
+	secret, err := b64.StdEncoding.DecodeString(ctrlCtx.CloudCFG.Global.AccessKeySecret)
 	if err != nil {
 		panic(fmt.Sprintf("ak secret must be base64 encoded: %s", err.Error()))
 	}
 	if len(key) == 0 ||
 		len(secret) == 0 {
-		log.Infof("ccm: use ramrole Token mode without ak.")
+		log.Info("ccm: use ramrole token mode without ak.")
 		return &RamRoleToken{meta: mgr.Meta}
 	}
-	region := ctrlCtx.ClougCFG.Global.Region
+	region := ctrlCtx.CloudCFG.Global.Region
 	if region == "" {
 		region, err = mgr.Meta.Region()
 		if err != nil {
@@ -189,19 +191,19 @@ func (mgr *ClientAuth) Token() TokenAuth {
 	inittoken := &Token{
 		AccessKey:    string(key),
 		AccessSecret: string(secret),
-		UID:          ctrlCtx.ClougCFG.Global.UID,
+		UID:          ctrlCtx.CloudCFG.Global.UID,
 		Region:       region,
 	}
 	if inittoken.UID == "" {
-		log.Infof("ccm: ak mode to authenticate user. without Token and role assume")
+		log.Info("ccm: ak mode to authenticate user. without Token and role assume")
 		return &AkAuthToken{ak: inittoken}
 	}
-	log.Infof("ccm: service account auth mode")
+	log.Info("ccm: service account auth mode")
 	return &ServiceToken{svcak: inittoken}
 }
 
 func RefreshToken(mgr *ClientAuth, token *Token) error {
-	log.Infof("refresh token: [region=%s]", token.Region)
+	log.Info("refresh token", "region", token.Region)
 	err := mgr.ECS.InitWithStsToken(
 		token.Region, token.AccessKey, token.AccessSecret, token.Token,
 	)
@@ -275,7 +277,7 @@ func (f *RamRoleToken) NextToken() (*Token, error) {
 	if err != nil {
 		return nil, fmt.Errorf("ramrole Token retrieve: %s", err.Error())
 	}
-	region := ctrlCtx.ClougCFG.Global.Region
+	region := ctrlCtx.CloudCFG.Global.Region
 	if region == "" {
 		region, err = f.meta.Region()
 		if err != nil {
@@ -302,6 +304,7 @@ func (f *ServiceToken) NextToken() (*Token, error) {
 		fmt.Sprintf("--uid=%s", f.svcak.UID),
 		fmt.Sprintf("--key=%s", f.svcak.AccessKey),
 		fmt.Sprintf("--secret=%s", f.svcak.AccessSecret),
+		fmt.Sprintf("--region=%s", f.svcak.Region),
 	).Start()
 	if status.Error != nil {
 		return nil, fmt.Errorf("invoke servicetoken: %s", status.Error.Error())

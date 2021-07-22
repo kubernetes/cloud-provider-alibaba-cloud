@@ -3,9 +3,9 @@ package crd
 import (
 	"context"
 	"fmt"
+	"k8s.io/klog/klogr"
 	"time"
 
-	log "github.com/sirupsen/logrus"
 	apiextv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	apiextcli "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -19,6 +19,7 @@ const (
 
 var (
 	defCategories = []string{"all", "kooper"}
+	log = klogr.New().WithName("crd")
 )
 
 // Scope is the scope of a CRD.
@@ -136,7 +137,7 @@ func (c *Client) EnsurePresent(conf Conf) error {
 		}
 		return nil
 	}
-	log.Infof("crd %s created, waiting to be ready...", crdName)
+	log.Info(fmt.Sprintf("crd %s created, waiting to be ready...", crdName))
 	return c.WaitToBePresent(crdName, crdReadyTimeout)
 }
 
@@ -207,7 +208,9 @@ func (c *Client) validateCRD() error {
 	if err != nil {
 		return fmt.Errorf("get server version: %s", err.Error())
 	}
-	log.Infof("kubernetes version should great then >v1.7.0 to use crd. current version=%s", v)
+	if v != nil {
+		log.Info("kubernetes version should great then v1.7.0 to use crd", "server version", v.GitVersion)
+	}
 	return nil
 }
 

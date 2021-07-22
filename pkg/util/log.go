@@ -1,23 +1,14 @@
 package util
 
 import (
-	"k8s.io/klog"
+	"github.com/go-logr/logr"
+	"k8s.io/klog/klogr"
 )
 
-func NewReqLog(prefix string) *Log {
-	return &Log{
-		prefix: prefix,
-	}
-}
+var (
+	ServiceLog logr.Logger
+)
 
-type Log struct {
-	prefix string
-}
-
-func (log *Log) Infof(format string, args ...interface{}) {
-	klog.Infof(log.prefix+format, args...)
-}
-
-func (log *Log) Warningf(format string, args ...interface{}) {
-	klog.Warningf(log.prefix+format, args...)
+func init() {
+	ServiceLog = klogr.New().WithName("service-controller")
 }

@@ -59,17 +59,17 @@ func getRouteTables(ctx context.Context, providerIns prvd.Provider) ([]string, e
 	if err != nil {
 		return nil, fmt.Errorf("get vpc id from metadata error: %s", err.Error())
 	}
-	if ctrlCtx.ClougCFG.Global.RouteTableIDS != "" {
-		return strings.Split(ctrlCtx.ClougCFG.Global.RouteTableIDS, ","), nil
+	if ctrlCtx.CloudCFG.Global.RouteTableIDS != "" {
+		return strings.Split(ctrlCtx.CloudCFG.Global.RouteTableIDS, ","), nil
 	}
 	tables, err := providerIns.ListRouteTables(ctx, vpcId)
 	if err != nil {
 		return nil, fmt.Errorf("alicloud: "+
-			"can not found routetable by id[%s], error: %v", ctrlCtx.ClougCFG.Global.VpcID, err)
+			"can not found routetable by id[%s], error: %v", ctrlCtx.CloudCFG.Global.VpcID, err)
 	}
 	if len(tables) > 1 {
 		return nil, fmt.Errorf("alicloud: "+
-			"multiple vpc found by id[%s], length(vpcs)=%d", ctrlCtx.ClougCFG.Global.VpcID, len(tables))
+			"multiple vpc found by id[%s], length(vpcs)=%d", ctrlCtx.CloudCFG.Global.VpcID, len(tables))
 	}
 	return tables, nil
 }
@@ -82,10 +82,10 @@ func (r *ReconcileRoute) syncTableRoutes(ctx context.Context, table string, node
 	}
 
 	var clusterCIDR *net.IPNet
-	if ctrlCtx.ClougCFG.Global.ClusterCidr != "" {
-		_, clusterCIDR, err = net.ParseCIDR(ctrlCtx.ClougCFG.Global.ClusterCidr)
+	if ctrlCtx.CloudCFG.Global.ClusterCidr != "" {
+		_, clusterCIDR, err = net.ParseCIDR(ctrlCtx.CloudCFG.Global.ClusterCidr)
 		if err != nil {
-			return fmt.Errorf("error parse cluster cidr %s: %s", ctrlCtx.ClougCFG.Global.ClusterCidr, err)
+			return fmt.Errorf("error parse cluster cidr %s: %s", ctrlCtx.CloudCFG.Global.ClusterCidr, err)
 		}
 	}
 

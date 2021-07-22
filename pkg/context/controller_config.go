@@ -10,7 +10,7 @@ const (
 	flagCloudConfig                    = "cloud-config"
 	flagServiceMaxConcurrentReconciles = "concurrent-service-syncs"
 	flagEnableControllers              = "enable-controllers"
-	defaultLogLevel                    = "info"
+	defaultLogLevel                    = 3
 	defaultMaxConcurrentReconciles     = 3
 	defaultCloudConfig                 = ""
 )
@@ -19,7 +19,7 @@ var ControllerCFG = &ControllerConfig{}
 
 // Flag stores the configuration for global usage
 type ControllerConfig struct {
-	LogLevel                       string
+	LogLevel                       int
 	ServiceMaxConcurrentReconciles int
 	EnableControllers              []string
 	DryRun                         bool
@@ -29,8 +29,8 @@ type ControllerConfig struct {
 }
 
 func (cfg *ControllerConfig) BindFlags(fs *pflag.FlagSet) {
-	fs.StringVar(&cfg.LogLevel, flagLogLevel, defaultLogLevel,
-		"Set the controller log level - info(default), debug")
+	fs.IntVar(&cfg.LogLevel, flagLogLevel, defaultLogLevel,
+		"Set the controller log level, 3")
 	fs.IntVar(&cfg.ServiceMaxConcurrentReconciles, flagServiceMaxConcurrentReconciles, defaultMaxConcurrentReconciles,
 		"Maximum number of concurrently running reconcile loops for service")
 	fs.StringSliceVar(&cfg.EnableControllers, flagEnableControllers, []string{"node", "route", "service"},

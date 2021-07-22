@@ -18,21 +18,19 @@ package node
 import (
 	"context"
 	"fmt"
-	log "github.com/sirupsen/logrus"
-	nctx "k8s.io/cloud-provider-alibaba-cloud/pkg/context/node"
-	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/helper"
-	prvd "k8s.io/cloud-provider-alibaba-cloud/pkg/provider"
-	"k8s.io/klog"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-	"time"
-
+	"github.com/pkg/errors"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-
+	nctx "k8s.io/cloud-provider-alibaba-cloud/pkg/context/node"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/helper"
+	prvd "k8s.io/cloud-provider-alibaba-cloud/pkg/provider"
 	"k8s.io/cloud-provider/api"
 	"k8s.io/cloud-provider/node/helpers"
+	"k8s.io/klog"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"time"
 )
 
 const (
@@ -50,6 +48,8 @@ const (
 
 	AnnotationProvidedIPAddr = "alpha.kubernetes.io/provided-node-ip"
 )
+
+var ErrNotFound = errors.New("instance not found")
 
 type nodeModifier func(*v1.Node)
 
@@ -141,7 +141,7 @@ func nodeConditionReady(kclient client.Client, node *v1.Node) *v1.NodeCondition 
 		}
 		err = kclient.Get(context.Background(), client.ObjectKey{Name: node.Name}, node)
 		if err != nil {
-			log.Errorf("Failed while getting a Node to retry updating "+
+			klog.Errorf("Failed while getting a Node to retry updating "+
 				"NodeStatus. Probably Node %s was deleted.", node.Name)
 			break
 		}
@@ -159,7 +159,7 @@ func findCloudECS(
 	}
 	cloudIns, ok := nodes[prvdId]
 	if !ok || cloudIns == nil {
-		return nil, fmt.Errorf("instance not found")
+		return nil, ErrNotFound
 	}
 	return cloudIns, nil
 }
