@@ -3,6 +3,8 @@ package ecs
 import (
 	"encoding/base64"
 	"fmt"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/context/node"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/base"
 	"testing"
 
 	"github.com/aliyun/alibaba-cloud-sdk-go/services/ecs"
@@ -71,4 +73,46 @@ func TestUserData(t *testing.T) {
 	} else {
 		t.Logf("empty userdata after modified")
 	}
+}
+
+func TestEcsProvider_ListInstances(t *testing.T) {
+	client, err := ecs.NewClientWithAccessKey(
+		"", "", "",
+	)
+	if err != nil {
+		t.Fatal(err)
+		return
+	}
+	ids := []string{
+		"cn-hangzhou.i-bp10p8lib5ep9nu6chg",
+		"cn-shanghai.i-uf606juqu3a9tpk2fzj",
+		"cn-shanghai.i-uf606juqu3a9tpk2fzj",
+		"cn-shanghai.i-uf606juqu3a9tpk2fzj",
+		"cn-shanghai.i-uf658ihjgkfvrf6axff",
+		"cn-shanghai.i-uf61cwrwp6rs3tplf32",
+		"cn-shanghai.i-uf6jf9j3ltkgq49p1jy",
+	}
+
+	ecsProvider := NewEcsProvider(&base.ClientAuth{
+		Meta: nil,
+		ECS:  client,
+		VPC:  nil,
+		SLB:  nil,
+		PVTZ: nil,
+	})
+
+	cloudNodes, err := ecsProvider.ListInstances(&node.NodeContext{}, ids)
+	if err != nil {
+		t.Errorf("%s", err.Error())
+	}
+
+	for _, id := range ids {
+		c, ok := cloudNodes[id]
+		if !ok || c == nil {
+			t.Errorf("cannot find %s ecs from cloud", id)
+		}
+		t.Logf("%s, instance address: %s", id, c.Addresses)
+	}
+
+	t.Logf("ListInstances test successfully")
 }
