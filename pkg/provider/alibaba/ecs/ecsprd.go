@@ -3,6 +3,7 @@ package ecs
 import (
 	"encoding/json"
 	"fmt"
+	"k8s.io/klog"
 	"strings"
 
 	v1 "k8s.io/api/core/v1"
@@ -13,13 +14,8 @@ import (
 
 	"github.com/aliyun/alibaba-cloud-sdk-go/sdk/requests"
 	"github.com/aliyun/alibaba-cloud-sdk-go/services/ecs"
-	log "github.com/sirupsen/logrus"
 )
 
-/*
-	Provider needs permission
-	"alibaba:DeleteInstance", "alibaba:RunCommand",
-*/
 func NewEcsProvider(
 	auth *base.ClientAuth,
 ) *EcsProvider {
@@ -75,17 +71,28 @@ func (e *EcsProvider) getInstances(ids []string, region string) ([]ecs.Instance,
 		return nil, fmt.Errorf("get instances error: %s", err.Error())
 	}
 	req := ecs.CreateDescribeInstancesRequest()
+	req.RegionId = region
 	req.InstanceIds = string(bids)
-	req.PageSize = requests.NewInteger(50)
+	req.NextToken = ""
+	req.MaxResults = requests.NewInteger(50)
 
-	// TODO: pagination
-	instances, err := e.auth.ECS.DescribeInstances(req)
-	if err != nil {
-		log.Errorf("calling DescribeInstances: region=%s, "+
-			"instancename=%s, message=[%s].", req.RegionId, req.InstanceName, err.Error())
-		return nil, err
+	var ecsInstances []ecs.Instance
+	for {
+		resp, err := e.auth.ECS.DescribeInstances(req)
+		if err != nil {
+			klog.Errorf("calling DescribeInstances: region=%s, "+
+				"instancename=%s, message=[%s].", req.RegionId, req.InstanceName, err.Error())
+			return nil, err
+		}
+		ecsInstances = append(ecsInstances, resp.Instances.Instance...)
+		if resp.NextToken == "" {
+			break
+		}
+
+		req.NextToken = resp.NextToken
 	}
-	return instances.Instances.Instance, nil
+
+	return ecsInstances, nil
 }
 
 func (e *EcsProvider) SetInstanceTags(
@@ -114,12 +121,6 @@ func (e *EcsProvider) DescribeNetworkInterfaces(vpcId string, ips *[]string, nex
 }
 
 const (
-	// 240s
-	StopECSTimeout  = 240
-	StartECSTimeout = 300
-
-	// Default timeout value for WaitForInstance method
-	InstanceDefaultTimeout = 120
 	DefaultWaitForInterval = 5
 )
 

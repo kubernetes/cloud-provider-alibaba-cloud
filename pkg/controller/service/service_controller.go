@@ -198,7 +198,7 @@ func (m *ReconcileService) reconcile(request reconcile.Request) error {
 func (m *ReconcileService) cleanupLoadBalancerResources(reqCtx *RequestContext) error {
 	reqCtx.Log.Info("service do not need lb any more, try to delete it")
 	if helper.HasFinalizer(reqCtx.Service, ServiceFinalizer) {
-		lb, err := m.buildAndApplyModel(reqCtx)
+		_, err := m.buildAndApplyModel(reqCtx)
 		if err != nil && !strings.Contains(err.Error(), "LoadBalancerId does not exist") {
 			m.record.Eventf(reqCtx.Service, v1.EventTypeWarning, helper.FailedCleanLB,
 				fmt.Sprintf("Error deleting load balancer: %s", helper.GetLogMessage(err)))
@@ -213,7 +213,7 @@ func (m *ReconcileService) cleanupLoadBalancerResources(reqCtx *RequestContext) 
 
 		// When service type changes from LoadBalancer to NodePort,
 		// we need to clean Ingress attribute in service status
-		if err := m.updateServiceStatus(reqCtx, reqCtx.Service, lb); err != nil {
+		if err := m.removeServiceStatus(reqCtx, reqCtx.Service); err != nil {
 			m.record.Event(reqCtx.Service, v1.EventTypeWarning, helper.FailedUpdateStatus,
 				fmt.Sprintf("Error removing load balancer status: %s", err.Error()))
 			return err
@@ -284,6 +284,9 @@ func (m *ReconcileService) buildAndApplyModel(reqCtx *RequestContext) (*model.Lo
 func (m *ReconcileService) updateServiceStatus(reqCtx *RequestContext, svc *v1.Service, lb *model.LoadBalancer) error {
 	preStatus := svc.Status.LoadBalancer.DeepCopy()
 	newStatus := &v1.LoadBalancerStatus{}
+	if lb == nil {
+		return fmt.Errorf("lb not found, cannot not patch service status")
+	}
 
 	// EIP ExternalIPType, display the slb associated elastic ip as service external ip
 	if reqCtx.Anno.Get(ExternalIPType) == "eip" {
@@ -296,13 +299,66 @@ func (m *ReconcileService) updateServiceStatus(reqCtx *RequestContext, svc *v1.S
 
 	// SLB ExternalIPType, display the slb ip as service external ip
 	// If the length of elastic ip is 0, display the slb ip
-	if len(newStatus.Ingress) == 0 &&
-		lb.LoadBalancerAttribute.Address != "" {
+	if len(newStatus.Ingress) == 0 {
 		newStatus.Ingress = append(newStatus.Ingress,
 			v1.LoadBalancerIngress{
 				IP: lb.LoadBalancerAttribute.Address,
 			})
 	}
+
+	// Write the state if changed
+	// TODO: Be careful here ... what if there were other changes to the service?
+	if !v1helper.LoadBalancerStatusEqual(preStatus, newStatus) {
+		util.ServiceLog.Info(fmt.Sprintf("status: [%v] [%v]", preStatus, newStatus))
+		return retry(
+			&wait.Backoff{
+				Duration: 1 * time.Second,
+				Steps:    3,
+				Factor:   2,
+				Jitter:   4,
+			},
+			func(svc *v1.Service) error {
+				// get latest svc from the shared informer cache
+				svcOld := &v1.Service{}
+				err := m.kubeClient.Get(reqCtx.Ctx, util.NamespacedName(svc), svcOld)
+				if err != nil {
+					return fmt.Errorf("error to get svc %s", util.Key(svc))
+				}
+				updated := svcOld.DeepCopy()
+				updated.Status.LoadBalancer = *newStatus
+				reqCtx.Log.Info(fmt.Sprintf("LoadBalancer: %v", updated.Status.LoadBalancer))
+				err = m.kubeClient.Status().Patch(reqCtx.Ctx, updated, client.MergeFrom(svcOld))
+				if err == nil {
+					return nil
+				}
+
+				// If the object no longer exists, we don't want to recreate it. Just bail
+				// out so that we can process the delete, which we should soon be receiving
+				// if we haven't already.
+				if errors.IsNotFound(err) {
+					util.ServiceLog.Error(err, "not persisting update to service that no longer exists")
+					return nil
+				}
+				// TODO: Try to resolve the conflict if the change was unrelated to load
+				// balancer status. For now, just pass it up the stack.
+				if errors.IsConflict(err) {
+					return fmt.Errorf("not persisting update to service %s that "+
+						"has been changed since we received it: %v", util.Key(svc), err)
+				}
+				reqCtx.Log.Error(err, "failed to persist updated LoadBalancerStatus"+
+					" after creating its load balancer")
+				return fmt.Errorf("retry with %s, %s", err.Error(), TRY_AGAIN)
+			},
+			svc,
+		)
+	}
+	return nil
+
+}
+
+func (m *ReconcileService) removeServiceStatus(reqCtx *RequestContext, svc *v1.Service) error {
+	preStatus := svc.Status.LoadBalancer.DeepCopy()
+	newStatus := &v1.LoadBalancerStatus{}
 
 	// Write the state if changed
 	// TODO: Be careful here ... what if there were other changes to the service?
