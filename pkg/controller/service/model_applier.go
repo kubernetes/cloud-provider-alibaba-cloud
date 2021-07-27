@@ -95,6 +95,7 @@ func (m *ModelApplier) applyLoadBalancerAttribute(reqCtx *RequestContext, local 
 			reqCtx.Log.Info(fmt.Sprintf("successfully delete slb %s", remote.LoadBalancerAttribute.LoadBalancerId))
 			return nil
 		}
+		reqCtx.Log.Info(fmt.Sprintf("slb %s is reused, skip delete it", remote.LoadBalancerAttribute.LoadBalancerId))
 	}
 
 	// create slb
@@ -122,8 +123,9 @@ func (m *ModelApplier) applyLoadBalancerAttribute(reqCtx *RequestContext, local 
 		return fmt.Errorf("DescribeTags: %s", err.Error())
 	}
 	remote.LoadBalancerAttribute.Tags = tags
-	// update slb
-	if local.LoadBalancerAttribute.IsUserManaged {
+
+	// check whether slb can be reused
+	if !needDeleteLoadBalancer(reqCtx.Service) && local.LoadBalancerAttribute.IsUserManaged {
 		if ok, reason := isLoadBalancerReusable(reqCtx.Service, tags, remote.LoadBalancerAttribute.Address); !ok {
 			return fmt.Errorf("alicloud: the loadbalancer %s can not be reused, %s",
 				remote.LoadBalancerAttribute.LoadBalancerId, reason)

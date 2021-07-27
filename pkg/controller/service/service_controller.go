@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/go-logr/logr"
+	"golang.org/x/time/rate"
+	"k8s.io/client-go/util/workqueue"
 	"os"
 	"strings"
 	"time"
@@ -68,12 +70,19 @@ func (svcC serviceController) Start(ctx context.Context) error {
 
 // add adds a new Controller to mgr with r as the reconcile.Reconciler
 func add(mgr manager.Manager, r *ReconcileService) error {
+	rateLimit := workqueue.NewMaxOfRateLimiter(
+		workqueue.NewItemExponentialFailureRateLimiter(5*time.Second, 900*time.Second),
+		// 10 qps, 100 bucket size.  This is only for retry speed and its only the overall factor (not per item)
+		&workqueue.BucketRateLimiter{Limiter: rate.NewLimiter(rate.Limit(10), 100)},
+	)
+
 	// Create a new controller
 	c, err := controller.NewUnmanaged(
 		"service-controller", mgr,
 		controller.Options{
 			Reconciler:              r,
 			MaxConcurrentReconciles: 1,
+			RateLimiter:             rateLimit,
 		},
 	)
 	if err != nil {
@@ -157,6 +166,7 @@ func (m *ReconcileService) reconcile(request reconcile.Request) error {
 			// Return and don't requeue
 			return nil
 		}
+		util.ServiceLog.Error(err, "reconcile: get service failed")
 		return err
 	}
 	anno := &AnnotationRequest{svc: svc}
@@ -186,11 +196,15 @@ func (m *ReconcileService) reconcile(request reconcile.Request) error {
 	reqContext.Log.Info(fmt.Sprintf("ensure loadbalancer with service details, %+v", svc.String()))
 	// check to see whither if loadbalancer deletion is needed
 	if needDeleteLoadBalancer(svc) {
-		return m.cleanupLoadBalancerResources(reqContext)
-	}
-	err = m.reconcileLoadBalancerResources(reqContext)
-	if err != nil {
-		util.ServiceLog.Error(err, "reconcile loadbalancer failed")
+		err = m.cleanupLoadBalancerResources(reqContext)
+		if err != nil {
+			util.ServiceLog.Error(err, "delete loadbalancer failed")
+		}
+	} else {
+		err = m.reconcileLoadBalancerResources(reqContext)
+		if err != nil {
+			util.ServiceLog.Error(err, "reconcile loadbalancer failed")
+		}
 	}
 	return err
 }
