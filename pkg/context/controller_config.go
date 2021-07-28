@@ -1,7 +1,9 @@
 package context
 
 import (
+	"fmt"
 	"github.com/spf13/pflag"
+	"time"
 )
 
 const (
@@ -10,9 +12,14 @@ const (
 	flagCloudConfig                    = "cloud-config"
 	flagServiceMaxConcurrentReconciles = "concurrent-service-syncs"
 	flagEnableControllers              = "enable-controllers"
-	defaultLogLevel                    = 3
-	defaultMaxConcurrentReconciles     = 3
-	defaultCloudConfig                 = ""
+	flagConfigureCloudRoutes           = "configure-cloud-routes"
+	flagClusterCidr                    = "cluster-cidr"
+	flagRouteReconciliationPeriod      = "route-reconciliation-period"
+
+	defaultLogLevel                  = 3
+	defaultMaxConcurrentReconciles   = 3
+	defaultCloudConfig               = ""
+	defaultRouteReconciliationPeriod = 5 * time.Minute
 )
 
 var ControllerCFG = &ControllerConfig{}
@@ -24,6 +31,10 @@ type ControllerConfig struct {
 	EnableControllers              []string
 	DryRun                         bool
 	CloudConfig                    string
+	//For Flannel Network
+	ConfigureCloudRoutes      bool
+	ClusterCidr               string
+	RouteReconciliationPeriod time.Duration
 
 	RuntimeConfig RuntimeConfig
 }
@@ -38,12 +49,28 @@ func (cfg *ControllerConfig) BindFlags(fs *pflag.FlagSet) {
 	fs.BoolVar(&cfg.DryRun, flagDryRun, false, "whether to perform a dry run")
 	fs.StringVar(&cfg.CloudConfig, flagCloudConfig, defaultCloudConfig,
 		"Path to the cloud provider configuration file. Empty string for no configuration file.")
+	fs.BoolVar(&cfg.ConfigureCloudRoutes, flagConfigureCloudRoutes, false, "Enable configure cloud routes.")
+	fs.StringVar(&cfg.ClusterCidr, flagClusterCidr, "", "CIDR Range for Pods in cluster.")
+	fs.DurationVar(&cfg.RouteReconciliationPeriod,
+		flagRouteReconciliationPeriod, defaultRouteReconciliationPeriod,
+		"The period for reconciling routes created for nodes by cloud provider. The minimum value is 1 minute")
 
 	cfg.RuntimeConfig.BindFlags(fs)
 }
 
 // Validate the controller configuration
 func (cfg *ControllerConfig) Validate() error {
+	if cfg.CloudConfig == "" {
+		return fmt.Errorf("cloud config cannot be empty")
+	}
+
+	if cfg.ConfigureCloudRoutes == true && cfg.ClusterCidr == "" {
+		return fmt.Errorf("--cluster-cidr must be set when --configure-cloud-routes=true")
+	}
+
+	if cfg.RouteReconciliationPeriod < 1*time.Minute {
+		cfg.RouteReconciliationPeriod = 1 * time.Minute
+	}
 
 	return nil
 }

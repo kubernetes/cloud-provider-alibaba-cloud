@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"github.com/spf13/pflag"
 	prvd "k8s.io/cloud-provider-alibaba-cloud/pkg/provider"
@@ -47,11 +48,7 @@ func main() {
 	printVersion()
 
 	// Get a config to talk to the api-server
-	cfg, err := config.GetConfig()
-	if err != nil {
-		log.Error(err, "")
-		os.Exit(1)
-	}
+	cfg := config.GetConfigOrDie()
 
 	// Create a new manager to provide shared dependencies and start components
 	mgr, err := manager.New(cfg, ctrlCtx.BuildRuntimeOptions(ctrlCtx.ControllerCFG.RuntimeConfig))
@@ -114,6 +111,7 @@ func main() {
 
 func loadControllerConfig() error {
 	fs := pflag.NewFlagSet("", pflag.ExitOnError)
+	fs.AddGoFlagSet(flag.CommandLine)
 	ctrlCtx.ControllerCFG.BindFlags(fs)
 
 	if err := fs.Parse(os.Args); err != nil {

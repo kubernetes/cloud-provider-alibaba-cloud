@@ -34,22 +34,13 @@ func Add(mgr manager.Manager, ctx *shared.SharedContext) error {
 // newReconciler returns a new reconcile.Reconciler
 func newReconciler(mgr manager.Manager, ctx *shared.SharedContext) reconcile.Reconciler {
 	recon := &ReconcileRoute{
-		cloud:        ctx.Provider(),
-		client:       mgr.GetClient(),
-		scheme:       mgr.GetScheme(),
-		record:       mgr.GetEventRecorderFor("Route"),
-		nodeCache:    cmap.New(),
-		configRoutes:  ctrlCtx.ControllerCFG.RuntimeConfig.ConfigureCloudRoutes,
-	}
-
-	if  ctrlCtx.CloudCFG.Global.RouteReconciliationPeriod != "" {
-		duration, err := time.ParseDuration( ctrlCtx.CloudCFG.Global.RouteReconciliationPeriod)
-		if err == nil || duration != 0 {
-			recon.reconcilePeriod = duration
-		}
-	}
-	if recon.reconcilePeriod == 0 {
-		recon.reconcilePeriod = 5 * time.Minute
+		cloud:           ctx.Provider(),
+		client:          mgr.GetClient(),
+		scheme:          mgr.GetScheme(),
+		record:          mgr.GetEventRecorderFor("Route"),
+		nodeCache:       cmap.New(),
+		configRoutes:    ctrlCtx.ControllerCFG.ConfigureCloudRoutes,
+		reconcilePeriod: ctrlCtx.ControllerCFG.RouteReconciliationPeriod,
 	}
 
 	if recon.configRoutes {

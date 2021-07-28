@@ -7,7 +7,6 @@ import (
 )
 
 const (
-	flagKubeconfig              = "kubeconfig"
 	flagMetricsBindAddr         = "metrics-bind-addr"
 	flagHealthProbeBindAddr     = "health-probe-bind-addr"
 	flagEnableLeaderElection    = "enable-leader-election"
@@ -17,7 +16,6 @@ const (
 	flagQPS                     = "kube-api-qps"
 	flagBurst                   = "kube-api-burst"
 
-	defaultKubeConfig              = ""
 	defaultMetricsAddr             = ":8080"
 	defaultHealthProbeBindAddress  = ":10258"
 	defaultLeaderElectionID        = "ccm"
@@ -29,21 +27,17 @@ const (
 
 // RuntimeConfig stores the configuration for controller-runtime
 type RuntimeConfig struct {
-	KubeConfig              string
 	MetricsBindAddress      string
 	HealthProbeBindAddress  string
 	EnableLeaderElection    bool
 	LeaderElectionID        string
 	LeaderElectionNamespace string
-	ConfigureCloudRoutes    bool
 	SyncPeriod              time.Duration
 	QPS                     int
 	Burst                   int
 }
 
 func (c *RuntimeConfig) BindFlags(fs *pflag.FlagSet) {
-	fs.StringVar(&c.KubeConfig, flagKubeconfig, defaultKubeConfig,
-		"Path to the kubeconfig file containing authorization and API server information.")
 	fs.StringVar(&c.MetricsBindAddress, flagMetricsBindAddr, defaultMetricsAddr,
 		"The address the metric endpoint binds to.")
 	fs.StringVar(&c.HealthProbeBindAddress, flagHealthProbeBindAddr, defaultHealthProbeBindAddress,
@@ -59,8 +53,6 @@ func (c *RuntimeConfig) BindFlags(fs *pflag.FlagSet) {
 		"Period at which the controller forces the repopulation of its local object stores.")
 	fs.IntVar(&c.QPS, flagQPS, defaultQPS, "QPS to use while talking with kubernetes apiserver.")
 	fs.IntVar(&c.Burst, flagBurst, defaultBurst, "Burst to use while talking with kubernetes apiserver.")
-	fs.BoolVar(&c.ConfigureCloudRoutes, flagConfigureCloudRoutes, false,
-		"Enable configure cloud routes.")
 }
 
 func BuildRuntimeOptions(rtCfg RuntimeConfig) manager.Options {

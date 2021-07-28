@@ -232,8 +232,7 @@ func RefreshToken(mgr *ClientAuth, token *Token) error {
 		return fmt.Errorf("init pvtz sts token config: %s", err.Error())
 	}
 
-	// TODO revert me
-	//setVPCEndpoint(mgr)
+	setVPCEndpoint(mgr)
 	return nil
 }
 

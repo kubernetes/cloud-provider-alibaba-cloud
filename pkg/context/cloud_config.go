@@ -2,11 +2,6 @@ package context
 
 var CloudCFG = &CloudConfig{}
 
-const (
-	flagConfigureCloudRoutes    = "configure-cloud-routes"
-	defaultConfigureCloudRoutes = false
-)
-
 // CloudConfig wraps the settings for the Alibaba Cloud provider.
 type CloudConfig struct {
 	Global struct {
@@ -17,7 +12,6 @@ type CloudConfig struct {
 		// cluster related
 		ClusterID            string `json:"clusterID"`
 		KubernetesClusterTag string `json:"kubernetesClusterTag"`
-		ClusterCidr          string `json:"clusterCidr"`
 		Region               string `json:"region"`
 		VpcID                string `json:"vpcid"`
 		ZoneID               string `json:"zoneid"`
@@ -32,8 +26,7 @@ type CloudConfig struct {
 		NodeAddrSyncPeriod int64 `json:"nodeAddrSyncPeriod"`
 
 		// route controller
-		RouteTableIDS             string `json:"routeTableIDs"`
-		RouteReconciliationPeriod string `json:"routeReconciliationPeriod"`
+		RouteTableIDS string `json:"routeTableIDs"`
 
 		// pvtz controller
 		PrivateZoneID        string `json:"privateZoneId"`

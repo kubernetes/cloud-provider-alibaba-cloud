@@ -3,7 +3,7 @@ package service
 import (
 	"encoding/json"
 	"fmt"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"strconv"
 	"strings"
 
@@ -375,13 +375,11 @@ func needExcludeFromLB(reqCtx *RequestContext, node *v1.Node) bool {
 func getEndpoints(reqCtx *RequestContext, client client.Client) (*v1.Endpoints, error) {
 	eps := &v1.Endpoints{}
 	err := client.Get(reqCtx.Ctx, util.NamespacedName(reqCtx.Service), eps)
-	if err != nil {
-		if errors.IsNotFound(err) {
-			return eps, fmt.Errorf("get endpoints from k8s error: %s", err.Error())
-		}
-		reqCtx.Log.Error(err, "fail to get endpoints")
+	if err != nil && apierrors.IsNotFound(err) {
+		reqCtx.Log.Info("warning: endpoint not found")
+		return eps, nil
 	}
-	return eps, nil
+	return eps, err
 }
 
 func (mgr *VGroupManager) buildVGroupForServicePort(reqCtx *RequestContext, port v1.ServicePort, candidates *EndpointWithENI) (model.VServerGroup, error) {
@@ -391,8 +389,8 @@ func (mgr *VGroupManager) buildVGroupForServicePort(reqCtx *RequestContext, port
 	}
 	vg.VGroupName = vg.NamedKey.Key()
 
-	if reqCtx.Anno.Get(PortVGroup) != "" {
-		vgroupId, err := vgroup(reqCtx.Anno.Get(PortVGroup), port)
+	if reqCtx.Anno.Get(VGroupPort) != "" {
+		vgroupId, err := vgroup(reqCtx.Anno.Get(VGroupPort), port)
 		if err != nil {
 			return vg, fmt.Errorf("vgroupid parse error: %s", err.Error())
 		}

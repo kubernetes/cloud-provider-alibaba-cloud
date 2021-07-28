@@ -131,8 +131,8 @@ func (mgr *ListenerManager) buildListenerFromServicePort(reqCtx *RequestContext,
 	}
 	listener.Protocol = proto
 
-	if reqCtx.Anno.Get(PortVGroup) != "" {
-		vGroupId, err := vgroup(reqCtx.Anno.Get(PortVGroup), port)
+	if reqCtx.Anno.Get(VGroupPort) != "" {
+		vGroupId, err := vgroup(reqCtx.Anno.Get(VGroupPort), port)
 		if err != nil {
 			return listener, err
 		}
@@ -575,11 +575,11 @@ func vgroup(annotation string, port v1.ServicePort) (string, error) {
 		pp := strings.Split(v, ":")
 		if len(pp) < 2 {
 			return "", fmt.Errorf("vgroupid and "+
-				"protocol format must be like '443:vsp-xxx' with colon separated. got=[%+v]", pp)
+				"protocol format must be like 'vsp-xxx:443' with colon separated. got=[%+v]", pp)
 		}
 
-		if pp[0] == fmt.Sprintf("%d", port.Port) {
-			return pp[1], nil
+		if pp[1] == fmt.Sprintf("%d", port.Port) {
+			return pp[0], nil
 		}
 	}
 	return "", nil
@@ -735,6 +735,7 @@ func isNeedUpdate(reqCtx *RequestContext, local model.ListenerAttribute, remote 
 			remote.ConnectionDrain, local.ConnectionDrain)
 	}
 	if Is4LayerProtocol(local.Protocol) &&
+		local.ConnectionDrain == model.OnFlag &&
 		local.ConnectionDrainTimeout != 0 &&
 		remote.ConnectionDrainTimeout != local.ConnectionDrainTimeout {
 		needUpdate = true

@@ -12,7 +12,7 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/record"
@@ -157,8 +157,8 @@ func (m *ReconcileService) reconcile(request reconcile.Request) error {
 	svc := &v1.Service{}
 	err := m.kubeClient.Get(context.Background(), request.NamespacedName, svc)
 	if err != nil {
-		if errors.IsNotFound(err) {
-			util.ServiceLog.Info("service not found, skip")
+		if apierrors.IsNotFound(err) {
+			util.ServiceLog.Info("service not found, skip", "service", request.NamespacedName)
 			// Request object not found, could have been deleted
 			// after reconcile request.
 			// Owned objects are automatically garbage collected.
@@ -166,7 +166,7 @@ func (m *ReconcileService) reconcile(request reconcile.Request) error {
 			// Return and don't requeue
 			return nil
 		}
-		util.ServiceLog.Error(err, "reconcile: get service failed")
+		util.ServiceLog.Error(err, "reconcile: get service failed", "service", request.NamespacedName)
 		return err
 	}
 	anno := &AnnotationRequest{svc: svc}
@@ -197,16 +197,16 @@ func (m *ReconcileService) reconcile(request reconcile.Request) error {
 	// check to see whither if loadbalancer deletion is needed
 	if needDeleteLoadBalancer(svc) {
 		err = m.cleanupLoadBalancerResources(reqContext)
-		if err != nil {
-			util.ServiceLog.Error(err, "delete loadbalancer failed")
-		}
 	} else {
 		err = m.reconcileLoadBalancerResources(reqContext)
-		if err != nil {
-			util.ServiceLog.Error(err, "reconcile loadbalancer failed")
-		}
 	}
-	return err
+	if err != nil {
+		reqContext.Log.Error(err, "reconcile loadbalancer failed")
+		return err
+	}
+
+	reqContext.Log.Info("successfully reconcile")
+	return nil
 }
 
 func (m *ReconcileService) cleanupLoadBalancerResources(reqCtx *RequestContext) error {
@@ -349,13 +349,13 @@ func (m *ReconcileService) updateServiceStatus(reqCtx *RequestContext, svc *v1.S
 				// If the object no longer exists, we don't want to recreate it. Just bail
 				// out so that we can process the delete, which we should soon be receiving
 				// if we haven't already.
-				if errors.IsNotFound(err) {
+				if apierrors.IsNotFound(err) {
 					util.ServiceLog.Error(err, "not persisting update to service that no longer exists")
 					return nil
 				}
 				// TODO: Try to resolve the conflict if the change was unrelated to load
 				// balancer status. For now, just pass it up the stack.
-				if errors.IsConflict(err) {
+				if apierrors.IsConflict(err) {
 					return fmt.Errorf("not persisting update to service %s that "+
 						"has been changed since we received it: %v", util.Key(svc), err)
 				}
@@ -403,13 +403,13 @@ func (m *ReconcileService) removeServiceStatus(reqCtx *RequestContext, svc *v1.S
 				// If the object no longer exists, we don't want to recreate it. Just bail
 				// out so that we can process the delete, which we should soon be receiving
 				// if we haven't already.
-				if errors.IsNotFound(err) {
+				if apierrors.IsNotFound(err) {
 					util.ServiceLog.Error(err, "not persisting update to service that no longer exists")
 					return nil
 				}
 				// TODO: Try to resolve the conflict if the change was unrelated to load
 				// balancer status. For now, just pass it up the stack.
-				if errors.IsConflict(err) {
+				if apierrors.IsConflict(err) {
 					return fmt.Errorf("not persisting update to service %s that "+
 						"has been changed since we received it: %v", util.Key(svc), err)
 				}
