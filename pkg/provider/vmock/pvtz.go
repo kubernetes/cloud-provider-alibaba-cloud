@@ -8,13 +8,13 @@ import (
 )
 
 func NewMockPVTZ(
-	auth *base.ClientAuth,
+	auth *base.ClientMgr,
 ) *MockPVTZ {
 	return &MockPVTZ{auth: auth}
 }
 
 type MockPVTZ struct {
-	auth *base.ClientAuth
+	auth *base.ClientMgr
 }
 
 func (p *MockPVTZ) ListPVTZ(ctx context.Context) ([]*model.PvtzEndpoint, error) {

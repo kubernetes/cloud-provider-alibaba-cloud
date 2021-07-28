@@ -8,14 +8,14 @@ import (
 )
 
 func NewDryRunPVTZ(
-	auth *base.ClientAuth,
+	auth *base.ClientMgr,
 	pvtz *pvtz.PVTZProvider,
 ) *DryRunPVTZ {
 	return &DryRunPVTZ{auth: auth, pvtz: pvtz}
 }
 
 type DryRunPVTZ struct {
-	auth *base.ClientAuth
+	auth *base.ClientMgr
 	pvtz *pvtz.PVTZProvider
 }
 

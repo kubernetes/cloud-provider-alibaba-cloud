@@ -20,7 +20,7 @@ type AssociatedInstanceType string
 const SlbInstance = AssociatedInstanceType("SlbInstance")
 
 func NewVPCProvider(
-	auth *base.ClientAuth,
+	auth *base.ClientMgr,
 ) *VPCProvider {
 	return &VPCProvider{auth: auth}
 }
@@ -28,7 +28,7 @@ func NewVPCProvider(
 var _ prvd.IVPC = &VPCProvider{}
 
 type VPCProvider struct {
-	auth   *base.ClientAuth
+	auth   *base.ClientMgr
 	region string
 }
 

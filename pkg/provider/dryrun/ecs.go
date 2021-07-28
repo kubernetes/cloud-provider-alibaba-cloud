@@ -9,14 +9,14 @@ import (
 )
 
 func NewDryRunECS(
-	auth *base.ClientAuth,
+	auth *base.ClientMgr,
 	ecs *ecs.EcsProvider,
 ) *DryRunECS {
 	return &DryRunECS{auth: auth, ecs: ecs}
 }
 
 type DryRunECS struct {
-	auth *base.ClientAuth
+	auth *base.ClientMgr
 	ecs  *ecs.EcsProvider
 }
 

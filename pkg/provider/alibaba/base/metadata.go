@@ -64,7 +64,7 @@ type IMetaDataRequest interface {
 func NewMetaData() prvd.IMetaData {
 	if ctrlCtx.CloudCFG.Global.VpcID != "" &&
 		ctrlCtx.CloudCFG.Global.VswitchID != "" {
-		klog.V(2).Infof("use mocked metadata server.")
+		klog.Infof("read metadata from cfg")
 		return &CfgMetaData{base: NewBaseMetaData(nil)}
 	}
 	return NewBaseMetaData(nil)

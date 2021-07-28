@@ -17,11 +17,12 @@ limitations under the License.
 package base
 
 import (
-	b64 "encoding/base64"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"k8s.io/klog/klogr"
+	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -39,16 +40,25 @@ import (
 	"k8s.io/cloud-provider-alibaba-cloud/version"
 )
 
-var KUBERNETES_CLOUD_CONTROLLER_MANAGER = "ack.ccm"
+const (
+	KubernetesCloudControllerManager = "ack.ccm"
+	TokenSyncPeriod                  = 10 * time.Minute
+)
 
-// TOKEN_RESYNC_PERIOD default Token sync period
-var TOKEN_RESYNC_PERIOD = 10 * time.Minute
+type AuthMode string
+
+const (
+	AKMode      = AuthMode("ak")      //get token by accessKeyId and accessKeySecretId
+	SAMode      = AuthMode("service") //get token by assuming role
+	RamRoleMode = AuthMode("ramrole") //get token by ecs ram role
+)
 
 var log = klogr.New().WithName("clientMgr")
 
-// ClientAuth client manager for aliyun sdk
-type ClientAuth struct {
-	stop <-chan struct{}
+// ClientMgr client manager for aliyun sdk
+type ClientMgr struct {
+	stop   <-chan struct{}
+	Region string
 
 	Meta prvd.IMetaData
 	ECS  *ecs.Client
@@ -58,42 +68,38 @@ type ClientAuth struct {
 }
 
 // NewClientMgr return a new client manager
-func NewClientAuth() (*ClientAuth, error) {
-	log.Info(fmt.Sprintf("load cfg from file: %s", ctrlCtx.ControllerCFG.CloudConfig))
-	// reload config while token refresh
-	err := LoadCfg(ctrlCtx.ControllerCFG.CloudConfig)
-	if err != nil {
-		log.Error(err, "load config fail")
-		return nil, err
+func NewClientMgr() (*ClientMgr, error) {
+	if err := loadCloudCFG(); err != nil {
+		return nil, fmt.Errorf("load cloud config %s error: %s", ctrlCtx.ControllerCFG.CloudConfig, err.Error())
 	}
 
 	meta := NewMetaData()
-
 	region, err := meta.Region()
 	if err != nil {
 		return nil, fmt.Errorf("can not determin region: %s", err.Error())
 	}
+
 	ecli, err := ecs.NewClientWithStsToken(
 		region, "key", "secret", "",
 	)
 	if err != nil {
 		return nil, fmt.Errorf("initialize alibaba ecs client: %s", err.Error())
 	}
-	ecli.AppendUserAgent(KUBERNETES_CLOUD_CONTROLLER_MANAGER, version.Version)
+	ecli.AppendUserAgent(KubernetesCloudControllerManager, version.Version)
 
 	vpcli, err := vpc.NewClientWithStsToken(
 		region, "key", "secret", "")
 	if err != nil {
 		return nil, fmt.Errorf("initialize alibaba vpc client: %s", err.Error())
 	}
-	vpcli.AppendUserAgent(KUBERNETES_CLOUD_CONTROLLER_MANAGER, version.Version)
+	vpcli.AppendUserAgent(KubernetesCloudControllerManager, version.Version)
 
 	slbcli, err := slb.NewClientWithStsToken(
 		region, "key", "secret", "")
 	if err != nil {
 		return nil, fmt.Errorf("initialize alibaba slb client: %s", err.Error())
 	}
-	slbcli.AppendUserAgent(KUBERNETES_CLOUD_CONTROLLER_MANAGER, version.Version)
+	slbcli.AppendUserAgent(KubernetesCloudControllerManager, version.Version)
 
 	pvtzcli, err := pvtz.NewClientWithStsToken(
 		region, "key", "secret", "",
@@ -101,34 +107,40 @@ func NewClientAuth() (*ClientAuth, error) {
 	if err != nil {
 		return nil, fmt.Errorf("initialize alibaba pvtz client: %s", err.Error())
 	}
-	pvtzcli.AppendUserAgent(KUBERNETES_CLOUD_CONTROLLER_MANAGER, version.Version)
+	pvtzcli.AppendUserAgent(KubernetesCloudControllerManager, version.Version)
 
-	auth := &ClientAuth{
-		Meta: meta,
-		ECS:  ecli,
-		VPC:  vpcli,
-		SLB:  slbcli,
-		PVTZ: pvtzcli,
-		stop: make(<-chan struct{}, 1),
+	auth := &ClientMgr{
+		Meta:   meta,
+		ECS:    ecli,
+		VPC:    vpcli,
+		SLB:    slbcli,
+		PVTZ:   pvtzcli,
+		Region: region,
+		stop:   make(<-chan struct{}, 1),
 	}
 	return auth, nil
 }
 
-func (mgr *ClientAuth) Start(
-	settoken func(mgr *ClientAuth, token *Token) error,
+func (mgr *ClientMgr) Start(
+	settoken func(mgr *ClientMgr, token *Token) error,
 ) error {
 	initialized := false
 	tokenfunc := func() {
-		log.Info(fmt.Sprintf("load cfg from file: %s", ctrlCtx.ControllerCFG.CloudConfig))
-		// reload config while token refresh
-		err := LoadCfg(ctrlCtx.ControllerCFG.CloudConfig)
-		if err != nil {
-			log.Error(err, "load config fail")
-			return
+		var err error
+		token := &Token{
+			Region: mgr.Region,
 		}
-
-		// refresh client Token periodically
-		token, err := mgr.Token().NextToken()
+		switch mgr.GetAuthMode() {
+		case AKMode:
+			akToken := &AkAuthToken{ak: token}
+			token, err = akToken.NextToken()
+		case SAMode:
+			saToken := &ServiceToken{svcak: token}
+			token, err = saToken.NextToken()
+		case RamRoleMode:
+			ramRoleToken := &RamRoleToken{meta: mgr.Meta}
+			token, err = ramRoleToken.NextToken()
+		}
 		if err != nil {
 			log.Error(err, "fail to get next token")
 			return
@@ -142,7 +154,7 @@ func (mgr *ClientAuth) Start(
 	}
 	go wait.Until(
 		tokenfunc,
-		TOKEN_RESYNC_PERIOD,
+		TokenSyncPeriod,
 		mgr.stop,
 	)
 	return wait.ExponentialBackoff(
@@ -159,51 +171,29 @@ func (mgr *ClientAuth) Start(
 	)
 }
 
-func LoadCfg(cfg string) error {
-	content, err := ioutil.ReadFile(cfg)
-	if err != nil {
-		return fmt.Errorf("read config file: %s", content)
-	}
-	return yaml.Unmarshal(content, ctrlCtx.CloudCFG)
-}
-
-func (mgr *ClientAuth) Token() TokenAuth {
-	key, err := b64.StdEncoding.DecodeString(ctrlCtx.CloudCFG.Global.AccessKeyID)
-	if err != nil {
-		panic(fmt.Sprintf("ak key must be base64 encoded: %s", err.Error()))
-	}
-	secret, err := b64.StdEncoding.DecodeString(ctrlCtx.CloudCFG.Global.AccessKeySecret)
-	if err != nil {
-		panic(fmt.Sprintf("ak secret must be base64 encoded: %s", err.Error()))
-	}
-	if len(key) == 0 ||
-		len(secret) == 0 {
-		log.Info("ccm: use ramrole token mode without ak.")
-		return &RamRoleToken{meta: mgr.Meta}
-	}
-	region := ctrlCtx.CloudCFG.Global.Region
-	if region == "" {
-		region, err = mgr.Meta.Region()
-		if err != nil {
-			panic(fmt.Sprintf("region not specified in config, detect region failed: %s", err.Error()))
+func (mgr *ClientMgr) GetAuthMode() AuthMode {
+	if ctrlCtx.CloudCFG.Global.AccessKeyID != "" &&
+		ctrlCtx.CloudCFG.Global.AccessKeySecret != "" {
+		if ctrlCtx.CloudCFG.Global.UID != "" {
+			log.Info("use assume role mode to get token")
+			return SAMode
+		} else {
+			log.Info("use ak mode to get token")
+			return AKMode
 		}
 	}
-	inittoken := &Token{
-		AccessKey:    string(key),
-		AccessSecret: string(secret),
-		UID:          ctrlCtx.CloudCFG.Global.UID,
-		Region:       region,
+
+	if os.Getenv("ACCESS_KEY_ID") != "" &&
+		os.Getenv("ACCESS_KEY_SECRET") != "" {
+		log.Info("use ak mode to get token")
+		return AKMode
 	}
-	if inittoken.UID == "" {
-		log.Info("ccm: ak mode to authenticate user. without Token and role assume")
-		return &AkAuthToken{ak: inittoken}
-	}
-	log.Info("ccm: service account auth mode")
-	return &ServiceToken{svcak: inittoken}
+	log.Info("use ram role mode to get token")
+	return RamRoleMode
 }
 
-func RefreshToken(mgr *ClientAuth, token *Token) error {
-	log.Info("refresh token", "region", token.Region)
+func RefreshToken(mgr *ClientMgr, token *Token, ) error {
+	log.V(5).Info("refresh token", "region", token.Region)
 	err := mgr.ECS.InitWithStsToken(
 		token.Region, token.AccessKey, token.AccessSecret, token.Token,
 	)
@@ -232,11 +222,14 @@ func RefreshToken(mgr *ClientAuth, token *Token) error {
 		return fmt.Errorf("init pvtz sts token config: %s", err.Error())
 	}
 
-	setVPCEndpoint(mgr)
+	if ctrlCtx.ControllerCFG.NetWork == "vpc" {
+		setVPCEndpoint(mgr)
+	}
+
 	return nil
 }
 
-func setVPCEndpoint(mgr *ClientAuth) {
+func setVPCEndpoint(mgr *ClientMgr) {
 	mgr.ECS.Network = "vpc"
 	mgr.VPC.Network = "vpc"
 	mgr.SLB.Network = "vpc"
@@ -260,7 +253,18 @@ type TokenAuth interface {
 // AkAuthToken implement ak auth
 type AkAuthToken struct{ ak *Token }
 
-func (f *AkAuthToken) NextToken() (*Token, error) { return f.ak, nil }
+func (f *AkAuthToken) NextToken() (*Token, error) {
+	key, secret, err := loadAK()
+	if err != nil {
+		return f.ak, err
+	}
+	f.ak = &Token{
+		AccessSecret: secret,
+		AccessKey:    key,
+		Region:       f.ak.Region,
+	}
+	return f.ak, nil
+}
 
 type RamRoleToken struct {
 	meta prvd.IMetaData
@@ -276,13 +280,11 @@ func (f *RamRoleToken) NextToken() (*Token, error) {
 	if err != nil {
 		return nil, fmt.Errorf("ramrole Token retrieve: %s", err.Error())
 	}
-	region := ctrlCtx.CloudCFG.Global.Region
-	if region == "" {
-		region, err = f.meta.Region()
-		if err != nil {
-			return nil, fmt.Errorf("read region error: %s", err.Error())
-		}
+	region, err := f.meta.Region()
+	if err != nil {
+		return nil, fmt.Errorf("read region error: %s", err.Error())
 	}
+
 	return &Token{
 		Token:        role.SecurityToken,
 		Region:       region,
@@ -298,22 +300,66 @@ type ServiceToken struct {
 }
 
 func (f *ServiceToken) NextToken() (*Token, error) {
+	key, secret, err := loadAK()
+	if err != nil {
+		return nil, err
+	}
 	status := <-cmd.NewCmd(
 		filepath.Join(f.execpath, "servicetoken"),
-		fmt.Sprintf("--uid=%s", f.svcak.UID),
-		fmt.Sprintf("--key=%s", f.svcak.AccessKey),
-		fmt.Sprintf("--secret=%s", f.svcak.AccessSecret),
+		fmt.Sprintf("--uid=%s", ctrlCtx.CloudCFG.Global.UID),
+		fmt.Sprintf("--key=%s", key),
+		fmt.Sprintf("--secret=%s", secret),
 		fmt.Sprintf("--region=%s", f.svcak.Region),
 	).Start()
 	if status.Error != nil {
 		return nil, fmt.Errorf("invoke servicetoken: %s", status.Error.Error())
 	}
 	token := &Token{Region: f.svcak.Region}
-	err := json.Unmarshal(
-		[]byte(strings.Join(status.Stdout, "")), token,
-	)
-	if err == nil {
-		return token, nil
+	if err = json.Unmarshal([]byte(strings.Join(status.Stdout, "")), token); err != nil {
+		return nil, fmt.Errorf("unmarshal Token error: %s, %s, %s", err.Error(), status.Stdout, status.Stderr)
 	}
-	return nil, fmt.Errorf("unmarshal Token: %s, %s, %s", err.Error(), status.Stdout, status.Stderr)
+
+	return token, nil
+}
+
+func loadCloudCFG() error {
+	content, err := ioutil.ReadFile(ctrlCtx.ControllerCFG.CloudConfig)
+	if err != nil {
+		return fmt.Errorf("read cloud config error: %s ", err.Error())
+	}
+	return yaml.Unmarshal(content, ctrlCtx.CloudCFG)
+}
+
+func loadAK() (string, string, error) {
+	var keyId, keySecret string
+	log.V(5).Info(fmt.Sprintf("load cfg from file: %s", ctrlCtx.ControllerCFG.CloudConfig))
+	if err := loadCloudCFG(); err != nil {
+		return "", "", fmt.Errorf("load cloud config %s error: %v",
+			ctrlCtx.ControllerCFG.CloudConfig, err.Error())
+	}
+
+	if ctrlCtx.CloudCFG.Global.AccessKeyID != "" && ctrlCtx.CloudCFG.Global.AccessKeySecret != "" {
+		key, err := base64.StdEncoding.DecodeString(ctrlCtx.CloudCFG.Global.AccessKeyID)
+		if err != nil {
+			return "", "", err
+		}
+		keyId = string(key)
+		secret, err := base64.StdEncoding.DecodeString(ctrlCtx.CloudCFG.Global.AccessKeySecret)
+		if err != nil {
+			return "", "", err
+		}
+		keySecret = string(secret)
+	}
+
+	if keyId == "" || keySecret == "" {
+		log.V(5).Info("LoadAK: cloud config does not have keyId or keySecret. " +
+			"try environment ACCESS_KEY_ID ACCESS_KEY_SECRET")
+		keyId = os.Getenv("ACCESS_KEY_ID")
+		keySecret = os.Getenv("ACCESS_KEY_SECRET")
+		if keyId == "" || keySecret == "" {
+			return "", "", fmt.Errorf("cloud config and env do not have keyId or keySecret, load AK failed")
+		}
+	}
+
+	return keyId, keySecret, nil
 }

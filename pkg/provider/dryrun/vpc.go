@@ -9,14 +9,14 @@ import (
 )
 
 func NewDryRunVPC(
-	auth *base.ClientAuth,
+	auth *base.ClientMgr,
 	vpc *vpc.VPCProvider,
 ) *DryRunVPC {
 	return &DryRunVPC{auth: auth, vpc: vpc}
 }
 
 type DryRunVPC struct {
-	auth        *base.ClientAuth
+	auth        *base.ClientMgr
 	vpc         *vpc.VPCProvider
 	routetables []string
 }

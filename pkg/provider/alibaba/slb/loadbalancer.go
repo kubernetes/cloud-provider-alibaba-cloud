@@ -17,7 +17,7 @@ import (
 )
 
 func NewLBProvider(
-	auth *base.ClientAuth,
+	auth *base.ClientMgr,
 ) *SLBProvider {
 	return &SLBProvider{auth: auth}
 }
@@ -25,7 +25,7 @@ func NewLBProvider(
 var _ prvd.ILoadBalancer = &SLBProvider{}
 
 type SLBProvider struct {
-	auth *base.ClientAuth
+	auth *base.ClientMgr
 }
 
 func (p SLBProvider) FindLoadBalancer(ctx context.Context, mdl *model.LoadBalancer) error {

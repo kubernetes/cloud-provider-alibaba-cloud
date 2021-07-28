@@ -17,7 +17,7 @@ import (
 )
 
 func NewEcsProvider(
-	auth *base.ClientAuth,
+	auth *base.ClientMgr,
 ) *EcsProvider {
 	return &EcsProvider{auth: auth}
 }
@@ -25,7 +25,7 @@ func NewEcsProvider(
 var _ prvd.IInstance = &EcsProvider{}
 
 type EcsProvider struct {
-	auth *base.ClientAuth
+	auth *base.ClientMgr
 }
 
 func (e *EcsProvider) ListInstances(ctx *node.NodeContext, ids []string) (map[string]*prvd.NodeAttribute, error) {

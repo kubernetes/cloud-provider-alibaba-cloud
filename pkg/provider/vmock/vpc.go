@@ -9,13 +9,13 @@ import (
 )
 
 func NewMockVPC(
-	auth *base.ClientAuth,
+	auth *base.ClientMgr,
 ) *MockVPC {
 	return &MockVPC{auth: auth}
 }
 
 type MockVPC struct {
-	auth        *base.ClientAuth
+	auth        *base.ClientMgr
 }
 
 func (m *MockVPC) CreateRoute(ctx context.Context, table string, provideID string, destinationCIDR string) (*model.Route, error) {

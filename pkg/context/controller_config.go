@@ -15,11 +15,13 @@ const (
 	flagConfigureCloudRoutes           = "configure-cloud-routes"
 	flagClusterCidr                    = "cluster-cidr"
 	flagRouteReconciliationPeriod      = "route-reconciliation-period"
+	flagNetwork                        = "network"
 
 	defaultLogLevel                  = 3
 	defaultMaxConcurrentReconciles   = 3
 	defaultCloudConfig               = ""
 	defaultRouteReconciliationPeriod = 5 * time.Minute
+	defaultNetwork                   = "vpc"
 )
 
 var ControllerCFG = &ControllerConfig{}
@@ -31,6 +33,7 @@ type ControllerConfig struct {
 	EnableControllers              []string
 	DryRun                         bool
 	CloudConfig                    string
+	NetWork                        string
 	//For Flannel Network
 	ConfigureCloudRoutes      bool
 	ClusterCidr               string
@@ -49,6 +52,7 @@ func (cfg *ControllerConfig) BindFlags(fs *pflag.FlagSet) {
 	fs.BoolVar(&cfg.DryRun, flagDryRun, false, "whether to perform a dry run")
 	fs.StringVar(&cfg.CloudConfig, flagCloudConfig, defaultCloudConfig,
 		"Path to the cloud provider configuration file. Empty string for no configuration file.")
+	fs.StringVar(&cfg.NetWork, flagNetwork, defaultNetwork, "Set network type for controller.")
 	fs.BoolVar(&cfg.ConfigureCloudRoutes, flagConfigureCloudRoutes, false, "Enable configure cloud routes.")
 	fs.StringVar(&cfg.ClusterCidr, flagClusterCidr, "", "CIDR Range for Pods in cluster.")
 	fs.DurationVar(&cfg.RouteReconciliationPeriod,

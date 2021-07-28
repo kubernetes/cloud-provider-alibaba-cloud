@@ -93,7 +93,7 @@ func TestEcsProvider_ListInstances(t *testing.T) {
 		"cn-shanghai.i-uf6jf9j3ltkgq49p1jy",
 	}
 
-	ecsProvider := NewEcsProvider(&base.ClientAuth{
+	ecsProvider := NewEcsProvider(&base.ClientMgr{
 		Meta: nil,
 		ECS:  client,
 		VPC:  nil,

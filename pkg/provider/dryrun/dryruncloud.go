@@ -12,7 +12,7 @@ import (
 )
 
 func NewDryRunCloud() prvd.Provider {
-	auth, err := base.NewClientAuth()
+	auth, err := base.NewClientMgr()
 	if err != nil {
 		log.Warnf("initialize alibaba cloud client auth: %s", err.Error())
 	}

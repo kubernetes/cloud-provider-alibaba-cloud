@@ -13,13 +13,13 @@ import (
 	"alibaba:DeleteInstance", "alibaba:RunCommand",
 */
 func NewMockECS(
-	auth *base.ClientAuth,
+	auth *base.ClientMgr,
 ) *MockECS {
 	return &MockECS{auth: auth}
 }
 
 type MockECS struct {
-	auth *base.ClientAuth
+	auth *base.ClientMgr
 }
 
 var _ prvd.IInstance = &MockECS{}
