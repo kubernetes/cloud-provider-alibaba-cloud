@@ -830,7 +830,7 @@ func isNeedUpdate(reqCtx *RequestContext, local model.ListenerAttribute, remote 
 	}
 
 	reqCtx.Ctx = context.WithValue(reqCtx.Ctx, dryrun.ContextMessage, updateDetail)
-	reqCtx.Log.Info(fmt.Sprintf("%d listener update: %s", local.ListenerPort, updateDetail))
+	reqCtx.Log.Info(fmt.Sprintf("try to update listener %d, detail %s", local.ListenerPort, updateDetail))
 	return needUpdate, update
 }
 

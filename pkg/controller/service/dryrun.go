@@ -30,7 +30,7 @@ func initMap(client client.Client) {
 			continue
 		}
 		length++
-		initial.Store(util.Key(&m), 0)
+		initial.Store(util.NamespacedName(&m).String(), 0)
 	}
 	util.ServiceLog.Info("ccm initial process finished.", "length", length)
 	if length == 0 {

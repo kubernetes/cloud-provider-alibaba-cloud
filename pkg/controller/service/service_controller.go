@@ -138,11 +138,10 @@ type RequestContext struct {
 	Recorder record.EventRecorder
 }
 
-func (m *ReconcileService) reconcile(request reconcile.Request) error {
-
+func (m *ReconcileService) reconcile(request reconcile.Request) (err error) {
 	defer func() {
 		if ctrlCtx.ControllerCFG.DryRun {
-			initial.Store(request, 1)
+			initial.Store(request.String(), 1)
 			if mapfull() {
 				util.ServiceLog.Info("ccm initial process finished.")
 				err := dryrun.ResultEvent(m.kubeClient, dryrun.SUCCESS, "ccm initial process finished")
@@ -151,11 +150,12 @@ func (m *ReconcileService) reconcile(request reconcile.Request) error {
 				}
 				os.Exit(0)
 			}
+			err = nil
 		}
 	}()
 
 	svc := &v1.Service{}
-	err := m.kubeClient.Get(context.Background(), request.NamespacedName, svc)
+	err = m.kubeClient.Get(context.Background(), request.NamespacedName, svc)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			util.ServiceLog.Info("service not found, skip", "service", request.NamespacedName)
