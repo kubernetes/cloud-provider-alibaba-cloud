@@ -141,7 +141,7 @@ func (m *ModelApplier) applyVGroups(reqCtx *RequestContext, local *model.LoadBal
 		found := false
 		var old model.VServerGroup
 		for _, rv := range remote.VServerGroups {
-			// find by vgroup id first
+			// for reuse vgroup case, find by vgroup id first
 			if local.VServerGroups[i].VGroupId != "" &&
 				local.VServerGroups[i].VGroupId == rv.VGroupId {
 				found = true
@@ -159,6 +159,8 @@ func (m *ModelApplier) applyVGroups(reqCtx *RequestContext, local *model.LoadBal
 
 		// update
 		if found {
+			reqCtx.Log.Info(fmt.Sprintf("try to update vgroup %s, VGroupId %s", local.VServerGroups[i].VGroupName,
+				local.VServerGroups[i].VGroupId))
 			if err := m.vGroupMgr.UpdateVServerGroup(reqCtx, local.VServerGroups[i], old); err != nil {
 				return fmt.Errorf("EnsureVGroupUpdated error: %s", err.Error())
 			}
@@ -166,6 +168,7 @@ func (m *ModelApplier) applyVGroups(reqCtx *RequestContext, local *model.LoadBal
 
 		// create
 		if !found {
+			reqCtx.Log.Info(fmt.Sprintf("try to create vgroup %s", local.VServerGroups[i].VGroupName))
 			err := m.vGroupMgr.CreateVServerGroup(reqCtx, &local.VServerGroups[i], remote.LoadBalancerAttribute.LoadBalancerId)
 			if err != nil {
 				return fmt.Errorf("EnsureVGroupCreated error: %s", err.Error())
@@ -240,11 +243,6 @@ func (m *ModelApplier) cleanup(reqCtx *RequestContext, local *model.LoadBalancer
 	// clean up vServerGroup
 	vgs := remote.VServerGroups
 	for _, vg := range vgs {
-		if !isVGroupManagedByMyService(vg, reqCtx.Service) {
-			reqCtx.Log.Info(fmt.Sprintf("delete vgroup: [%s] description [%s] is managed by user, skip delete",
-				vg.VGroupName, vg.VGroupId))
-			continue
-		}
 		found := false
 		for _, l := range local.VServerGroups {
 			if vg.VGroupId == l.VGroupId {
@@ -252,7 +250,27 @@ func (m *ModelApplier) cleanup(reqCtx *RequestContext, local *model.LoadBalancer
 				break
 			}
 		}
+
+		// delete unused vgroup
 		if !found {
+			// do not delete user managed vgroup, but need to clean the backends in the vgroup
+			if !isVGroupManagedByMyService(vg, reqCtx.Service) {
+				reqCtx.Log.Info(fmt.Sprintf("try to delete vgroup: [%s] description [%s] is managed by user, skip delete",
+					vg.VGroupName, vg.VGroupId))
+				var del []model.BackendAttribute
+				for _, remote := range vg.Backends {
+					if isBackendManagedByMyService(reqCtx, remote, "") {
+						del = append(del, remote)
+					}
+				}
+				if len(del) > 0 {
+					if err := m.vGroupMgr.BatchRemoveVServerGroupBackendServers(reqCtx, vg, del); err != nil {
+						return err
+					}
+				}
+				continue
+			}
+
 			reqCtx.Log.Info(fmt.Sprintf("delete vgroup: [%s], [%s]", vg.NamedKey.Key(), vg.VGroupId))
 			err := m.vGroupMgr.DeleteVServerGroup(reqCtx, vg.VGroupId)
 			if err != nil {

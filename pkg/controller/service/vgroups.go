@@ -80,6 +80,13 @@ func (mgr *VGroupManager) BuildLocalModel(reqCtx *RequestContext, m *model.LoadB
 	if err != nil {
 		return fmt.Errorf("get endpoints error: %s", err.Error())
 	}
+	var epAddrList []string
+	for _, subSet := range eps.Subsets {
+		for _, addr := range subSet.Addresses {
+			epAddrList = append(epAddrList, addr.IP)
+		}
+	}
+	reqCtx.Log.Info("backend details", "endpoints", strings.Join(epAddrList, ","))
 
 	candidates := &EndpointWithENI{
 		Nodes:     nodes,
@@ -118,7 +125,7 @@ func (mgr *VGroupManager) DeleteVServerGroup(reqCtx *RequestContext, vGroupId st
 }
 
 func (mgr *VGroupManager) UpdateVServerGroup(reqCtx *RequestContext, local, remote model.VServerGroup) error {
-	add, del, update := diff(remote, local)
+	add, del, update := diff(reqCtx, remote, local)
 	if len(add) == 0 && len(del) == 0 && len(update) == 0 {
 		reqCtx.Log.Info(fmt.Sprintf("update vgroup [%s]: no change, skip reconcile", remote.VGroupId))
 	}
@@ -178,7 +185,7 @@ func (mgr *VGroupManager) BatchUpdateVServerGroupBackendServers(reqCtx *RequestC
 		})
 }
 
-func diff(remote, local model.VServerGroup) (
+func diff(reqCtx *RequestContext, remote, local model.VServerGroup) (
 	[]model.BackendAttribute, []model.BackendAttribute, []model.BackendAttribute) {
 
 	var (
@@ -188,7 +195,7 @@ func diff(remote, local model.VServerGroup) (
 	)
 
 	for _, r := range remote.Backends {
-		if !isBackendManagedByMyService(r, local) {
+		if !isBackendManagedByMyService(reqCtx, r, local.VGroupName) {
 			continue
 		}
 		found := false
@@ -234,7 +241,7 @@ func diff(remote, local model.VServerGroup) (
 	}
 	for _, l := range local.Backends {
 		for _, r := range remote.Backends {
-			if !isBackendManagedByMyService(r, local) {
+			if !isBackendManagedByMyService(reqCtx, r, local.VGroupName) {
 				continue
 			}
 			if l.Type == "eni" {
@@ -256,8 +263,21 @@ func diff(remote, local model.VServerGroup) (
 	return addition, deletions, updates
 }
 
-func isBackendManagedByMyService(remoteBackend model.BackendAttribute, local model.VServerGroup) bool {
-	return remoteBackend.Description == local.VGroupName
+func isBackendManagedByMyService(reqCtx *RequestContext, remoteBackend model.BackendAttribute, localVGroupName string) bool {
+	if localVGroupName != "" {
+		return remoteBackend.Description == localVGroupName
+	}
+
+	namedKey, err := model.LoadVGroupNamedKey(remoteBackend.Description)
+	if err != nil {
+		reqCtx.Log.V(5).Info(fmt.Sprintf("warning: %s description %s which is managed by user, skip delete",
+			remoteBackend.ServerId, remoteBackend.Description))
+		return false
+	}
+
+	return namedKey.ServiceName == reqCtx.Service.Name &&
+		namedKey.Namespace == reqCtx.Service.Namespace &&
+		namedKey.CID == base.CLUSTER_ID
 }
 
 func isVGroupManagedByMyService(remote model.VServerGroup, service *v1.Service) bool {
@@ -329,20 +349,15 @@ func needExcludeFromLB(reqCtx *RequestContext, node *v1.Node) bool {
 	// need to keep the node who has exclude label in order to be compatible with vk node
 	// It's safe because these nodes will be filtered in build backends func
 
-	// exclude node which has exclude balancer label
-	if _, exclude := node.Labels[LabelNodeExcludeBalancer]; exclude {
-		return true
-	}
-
 	if isMasterNode(node) {
-		klog.Infof("[%s] node %s is master node, skip adding it to lb", util.Key(reqCtx.Service), node.Name)
+		klog.V(5).Infof("[%s] node %s is master node, skip adding it to lb", util.Key(reqCtx.Service), node.Name)
 		return true
 	}
 
 	// filter unscheduled node
 	if node.Spec.Unschedulable && reqCtx.Anno.Get(RemoveUnscheduled) != "" {
 		if reqCtx.Anno.Get(RemoveUnscheduled) == string(model.OnFlag) {
-			klog.Infof("[%s] node %s is unschedulable, skip adding to lb", util.Key(reqCtx.Service), node.Name)
+			reqCtx.Log.Info("node is unschedulable, skip add to lb", "node", node.Name)
 			return true
 		}
 	}
@@ -355,6 +370,7 @@ func needExcludeFromLB(reqCtx *RequestContext, node *v1.Node) bool {
 
 	// If we have no info, don't accept
 	if len(node.Status.Conditions) == 0 {
+		reqCtx.Log.Info("node condition is nil, skip add to lb", "node", node.Name)
 		return true
 	}
 
@@ -363,8 +379,8 @@ func needExcludeFromLB(reqCtx *RequestContext, node *v1.Node) bool {
 		// condition status is ConditionTrue
 		if cond.Type == v1.NodeReady &&
 			cond.Status != v1.ConditionTrue {
-			klog.Infof("[%s] node %v with %v condition "+
-				"status %v", util.Key(reqCtx.Service), node.Name, cond.Type, cond.Status)
+			reqCtx.Log.Info(fmt.Sprintf("node not ready with %v condition, status %v", cond.Type, cond.Status),
+				"node", node.Name)
 			return true
 		}
 	}
@@ -404,6 +420,12 @@ func (mgr *VGroupManager) buildVGroupForServicePort(reqCtx *RequestContext, port
 		w, err := strconv.Atoi(reqCtx.Anno.Get(VGroupWeight))
 		if err != nil {
 			return vg, fmt.Errorf("weight must be integer, got [%s], error: %s", reqCtx.Anno.Get(VGroupWeight), err.Error())
+		}
+		if w < 0 {
+			w = 0
+		}
+		if w > 100 {
+			w = 100
 		}
 		vg.VGroupWeight = w
 	}
@@ -517,13 +539,14 @@ func (mgr *VGroupManager) buildLocalBackends(reqCtx *RequestContext, candidates 
 			continue
 		}
 
-		// check if the node is VK
+		// check if the node is virtual node, virtual node add as eci backend
 		if node.Labels["type"] == LabelNodeTypeVK {
 			eciBackends = append(eciBackends, backend)
 			continue
 		}
 
-		if helper.HasExcludeLabel(node) {
+		if isNodeExcludeFromLoadBalancer(node) {
+			reqCtx.Log.Info("node has exclude label which cannot be added to lb backend", "node", node.Name)
 			continue
 		}
 
@@ -585,7 +608,8 @@ func (mgr *VGroupManager) buildClusterBackends(reqCtx *RequestContext, candidate
 
 	// 1. add ecs backends. add all cluster nodes.
 	for _, node := range candidates.Nodes {
-		if helper.HasExcludeLabel(&node) {
+		if isNodeExcludeFromLoadBalancer(&node) {
+			reqCtx.Log.Info("node has exclude label which cannot be added to lb backend", "node", node.Name)
 			continue
 		}
 		_, id, err := nodeFromProviderID(node.Spec.ProviderID)

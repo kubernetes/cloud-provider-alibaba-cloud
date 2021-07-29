@@ -336,7 +336,7 @@ var _ predicate.Predicate = (*predicateForNodeEvent)(nil)
 
 func (p *predicateForNodeEvent) Create(e event.CreateEvent) bool {
 	node, ok := e.Object.(*v1.Node)
-	if ok && !isExcludeNode(node) {
+	if ok && !canNodeSkipEventHandler(node) {
 		util.ServiceLog.Info("controller: node create event", "node", node.Name)
 		return true
 	}
@@ -358,7 +358,7 @@ func (p *predicateForNodeEvent) Update(e event.UpdateEvent) bool {
 
 func (p *predicateForNodeEvent) Delete(e event.DeleteEvent) bool {
 	node, ok := e.Object.(*v1.Node)
-	if ok && !isExcludeNode(node) {
+	if ok && !canNodeSkipEventHandler(node) {
 		util.ServiceLog.Info("controller: node delete event", "node", node.Name)
 		return true
 	}

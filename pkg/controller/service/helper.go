@@ -46,7 +46,7 @@ func nodeFromProviderID(providerID string) (string, string, error) {
 }
 
 // only for node event
-func isExcludeNode(node *v1.Node) bool {
+func canNodeSkipEventHandler(node *v1.Node) bool {
 	if node == nil || node.Labels == nil {
 		return false
 	}
@@ -83,6 +83,17 @@ func isENIBackendType(svc *v1.Service) bool {
 	}
 
 	return ctrlCtx.CloudCFG.Global.ServiceBackendType == model.ENIBackendType
+}
+
+func isNodeExcludeFromLoadBalancer(node *v1.Node) bool {
+	if _, exclude := node.Labels[LabelNodeExcludeBalancer]; exclude {
+		return true
+	}
+
+	if helper.HasExcludeLabel(node) {
+		return true
+	}
+	return false
 }
 
 func needDeleteLoadBalancer(svc *v1.Service) bool {
