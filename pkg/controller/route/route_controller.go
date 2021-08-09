@@ -192,9 +192,9 @@ func (r *ReconcileRoute) addRouteForNode(ctx context.Context, table, ipv4Cidr, p
 		route, err = createRouteForInstance(ctx, table, prvdId, ipv4Cidr, r.cloud)
 		if err != nil {
 			klog.Errorf("error add route for instance: %v, %v, %v", prvdId, table, err)
-			r.record.Eventf(node, corev1.EventTypeWarning, "CreateRouteFailed", "Create Route Failed for %s reason: %s", table, err)
+			r.record.Eventf(node, corev1.EventTypeWarning, helper.FailedCreateRoute, "Create route entry in %s failed, reason: %s", table, err)
 		} else {
-			r.record.Eventf(node, corev1.EventTypeNormal, "CreatedRoute", "Created route for %s with %s -> %s successfully", table, node.Name, ipv4Cidr)
+			r.record.Eventf(node, corev1.EventTypeNormal, helper.SucceedCreateRoute, "Created route for %s with %s -> %s successfully", table, node.Name, ipv4Cidr)
 		}
 	}
 	if route != nil {
@@ -264,6 +264,10 @@ func (r *ReconcileRoute) reconcileForCluster() {
 		err := r.syncTableRoutes(ctx, table, nodes)
 		if err != nil {
 			klog.Errorf("reconcile route for table [%s] error: %s", table, err.Error())
+			if len(nodes.Items) > 0 {
+				refNode := nodes.Items[0]
+				r.record.Eventf(&refNode, corev1.EventTypeNormal, helper.FailedSyncRoute, "Sync route for table %s error", table, refNode.Name)
+			}
 		}
 	}
 	metric.RouteLatency.WithLabelValues("reconcile").Observe(metric.MsSince(start))

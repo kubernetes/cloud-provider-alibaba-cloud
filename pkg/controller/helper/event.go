@@ -23,7 +23,7 @@ const (
 //NodeEventReason
 const (
 	FailedDeleteNode  = "DeleteNodeFailed"
-	FailedAddonNode   = "AddNodeFailed"
+	FailedAddNode   = "AddNodeFailed"
 	FailedSyncNode    = "SyncNodeFailed"
 	SucceedDeleteNode = "DeletedNode"
 	InitializedNode   = "InitializedNode"

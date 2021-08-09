@@ -7,6 +7,7 @@ import (
 	"github.com/go-logr/logr"
 	"golang.org/x/time/rate"
 	"k8s.io/client-go/util/workqueue"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/util/metric"
 	"os"
 	"strings"
 	"time"
@@ -139,6 +140,8 @@ type RequestContext struct {
 }
 
 func (m *ReconcileService) reconcile(request reconcile.Request) (err error) {
+	startTime := time.Now()
+
 	defer func() {
 		if ctrlCtx.ControllerCFG.DryRun {
 			initial.Store(request.String(), 1)
@@ -206,6 +209,8 @@ func (m *ReconcileService) reconcile(request reconcile.Request) (err error) {
 	}
 
 	reqContext.Log.Info("successfully reconcile")
+	metric.SLBLatency.WithLabelValues("reconcile").Observe(metric.MsSince(startTime))
+
 	return nil
 }
 

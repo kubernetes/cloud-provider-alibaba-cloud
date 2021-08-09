@@ -12,6 +12,7 @@ import (
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/context/shared"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/helper"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/util/metric"
 	"k8s.io/klog"
 	"k8s.io/klog/klogr"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
@@ -123,6 +124,7 @@ func (m *ReconcileNode) syncCloudNode(node *corev1.Node) error {
 
 // This processes nodes that were added into the cluster, and cloud initialize them if appropriate
 func (m *ReconcileNode) doAddCloudNode(node *corev1.Node) error {
+	start := time.Now()
 	prvdId := node.Spec.ProviderID
 	if prvdId == "" {
 		log.Info(fmt.Sprintf("warning: provider id not exist, skip %s initialize", node.Name))
@@ -180,18 +182,14 @@ func (m *ReconcileNode) doAddCloudNode(node *corev1.Node) error {
 
 	err = wait.PollImmediate(2*time.Second, 20*time.Second, initializer)
 	if err != nil {
-		m.record.Eventf(
-			node, corev1.EventTypeWarning, "AddNodeFailed", err.Error(),
-		)
-
+		m.record.Eventf(node, corev1.EventTypeWarning, helper.FailedAddNode, err.Error(), )
 		return fmt.Errorf("doAddCloudNode %s error: %s", node.Name, err.Error())
 	}
 
-	m.record.Eventf(
-		node, corev1.EventTypeNormal, "InitializedNode", "Initialize node successfully",
-	)
-
+	m.record.Eventf(node, corev1.EventTypeNormal, helper.InitializedNode, "Initialize node successfully", )
+	metric.NodeLatency.WithLabelValues("remove_taint").Observe(metric.MsSince(start))
 	log.Info("Successfully initialized node", "node", node.Name)
+
 	return nil
 }
 
@@ -233,7 +231,7 @@ func (m *ReconcileNode) syncNodeAddress(nodes []corev1.Node) error {
 		if err != nil {
 			log.Error(err, "patch node address error, wait for next retry", "node", node.Name)
 			m.record.Eventf(
-				node, corev1.EventTypeWarning, "SyncNodeFailed", err.Error(),
+				node, corev1.EventTypeWarning, helper.FailedSyncNode, err.Error(),
 			)
 		}
 

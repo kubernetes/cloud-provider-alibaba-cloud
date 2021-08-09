@@ -8,6 +8,7 @@ import (
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/pvtz"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/slb"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/vpc"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/util/metric"
 	"k8s.io/klog"
 )
 
@@ -23,6 +24,9 @@ func NewAlibabaCloud() prvd.Provider {
 	if err != nil {
 		klog.Warningf("refresh token: %s", err.Error())
 	}
+
+	metric.RegisterPrometheus()
+
 	return &AlibabaCloud{
 		IMetaData:    mgr.Meta,
 		EcsProvider:  ecs.NewEcsProvider(mgr),
