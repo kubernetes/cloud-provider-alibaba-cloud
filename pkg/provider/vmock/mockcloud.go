@@ -6,7 +6,7 @@ import (
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/base"
 )
 
-func NewMockCloud(auth *base.ClientAuth) prvd.Provider {
+func NewMockCloud(auth *base.ClientMgr) prvd.Provider {
 
 	return &MockCloud{
 		IMetaData: auth.Meta,

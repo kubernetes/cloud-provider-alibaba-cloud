@@ -6,7 +6,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/client-go/tools/leaderelection/resourcelock"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/helper"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/util"
@@ -45,7 +45,7 @@ func (m *MapEnqueue) FanIN(o client.Object) []reconcile.Request {
 	default:
 		util.ServiceLog.Info(fmt.Sprintf("warning: unknown object: %s, %v", reflect.TypeOf(o), o))
 	}
-	return dropLeaseEndpoint(request)
+	return request
 }
 
 func (m *MapEnqueue) mapNode(o *v1.Node) []reconcile.Request {
@@ -96,28 +96,6 @@ func (m *MapEnqueue) mapService(o *v1.Service) []reconcile.Request {
 func (m *MapEnqueue) InjectClient(c client.Client) error {
 	m.client = c
 	return nil
-}
-
-func dropLeaseEndpoint(req []reconcile.Request) []reconcile.Request {
-
-	var reqs []reconcile.Request
-	for _, r := range req {
-		if isLeaseEndpoint(r.String()) {
-			continue
-		}
-		reqs = append(reqs, r)
-	}
-	return reqs
-}
-
-func isLeaseEndpoint(epNamespacedName string) bool {
-	e := sets.Empty{}
-	avoid := sets.String{
-		"kube-system/kube-scheduler":          e,
-		"kube-system/ccm":                     e,
-		"kube-system/kube-controller-manager": e,
-	}
-	return avoid.Has(epNamespacedName)
 }
 
 // PredicateForServiceEvent, filter service event
@@ -295,6 +273,13 @@ func isEndpointProcessNeeded(ep *v1.Endpoints, client client.Client) bool {
 		return false
 	}
 
+	if len(ep.Annotations) != 0 {
+		// skip eps which are used for leader election
+		if _, ok := ep.Annotations[resourcelock.LeaderElectionRecordAnnotationKey]; ok {
+			return false
+		}
+	}
+
 	svc := &v1.Service{}
 	err := client.Get(context.TODO(),
 		types.NamespacedName{
@@ -302,7 +287,7 @@ func isEndpointProcessNeeded(ep *v1.Endpoints, client client.Client) bool {
 			Name:      ep.GetName(),
 		}, svc)
 	if err != nil {
-		if apierrors.IsNotFound(err) && !isLeaseEndpoint(util.NamespacedName(ep).String()) {
+		if apierrors.IsNotFound(err) {
 			util.ServiceLog.Error(err, "fail to get service, skip reconcile", "service", util.Key(ep))
 		}
 		return false
@@ -336,7 +321,7 @@ var _ predicate.Predicate = (*predicateForNodeEvent)(nil)
 
 func (p *predicateForNodeEvent) Create(e event.CreateEvent) bool {
 	node, ok := e.Object.(*v1.Node)
-	if ok && !isExcludeNode(node) {
+	if ok && !canNodeSkipEventHandler(node) {
 		util.ServiceLog.Info("controller: node create event", "node", node.Name)
 		return true
 	}
@@ -346,19 +331,24 @@ func (p *predicateForNodeEvent) Create(e event.CreateEvent) bool {
 func (p *predicateForNodeEvent) Update(e event.UpdateEvent) bool {
 	oldNode, ok1 := e.ObjectOld.(*v1.Node)
 	newNode, ok2 := e.ObjectNew.(*v1.Node)
-	if ok1 && ok2 &&
-		nodeSpecChanged(oldNode, newNode) {
-		// label and schedulable changed .
-		// status healthy should be considered
-		util.ServiceLog.Info("controller: node update event", "node", oldNode.Name)
-		return true
+
+	if ok1 && ok2 {
+		if canNodeSkipEventHandler(oldNode) && canNodeSkipEventHandler(newNode) {
+			return false
+		}
+
+		//if node label and schedulable condition changed, need to reconcile svc
+		if nodeSpecChanged(oldNode, newNode) {
+			util.ServiceLog.Info("controller: node update event", "node", oldNode.Name)
+			return true
+		}
 	}
 	return false
 }
 
 func (p *predicateForNodeEvent) Delete(e event.DeleteEvent) bool {
 	node, ok := e.Object.(*v1.Node)
-	if ok && !isExcludeNode(node) {
+	if ok && !canNodeSkipEventHandler(node) {
 		util.ServiceLog.Info("controller: node delete event", "node", node.Name)
 		return true
 	}
@@ -375,7 +365,7 @@ func nodeSpecChanged(oldNode, newNode *v1.Node) bool {
 	}
 	if oldNode.Spec.Unschedulable != newNode.Spec.Unschedulable {
 		util.ServiceLog.Info(fmt.Sprintf(
-			"node spec changed: %s, from=%t, to=%t",
+			"node changed: %s, spec from=%t, to=%t",
 			oldNode.Name, oldNode.Spec.Unschedulable, newNode.Spec.Unschedulable),
 			"node", oldNode.Name)
 		return true
@@ -388,7 +378,7 @@ func nodeSpecChanged(oldNode, newNode *v1.Node) bool {
 
 func nodeConditionChanged(name string, oldC, newC []v1.NodeCondition) bool {
 	if len(oldC) != len(newC) {
-		util.ServiceLog.Info(fmt.Sprintf("node condition changed: length not equal, from=%v, to=%v", oldC, newC),
+		util.ServiceLog.Info(fmt.Sprintf("node changed:  condition length not equal, from=%v, to=%v", oldC, newC),
 			"node", name)
 		return true
 	}
@@ -405,7 +395,7 @@ func nodeConditionChanged(name string, oldC, newC []v1.NodeCondition) bool {
 		if oldC[i].Type != newC[i].Type ||
 			oldC[i].Status != newC[i].Status {
 			util.ServiceLog.Info(
-				fmt.Sprintf("node condition changed: type(%s,%s) | status(%s,%s)",
+				fmt.Sprintf("node changed: condition type(%s,%s) | status(%s,%s)",
 					oldC[i].Type, newC[i].Type, oldC[i].Status, newC[i].Status),
 				"node", name)
 			return true
@@ -416,13 +406,13 @@ func nodeConditionChanged(name string, oldC, newC []v1.NodeCondition) bool {
 
 func nodeLabelsChanged(nodeName string, oldL, newL map[string]string) bool {
 	if len(oldL) != len(newL) {
-		util.ServiceLog.Info(fmt.Sprintf("node label changed: size not equal, from=%v, to=%v", oldL, newL),
+		util.ServiceLog.Info(fmt.Sprintf("node changed: label size not equal, from=%v, to=%v", oldL, newL),
 			"node", nodeName)
 		return true
 	}
 	for k, v := range oldL {
 		if newL[k] != v {
-			util.ServiceLog.Info(fmt.Sprintf("node label changed: key=%s, value from=%v, to=%v",
+			util.ServiceLog.Info(fmt.Sprintf("node changed: label key=%s, value from=%v, to=%v",
 				k, oldL[k], newL[k]),
 				"node", nodeName)
 			return true

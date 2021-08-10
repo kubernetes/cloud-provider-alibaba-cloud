@@ -2,6 +2,7 @@ package metric
 
 import (
 	"github.com/prometheus/client_golang/prometheus"
+	"sigs.k8s.io/controller-runtime/pkg/metrics"
 	"time"
 )
 
@@ -46,7 +47,7 @@ func MsSince(start time.Time) float64 {
 
 // RegisterPrometheus register metrics to prometheus server
 func RegisterPrometheus() {
-	prometheus.MustRegister(RouteLatency)
-	prometheus.MustRegister(NodeLatency)
-	prometheus.MustRegister(SLBLatency)
+	metrics.Registry.MustRegister(RouteLatency)
+	metrics.Registry.MustRegister(NodeLatency)
+	metrics.Registry.MustRegister(SLBLatency)
 }

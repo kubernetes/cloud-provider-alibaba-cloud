@@ -39,11 +39,14 @@ func (p SLBProvider) CreateVServerGroup(ctx context.Context, vg *model.VServerGr
 	req := slb.CreateCreateVServerGroupRequest()
 	req.LoadBalancerId = lbId
 	req.VServerGroupName = vg.VGroupName
-	backendJson, err := json.Marshal(vg.Backends)
-	if err != nil {
-		return err
+	if len(vg.Backends) != 0 {
+		backendJson, err := json.Marshal(vg.Backends)
+		if err != nil {
+			return err
+		}
+		req.BackendServers = string(backendJson)
 	}
-	req.BackendServers = string(backendJson)
+
 	resp, err := p.auth.SLB.CreateVServerGroup(req)
 	if err != nil {
 		return util.FormatErrorMessage(err)

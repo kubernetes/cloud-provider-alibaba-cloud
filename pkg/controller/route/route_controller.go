@@ -34,22 +34,13 @@ func Add(mgr manager.Manager, ctx *shared.SharedContext) error {
 // newReconciler returns a new reconcile.Reconciler
 func newReconciler(mgr manager.Manager, ctx *shared.SharedContext) reconcile.Reconciler {
 	recon := &ReconcileRoute{
-		cloud:        ctx.Provider(),
-		client:       mgr.GetClient(),
-		scheme:       mgr.GetScheme(),
-		record:       mgr.GetEventRecorderFor("Route"),
-		nodeCache:    cmap.New(),
-		configRoutes:  ctrlCtx.ControllerCFG.RuntimeConfig.ConfigureCloudRoutes,
-	}
-
-	if  ctrlCtx.CloudCFG.Global.RouteReconciliationPeriod != "" {
-		duration, err := time.ParseDuration( ctrlCtx.CloudCFG.Global.RouteReconciliationPeriod)
-		if err == nil || duration != 0 {
-			recon.reconcilePeriod = duration
-		}
-	}
-	if recon.reconcilePeriod == 0 {
-		recon.reconcilePeriod = 5 * time.Minute
+		cloud:           ctx.Provider(),
+		client:          mgr.GetClient(),
+		scheme:          mgr.GetScheme(),
+		record:          mgr.GetEventRecorderFor("Route"),
+		nodeCache:       cmap.New(),
+		configRoutes:    ctrlCtx.ControllerCFG.ConfigureCloudRoutes,
+		reconcilePeriod: ctrlCtx.ControllerCFG.RouteReconciliationPeriod,
 	}
 
 	if recon.configRoutes {
@@ -139,20 +130,25 @@ func (r *ReconcileRoute) Reconcile(ctx context.Context, request reconcile.Reques
 }
 
 func (r *ReconcileRoute) syncCloudRoute(ctx context.Context, node *corev1.Node) error {
-	klog.Infof("sync routes for node: %v", node.Name)
-	if !r.configRoutes || helper.HasExcludeLabel(node) {
+	klog.Infof("try to sync routes for node: %v", node.Name)
+	if !r.configRoutes {
+		return nil
+	}
+
+	if helper.HasExcludeLabel(node) {
+		klog.Info("node %s has exclude label, skip creating route", node.Name)
 		return nil
 	}
 
 	readyCondition, ok := helper.FindCondition(node.Status.Conditions, corev1.NodeReady)
 	if ok && readyCondition.Status == corev1.ConditionUnknown {
-		klog.Infof("node %s is in unknown status.Skip creating route.", node.Name)
+		klog.Infof("node %s is in unknown status, skip creating route", node.Name)
 		return nil
 	}
 
 	prvdId := node.Spec.ProviderID
 	if prvdId == "" {
-		klog.Warningf("provider id not exist, skip %s route config", node.Name)
+		klog.Warningf("node %s provider id is not exist, skip creating route", node.Name)
 		return nil
 	}
 
@@ -200,10 +196,11 @@ func (r *ReconcileRoute) addRouteForNode(ctx context.Context, table, ipv4Cidr, p
 	if route == nil || route.DestinationCIDR != ipv4Cidr {
 		route, err = createRouteForInstance(ctx, table, prvdId, ipv4Cidr, r.cloud)
 		if err != nil {
-			klog.Errorf("error add route for instance: %v, %v, %v", prvdId, table, err)
-			r.record.Eventf(node, corev1.EventTypeWarning, "CreateRouteFailed", "Create Route Failed for %s reason: %s", table, err)
+			klog.Errorf("error create route for node %v : instance id [%v], route [%v], err: %s", node.Name, prvdId, table, err.Error())
+			r.record.Eventf(node, corev1.EventTypeWarning, helper.FailedCreateRoute, "Create route entry in %s failed, reason: %s", table, err)
 		} else {
-			r.record.Eventf(node, corev1.EventTypeNormal, "CreatedRoute", "Created route for %s with %s -> %s successfully", table, node.Name, ipv4Cidr)
+			klog.Infof("Created route for %s with %s -> %s successfully", table, node.Name, ipv4Cidr)
+			r.record.Eventf(node, corev1.EventTypeNormal, helper.SucceedCreateRoute, "Created route for %s with %s -> %s successfully", table, node.Name, ipv4Cidr)
 		}
 	}
 	if route != nil {
@@ -273,6 +270,10 @@ func (r *ReconcileRoute) reconcileForCluster() {
 		err := r.syncTableRoutes(ctx, table, nodes)
 		if err != nil {
 			klog.Errorf("reconcile route for table [%s] error: %s", table, err.Error())
+			if len(nodes.Items) > 0 {
+				refNode := nodes.Items[0]
+				r.record.Eventf(&refNode, corev1.EventTypeNormal, helper.FailedSyncRoute, "Sync route for table %s error", table, refNode.Name)
+			}
 		}
 	}
 	metric.RouteLatency.WithLabelValues("reconcile").Observe(metric.MsSince(start))

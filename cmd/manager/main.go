@@ -1,8 +1,13 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"github.com/spf13/pflag"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	_ "k8s.io/client-go/plugin/pkg/client/auth"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/apis"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/context/shared"
 	prvd "k8s.io/cloud-provider-alibaba-cloud/pkg/provider"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/dryrun"
@@ -11,11 +16,6 @@ import (
 	"net/http"
 	"os"
 	"runtime"
-
-	utilerrors "k8s.io/apimachinery/pkg/util/errors"
-	_ "k8s.io/client-go/plugin/pkg/client/auth"
-	"k8s.io/cloud-provider-alibaba-cloud/pkg/apis"
-	"k8s.io/cloud-provider-alibaba-cloud/pkg/context/shared"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 	ctrl "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
@@ -47,11 +47,7 @@ func main() {
 	printVersion()
 
 	// Get a config to talk to the api-server
-	cfg, err := config.GetConfig()
-	if err != nil {
-		log.Error(err, "")
-		os.Exit(1)
-	}
+	cfg := config.GetConfigOrDie()
 
 	// Create a new manager to provide shared dependencies and start components
 	mgr, err := manager.New(cfg, ctrlCtx.BuildRuntimeOptions(ctrlCtx.ControllerCFG.RuntimeConfig))
@@ -114,6 +110,7 @@ func main() {
 
 func loadControllerConfig() error {
 	fs := pflag.NewFlagSet("", pflag.ExitOnError)
+	fs.AddGoFlagSet(flag.CommandLine)
 	ctrlCtx.ControllerCFG.BindFlags(fs)
 
 	if err := fs.Parse(os.Args); err != nil {

@@ -229,6 +229,11 @@ func setGenericListenerValue(req interface{}, listener *model.ListenerAttribute)
 		connectPort.SetString(strconv.Itoa(listener.HealthCheckConnectPort))
 	}
 
+	if listener.HealthCheckInterval != 0 {
+		healthCheckInterval := v.FieldByName("HealthCheckInterval")
+		healthCheckInterval.SetString(strconv.Itoa(listener.HealthCheckInterval))
+	}
+
 	if listener.HealthyThreshold != 0 {
 		healthyThreshold := v.FieldByName("HealthyThreshold")
 		healthyThreshold.SetString(strconv.Itoa(listener.HealthyThreshold))
@@ -267,10 +272,6 @@ func setTCPListenerValue(req interface{}, listener *model.ListenerAttribute) {
 		healthCheckDomain := v.FieldByName("HealthCheckDomain")
 		healthCheckDomain.SetString(listener.HealthCheckDomain)
 	}
-	if listener.HealthCheckInterval != 0 {
-		healthCheckInterval := v.FieldByName("HealthCheckInterval")
-		healthCheckInterval.SetString(strconv.Itoa(listener.HealthCheckInterval))
-	}
 
 	if listener.ConnectionDrain != "" {
 		connectionDrain := v.FieldByName("ConnectionDrain")
@@ -289,10 +290,15 @@ func setUDPListenerValue(req interface{}, listener *model.ListenerAttribute) {
 		healthCheckConnectTimeout := v.FieldByName("HealthCheckConnectTimeout")
 		healthCheckConnectTimeout.SetString(strconv.Itoa(listener.HealthCheckConnectTimeout))
 	}
-	if listener.HealthCheckInterval != 0 {
-		healthCheckInterval := v.FieldByName("HealthCheckInterval")
-		healthCheckInterval.SetString(strconv.Itoa(listener.HealthCheckInterval))
+	if listener.ConnectionDrain != "" {
+		connectionDrain := v.FieldByName("ConnectionDrain")
+		connectionDrain.SetString(string(listener.ConnectionDrain))
 	}
+	if listener.ConnectionDrainTimeout != 0 {
+		connectionDrainTimeout := v.FieldByName("ConnectionDrainTimeout")
+		connectionDrainTimeout.SetString(strconv.Itoa(listener.ConnectionDrainTimeout))
+	}
+
 }
 
 func setHTTPListenerValue(req interface{}, listener *model.ListenerAttribute) {
@@ -309,10 +315,6 @@ func setHTTPListenerValue(req interface{}, listener *model.ListenerAttribute) {
 	if listener.HealthCheckURI != "" {
 		healthCheckURI := v.FieldByName("HealthCheckURI")
 		healthCheckURI.SetString(listener.HealthCheckURI)
-	}
-	if listener.HealthCheckInterval != 0 {
-		healthCheckInterval := v.FieldByName("HealthCheckInterval")
-		healthCheckInterval.SetString(strconv.Itoa(listener.HealthCheckInterval))
 	}
 	if listener.HealthCheckDomain != "" {
 		healthCheckDomain := v.FieldByName("HealthCheckDomain")
@@ -354,10 +356,6 @@ func setHTTPSListenerValue(req interface{}, listener *model.ListenerAttribute) {
 	if listener.HealthCheckURI != "" {
 		healthCheckURI := v.FieldByName("HealthCheckURI")
 		healthCheckURI.SetString(listener.HealthCheckURI)
-	}
-	if listener.HealthCheckInterval != 0 {
-		healthCheckInterval := v.FieldByName("HealthCheckInterval")
-		healthCheckInterval.SetString(strconv.Itoa(listener.HealthCheckInterval))
 	}
 	if listener.HealthCheckDomain != "" {
 		healthCheckDomain := v.FieldByName("HealthCheckDomain")

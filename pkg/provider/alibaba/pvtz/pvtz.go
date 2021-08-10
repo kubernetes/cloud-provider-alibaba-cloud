@@ -27,7 +27,7 @@ type PVTZProvider struct {
 	zoneId string
 }
 
-func NewPVTZProvider(auth *base.ClientAuth) *PVTZProvider {
+func NewPVTZProvider(auth *base.ClientMgr) *PVTZProvider {
 	return &PVTZProvider{
 		client: auth.PVTZ,
 		zoneId: ctrlCtx.CloudCFG.Global.PrivateZoneID,

@@ -14,7 +14,7 @@ import (
 )
 
 func NewDryRunSLB(
-	auth *base.ClientAuth, slb *slb.SLBProvider,
+	auth *base.ClientMgr, slb *slb.SLBProvider,
 ) *DryRunSLB {
 	return &DryRunSLB{auth: auth, slb: slb}
 }
@@ -22,7 +22,7 @@ func NewDryRunSLB(
 var _ prvd.ILoadBalancer = &DryRunSLB{}
 
 type DryRunSLB struct {
-	auth *base.ClientAuth
+	auth *base.ClientMgr
 	slb  *slb.SLBProvider
 }
 

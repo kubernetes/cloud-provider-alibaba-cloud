@@ -5,12 +5,16 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/go-logr/logr"
+	"golang.org/x/time/rate"
+	"k8s.io/client-go/util/workqueue"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/util/metric"
+	"k8s.io/klog"
 	"os"
 	"strings"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/record"
@@ -68,12 +72,19 @@ func (svcC serviceController) Start(ctx context.Context) error {
 
 // add adds a new Controller to mgr with r as the reconcile.Reconciler
 func add(mgr manager.Manager, r *ReconcileService) error {
+	rateLimit := workqueue.NewMaxOfRateLimiter(
+		workqueue.NewItemExponentialFailureRateLimiter(5*time.Second, 900*time.Second),
+		// 10 qps, 100 bucket size.  This is only for retry speed and its only the overall factor (not per item)
+		&workqueue.BucketRateLimiter{Limiter: rate.NewLimiter(rate.Limit(10), 100)},
+	)
+
 	// Create a new controller
 	c, err := controller.NewUnmanaged(
 		"service-controller", mgr,
 		controller.Options{
 			Reconciler:              r,
 			MaxConcurrentReconciles: 1,
+			RateLimiter:             rateLimit,
 		},
 	)
 	if err != nil {
@@ -129,11 +140,12 @@ type RequestContext struct {
 	Recorder record.EventRecorder
 }
 
-func (m *ReconcileService) reconcile(request reconcile.Request) error {
+func (m *ReconcileService) reconcile(request reconcile.Request) (err error) {
+	startTime := time.Now()
 
 	defer func() {
 		if ctrlCtx.ControllerCFG.DryRun {
-			initial.Store(request, 1)
+			initial.Store(request.String(), 1)
 			if mapfull() {
 				util.ServiceLog.Info("ccm initial process finished.")
 				err := dryrun.ResultEvent(m.kubeClient, dryrun.SUCCESS, "ccm initial process finished")
@@ -142,14 +154,15 @@ func (m *ReconcileService) reconcile(request reconcile.Request) error {
 				}
 				os.Exit(0)
 			}
+			err = nil
 		}
 	}()
 
 	svc := &v1.Service{}
-	err := m.kubeClient.Get(context.Background(), request.NamespacedName, svc)
+	err = m.kubeClient.Get(context.Background(), request.NamespacedName, svc)
 	if err != nil {
-		if errors.IsNotFound(err) {
-			util.ServiceLog.Info("service not found, skip")
+		if apierrors.IsNotFound(err) {
+			util.ServiceLog.Info("service not found, skip", "service", request.NamespacedName)
 			// Request object not found, could have been deleted
 			// after reconcile request.
 			// Owned objects are automatically garbage collected.
@@ -157,6 +170,7 @@ func (m *ReconcileService) reconcile(request reconcile.Request) error {
 			// Return and don't requeue
 			return nil
 		}
+		util.ServiceLog.Error(err, "reconcile: get service failed", "service", request.NamespacedName)
 		return err
 	}
 	anno := &AnnotationRequest{svc: svc}
@@ -183,16 +197,22 @@ func (m *ReconcileService) reconcile(request reconcile.Request) error {
 		Recorder: m.record,
 	}
 
-	reqContext.Log.Info(fmt.Sprintf("ensure loadbalancer with service details, %+v", svc.String()))
+	klog.Infof("%s: ensure loadbalancer with service details, \n%+v", util.Key(svc), util.PrettyJson(svc))
 	// check to see whither if loadbalancer deletion is needed
 	if needDeleteLoadBalancer(svc) {
-		return m.cleanupLoadBalancerResources(reqContext)
+		err = m.cleanupLoadBalancerResources(reqContext)
+	} else {
+		err = m.reconcileLoadBalancerResources(reqContext)
 	}
-	err = m.reconcileLoadBalancerResources(reqContext)
 	if err != nil {
-		util.ServiceLog.Error(err, "reconcile loadbalancer failed")
+		reqContext.Log.Error(err, "reconcile loadbalancer failed")
+		return err
 	}
-	return err
+
+	reqContext.Log.Info("successfully reconcile")
+	metric.SLBLatency.WithLabelValues("reconcile").Observe(metric.MsSince(startTime))
+
+	return nil
 }
 
 func (m *ReconcileService) cleanupLoadBalancerResources(reqCtx *RequestContext) error {
@@ -335,13 +355,13 @@ func (m *ReconcileService) updateServiceStatus(reqCtx *RequestContext, svc *v1.S
 				// If the object no longer exists, we don't want to recreate it. Just bail
 				// out so that we can process the delete, which we should soon be receiving
 				// if we haven't already.
-				if errors.IsNotFound(err) {
+				if apierrors.IsNotFound(err) {
 					util.ServiceLog.Error(err, "not persisting update to service that no longer exists")
 					return nil
 				}
 				// TODO: Try to resolve the conflict if the change was unrelated to load
 				// balancer status. For now, just pass it up the stack.
-				if errors.IsConflict(err) {
+				if apierrors.IsConflict(err) {
 					return fmt.Errorf("not persisting update to service %s that "+
 						"has been changed since we received it: %v", util.Key(svc), err)
 				}
@@ -389,13 +409,13 @@ func (m *ReconcileService) removeServiceStatus(reqCtx *RequestContext, svc *v1.S
 				// If the object no longer exists, we don't want to recreate it. Just bail
 				// out so that we can process the delete, which we should soon be receiving
 				// if we haven't already.
-				if errors.IsNotFound(err) {
+				if apierrors.IsNotFound(err) {
 					util.ServiceLog.Error(err, "not persisting update to service that no longer exists")
 					return nil
 				}
 				// TODO: Try to resolve the conflict if the change was unrelated to load
 				// balancer status. For now, just pass it up the stack.
-				if errors.IsConflict(err) {
+				if apierrors.IsConflict(err) {
 					return fmt.Errorf("not persisting update to service %s that "+
 						"has been changed since we received it: %v", util.Key(svc), err)
 				}

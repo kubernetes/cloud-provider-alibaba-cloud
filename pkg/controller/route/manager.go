@@ -82,10 +82,10 @@ func (r *ReconcileRoute) syncTableRoutes(ctx context.Context, table string, node
 	}
 
 	var clusterCIDR *net.IPNet
-	if ctrlCtx.CloudCFG.Global.ClusterCidr != "" {
-		_, clusterCIDR, err = net.ParseCIDR(ctrlCtx.CloudCFG.Global.ClusterCidr)
+	if ctrlCtx.ControllerCFG.ClusterCidr != "" {
+		_, clusterCIDR, err = net.ParseCIDR(ctrlCtx.ControllerCFG.ClusterCidr)
 		if err != nil {
-			return fmt.Errorf("error parse cluster cidr %s: %s", ctrlCtx.CloudCFG.Global.ClusterCidr, err)
+			return fmt.Errorf("error parse cluster cidr %s: %s", ctrlCtx.ControllerCFG.ClusterCidr, err)
 		}
 	}
 
@@ -98,7 +98,7 @@ func (r *ReconcileRoute) syncTableRoutes(ctx context.Context, table string, node
 		if !contains {
 			continue
 		}
-		if confilctWithNodes(route.DestinationCIDR, nodes) {
+		if conflictWithNodes(route.DestinationCIDR, nodes) {
 			klog.Infof("delete route %s, %s", route.Name, route.DestinationCIDR)
 			if err = deleteRouteForInstance(ctx, table, route.ProviderId, route.DestinationCIDR, r.cloud); err != nil {
 				klog.Errorf("Could not delete route %s %s from table %s, %s", route.Name, route.DestinationCIDR, table, err.Error())
@@ -108,7 +108,7 @@ func (r *ReconcileRoute) syncTableRoutes(ctx context.Context, table string, node
 		}
 	}
 	for _, node := range nodes.Items {
-		klog.Infof("sync routes for node: %v", node.Name)
+		klog.V(5).Infof("sync routes for node: %v", node.Name)
 		if !r.configRoutes || helper.HasExcludeLabel(&node) {
 			continue
 		}
@@ -134,15 +134,18 @@ func (r *ReconcileRoute) syncTableRoutes(ctx context.Context, table string, node
 			r.record.Eventf(&node, v1.EventTypeWarning, "CreateRouteFailed", "Create Route Failed for %s reason: %s", table, err)
 			continue
 		}
+
 		networkCondition, ok := helper.FindCondition(node.Status.Conditions, v1.NodeNetworkUnavailable)
 		if !ok || networkCondition.Status != v1.ConditionFalse {
-			r.updateNetworkingCondition(ctx, &node, true)
+			if err := r.updateNetworkingCondition(ctx, &node, true); err != nil {
+				klog.Errorf("update node %s network condition err: %s", node.Name, err.Error())
+			}
 		}
 	}
 	return nil
 }
 
-func confilctWithNodes(route string, nodes *v1.NodeList) bool {
+func conflictWithNodes(route string, nodes *v1.NodeList) bool {
 	for _, node := range nodes.Items {
 		ipv4Cidr, _, err := getIPv4RouteForNode(&node)
 		if err != nil {

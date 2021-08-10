@@ -8,13 +8,13 @@ import (
 )
 
 func NewMockCLB(
-	auth *base.ClientAuth,
+	auth *base.ClientMgr,
 ) *MockCLB {
 	return &MockCLB{auth: auth}
 }
 
 type MockCLB struct {
-	auth *base.ClientAuth
+	auth *base.ClientMgr
 }
 
 func (m *MockCLB) FindLoadBalancer(ctx context.Context, mdl *model.LoadBalancer) error {

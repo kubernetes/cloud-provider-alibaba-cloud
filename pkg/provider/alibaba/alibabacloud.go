@@ -1,33 +1,38 @@
 package alibaba
 
 import (
-	log "github.com/sirupsen/logrus"
+	"fmt"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/base"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/ecs"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/pvtz"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/slb"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/vpc"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/util/metric"
+	"k8s.io/klog"
 )
 
 func NewAlibabaCloud() prvd.Provider {
-	auth, err := base.NewClientAuth()
+	mgr, err := base.NewClientMgr()
 	if err != nil {
-		log.Warnf("initialize alibaba cloud client auth: %s", err.Error())
+		panic(fmt.Sprintf("initialize alibaba cloud client auth: %s", err.Error()))
 	}
-	if auth == nil {
+	if mgr == nil {
 		panic("auth should not be nil")
 	}
-	err = auth.Start(base.RefreshToken)
+	err = mgr.Start(base.RefreshToken)
 	if err != nil {
-		log.Warnf("refresh token: %s", err.Error())
+		klog.Warningf("refresh token: %s", err.Error())
 	}
+
+	metric.RegisterPrometheus()
+
 	return &AlibabaCloud{
-		IMetaData:    auth.Meta,
-		EcsProvider:  ecs.NewEcsProvider(auth),
-		SLBProvider:  slb.NewLBProvider(auth),
-		PVTZProvider: pvtz.NewPVTZProvider(auth),
-		VPCProvider:  vpc.NewVPCProvider(auth),
+		IMetaData:    mgr.Meta,
+		EcsProvider:  ecs.NewEcsProvider(mgr),
+		SLBProvider:  slb.NewLBProvider(mgr),
+		PVTZProvider: pvtz.NewPVTZProvider(mgr),
+		VPCProvider:  vpc.NewVPCProvider(mgr),
 	}
 }
 
