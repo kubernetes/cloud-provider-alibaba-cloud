@@ -66,20 +66,20 @@ var UnitRegions = map[Region]interface{}{
 }
 
 // Get openapi endpoint accessed by ecs instance.
-// For some UnitRegions, the endpoint pattern is https://[product].[regionid].aliyuncs.com
-// For some CentralRegions, the endpoint pattern is https://[product].vpc-proxy.aliyuncs.com
-// The other region, the endpoint pattern is https://[product]-vpc.[regionid].aliyuncs.com
+// For some UnitRegions, the endpoint pattern is http://[product].[regionid].aliyuncs.com
+// For some CentralRegions, the endpoint pattern is http://[product].vpc-proxy.aliyuncs.com
+// The other region, the endpoint pattern is http://[product]-vpc.[regionid].aliyuncs.com
 func SetEndpoint4RegionalDomain(region Region, serviceCode string) string {
 	if endpoint, ok := CentralDomainServices[serviceCode]; ok {
-		return fmt.Sprintf("https://%s", endpoint)
+		return fmt.Sprintf("%s", endpoint)
 	}
 	for _, service := range RegionalDomainServices {
 		if service == serviceCode {
 			if ep, ok := UnitRegions[region]; ok {
-				return fmt.Sprintf("https://%s.%s.aliyuncs.com", serviceCode, ep)
+				return fmt.Sprintf("%s.%s.aliyuncs.com", serviceCode, ep)
 			}
 
-			return fmt.Sprintf("https://%s%s.%s.aliyuncs.com", serviceCode, "-vpc", region)
+			return fmt.Sprintf("%s%s.%s.aliyuncs.com", serviceCode, "-vpc", region)
 		}
 	}
 	return ""
