@@ -6,7 +6,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/client-go/tools/leaderelection/resourcelock"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/helper"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/util"
@@ -45,7 +45,7 @@ func (m *MapEnqueue) FanIN(o client.Object) []reconcile.Request {
 	default:
 		util.ServiceLog.Info(fmt.Sprintf("warning: unknown object: %s, %v", reflect.TypeOf(o), o))
 	}
-	return dropLeaseEndpoint(request)
+	return request
 }
 
 func (m *MapEnqueue) mapNode(o *v1.Node) []reconcile.Request {
@@ -96,28 +96,6 @@ func (m *MapEnqueue) mapService(o *v1.Service) []reconcile.Request {
 func (m *MapEnqueue) InjectClient(c client.Client) error {
 	m.client = c
 	return nil
-}
-
-func dropLeaseEndpoint(req []reconcile.Request) []reconcile.Request {
-
-	var reqs []reconcile.Request
-	for _, r := range req {
-		if isLeaseEndpoint(r.String()) {
-			continue
-		}
-		reqs = append(reqs, r)
-	}
-	return reqs
-}
-
-func isLeaseEndpoint(epNamespacedName string) bool {
-	e := sets.Empty{}
-	avoid := sets.String{
-		"kube-system/kube-scheduler":          e,
-		"kube-system/ccm":                     e,
-		"kube-system/kube-controller-manager": e,
-	}
-	return avoid.Has(epNamespacedName)
 }
 
 // PredicateForServiceEvent, filter service event
@@ -295,6 +273,13 @@ func isEndpointProcessNeeded(ep *v1.Endpoints, client client.Client) bool {
 		return false
 	}
 
+	if len(ep.Annotations) != 0 {
+		// skip eps which are used for leader election
+		if _, ok := ep.Annotations[resourcelock.LeaderElectionRecordAnnotationKey]; ok {
+			return false
+		}
+	}
+
 	svc := &v1.Service{}
 	err := client.Get(context.TODO(),
 		types.NamespacedName{
@@ -302,7 +287,7 @@ func isEndpointProcessNeeded(ep *v1.Endpoints, client client.Client) bool {
 			Name:      ep.GetName(),
 		}, svc)
 	if err != nil {
-		if apierrors.IsNotFound(err) && !isLeaseEndpoint(util.NamespacedName(ep).String()) {
+		if apierrors.IsNotFound(err) {
 			util.ServiceLog.Error(err, "fail to get service, skip reconcile", "service", util.Key(ep))
 		}
 		return false

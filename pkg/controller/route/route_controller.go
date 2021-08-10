@@ -130,20 +130,25 @@ func (r *ReconcileRoute) Reconcile(ctx context.Context, request reconcile.Reques
 }
 
 func (r *ReconcileRoute) syncCloudRoute(ctx context.Context, node *corev1.Node) error {
-	klog.Infof("sync routes for node: %v", node.Name)
-	if !r.configRoutes || helper.HasExcludeLabel(node) {
+	klog.Infof("try to sync routes for node: %v", node.Name)
+	if !r.configRoutes {
+		return nil
+	}
+
+	if helper.HasExcludeLabel(node) {
+		klog.Info("node %s has exclude label, skip creating route", node.Name)
 		return nil
 	}
 
 	readyCondition, ok := helper.FindCondition(node.Status.Conditions, corev1.NodeReady)
 	if ok && readyCondition.Status == corev1.ConditionUnknown {
-		klog.Infof("node %s is in unknown status.Skip creating route.", node.Name)
+		klog.Infof("node %s is in unknown status, skip creating route", node.Name)
 		return nil
 	}
 
 	prvdId := node.Spec.ProviderID
 	if prvdId == "" {
-		klog.Warningf("provider id not exist, skip %s route config", node.Name)
+		klog.Warningf("node %s provider id is not exist, skip creating route", node.Name)
 		return nil
 	}
 
