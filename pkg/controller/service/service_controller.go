@@ -8,6 +8,7 @@ import (
 	"golang.org/x/time/rate"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/util/metric"
+	"k8s.io/klog"
 	"os"
 	"strings"
 	"time"
@@ -196,7 +197,7 @@ func (m *ReconcileService) reconcile(request reconcile.Request) (err error) {
 		Recorder: m.record,
 	}
 
-	reqContext.Log.Info(fmt.Sprintf("ensure loadbalancer with service details, %+v", svc.String()))
+	klog.Infof("%s: ensure loadbalancer with service details, \n%+v", util.Key(svc), util.PrettyJson(svc))
 	// check to see whither if loadbalancer deletion is needed
 	if needDeleteLoadBalancer(svc) {
 		err = m.cleanupLoadBalancerResources(reqContext)

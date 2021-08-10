@@ -375,7 +375,7 @@ func nodeSpecChanged(oldNode, newNode *v1.Node) bool {
 	}
 	if oldNode.Spec.Unschedulable != newNode.Spec.Unschedulable {
 		util.ServiceLog.Info(fmt.Sprintf(
-			"node spec changed: %s, from=%t, to=%t",
+			"node changed: %s, spec from=%t, to=%t",
 			oldNode.Name, oldNode.Spec.Unschedulable, newNode.Spec.Unschedulable),
 			"node", oldNode.Name)
 		return true
@@ -388,7 +388,7 @@ func nodeSpecChanged(oldNode, newNode *v1.Node) bool {
 
 func nodeConditionChanged(name string, oldC, newC []v1.NodeCondition) bool {
 	if len(oldC) != len(newC) {
-		util.ServiceLog.Info(fmt.Sprintf("node condition changed: length not equal, from=%v, to=%v", oldC, newC),
+		util.ServiceLog.Info(fmt.Sprintf("node changed:  condition length not equal, from=%v, to=%v", oldC, newC),
 			"node", name)
 		return true
 	}
@@ -405,7 +405,7 @@ func nodeConditionChanged(name string, oldC, newC []v1.NodeCondition) bool {
 		if oldC[i].Type != newC[i].Type ||
 			oldC[i].Status != newC[i].Status {
 			util.ServiceLog.Info(
-				fmt.Sprintf("node condition changed: type(%s,%s) | status(%s,%s)",
+				fmt.Sprintf("node changed: condition type(%s,%s) | status(%s,%s)",
 					oldC[i].Type, newC[i].Type, oldC[i].Status, newC[i].Status),
 				"node", name)
 			return true
@@ -416,13 +416,13 @@ func nodeConditionChanged(name string, oldC, newC []v1.NodeCondition) bool {
 
 func nodeLabelsChanged(nodeName string, oldL, newL map[string]string) bool {
 	if len(oldL) != len(newL) {
-		util.ServiceLog.Info(fmt.Sprintf("node label changed: size not equal, from=%v, to=%v", oldL, newL),
+		util.ServiceLog.Info(fmt.Sprintf("node changed: label size not equal, from=%v, to=%v", oldL, newL),
 			"node", nodeName)
 		return true
 	}
 	for k, v := range oldL {
 		if newL[k] != v {
-			util.ServiceLog.Info(fmt.Sprintf("node label changed: key=%s, value from=%v, to=%v",
+			util.ServiceLog.Info(fmt.Sprintf("node changed: label key=%s, value from=%v, to=%v",
 				k, oldL[k], newL[k]),
 				"node", nodeName)
 			return true
