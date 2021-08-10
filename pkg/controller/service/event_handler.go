@@ -331,12 +331,17 @@ func (p *predicateForNodeEvent) Create(e event.CreateEvent) bool {
 func (p *predicateForNodeEvent) Update(e event.UpdateEvent) bool {
 	oldNode, ok1 := e.ObjectOld.(*v1.Node)
 	newNode, ok2 := e.ObjectNew.(*v1.Node)
-	if ok1 && ok2 &&
-		nodeSpecChanged(oldNode, newNode) {
-		// label and schedulable changed .
-		// status healthy should be considered
-		util.ServiceLog.Info("controller: node update event", "node", oldNode.Name)
-		return true
+
+	if ok1 && ok2 {
+		if canNodeSkipEventHandler(oldNode) && canNodeSkipEventHandler(newNode) {
+			return false
+		}
+
+		//if node label and schedulable condition changed, need to reconcile svc
+		if nodeSpecChanged(oldNode, newNode) {
+			util.ServiceLog.Info("controller: node update event", "node", oldNode.Name)
+			return true
+		}
 	}
 	return false
 }
