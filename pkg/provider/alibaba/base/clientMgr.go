@@ -192,7 +192,7 @@ func (mgr *ClientMgr) GetAuthMode() AuthMode {
 	return RamRoleMode
 }
 
-func RefreshToken(mgr *ClientMgr, token *Token, ) error {
+func RefreshToken(mgr *ClientMgr, token *Token) error {
 	log.V(5).Info("refresh token", "region", token.Region)
 	err := mgr.ECS.InitWithStsToken(
 		token.Region, token.AccessKey, token.AccessSecret, token.Token,
@@ -230,10 +230,18 @@ func RefreshToken(mgr *ClientMgr, token *Token, ) error {
 }
 
 func setVPCEndpoint(mgr *ClientMgr) {
-	mgr.ECS.Network = "vpc"
-	mgr.VPC.Network = "vpc"
-	mgr.SLB.Network = "vpc"
-	mgr.PVTZ.Network = "vpc"
+	if ecsEndpoint := SetEndpoint4RegionalDomain(Region(mgr.Region), "ecs"); ecsEndpoint != "" {
+		mgr.ECS.Domain = ecsEndpoint
+	}
+	if vpcEndpoint := SetEndpoint4RegionalDomain(Region(mgr.Region), "vpc"); vpcEndpoint != "" {
+		mgr.VPC.Domain = vpcEndpoint
+	}
+	if slbEndpoint := SetEndpoint4RegionalDomain(Region(mgr.Region), "slb"); slbEndpoint != "" {
+		mgr.SLB.Domain = slbEndpoint
+	}
+	if pvtzEndpoint := SetEndpoint4RegionalDomain(Region(mgr.Region), "pvtz"); pvtzEndpoint != "" {
+		mgr.PVTZ.Domain = pvtzEndpoint
+	}
 }
 
 // Token base Token info
