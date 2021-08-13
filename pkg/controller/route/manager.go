@@ -25,7 +25,6 @@ var (
 )
 
 func createRouteForInstance(ctx context.Context, table, providerID, cidr string, providerIns prvd.IVPC) (*model.Route, error) {
-	klog.Infof("create routes for node: %v -> %v", providerID, cidr)
 	var (
 		route    *model.Route
 		innerErr error
@@ -69,7 +68,7 @@ func getRouteTables(ctx context.Context, providerIns prvd.Provider) ([]string, e
 	}
 	if len(tables) > 1 {
 		return nil, fmt.Errorf("alicloud: "+
-			"multiple vpc found by id[%s], length(vpcs)=%d", ctrlCtx.CloudCFG.Global.VpcID, len(tables))
+			"multiple route tables found by vpc id[%s], length(tables)=%d", ctrlCtx.CloudCFG.Global.VpcID, len(tables))
 	}
 	return tables, nil
 }

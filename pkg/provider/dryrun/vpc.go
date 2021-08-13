@@ -39,7 +39,7 @@ func (m *DryRunVPC) FindRoute(ctx context.Context, table, pvid, cidr string) (*m
 
 func (m *DryRunVPC) ListRouteTables(ctx context.Context, vpcID string) ([]string, error) {
 	if len(m.routetables) == 0 {
-		return nil, fmt.Errorf("no route table")
+		return nil, fmt.Errorf("no route table found in %s", vpcID)
 	}
 	return m.routetables, nil
 }
