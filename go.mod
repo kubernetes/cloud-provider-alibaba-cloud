@@ -1,6 +1,6 @@
 module k8s.io/cloud-provider-alibaba-cloud
 
-go 1.14
+go 1.16
 
 require (
 	github.com/denverdino/aliyungo v0.0.0-20201222091910-a47aa053adf7

@@ -69,7 +69,7 @@ test:
 	    -e CC=$(CC) -e GOARM=$(GOARM) -e GOARCH=$(ARCH) -e CGO_ENABLED=1 \
 		-v $(SOURCE):/go/src/k8s.io/cloud-provider-alibaba-cloud \
 		-v $(HOME)/mod:/go/pkg/mod \
-		golang:1.14.1 /bin/bash -c '\
+		golang:1.16.7 /bin/bash -c '\
 		cd /go/src/k8s.io/cloud-provider-alibaba-cloud && \
 		go test -mod readonly -v -race -coverprofile=coverage.txt -covermode=atomic \
         		k8s.io/cloud-provider-alibaba-cloud/cloud-controller-manager \
@@ -82,7 +82,7 @@ e2etest:
 		-v $(HOME)/mod:/go/pkg/mod \
 		-v /root/.kube/config:/root/.kube/config \
 		-v /root/.kube/config.cloud:/root/.kube/config.cloud \
-		golang:1.14.1 /bin/bash -c '\
+		golang:1.16.7 /bin/bash -c '\
 		cd /go/src/k8s.io/cloud-provider-alibaba-cloud && \
 		go test -mod readonly -v \
             k8s.io/cloud-provider-alibaba-cloud/cmd/e2e \
@@ -107,7 +107,7 @@ cloud-controller-manager-$(ARCH): pre-requisite
 	docker run -e CC=$(CC) -e GOARM=$(GOARM) -e GOARCH=$(ARCH) -e CGO_ENABLED=$(CGO_ENABLED) \
 		-v $(SOURCE):/go/src/k8s.io/cloud-provider-alibaba-cloud \
 		-v $(HOME)/mod:/go/pkg/mod \
-		golang:1.14.1 /bin/bash -c '\
+		golang:1.16.7 /bin/bash -c '\
 		cd /go/src/k8s.io/cloud-provider-alibaba-cloud && \
 		TAG=$(TAG) ARCH=$(ARCH) make -e cloud-controller-manager'
 
