@@ -194,6 +194,7 @@ func (r *ReconcileRoute) addRouteForNode(ctx context.Context, table, ipv4Cidr, p
 		return nil
 	}
 	if route == nil || route.DestinationCIDR != ipv4Cidr {
+		klog.Infof("create routes for node %s: %v -> %v", node.Name, prvdId, ipv4Cidr)
 		route, err = createRouteForInstance(ctx, table, prvdId, ipv4Cidr, r.cloud)
 		if err != nil {
 			klog.Errorf("error create route for node %v : instance id [%v], route [%v], err: %s", node.Name, prvdId, table, err.Error())
