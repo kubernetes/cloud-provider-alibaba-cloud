@@ -41,7 +41,6 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/cloud-provider-alibaba-cloud/cloud-controller-manager/controller/route"
 	"k8s.io/cloud-provider-alibaba-cloud/cloud-controller-manager/utils"
-	//nodeutilv1 "k8s.io/kubernetes/pkg/api/v1/node"
 	"k8s.io/cloud-provider"
 	"k8s.io/cloud-provider/api"
 	"k8s.io/cloud-provider/node/helpers"

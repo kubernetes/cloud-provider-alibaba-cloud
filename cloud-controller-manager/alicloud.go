@@ -195,7 +195,7 @@ func (c *Cloud) Initialize(builder cloudprovider.ControllerClientBuilder, stop <
 	if route.Options.ConfigCloudRoutes {
 		cidr := route.Options.ClusterCIDR
 		if len(strings.TrimSpace(cidr)) == 0 {
-			panic(fmt.Sprintf("ivalid cluster CIDR %s", cidr))
+			panic(fmt.Sprintf("invalid cluster CIDR %s", cidr))
 		}
 		_, cidrc, err := net.ParseCIDR(cidr)
 		if err != nil {
@@ -330,7 +330,7 @@ func (c *Cloud) EnsureLoadBalancer(
 	eps, err := c.kclient.
 		CoreV1().
 		Endpoints(service.Namespace).
-		Get(context.TODO(), service.Name, metav1.GetOptions{})
+		Get(ctx, service.Name, metav1.GetOptions{})
 
 	if err != nil {
 		if strings.Contains(err.Error(), "not found") {

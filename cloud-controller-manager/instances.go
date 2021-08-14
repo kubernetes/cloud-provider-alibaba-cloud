@@ -34,7 +34,6 @@ import (
 // InstanceClient wrap for instance sdk
 type InstanceClient struct {
 	c ClientInstanceSDK
-	//lock            sync.RWMutex
 	CurrentNodeName types.NodeName
 }
 
@@ -49,7 +48,7 @@ type ClientInstanceSDK interface {
 func (s *InstanceClient) filterOutByLabel(nodes []*v1.Node, labels string) ([]*v1.Node, error) {
 	if labels == "" {
 		// skip filter when label is empty
-		klog.V(2).Infof("alicloud: slb backend server label does not specified, skip filter nodes by label.")
+		klog.V(2).Infof("alicloud: slb backend server label is not specified, skip filter nodes by label.")
 		return nodes, nil
 	}
 	result := []*v1.Node{}

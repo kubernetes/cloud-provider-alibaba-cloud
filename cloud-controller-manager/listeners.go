@@ -18,7 +18,6 @@ package alicloud
 
 import (
 	"context"
-	//"errors"
 	"fmt"
 	"github.com/denverdino/aliyungo/slb"
 	"k8s.io/api/core/v1"
@@ -819,8 +818,6 @@ func (t *udp) Add(ctx context.Context) error {
 			AclType:   def.AclType,
 			AclStatus: def.AclStatus,
 			AclId:     def.AclID,
-			//HealthCheckType:           request.HealthCheckType,
-			//HealthCheckURI:            request.HealthCheckURI,
 			HealthCheckConnectPort:    def.HealthCheckConnectPort,
 			HealthyThreshold:          def.HealthyThreshold,
 			UnhealthyThreshold:        def.UnhealthyThreshold,

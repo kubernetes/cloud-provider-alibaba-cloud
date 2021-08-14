@@ -49,7 +49,6 @@ type AnnotationRequest struct {
 	SLBNetworkType string
 
 	ChargeType slb.InternetChargeType
-	//Region     		common.Region
 	Bandwidth int
 	CertID    string
 
