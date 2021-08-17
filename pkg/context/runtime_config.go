@@ -7,34 +7,37 @@ import (
 )
 
 const (
-	flagMetricsBindAddr         = "metrics-bind-addr"
-	flagHealthProbeBindAddr     = "health-probe-bind-addr"
-	flagEnableLeaderElection    = "enable-leader-election"
-	flagLeaderElectionID        = "leader-election-id"
-	flagLeaderElectionNamespace = "leader-election-namespace"
-	flagSyncPeriod              = "sync-period"
-	flagQPS                     = "kube-api-qps"
-	flagBurst                   = "kube-api-burst"
+	flagMetricsBindAddr            = "metrics-bind-addr"
+	flagHealthProbeBindAddr        = "health-probe-bind-addr"
+	flagEnableLeaderElection       = "enable-leader-election"
+	flagLeaderElectionID           = "leader-election-id"
+	flagLeaderElectionNamespace    = "leader-election-namespace"
+	flagLeaderElectionResourceLock = "leader-election-resource-lock"
+	flagSyncPeriod                 = "sync-period"
+	flagQPS                        = "kube-api-qps"
+	flagBurst                      = "kube-api-burst"
 
-	defaultMetricsAddr             = ":8080"
-	defaultHealthProbeBindAddress  = ":10258"
-	defaultLeaderElectionID        = "ccm"
-	defaultLeaderElectionNamespace = "kube-system"
-	defaultSyncPeriod              = 60 * time.Minute
-	defaultQPS                     = 20
-	defaultBurst                   = 30
+	defaultMetricsAddr                = ":8080"
+	defaultHealthProbeBindAddress     = ":10258"
+	defaultLeaderElectionID           = "ccm"
+	defaultLeaderElectionNamespace    = "kube-system"
+	defaultLeaderElectionResourceLock = "endpointsleases"
+	defaultSyncPeriod                 = 60 * time.Minute
+	defaultQPS                        = 20
+	defaultBurst                      = 30
 )
 
 // RuntimeConfig stores the configuration for controller-runtime
 type RuntimeConfig struct {
-	MetricsBindAddress      string
-	HealthProbeBindAddress  string
-	EnableLeaderElection    bool
-	LeaderElectionID        string
-	LeaderElectionNamespace string
-	SyncPeriod              time.Duration
-	QPS                     int
-	Burst                   int
+	MetricsBindAddress         string
+	HealthProbeBindAddress     string
+	EnableLeaderElection       bool
+	LeaderElectionID           string
+	LeaderElectionNamespace    string
+	LeaderElectionResourceLock string
+	SyncPeriod                 time.Duration
+	QPS                        int
+	Burst                      int
 }
 
 func (c *RuntimeConfig) BindFlags(fs *pflag.FlagSet) {
@@ -49,6 +52,8 @@ func (c *RuntimeConfig) BindFlags(fs *pflag.FlagSet) {
 		"Name of the leader election ID to use for this controller")
 	fs.StringVar(&c.LeaderElectionNamespace, flagLeaderElectionNamespace, defaultLeaderElectionNamespace,
 		"Name of the leader election ID to use for this controller")
+	fs.StringVar(&c.LeaderElectionResourceLock, flagLeaderElectionResourceLock, defaultLeaderElectionResourceLock,
+		"Resource lock to use for leader election")
 	fs.DurationVar(&c.SyncPeriod, flagSyncPeriod, defaultSyncPeriod,
 		"Period at which the controller forces the repopulation of its local object stores.")
 	fs.IntVar(&c.QPS, flagQPS, defaultQPS, "QPS to use while talking with kubernetes apiserver.")
@@ -57,11 +62,12 @@ func (c *RuntimeConfig) BindFlags(fs *pflag.FlagSet) {
 
 func BuildRuntimeOptions(rtCfg RuntimeConfig) manager.Options {
 	return manager.Options{
-		MetricsBindAddress:      rtCfg.MetricsBindAddress,
-		HealthProbeBindAddress:  rtCfg.HealthProbeBindAddress,
-		LeaderElection:          rtCfg.EnableLeaderElection,
-		LeaderElectionID:        rtCfg.LeaderElectionID,
-		LeaderElectionNamespace: rtCfg.LeaderElectionNamespace,
-		SyncPeriod:              &rtCfg.SyncPeriod,
+		MetricsBindAddress:         rtCfg.MetricsBindAddress,
+		HealthProbeBindAddress:     rtCfg.HealthProbeBindAddress,
+		LeaderElection:             rtCfg.EnableLeaderElection,
+		LeaderElectionID:           rtCfg.LeaderElectionID,
+		LeaderElectionResourceLock: rtCfg.LeaderElectionResourceLock,
+		LeaderElectionNamespace:    rtCfg.LeaderElectionNamespace,
+		SyncPeriod:                 &rtCfg.SyncPeriod,
 	}
 }

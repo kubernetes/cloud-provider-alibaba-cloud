@@ -1,4 +1,4 @@
-FROM alpine:3.11.6
+FROM registry.cn-hangzhou.aliyuncs.com/acs/alpine:3.13-update
 
 # Do not use docker multiple stage build until we
 # figure a way out how to solve build cache problem under 'go mod'.
