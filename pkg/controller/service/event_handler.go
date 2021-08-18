@@ -144,13 +144,13 @@ func needUpdate(oldSvc, newSvc *v1.Service, recorder record.EventRecorder) bool 
 	}
 
 	if needLoadBalancer(oldSvc) != needLoadBalancer(newSvc) {
-		util.ServiceLog.Info(fmt.Sprintf("TypeChanged %v -> %v", oldSvc.Spec.Type, newSvc.Spec.Type),
+		util.ServiceLog.Info(fmt.Sprintf("TypeChanged %v - %v", oldSvc.Spec.Type, newSvc.Spec.Type),
 			"service", util.Key(oldSvc))
 		recorder.Eventf(
 			newSvc,
 			v1.EventTypeNormal,
 			helper.TypeChanged,
-			"%v->%v",
+			"%v - %v",
 			oldSvc.Spec.Type,
 			newSvc.Spec.Type,
 		)
@@ -158,13 +158,13 @@ func needUpdate(oldSvc, newSvc *v1.Service, recorder record.EventRecorder) bool 
 	}
 
 	if oldSvc.UID != newSvc.UID {
-		util.ServiceLog.Info(fmt.Sprintf("UIDChanged: %v -> %v", oldSvc.UID, newSvc.UID),
+		util.ServiceLog.Info(fmt.Sprintf("UIDChanged: %v - %v", oldSvc.UID, newSvc.UID),
 			"service", util.Key(oldSvc))
 		return true
 	}
 
 	if !reflect.DeepEqual(oldSvc.Annotations, newSvc.Annotations) {
-		util.ServiceLog.Info(fmt.Sprintf("AnnotationChanged: %v -> %v",
+		util.ServiceLog.Info(fmt.Sprintf("AnnotationChanged: %v - %v",
 			oldSvc.Annotations, newSvc.Annotations),
 			"service", util.Key(oldSvc))
 		recorder.Eventf(
@@ -177,7 +177,7 @@ func needUpdate(oldSvc, newSvc *v1.Service, recorder record.EventRecorder) bool 
 	}
 
 	if !reflect.DeepEqual(oldSvc.Spec, newSvc.Spec) {
-		util.ServiceLog.Info(fmt.Sprintf("SpecChanged: %v -> %v", oldSvc.Spec, newSvc.Spec),
+		util.ServiceLog.Info(fmt.Sprintf("SpecChanged: %v - %v", oldSvc.Spec, newSvc.Spec),
 			"service", util.Key(oldSvc))
 		recorder.Eventf(
 			newSvc,
@@ -189,7 +189,7 @@ func needUpdate(oldSvc, newSvc *v1.Service, recorder record.EventRecorder) bool 
 	}
 
 	if !reflect.DeepEqual(oldSvc.DeletionTimestamp.IsZero(), newSvc.DeletionTimestamp.IsZero()) {
-		util.ServiceLog.Info(fmt.Sprintf("DeleteTimestampChanged: %v -> %v",
+		util.ServiceLog.Info(fmt.Sprintf("DeleteTimestampChanged: %v - %v",
 			oldSvc.DeletionTimestamp.IsZero(), newSvc.DeletionTimestamp.IsZero()),
 			"service", util.Key(oldSvc))
 		recorder.Eventf(
@@ -245,9 +245,8 @@ func (p *predicateForEndpointEvent) Update(e event.UpdateEvent) bool {
 	if ok1 && ok2 &&
 		isEndpointProcessNeeded(ep1, p.client) &&
 		!reflect.DeepEqual(ep1.Subsets, ep2.Subsets) {
-		util.ServiceLog.Info(fmt.Sprintf(
-			"controller: endpoint update event, before [%v], after [%v]", ep1.Subsets, ep2.Subsets),
-			"endpoint", util.Key(ep1))
+		util.ServiceLog.Info("controller: endpoint update event", "endpoint", util.Key(ep1))
+		util.ServiceLog.Info(fmt.Sprintf("endpoints before [%s], afeter [%s]", LogEndpoints(*ep1), LogEndpoints(*ep2)), "endpoint", util.Key(ep1))
 		return true
 	}
 	return false

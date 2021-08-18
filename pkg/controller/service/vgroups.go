@@ -80,13 +80,7 @@ func (mgr *VGroupManager) BuildLocalModel(reqCtx *RequestContext, m *model.LoadB
 	if err != nil {
 		return fmt.Errorf("get endpoints error: %s", err.Error())
 	}
-	var epAddrList []string
-	for _, subSet := range eps.Subsets {
-		for _, addr := range subSet.Addresses {
-			epAddrList = append(epAddrList, addr.IP)
-		}
-	}
-	reqCtx.Log.Info("backend details", "endpoints", strings.Join(epAddrList, ","))
+	reqCtx.Log.Info("backend details", "endpoints", LogEndpoints(*eps))
 
 	candidates := &EndpointWithENI{
 		Nodes:     nodes,

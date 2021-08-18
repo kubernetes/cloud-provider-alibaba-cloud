@@ -18,15 +18,15 @@ func (sp *predicateForNodeEvent) Update(e event.UpdateEvent) bool {
 	newNode, ok2 := e.ObjectNew.(*v1.Node)
 	if ok1 && ok2 {
 		if oldNode.UID != newNode.UID {
-			klog.Infof("node changed: %s UIDChanged: %v -> %v", oldNode.Name, oldNode.UID, newNode.UID)
+			klog.Infof("node changed: %s UIDChanged: %v - %v", oldNode.Name, oldNode.UID, newNode.UID)
 			return true
 		}
 		if oldNode.Spec.PodCIDR != newNode.Spec.PodCIDR {
-			klog.Infof("node changed: %s Pod CIDR Changed: %v -> %v", oldNode.Name, oldNode.Spec.PodCIDR, newNode.Spec.PodCIDR)
+			klog.Infof("node changed: %s Pod CIDR Changed: %v - %v", oldNode.Name, oldNode.Spec.PodCIDR, newNode.Spec.PodCIDR)
 			return true
 		}
 		if !reflect.DeepEqual(oldNode.Spec.PodCIDRs, oldNode.Spec.PodCIDRs) {
-			klog.Infof("node changed: %s Pod CIDRs Changed: %v -> %v", oldNode.Name, oldNode.Spec.PodCIDRs, newNode.Spec.PodCIDRs)
+			klog.Infof("node changed: %s Pod CIDRs Changed: %v - %v", oldNode.Name, oldNode.Spec.PodCIDRs, newNode.Spec.PodCIDRs)
 			return true
 		}
 		return false

@@ -33,7 +33,7 @@ func Add(mgr manager.Manager, ctx *shared.SharedContext) error {
 }
 
 // newReconciler returns a new reconcile.Reconciler
-func newReconciler(mgr manager.Manager, ctx *shared.SharedContext) reconcile.Reconciler {
+func newReconciler(mgr manager.Manager, ctx *shared.SharedContext) *ReconcileNode {
 	recon := &ReconcileNode{
 		monitorPeriod:   5 * time.Minute,
 		statusFrequency: 5 * time.Minute,
@@ -43,14 +43,23 @@ func newReconciler(mgr manager.Manager, ctx *shared.SharedContext) reconcile.Rec
 		scheme: mgr.GetScheme(),
 		record: mgr.GetEventRecorderFor("Node"),
 	}
-	recon.PeriodicalSync()
 	return recon
 }
 
+type nodeController struct {
+	c     controller.Controller
+	recon *ReconcileNode
+}
+
+func (controller nodeController) Start(ctx context.Context) error {
+	controller.recon.PeriodicalSync()
+	return controller.c.Start(ctx)
+}
+
 // add adds a new Controller to mgr with r as the reconcile.Reconciler
-func add(mgr manager.Manager, r reconcile.Reconciler) error {
+func add(mgr manager.Manager, r *ReconcileNode) error {
 	// Create a new controller
-	c, err := controller.New(
+	c, err := controller.NewUnmanaged(
 		"node-controller", mgr,
 		controller.Options{
 			Reconciler:              r,
@@ -62,12 +71,11 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	}
 
 	// Watch for changes to primary resource AutoRepair
-	return c.Watch(
-		&source.Kind{
-			Type: &corev1.Node{},
-		},
-		&handler.EnqueueRequestForObject{},
-	)
+	if err := c.Watch(&source.Kind{Type: &corev1.Node{}}, &handler.EnqueueRequestForObject{}); err != nil {
+		return err
+	}
+
+	return mgr.Add(&nodeController{c: c, recon: r})
 }
 
 // ReconcileNode implements reconcile.Reconciler
