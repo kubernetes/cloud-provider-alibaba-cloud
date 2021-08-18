@@ -185,7 +185,7 @@ func (m *ReconcileNode) doAddCloudNode(node *corev1.Node) error {
 		log.Info("finished remove uninitialized cloud taints", "node", node.Name)
 		// After adding, call UpdateNodeAddress to set the CloudProvider provided IPAddresses
 		// So that users do not see any significant delay in IP addresses being filled into the node
-		_ = m.syncNodeAddress([]corev1.Node{*node})
+		_ = m.syncNode([]corev1.Node{*node})
 		return true, nil
 	}
 
@@ -202,8 +202,8 @@ func (m *ReconcileNode) doAddCloudNode(node *corev1.Node) error {
 	return nil
 }
 
-// syncNodeAddress updates the nodeAddress
-func (m *ReconcileNode) syncNodeAddress(nodes []corev1.Node) error {
+// syncNode sync the nodeAddress & cloud node existence
+func (m *ReconcileNode) syncNode(nodes []corev1.Node) error {
 
 	instances, err := m.cloud.ListInstances(nctx.NewEmpty(), nodeids(nodes))
 	if err != nil {
@@ -213,10 +213,20 @@ func (m *ReconcileNode) syncNodeAddress(nodes []corev1.Node) error {
 	for i := range nodes {
 		node := &nodes[i]
 		cloudNode := instances[node.Spec.ProviderID]
+
 		if cloudNode == nil {
+			// if cloud node has been deleted, try to delete node from cluster
+			condition := nodeConditionReady(m.client, node)
+			if condition != nil && condition.Status == corev1.ConditionFalse {
+				log.Info("node is NotReady and cloud node can not found by prvdId, try to delete node from cluster ", "node", node.Name, "prvdId", node.Spec.ProviderID)
+				// ignore error, retry next loop
+				deleteNode(m, node)
+			}
+
 			log.Info("cloud node not found by prvdId, skip update node address", "node", node.Name, "prvdId", node.Spec.ProviderID)
 			continue
 		}
+
 		cloudNode.Addresses = setHostnameAddress(node, cloudNode.Addresses)
 		// If nodeIP was suggested by user, ensure that
 		// it can be found in the cloud as well (consistent with the behaviour in kubelet)
@@ -261,41 +271,9 @@ func (m *ReconcileNode) syncNodeAddress(nodes []corev1.Node) error {
 	return nil
 }
 
-func (m *ReconcileNode) syncNodeExists(nodes []corev1.Node) error {
-	instances, err := m.cloud.ListInstances(nctx.NewEmpty(), nodeids(nodes))
-	if err != nil {
-		return fmt.Errorf("EnsureNodeExists, get instances from api: %s", err.Error())
-	}
-
-	for i := range nodes {
-		node := &nodes[i]
-
-		condition := nodeConditionReady(m.client, node)
-		if condition == nil {
-			log.Info("node condition not ready, wait for next retry", "node", node.Name)
-			continue
-		}
-
-		if condition.Status == corev1.ConditionTrue {
-			// skip ready nodes
-			continue
-		}
-
-		cloudNode := instances[node.Spec.ProviderID]
-		if cloudNode != nil {
-			continue
-		}
-
-		log.Info("cloud node not found by prvdId, start to delete from meta", "node", node.Name, "prvdId", node.Spec.ProviderID)
-		// try delete node and ignore error, retry next loop
-		deleteNode(m, node)
-	}
-	return nil
-}
-
 func (m *ReconcileNode) PeriodicalSync() {
 	// Start a loop to periodically update the node addresses obtained from the cloud
-	address := func() {
+	syncNode := func() {
 
 		nodes, err := NodeList(m.client)
 		if err != nil {
@@ -306,33 +284,13 @@ func (m *ReconcileNode) PeriodicalSync() {
 		// ignore return value, retry on error
 		err = batchOperate(
 			nodes.Items,
-			m.syncNodeAddress,
+			m.syncNode,
 		)
 		if err != nil {
-			log.Error(err, "periodically update node address error")
+			log.Error(err, "periodically sync node error")
 		}
-		log.Info("sync node address successfully", "length", len(nodes.Items))
-	}
-	nodeExists := func() {
-
-		nodes, err := NodeList(m.client)
-		if err != nil {
-			log.Error(err, "node exists sync error")
-			return
-		}
-		// ignore return value, retry on error
-		err = batchOperate(
-			nodes.Items,
-			m.syncNodeExists,
-		)
-		if err != nil {
-			log.Error(err, "periodically try detect node existence error")
-		}
-		log.Info("sync node existence successfully", "length", len(nodes.Items))
+		log.Info("sync node successfully", "length", len(nodes.Items))
 	}
 
-	go wait.Until(address, m.statusFrequency, wait.NeverStop)
-	// start a loop to periodically check if any
-	// nodes have been deleted from cloudprovider
-	go wait.Until(nodeExists, m.monitorPeriod, wait.NeverStop)
+	go wait.Until(syncNode, m.statusFrequency, wait.NeverStop)
 }

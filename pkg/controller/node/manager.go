@@ -21,7 +21,6 @@ import (
 	"github.com/pkg/errors"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	nctx "k8s.io/cloud-provider-alibaba-cloud/pkg/context/node"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/helper"
@@ -103,10 +102,9 @@ func deleteNode(cnc *ReconcileNode, node *v1.Node) {
 	ref := &v1.ObjectReference{
 		Kind:      "Node",
 		Name:      node.Name,
-		UID:       types.UID(node.UID),
+		UID:       node.UID,
 		Namespace: "",
 	}
-	klog.V(2).Infof("recording %s event message for node %s", "DeletingNode", node.Name)
 
 	deleteOne := func() {
 		defer utilruntime.HandleCrash()
@@ -123,6 +121,7 @@ func deleteNode(cnc *ReconcileNode, node *v1.Node) {
 		cnc.record.Eventf(
 			ref, v1.EventTypeNormal, helper.SucceedDeleteNode, node.Name,
 		)
+		log.Info("delete node from cluster successfully", "node", node.Name, "prvdId", node.Spec.ProviderID)
 	}
 	go deleteOne()
 }
