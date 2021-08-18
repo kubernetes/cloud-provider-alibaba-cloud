@@ -3,6 +3,7 @@ package crd
 import (
 	"context"
 	"fmt"
+	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/klog/klogr"
 	"time"
 
@@ -19,7 +20,7 @@ const (
 
 var (
 	defCategories = []string{"all", "kooper"}
-	log = klogr.New().WithName("crd")
+	log           = klogr.New().WithName("crd")
 )
 
 // Scope is the scope of a CRD.
@@ -203,14 +204,22 @@ func (c *Client) Delete(name string) error {
 
 // validateCRD returns nil if cluster is ok to be used for CRDs, otherwise error.
 func (c *Client) validateCRD() error {
-	// Check cluster version.
-	v, err := c.client.Discovery().ServerVersion()
+	// Check cluster version
+	serverVersion, err := c.client.Discovery().ServerVersion()
 	if err != nil {
 		return fmt.Errorf("get server version: %s", err.Error())
 	}
-	if v != nil {
-		log.Info("kubernetes version should great then v1.7.0 to use crd", "server version", v.GitVersion)
+
+	runningVersion, err := version.ParseGeneric(serverVersion.String())
+	if err != nil {
+		return fmt.Errorf("unexpected error parsing running Kubernetes version, %s", err.Error())
 	}
+
+	leastVersion, _ := version.ParseGeneric("v1.7.0")
+	if !runningVersion.AtLeast(leastVersion) {
+		log.Info("kubernetes version should great then v1.7.0 to use crd", "server version", serverVersion.GitVersion)
+	}
+
 	return nil
 }
 

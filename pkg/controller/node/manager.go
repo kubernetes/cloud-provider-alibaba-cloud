@@ -57,8 +57,6 @@ func batchOperate(
 	nodes []v1.Node,
 	batch func([]v1.Node) error,
 ) error {
-
-	klog.Infof("batch operate, length %d", len(nodes))
 	for len(nodes) > MAX_BATCH_NUM {
 		if err := batch(nodes[0:MAX_BATCH_NUM]); err != nil {
 			klog.Errorf("batch process func error: %s", err.Error())

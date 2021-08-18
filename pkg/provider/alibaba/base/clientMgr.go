@@ -126,12 +126,14 @@ func (mgr *ClientMgr) Start(
 	settoken func(mgr *ClientMgr, token *Token) error,
 ) error {
 	initialized := false
-	tokenfunc := func() {
+	authMode := mgr.GetAuthMode()
+
+	tokenfunc := func(authMode AuthMode) {
 		var err error
 		token := &Token{
 			Region: mgr.Region,
 		}
-		switch mgr.GetAuthMode() {
+		switch authMode {
 		case AKMode:
 			akToken := &AkAuthToken{ak: token}
 			token, err = akToken.NextToken()
@@ -154,7 +156,7 @@ func (mgr *ClientMgr) Start(
 		initialized = true
 	}
 	go wait.Until(
-		tokenfunc,
+		func() { tokenfunc(authMode) },
 		TokenSyncPeriod,
 		mgr.stop,
 	)
@@ -165,7 +167,7 @@ func (mgr *ClientMgr) Start(
 			Jitter:   1,
 			Factor:   2,
 		}, func() (done bool, err error) {
-			tokenfunc()
+			tokenfunc(authMode)
 			log.Info("wait for Token ready")
 			return initialized, nil
 		},

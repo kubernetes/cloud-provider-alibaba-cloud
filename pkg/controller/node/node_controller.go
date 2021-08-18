@@ -51,6 +51,7 @@ type nodeController struct {
 	recon *ReconcileNode
 }
 
+// Start() function will not be called until the resource lock is acquired
 func (controller nodeController) Start(ctx context.Context) error {
 	controller.recon.PeriodicalSync()
 	return controller.c.Start(ctx)
@@ -308,8 +309,9 @@ func (m *ReconcileNode) PeriodicalSync() {
 			m.syncNodeAddress,
 		)
 		if err != nil {
-			log.Error(err, "periodically update address error")
+			log.Error(err, "periodically update node address error")
 		}
+		log.Info("sync node address successfully", "length", len(nodes.Items))
 	}
 	nodeExists := func() {
 
@@ -326,6 +328,7 @@ func (m *ReconcileNode) PeriodicalSync() {
 		if err != nil {
 			log.Error(err, "periodically try detect node existence error")
 		}
+		log.Info("sync node existence successfully", "length", len(nodes.Items))
 	}
 
 	go wait.Until(address, m.statusFrequency, wait.NeverStop)
