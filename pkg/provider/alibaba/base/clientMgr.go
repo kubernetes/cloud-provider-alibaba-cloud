@@ -233,18 +233,10 @@ func RefreshToken(mgr *ClientMgr, token *Token) error {
 }
 
 func setVPCEndpoint(mgr *ClientMgr) {
-	if ecsEndpoint := SetEndpoint4RegionalDomain(Region(mgr.Region), "ecs"); ecsEndpoint != "" {
-		mgr.ECS.Domain = ecsEndpoint
-	}
-	if vpcEndpoint := SetEndpoint4RegionalDomain(Region(mgr.Region), "vpc"); vpcEndpoint != "" {
-		mgr.VPC.Domain = vpcEndpoint
-	}
-	if slbEndpoint := SetEndpoint4RegionalDomain(Region(mgr.Region), "slb"); slbEndpoint != "" {
-		mgr.SLB.Domain = slbEndpoint
-	}
-	if pvtzEndpoint := SetEndpoint4RegionalDomain(Region(mgr.Region), "pvtz"); pvtzEndpoint != "" {
-		mgr.PVTZ.Domain = pvtzEndpoint
-	}
+	mgr.ECS.Network = "vpc"
+	mgr.VPC.Network = "vpc"
+	mgr.SLB.Network = "vpc"
+	mgr.PVTZ.Network = "vpc"
 }
 
 // Token base Token info
