@@ -235,19 +235,16 @@ func diff(reqCtx *RequestContext, remote, local model.VServerGroup) (
 	}
 	for _, l := range local.Backends {
 		for _, r := range remote.Backends {
-			if !isBackendManagedByMyService(reqCtx, r, local.VGroupName) {
-				continue
-			}
 			if l.Type == "eni" {
 				if l.ServerId == r.ServerId &&
 					l.ServerIp == r.ServerIp &&
-					l.Weight != r.Weight {
+					(l.Weight != r.Weight || l.Description != r.Description) {
 					updates = append(updates, l)
 					break
 				}
 			} else {
 				if l.ServerId == r.ServerId &&
-					l.Weight != r.Weight {
+					(l.Weight != r.Weight || l.Description != r.Description) {
 					updates = append(updates, l)
 					break
 				}

@@ -293,5 +293,5 @@ func (r *ReconcileRoute) reconcileForCluster() {
 		}
 	}
 	metric.RouteLatency.WithLabelValues("reconcile").Observe(metric.MsSince(start))
-	klog.Info("sync route tables successfully, tables [%s]", strings.Join(tables, ","))
+	klog.Infof("sync route tables successfully, tables [%s]", strings.Join(tables, ","))
 }
