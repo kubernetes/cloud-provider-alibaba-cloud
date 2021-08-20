@@ -137,14 +137,13 @@ func (v *vgroup) Update(ctx context.Context) error {
 		v.Logf("update: no backend need to be added for vgroupid [%s]", v.VGroupId)
 		return nil
 	}
-
-	if len(add) > 0 {
-		if err := v.BatchAddVServerGroupBackendServers(ctx, add); err != nil {
+	if len(del) > 0 {
+		if err := v.BatchRemoveVServerGroupBackendServers(ctx, del); err != nil {
 			return err
 		}
 	}
-	if len(del) > 0 {
-		if err := v.BatchRemoveVServerGroupBackendServers(ctx, del); err != nil {
+	if len(add) > 0 {
+		if err := v.BatchAddVServerGroupBackendServers(ctx, add); err != nil {
 			return err
 		}
 	}
@@ -153,7 +152,6 @@ func (v *vgroup) Update(ctx context.Context) error {
 	}
 	return nil
 }
-
 
 func (v *vgroup) removeUserManagedNodeFromVgBackends(ctx context.Context) (bool, error) {
 	hasUserManagedNode := false
