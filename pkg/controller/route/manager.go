@@ -74,7 +74,6 @@ func getRouteTables(ctx context.Context, providerIns prvd.Provider) ([]string, e
 }
 
 func (r *ReconcileRoute) syncTableRoutes(ctx context.Context, table string, nodes *v1.NodeList) error {
-	klog.Infof("list route table %s ", table)
 	routes, err := r.cloud.ListRoute(ctx, table)
 	if err != nil {
 		return fmt.Errorf("error listing routes: %v", err)
@@ -107,7 +106,6 @@ func (r *ReconcileRoute) syncTableRoutes(ctx context.Context, table string, node
 		}
 	}
 	for _, node := range nodes.Items {
-		klog.V(5).Infof("sync routes for node: %v", node.Name)
 		if !r.configRoutes || helper.HasExcludeLabel(&node) {
 			continue
 		}

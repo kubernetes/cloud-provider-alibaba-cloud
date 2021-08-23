@@ -197,6 +197,11 @@ func (m *ReconcileService) reconcile(request reconcile.Request) (err error) {
 		Recorder: m.record,
 	}
 
+	if ctrlCtx.ControllerCFG.DryRun {
+		_, _ = m.buildAndApplyModel(reqContext)
+		return nil
+	}
+
 	klog.Infof("%s: ensure loadbalancer with service details, \n%+v", util.Key(svc), util.PrettyJson(svc))
 	// check to see whither if loadbalancer deletion is needed
 	if needDeleteLoadBalancer(svc) {

@@ -80,13 +80,7 @@ func (mgr *VGroupManager) BuildLocalModel(reqCtx *RequestContext, m *model.LoadB
 	if err != nil {
 		return fmt.Errorf("get endpoints error: %s", err.Error())
 	}
-	var epAddrList []string
-	for _, subSet := range eps.Subsets {
-		for _, addr := range subSet.Addresses {
-			epAddrList = append(epAddrList, addr.IP)
-		}
-	}
-	reqCtx.Log.Info("backend details", "endpoints", strings.Join(epAddrList, ","))
+	reqCtx.Log.Info("backend details", "endpoints", LogEndpoints(*eps))
 
 	candidates := &EndpointWithENI{
 		Nodes:     nodes,
@@ -241,19 +235,16 @@ func diff(reqCtx *RequestContext, remote, local model.VServerGroup) (
 	}
 	for _, l := range local.Backends {
 		for _, r := range remote.Backends {
-			if !isBackendManagedByMyService(reqCtx, r, local.VGroupName) {
-				continue
-			}
 			if l.Type == "eni" {
 				if l.ServerId == r.ServerId &&
 					l.ServerIp == r.ServerIp &&
-					l.Weight != r.Weight {
+					(l.Weight != r.Weight || l.Description != r.Description) {
 					updates = append(updates, l)
 					break
 				}
 			} else {
 				if l.ServerId == r.ServerId &&
-					l.Weight != r.Weight {
+					(l.Weight != r.Weight || l.Description != r.Description) {
 					updates = append(updates, l)
 					break
 				}

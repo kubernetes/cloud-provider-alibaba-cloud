@@ -232,3 +232,13 @@ func Is7LayerProtocol(protocol string) bool {
 func Is4LayerProtocol(protocol string) bool {
 	return protocol == model.TCP || protocol == model.UDP
 }
+
+func LogEndpoints(eps v1.Endpoints) string {
+	var epAddrList []string
+	for _, subSet := range eps.Subsets {
+		for _, addr := range subSet.Addresses {
+			epAddrList = append(epAddrList, addr.IP)
+		}
+	}
+	return strings.Join(epAddrList, ",")
+}

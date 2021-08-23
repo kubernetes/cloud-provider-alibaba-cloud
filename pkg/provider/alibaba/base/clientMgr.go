@@ -126,12 +126,14 @@ func (mgr *ClientMgr) Start(
 	settoken func(mgr *ClientMgr, token *Token) error,
 ) error {
 	initialized := false
-	tokenfunc := func() {
+	authMode := mgr.GetAuthMode()
+
+	tokenfunc := func(authMode AuthMode) {
 		var err error
 		token := &Token{
 			Region: mgr.Region,
 		}
-		switch mgr.GetAuthMode() {
+		switch authMode {
 		case AKMode:
 			akToken := &AkAuthToken{ak: token}
 			token, err = akToken.NextToken()
@@ -154,7 +156,7 @@ func (mgr *ClientMgr) Start(
 		initialized = true
 	}
 	go wait.Until(
-		tokenfunc,
+		func() { tokenfunc(authMode) },
 		TokenSyncPeriod,
 		mgr.stop,
 	)
@@ -165,7 +167,7 @@ func (mgr *ClientMgr) Start(
 			Jitter:   1,
 			Factor:   2,
 		}, func() (done bool, err error) {
-			tokenfunc()
+			tokenfunc(authMode)
 			log.Info("wait for Token ready")
 			return initialized, nil
 		},
@@ -231,18 +233,10 @@ func RefreshToken(mgr *ClientMgr, token *Token) error {
 }
 
 func setVPCEndpoint(mgr *ClientMgr) {
-	if ecsEndpoint := SetEndpoint4RegionalDomain(Region(mgr.Region), "ecs"); ecsEndpoint != "" {
-		mgr.ECS.Domain = ecsEndpoint
-	}
-	if vpcEndpoint := SetEndpoint4RegionalDomain(Region(mgr.Region), "vpc"); vpcEndpoint != "" {
-		mgr.VPC.Domain = vpcEndpoint
-	}
-	if slbEndpoint := SetEndpoint4RegionalDomain(Region(mgr.Region), "slb"); slbEndpoint != "" {
-		mgr.SLB.Domain = slbEndpoint
-	}
-	if pvtzEndpoint := SetEndpoint4RegionalDomain(Region(mgr.Region), "pvtz"); pvtzEndpoint != "" {
-		mgr.PVTZ.Domain = pvtzEndpoint
-	}
+	mgr.ECS.Network = "vpc"
+	mgr.VPC.Network = "vpc"
+	mgr.SLB.Network = "vpc"
+	mgr.PVTZ.Network = "vpc"
 }
 
 // Token base Token info

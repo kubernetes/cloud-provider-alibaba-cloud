@@ -24,6 +24,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
+	"strings"
 	"time"
 )
 
@@ -32,7 +33,7 @@ func Add(mgr manager.Manager, ctx *shared.SharedContext) error {
 }
 
 // newReconciler returns a new reconcile.Reconciler
-func newReconciler(mgr manager.Manager, ctx *shared.SharedContext) reconcile.Reconciler {
+func newReconciler(mgr manager.Manager, ctx *shared.SharedContext) *ReconcileRoute {
 	recon := &ReconcileRoute{
 		cloud:           ctx.Provider(),
 		client:          mgr.GetClient(),
@@ -42,17 +43,26 @@ func newReconciler(mgr manager.Manager, ctx *shared.SharedContext) reconcile.Rec
 		configRoutes:    ctrlCtx.ControllerCFG.ConfigureCloudRoutes,
 		reconcilePeriod: ctrlCtx.ControllerCFG.RouteReconciliationPeriod,
 	}
-
-	if recon.configRoutes {
-		recon.periodicalSync()
-	}
 	return recon
 }
 
+type routeController struct {
+	c     controller.Controller
+	recon *ReconcileRoute
+}
+
+// Start() function will not be called until the resource lock is acquired
+func (controller routeController) Start(ctx context.Context) error {
+	if controller.recon.configRoutes {
+		controller.recon.periodicalSync()
+	}
+	return controller.c.Start(ctx)
+}
+
 // add adds a new Controller to mgr with r as the reconcile.Reconciler
-func add(mgr manager.Manager, r reconcile.Reconciler) error {
+func add(mgr manager.Manager, r *ReconcileRoute) error {
 	// Create a new controller
-	c, err := controller.New(
+	c, err := controller.NewUnmanaged(
 		"route-controller", mgr,
 		controller.Options{
 			Reconciler:              r,
@@ -64,13 +74,18 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	}
 
 	// Watch for changes to primary resource AutoRepair
-	return c.Watch(
+	err = c.Watch(
 		&source.Kind{
 			Type: &corev1.Node{},
 		},
 		&handler.EnqueueRequestForObject{},
 		&predicateForNodeEvent{},
 	)
+	if err != nil {
+		return err
+	}
+
+	return mgr.Add(&routeController{c: c, recon: r})
 }
 
 // ReconcileRoute implements reconcile.Reconciler
@@ -194,13 +209,13 @@ func (r *ReconcileRoute) addRouteForNode(ctx context.Context, table, ipv4Cidr, p
 		return nil
 	}
 	if route == nil || route.DestinationCIDR != ipv4Cidr {
-		klog.Infof("create routes for node %s: %v -> %v", node.Name, prvdId, ipv4Cidr)
+		klog.Infof("create routes for node %s: %v - %v", node.Name, prvdId, ipv4Cidr)
 		route, err = createRouteForInstance(ctx, table, prvdId, ipv4Cidr, r.cloud)
 		if err != nil {
 			klog.Errorf("error create route for node %v : instance id [%v], route [%v], err: %s", node.Name, prvdId, table, err.Error())
 			r.record.Eventf(node, corev1.EventTypeWarning, helper.FailedCreateRoute, "Create route entry in %s failed, reason: %s", table, err)
 		} else {
-			klog.Infof("Created route for %s with %s -> %s successfully", table, node.Name, ipv4Cidr)
+			klog.Infof("Created route for %s with %s - %s successfully", table, node.Name, ipv4Cidr)
 			r.record.Eventf(node, corev1.EventTypeNormal, helper.SucceedCreateRoute, "Created route for %s with %s -> %s successfully", table, node.Name, ipv4Cidr)
 		}
 	}
@@ -278,4 +293,5 @@ func (r *ReconcileRoute) reconcileForCluster() {
 		}
 	}
 	metric.RouteLatency.WithLabelValues("reconcile").Observe(metric.MsSince(start))
+	klog.Infof("sync route tables successfully, tables [%s]", strings.Join(tables, ","))
 }
