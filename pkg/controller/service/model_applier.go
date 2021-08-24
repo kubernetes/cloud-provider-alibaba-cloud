@@ -214,7 +214,7 @@ func (m *ModelApplier) applyListeners(reqCtx *RequestContext, local *model.LoadB
 		},
 	)
 
-	// Pls be careful of the sequence. deletion first,then addition, last updation
+	// Pls be careful of the sequence. deletion first, then addition, last update
 	for _, action := range deleteActions {
 		err := m.lisMgr.Delete(reqCtx, action)
 		if err != nil {

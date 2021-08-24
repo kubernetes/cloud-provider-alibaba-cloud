@@ -847,6 +847,10 @@ func findVServerGroup(vgs []model.VServerGroup, port *model.ListenerAttribute) e
 // ==========================================================================================
 
 func isPortManagedByMyService(local *model.LoadBalancer, n model.ListenerAttribute) bool {
+	if n.IsUserManaged || n.NamedKey == nil {
+		return false
+	}
+
 	return n.NamedKey.ServiceName == local.NamespacedName.Name &&
 		n.NamedKey.Namespace == local.NamespacedName.Namespace &&
 		n.NamedKey.CID == base.CLUSTER_ID
