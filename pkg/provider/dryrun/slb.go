@@ -198,8 +198,8 @@ From v1.9.3.313-g748f81e-aliyun, ccm sets backend type to eni in newly created T
 func (m *DryRunSLB) CreateVServerGroup(ctx context.Context, vg *model.VServerGroup, lbId string) error {
 	mtype := "CreateVServerGroup"
 	AddEvent(SLB, vg.VGroupName, lbId, "CreateVgroup", NORMAL, "")
-	klog.Errorf("function should not be called on start %s, CreateVServerGroupArgs %++v", mtype, vg)
-	return fmt.Errorf("function should not be called on start %s", mtype)
+	klog.Warningf("%s try to call %s function, lb id: %s", vg.VGroupName, mtype, lbId)
+	return nil
 }
 
 func (m *DryRunSLB) DescribeVServerGroupAttribute(ctx context.Context, vGroupId string) (model.VServerGroup, error) {
@@ -225,7 +225,8 @@ func (m *DryRunSLB) AddVServerGroupBackendServers(ctx context.Context, vGroupId 
 	lbId := getSlb(ctx)
 	AddEvent(SLB, fmt.Sprintf("%s/%s", util.Key(svc), vGroupId), lbId,
 		"AddVgroup", NORMAL, "")
-	return fmt.Errorf("function should not be called on start %s", mtype)
+	klog.Warningf("%s try to call %s function, vgroup id: %s, lb id: %s", util.Key(svc), mtype, vGroupId, lbId)
+	return nil
 }
 
 func (m *DryRunSLB) RemoveVServerGroupBackendServers(ctx context.Context, vGroupId string, backends string) error {

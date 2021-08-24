@@ -3,15 +3,14 @@ package slb
 import (
 	"context"
 	"fmt"
+	"k8s.io/klog"
 	"reflect"
 	"strconv"
 
-	"k8s.io/cloud-provider-alibaba-cloud/pkg/model"
-	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/util"
-	"k8s.io/klog"
-
 	"github.com/aliyun/alibaba-cloud-sdk-go/sdk/requests"
 	"github.com/aliyun/alibaba-cloud-sdk-go/services/slb"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/model"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/util"
 )
 
 func (p SLBProvider) DescribeLoadBalancerListeners(ctx context.Context, lbId string) ([]model.ListenerAttribute, error) {
@@ -62,8 +61,8 @@ func (p SLBProvider) DescribeLoadBalancerListeners(ctx context.Context, lbId str
 
 		namedKey, err := model.LoadListenerNamedKey(lis.Description)
 		if err != nil {
+			n.IsUserManaged = true
 			klog.Warningf("listener description [%s], not expected format. skip user managed port", lis.Description)
-			continue
 		}
 		n.NamedKey = namedKey
 
