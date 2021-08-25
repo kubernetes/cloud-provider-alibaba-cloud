@@ -403,6 +403,8 @@ func loadTCPListener(config slb.TCPListenerConfig, listener *model.ListenerAttri
 }
 
 func loadUDPListener(config slb.UDPListenerConfig, listener *model.ListenerAttribute) {
+	listener.ConnectionDrain = model.FlagType(config.ConnectionDrain)
+	listener.ConnectionDrainTimeout = config.ConnectionDrainTimeout
 	listener.HealthyThreshold = config.HealthyThreshold
 	listener.UnhealthyThreshold = config.UnhealthyThreshold
 	listener.HealthCheckConnectTimeout = config.HealthCheckConnectTimeout
