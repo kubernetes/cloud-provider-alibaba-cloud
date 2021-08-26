@@ -23,7 +23,7 @@ func initMap(client client.Client) {
 
 	length := 0
 	for _, m := range svcs.Items {
-		if !isProcessNeeded(&m) {
+		if !isServiceProcessNeeded(&m) {
 			continue
 		}
 		if !needAdd(&m) {

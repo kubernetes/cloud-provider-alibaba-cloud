@@ -23,7 +23,7 @@ const (
 //NodeEventReason
 const (
 	FailedDeleteNode  = "DeleteNodeFailed"
-	FailedAddNode   = "AddNodeFailed"
+	FailedAddNode     = "AddNodeFailed"
 	FailedSyncNode    = "SyncNodeFailed"
 	SucceedDeleteNode = "DeletedNode"
 	InitializedNode   = "InitializedNode"
@@ -39,6 +39,9 @@ const (
 var re = regexp.MustCompile(".*(Message:.*)")
 
 func GetLogMessage(err error) string {
+	if err == nil {
+		return ""
+	}
 	var message string
 	sub := re.FindSubmatch([]byte(err.Error()))
 	if len(sub) > 1 {
@@ -48,4 +51,3 @@ func GetLogMessage(err error) string {
 	}
 	return message
 }
-

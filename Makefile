@@ -44,6 +44,12 @@ OUT_DIR=$(REPO_ROOT)/bin
 UID:=$(shell id -u)
 GID:=$(shell id -g)
 
+# ldflags
+VERSION_PKG=k8s.io/cloud-provider-alibaba-cloud/version
+GIT_COMMIT=$(shell git rev-parse HEAD)
+BUILD_DATE=$(shell date +%Y-%m-%dT%H:%M:%S%z)
+ldflags="-s -w -X $(VERSION_PKG).Version=$(TAG) -X $(VERSION_PKG).GitCommit=${GIT_COMMIT} -X ${VERSION_PKG}.BuildDate=${BUILD_DATE}"
+
 # standard "make" target -> builds
 all: build
 
@@ -88,7 +94,7 @@ cloud-controller-manager: make-cache out-dir
 		--user $(UID):$(GID) \
 		$(GO_IMAGE) \
 		go build -v -o /out/$(KIND_BINARY_NAME) \
-		    -ldflags "-X k8s.io/cloud-provider-alibaba-cloud/version.Version=$(TAG)" cmd/manager/main.go
+		    -ldflags $(ldflags) cmd/manager/main.go
 	@echo + Built cloud-controller-manager binary to $(OUT_DIR)/$(KIND_BINARY_NAME)
 
 # alias for building cloud-controller-manager
@@ -120,7 +126,7 @@ ccm-mac:
 	CGO_ENABLED=0 \
 	GO111MODULE=on \
 	go build -v -o build/bin/cloud-controller-manager \
-       -ldflags "-X k8s.io/cloud-provider-alibaba-cloud/version.Version=$(TAG)" cmd/manager/main.go
+       -ldflags $(ldflags) cmd/manager/main.go
 
 ccm-linux:
 	GOARCH=amd64 \
@@ -128,21 +134,21 @@ ccm-linux:
 	CGO_ENABLED=0 \
 	GO111MODULE=on \
 	go build -v -o build/bin/cloud-controller-manager.amd64 \
-       -ldflags "-X k8s.io/cloud-provider-alibaba-cloud/version.Version=$(TAG)" cmd/manager/main.go
+       -ldflags $(ldflags) cmd/manager/main.go
 ccm-win:
 	GOARCH=amd64 \
 	GOOS=windows \
 	CGO_ENABLED=0 \
 	GO111MODULE=on \
 	go build -v -o build/bin/cloud-controller-manager.exe \
-       -ldflags "-X k8s.io/cloud-provider-alibaba-cloud/version.Version=$(TAG)" cmd/manager/main.go
+       -ldflags $(ldflags) cmd/manager/main.go
 ccm-arm64:
 	GOARCH=arm64 \
 	GOOS=linux \
 	CGO_ENABLED=0 \
 	GO111MODULE=on \
 	go build -v -o build/bin/cloud-controller-manager.arm64 \
-       -ldflags "-X k8s.io/cloud-provider-alibaba-cloud/version.Version=$(TAG)" cmd/manager/main.go
+       -ldflags $(ldflags) cmd/manager/main.go
 # standard cleanup target
 clean: clean-cache clean-output
 

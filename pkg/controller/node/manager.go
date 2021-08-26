@@ -112,9 +112,10 @@ func deleteNode(cnc *ReconcileNode, node *v1.Node) {
 			context.Background(), node,
 		)
 		if err != nil {
-			klog.Errorf("unable to delete node %q: %v", node.Name, err)
+			log.Error(err, "failed to delete node", "node", node.Name, "prvdId", node.Spec.ProviderID)
 			cnc.record.Eventf(
-				node, v1.EventTypeWarning, helper.FailedDeleteNode, err.Error(),
+				node, v1.EventTypeWarning, helper.FailedDeleteNode, "Error deleting node: %s",
+				helper.GetLogMessage(err),
 			)
 			return
 		}
