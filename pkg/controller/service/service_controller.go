@@ -201,7 +201,8 @@ func (m *ReconcileService) reconcile(request reconcile.Request) (err error) {
 
 	if ctrlCtx.ControllerCFG.DryRun {
 		if _, err = m.buildAndApplyModel(reqContext); err != nil {
-			reqContext.Log.Error(err, "dryrun: reconcile loadbalancer failed")
+			m.record.Eventf(reqContext.Service, v1.EventTypeWarning, helper.FailedSyncLB,
+				"DryRun: Error syncing load balancer: %s", helper.GetLogMessage(err))
 		}
 		return nil
 	}
