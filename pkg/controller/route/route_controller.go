@@ -205,7 +205,7 @@ func (r *ReconcileRoute) addRouteForNode(ctx context.Context, table, ipv4Cidr, p
 	route, findErr := findRoute(ctx, table, prvdId, ipv4Cidr, cachedRouteEntry, r.cloud)
 	if findErr != nil {
 		klog.Errorf("error found exist route for instance: %v, %v", prvdId, findErr)
-		r.record.Eventf(node, corev1.EventTypeWarning, "DescriberRouteFailed", "Describe Route Failed for %s reason: %s", table, findErr)
+		r.record.Eventf(node, corev1.EventTypeWarning, "DescriberRouteFailed", "Describe Route Failed for %s reason: %s", table, helper.GetLogMessage(findErr))
 		return nil
 	}
 	if route == nil || route.DestinationCIDR != ipv4Cidr {
@@ -213,7 +213,7 @@ func (r *ReconcileRoute) addRouteForNode(ctx context.Context, table, ipv4Cidr, p
 		route, err = createRouteForInstance(ctx, table, prvdId, ipv4Cidr, r.cloud)
 		if err != nil {
 			klog.Errorf("error create route for node %v : instance id [%v], route [%v], err: %s", node.Name, prvdId, table, err.Error())
-			r.record.Eventf(node, corev1.EventTypeWarning, helper.FailedCreateRoute, "Create route entry in %s failed, reason: %s", table, err)
+			r.record.Eventf(node, corev1.EventTypeWarning, helper.FailedCreateRoute, "Error creating route entry in %s: %s", table, helper.GetLogMessage(err))
 		} else {
 			klog.Infof("Created route for %s with %s - %s successfully", table, node.Name, ipv4Cidr)
 			r.record.Eventf(node, corev1.EventTypeNormal, helper.SucceedCreateRoute, "Created route for %s with %s -> %s successfully", table, node.Name, ipv4Cidr)
@@ -288,7 +288,8 @@ func (r *ReconcileRoute) reconcileForCluster() {
 			klog.Errorf("reconcile route for table [%s] error: %s", table, err.Error())
 			if len(nodes.Items) > 0 {
 				refNode := nodes.Items[0]
-				r.record.Eventf(&refNode, corev1.EventTypeNormal, helper.FailedSyncRoute, "Sync route for table %s error", table, refNode.Name)
+				r.record.Eventf(&refNode, corev1.EventTypeNormal, helper.FailedSyncRoute,
+					"Error reconciling route for table %s: %s", table, helper.GetLogMessage(err))
 			}
 		}
 	}

@@ -8,135 +8,71 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/leaderelection/resourcelock"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/util/workqueue"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/helper"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/util"
 	"reflect"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
-	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sort"
 	"strings"
 )
 
-func NewMapHandler() *MapEnqueue {
-	omap := &MapEnqueue{}
-	omap.EventHandler = handler.EnqueueRequestsFromMapFunc(omap.FanIN)
-	return omap
+func NewEnqueueRequestForServiceEvent(eventRecorder record.EventRecorder) *enqueueRequestForServiceEvent {
+	return &enqueueRequestForServiceEvent{eventRecorder: eventRecorder}
 }
 
-type MapEnqueue struct {
-	client client.Client
-	handler.EventHandler
-}
-
-// FanIN aggregate multiple resource notification into service update.
-func (m *MapEnqueue) FanIN(o client.Object) []reconcile.Request {
-
-	var request []reconcile.Request
-	switch o.(type) {
-	case *v1.Node:
-		request = append(request, m.mapNode(o.(*v1.Node))...)
-	case *v1.Endpoints:
-		request = append(request, m.mapEndpoint(o.(*v1.Endpoints))...)
-	case *v1.Service:
-		request = append(request, m.mapService(o.(*v1.Service))...)
-	default:
-		util.ServiceLog.Info(fmt.Sprintf("warning: unknown object: %s, %v", reflect.TypeOf(o), o))
-	}
-	return request
-}
-
-func (m *MapEnqueue) mapNode(o *v1.Node) []reconcile.Request {
-	var request []reconcile.Request
-	// node change would cause all service object reconcile
-	svcs := v1.ServiceList{}
-	err := m.client.List(context.TODO(), &svcs)
-	if err != nil {
-		util.ServiceLog.Error(err, fmt.Sprintf("fail to list services for node"),
-			"node", o.Name)
-		return request
-	}
-
-	for _, v := range svcs.Items {
-		if !needLoadBalancer(&v) {
-			continue
-		}
-		if !isProcessNeeded(&v) {
-			continue
-		}
-		util.ServiceLog.Info(fmt.Sprintf("node change: enqueue service %s", util.Key(&v)),
-			"node", o.Name)
-		req := reconcile.Request{
-			NamespacedName: client.ObjectKey{Namespace: v.Namespace, Name: v.Name},
-		}
-		request = append(request, req)
-	}
-	return request
-}
-
-func (m *MapEnqueue) mapEndpoint(o *v1.Endpoints) []reconcile.Request {
-
-	return []reconcile.Request{
-		{NamespacedName: client.ObjectKey{Namespace: o.GetNamespace(), Name: o.GetName()}},
-	}
-}
-
-func (m *MapEnqueue) mapService(o *v1.Service) []reconcile.Request {
-	if !isProcessNeeded(o) {
-		util.ServiceLog.Info("ccm class not empty, skip process", "service", util.Key(o))
-		return nil
-	}
-	return []reconcile.Request{
-		{NamespacedName: client.ObjectKey{Namespace: o.GetNamespace(), Name: o.GetName()}},
-	}
-}
-
-func (m *MapEnqueue) InjectClient(c client.Client) error {
-	m.client = c
-	return nil
-}
-
-// PredicateForServiceEvent, filter service event
-func NewPredicateForServiceEvent(eventRecorder record.EventRecorder) *predicateForServiceEvent {
-	return &predicateForServiceEvent{eventRecorder: eventRecorder}
-}
-
-type predicateForServiceEvent struct {
+type enqueueRequestForServiceEvent struct {
 	eventRecorder record.EventRecorder
 }
 
-var _ predicate.Predicate = (*predicateForServiceEvent)(nil)
+var _ handler.EventHandler = (*enqueueRequestForServiceEvent)(nil)
 
-func (p *predicateForServiceEvent) Create(e event.CreateEvent) bool {
+func (h *enqueueRequestForServiceEvent) Create(e event.CreateEvent, queue workqueue.RateLimitingInterface) {
 	svc, ok := e.Object.(*v1.Service)
 	if ok && needAdd(svc) {
 		util.ServiceLog.Info("controller: service create event", "service", util.Key(svc))
-		return true
+		h.enqueueManagedService(queue, svc)
 	}
-	return false
 }
 
-func (p *predicateForServiceEvent) Update(e event.UpdateEvent) bool {
+func (h *enqueueRequestForServiceEvent) Update(e event.UpdateEvent, queue workqueue.RateLimitingInterface) {
 	oldSvc, ok1 := e.ObjectOld.(*v1.Service)
 	newSvc, ok2 := e.ObjectNew.(*v1.Service)
 
-	if ok1 && ok2 && needUpdate(oldSvc, newSvc, p.eventRecorder) {
-		util.ServiceLog.Info("controller: service update event",
-			"service", util.Key(oldSvc))
-		return true
+	if ok1 && ok2 && needUpdate(oldSvc, newSvc, h.eventRecorder) {
+		util.ServiceLog.Info("controller: service update event", "service", util.Key(oldSvc))
+		h.enqueueManagedService(queue, oldSvc)
 	}
-	return false
 }
 
-func (p *predicateForServiceEvent) Delete(e event.DeleteEvent) bool {
-	return false
+func (h *enqueueRequestForServiceEvent) Delete(e event.DeleteEvent, queue workqueue.RateLimitingInterface) {
+	// Services have the finalizer. When a service is deleted, it will update the deletionTimestamp of the service.
+	// Since a delete event has changed to an update event, it is safe to ignore it.
 }
 
-func (p *predicateForServiceEvent) Generic(event.GenericEvent) bool {
-	return false
+func (h *enqueueRequestForServiceEvent) Generic(e event.GenericEvent, queue workqueue.RateLimitingInterface) {
+	// unknown type event, ignore
 }
+
+func (h *enqueueRequestForServiceEvent) enqueueManagedService(queue workqueue.RateLimitingInterface, service *v1.Service) {
+	if !isServiceProcessNeeded(service) {
+		util.ServiceLog.Info("ccm class not empty, skip process", "service", util.Key(service))
+		return
+	}
+
+	queue.Add(reconcile.Request{
+		NamespacedName: types.NamespacedName{
+			Namespace: service.Namespace,
+			Name:      service.Name,
+		},
+	})
+	util.ServiceLog.Info("enqueue", "service", util.Key(service), "queueLen", queue.Len())
+}
+
+func isServiceProcessNeeded(svc *v1.Service) bool { return svc.Annotations[CCMClass] == "" }
 
 func needUpdate(oldSvc, newSvc *v1.Service, recorder record.EventRecorder) bool {
 	if !needLoadBalancer(oldSvc) && !needLoadBalancer(newSvc) {
@@ -218,54 +154,64 @@ func needAdd(newService *v1.Service) bool {
 	return false
 }
 
-// PredicateForEndpointEvent, filter endpoint event
-func NewPredicateForEndpointEvent(client client.Client) *predicateForEndpointEvent {
-	return &predicateForEndpointEvent{client}
+// NewEnqueueRequestForEndpointEvent, event handler for endpoint events
+func NewEnqueueRequestForEndpointEvent(eventRecorder record.EventRecorder) *enqueueRequestForEndpointEvent {
+	return &enqueueRequestForEndpointEvent{eventRecorder: eventRecorder}
 }
 
-type predicateForEndpointEvent struct {
-	client client.Client
+type enqueueRequestForEndpointEvent struct {
+	client        client.Client
+	eventRecorder record.EventRecorder
 }
 
-var _ predicate.Predicate = (*predicateForEndpointEvent)(nil)
+func (h *enqueueRequestForEndpointEvent) InjectClient(c client.Client) error {
+	h.client = c
+	return nil
+}
 
-func (p *predicateForEndpointEvent) Create(e event.CreateEvent) bool {
+var _ handler.EventHandler = (*enqueueRequestForEndpointEvent)(nil)
+
+func (h *enqueueRequestForEndpointEvent) Create(e event.CreateEvent, queue workqueue.RateLimitingInterface) {
 	ep, ok := e.Object.(*v1.Endpoints)
-	if ok && isEndpointProcessNeeded(ep, p.client) {
+	if ok && isEndpointProcessNeeded(ep, h.client) {
 		util.ServiceLog.Info("controller: endpoint create event", "endpoint", util.Key(ep))
-		return true
+		h.enqueueManagedEndpoint(queue, ep)
 	}
-	return false
 }
 
-func (p *predicateForEndpointEvent) Update(e event.UpdateEvent) bool {
+func (h *enqueueRequestForEndpointEvent) Update(e event.UpdateEvent, queue workqueue.RateLimitingInterface) {
 	ep1, ok1 := e.ObjectOld.(*v1.Endpoints)
 	ep2, ok2 := e.ObjectNew.(*v1.Endpoints)
 
-	if ok1 && ok2 &&
-		isEndpointProcessNeeded(ep1, p.client) &&
+	if ok1 && ok2 && isEndpointProcessNeeded(ep1, h.client) &&
 		!reflect.DeepEqual(ep1.Subsets, ep2.Subsets) {
 		util.ServiceLog.Info("controller: endpoint update event", "endpoint", util.Key(ep1))
 		util.ServiceLog.Info(fmt.Sprintf("endpoints before [%s], afeter [%s]", LogEndpoints(*ep1), LogEndpoints(*ep2)), "endpoint", util.Key(ep1))
-		return true
+		h.enqueueManagedEndpoint(queue, ep1)
 	}
-	return false
 }
 
-func (p *predicateForEndpointEvent) Delete(e event.DeleteEvent) bool {
+func (h *enqueueRequestForEndpointEvent) Delete(e event.DeleteEvent, queue workqueue.RateLimitingInterface) {
 	ep, ok := e.Object.(*v1.Endpoints)
-	if ok && isEndpointProcessNeeded(ep, p.client) {
+	if ok && isEndpointProcessNeeded(ep, h.client) {
 		util.ServiceLog.Info("controller: endpoint delete event", "endpoint", util.Key(ep))
-		return true
+		h.enqueueManagedEndpoint(queue, ep)
 	}
-	return false
 }
 
-func (p *predicateForEndpointEvent) Generic(event.GenericEvent) bool {
-	return false
+func (h *enqueueRequestForEndpointEvent) Generic(e event.GenericEvent, queue workqueue.RateLimitingInterface) {
+	// unknown event, ignore
 }
 
-func isProcessNeeded(svc *v1.Service) bool { return svc.Annotations[CCMClass] == "" }
+func (h *enqueueRequestForEndpointEvent) enqueueManagedEndpoint(queue workqueue.RateLimitingInterface, endpoint *v1.Endpoints) {
+	queue.Add(reconcile.Request{
+		NamespacedName: types.NamespacedName{
+			Namespace: endpoint.Namespace,
+			Name:      endpoint.Name,
+		},
+	})
+	util.ServiceLog.Info("enqueue", "endpoint", util.Key(endpoint), "queueLen", queue.Len())
+}
 
 func isEndpointProcessNeeded(ep *v1.Endpoints, client client.Client) bool {
 	if ep == nil {
@@ -292,14 +238,14 @@ func isEndpointProcessNeeded(ep *v1.Endpoints, client client.Client) bool {
 		return false
 	}
 
-	if !isProcessNeeded(svc) {
-		util.ServiceLog.Info("endpoint change: class not empty, skip reconcile",
+	if !isServiceProcessNeeded(svc) {
+		util.ServiceLog.Info("endpoint change: service class not empty, skip reconcile",
 			"endpoint", util.Key(ep))
 		return false
 	}
 
 	if !needLoadBalancer(svc) {
-		// we are safe here to skip process syncEndpoint
+		// it is safe not to reconcile endpoints which belongs to the non-loadbalancer svc
 		util.ServiceLog.V(5).Info("endpoint change: loadBalancer is not needed, skip",
 			"endpoint", util.Key(ep))
 		return false
@@ -307,55 +253,87 @@ func isEndpointProcessNeeded(ep *v1.Endpoints, client client.Client) bool {
 	return true
 }
 
-// PredicateForNodeEvent, filter node event
-func NewPredicateForNodeEvent(record record.EventRecorder) *predicateForNodeEvent {
-	return &predicateForNodeEvent{eventRecorder: record}
+// NewEnqueueRequestForNodeEvent, event handler for node event
+func NewEnqueueRequestForNodeEvent(record record.EventRecorder) *enqueueRequestForNodeEvent {
+	return &enqueueRequestForNodeEvent{eventRecorder: record}
 }
 
-type predicateForNodeEvent struct {
+type enqueueRequestForNodeEvent struct {
+	client        client.Client
 	eventRecorder record.EventRecorder
 }
 
-var _ predicate.Predicate = (*predicateForNodeEvent)(nil)
+var _ handler.EventHandler = (*enqueueRequestForNodeEvent)(nil)
 
-func (p *predicateForNodeEvent) Create(e event.CreateEvent) bool {
+func (h *enqueueRequestForNodeEvent) InjectClient(c client.Client) error {
+	h.client = c
+	return nil
+}
+
+func (h *enqueueRequestForNodeEvent) Create(e event.CreateEvent, queue workqueue.RateLimitingInterface) {
 	node, ok := e.Object.(*v1.Node)
 	if ok && !canNodeSkipEventHandler(node) {
 		util.ServiceLog.Info("controller: node create event", "node", node.Name)
-		return true
+		h.enqueueManagedNode(queue, node)
 	}
-	return false
 }
 
-func (p *predicateForNodeEvent) Update(e event.UpdateEvent) bool {
+func (h *enqueueRequestForNodeEvent) Update(e event.UpdateEvent, queue workqueue.RateLimitingInterface) {
 	oldNode, ok1 := e.ObjectOld.(*v1.Node)
 	newNode, ok2 := e.ObjectNew.(*v1.Node)
 
 	if ok1 && ok2 {
 		if canNodeSkipEventHandler(oldNode) && canNodeSkipEventHandler(newNode) {
-			return false
+			return
 		}
 
 		//if node label and schedulable condition changed, need to reconcile svc
 		if nodeSpecChanged(oldNode, newNode) {
 			util.ServiceLog.Info("controller: node update event", "node", oldNode.Name)
-			return true
+			h.enqueueManagedNode(queue, newNode)
 		}
 	}
-	return false
 }
 
-func (p *predicateForNodeEvent) Delete(e event.DeleteEvent) bool {
+func (h *enqueueRequestForNodeEvent) Delete(e event.DeleteEvent, queue workqueue.RateLimitingInterface) {
 	node, ok := e.Object.(*v1.Node)
 	if ok && !canNodeSkipEventHandler(node) {
 		util.ServiceLog.Info("controller: node delete event", "node", node.Name)
-		return true
+		h.enqueueManagedNode(queue, node)
 	}
-	return false
 }
 
-func (p *predicateForNodeEvent) Generic(event.GenericEvent) bool {
-	return false
+func (h *enqueueRequestForNodeEvent) Generic(e event.GenericEvent, queue workqueue.RateLimitingInterface) {
+	// unknown event, ignore
+}
+
+func (h *enqueueRequestForNodeEvent) enqueueManagedNode(queue workqueue.RateLimitingInterface, node *v1.Node) {
+
+	// node change would cause all service object reconcile
+	svcs := v1.ServiceList{}
+	err := h.client.List(context.TODO(), &svcs)
+	if err != nil {
+		util.ServiceLog.Error(err, fmt.Sprintf("fail to list services for node"),
+			"node", node.Name)
+		return
+	}
+
+	for _, v := range svcs.Items {
+		if !needLoadBalancer(&v) {
+			continue
+		}
+		if !isServiceProcessNeeded(&v) {
+			continue
+		}
+		queue.Add(reconcile.Request{
+			NamespacedName: types.NamespacedName{
+				Namespace: v.Namespace,
+				Name:      v.Name,
+			},
+		})
+		util.ServiceLog.Info(fmt.Sprintf("node change: enqueue service %s", util.Key(&v)),
+			"node", node.Name, "queueLen", queue.Len())
+	}
 }
 
 func nodeSpecChanged(oldNode, newNode *v1.Node) bool {

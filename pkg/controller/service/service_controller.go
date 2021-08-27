@@ -73,7 +73,7 @@ func (svcC serviceController) Start(ctx context.Context) error {
 // add adds a new Controller to mgr with r as the reconcile.Reconciler
 func add(mgr manager.Manager, r *ReconcileService) error {
 	rateLimit := workqueue.NewMaxOfRateLimiter(
-		workqueue.NewItemExponentialFailureRateLimiter(5*time.Second, 900*time.Second),
+		workqueue.NewItemExponentialFailureRateLimiter(5*time.Second, 300*time.Second),
 		// 10 qps, 100 bucket size.  This is only for retry speed and its only the overall factor (not per item)
 		&workqueue.BucketRateLimiter{Limiter: rate.NewLimiter(rate.Limit(10), 100)},
 	)
@@ -83,26 +83,26 @@ func add(mgr manager.Manager, r *ReconcileService) error {
 		"service-controller", mgr,
 		controller.Options{
 			Reconciler:              r,
-			MaxConcurrentReconciles: 1,
+			MaxConcurrentReconciles: 2,
 			RateLimiter:             rateLimit,
 		},
 	)
 	if err != nil {
 		return err
 	}
-	hand := NewMapHandler()
-	if err := c.Watch(&source.Kind{Type: &v1.Service{}}, hand,
-		NewPredicateForServiceEvent(mgr.GetEventRecorderFor("service-controller"))); err != nil {
+
+	if err := c.Watch(&source.Kind{Type: &v1.Service{}},
+		NewEnqueueRequestForServiceEvent(mgr.GetEventRecorderFor("service-controller"))); err != nil {
 		return fmt.Errorf("watch resource svc error: %s", err.Error())
 	}
 
-	if err := c.Watch(&source.Kind{Type: &v1.Endpoints{}}, hand,
-		NewPredicateForEndpointEvent(mgr.GetClient())); err != nil {
+	if err := c.Watch(&source.Kind{Type: &v1.Endpoints{}},
+		NewEnqueueRequestForEndpointEvent(mgr.GetEventRecorderFor("service-controller"))); err != nil {
 		return fmt.Errorf("watch resource endpoint error: %s", err.Error())
 	}
 
-	if err := c.Watch(&source.Kind{Type: &v1.Node{}}, hand,
-		NewPredicateForNodeEvent(mgr.GetEventRecorderFor("service-controller"))); err != nil {
+	if err := c.Watch(&source.Kind{Type: &v1.Node{}},
+		NewEnqueueRequestForNodeEvent(mgr.GetEventRecorderFor("service-controller"))); err != nil {
 		return fmt.Errorf("watch resource node error: %s", err.Error())
 	}
 	return mgr.Add(&serviceController{c: c, recon: r})
@@ -229,27 +229,27 @@ func (m *ReconcileService) cleanupLoadBalancerResources(reqCtx *RequestContext) 
 		_, err := m.buildAndApplyModel(reqCtx)
 		if err != nil && !strings.Contains(err.Error(), "LoadBalancerId does not exist") {
 			m.record.Eventf(reqCtx.Service, v1.EventTypeWarning, helper.FailedCleanLB,
-				fmt.Sprintf("Error deleting load balancer: %s", helper.GetLogMessage(err)))
+				"Error deleting load balancer: %s", helper.GetLogMessage(err))
 			return err
 		}
 
 		if err := m.removeServiceHash(reqCtx.Service); err != nil {
 			m.record.Eventf(reqCtx.Service, v1.EventTypeWarning, helper.FailedRemoveHash,
-				fmt.Sprintf("Error removing service hash: %s", err.Error()))
+				"Error removing service hash: %s", err.Error())
 			return err
 		}
 
 		// When service type changes from LoadBalancer to NodePort,
 		// we need to clean Ingress attribute in service status
 		if err := m.removeServiceStatus(reqCtx, reqCtx.Service); err != nil {
-			m.record.Event(reqCtx.Service, v1.EventTypeWarning, helper.FailedUpdateStatus,
-				fmt.Sprintf("Error removing load balancer status: %s", err.Error()))
+			m.record.Eventf(reqCtx.Service, v1.EventTypeWarning, helper.FailedUpdateStatus,
+				"Error removing load balancer status: %s", err.Error())
 			return err
 		}
 
 		if err := m.finalizerManager.RemoveFinalizers(reqCtx.Ctx, reqCtx.Service, ServiceFinalizer); err != nil {
 			m.record.Eventf(reqCtx.Service, v1.EventTypeWarning, helper.FailedRemoveFinalizer,
-				fmt.Sprintf("Error removing load balancer finalizer: %v", err.Error()))
+				"Error removing load balancer finalizer: %v", err.Error())
 			return err
 		}
 	}
@@ -260,27 +260,27 @@ func (m *ReconcileService) cleanupLoadBalancerResources(reqCtx *RequestContext) 
 func (m *ReconcileService) reconcileLoadBalancerResources(req *RequestContext) error {
 
 	if err := m.finalizerManager.AddFinalizers(req.Ctx, req.Service, ServiceFinalizer); err != nil {
-		m.record.Event(req.Service, v1.EventTypeWarning, helper.FailedAddFinalizer,
-			fmt.Sprintf("Error adding finalizer: %s", err.Error()))
+		m.record.Eventf(req.Service, v1.EventTypeWarning, helper.FailedAddFinalizer,
+			"Error adding finalizer: %s", err.Error())
 		return err
 	}
 
 	lb, err := m.buildAndApplyModel(req)
 	if err != nil {
-		m.record.Event(req.Service, v1.EventTypeWarning, helper.FailedSyncLB,
-			fmt.Sprintf("Error syncing load balancer: %s", helper.GetLogMessage(err)))
+		m.record.Eventf(req.Service, v1.EventTypeWarning, helper.FailedSyncLB,
+			"Error syncing load balancer: %s", helper.GetLogMessage(err))
 		return err
 	}
 
 	if err := m.addServiceHash(req.Service); err != nil {
 		m.record.Eventf(req.Service, v1.EventTypeWarning, helper.FailedAddHash,
-			fmt.Sprintf("Error adding service hash: %s", err.Error()))
+			"Error adding service hash: %s", err.Error())
 		return err
 	}
 
 	if err := m.updateServiceStatus(req, req.Service, lb); err != nil {
-		m.record.Event(req.Service, v1.EventTypeWarning, helper.FailedUpdateStatus,
-			fmt.Sprintf("Error updating load balancer status: %s", err.Error()))
+		m.record.Eventf(req.Service, v1.EventTypeWarning, helper.FailedUpdateStatus,
+			"Error updating load balancer status: %s", err.Error())
 		return err
 	}
 

@@ -191,7 +191,8 @@ func (m *ReconcileNode) doAddCloudNode(node *corev1.Node) error {
 
 	err = wait.PollImmediate(2*time.Second, 20*time.Second, initializer)
 	if err != nil {
-		m.record.Eventf(node, corev1.EventTypeWarning, helper.FailedAddNode, err.Error(), )
+		m.record.Eventf(node, corev1.EventTypeWarning, helper.FailedAddNode, "Error adding node: %s",
+			helper.GetLogMessage(err))
 		return fmt.Errorf("doAddCloudNode %s error: %s", node.Name, err.Error())
 	}
 
@@ -217,7 +218,7 @@ func (m *ReconcileNode) syncNode(nodes []corev1.Node) error {
 		if cloudNode == nil {
 			// if cloud node has been deleted, try to delete node from cluster
 			condition := nodeConditionReady(m.client, node)
-			if condition != nil && condition.Status == corev1.ConditionFalse {
+			if condition != nil && condition.Status == corev1.ConditionUnknown {
 				log.Info("node is NotReady and cloud node can not found by prvdId, try to delete node from cluster ", "node", node.Name, "prvdId", node.Spec.ProviderID)
 				// ignore error, retry next loop
 				deleteNode(m, node)
@@ -250,7 +251,8 @@ func (m *ReconcileNode) syncNode(nodes []corev1.Node) error {
 		if err != nil {
 			log.Error(err, "patch node address error, wait for next retry", "node", node.Name)
 			m.record.Eventf(
-				node, corev1.EventTypeWarning, helper.FailedSyncNode, err.Error(),
+				node, corev1.EventTypeWarning, helper.FailedSyncNode, "Error reconciling node: %s",
+				helper.GetLogMessage(err),
 			)
 		}
 
