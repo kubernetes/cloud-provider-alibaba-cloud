@@ -89,7 +89,7 @@ func (mgr *VGroupManager) BuildLocalModel(reqCtx *RequestContext, m *model.LoadB
 	candidates.setTrafficPolicy(reqCtx)
 
 	for _, port := range reqCtx.Service.Spec.Ports {
-		vg, err := mgr.buildVGroupForServicePort(reqCtx, port, candidates)
+		vg, err := mgr.buildVGroupForServicePort(reqCtx, port, candidates, m.LoadBalancerAttribute.IsUserManaged)
 		if err != nil {
 			return fmt.Errorf("build vgroup for port %d error: %s", port.Port, err.Error())
 		}
@@ -389,14 +389,15 @@ func getEndpoints(reqCtx *RequestContext, client client.Client) (*v1.Endpoints, 
 	return eps, err
 }
 
-func (mgr *VGroupManager) buildVGroupForServicePort(reqCtx *RequestContext, port v1.ServicePort, candidates *EndpointWithENI) (model.VServerGroup, error) {
+func (mgr *VGroupManager) buildVGroupForServicePort(reqCtx *RequestContext, port v1.ServicePort,
+	candidates *EndpointWithENI, isUserManagedLB bool) (model.VServerGroup, error) {
 	vg := model.VServerGroup{
 		NamedKey:    getVGroupNamedKey(reqCtx.Service, port),
 		ServicePort: port,
 	}
 	vg.VGroupName = vg.NamedKey.Key()
 
-	if reqCtx.Anno.Get(VGroupPort) != "" {
+	if isUserManagedLB && reqCtx.Anno.Get(VGroupPort) != "" {
 		vgroupId, err := vgroup(reqCtx.Anno.Get(VGroupPort), port)
 		if err != nil {
 			return vg, fmt.Errorf("vgroupid parse error: %s", err.Error())
@@ -406,19 +407,20 @@ func (mgr *VGroupManager) buildVGroupForServicePort(reqCtx *RequestContext, port
 			vg.VGroupId = vgroupId
 			vg.IsUserManaged = true
 		}
-	}
-	if reqCtx.Anno.Get(VGroupWeight) != "" {
-		w, err := strconv.Atoi(reqCtx.Anno.Get(VGroupWeight))
-		if err != nil {
-			return vg, fmt.Errorf("weight must be integer, got [%s], error: %s", reqCtx.Anno.Get(VGroupWeight), err.Error())
+
+		if reqCtx.Anno.Get(VGroupWeight) != "" {
+			w, err := strconv.Atoi(reqCtx.Anno.Get(VGroupWeight))
+			if err != nil {
+				return vg, fmt.Errorf("weight must be integer, got [%s], error: %s", reqCtx.Anno.Get(VGroupWeight), err.Error())
+			}
+			if w < 0 {
+				w = 0
+			}
+			if w > 100 {
+				w = 100
+			}
+			vg.VGroupWeight = w
 		}
-		if w < 0 {
-			w = 0
-		}
-		if w > 100 {
-			w = 100
-		}
-		vg.VGroupWeight = w
 	}
 
 	// build backends
