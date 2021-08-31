@@ -214,7 +214,7 @@ func (r *VPCProvider) DescribeEipAddresses(ctx context.Context, instanceType str
 			PageSize:   resp.PageSize,
 			TotalCount: resp.TotalCount,
 		}
-		next := pageResult.NextPage()
+		next = pageResult.NextPage()
 		if next == nil {
 			break
 		}
