@@ -196,5 +196,5 @@ func (n *AnnotationRequest) GetLoadBalancerAdditionalTags() []model.Tag {
 }
 
 func (n *AnnotationRequest) isForceOverride() bool {
-	return n.Get(OverrideListener) == "" || n.Get(OverrideListener) == string(model.OffFlag)
+	return n.Get(OverrideListener) == "" || n.Get(OverrideListener) == "false"
 }

@@ -42,6 +42,7 @@ import (
 
 const (
 	KubernetesCloudControllerManager = "ack.ccm"
+	AgentClusterId                   = "ClusterId"
 	TokenSyncPeriod                  = 10 * time.Minute
 )
 
@@ -87,6 +88,7 @@ func NewClientMgr() (*ClientMgr, error) {
 		return nil, fmt.Errorf("initialize alibaba ecs client: %s", err.Error())
 	}
 	ecli.AppendUserAgent(KubernetesCloudControllerManager, version.Version)
+	ecli.AppendUserAgent(AgentClusterId, CLUSTER_ID)
 
 	vpcli, err := vpc.NewClientWithStsToken(
 		region, "key", "secret", "")
@@ -94,6 +96,7 @@ func NewClientMgr() (*ClientMgr, error) {
 		return nil, fmt.Errorf("initialize alibaba vpc client: %s", err.Error())
 	}
 	vpcli.AppendUserAgent(KubernetesCloudControllerManager, version.Version)
+	vpcli.AppendUserAgent(AgentClusterId, CLUSTER_ID)
 
 	slbcli, err := slb.NewClientWithStsToken(
 		region, "key", "secret", "")
@@ -101,6 +104,7 @@ func NewClientMgr() (*ClientMgr, error) {
 		return nil, fmt.Errorf("initialize alibaba slb client: %s", err.Error())
 	}
 	slbcli.AppendUserAgent(KubernetesCloudControllerManager, version.Version)
+	slbcli.AppendUserAgent(AgentClusterId, CLUSTER_ID)
 
 	pvtzcli, err := pvtz.NewClientWithStsToken(
 		region, "key", "secret", "",
@@ -109,6 +113,7 @@ func NewClientMgr() (*ClientMgr, error) {
 		return nil, fmt.Errorf("initialize alibaba pvtz client: %s", err.Error())
 	}
 	pvtzcli.AppendUserAgent(KubernetesCloudControllerManager, version.Version)
+	pvtzcli.AppendUserAgent(AgentClusterId, CLUSTER_ID)
 
 	auth := &ClientMgr{
 		Meta:   meta,

@@ -50,6 +50,7 @@ func (p SLBProvider) FindLoadBalancer(ctx context.Context, mdl *model.LoadBalanc
 	if err != nil {
 		return fmt.Errorf("[%s] find loadbalancer by tag error: %s", mdl.NamespacedName, util.FormatErrorMessage(err))
 	}
+	klog.Infof("test zibai: request id: %s", resp.RequestId)
 
 	num := len(resp.LoadBalancers.LoadBalancer)
 	if num > 0 {
