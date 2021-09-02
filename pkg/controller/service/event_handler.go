@@ -232,8 +232,8 @@ func isEndpointProcessNeeded(ep *v1.Endpoints, client client.Client) bool {
 			Name:      ep.GetName(),
 		}, svc)
 	if err != nil {
-		if apierrors.IsNotFound(err) {
-			util.ServiceLog.Error(err, "fail to get service, skip reconcile", "service", util.Key(ep))
+		if !apierrors.IsNotFound(err) {
+			util.ServiceLog.Error(err, "fail to get service, skip reconcile endpoint", "service", util.Key(ep))
 		}
 		return false
 	}

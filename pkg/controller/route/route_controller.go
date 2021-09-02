@@ -125,6 +125,8 @@ func (r *ReconcileRoute) Reconcile(ctx context.Context, request reconcile.Reques
 						if err = deleteRouteForInstance(ctx, table, route.ProviderId, route.DestinationCIDR, r.cloud); err != nil {
 							errList = append(errList, err)
 							klog.Errorf("error delete route entry for delete node %s route %v, error: %v", request.Name, route, err)
+						} else {
+							klog.Infof("successfully delete route entry for node %s route %s", request.Name, route)
 						}
 					}
 					metric.RouteLatency.WithLabelValues("delete").Observe(metric.MsSince(start))
