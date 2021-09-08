@@ -410,14 +410,8 @@ func (mgr *VGroupManager) buildVGroupForServicePort(reqCtx *RequestContext, port
 
 		if reqCtx.Anno.Get(VGroupWeight) != "" {
 			w, err := strconv.Atoi(reqCtx.Anno.Get(VGroupWeight))
-			if err != nil {
-				return vg, fmt.Errorf("weight must be integer, got [%s], error: %s", reqCtx.Anno.Get(VGroupWeight), err.Error())
-			}
-			if w < 0 {
-				w = 0
-			}
-			if w > 100 {
-				w = 100
+			if err != nil || w < 1 || w > 100 {
+				return vg, fmt.Errorf("weight must be integer in range [1,100] , got [%s]", reqCtx.Anno.Get(VGroupWeight))
 			}
 			vg.VGroupWeight = w
 		}

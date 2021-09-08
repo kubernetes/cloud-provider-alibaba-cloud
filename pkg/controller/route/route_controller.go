@@ -7,6 +7,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/record"
@@ -38,7 +39,7 @@ func newReconciler(mgr manager.Manager, ctx *shared.SharedContext) *ReconcileRou
 		cloud:           ctx.Provider(),
 		client:          mgr.GetClient(),
 		scheme:          mgr.GetScheme(),
-		record:          mgr.GetEventRecorderFor("Route"),
+		record:          mgr.GetEventRecorderFor("route-controller"),
 		nodeCache:       cmap.New(),
 		configRoutes:    ctrlCtx.ControllerCFG.ConfigureCloudRoutes,
 		reconcilePeriod: ctrlCtx.ControllerCFG.RouteReconciliationPeriod,
@@ -143,7 +144,18 @@ func (r *ReconcileRoute) Reconcile(ctx context.Context, request reconcile.Reques
 		return reconcile.Result{}, err
 	}
 
-	return reconcile.Result{}, r.syncCloudRoute(ctx, nodepool)
+	err = r.syncCloudRoute(ctx, nodepool)
+	if err != nil {
+		klog.Errorf("sync cloud route failed,node: %s, err: %s", nodepool.Name, err.Error())
+		nodeRef := &corev1.ObjectReference{
+			Kind:      "Node",
+			Name:      nodepool.Name,
+			UID:       types.UID(nodepool.Name),
+			Namespace: "",
+		}
+		r.record.Eventf(nodeRef, corev1.EventTypeWarning, helper.FailedSyncRoute, "sync cloud route failed")
+	}
+	return reconcile.Result{}, err
 }
 
 func (r *ReconcileRoute) syncCloudRoute(ctx context.Context, node *corev1.Node) error {
@@ -171,6 +183,7 @@ func (r *ReconcileRoute) syncCloudRoute(ctx context.Context, node *corev1.Node) 
 
 	_, ipv4RouteCidr, err := getIPv4RouteForNode(node)
 	if err != nil || ipv4RouteCidr == "" {
+		klog.Warningf("node %s parse podCIDR %s error, skip creating route", node.Name, node.Spec.PodCIDR)
 		if err1 := r.updateNetworkingCondition(ctx, node, false); err1 != nil {
 			klog.Errorf("route, update network condition error: %v", err1)
 		}
@@ -179,7 +192,6 @@ func (r *ReconcileRoute) syncCloudRoute(ctx context.Context, node *corev1.Node) 
 
 	tables, err := getRouteTables(ctx, r.cloud)
 	if err != nil {
-		r.record.Eventf(node, corev1.EventTypeWarning, "DescriberRouteTablesFailed", "Describe RouteTables Failed reason: %s", err)
 		return err
 	}
 	var tablesErr []error
@@ -204,10 +216,17 @@ func (r *ReconcileRoute) syncCloudRoute(ctx context.Context, node *corev1.Node) 
 func (r *ReconcileRoute) addRouteForNode(ctx context.Context, table, ipv4Cidr, prvdId string, node *corev1.Node, cachedRouteEntry []*model.Route) error {
 	var err error
 	start := time.Now()
+	nodeRef := &corev1.ObjectReference{
+		Kind:      "Node",
+		Name:      node.Name,
+		UID:       types.UID(node.Name),
+		Namespace: "",
+	}
+
 	route, findErr := findRoute(ctx, table, prvdId, ipv4Cidr, cachedRouteEntry, r.cloud)
 	if findErr != nil {
 		klog.Errorf("error found exist route for instance: %v, %v", prvdId, findErr)
-		r.record.Eventf(node, corev1.EventTypeWarning, "DescriberRouteFailed", "Describe Route Failed for %s reason: %s", table, helper.GetLogMessage(findErr))
+		r.record.Eventf(nodeRef, corev1.EventTypeWarning, "DescriberRouteFailed", "Describe Route Failed for %s reason: %s", table, helper.GetLogMessage(findErr))
 		return nil
 	}
 	if route == nil || route.DestinationCIDR != ipv4Cidr {
@@ -215,10 +234,10 @@ func (r *ReconcileRoute) addRouteForNode(ctx context.Context, table, ipv4Cidr, p
 		route, err = createRouteForInstance(ctx, table, prvdId, ipv4Cidr, r.cloud)
 		if err != nil {
 			klog.Errorf("error create route for node %v : instance id [%v], route [%v], err: %s", node.Name, prvdId, table, err.Error())
-			r.record.Eventf(node, corev1.EventTypeWarning, helper.FailedCreateRoute, "Error creating route entry in %s: %s", table, helper.GetLogMessage(err))
+			r.record.Eventf(nodeRef, corev1.EventTypeWarning, helper.FailedCreateRoute, "Error creating route entry in %s: %s", table, helper.GetLogMessage(err))
 		} else {
 			klog.Infof("Created route for %s with %s - %s successfully", table, node.Name, ipv4Cidr)
-			r.record.Eventf(node, corev1.EventTypeNormal, helper.SucceedCreateRoute, "Created route for %s with %s -> %s successfully", table, node.Name, ipv4Cidr)
+			r.record.Eventf(nodeRef, corev1.EventTypeNormal, helper.SucceedCreateRoute, "Created route for %s with %s -> %s successfully", table, node.Name, ipv4Cidr)
 		}
 	}
 	if route != nil {
@@ -280,19 +299,20 @@ func (r *ReconcileRoute) reconcileForCluster() {
 
 	tables, err := getRouteTables(ctx, r.cloud)
 	if err != nil {
-		klog.Errorf("reconcile: error get RouteTables: %v", err)
+		klog.Errorf("sync route tables error: get RouteTables: %v", err)
+		r.record.Eventf(&corev1.Event{ObjectMeta: metav1.ObjectMeta{Name: "route-controller"}},
+			corev1.EventTypeWarning, helper.FailedSyncRoute,
+			"Error reconciling route, get route tables failed.")
 	}
 
 	for _, table := range tables {
 		// Sync for Nodes
 		err := r.syncTableRoutes(ctx, table, nodes)
 		if err != nil {
-			klog.Errorf("reconcile route for table [%s] error: %s", table, err.Error())
-			if len(nodes.Items) > 0 {
-				refNode := nodes.Items[0]
-				r.record.Eventf(&refNode, corev1.EventTypeNormal, helper.FailedSyncRoute,
-					"Error reconciling route for table %s: %s", table, helper.GetLogMessage(err))
-			}
+			klog.Errorf("sync route tables error: sync table [%s] error: %s", table, err.Error())
+			r.record.Eventf(&corev1.Event{ObjectMeta: metav1.ObjectMeta{Name: "route-controller"}},
+				corev1.EventTypeWarning, helper.FailedSyncRoute,
+				"Error reconciling route, reconcile table [%s] failed", table)
 		}
 	}
 	metric.RouteLatency.WithLabelValues("reconcile").Observe(metric.MsSince(start))
