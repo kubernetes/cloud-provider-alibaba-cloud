@@ -6,6 +6,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/record"
 	nctx "k8s.io/cloud-provider-alibaba-cloud/pkg/context/node"
@@ -41,7 +42,7 @@ func newReconciler(mgr manager.Manager, ctx *shared.SharedContext) *ReconcileNod
 		cloud:  ctx.Provider(),
 		client: mgr.GetClient(),
 		scheme: mgr.GetScheme(),
-		record: mgr.GetEventRecorderFor("Node"),
+		record: mgr.GetEventRecorderFor("node-controller"),
 	}
 	return recon
 }
@@ -189,14 +190,21 @@ func (m *ReconcileNode) doAddCloudNode(node *corev1.Node) error {
 		return true, nil
 	}
 
+	nodeRef := &corev1.ObjectReference{
+		Kind:      "Node",
+		Name:      node.Name,
+		UID:       types.UID(node.Name),
+		Namespace: "",
+	}
+
 	err = wait.PollImmediate(2*time.Second, 20*time.Second, initializer)
 	if err != nil {
-		m.record.Eventf(node, corev1.EventTypeWarning, helper.FailedAddNode, "Error adding node: %s",
+		m.record.Eventf(nodeRef, corev1.EventTypeWarning, helper.FailedAddNode, "Error adding node: %s",
 			helper.GetLogMessage(err))
 		return fmt.Errorf("doAddCloudNode %s error: %s", node.Name, err.Error())
 	}
 
-	m.record.Eventf(node, corev1.EventTypeNormal, helper.InitializedNode, "Initialize node successfully", )
+	m.record.Eventf(nodeRef, corev1.EventTypeNormal, helper.InitializedNode, "Initialize node successfully", )
 	metric.NodeLatency.WithLabelValues("remove_taint").Observe(metric.MsSince(start))
 	log.Info("Successfully initialized node", "node", node.Name)
 
@@ -214,6 +222,12 @@ func (m *ReconcileNode) syncNode(nodes []corev1.Node) error {
 	for i := range nodes {
 		node := &nodes[i]
 		cloudNode := instances[node.Spec.ProviderID]
+		nodeRef := &corev1.ObjectReference{
+			Kind:      "Node",
+			Name:      node.Name,
+			UID:       types.UID(node.Name),
+			Namespace: "",
+		}
 
 		if cloudNode == nil {
 			// if cloud node has been deleted, try to delete node from cluster
@@ -251,8 +265,7 @@ func (m *ReconcileNode) syncNode(nodes []corev1.Node) error {
 		if err != nil {
 			log.Error(err, "patch node address error, wait for next retry", "node", node.Name)
 			m.record.Eventf(
-				node, corev1.EventTypeWarning, helper.FailedSyncNode, "Error reconciling node: %s",
-				helper.GetLogMessage(err),
+				nodeRef, corev1.EventTypeWarning, helper.FailedSyncNode, err.Error(),
 			)
 		}
 
@@ -266,7 +279,7 @@ func (m *ReconcileNode) syncNode(nodes []corev1.Node) error {
 		if err != nil {
 			log.Error(err, "patch node label error, wait for next retry", "node", node.Name)
 			m.record.Eventf(
-				node, corev1.EventTypeWarning, "SyncNodeFailed", err.Error(),
+				nodeRef, corev1.EventTypeWarning, helper.FailedSyncNode, err.Error(),
 			)
 		}
 	}
