@@ -49,6 +49,8 @@ func main() {
 
 	// Get a config to talk to the api-server
 	cfg := config.GetConfigOrDie()
+	cfg.QPS = ctrlCtx.ControllerCFG.RuntimeConfig.QPS
+	cfg.Burst = ctrlCtx.ControllerCFG.RuntimeConfig.Burst
 
 	// Create a new manager to provide shared dependencies and start components
 	mgr, err := manager.New(cfg, ctrlCtx.BuildRuntimeOptions(ctrlCtx.ControllerCFG.RuntimeConfig))
