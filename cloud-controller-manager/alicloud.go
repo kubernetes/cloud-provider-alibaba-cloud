@@ -190,7 +190,7 @@ func newAliCloud(mgr *ClientMgr, rtableids string) (*Cloud, error) {
 
 // Initialize passes a Kubernetes clientBuilder interface to the cloud provider
 func (c *Cloud) Initialize(builder cloudprovider.ControllerClientBuilder, stop <-chan struct{}) {
-	c.kclient = builder.ClientOrDie("shared-informers")
+	c.kclient = builder.ClientOrDie("cloud-controller-manager")
 	shared := informers.NewSharedInformerFactory(c.kclient, syncPeriod())
 	if route.Options.ConfigCloudRoutes {
 		cidr := route.Options.ClusterCIDR
@@ -208,7 +208,7 @@ func (c *Cloud) Initialize(builder cloudprovider.ControllerClientBuilder, stop <
 		}
 
 		ctrl, err := route.New(c,
-			builder.ClientOrDie(route.ROUTE_CONTROLLER),
+			builder.ClientOrDie("cloud-controller-manager"),
 			shared.Core().V1().Nodes(),
 			clusterid, cidrc)
 		if err != nil {
@@ -232,7 +232,7 @@ func (c *Cloud) Initialize(builder cloudprovider.ControllerClientBuilder, stop <
 		// run node controller
 		nctrl := node.NewCloudNodeController(
 			shared.Core().V1().Nodes(),
-			builder.ClientOrDie(node.NODE_CONTROLLER),
+			builder.ClientOrDie("cloud-controller-manager"),
 			c,
 			// delete node monitor
 			nodeMonitorPeriod,

@@ -52,6 +52,15 @@ rules:
       - create
       - patch
       - update
+  - apiGroups:
+      - coordination.k8s.io
+    resources:
+      - leases
+    verbs:
+      - get
+      - update
+      - create
+      - delete
 ---
 apiVersion: v1
 kind: ServiceAccount
@@ -70,58 +79,6 @@ roleRef:
 subjects:
   - kind: ServiceAccount
     name: cloud-controller-manager
-    namespace: kube-system
----
-kind: ClusterRoleBinding
-apiVersion: rbac.authorization.k8s.io/v1
-metadata:
-  name: system:shared-informers
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: ClusterRole
-  name: system:cloud-controller-manager
-subjects:
-  - kind: ServiceAccount
-    name: shared-informers
-    namespace: kube-system
----
-kind: ClusterRoleBinding
-apiVersion: rbac.authorization.k8s.io/v1
-metadata:
-  name: system:cloud-node-controller
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: ClusterRole
-  name: system:cloud-controller-manager
-subjects:
-  - kind: ServiceAccount
-    name: cloud-node-controller
-    namespace: kube-system
----
-kind: ClusterRoleBinding
-apiVersion: rbac.authorization.k8s.io/v1
-metadata:
-  name: system:pvl-controller
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: ClusterRole
-  name: system:cloud-controller-manager
-subjects:
-  - kind: ServiceAccount
-    name: pvl-controller
-    namespace: kube-system
----
-kind: ClusterRoleBinding
-apiVersion: rbac.authorization.k8s.io/v1
-metadata:
-  name: system:route-controller
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: ClusterRole
-  name: system:cloud-controller-manager
-subjects:
-  - kind: ServiceAccount
-    name: route-controller
     namespace: kube-system
 ---
 apiVersion: apps/v1
@@ -165,12 +122,9 @@ spec:
           - --cloud-provider=alicloud
           - --use-service-account-credentials=true
           - --cloud-config=/etc/kubernetes/config/cloud-config.conf
-          - --configure-cloud-routes=true
-          - --allocate-node-cidrs=true
-          - --route-reconciliation-period=3m
-          # replace ${cluster-cidr} with your own cluster cidr
-          - --cluster-cidr=172.20.0.0/16
-          image: registry.cn-hangzhou.aliyuncs.com/acs/cloud-controller-manager-amd64:v1.9.3.339-g9830b58-aliyun
+          - --configure-cloud-routes=false
+          - --allocate-node-cidrs=false
+          image: registry.cn-hangzhou.aliyuncs.com/acs/cloud-controller-manager-amd64:${ImageVersion}
           livenessProbe:
             failureThreshold: 8
             httpGet:
@@ -187,10 +141,6 @@ spec:
           volumeMounts:
             - mountPath: /etc/kubernetes/
               name: k8s
-            - mountPath: /etc/ssl/certs
-              name: certs
-            - mountPath: /etc/pki
-              name: pki
             - mountPath: /etc/kubernetes/config
               name: cloud-config
       hostNetwork: true
@@ -198,12 +148,6 @@ spec:
         - hostPath:
             path: /etc/kubernetes
           name: k8s
-        - hostPath:
-            path: /etc/ssl/certs
-          name: certs
-        - hostPath:
-            path: /etc/pki
-          name: pki
         - configMap:
             defaultMode: 420
             items:
