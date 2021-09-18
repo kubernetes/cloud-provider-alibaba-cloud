@@ -100,6 +100,8 @@ func NewServerCCM() *ServerCCM {
 		NodeStatusUpdateFrequency: metav1.Duration{Duration: 5 * time.Minute},
 	}
 	ccm.Generic.LeaderElection.LeaderElect = true
+	ccm.Generic.LeaderElection.ResourceName = "ccm"
+	ccm.Generic.LeaderElection.ResourceNamespace = metav1.NamespaceSystem
 	return &ccm
 }
 
@@ -232,7 +234,7 @@ func (ccm *ServerCCM) MainLoop(ctx context.Context) {
 			ClientConfig:         rest.AnonymousClientConfig(ccm.restConfig),
 			CoreClient:           ccm.client.CoreV1(),
 			AuthenticationClient: ccm.client.AuthenticationV1(),
-			Namespace:            "kube-system",
+			Namespace:            ccm.Generic.LeaderElection.ResourceNamespace,
 		}
 	}
 	panic(fmt.Sprintf("unreachable: %v", RunControllers(ccm, builder, nil)))
@@ -265,8 +267,8 @@ func Run(ccm *ServerCCM) error {
 	// Lock required for leader election
 	rl, err := resourcelock.New(
 		ccm.Generic.LeaderElection.ResourceLock,
-		"kube-system",
-		"ccm",
+		ccm.Generic.LeaderElection.ResourceNamespace,
+		ccm.Generic.LeaderElection.ResourceName,
 		ccm.election.CoreV1(),
 		ccm.election.CoordinationV1(),
 		resourcelock.ResourceLockConfig{
@@ -307,7 +309,7 @@ func RunControllers(
 		// Initialize the cloud provider with a reference to the clientBuilder
 		ccm.cloud.Initialize(clientBuilder, stop)
 	}
-	client := clientBuilder.ClientOrDie("shared-informers")
+	client := clientBuilder.ClientOrDie("cloud-controller-manager")
 
 	ifactory := informers.NewSharedInformerFactory(client, resyncPeriod(ccm)())
 

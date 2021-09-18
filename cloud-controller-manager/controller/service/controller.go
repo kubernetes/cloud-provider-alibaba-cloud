@@ -647,16 +647,13 @@ func (con *Controller) updateStatus(svc *v1.Service, pre, newm *v1.LoadBalancerS
 			},
 			func(svc *v1.Service) error {
 				// get latest svc from the shared informer cache
-				updated, err := con.client.CoreV1().Services(svc.Namespace).Get(context.TODO(), svc.Name, metav1.GetOptions{ResourceVersion: "0"})
+				oldSvc, err := con.client.CoreV1().Services(svc.Namespace).Get(context.TODO(), svc.Name, metav1.GetOptions{ResourceVersion: "0"})
 				if err != nil {
 					return fmt.Errorf("error to get svc %s", key(svc))
 				}
-				updated.Status.LoadBalancer = *newm
-				_, err = con.
-					client.
-					CoreV1().
-					Services(updated.Namespace).
-					UpdateStatus(context.Background(), updated, metav1.UpdateOptions{})
+				newSvc := oldSvc.DeepCopy()
+				newSvc.Status.LoadBalancer = *newm
+				_, err = servicehelper.PatchService(con.client.CoreV1(), oldSvc, newSvc)
 				if err == nil {
 					return nil
 				}
