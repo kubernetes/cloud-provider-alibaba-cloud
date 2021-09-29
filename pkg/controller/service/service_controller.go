@@ -268,6 +268,7 @@ func (m *ReconcileService) reconcileLoadBalancerResources(req *RequestContext) e
 
 	lb, err := m.buildAndApplyModel(req)
 	if err != nil {
+		klog.Infof("zibai error: %s", helper.GetLogMessage(err))
 		m.record.Eventf(req.Service, v1.EventTypeWarning, helper.FailedSyncLB,
 			"Error syncing load balancer: %s", helper.GetLogMessage(err))
 		return err

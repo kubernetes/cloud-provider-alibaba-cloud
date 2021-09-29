@@ -157,8 +157,11 @@ func (mgr *ListenerManager) buildListenerFromServicePort(reqCtx *RequestContext,
 	}
 
 	if reqCtx.Anno.Get(ForwardPort) != "" && listener.Protocol == model.HTTP {
-		listener.ForwardPort = forwardPort(reqCtx.Anno.Get(ForwardPort), int(port.Port))
-		listener.ListenerForward = model.OnFlag
+		forwardPort := forwardPort(reqCtx.Anno.Get(ForwardPort), int(port.Port))
+		if forwardPort != 0 {
+			listener.ForwardPort = forwardPort
+			listener.ListenerForward = model.OnFlag
+		}
 	}
 
 	// acl
@@ -457,6 +460,7 @@ func forwardPort(port string, target int) int {
 		klog.Infof("forward http port %d to %d", target, forward)
 		return forward
 	}
+	klog.Errorf("forward-port %s cannot be parsed, expect 80:443,88:6443", port)
 	return 0
 }
 
