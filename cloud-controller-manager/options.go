@@ -186,6 +186,18 @@ const (
 
 	// ServiceAnnotationLoadBalancerBackendType external ip type
 	ServiceAnnotationLoadBalancerExternalIPType = ServiceAnnotationLoadBalancerPrefix + "external-ip-type"
+
+	// ServiceAnnotationLoadBalancerXForwardedForPrefix prefix of service annotation
+	ServiceAnnotationLoadBalancerXForwardedForPrefix = ServiceAnnotationLoadBalancerPrefix + "x-forwarded-for-"
+
+	// ServiceAnnotationLoadBalancerXForwardedForSLBIP slb ip forward
+	ServiceAnnotationLoadBalancerXForwardedForSLBIP = ServiceAnnotationLoadBalancerXForwardedForPrefix + "slb-ip"
+
+	// ServiceAnnotationLoadBalancerXForwardedForSLBID slb id forward
+	ServiceAnnotationLoadBalancerXForwardedForSLBID = ServiceAnnotationLoadBalancerXForwardedForPrefix + "slb-id"
+
+	// ServiceAnnotationLoadBalancerXForwardedForProto slb protocol forward
+	ServiceAnnotationLoadBalancerXForwardedForProto = ServiceAnnotationLoadBalancerXForwardedForPrefix + "proto"
 )
 
 type ExternalIPType string
@@ -593,6 +605,24 @@ func ExtractAnnotationRequest(service *v1.Service) (*AnnotationRequest, *Annotat
 	if ok {
 		request.ExternalIPType = externalIpType
 		defaulted.ExternalIPType = request.ExternalIPType
+	}
+
+	xForwardedForProto, ok := annotation[ServiceAnnotationLoadBalancerXForwardedForProto]
+	if ok {
+		request.XForwardedForProto = slb.FlagType(xForwardedForProto)
+		defaulted.XForwardedForProto = request.XForwardedForProto
+	}
+
+	xForwardedForSLBIP, ok := annotation[ServiceAnnotationLoadBalancerXForwardedForSLBIP]
+	if ok {
+		request.XForwardedForSLBIP = slb.FlagType(xForwardedForSLBIP)
+		defaulted.XForwardedForSLBIP = request.XForwardedForSLBIP
+	}
+
+	xForwardedForSLBID, ok := annotation[ServiceAnnotationLoadBalancerXForwardedForSLBID]
+	if ok {
+		request.XForwardedForSLBID = slb.FlagType(xForwardedForSLBID)
+		defaulted.XForwardedForSLBID = request.XForwardedForSLBID
 	}
 
 	return defaulted, request

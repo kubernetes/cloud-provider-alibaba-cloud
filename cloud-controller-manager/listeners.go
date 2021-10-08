@@ -1013,6 +1013,10 @@ func (t *http) Add(ctx context.Context) error {
 		HealthCheck:         def.HealthCheck,
 		HealthCheckTimeout:  def.HealthCheckTimeout,
 		HealthCheckHttpCode: def.HealthCheckHttpCode,
+		// X-Forwarded-For
+		XForwardedFor_proto: def.XForwardedForProto,
+		XForwardedFor_SLBID: def.XForwardedForSLBID,
+		XForwardedFor_SLBIP: def.XForwardedForSLBIP,
 	}
 	forward := forwardPort(def.ForwardPort, t.Port)
 	if forward != 0 {
@@ -1093,6 +1097,10 @@ func (t *http) Update(ctx context.Context) error {
 		HealthCheckDomain:      response.HealthCheckDomain,
 		HealthCheckHttpCode:    response.HealthCheckHttpCode,
 		HealthCheckInterval:    response.HealthCheckInterval,
+		// X-Forwarded-For
+		XForwardedFor_proto:    def.XForwardedForProto,
+		XForwardedFor_SLBID:    def.XForwardedForSLBID,
+		XForwardedFor_SLBIP:    def.XForwardedForSLBIP,
 	}
 	needUpdate := false
 	needRecreate := false
@@ -1209,6 +1217,22 @@ func (t *http) Update(ctx context.Context) error {
 		}
 	}
 
+	if request.XForwardedForSLBIP != "" &&
+		def.XForwardedForSLBIP != response.XForwardedFor_SLBIP {
+		needUpdate = true
+		config.XForwardedFor_SLBIP = def.XForwardedForSLBIP
+	}
+	if request.XForwardedForSLBID != "" &&
+		def.XForwardedForSLBID != response.XForwardedFor_SLBID {
+		needUpdate = true
+		config.XForwardedFor_SLBIP = def.XForwardedForSLBID
+	}
+	if request.XForwardedForProto != "" &&
+		def.XForwardedForProto != response.XForwardedFor_proto {
+		needUpdate = true
+		config.XForwardedFor_SLBIP = def.XForwardedForProto
+	}
+
 	if needRecreate {
 
 		config.BackendServerPort = int(t.NodePort)
@@ -1304,6 +1328,10 @@ func (t *https) Add(ctx context.Context) error {
 				HealthCheckInterval:    def.HealthCheckInterval,
 				HealthCheckDomain:      def.HealthCheckDomain,
 				HealthCheckHttpCode:    def.HealthCheckHttpCode,
+				// X-Forwarded-For
+				XForwardedFor_proto:    def.XForwardedForProto,
+				XForwardedFor_SLBID:    def.XForwardedForSLBID,
+				XForwardedFor_SLBIP:    def.XForwardedForSLBIP,
 			},
 			ServerCertificateId: request.CertID,
 		},
@@ -1350,6 +1378,11 @@ func (t *https) Update(ctx context.Context) error {
 			HealthCheckInterval:    response.HealthCheckInterval,
 			HealthCheckHttpCode:    response.HealthCheckHttpCode,
 			HealthCheckDomain:      response.HealthCheckDomain,
+
+			// X-Forwarded-For
+			XForwardedFor_proto:    def.XForwardedForProto,
+			XForwardedFor_SLBID:    def.XForwardedForSLBID,
+			XForwardedFor_SLBIP:    def.XForwardedForSLBIP,
 		},
 		ServerCertificateId: response.ServerCertificateId,
 	}
@@ -1480,6 +1513,21 @@ func (t *https) Update(ctx context.Context) error {
 			return err
 		}
 		return t.Client.StartLoadBalancerListener(ctx, t.LoadBalancerID, int(t.Port))
+	}
+	if request.XForwardedForSLBIP != "" &&
+		def.XForwardedForSLBIP != response.XForwardedFor_SLBIP {
+		needUpdate = true
+		config.XForwardedFor_SLBIP = def.XForwardedForSLBIP
+	}
+	if request.XForwardedForSLBID != "" &&
+		def.XForwardedForSLBID != response.XForwardedFor_SLBID {
+		needUpdate = true
+		config.XForwardedFor_SLBID = def.XForwardedForSLBID
+	}
+	if request.XForwardedForProto != "" &&
+		def.XForwardedForProto != response.XForwardedFor_proto {
+		needUpdate = true
+		config.XForwardedFor_proto = def.XForwardedForProto
 	}
 
 	if !needUpdate {

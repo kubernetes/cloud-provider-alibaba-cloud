@@ -92,6 +92,11 @@ type AnnotationRequest struct {
 	DeleteProtection             slb.FlagType
 	ModificationProtectionStatus slb.ModificationProtectionType
 	ExternalIPType               string
+
+	// X-Frowarded-For section
+	XForwardedForProto slb.FlagType
+	XForwardedForSLBID slb.FlagType
+	XForwardedForSLBIP slb.FlagType
 }
 
 // TAGKEY Default tag key.

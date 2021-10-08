@@ -790,6 +790,11 @@ func (f *FrameWork) ListenerEqual(ctx context.Context, id string, p v1.ServicePo
 		aclId     string
 		aclType   string
 
+		// x-forward-for
+		xforwardedforProto string
+		xforwardedforSLBID string
+		xforwardedforSLBIP string
+
 		scheduler string
 	)
 	defd, _ := ExtractAnnotationRequest(f.SVC)
@@ -872,6 +877,9 @@ func (f *FrameWork) ListenerEqual(ctx context.Context, id string, p v1.ServicePo
 		aclStatus = resp.AclStatus
 		aclType = resp.AclType
 		scheduler = string(resp.Scheduler)
+		xforwardedforProto = string(resp.XForwardedFor_proto)
+		xforwardedforSLBID = string(resp.XForwardedFor_SLBID)
+		xforwardedforSLBIP = string(resp.XForwardedFor_SLBIP)
 	case "https":
 		resp, err := f.SLBSDK().DescribeLoadBalancerHTTPSListenerAttribute(ctx, id, int(p.Port))
 		if err != nil {
@@ -903,6 +911,9 @@ func (f *FrameWork) ListenerEqual(ctx context.Context, id string, p v1.ServicePo
 		aclStatus = resp.AclStatus
 		aclType = resp.AclType
 		scheduler = string(resp.Scheduler)
+		xforwardedforProto = string(resp.XForwardedFor_proto)
+		xforwardedforSLBID = string(resp.XForwardedFor_SLBID)
+		xforwardedforSLBIP = string(resp.XForwardedFor_SLBIP)
 	default:
 		return fmt.Errorf("unknown proto: %s", proto)
 	}
@@ -1035,6 +1046,22 @@ func (f *FrameWork) ListenerEqual(ctx context.Context, id string, p v1.ServicePo
 		f.hasAnnotation(ServiceAnnotationLoadBalancerHealthCheckFlag) {
 		if healthCheck != string(defd.HealthCheck) {
 			return fmt.Errorf("health check flag error")
+		}
+	}
+
+	// --------------------------- XForwardedFor ----------------------------
+	if (proto == "http" || proto == "https") &&
+		f.hasAnnotation(ServiceAnnotationLoadBalancerXForwardedForProto) {
+		if xforwardedforProto != string(defd.XForwardedForProto) {
+			return fmt.Errorf("x-forwarded-for_proto check flag error")
+		}
+
+		if xforwardedforSLBIP != string(defd.XForwardedForSLBIP) {
+			return fmt.Errorf("x-forwarded-for_slb-ip check flag error")
+		}
+
+		if xforwardedforSLBID != string(defd.XForwardedForSLBID) {
+			return fmt.Errorf("x-forwarded-for_slb-id check flag error")
 		}
 	}
 
