@@ -199,12 +199,16 @@ func (m *ReconcileNode) doAddCloudNode(node *corev1.Node) error {
 
 	err = wait.PollImmediate(2*time.Second, 20*time.Second, initializer)
 	if err != nil {
-		m.record.Eventf(nodeRef, corev1.EventTypeWarning, helper.FailedAddNode, "Error adding node: %s",
-			helper.GetLogMessage(err))
+		m.record.Event(
+			nodeRef,
+			corev1.EventTypeWarning,
+			helper.FailedAddNode,
+			fmt.Sprintf("Error adding node: %s", helper.GetLogMessage(err)),
+		)
 		return fmt.Errorf("doAddCloudNode %s error: %s", node.Name, err.Error())
 	}
 
-	m.record.Eventf(nodeRef, corev1.EventTypeNormal, helper.InitializedNode, "Initialize node successfully", )
+	m.record.Event(nodeRef, corev1.EventTypeNormal, helper.InitializedNode, "Initialize node successfully")
 	metric.NodeLatency.WithLabelValues("remove_taint").Observe(metric.MsSince(start))
 	log.Info("Successfully initialized node", "node", node.Name)
 
@@ -264,7 +268,7 @@ func (m *ReconcileNode) syncNode(nodes []corev1.Node) error {
 		err := helper.PatchM(m.client, node, diff, helper.PatchStatus)
 		if err != nil {
 			log.Error(err, "patch node address error, wait for next retry", "node", node.Name)
-			m.record.Eventf(
+			m.record.Event(
 				nodeRef, corev1.EventTypeWarning, helper.FailedSyncNode, err.Error(),
 			)
 		}
@@ -278,7 +282,7 @@ func (m *ReconcileNode) syncNode(nodes []corev1.Node) error {
 		err = helper.PatchM(m.client, node, diff, helper.PatchAll)
 		if err != nil {
 			log.Error(err, "patch node label error, wait for next retry", "node", node.Name)
-			m.record.Eventf(
+			m.record.Event(
 				nodeRef, corev1.EventTypeWarning, helper.FailedSyncNode, err.Error(),
 			)
 		}

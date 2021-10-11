@@ -82,13 +82,11 @@ func needUpdate(oldSvc, newSvc *v1.Service, recorder record.EventRecorder) bool 
 	if needLoadBalancer(oldSvc) != needLoadBalancer(newSvc) {
 		util.ServiceLog.Info(fmt.Sprintf("TypeChanged %v - %v", oldSvc.Spec.Type, newSvc.Spec.Type),
 			"service", util.Key(oldSvc))
-		recorder.Eventf(
+		recorder.Event(
 			newSvc,
 			v1.EventTypeNormal,
 			helper.TypeChanged,
-			"%v - %v",
-			oldSvc.Spec.Type,
-			newSvc.Spec.Type,
+			fmt.Sprintf("type change %v - %v", oldSvc.Spec.Type, newSvc.Spec.Type),
 		)
 		return true
 	}
@@ -103,7 +101,7 @@ func needUpdate(oldSvc, newSvc *v1.Service, recorder record.EventRecorder) bool 
 		util.ServiceLog.Info(fmt.Sprintf("AnnotationChanged: %v - %v",
 			oldSvc.Annotations, newSvc.Annotations),
 			"service", util.Key(oldSvc))
-		recorder.Eventf(
+		recorder.Event(
 			newSvc,
 			v1.EventTypeNormal,
 			helper.AnnoChanged,
@@ -115,7 +113,7 @@ func needUpdate(oldSvc, newSvc *v1.Service, recorder record.EventRecorder) bool 
 	if !reflect.DeepEqual(oldSvc.Spec, newSvc.Spec) {
 		util.ServiceLog.Info(fmt.Sprintf("SpecChanged: %v - %v", oldSvc.Spec, newSvc.Spec),
 			"service", util.Key(oldSvc))
-		recorder.Eventf(
+		recorder.Event(
 			newSvc,
 			v1.EventTypeNormal,
 			helper.SpecChanged,
@@ -128,7 +126,7 @@ func needUpdate(oldSvc, newSvc *v1.Service, recorder record.EventRecorder) bool 
 		util.ServiceLog.Info(fmt.Sprintf("DeleteTimestampChanged: %v - %v",
 			oldSvc.DeletionTimestamp.IsZero(), newSvc.DeletionTimestamp.IsZero()),
 			"service", util.Key(oldSvc))
-		recorder.Eventf(
+		recorder.Event(
 			newSvc,
 			v1.EventTypeNormal,
 			helper.DeleteTimestampChanged,

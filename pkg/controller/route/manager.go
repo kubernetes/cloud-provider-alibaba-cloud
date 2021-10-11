@@ -128,7 +128,12 @@ func (r *ReconcileRoute) syncTableRoutes(ctx context.Context, table string, node
 		err = r.addRouteForNode(ctx, table, ipv4RouteCidr, prvdId, &node, routes)
 		if err != nil {
 			klog.Errorf("try create route error: %s", err.Error())
-			r.record.Eventf(&node, v1.EventTypeWarning, "CreateRouteFailed", "Create Route Failed for %s reason: %s", table, err)
+			r.record.Event(
+				&node,
+				v1.EventTypeWarning,
+				"CreateRouteFailed",
+				fmt.Sprintf("Create Route Failed for %s reason: %s", table, err),
+			)
 			continue
 		}
 

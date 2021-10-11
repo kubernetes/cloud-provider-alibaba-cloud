@@ -201,8 +201,8 @@ func (m *ReconcileService) reconcile(request reconcile.Request) (err error) {
 
 	if ctrlCtx.ControllerCFG.DryRun {
 		if _, err = m.buildAndApplyModel(reqContext); err != nil {
-			m.record.Eventf(reqContext.Service, v1.EventTypeWarning, helper.FailedSyncLB,
-				"DryRun: Error syncing load balancer: %s", helper.GetLogMessage(err))
+			m.record.Event(reqContext.Service, v1.EventTypeWarning, helper.FailedSyncLB,
+				fmt.Sprintf("DryRun: Error syncing load balancer: %s", helper.GetLogMessage(err)))
 		}
 		return nil
 	}
@@ -229,28 +229,28 @@ func (m *ReconcileService) cleanupLoadBalancerResources(reqCtx *RequestContext) 
 	if helper.HasFinalizer(reqCtx.Service, ServiceFinalizer) {
 		_, err := m.buildAndApplyModel(reqCtx)
 		if err != nil && !strings.Contains(err.Error(), "LoadBalancerId does not exist") {
-			m.record.Eventf(reqCtx.Service, v1.EventTypeWarning, helper.FailedCleanLB,
-				"Error deleting load balancer: %s", helper.GetLogMessage(err))
+			m.record.Event(reqCtx.Service, v1.EventTypeWarning, helper.FailedCleanLB,
+				fmt.Sprintf("Error deleting load balancer: %s", helper.GetLogMessage(err)))
 			return err
 		}
 
 		if err := m.removeServiceHash(reqCtx.Service); err != nil {
-			m.record.Eventf(reqCtx.Service, v1.EventTypeWarning, helper.FailedRemoveHash,
-				"Error removing service hash: %s", err.Error())
+			m.record.Event(reqCtx.Service, v1.EventTypeWarning, helper.FailedRemoveHash,
+				fmt.Sprintf("Error removing service hash: %s", err.Error()))
 			return err
 		}
 
 		// When service type changes from LoadBalancer to NodePort,
 		// we need to clean Ingress attribute in service status
 		if err := m.removeServiceStatus(reqCtx, reqCtx.Service); err != nil {
-			m.record.Eventf(reqCtx.Service, v1.EventTypeWarning, helper.FailedUpdateStatus,
-				"Error removing load balancer status: %s", err.Error())
+			m.record.Event(reqCtx.Service, v1.EventTypeWarning, helper.FailedUpdateStatus,
+				fmt.Sprintf("Error removing load balancer status: %s", err.Error()))
 			return err
 		}
 
 		if err := m.finalizerManager.RemoveFinalizers(reqCtx.Ctx, reqCtx.Service, ServiceFinalizer); err != nil {
-			m.record.Eventf(reqCtx.Service, v1.EventTypeWarning, helper.FailedRemoveFinalizer,
-				"Error removing load balancer finalizer: %v", err.Error())
+			m.record.Event(reqCtx.Service, v1.EventTypeWarning, helper.FailedRemoveFinalizer,
+				fmt.Sprintf("Error removing load balancer finalizer: %v", err.Error()))
 			return err
 		}
 	}
@@ -261,27 +261,27 @@ func (m *ReconcileService) cleanupLoadBalancerResources(reqCtx *RequestContext) 
 func (m *ReconcileService) reconcileLoadBalancerResources(req *RequestContext) error {
 
 	if err := m.finalizerManager.AddFinalizers(req.Ctx, req.Service, ServiceFinalizer); err != nil {
-		m.record.Eventf(req.Service, v1.EventTypeWarning, helper.FailedAddFinalizer,
-			"Error adding finalizer: %s", err.Error())
+		m.record.Event(req.Service, v1.EventTypeWarning, helper.FailedAddFinalizer,
+			fmt.Sprintf("Error adding finalizer: %s", err.Error()))
 		return err
 	}
 
 	lb, err := m.buildAndApplyModel(req)
 	if err != nil {
-		m.record.Eventf(req.Service, v1.EventTypeWarning, helper.FailedSyncLB,
-			"Error syncing load balancer: %s", helper.GetLogMessage(err))
+		m.record.Event(req.Service, v1.EventTypeWarning, helper.FailedSyncLB,
+			fmt.Sprintf("Error syncing load balancer: %s", helper.GetLogMessage(err)))
 		return err
 	}
 
 	if err := m.addServiceHash(req.Service); err != nil {
-		m.record.Eventf(req.Service, v1.EventTypeWarning, helper.FailedAddHash,
-			"Error adding service hash: %s", err.Error())
+		m.record.Event(req.Service, v1.EventTypeWarning, helper.FailedAddHash,
+			fmt.Sprintf("Error adding service hash: %s", err.Error()))
 		return err
 	}
 
 	if err := m.updateServiceStatus(req, req.Service, lb); err != nil {
-		m.record.Eventf(req.Service, v1.EventTypeWarning, helper.FailedUpdateStatus,
-			"Error updating load balancer status: %s", err.Error())
+		m.record.Event(req.Service, v1.EventTypeWarning, helper.FailedUpdateStatus,
+			fmt.Sprintf("Error updating load balancer status: %s", err.Error()))
 		return err
 	}
 
