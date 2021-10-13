@@ -653,12 +653,12 @@ func isNeedUpdate(reqCtx *RequestContext, local model.ListenerAttribute, remote 
 			remote.Scheduler, local.Scheduler)
 	}
 	if local.Protocol == model.TCP &&
-		local.PersistenceTimeout != nil &&
-		remote.PersistenceTimeout != local.PersistenceTimeout {
+		local.PersistenceTimeout != nil && remote.PersistenceTimeout != nil &&
+		*remote.PersistenceTimeout != *local.PersistenceTimeout {
 		needUpdate = true
 		update.PersistenceTimeout = local.PersistenceTimeout
 		updateDetail += fmt.Sprintf("PersistenceTimeout changed: %v - %v ;",
-			remote.PersistenceTimeout, local.PersistenceTimeout)
+			*remote.PersistenceTimeout, *local.PersistenceTimeout)
 	}
 	if local.Protocol == model.HTTPS &&
 		local.CertId != "" &&
