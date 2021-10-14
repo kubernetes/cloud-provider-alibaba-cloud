@@ -153,7 +153,7 @@ type VServerGroup struct {
 
 	VGroupId     string
 	VGroupName   string
-	VGroupWeight int
+	VGroupWeight *int
 	Backends     []BackendAttribute
 }
 
