@@ -74,6 +74,7 @@ const (
 	ConnectionDrain           = AnnotationLoadBalancerPrefix + "connection-drain"             // ConnectionDrain connection drain
 	ConnectionDrainTimeout    = AnnotationLoadBalancerPrefix + "connection-drain-timeout"     // ConnectionDrainTimeout connection drain timeout
 	VGroupPort                = AnnotationLoadBalancerPrefix + "vgroup-port"                  // VGroupIDs binding user managed vGroup ids to ports
+	XForwardedForProto        = AnnotationLoadBalancerPrefix + "xforwardedfor-proto"          // XForwardedForProto whether to use the X-Forwarded-Proto header to retrieve the listener protocol
 
 	// VServerBackend Attribute
 	BackendLabel      = AnnotationLoadBalancerPrefix + "backend-label"              // BackendLabel backend labels
