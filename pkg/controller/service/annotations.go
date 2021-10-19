@@ -55,6 +55,7 @@ const (
 	ProtocolPort              = AnnotationLoadBalancerPrefix + "protocol-port"                // ProtocolPort protocol port
 	ForwardPort               = AnnotationLoadBalancerPrefix + "forward-port"                 // ForwardPort loadbalancer forward port
 	CertID                    = AnnotationLoadBalancerPrefix + "cert-id"                      // CertID cert id
+	EnableHttp2               = AnnotationLoadBalancerPrefix + "http2-enabled"                //EnableHttp2 enable http2 on https port
 	HealthCheckFlag           = AnnotationLoadBalancerPrefix + "health-check-flag"            // HealthCheckFlag health check flag
 	HealthCheckType           = AnnotationLoadBalancerPrefix + "health-check-type"            // HealthCheckType health check type
 	HealthCheckURI            = AnnotationLoadBalancerPrefix + "health-check-uri"             // HealthCheckURI health check uri
