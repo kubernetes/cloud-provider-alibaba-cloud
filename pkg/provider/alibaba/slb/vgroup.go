@@ -3,7 +3,6 @@ package slb
 import (
 	"context"
 	"encoding/json"
-
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/model"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/util"
 

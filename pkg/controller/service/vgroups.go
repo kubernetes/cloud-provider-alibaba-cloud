@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"strconv"
 	"strings"
 
@@ -196,12 +197,14 @@ func diff(reqCtx *RequestContext, remote, local model.VServerGroup) (
 		for _, l := range local.Backends {
 			if l.Type == "eni" {
 				if r.ServerId == l.ServerId &&
-					r.ServerIp == l.ServerIp {
+					r.ServerIp == l.ServerIp &&
+					r.Port == l.Port {
 					found = true
 					break
 				}
 			} else {
-				if r.ServerId == l.ServerId {
+				if r.ServerId == l.ServerId &&
+					r.Port == l.Port {
 					found = true
 					break
 				}
@@ -217,12 +220,14 @@ func diff(reqCtx *RequestContext, remote, local model.VServerGroup) (
 		for _, r := range remote.Backends {
 			if l.Type == "eni" {
 				if r.ServerId == l.ServerId &&
-					r.ServerIp == l.ServerIp {
+					r.ServerIp == l.ServerIp &&
+					r.Port == l.Port {
 					found = true
 					break
 				}
 			} else {
-				if r.ServerId == l.ServerId {
+				if r.ServerId == l.ServerId &&
+					r.Port == l.Port {
 					found = true
 					break
 				}
@@ -238,13 +243,13 @@ func diff(reqCtx *RequestContext, remote, local model.VServerGroup) (
 			if l.Type == "eni" {
 				if l.ServerId == r.ServerId &&
 					l.ServerIp == r.ServerIp &&
-					(l.Weight != r.Weight || l.Description != r.Description) {
+					(l.Port != r.Port || l.Weight != r.Weight || l.Description != r.Description) {
 					updates = append(updates, l)
 					break
 				}
 			} else {
 				if l.ServerId == r.ServerId &&
-					(l.Weight != r.Weight || l.Description != r.Description) {
+					(l.Port != r.Port || l.Weight != r.Weight || l.Description != r.Description) {
 					updates = append(updates, l)
 					break
 				}
@@ -463,10 +468,14 @@ func setGenericBackendAttribute(candidates *EndpointWithENI, vgroup model.VServe
 
 	for _, ep := range candidates.Endpoints.Subsets {
 		var backendPort int
-		for _, p := range ep.Ports {
-			if p.Name == vgroup.ServicePort.Name {
-				backendPort = int(p.Port)
-				break
+		if vgroup.ServicePort.TargetPort.Type == intstr.Int {
+			backendPort = vgroup.ServicePort.TargetPort.IntValue()
+		} else {
+			for _, p := range ep.Ports {
+				if p.Name == vgroup.ServicePort.Name {
+					backendPort = int(p.Port)
+					break
+				}
 			}
 		}
 
