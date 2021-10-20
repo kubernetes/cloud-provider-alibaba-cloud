@@ -129,6 +129,7 @@ type ListenerAttribute struct {
 	AclStatus                 FlagType
 	ConnectionDrain           FlagType
 	ConnectionDrainTimeout    int // values: 10~900
+	IdleTimeout               int // values: 1~60
 	HealthCheckConnectPort    int
 	HealthCheckInterval       int      // values: 1~50
 	HealthyThreshold          int      // values: 2~10

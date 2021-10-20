@@ -161,6 +161,15 @@ func (mgr *ListenerManager) buildListenerFromServicePort(reqCtx *RequestContext,
 		listener.ListenerForward = model.OnFlag
 	}
 
+	if reqCtx.Anno.Get(IdleTimeout) != "" {
+		idleTimeout, err := strconv.Atoi(reqCtx.Anno.Get(IdleTimeout))
+		if err != nil {
+			return listener, fmt.Errorf("Annotation IdleTimeout must be integer, but got [%s]. message=[%s] ",
+				reqCtx.Anno.Get(IdleTimeout), err.Error())
+		}
+		listener.IdleTimeout = idleTimeout
+	}
+
 	// acl
 	if reqCtx.Anno.Get(AclStatus) != "" {
 		listener.AclStatus = model.FlagType(reqCtx.Anno.Get(AclStatus))
@@ -691,6 +700,15 @@ func isNeedUpdate(reqCtx *RequestContext, local model.ListenerAttribute, remote 
 		update.AclType = local.AclType
 		updateDetail += fmt.Sprintf("AclType changed: %v - %v ;",
 			remote.AclType, local.AclType)
+	}
+	// idle timeout
+	if Is7LayerProtocol(local.Protocol) &&
+		local.IdleTimeout != 0 &&
+		remote.IdleTimeout != local.IdleTimeout {
+		needUpdate = true
+		update.IdleTimeout = local.IdleTimeout
+		updateDetail += fmt.Sprintf("IdleTimeout changed: %v - %v ;",
+			remote.IdleTimeout, local.IdleTimeout)
 	}
 	// session
 	if Is7LayerProtocol(local.Protocol) &&
