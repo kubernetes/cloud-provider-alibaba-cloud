@@ -12,6 +12,7 @@ import (
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/dryrun"
 	"k8s.io/cloud-provider-alibaba-cloud/version"
+	"k8s.io/klog"
 	"k8s.io/klog/klogr"
 	"net/http"
 	"os"
@@ -43,7 +44,7 @@ func main() {
 		log.Error(err, "unable to load controller config")
 		os.Exit(1)
 	}
-	ctrl.SetLogger(klogr.New())
+	ctrl.SetLogger(klogr.New().V(ctrlCtx.ControllerCFG.LogLevel))
 
 	printVersion()
 
@@ -103,6 +104,8 @@ func main() {
 }
 
 func loadControllerConfig() error {
+	klog.InitFlags(nil)
+
 	fs := pflag.NewFlagSet("", pflag.ExitOnError)
 	fs.AddGoFlagSet(flag.CommandLine)
 	ctrlCtx.ControllerCFG.BindFlags(fs)

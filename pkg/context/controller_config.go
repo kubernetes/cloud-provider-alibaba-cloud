@@ -43,8 +43,6 @@ type ControllerConfig struct {
 }
 
 func (cfg *ControllerConfig) BindFlags(fs *pflag.FlagSet) {
-	fs.IntVar(&cfg.LogLevel, flagLogLevel, defaultLogLevel,
-		"Set the controller log level, 3")
 	fs.IntVar(&cfg.ServiceMaxConcurrentReconciles, flagServiceMaxConcurrentReconciles, defaultMaxConcurrentReconciles,
 		"Maximum number of concurrently running reconcile loops for service")
 	fs.StringSliceVar(&cfg.EnableControllers, flagEnableControllers, []string{"node", "route", "service"},
