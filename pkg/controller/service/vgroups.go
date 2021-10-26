@@ -451,7 +451,7 @@ func (mgr *VGroupManager) buildVGroupForServicePort(reqCtx *RequestContext, port
 	}
 
 	if len(backends) == 0 {
-		reqCtx.Recorder.Eventf(
+		reqCtx.Recorder.Event(
 			reqCtx.Service,
 			v1.EventTypeNormal,
 			helper.UnAvailableBackends,

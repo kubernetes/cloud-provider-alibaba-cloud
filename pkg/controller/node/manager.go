@@ -113,15 +113,13 @@ func deleteNode(cnc *ReconcileNode, node *v1.Node) {
 		)
 		if err != nil {
 			log.Error(err, "failed to delete node", "node", node.Name, "prvdId", node.Spec.ProviderID)
-			cnc.record.Eventf(
-				node, v1.EventTypeWarning, helper.FailedDeleteNode, "Error deleting node: %s",
-				helper.GetLogMessage(err),
+			cnc.record.Event(
+				node, v1.EventTypeWarning, helper.FailedDeleteNode,
+				fmt.Sprintf("Error deleting node: %s", helper.GetLogMessage(err)),
 			)
 			return
 		}
-		cnc.record.Eventf(
-			ref, v1.EventTypeNormal, helper.SucceedDeleteNode, node.Name,
-		)
+		cnc.record.Event(ref, v1.EventTypeNormal, helper.SucceedDeleteNode, node.Name)
 		log.Info("delete node from cluster successfully", "node", node.Name, "prvdId", node.Spec.ProviderID)
 	}
 	go deleteOne()

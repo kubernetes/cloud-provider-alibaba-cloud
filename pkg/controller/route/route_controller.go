@@ -2,6 +2,7 @@ package route
 
 import (
 	"context"
+	"fmt"
 	cmap "github.com/orcaman/concurrent-map"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -153,7 +154,7 @@ func (r *ReconcileRoute) Reconcile(ctx context.Context, request reconcile.Reques
 			UID:       types.UID(nodepool.Name),
 			Namespace: "",
 		}
-		r.record.Eventf(nodeRef, corev1.EventTypeWarning, helper.FailedSyncRoute, "sync cloud route failed")
+		r.record.Event(nodeRef, corev1.EventTypeWarning, helper.FailedSyncRoute, "sync cloud route failed")
 	}
 	return reconcile.Result{}, err
 }
@@ -225,7 +226,12 @@ func (r *ReconcileRoute) addRouteForNode(ctx context.Context, table, ipv4Cidr, p
 	route, findErr := findRoute(ctx, table, prvdId, ipv4Cidr, cachedRouteEntry, r.cloud)
 	if findErr != nil {
 		klog.Errorf("error found exist route for instance: %v, %v", prvdId, findErr)
-		r.record.Eventf(nodeRef, corev1.EventTypeWarning, "DescriberRouteFailed", "Describe Route Failed for %s reason: %s", table, helper.GetLogMessage(findErr))
+		r.record.Event(
+			nodeRef,
+			corev1.EventTypeWarning,
+			"DescriberRouteFailed",
+			fmt.Sprintf("Describe Route Failed for %s reason: %s", table, helper.GetLogMessage(findErr)),
+		)
 		return nil
 	}
 	if route == nil || route.DestinationCIDR != ipv4Cidr {
@@ -233,10 +239,21 @@ func (r *ReconcileRoute) addRouteForNode(ctx context.Context, table, ipv4Cidr, p
 		route, err = createRouteForInstance(ctx, table, prvdId, ipv4Cidr, r.cloud)
 		if err != nil {
 			klog.Errorf("error create route for node %v : instance id [%v], route [%v], err: %s", node.Name, prvdId, table, err.Error())
-			r.record.Eventf(nodeRef, corev1.EventTypeWarning, helper.FailedCreateRoute, "Error creating route entry in %s: %s", table, helper.GetLogMessage(err))
+			r.record.Event(
+				nodeRef,
+				corev1.EventTypeWarning,
+				helper.FailedCreateRoute,
+				fmt.Sprintf("Error creating route entry in %s: %s", table, helper.GetLogMessage(err)),
+			)
 		} else {
 			klog.Infof("Created route for %s with %s - %s successfully", table, node.Name, ipv4Cidr)
-			r.record.Eventf(nodeRef, corev1.EventTypeNormal, helper.SucceedCreateRoute, "Created route for %s with %s -> %s successfully", table, node.Name, ipv4Cidr)
+			r.record.Event(
+				nodeRef,
+				corev1.EventTypeNormal,
+				helper.SucceedCreateRoute,
+				fmt.Sprintf("Created route for %s with %s -> %s successfully", table, node.Name, ipv4Cidr),
+			)
+
 		}
 	}
 	if route != nil {
@@ -299,7 +316,7 @@ func (r *ReconcileRoute) reconcileForCluster() {
 	tables, err := getRouteTables(ctx, r.cloud)
 	if err != nil {
 		klog.Errorf("sync route tables error: get RouteTables: %v", err)
-		r.record.Eventf(&corev1.Event{ObjectMeta: metav1.ObjectMeta{Name: "route-controller"}},
+		r.record.Event(&corev1.Event{ObjectMeta: metav1.ObjectMeta{Name: "route-controller"}},
 			corev1.EventTypeWarning, helper.FailedSyncRoute,
 			"Error reconciling route, get route tables failed.")
 	}
@@ -309,9 +326,9 @@ func (r *ReconcileRoute) reconcileForCluster() {
 		err := r.syncTableRoutes(ctx, table, nodes)
 		if err != nil {
 			klog.Errorf("sync route tables error: sync table [%s] error: %s", table, err.Error())
-			r.record.Eventf(&corev1.Event{ObjectMeta: metav1.ObjectMeta{Name: "route-controller"}},
+			r.record.Event(&corev1.Event{ObjectMeta: metav1.ObjectMeta{Name: "route-controller"}},
 				corev1.EventTypeWarning, helper.FailedSyncRoute,
-				"Error reconciling route, reconcile table [%s] failed", table)
+				fmt.Sprintf("Error reconciling route, reconcile table [%s] failed", table))
 		}
 	}
 	metric.RouteLatency.WithLabelValues("reconcile").Observe(metric.MsSince(start))
