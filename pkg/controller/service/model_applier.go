@@ -169,9 +169,15 @@ func (m *ModelApplier) applyVGroups(reqCtx *RequestContext, local *model.LoadBal
 		// create
 		if !found {
 			reqCtx.Log.Info(fmt.Sprintf("try to create vgroup %s", local.VServerGroups[i].VGroupName))
+			// to avoid add too many backends in one action, create vserver group with empty backends,
+			// then use AddVServerGroupBackendServers to add backends
 			err := m.vGroupMgr.CreateVServerGroup(reqCtx, &local.VServerGroups[i], remote.LoadBalancerAttribute.LoadBalancerId)
 			if err != nil {
 				return fmt.Errorf("EnsureVGroupCreated error: %s", err.Error())
+			}
+			if err := m.vGroupMgr.BatchAddVServerGroupBackendServers(reqCtx, local.VServerGroups[i],
+				local.VServerGroups[i].Backends); err != nil {
+				return err
 			}
 			remote.VServerGroups = append(remote.VServerGroups, local.VServerGroups[i])
 		}

@@ -2,8 +2,6 @@ package slb
 
 import (
 	"context"
-	"encoding/json"
-
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/model"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/util"
 
@@ -39,14 +37,7 @@ func (p SLBProvider) CreateVServerGroup(ctx context.Context, vg *model.VServerGr
 	req := slb.CreateCreateVServerGroupRequest()
 	req.LoadBalancerId = lbId
 	req.VServerGroupName = vg.VGroupName
-	if len(vg.Backends) != 0 {
-		backendJson, err := json.Marshal(vg.Backends)
-		if err != nil {
-			return err
-		}
-		req.BackendServers = string(backendJson)
-	}
-
+	// create vserver group with empty backends to avoid reach the limit of backends per action
 	resp, err := p.auth.SLB.CreateVServerGroup(req)
 	if err != nil {
 		return util.FormatErrorMessage(err)
