@@ -24,11 +24,11 @@ import (
 type TrafficPolicy string
 
 const (
-	// Local externalTrafficPolicy=Local
+	// LocalTrafficPolicy externalTrafficPolicy=Local
 	LocalTrafficPolicy = TrafficPolicy("Local")
-	// Cluster externalTrafficPolicy=Cluster
+	// ClusterTrafficPolicy externalTrafficPolicy=Cluster
 	ClusterTrafficPolicy = TrafficPolicy("Cluster")
-	// ENI external traffic is forwarded to pod directly
+	// ENITrafficPolicy is forwarded to pod directly
 	ENITrafficPolicy = TrafficPolicy("ENI")
 )
 

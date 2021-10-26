@@ -1,7 +1,7 @@
 package vmock
 
 import (
-	"k8s.io/cloud-provider-alibaba-cloud/pkg/context/node"
+	"context"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/base"
 
@@ -24,11 +24,11 @@ type MockECS struct {
 
 var _ prvd.IInstance = &MockECS{}
 
-func (d *MockECS) ListInstances(ctx *node.NodeContext, ids []string) (map[string]*prvd.NodeAttribute, error) {
+func (d *MockECS) ListInstances(ctx context.Context, ids []string) (map[string]*prvd.NodeAttribute, error) {
 	return nil, nil
 }
 
-func (d *MockECS) SetInstanceTags(ctx *node.NodeContext, id string, tags map[string]string) error {
+func (d *MockECS) SetInstanceTags(ctx context.Context, id string, tags map[string]string) error {
 	return nil
 }
 

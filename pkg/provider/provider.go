@@ -4,7 +4,6 @@ import (
 	"context"
 	"github.com/aliyun/alibaba-cloud-sdk-go/services/ecs"
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/cloud-provider-alibaba-cloud/pkg/context/node"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/model"
 	"time"
 )
@@ -61,8 +60,8 @@ type NodeAttribute struct {
 }
 
 type IInstance interface {
-	ListInstances(ctx *node.NodeContext, ids []string) (map[string]*NodeAttribute, error)
-	SetInstanceTags(ctx *node.NodeContext, id string, tags map[string]string) error
+	ListInstances(ctx context.Context, ids []string) (map[string]*NodeAttribute, error)
+	SetInstanceTags(ctx context.Context, id string, tags map[string]string) error
 	// DescribeNetworkInterfaces query one or more elastic network interfaces (ENIs)
 	DescribeNetworkInterfaces(vpcId string, ips *[]string, nextToken string) (*ecs.DescribeNetworkInterfacesResponse, error)
 }

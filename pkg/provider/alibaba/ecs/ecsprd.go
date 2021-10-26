@@ -1,13 +1,13 @@
 package ecs
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"k8s.io/klog"
 	"strings"
 
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/cloud-provider-alibaba-cloud/pkg/context/node"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/base"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/util"
@@ -28,7 +28,7 @@ type EcsProvider struct {
 	auth *base.ClientMgr
 }
 
-func (e *EcsProvider) ListInstances(ctx *node.NodeContext, ids []string) (map[string]*prvd.NodeAttribute, error) {
+func (e *EcsProvider) ListInstances(ctx context.Context, ids []string) (map[string]*prvd.NodeAttribute, error) {
 	nodeRegionMap := make(map[string][]string)
 	for _, id := range ids {
 		regionID, nodeID, err := util.NodeFromProviderID(id)
@@ -84,6 +84,7 @@ func (e *EcsProvider) getInstances(ids []string, region string) ([]ecs.Instance,
 				"instancename=%s, message=[%s].", req.RegionId, req.InstanceName, err.Error())
 			return nil, err
 		}
+		klog.V(5).Infof("RequestId: %s, API: %s, ids: %s", resp.RequestId, "DescribeInstances", string(bids))
 		ecsInstances = append(ecsInstances, resp.Instances.Instance...)
 		if resp.NextToken == "" {
 			break
@@ -96,7 +97,7 @@ func (e *EcsProvider) getInstances(ids []string, region string) ([]ecs.Instance,
 }
 
 func (e *EcsProvider) SetInstanceTags(
-	ctx *node.NodeContext, id string, tags map[string]string,
+	ctx context.Context, id string, tags map[string]string,
 ) error {
 	var mtag []ecs.AddTagsTag
 	for k, v := range tags {
@@ -117,12 +118,13 @@ func (e *EcsProvider) DescribeNetworkInterfaces(vpcId string, ips *[]string, nex
 	req.PrivateIpAddress = ips
 	req.NextToken = nextToken
 	req.MaxResults = requests.NewInteger(100)
-	return e.auth.ECS.DescribeNetworkInterfaces(req)
+	resp, err := e.auth.ECS.DescribeNetworkInterfaces(req)
+	if err != nil {
+		return nil, err
+	}
+	klog.V(5).Infof("RequestId: %s, API: %s, ips: %s", resp.RequestId, ips)
+	return resp, nil
 }
-
-const (
-	DefaultWaitForInterval = 5
-)
 
 func findAddress(instance *ecs.Instance) []v1.NodeAddress {
 	var addrs []v1.NodeAddress

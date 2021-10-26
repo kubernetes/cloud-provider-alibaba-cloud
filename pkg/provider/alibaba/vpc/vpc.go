@@ -39,6 +39,7 @@ func (r *VPCProvider) ListRouteTables(ctx context.Context, vpcID string) ([]stri
 	if err != nil {
 		return nil, fmt.Errorf("error describe vpc: %v route tables, error: %v", vpcID, err)
 	}
+	klog.V(5).Infof("RequestId: %s, API: %s, vpcId: %s", resp.RequestId, "DescribeRouteTableList", vpcID)
 	var tableIds []string
 	for _, table := range resp.RouterTableList.RouterTableListType {
 		tableIds = append(tableIds, table.RouteTableId)
@@ -67,6 +68,8 @@ func (r *VPCProvider) FindRoute(ctx context.Context, table, provID, cidr string)
 	if err != nil {
 		return nil, fmt.Errorf("error describe route entry list: %v", err)
 	}
+	klog.V(5).Infof("RequestId: %s, API: %s, providerId: %s",
+		resp.RequestId, "DescribeRouteEntryList", provID)
 	if len(resp.RouteEntrys.RouteEntry) >= 1 {
 		route := &model.Route{
 			DestinationCIDR: resp.RouteEntrys.RouteEntry[0].DestinationCidrBlock,
@@ -154,6 +157,8 @@ func (r *VPCProvider) listRouteBatch(table, nextToken string, routes *[]*model.R
 	if err != nil {
 		return fmt.Errorf("describe route entry list error, err %v", err)
 	}
+	klog.V(5).Infof("RequestId: %s, API: %s, tableId: %s",
+		routeEntryListResponse.RequestId, "DescribeRouteEntryList", table)
 	routeEntries := routeEntryListResponse.RouteEntrys.RouteEntry
 	if len(routeEntries) <= 0 {
 		klog.Warningf("alicloud: table [%s] has 0 route entry.", table)

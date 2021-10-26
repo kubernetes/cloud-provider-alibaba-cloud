@@ -14,7 +14,7 @@ import (
 	"strings"
 	"time"
 
-	ctrlCtx "k8s.io/cloud-provider-alibaba-cloud/pkg/context"
+	ctrlCfg "k8s.io/cloud-provider-alibaba-cloud/pkg/config"
 	prvd "k8s.io/cloud-provider-alibaba-cloud/pkg/provider"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/util"
 	"k8s.io/klog"
@@ -62,8 +62,8 @@ type IMetaDataRequest interface {
 
 // NewMetaData return new metadata
 func NewMetaData() prvd.IMetaData {
-	if ctrlCtx.CloudCFG.Global.VpcID != "" &&
-		ctrlCtx.CloudCFG.Global.VswitchID != "" {
+	if ctrlCfg.CloudCFG.Global.VpcID != "" &&
+		ctrlCfg.CloudCFG.Global.VswitchID != "" {
 		klog.Infof("read metadata from cfg")
 		return &CfgMetaData{base: NewBaseMetaData(nil)}
 	}
@@ -277,8 +277,8 @@ func (m *BaseMetaData) RamRoleToken(role string) (prvd.RoleAuth, error) {
 }
 
 func (m *BaseMetaData) ClusterID() string {
-	if ctrlCtx.CloudCFG.Global.ClusterID != "" {
-		return ctrlCtx.CloudCFG.Global.ClusterID
+	if ctrlCfg.CloudCFG.Global.ClusterID != "" {
+		return ctrlCfg.CloudCFG.Global.ClusterID
 	}
 	return CLUSTER_ID
 }
@@ -493,8 +493,8 @@ func (m *CfgMetaData) PrivateIPv4() (string, error) {
 }
 
 func (m *CfgMetaData) Region() (string, error) {
-	if ctrlCtx.CloudCFG.Global.Region != "" {
-		return ctrlCtx.CloudCFG.Global.Region, nil
+	if ctrlCfg.CloudCFG.Global.Region != "" {
+		return ctrlCfg.CloudCFG.Global.Region, nil
 	}
 	return m.base.Region()
 }
@@ -516,8 +516,8 @@ func (m *CfgMetaData) VpcCIDRBlock() (string, error) {
 }
 
 func (m *CfgMetaData) VpcID() (string, error) {
-	if ctrlCtx.CloudCFG.Global.VpcID != "" {
-		return ctrlCtx.CloudCFG.Global.VpcID, nil
+	if ctrlCfg.CloudCFG.Global.VpcID != "" {
+		return ctrlCfg.CloudCFG.Global.VpcID, nil
 	}
 	return m.base.VpcID()
 }
@@ -529,19 +529,19 @@ func (m *CfgMetaData) VswitchCIDRBlock() (string, error) {
 
 // zone1:vswitchid1,zone2:vswitch2
 func (m *CfgMetaData) VswitchID() (string, error) {
-	if ctrlCtx.CloudCFG.Global.VswitchID == "" {
+	if ctrlCfg.CloudCFG.Global.VswitchID == "" {
 		// get vswitch id from meta server
 		return m.base.VswitchID()
 	}
-	zlist := strings.Split(ctrlCtx.CloudCFG.Global.VswitchID, ",")
+	zlist := strings.Split(ctrlCfg.CloudCFG.Global.VswitchID, ",")
 	if len(zlist) == 1 {
-		vSwitchs := strings.Split(ctrlCtx.CloudCFG.Global.VswitchID, ":")
+		vSwitchs := strings.Split(ctrlCfg.CloudCFG.Global.VswitchID, ":")
 		if len(vSwitchs) == 2 {
 			klog.Infof("only one vswitchid mode, %s", vSwitchs[1])
 			return vSwitchs[1], nil
 		}
-		klog.Infof("simple vswitchid mode, %s", ctrlCtx.CloudCFG.Global.VswitchID)
-		return ctrlCtx.CloudCFG.Global.VswitchID, nil
+		klog.Infof("simple vswitchid mode, %s", ctrlCfg.CloudCFG.Global.VswitchID)
+		return ctrlCfg.CloudCFG.Global.VswitchID, nil
 	}
 	mzone, err := m.Zone()
 	if err != nil {
@@ -550,14 +550,14 @@ func (m *CfgMetaData) VswitchID() (string, error) {
 	for _, zone := range zlist {
 		vs := strings.Split(zone, ":")
 		if len(vs) != 2 {
-			return "", fmt.Errorf("cloud-config vswitch format error: %s", ctrlCtx.CloudCFG.Global.VswitchID)
+			return "", fmt.Errorf("cloud-config vswitch format error: %s", ctrlCfg.CloudCFG.Global.VswitchID)
 		}
 		if vs[0] == "" || vs[0] == mzone {
 			return vs[1], nil
 		}
 	}
-	klog.Infof("zone[%s] match failed, fallback with simple vswitch id mode, [%s]", mzone, ctrlCtx.CloudCFG.Global.VswitchID)
-	return ctrlCtx.CloudCFG.Global.VswitchID, nil
+	klog.Infof("zone[%s] match failed, fallback with simple vswitch id mode, [%s]", mzone, ctrlCfg.CloudCFG.Global.VswitchID)
+	return ctrlCfg.CloudCFG.Global.VswitchID, nil
 }
 
 func (m *CfgMetaData) EIPv4() (string, error) {
@@ -576,8 +576,8 @@ func (m *CfgMetaData) NTPConfigServers() ([]string, error) {
 }
 
 func (m *CfgMetaData) Zone() (string, error) {
-	if ctrlCtx.CloudCFG.Global.ZoneID != "" {
-		return ctrlCtx.CloudCFG.Global.ZoneID, nil
+	if ctrlCfg.CloudCFG.Global.ZoneID != "" {
+		return ctrlCfg.CloudCFG.Global.ZoneID, nil
 	}
 	return m.base.Zone()
 }
@@ -593,8 +593,8 @@ func (m *CfgMetaData) RamRoleToken(role string) (prvd.RoleAuth, error) {
 }
 
 func (m *CfgMetaData) ClusterID() string {
-	if ctrlCtx.CloudCFG.Global.ClusterID != "" {
-		CLUSTER_ID = ctrlCtx.CloudCFG.Global.ClusterID
+	if ctrlCfg.CloudCFG.Global.ClusterID != "" {
+		CLUSTER_ID = ctrlCfg.CloudCFG.Global.ClusterID
 	}
 	return CLUSTER_ID
 }

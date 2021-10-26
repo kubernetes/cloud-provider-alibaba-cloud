@@ -1,4 +1,4 @@
-package context
+package config
 
 import (
 	"fmt"
@@ -7,7 +7,6 @@ import (
 )
 
 const (
-	flagLogLevel                       = "log-level"
 	flagDryRun                         = "dry-run"
 	flagCloudConfig                    = "cloud-config"
 	flagServiceMaxConcurrentReconciles = "concurrent-service-syncs"
@@ -17,7 +16,6 @@ const (
 	flagRouteReconciliationPeriod      = "route-reconciliation-period"
 	flagNetwork                        = "network"
 
-	defaultLogLevel                  = 3
 	defaultMaxConcurrentReconciles   = 3
 	defaultCloudConfig               = ""
 	defaultRouteReconciliationPeriod = 5 * time.Minute
@@ -43,8 +41,6 @@ type ControllerConfig struct {
 }
 
 func (cfg *ControllerConfig) BindFlags(fs *pflag.FlagSet) {
-	fs.IntVar(&cfg.LogLevel, flagLogLevel, defaultLogLevel,
-		"Set the controller log level, 3")
 	fs.IntVar(&cfg.ServiceMaxConcurrentReconciles, flagServiceMaxConcurrentReconciles, defaultMaxConcurrentReconciles,
 		"Maximum number of concurrently running reconcile loops for service")
 	fs.StringSliceVar(&cfg.EnableControllers, flagEnableControllers, []string{"node", "route", "service"},

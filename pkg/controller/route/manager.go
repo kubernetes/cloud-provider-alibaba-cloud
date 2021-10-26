@@ -5,7 +5,7 @@ import (
 	"fmt"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
-	ctrlCtx "k8s.io/cloud-provider-alibaba-cloud/pkg/context"
+	ctrlCfg "k8s.io/cloud-provider-alibaba-cloud/pkg/config"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/helper"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/model"
 	prvd "k8s.io/cloud-provider-alibaba-cloud/pkg/provider"
@@ -58,17 +58,17 @@ func getRouteTables(ctx context.Context, providerIns prvd.Provider) ([]string, e
 	if err != nil {
 		return nil, fmt.Errorf("get vpc id from metadata error: %s", err.Error())
 	}
-	if ctrlCtx.CloudCFG.Global.RouteTableIDS != "" {
-		return strings.Split(ctrlCtx.CloudCFG.Global.RouteTableIDS, ","), nil
+	if ctrlCfg.CloudCFG.Global.RouteTableIDS != "" {
+		return strings.Split(ctrlCfg.CloudCFG.Global.RouteTableIDS, ","), nil
 	}
 	tables, err := providerIns.ListRouteTables(ctx, vpcId)
 	if err != nil {
 		return nil, fmt.Errorf("alicloud: "+
-			"can not found routetable by id[%s], error: %v", ctrlCtx.CloudCFG.Global.VpcID, err)
+			"can not found routetable by id[%s], error: %v", ctrlCfg.CloudCFG.Global.VpcID, err)
 	}
 	if len(tables) > 1 {
 		return nil, fmt.Errorf("alicloud: "+
-			"multiple route tables found by vpc id[%s], length(tables)=%d", ctrlCtx.CloudCFG.Global.VpcID, len(tables))
+			"multiple route tables found by vpc id[%s], length(tables)=%d", ctrlCfg.CloudCFG.Global.VpcID, len(tables))
 	}
 	return tables, nil
 }
@@ -80,10 +80,10 @@ func (r *ReconcileRoute) syncTableRoutes(ctx context.Context, table string, node
 	}
 
 	var clusterCIDR *net.IPNet
-	if ctrlCtx.ControllerCFG.ClusterCidr != "" {
-		_, clusterCIDR, err = net.ParseCIDR(ctrlCtx.ControllerCFG.ClusterCidr)
+	if ctrlCfg.ControllerCFG.ClusterCidr != "" {
+		_, clusterCIDR, err = net.ParseCIDR(ctrlCfg.ControllerCFG.ClusterCidr)
 		if err != nil {
-			return fmt.Errorf("error parse cluster cidr %s: %s", ctrlCtx.ControllerCFG.ClusterCidr, err)
+			return fmt.Errorf("error parse cluster cidr %s: %s", ctrlCfg.ControllerCFG.ClusterCidr, err)
 		}
 	}
 

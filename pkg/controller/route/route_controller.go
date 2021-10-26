@@ -12,7 +12,7 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/record"
-	ctrlCtx "k8s.io/cloud-provider-alibaba-cloud/pkg/context"
+	ctrlCfg "k8s.io/cloud-provider-alibaba-cloud/pkg/config"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/context/shared"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/helper"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/node"
@@ -42,8 +42,8 @@ func newReconciler(mgr manager.Manager, ctx *shared.SharedContext) *ReconcileRou
 		scheme:          mgr.GetScheme(),
 		record:          mgr.GetEventRecorderFor("route-controller"),
 		nodeCache:       cmap.New(),
-		configRoutes:    ctrlCtx.ControllerCFG.ConfigureCloudRoutes,
-		reconcilePeriod: ctrlCtx.ControllerCFG.RouteReconciliationPeriod,
+		configRoutes:    ctrlCfg.ControllerCFG.ConfigureCloudRoutes,
+		reconcilePeriod: ctrlCfg.ControllerCFG.RouteReconciliationPeriod,
 	}
 	return recon
 }
