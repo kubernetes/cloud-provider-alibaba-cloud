@@ -415,10 +415,10 @@ func (mgr *VGroupManager) buildVGroupForServicePort(reqCtx *RequestContext, port
 
 		if reqCtx.Anno.Get(VGroupWeight) != "" {
 			w, err := strconv.Atoi(reqCtx.Anno.Get(VGroupWeight))
-			if err != nil || w < 1 || w > 100 {
-				return vg, fmt.Errorf("weight must be integer in range [1,100] , got [%s]", reqCtx.Anno.Get(VGroupWeight))
+			if err != nil || w < 0 || w > 100 {
+				return vg, fmt.Errorf("weight must be integer in range [0,100] , got [%s]", reqCtx.Anno.Get(VGroupWeight))
 			}
-			vg.VGroupWeight = w
+			vg.VGroupWeight = &w
 		}
 	}
 
@@ -698,13 +698,17 @@ func updateENIBackends(mgr *VGroupManager, backends []model.BackendAttribute) ([
 	return backends, nil
 }
 
-func setWeightBackends(mode TrafficPolicy, backends []model.BackendAttribute, weight int) []model.BackendAttribute {
+func setWeightBackends(mode TrafficPolicy, backends []model.BackendAttribute, weight *int) []model.BackendAttribute {
 	// use default
-	if weight == 0 {
+	if weight == nil {
 		return podNumberAlgorithm(mode, backends)
 	}
 
-	return podPercentAlgorithm(mode, backends, weight)
+	if *weight == 0 {
+		return backends
+	}
+
+	return podPercentAlgorithm(mode, backends, *weight)
 
 }
 
