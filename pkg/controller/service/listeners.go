@@ -211,6 +211,11 @@ func (mgr *ListenerManager) buildListenerFromServicePort(reqCtx *RequestContext,
 		listener.StickySessionType = reqCtx.Anno.Get(SessionStickType)
 	}
 
+	// x-forwarded-for
+	if reqCtx.Anno.Get(XForwardedForProto) != "" {
+		listener.XForwardedForProto = model.FlagType(reqCtx.Anno.Get(XForwardedForProto))
+	}
+
 	// health check
 	if reqCtx.Anno.Get(HealthyThreshold) != "" {
 		t, err := strconv.Atoi(reqCtx.Anno.Get(HealthyThreshold))
@@ -759,6 +764,17 @@ func isNeedUpdate(reqCtx *RequestContext, local model.ListenerAttribute, remote 
 		updateDetail += fmt.Sprintf("ConnectionDrainTimeout changed: %v - %v ;",
 			remote.ConnectionDrainTimeout, local.ConnectionDrainTimeout)
 	}
+
+	//x-forwarded-for
+	if Is7LayerProtocol(local.Protocol) &&
+		local.XForwardedForProto != "" &&
+		remote.XForwardedForProto != local.XForwardedForProto {
+		needUpdate = true
+		update.XForwardedForProto = local.XForwardedForProto
+		updateDetail += fmt.Sprintf("XForwardedForProto changed: %v - %v ;",
+			remote.XForwardedForProto, local.XForwardedForProto)
+	}
+
 	// health check
 	if local.HealthCheckConnectPort != 0 &&
 		remote.HealthCheckConnectPort != local.HealthCheckConnectPort {

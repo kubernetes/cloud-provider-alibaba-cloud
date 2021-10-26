@@ -339,6 +339,10 @@ func setHTTPListenerValue(req interface{}, listener *model.ListenerAttribute) {
 		stickySessionType := v.FieldByName("StickySessionType")
 		stickySessionType.SetString(listener.StickySessionType)
 	}
+	if listener.XForwardedForProto != "" {
+		xForwardedForProto := v.FieldByName("XForwardedForProto")
+		xForwardedForProto.SetString(string(listener.XForwardedForProto))
+	}
 }
 
 func setHTTPSListenerValue(req interface{}, listener *model.ListenerAttribute) {
@@ -379,6 +383,10 @@ func setHTTPSListenerValue(req interface{}, listener *model.ListenerAttribute) {
 	if listener.StickySessionType != "" {
 		stickySessionType := v.FieldByName("StickySessionType")
 		stickySessionType.SetString(listener.StickySessionType)
+	}
+	if listener.XForwardedForProto != "" {
+		xForwardedForProto := v.FieldByName("XForwardedForProto")
+		xForwardedForProto.SetString(string(listener.XForwardedForProto))
 	}
 	if listener.CertId != "" {
 		certId := v.FieldByName("ServerCertificateId")
@@ -421,6 +429,7 @@ func loadHTTPListener(config slb.HTTPListenerConfig, listener *model.ListenerAtt
 	listener.StickySessionType = config.StickySessionType
 	listener.CookieTimeout = config.CookieTimeout
 	listener.Cookie = config.Cookie
+	listener.XForwardedForProto = model.FlagType(config.XForwardedForProto)
 	listener.HealthCheck = model.FlagType(config.HealthCheck)
 	listener.HealthCheckDomain = config.HealthCheckDomain
 	listener.HealthCheckURI = config.HealthCheckURI
@@ -439,6 +448,7 @@ func loadHTTPSListener(config slb.HTTPSListenerConfig, listener *model.ListenerA
 	listener.StickySessionType = config.StickySessionType
 	listener.CookieTimeout = config.CookieTimeout
 	listener.Cookie = config.Cookie
+	listener.XForwardedForProto = model.FlagType(config.XForwardedForProto)
 	listener.HealthCheck = model.FlagType(config.HealthCheck)
 	listener.HealthCheckDomain = config.HealthCheckDomain
 	listener.HealthCheckURI = config.HealthCheckURI
