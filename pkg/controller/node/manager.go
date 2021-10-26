@@ -22,7 +22,6 @@ import (
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	nctx "k8s.io/cloud-provider-alibaba-cloud/pkg/context/node"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/helper"
 	prvd "k8s.io/cloud-provider-alibaba-cloud/pkg/provider"
 	"k8s.io/cloud-provider/api"
@@ -151,7 +150,7 @@ func nodeConditionReady(kclient client.Client, node *v1.Node) *v1.NodeCondition 
 func findCloudECS(
 	ins prvd.IInstance, prvdId string,
 ) (*prvd.NodeAttribute, error) {
-	nodes, err := ins.ListInstances(nctx.NewEmpty(), []string{prvdId})
+	nodes, err := ins.ListInstances(context.TODO(), []string{prvdId})
 	if err != nil {
 		return nil, fmt.Errorf("cloud instance api fail, %s", err.Error())
 	}

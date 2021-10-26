@@ -3,6 +3,7 @@ package slb
 import (
 	"context"
 	"encoding/json"
+	"k8s.io/klog"
 
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/model"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/util"
@@ -17,6 +18,7 @@ func (p SLBProvider) DescribeVServerGroups(ctx context.Context, lbId string) ([]
 	if err != nil {
 		return nil, util.FormatErrorMessage(err)
 	}
+	klog.V(5).Infof("RequestId: %s, API: %s, lbId: %s", resp.RequestId, "DescribeVServerGroups", lbId)
 	var vgs []model.VServerGroup
 	for _, v := range resp.VServerGroups.VServerGroup {
 		vg, err := p.DescribeVServerGroupAttribute(ctx, v.VServerGroupId)
@@ -62,6 +64,7 @@ func (p SLBProvider) DescribeVServerGroupAttribute(ctx context.Context, vGroupId
 	if err != nil {
 		return model.VServerGroup{}, util.FormatErrorMessage(err)
 	}
+	klog.V(5).Infof("RequestId: %s, API: %s, vGroupId: %s", resp.RequestId, "DescribeVServerGroupAttribute", vGroupId)
 	vg := setVServerGroupFromResponse(resp)
 	return vg, nil
 

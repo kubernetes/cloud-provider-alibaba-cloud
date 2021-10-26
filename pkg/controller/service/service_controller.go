@@ -18,7 +18,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/record"
-	ctrlCtx "k8s.io/cloud-provider-alibaba-cloud/pkg/context"
+	ctrlCfg "k8s.io/cloud-provider-alibaba-cloud/pkg/config"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/context/shared"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/helper"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/model"
@@ -64,7 +64,7 @@ type serviceController struct {
 }
 
 func (svcC serviceController) Start(ctx context.Context) error {
-	if ctrlCtx.ControllerCFG.DryRun {
+	if ctrlCfg.ControllerCFG.DryRun {
 		initMap(svcC.recon.kubeClient)
 	}
 	return svcC.c.Start(ctx)
@@ -144,7 +144,7 @@ func (m *ReconcileService) reconcile(request reconcile.Request) (err error) {
 	startTime := time.Now()
 
 	defer func() {
-		if ctrlCtx.ControllerCFG.DryRun {
+		if ctrlCfg.ControllerCFG.DryRun {
 			initial.Store(request.String(), 1)
 			if mapfull() {
 				util.ServiceLog.Info("ccm initial process finished.")
@@ -178,7 +178,7 @@ func (m *ReconcileService) reconcile(request reconcile.Request) (err error) {
 	// disable public address
 	if anno.Get(AddressType) == "" ||
 		anno.Get(AddressType) == string(model.InternetAddressType) {
-		if ctrlCtx.CloudCFG.Global.DisablePublicSLB {
+		if ctrlCfg.CloudCFG.Global.DisablePublicSLB {
 			m.record.Event(svc, v1.EventTypeWarning, helper.FailedSyncLB, "create public address slb is not allowed")
 			// do not support create public address slb, return and don't requeue
 			return nil
@@ -199,7 +199,7 @@ func (m *ReconcileService) reconcile(request reconcile.Request) (err error) {
 
 	klog.Infof("%s: ensure loadbalancer with service details, \n%+v", util.Key(svc), util.PrettyJson(svc))
 
-	if ctrlCtx.ControllerCFG.DryRun {
+	if ctrlCfg.ControllerCFG.DryRun {
 		if _, err = m.buildAndApplyModel(reqContext); err != nil {
 			m.record.Eventf(reqContext.Service, v1.EventTypeWarning, helper.FailedSyncLB,
 				"DryRun: Error syncing load balancer: %s", helper.GetLogMessage(err))

@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	util_errors "k8s.io/apimachinery/pkg/util/errors"
-	ctrlCtx "k8s.io/cloud-provider-alibaba-cloud/pkg/context"
+	ctrlCfg "k8s.io/cloud-provider-alibaba-cloud/pkg/config"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/model"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/base"
 
@@ -30,7 +30,7 @@ type PVTZProvider struct {
 func NewPVTZProvider(auth *base.ClientMgr) *PVTZProvider {
 	return &PVTZProvider{
 		client: auth.PVTZ,
-		zoneId: ctrlCtx.CloudCFG.Global.PrivateZoneID,
+		zoneId: ctrlCfg.CloudCFG.Global.PrivateZoneID,
 	}
 }
 func (p *PVTZProvider) ListPVTZ(ctx context.Context) ([]*model.PvtzEndpoint, error) {

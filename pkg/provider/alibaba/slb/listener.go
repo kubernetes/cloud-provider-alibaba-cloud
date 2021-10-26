@@ -24,6 +24,7 @@ func (p SLBProvider) DescribeLoadBalancerListeners(ctx context.Context, lbId str
 		if err != nil {
 			return nil, util.FormatErrorMessage(err)
 		}
+		klog.V(5).Infof("RequestId: %s, API: %s, lbId: %s", resp.RequestId, "DescribeLoadBalancerListeners", lbId)
 		respListeners = append(respListeners, resp.Listeners...)
 
 		if resp.NextToken == "" {

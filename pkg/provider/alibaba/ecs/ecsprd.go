@@ -1,13 +1,13 @@
 package ecs
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"k8s.io/klog"
 	"strings"
 
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/cloud-provider-alibaba-cloud/pkg/context/node"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/base"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/util"
@@ -28,7 +28,7 @@ type EcsProvider struct {
 	auth *base.ClientMgr
 }
 
-func (e *EcsProvider) ListInstances(ctx *node.NodeContext, ids []string) (map[string]*prvd.NodeAttribute, error) {
+func (e *EcsProvider) ListInstances(ctx context.Context, ids []string) (map[string]*prvd.NodeAttribute, error) {
 	nodeRegionMap := make(map[string][]string)
 	for _, id := range ids {
 		regionID, nodeID, err := util.NodeFromProviderID(id)
@@ -96,7 +96,7 @@ func (e *EcsProvider) getInstances(ids []string, region string) ([]ecs.Instance,
 }
 
 func (e *EcsProvider) SetInstanceTags(
-	ctx *node.NodeContext, id string, tags map[string]string,
+	ctx context.Context, id string, tags map[string]string,
 ) error {
 	var mtag []ecs.AddTagsTag
 	for k, v := range tags {

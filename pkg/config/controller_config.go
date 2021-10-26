@@ -1,4 +1,4 @@
-package context
+package config
 
 import (
 	"fmt"
@@ -7,7 +7,6 @@ import (
 )
 
 const (
-	flagLogLevel                       = "log-level"
 	flagDryRun                         = "dry-run"
 	flagCloudConfig                    = "cloud-config"
 	flagServiceMaxConcurrentReconciles = "concurrent-service-syncs"
@@ -17,7 +16,6 @@ const (
 	flagRouteReconciliationPeriod      = "route-reconciliation-period"
 	flagNetwork                        = "network"
 
-	defaultLogLevel                  = 3
 	defaultMaxConcurrentReconciles   = 3
 	defaultCloudConfig               = ""
 	defaultRouteReconciliationPeriod = 5 * time.Minute
