@@ -84,6 +84,7 @@ func (e *EcsProvider) getInstances(ids []string, region string) ([]ecs.Instance,
 				"instancename=%s, message=[%s].", req.RegionId, req.InstanceName, err.Error())
 			return nil, err
 		}
+		klog.V(5).Infof("RequestId: %s, API: %s, ids: %s", resp.RequestId, "DescribeInstances", string(bids))
 		ecsInstances = append(ecsInstances, resp.Instances.Instance...)
 		if resp.NextToken == "" {
 			break
@@ -117,12 +118,13 @@ func (e *EcsProvider) DescribeNetworkInterfaces(vpcId string, ips *[]string, nex
 	req.PrivateIpAddress = ips
 	req.NextToken = nextToken
 	req.MaxResults = requests.NewInteger(100)
-	return e.auth.ECS.DescribeNetworkInterfaces(req)
+	resp, err := e.auth.ECS.DescribeNetworkInterfaces(req)
+	if err != nil {
+		return nil, err
+	}
+	klog.V(5).Infof("RequestId: %s, API: %s, ips: %s", resp.RequestId, ips)
+	return resp, nil
 }
-
-const (
-	DefaultWaitForInterval = 5
-)
 
 func findAddress(instance *ecs.Instance) []v1.NodeAddress {
 	var addrs []v1.NodeAddress
