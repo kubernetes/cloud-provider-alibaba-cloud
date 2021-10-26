@@ -384,6 +384,10 @@ func setHTTPSListenerValue(req interface{}, listener *model.ListenerAttribute) {
 		certId := v.FieldByName("ServerCertificateId")
 		certId.SetString(listener.CertId)
 	}
+	if listener.EnableHttp2 != "" {
+		enabled := v.FieldByName("EnableHttp2")
+		enabled.SetString(string(listener.EnableHttp2))
+	}
 }
 
 func loadTCPListener(config slb.TCPListenerConfig, listener *model.ListenerAttribute) {
@@ -445,4 +449,5 @@ func loadHTTPSListener(config slb.HTTPSListenerConfig, listener *model.ListenerA
 	listener.HealthCheckConnectPort = config.HealthCheckConnectPort
 	listener.HealthCheckHttpCode = config.HealthCheckHttpCode
 	listener.CertId = config.ServerCertificateId
+	listener.EnableHttp2 = model.FlagType(config.EnableHttp2)
 }

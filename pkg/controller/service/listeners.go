@@ -156,6 +156,10 @@ func (mgr *ListenerManager) buildListenerFromServicePort(reqCtx *RequestContext,
 		listener.CertId = reqCtx.Anno.Get(CertID)
 	}
 
+	if reqCtx.Anno.Get(EnableHttp2) != ""{
+		listener.EnableHttp2 = model.FlagType(reqCtx.Anno.Get(EnableHttp2))
+	}
+
 	if reqCtx.Anno.Get(ForwardPort) != "" && listener.Protocol == model.HTTP {
 		forwardPort := forwardPort(reqCtx.Anno.Get(ForwardPort), int(port.Port))
 		if forwardPort != 0 {
@@ -664,13 +668,21 @@ func isNeedUpdate(reqCtx *RequestContext, local model.ListenerAttribute, remote 
 		updateDetail += fmt.Sprintf("PersistenceTimeout changed: %v - %v ;",
 			*remote.PersistenceTimeout, *local.PersistenceTimeout)
 	}
+	// The cert id is necessary for https, so skip to check whether it is blank
 	if local.Protocol == model.HTTPS &&
-		local.CertId != "" &&
 		remote.CertId != local.CertId {
 		needUpdate = true
 		update.CertId = local.CertId
 		updateDetail += fmt.Sprintf("CertId changed: %v - %v ;",
 			remote.CertId, local.CertId)
+	}
+	if local.Protocol == model.HTTPS &&
+		local.EnableHttp2 != "" &&
+		remote.EnableHttp2 != local.EnableHttp2 {
+		needUpdate = true
+		update.EnableHttp2 = local.EnableHttp2
+		updateDetail += fmt.Sprintf("EnableHttp2 changed: %v - %v ;",
+			remote.EnableHttp2, local.EnableHttp2)
 	}
 	// acl
 	if local.AclStatus != "" &&
