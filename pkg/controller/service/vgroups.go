@@ -403,6 +403,11 @@ func (mgr *VGroupManager) buildVGroupForServicePort(reqCtx *RequestContext, port
 			return vg, fmt.Errorf("vgroupid parse error: %s", err.Error())
 		}
 		if vgroupId != "" {
+			// check vgroup id is existed
+			_, err = mgr.cloud.DescribeVServerGroupAttribute(reqCtx.Ctx, vgroupId)
+			if err != nil {
+				return vg, fmt.Errorf("cannot find vgroup by vgroupId %s error: %s", vgroupId, err.Error())
+			}
 			reqCtx.Log.Info(fmt.Sprintf("user managed vgroupId %s for port %d", vgroupId, port.Port))
 			vg.VGroupId = vgroupId
 			vg.IsUserManaged = true

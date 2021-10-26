@@ -159,13 +159,12 @@ func (r *ReconcileRoute) Reconcile(ctx context.Context, request reconcile.Reques
 }
 
 func (r *ReconcileRoute) syncCloudRoute(ctx context.Context, node *corev1.Node) error {
-	klog.Infof("try to sync routes for node: %v", node.Name)
 	if !r.configRoutes {
 		return nil
 	}
 
 	if helper.HasExcludeLabel(node) {
-		klog.Info("node %s has exclude label, skip creating route", node.Name)
+		klog.Infof("node %s has exclude label, skip creating route", node.Name)
 		return nil
 	}
 
