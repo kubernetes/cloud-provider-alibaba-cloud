@@ -4,8 +4,6 @@ import (
 	"context"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/base"
-
-	"github.com/aliyun/alibaba-cloud-sdk-go/services/ecs"
 )
 
 /*
@@ -32,6 +30,6 @@ func (d *MockECS) SetInstanceTags(ctx context.Context, id string, tags map[strin
 	return nil
 }
 
-func (d *MockECS) DescribeNetworkInterfaces(vpcId string, ips *[]string, nextToken string) (*ecs.DescribeNetworkInterfacesResponse, error) {
+func (d *MockECS) DescribeNetworkInterfaces(vpcId string, ips []string) (map[string]string, error) {
 	return nil, nil
 }

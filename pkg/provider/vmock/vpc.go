@@ -2,8 +2,6 @@ package vmock
 
 import (
 	"context"
-	"fmt"
-
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/model"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/base"
 )
@@ -15,7 +13,7 @@ func NewMockVPC(
 }
 
 type MockVPC struct {
-	auth        *base.ClientMgr
+	auth *base.ClientMgr
 }
 
 func (m *MockVPC) CreateRoute(ctx context.Context, table string, provideID string, destinationCIDR string) (*model.Route, error) {
@@ -35,10 +33,7 @@ func (m *MockVPC) FindRoute(ctx context.Context, table, pvid, cidr string) (*mod
 }
 
 func (m *MockVPC) ListRouteTables(ctx context.Context, vpcID string) ([]string, error) {
-	if len(m.routetables) == 0 {
-		return nil, fmt.Errorf("no route table")
-	}
-	return m.routetables, nil
+	panic("implement me")
 }
 
 func (m *MockVPC) DescribeEipAddresses(ctx context.Context, instanceType string, instanceId string) ([]string, error) {
