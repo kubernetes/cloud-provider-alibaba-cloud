@@ -16,6 +16,10 @@ import (
 	"github.com/aliyun/alibaba-cloud-sdk-go/services/ecs"
 )
 
+const (
+	MaxNetworkInterfaceNum = 100
+)
+
 func NewEcsProvider(
 	auth *base.ClientMgr,
 ) *EcsProvider {
@@ -111,18 +115,54 @@ func (e *EcsProvider) SetInstanceTags(
 	return err
 }
 
-func (e *EcsProvider) DescribeNetworkInterfaces(vpcId string, ips *[]string, nextToken string) (*ecs.DescribeNetworkInterfacesResponse, error) {
-	req := ecs.CreateDescribeNetworkInterfacesRequest()
-	req.VpcId = vpcId
-	req.PrivateIpAddress = ips
-	req.NextToken = nextToken
-	req.MaxResults = requests.NewInteger(100)
-	return e.auth.ECS.DescribeNetworkInterfaces(req)
-}
+func (e *EcsProvider) DescribeNetworkInterfaces(vpcId string, ips []string) (map[string]string, error) {
+	result := make(map[string]string)
 
-const (
-	DefaultWaitForInterval = 5
-)
+	for begin := 0; begin < len(ips); begin += MaxNetworkInterfaceNum {
+		last := len(ips)
+		if begin+MaxNetworkInterfaceNum < last {
+			last = begin + MaxNetworkInterfaceNum
+		}
+		privateIpAddress := ips[begin:last]
+
+		req := ecs.CreateDescribeNetworkInterfacesRequest()
+		req.VpcId = vpcId
+		req.PrivateIpAddress = &privateIpAddress
+		next := &util.Pagination{
+			PageNumber: 1,
+			PageSize:   100,
+		}
+
+		for {
+			req.PageSize = requests.NewInteger(next.PageSize)
+			req.PageNumber = requests.NewInteger(next.PageNumber)
+			resp, err := e.auth.ECS.DescribeNetworkInterfaces(req)
+			if err != nil {
+				return result, err
+			}
+			klog.V(5).Infof("RequestId: %s, API: %s, ips: %s, privateIpAddress[%d:%d], pageNumber: %d",
+				resp.RequestId, "DescribeNetworkInterfaces", privateIpAddress, begin, last, req.PageNumber)
+
+			for _, eni := range resp.NetworkInterfaceSets.NetworkInterfaceSet {
+				for _, privateIp := range eni.PrivateIpSets.PrivateIpSet {
+					result[privateIp.PrivateIpAddress] = eni.NetworkInterfaceId
+				}
+			}
+
+			pageResult := &util.PaginationResult{
+				PageNumber: resp.PageNumber,
+				PageSize:   resp.PageSize,
+				TotalCount: resp.TotalCount,
+			}
+			next = pageResult.NextPage()
+			if next == nil {
+				break
+			}
+		}
+
+	}
+	return result, nil
+}
 
 func findAddress(instance *ecs.Instance) []v1.NodeAddress {
 	var addrs []v1.NodeAddress

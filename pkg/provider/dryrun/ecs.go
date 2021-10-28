@@ -5,7 +5,6 @@ import (
 	prvd "k8s.io/cloud-provider-alibaba-cloud/pkg/provider"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/base"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/ecs"
-	cloud "github.com/aliyun/alibaba-cloud-sdk-go/services/ecs"
 )
 
 func NewDryRunECS(
@@ -30,6 +29,6 @@ func (d *DryRunECS) SetInstanceTags(ctx *node.NodeContext, id string, tags map[s
 	return d.ecs.SetInstanceTags(ctx, id, tags)
 }
 
-func (d *DryRunECS) DescribeNetworkInterfaces(vpcId string, ips *[]string, nextToken string) (*cloud.DescribeNetworkInterfacesResponse, error) {
-	return d.ecs.DescribeNetworkInterfaces(vpcId, ips, nextToken)
+func (d *DryRunECS) DescribeNetworkInterfaces(vpcId string, ips []string) (map[string]string, error) {
+	return d.ecs.DescribeNetworkInterfaces(vpcId, ips)
 }

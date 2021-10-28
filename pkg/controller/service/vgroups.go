@@ -653,36 +653,19 @@ func updateENIBackends(mgr *VGroupManager, backends []model.BackendAttribute) ([
 	if err != nil {
 		return nil, fmt.Errorf("get vpc id from metadata error:%s", err.Error())
 	}
-	var (
-		ips       []string
-		nextToken string
-	)
+
+	var ips []string
 	for _, b := range backends {
 		ips = append(ips, b.ServerIp)
 	}
-	ecis := make(map[string]string)
-	for {
-		resp, err := mgr.cloud.DescribeNetworkInterfaces(vpcId, &ips, nextToken)
-		if err != nil {
-			return nil, fmt.Errorf("call DescribeNetworkInterfaces: %s", err.Error())
-		}
-		for _, ip := range ips {
-			for _, eni := range resp.NetworkInterfaceSets.NetworkInterfaceSet {
-				for _, privateIp := range eni.PrivateIpSets.PrivateIpSet {
-					if ip == privateIp.PrivateIpAddress {
-						ecis[ip] = eni.NetworkInterfaceId
-					}
-				}
-			}
-		}
-		if resp.NextToken == "" {
-			break
-		}
-		nextToken = resp.NextToken
+
+	result, err := mgr.cloud.DescribeNetworkInterfaces(vpcId, ips)
+	if err != nil {
+		return nil, fmt.Errorf("call DescribeNetworkInterfaces: %s", err.Error())
 	}
 
 	for i := range backends {
-		eniid, ok := ecis[backends[i].ServerIp]
+		eniid, ok := result[backends[i].ServerIp]
 		if !ok {
 			return nil, fmt.Errorf("can not find eniid for ip %s in vpc %s", backends[i].ServerIp, vpcId)
 		}
