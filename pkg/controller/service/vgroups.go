@@ -123,6 +123,9 @@ func (mgr *VGroupManager) UpdateVServerGroup(reqCtx *RequestContext, local, remo
 	add, del, update := diff(reqCtx, remote, local)
 	if len(add) == 0 && len(del) == 0 && len(update) == 0 {
 		reqCtx.Log.Info(fmt.Sprintf("update vgroup [%s]: no change, skip reconcile", remote.VGroupId))
+	}else{
+		reqCtx.Log.Info(fmt.Sprintf("try to update vgroup [%s]: local: [%v], remote: [%v]",
+			remote.VGroupId, local.Backends, remote.Backends))
 	}
 	if len(add) > 0 {
 		if err := mgr.BatchAddVServerGroupBackendServers(reqCtx, local, add); err != nil {
