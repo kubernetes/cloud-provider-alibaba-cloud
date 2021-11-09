@@ -76,6 +76,7 @@ func (e *EcsProvider) getInstances(ids []string, region string) ([]ecs.Instance,
 	}
 	req := ecs.CreateDescribeInstancesRequest()
 	req.RegionId = region
+	req.Status = "InUse"
 	req.InstanceIds = string(bids)
 	req.NextToken = ""
 	req.MaxResults = requests.NewInteger(50)
