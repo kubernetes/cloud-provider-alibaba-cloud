@@ -43,8 +43,6 @@ const (
 
 	// MAX_BATCH_NUM batch process per loop.
 	MAX_BATCH_NUM = 50
-
-	AnnotationProvidedIPAddr = "alpha.kubernetes.io/provided-node-ip"
 )
 
 var ErrNotFound = errors.New("instance not found")
@@ -294,7 +292,7 @@ func NodeList(kclient client.Client) (*v1.NodeList, error) {
 func isProvidedAddrExist(node *v1.Node, nodeAddresses []v1.NodeAddress) (*v1.NodeAddress, bool) {
 	var nodeIP *v1.NodeAddress
 	ipExists := false
-	addr, ok := node.ObjectMeta.Annotations[AnnotationProvidedIPAddr]
+	addr, ok := node.ObjectMeta.Annotations[api.AnnotationAlphaProvidedIPAddr]
 	if ok {
 		ipExists = true
 		for i := range nodeAddresses {
