@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	v1 "k8s.io/api/core/v1"
+	discovery "k8s.io/api/discovery/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/leaderelection/resourcelock"
@@ -184,7 +185,8 @@ func (h *enqueueRequestForEndpointEvent) Update(e event.UpdateEvent, queue workq
 	if ok1 && ok2 && isEndpointProcessNeeded(ep1, h.client) &&
 		!reflect.DeepEqual(ep1.Subsets, ep2.Subsets) {
 		util.ServiceLog.Info("controller: endpoint update event", "endpoint", util.Key(ep1))
-		util.ServiceLog.Info(fmt.Sprintf("endpoints before [%s], afeter [%s]", LogEndpoints(*ep1), LogEndpoints(*ep2)), "endpoint", util.Key(ep1))
+		util.ServiceLog.Info(fmt.Sprintf("endpoints before [%s], afeter [%s]",
+			LogEndpoints(ep1), LogEndpoints(ep2)), "endpoint", util.Key(ep1))
 		h.enqueueManagedEndpoint(queue, ep1)
 	}
 }
@@ -332,6 +334,114 @@ func (h *enqueueRequestForNodeEvent) enqueueManagedNode(queue workqueue.RateLimi
 		util.ServiceLog.Info(fmt.Sprintf("node change: enqueue service %s", util.Key(&v)),
 			"node", node.Name, "queueLen", queue.Len())
 	}
+}
+
+// NewEnqueueRequestForEndpointSliceEvent, event handler for endpointslice event
+func NewEnqueueRequestForEndpointSliceEvent(record record.EventRecorder) *enqueueRequestForEndpointSliceEvent {
+	return &enqueueRequestForEndpointSliceEvent{eventRecorder: record}
+}
+
+type enqueueRequestForEndpointSliceEvent struct {
+	client        client.Client
+	eventRecorder record.EventRecorder
+}
+
+var _ handler.EventHandler = (*enqueueRequestForEndpointSliceEvent)(nil)
+
+func (h *enqueueRequestForEndpointSliceEvent) InjectClient(c client.Client) error {
+	h.client = c
+	return nil
+}
+
+func (h *enqueueRequestForEndpointSliceEvent) Create(e event.CreateEvent, queue workqueue.RateLimitingInterface) {
+	es, ok := e.Object.(*discovery.EndpointSlice)
+	if ok && isEndpointSliceProcessNeeded(es, h.client) {
+		util.ServiceLog.Info("controller: endpointslice create event", "endpointslice", util.Key(es))
+		h.enqueueManagedEndpointSlice(queue, es)
+	}
+}
+
+func (h *enqueueRequestForEndpointSliceEvent) Update(e event.UpdateEvent, queue workqueue.RateLimitingInterface) {
+	es1, ok1 := e.ObjectOld.(*discovery.EndpointSlice)
+	es2, ok2 := e.ObjectNew.(*discovery.EndpointSlice)
+
+	if ok1 && ok2 && isEndpointSliceProcessNeeded(es1, h.client) &&
+		isEndpointSliceUpdateNeeded(es1, es2) {
+		util.ServiceLog.Info("controller: endpointslice update event", "endpointslice", util.Key(es1))
+		util.ServiceLog.Info(fmt.Sprintf("endpoints before [%s], afeter [%s]", LogEndpointSlice(es1), LogEndpointSlice(es2)), "endpointslice", util.Key(es1))
+		h.enqueueManagedEndpointSlice(queue, es1)
+	}
+}
+
+func (h *enqueueRequestForEndpointSliceEvent) Delete(e event.DeleteEvent, queue workqueue.RateLimitingInterface) {
+	es, ok := e.Object.(*discovery.EndpointSlice)
+	if ok && isEndpointSliceProcessNeeded(es, h.client) {
+		util.ServiceLog.Info("controller: endpointslice delete event", "endpointslice", util.Key(es))
+		h.enqueueManagedEndpointSlice(queue, es)
+	}
+}
+
+func (h *enqueueRequestForEndpointSliceEvent) Generic(e event.GenericEvent, queue workqueue.RateLimitingInterface) {
+	// unknown event, ignore
+}
+
+func (h *enqueueRequestForEndpointSliceEvent) enqueueManagedEndpointSlice(queue workqueue.RateLimitingInterface, endpointSlice *discovery.EndpointSlice) {
+	serviceName, ok := endpointSlice.Labels[discovery.LabelServiceName]
+	if !ok {
+		return
+	}
+
+	queue.Add(reconcile.Request{
+		NamespacedName: types.NamespacedName{
+			Namespace: endpointSlice.Namespace,
+			Name:      serviceName,
+		},
+	})
+
+	util.ServiceLog.Info("enqueue", "endpointslice", util.Key(endpointSlice), "queueLen", queue.Len())
+}
+
+func isEndpointSliceProcessNeeded(es *discovery.EndpointSlice, client client.Client) bool {
+	if es == nil {
+		return false
+	}
+
+	serviceName, ok := es.Labels[discovery.LabelServiceName]
+	if !ok {
+		return false
+	}
+
+	svc := &v1.Service{}
+	err := client.Get(context.TODO(),
+		types.NamespacedName{
+			Namespace: es.Namespace,
+			Name:      serviceName,
+		}, svc)
+	if err != nil {
+		if !apierrors.IsNotFound(err) {
+			util.ServiceLog.Error(err, "fail to get service, skip reconcile endpointslice",
+				"endpointslice", util.Key(es), "service", serviceName)
+		}
+		return false
+	}
+
+	if !isServiceProcessNeeded(svc) {
+		util.ServiceLog.Info("endpointslice change: service class not empty, skip reconcile",
+			"endpointslice", util.Key(es))
+		return false
+	}
+
+	if !needLoadBalancer(svc) {
+		// it is safe not to reconcile endpointslice which belongs to the non-loadbalancer svc
+		util.ServiceLog.V(5).Info("endpointslice change: loadBalancer is not needed, skip",
+			"endpointslice", util.Key(es))
+		return false
+	}
+	return true
+}
+
+func isEndpointSliceUpdateNeeded(old, new *discovery.EndpointSlice) bool {
+	return !reflect.DeepEqual(old.Endpoints, new.Endpoints) || !reflect.DeepEqual(old.Ports, new.Ports)
 }
 
 func nodeSpecChanged(oldNode, newNode *v1.Node) bool {

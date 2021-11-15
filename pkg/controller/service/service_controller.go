@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"github.com/go-logr/logr"
 	"golang.org/x/time/rate"
+	discovery "k8s.io/api/discovery/v1beta1"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/util/metric"
 	"k8s.io/klog"
@@ -96,9 +98,18 @@ func add(mgr manager.Manager, r *ReconcileService) error {
 		return fmt.Errorf("watch resource svc error: %s", err.Error())
 	}
 
-	if err := c.Watch(&source.Kind{Type: &v1.Endpoints{}},
-		NewEnqueueRequestForEndpointEvent(mgr.GetEventRecorderFor("service-controller"))); err != nil {
-		return fmt.Errorf("watch resource endpoint error: %s", err.Error())
+	if utilfeature.DefaultFeatureGate.Enabled(helper.EndpointSlice) {
+		// watch endpointslice
+		if err := c.Watch(&source.Kind{Type: &discovery.EndpointSlice{}},
+			NewEnqueueRequestForEndpointSliceEvent(mgr.GetEventRecorderFor("service-controller"))); err != nil {
+			return fmt.Errorf("watch resource endpointslice error: %s", err.Error())
+		}
+	} else {
+		// watch endpoints
+		if err := c.Watch(&source.Kind{Type: &v1.Endpoints{}},
+			NewEnqueueRequestForEndpointEvent(mgr.GetEventRecorderFor("service-controller"))); err != nil {
+			return fmt.Errorf("watch resource endpoint error: %s", err.Error())
+		}
 	}
 
 	if err := c.Watch(&source.Kind{Type: &v1.Node{}},

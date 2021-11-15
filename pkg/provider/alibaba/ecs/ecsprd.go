@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/model"
 	"k8s.io/klog"
 	"strings"
 
@@ -117,7 +118,7 @@ func (e *EcsProvider) SetInstanceTags(
 	return err
 }
 
-func (e *EcsProvider) DescribeNetworkInterfaces(vpcId string, ips []string) (map[string]string, error) {
+func (e *EcsProvider) DescribeNetworkInterfaces(vpcId string, ips []string, ipVersionType model.AddressIPVersionType) (map[string]string, error) {
 	result := make(map[string]string)
 
 	for begin := 0; begin < len(ips); begin += MaxNetworkInterfaceNum {
@@ -129,7 +130,11 @@ func (e *EcsProvider) DescribeNetworkInterfaces(vpcId string, ips []string) (map
 
 		req := ecs.CreateDescribeNetworkInterfacesRequest()
 		req.VpcId = vpcId
-		req.PrivateIpAddress = &privateIpAddress
+		if ipVersionType == model.IPv6 {
+			req.Ipv6Address = &privateIpAddress
+		} else {
+			req.PrivateIpAddress = &privateIpAddress
+		}
 		next := &util.Pagination{
 			PageNumber: 1,
 			PageSize:   100,
@@ -146,8 +151,15 @@ func (e *EcsProvider) DescribeNetworkInterfaces(vpcId string, ips []string) (map
 				resp.RequestId, "DescribeNetworkInterfaces", privateIpAddress, begin, last, req.PageNumber)
 
 			for _, eni := range resp.NetworkInterfaceSets.NetworkInterfaceSet {
-				for _, privateIp := range eni.PrivateIpSets.PrivateIpSet {
-					result[privateIp.PrivateIpAddress] = eni.NetworkInterfaceId
+
+				if ipVersionType == model.IPv6 {
+					for _, ipv6 := range eni.Ipv6Sets.Ipv6Set {
+						result[ipv6.Ipv6Address] = eni.NetworkInterfaceId
+					}
+				} else {
+					for _, privateIp := range eni.PrivateIpSets.PrivateIpSet {
+						result[privateIp.PrivateIpAddress] = eni.NetworkInterfaceId
+					}
 				}
 			}
 

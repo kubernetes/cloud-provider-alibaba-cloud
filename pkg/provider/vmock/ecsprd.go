@@ -2,14 +2,11 @@ package vmock
 
 import (
 	"context"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/model"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/base"
 )
 
-/*
-	Provider needs permission
-	"alibaba:DeleteInstance", "alibaba:RunCommand",
-*/
 func NewMockECS(
 	auth *base.ClientMgr,
 ) *MockECS {
@@ -30,6 +27,6 @@ func (d *MockECS) SetInstanceTags(ctx context.Context, id string, tags map[strin
 	return nil
 }
 
-func (d *MockECS) DescribeNetworkInterfaces(vpcId string, ips []string) (map[string]string, error) {
+func (d *MockECS) DescribeNetworkInterfaces(vpcId string, ips []string, ipVersionType model.AddressIPVersionType) (map[string]string, error) {
 	return nil, nil
 }

@@ -8,8 +8,8 @@ require (
 	github.com/go-cmd/cmd v1.2.1
 	github.com/go-logr/logr v0.4.0
 	github.com/mohae/deepcopy v0.0.0-20170603005431-491d3605edfb
-	github.com/onsi/ginkgo v1.14.1
-	github.com/onsi/gomega v1.10.2
+	github.com/onsi/ginkgo v1.16.4
+	github.com/onsi/gomega v1.15.0
 	github.com/operator-framework/operator-sdk v0.19.4
 	github.com/orcaman/concurrent-map v0.0.0-20210501183033-44dafcb38ecc
 	github.com/pkg/errors v0.9.1
@@ -21,12 +21,14 @@ require (
 	k8s.io/api v0.22.3
 	k8s.io/apiextensions-apiserver v0.22.3
 	k8s.io/apimachinery v0.22.3
+	k8s.io/apiserver v0.22.3
 	k8s.io/client-go v12.0.0+incompatible
 	k8s.io/cloud-provider v0.22.3
+	k8s.io/component-base v0.22.3
 	k8s.io/klog v1.0.0
 	k8s.io/klog/v2 v2.9.0
 	k8s.io/kubernetes v1.22.3
-	sigs.k8s.io/controller-runtime v0.8.3
+	sigs.k8s.io/controller-runtime v0.10.3
 )
 
 replace (

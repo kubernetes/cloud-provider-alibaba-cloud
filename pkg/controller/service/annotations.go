@@ -81,6 +81,7 @@ const (
 	// VServerBackend Attribute
 	BackendLabel      = AnnotationLoadBalancerPrefix + "backend-label"              // BackendLabel backend labels
 	BackendType       = "service.beta.kubernetes.io/backend-type"                   // BackendType backend type
+	BackendIPVersion  = AnnotationLoadBalancerPrefix + "backend-ip-version"         // BackendIPVersion backend ip version
 	RemoveUnscheduled = AnnotationLoadBalancerPrefix + "remove-unscheduled-backend" // RemoveUnscheduled remove unscheduled node from backends
 	VGroupWeight      = AnnotationLoadBalancerPrefix + "weight"                     // Weight total weight of the load balancer
 )

@@ -4,10 +4,12 @@ import (
 	"flag"
 	"fmt"
 	"github.com/spf13/pflag"
+	apiext "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/apis"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/context/shared"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/helper"
 	prvd "k8s.io/cloud-provider-alibaba-cloud/pkg/provider"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/dryrun"
@@ -39,6 +41,9 @@ func printVersion() {
 }
 
 func main() {
+	ctrl.SetLogger(klogr.New())
+	printVersion()
+
 	err := loadControllerConfig()
 	if err != nil {
 		log.Error(err, "unable to load controller config")
@@ -118,6 +123,16 @@ func loadControllerConfig() error {
 
 	if err := ctrlCfg.ControllerCFG.Validate(); err != nil {
 		return err
+	}
+
+	if err := ctrlCfg.CloudCFG.LoadCloudCFG(); err != nil {
+		return fmt.Errorf("load cloud config error: %s", err.Error())
+	}
+	ctrlCfg.CloudCFG.PrintInfo()
+
+	if ctrlCfg.CloudCFG.Global.FeatureGates != "" {
+		apiClient := apiext.NewForConfigOrDie(config.GetConfigOrDie())
+		return helper.BindFeatureGates(apiClient, ctrlCfg.CloudCFG.Global.FeatureGates)
 	}
 	return nil
 }

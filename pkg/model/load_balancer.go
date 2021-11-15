@@ -1,6 +1,7 @@
 package model
 
 import (
+	"encoding/json"
 	"fmt"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -158,16 +159,24 @@ type VServerGroup struct {
 	Backends     []BackendAttribute
 }
 
+func (v *VServerGroup) BackendInfo() string {
+	backendJson, err := json.Marshal(v.Backends)
+	if err != nil {
+		return fmt.Sprintf("%v", v.Backends)
+	}
+	return string(backendJson)
+}
+
 type BackendAttribute struct {
 	IsUserManaged bool
 	NodeName      *string
 
-	Description string
-	ServerId    string
-	ServerIp    string
-	Weight      int
-	Port        int
-	Type        string
+	Description string `json:"description"`
+	ServerId    string `json:"serverId"`
+	ServerIp    string `json:"serverIp"`
+	Weight      int    `json:"weight"`
+	Port        int    `json:"port"`
+	Type        string `json:"type"`
 }
 
 // DEFAULT_PREFIX default prefix for listener

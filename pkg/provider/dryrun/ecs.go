@@ -2,6 +2,7 @@ package dryrun
 
 import (
 	"context"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/model"
 	prvd "k8s.io/cloud-provider-alibaba-cloud/pkg/provider"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/base"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/ecs"
@@ -29,6 +30,6 @@ func (d *DryRunECS) SetInstanceTags(ctx context.Context, id string, tags map[str
 	return d.ecs.SetInstanceTags(ctx, id, tags)
 }
 
-func (d *DryRunECS) DescribeNetworkInterfaces(vpcId string, ips []string) (map[string]string, error) {
-	return d.ecs.DescribeNetworkInterfaces(vpcId, ips)
+func (d *DryRunECS) DescribeNetworkInterfaces(vpcId string, ips []string, ipVersionType model.AddressIPVersionType) (map[string]string, error) {
+	return d.ecs.DescribeNetworkInterfaces(vpcId, ips, ipVersionType)
 }
