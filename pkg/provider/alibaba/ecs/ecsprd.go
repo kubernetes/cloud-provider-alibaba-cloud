@@ -77,7 +77,6 @@ func (e *EcsProvider) getInstances(ids []string, region string) ([]ecs.Instance,
 	}
 	req := ecs.CreateDescribeInstancesRequest()
 	req.RegionId = region
-	req.Status = "InUse"
 	req.InstanceIds = string(bids)
 	req.NextToken = ""
 	req.MaxResults = requests.NewInteger(50)
@@ -130,6 +129,7 @@ func (e *EcsProvider) DescribeNetworkInterfaces(vpcId string, ips []string, ipVe
 
 		req := ecs.CreateDescribeNetworkInterfacesRequest()
 		req.VpcId = vpcId
+		req.Status = "InUse"
 		if ipVersionType == model.IPv6 {
 			req.Ipv6Address = &privateIpAddress
 		} else {
