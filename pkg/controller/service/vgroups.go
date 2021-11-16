@@ -605,7 +605,10 @@ func setBackendsFromEndpointSlices(candidates *EndpointWithENI, vgroup model.VSe
 		}
 
 		for _, ep := range es.Endpoints {
-			if ep.Conditions.Ready != nil && !*ep.Conditions.Ready {
+			if ep.Conditions.Ready == nil {
+				continue
+			}
+			if !*ep.Conditions.Ready {
 				continue
 			}
 
@@ -613,14 +616,15 @@ func setBackendsFromEndpointSlices(candidates *EndpointWithENI, vgroup model.VSe
 				if _, ok := endpointMap[addr]; ok {
 					continue
 				}
-
 				endpointMap[addr] = true
+				// NodeName of endpoint is nil, use topology.hostname instead of NodeName
+				hostName, _ := ep.Topology[v1.LabelHostname]
 				backends = append(backends, model.BackendAttribute{
-					NodeName: ep.NodeName,
+					NodeName: &hostName,
 					ServerIp: addr,
 					// set backend port to targetPort by default
 					// if backend type is ecs, update backend port to nodePort
-					Port:        int(backendPort),
+					Port:        backendPort,
 					Description: vgroup.VGroupName,
 				})
 			}
