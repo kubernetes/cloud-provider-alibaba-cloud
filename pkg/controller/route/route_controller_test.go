@@ -11,7 +11,7 @@ import (
 	"testing"
 )
 
-func Test_updateNetworkingCondition(t *testing.T) {
+func TestUpdateNetworkingCondition(t *testing.T) {
 	cl, err := client.New(config.GetConfigOrDie(), client.Options{})
 	if err != nil {
 		fmt.Println("failed to create client")

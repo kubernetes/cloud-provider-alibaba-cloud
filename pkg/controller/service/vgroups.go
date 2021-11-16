@@ -540,14 +540,7 @@ func (mgr *VGroupManager) buildVGroupForServicePort(reqCtx *RequestContext, port
 
 func setGenericBackendAttribute(candidates *EndpointWithENI, vgroup model.VServerGroup) []model.BackendAttribute {
 	if utilfeature.DefaultMutableFeatureGate.Enabled(helper.EndpointSlice) {
-		if len(candidates.EndpointSlices) == 0 {
-			return nil
-		}
 		return setBackendsFromEndpointSlices(candidates, vgroup)
-	}
-
-	if len(candidates.Endpoints.Subsets) == 0 {
-		return nil
 	}
 	return setBackendsFromEndpoints(candidates, vgroup)
 }
@@ -555,6 +548,9 @@ func setGenericBackendAttribute(candidates *EndpointWithENI, vgroup model.VServe
 func setBackendsFromEndpoints(candidates *EndpointWithENI, vgroup model.VServerGroup) []model.BackendAttribute {
 	var backends []model.BackendAttribute
 
+	if len(candidates.Endpoints.Subsets) == 0 {
+		return nil
+	}
 	for _, ep := range candidates.Endpoints.Subsets {
 		var backendPort int
 		if vgroup.ServicePort.TargetPort.Type == intstr.Int {
@@ -565,6 +561,9 @@ func setBackendsFromEndpoints(candidates *EndpointWithENI, vgroup model.VServerG
 					backendPort = int(p.Port)
 					break
 				}
+			}
+			if backendPort == 0 {
+				klog.Warningf("%s cannot find port according port name: %s", vgroup.VGroupName, vgroup.ServicePort.Name)
 			}
 		}
 
@@ -588,6 +587,10 @@ func setBackendsFromEndpointSlices(candidates *EndpointWithENI, vgroup model.VSe
 	endpointMap := make(map[string]bool)
 	var backends []model.BackendAttribute
 
+	if len(candidates.EndpointSlices) == 0 {
+		return nil
+	}
+
 	for _, es := range candidates.EndpointSlices {
 		var backendPort int
 		if vgroup.ServicePort.TargetPort.Type == intstr.Int {
@@ -601,6 +604,9 @@ func setBackendsFromEndpointSlices(candidates *EndpointWithENI, vgroup model.VSe
 					}
 					break
 				}
+			}
+			if backendPort == 0 {
+				klog.Warningf("%s cannot find port according port name: %s", vgroup.VGroupName, vgroup.ServicePort.Name)
 			}
 		}
 

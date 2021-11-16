@@ -42,7 +42,10 @@ func ClusterVersionAtLeast(client *apiext.Clientset, min string) (bool, error) {
 	}
 	klog.Infof("kubernetes version: %s", serverVersion.String())
 
-	least, _ := version.ParseGeneric(min)
+	least, err := version.ParseGeneric(min)
+	if err != nil {
+		klog.Errorf("parse version %s error: %s", min, err.Error())
+	}
 
 	return runningVersion.AtLeast(least), nil
 }

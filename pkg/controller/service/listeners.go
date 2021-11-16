@@ -156,16 +156,17 @@ func (mgr *ListenerManager) buildListenerFromServicePort(reqCtx *RequestContext,
 		listener.CertId = reqCtx.Anno.Get(CertID)
 	}
 
-	if reqCtx.Anno.Get(EnableHttp2) != ""{
+	if reqCtx.Anno.Get(EnableHttp2) != "" {
 		listener.EnableHttp2 = model.FlagType(reqCtx.Anno.Get(EnableHttp2))
 	}
 
 	if reqCtx.Anno.Get(ForwardPort) != "" && listener.Protocol == model.HTTP {
-		forwardPort := forwardPort(reqCtx.Anno.Get(ForwardPort), int(port.Port))
-		if forwardPort != 0 {
-			listener.ForwardPort = forwardPort
-			listener.ListenerForward = model.OnFlag
+		forwardPort, err := forwardPort(reqCtx.Anno.Get(ForwardPort), int(port.Port))
+		if err != nil {
+			return listener, fmt.Errorf("Annotation ForwardPort error: %s ", err.Error())
 		}
+		listener.ForwardPort = forwardPort
+		listener.ListenerForward = model.OnFlag
 	}
 
 	if reqCtx.Anno.Get(IdleTimeout) != "" {
@@ -452,17 +453,16 @@ func (t *https) Update(reqCtx *RequestContext, action UpdateAction) error {
 	return t.mgr.cloud.SetLoadBalancerHTTPSListenerAttribute(reqCtx.Ctx, action.lbId, update)
 }
 
-func forwardPort(port string, target int) int {
+func forwardPort(port string, target int) (int, error) {
 	if port == "" {
-		return 0
+		return 0, fmt.Errorf("forward port format error, get: %s, expect 80:443", port)
 	}
 	forwarded := ""
 	tmps := strings.Split(port, ",")
 	for _, v := range tmps {
 		ports := strings.Split(v, ":")
 		if len(ports) != 2 {
-			klog.Infof("forward-port format error: %s, expect 80:443,88:6443", port)
-			continue
+			return 0, fmt.Errorf("forward port format error: %s, expect 80:443,88:6443", port)
 		}
 		if ports[0] == strconv.Itoa(int(target)) {
 			forwarded = ports[1]
@@ -472,14 +472,12 @@ func forwardPort(port string, target int) int {
 	if forwarded != "" {
 		forward, err := strconv.Atoi(forwarded)
 		if err != nil {
-			klog.Errorf("forward port is not an integer, %s", forwarded)
-			return 0
+			return 0, fmt.Errorf("forward port is not an integer, %s", forwarded)
 		}
 		klog.Infof("forward http port %d to %d", target, forward)
-		return forward
+		return forward, nil
 	}
-	klog.Errorf("forward-port %s cannot be parsed, expect 80:443,88:6443", port)
-	return 0
+	return 0, fmt.Errorf("forward port format error: %s, expect 80:443,88:6443", port)
 }
 
 func buildActionsForListeners(reqCtx *RequestContext, local *model.LoadBalancer, remote *model.LoadBalancer) ([]CreateAction, []UpdateAction, []DeleteAction, error) {
