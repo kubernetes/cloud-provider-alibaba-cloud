@@ -4,14 +4,17 @@ import (
 	"flag"
 	"fmt"
 	"github.com/spf13/pflag"
+	apiext "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/apis"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/context/shared"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/helper"
 	prvd "k8s.io/cloud-provider-alibaba-cloud/pkg/provider"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/dryrun"
 	"k8s.io/cloud-provider-alibaba-cloud/version"
+	"k8s.io/klog"
 	"k8s.io/klog/klogr"
 	"net/http"
 	"os"
@@ -23,7 +26,7 @@ import (
 
 	sdkVersion "github.com/operator-framework/operator-sdk/version"
 	"k8s.io/cloud-provider-alibaba-cloud/cmd/health"
-	ctrlCtx "k8s.io/cloud-provider-alibaba-cloud/pkg/context"
+	ctrlCfg "k8s.io/cloud-provider-alibaba-cloud/pkg/config"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller"
 )
 
@@ -38,20 +41,25 @@ func printVersion() {
 }
 
 func main() {
+	ctrl.SetLogger(klogr.New())
+	printVersion()
+
 	err := loadControllerConfig()
 	if err != nil {
 		log.Error(err, "unable to load controller config")
 		os.Exit(1)
 	}
-	ctrl.SetLogger(klogr.New())
+	ctrl.SetLogger(klogr.New().V(ctrlCfg.ControllerCFG.LogLevel))
 
 	printVersion()
 
 	// Get a config to talk to the api-server
 	cfg := config.GetConfigOrDie()
+	cfg.QPS = ctrlCfg.ControllerCFG.RuntimeConfig.QPS
+	cfg.Burst = ctrlCfg.ControllerCFG.RuntimeConfig.Burst
 
 	// Create a new manager to provide shared dependencies and start components
-	mgr, err := manager.New(cfg, ctrlCtx.BuildRuntimeOptions(ctrlCtx.ControllerCFG.RuntimeConfig))
+	mgr, err := manager.New(cfg, ctrlCfg.BuildRuntimeOptions(ctrlCfg.ControllerCFG.RuntimeConfig))
 	if err != nil {
 		log.Error(err, "fail to create manager")
 		os.Exit(1)
@@ -64,7 +72,7 @@ func main() {
 	}
 
 	var cloud prvd.Provider
-	if ctrlCtx.ControllerCFG.DryRun {
+	if ctrlCfg.ControllerCFG.DryRun {
 		log.Info("using DryRun Mode")
 		cloud = dryrun.NewDryRunCloud()
 	} else {
@@ -73,11 +81,11 @@ func main() {
 	ctx := shared.NewSharedContext(cloud)
 
 	log.Info("Registering Components.")
-	if err := controller.AddToManager(mgr, ctx, ctrlCtx.ControllerCFG.EnableControllers); err != nil {
+	if err := controller.AddToManager(mgr, ctx, ctrlCfg.ControllerCFG.EnableControllers); err != nil {
 		log.Error(err, "add controller: %s", err.Error())
 		os.Exit(1)
 	} else {
-		log.Info(fmt.Sprintf("Loaded controllers: %v", ctrlCtx.ControllerCFG.EnableControllers))
+		log.Info(fmt.Sprintf("Loaded controllers: %v", ctrlCfg.ControllerCFG.EnableControllers))
 	}
 
 	// Start the Cmd
@@ -103,16 +111,28 @@ func main() {
 }
 
 func loadControllerConfig() error {
+	klog.InitFlags(nil)
+
 	fs := pflag.NewFlagSet("", pflag.ExitOnError)
 	fs.AddGoFlagSet(flag.CommandLine)
-	ctrlCtx.ControllerCFG.BindFlags(fs)
+	ctrlCfg.ControllerCFG.BindFlags(fs)
 
 	if err := fs.Parse(os.Args); err != nil {
 		return err
 	}
 
-	if err := ctrlCtx.ControllerCFG.Validate(); err != nil {
+	if err := ctrlCfg.ControllerCFG.Validate(); err != nil {
 		return err
+	}
+
+	if err := ctrlCfg.CloudCFG.LoadCloudCFG(); err != nil {
+		return fmt.Errorf("load cloud config error: %s", err.Error())
+	}
+	ctrlCfg.CloudCFG.PrintInfo()
+
+	if ctrlCfg.CloudCFG.Global.FeatureGates != "" {
+		apiClient := apiext.NewForConfigOrDie(config.GetConfigOrDie())
+		return helper.BindFeatureGates(apiClient, ctrlCfg.CloudCFG.Global.FeatureGates)
 	}
 	return nil
 }

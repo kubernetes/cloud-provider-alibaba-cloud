@@ -36,7 +36,7 @@ func (m *defaultFinalizerManager) AddFinalizers(ctx context.Context, obj APIObje
 			return err
 		}
 
-		oldObj := obj.DeepCopyObject()
+		oldObj := obj.DeepCopyObject().(client.Object)
 		needsUpdate := false
 		for _, finalizer := range finalizers {
 			if !HasFinalizer(obj, finalizer) {
@@ -57,7 +57,7 @@ func (m *defaultFinalizerManager) RemoveFinalizers(ctx context.Context, obj APIO
 			return err
 		}
 
-		oldObj := obj.DeepCopyObject()
+		oldObj := obj.DeepCopyObject().(client.Object)
 		needsUpdate := false
 		for _, finalizer := range finalizers {
 			if HasFinalizer(obj, finalizer) {

@@ -13,7 +13,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	util_errors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	ctrlCtx "k8s.io/cloud-provider-alibaba-cloud/pkg/context"
+	ctrlCfg "k8s.io/cloud-provider-alibaba-cloud/pkg/config"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/model"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -169,7 +169,7 @@ func (a *Actuator) desiredAandAAAA(svc *corev1.Service) ([]*model.PvtzEndpoint, 
 
 	epTemplate := model.NewPvtzEndpointBuilder()
 	epTemplate.WithRr(serviceRr(svc))
-	epTemplate.WithTtl( ctrlCtx.CloudCFG.Global.PrivateZoneRecordTTL)
+	epTemplate.WithTtl( ctrlCfg.CloudCFG.Global.PrivateZoneRecordTTL)
 
 	if len(ipsV4) != 0 {
 		epb := epTemplate.DeepCopy()
@@ -199,7 +199,7 @@ func (a *Actuator) desiredSRV(svc *corev1.Service) ([]*model.PvtzEndpoint, error
 
 	eps := make([]*model.PvtzEndpoint, 0)
 	epTemplate := model.NewPvtzEndpointBuilder()
-	epTemplate.WithTtl(ctrlCtx.CloudCFG.Global.PrivateZoneRecordTTL)
+	epTemplate.WithTtl(ctrlCfg.CloudCFG.Global.PrivateZoneRecordTTL)
 	epTemplate.WithType(model.RecordTypeSRV)
 	svcName := svc.Name
 	ns := svc.Namespace
@@ -227,7 +227,7 @@ func (a *Actuator) desiredSRV(svc *corev1.Service) ([]*model.PvtzEndpoint, error
 
 func (a *Actuator) desiredPTR(svc *corev1.Service) ([]*model.PvtzEndpoint, error) {
 	epb := model.NewPvtzEndpointBuilder()
-	epb.WithTtl( ctrlCtx.CloudCFG.Global.PrivateZoneRecordTTL)
+	epb.WithTtl( ctrlCfg.CloudCFG.Global.PrivateZoneRecordTTL)
 	epb.WithType(model.RecordTypePTR)
 	epb.WithValueData(serviceRr(svc))
 	switch svc.Spec.Type {
@@ -292,7 +292,7 @@ func (a *Actuator) desiredPTR(svc *corev1.Service) ([]*model.PvtzEndpoint, error
 func (a *Actuator) desiredCNAME(svc *corev1.Service) ([]*model.PvtzEndpoint, error) {
 	epb := model.NewPvtzEndpointBuilder()
 	epb.WithRr(serviceRr(svc))
-	epb.WithTtl( ctrlCtx.CloudCFG.Global.PrivateZoneRecordTTL)
+	epb.WithTtl( ctrlCfg.CloudCFG.Global.PrivateZoneRecordTTL)
 	epb.WithType(model.RecordTypeCNAME)
 	if svc.Spec.Type == corev1.ServiceTypeExternalName {
 		if ip := net.ParseIP(svc.Spec.ExternalName); ip == nil {

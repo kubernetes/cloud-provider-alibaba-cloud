@@ -1,4 +1,4 @@
-package context
+package config
 
 import (
 	"fmt"
@@ -7,7 +7,6 @@ import (
 )
 
 const (
-	flagLogLevel                       = "log-level"
 	flagDryRun                         = "dry-run"
 	flagCloudConfig                    = "cloud-config"
 	flagServiceMaxConcurrentReconciles = "concurrent-service-syncs"
@@ -17,7 +16,6 @@ const (
 	flagRouteReconciliationPeriod      = "route-reconciliation-period"
 	flagNetwork                        = "network"
 
-	defaultLogLevel                  = 3
 	defaultMaxConcurrentReconciles   = 3
 	defaultCloudConfig               = ""
 	defaultRouteReconciliationPeriod = 5 * time.Minute
@@ -43,8 +41,6 @@ type ControllerConfig struct {
 }
 
 func (cfg *ControllerConfig) BindFlags(fs *pflag.FlagSet) {
-	fs.IntVar(&cfg.LogLevel, flagLogLevel, defaultLogLevel,
-		"Set the controller log level, 3")
 	fs.IntVar(&cfg.ServiceMaxConcurrentReconciles, flagServiceMaxConcurrentReconciles, defaultMaxConcurrentReconciles,
 		"Maximum number of concurrently running reconcile loops for service")
 	fs.StringSliceVar(&cfg.EnableControllers, flagEnableControllers, []string{"node", "route", "service"},
@@ -54,7 +50,7 @@ func (cfg *ControllerConfig) BindFlags(fs *pflag.FlagSet) {
 		"Path to the cloud provider configuration file. Empty string for no configuration file.")
 	fs.StringVar(&cfg.NetWork, flagNetwork, defaultNetwork, "Set network type for controller.")
 	fs.BoolVar(&cfg.ConfigureCloudRoutes, flagConfigureCloudRoutes, false, "Enable configure cloud routes.")
-	fs.StringVar(&cfg.ClusterCidr, flagClusterCidr, "", "CIDR Range for Pods in cluster.")
+	fs.StringVar(&cfg.ClusterCidr, flagClusterCidr, "", "CIDR Range for Pods in cluster.") // todo: support ipv6 dual stack
 	fs.DurationVar(&cfg.RouteReconciliationPeriod,
 		flagRouteReconciliationPeriod, defaultRouteReconciliationPeriod,
 		"The period for reconciling routes created for nodes by cloud provider. The minimum value is 1 minute")
@@ -75,6 +71,5 @@ func (cfg *ControllerConfig) Validate() error {
 	if cfg.RouteReconciliationPeriod < 1*time.Minute {
 		cfg.RouteReconciliationPeriod = 1 * time.Minute
 	}
-
 	return nil
 }

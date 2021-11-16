@@ -24,6 +24,7 @@ func (p SLBProvider) DescribeLoadBalancerListeners(ctx context.Context, lbId str
 		if err != nil {
 			return nil, util.FormatErrorMessage(err)
 		}
+		klog.V(5).Infof("RequestId: %s, API: %s, lbId: %s", resp.RequestId, "DescribeLoadBalancerListeners", lbId)
 		respListeners = append(respListeners, resp.Listeners...)
 
 		if resp.NextToken == "" {
@@ -339,6 +340,14 @@ func setHTTPListenerValue(req interface{}, listener *model.ListenerAttribute) {
 		stickySessionType := v.FieldByName("StickySessionType")
 		stickySessionType.SetString(listener.StickySessionType)
 	}
+	if listener.XForwardedForProto != "" {
+		xForwardedForProto := v.FieldByName("XForwardedForProto")
+		xForwardedForProto.SetString(string(listener.XForwardedForProto))
+	}
+	if listener.IdleTimeout != 0 {
+		idleTimeout := v.FieldByName("IdleTimeout")
+		idleTimeout.SetString(strconv.Itoa(listener.IdleTimeout))
+	}
 }
 
 func setHTTPSListenerValue(req interface{}, listener *model.ListenerAttribute) {
@@ -380,9 +389,21 @@ func setHTTPSListenerValue(req interface{}, listener *model.ListenerAttribute) {
 		stickySessionType := v.FieldByName("StickySessionType")
 		stickySessionType.SetString(listener.StickySessionType)
 	}
+	if listener.XForwardedForProto != "" {
+		xForwardedForProto := v.FieldByName("XForwardedForProto")
+		xForwardedForProto.SetString(string(listener.XForwardedForProto))
+	}
 	if listener.CertId != "" {
 		certId := v.FieldByName("ServerCertificateId")
 		certId.SetString(listener.CertId)
+	}
+	if listener.IdleTimeout != 0 {
+		idleTimeout := v.FieldByName("IdleTimeout")
+		idleTimeout.SetString(strconv.Itoa(listener.IdleTimeout))
+	}
+	if listener.EnableHttp2 != "" {
+		enabled := v.FieldByName("EnableHttp2")
+		enabled.SetString(string(listener.EnableHttp2))
 	}
 }
 
@@ -417,6 +438,8 @@ func loadHTTPListener(config slb.HTTPListenerConfig, listener *model.ListenerAtt
 	listener.StickySessionType = config.StickySessionType
 	listener.CookieTimeout = config.CookieTimeout
 	listener.Cookie = config.Cookie
+	listener.XForwardedForProto = model.FlagType(config.XForwardedForProto)
+	listener.IdleTimeout = config.IdleTimeout
 	listener.HealthCheck = model.FlagType(config.HealthCheck)
 	listener.HealthCheckDomain = config.HealthCheckDomain
 	listener.HealthCheckURI = config.HealthCheckURI
@@ -435,6 +458,8 @@ func loadHTTPSListener(config slb.HTTPSListenerConfig, listener *model.ListenerA
 	listener.StickySessionType = config.StickySessionType
 	listener.CookieTimeout = config.CookieTimeout
 	listener.Cookie = config.Cookie
+	listener.XForwardedForProto = model.FlagType(config.XForwardedForProto)
+	listener.IdleTimeout = config.IdleTimeout
 	listener.HealthCheck = model.FlagType(config.HealthCheck)
 	listener.HealthCheckDomain = config.HealthCheckDomain
 	listener.HealthCheckURI = config.HealthCheckURI
@@ -445,4 +470,5 @@ func loadHTTPSListener(config slb.HTTPSListenerConfig, listener *model.ListenerA
 	listener.HealthCheckConnectPort = config.HealthCheckConnectPort
 	listener.HealthCheckHttpCode = config.HealthCheckHttpCode
 	listener.CertId = config.ServerCertificateId
+	listener.EnableHttp2 = model.FlagType(config.EnableHttp2)
 }

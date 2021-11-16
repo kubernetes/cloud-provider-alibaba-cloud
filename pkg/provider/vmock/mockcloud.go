@@ -13,7 +13,7 @@ func NewMockCloud(auth *base.ClientMgr) prvd.Provider {
 		MockECS:   NewMockECS(auth),
 		MockCLB:   NewMockCLB(auth),
 		MockPVTZ:  NewMockPVTZ(auth),
-		MockVPC:   NewMockVPC(auth, nil),
+		MockVPC:   NewMockVPC(auth),
 	}
 }
 

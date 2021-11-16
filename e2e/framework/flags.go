@@ -2,13 +2,12 @@ package framework
 
 import (
 	"flag"
-	ctx2 "k8s.io/cloud-provider-alibaba-cloud/pkg/context"
 	"testing"
 )
 
 func RegisterCommonFlags() {
 	flag.StringVar(&TestConfig.KubeConfig, "kubeconfig", "", "kubernetes config path")
-	flag.StringVar(&ctx2.GlobalFlag.CloudConfig, "cloud-config", "", "cloud config")
+	flag.StringVar(&TestConfig.CloudConfig, "cloud-config", "", "cloud config path")
 	flag.StringVar(&TestConfig.LoadBalancerID, "lb-id", "", "reused slb id")
 	flag.StringVar(&TestConfig.MasterZoneID, "master-zone-id", "", "master zone id")
 	flag.StringVar(&TestConfig.SlaveZoneID, "slave-zone-id", "", "slave zone id")

@@ -1,19 +1,24 @@
 package ecs
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/model"
 	"k8s.io/klog"
 	"strings"
 
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/cloud-provider-alibaba-cloud/pkg/context/node"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/base"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/util"
 
 	"github.com/aliyun/alibaba-cloud-sdk-go/sdk/requests"
 	"github.com/aliyun/alibaba-cloud-sdk-go/services/ecs"
+)
+
+const (
+	MaxNetworkInterfaceNum = 100
 )
 
 func NewEcsProvider(
@@ -28,7 +33,7 @@ type EcsProvider struct {
 	auth *base.ClientMgr
 }
 
-func (e *EcsProvider) ListInstances(ctx *node.NodeContext, ids []string) (map[string]*prvd.NodeAttribute, error) {
+func (e *EcsProvider) ListInstances(ctx context.Context, ids []string) (map[string]*prvd.NodeAttribute, error) {
 	nodeRegionMap := make(map[string][]string)
 	for _, id := range ids {
 		regionID, nodeID, err := util.NodeFromProviderID(id)
@@ -84,6 +89,7 @@ func (e *EcsProvider) getInstances(ids []string, region string) ([]ecs.Instance,
 				"instancename=%s, message=[%s].", req.RegionId, req.InstanceName, err.Error())
 			return nil, err
 		}
+		klog.V(5).Infof("RequestId: %s, API: %s, ids: %s", resp.RequestId, "DescribeInstances", string(bids))
 		ecsInstances = append(ecsInstances, resp.Instances.Instance...)
 		if resp.NextToken == "" {
 			break
@@ -96,7 +102,7 @@ func (e *EcsProvider) getInstances(ids []string, region string) ([]ecs.Instance,
 }
 
 func (e *EcsProvider) SetInstanceTags(
-	ctx *node.NodeContext, id string, tags map[string]string,
+	ctx context.Context, id string, tags map[string]string,
 ) error {
 	var mtag []ecs.AddTagsTag
 	for k, v := range tags {
@@ -111,18 +117,66 @@ func (e *EcsProvider) SetInstanceTags(
 	return err
 }
 
-func (e *EcsProvider) DescribeNetworkInterfaces(vpcId string, ips *[]string, nextToken string) (*ecs.DescribeNetworkInterfacesResponse, error) {
-	req := ecs.CreateDescribeNetworkInterfacesRequest()
-	req.VpcId = vpcId
-	req.PrivateIpAddress = ips
-	req.NextToken = nextToken
-	req.MaxResults = requests.NewInteger(100)
-	return e.auth.ECS.DescribeNetworkInterfaces(req)
-}
+func (e *EcsProvider) DescribeNetworkInterfaces(vpcId string, ips []string, ipVersionType model.AddressIPVersionType) (map[string]string, error) {
+	result := make(map[string]string)
 
-const (
-	DefaultWaitForInterval = 5
-)
+	for begin := 0; begin < len(ips); begin += MaxNetworkInterfaceNum {
+		last := len(ips)
+		if begin+MaxNetworkInterfaceNum < last {
+			last = begin + MaxNetworkInterfaceNum
+		}
+		privateIpAddress := ips[begin:last]
+
+		req := ecs.CreateDescribeNetworkInterfacesRequest()
+		req.VpcId = vpcId
+		req.Status = "InUse"
+		if ipVersionType == model.IPv6 {
+			req.Ipv6Address = &privateIpAddress
+		} else {
+			req.PrivateIpAddress = &privateIpAddress
+		}
+		next := &util.Pagination{
+			PageNumber: 1,
+			PageSize:   100,
+		}
+
+		for {
+			req.PageSize = requests.NewInteger(next.PageSize)
+			req.PageNumber = requests.NewInteger(next.PageNumber)
+			resp, err := e.auth.ECS.DescribeNetworkInterfaces(req)
+			if err != nil {
+				return result, err
+			}
+			klog.V(5).Infof("RequestId: %s, API: %s, ips: %s, privateIpAddress[%d:%d], pageNumber: %d",
+				resp.RequestId, "DescribeNetworkInterfaces", privateIpAddress, begin, last, req.PageNumber)
+
+			for _, eni := range resp.NetworkInterfaceSets.NetworkInterfaceSet {
+
+				if ipVersionType == model.IPv6 {
+					for _, ipv6 := range eni.Ipv6Sets.Ipv6Set {
+						result[ipv6.Ipv6Address] = eni.NetworkInterfaceId
+					}
+				} else {
+					for _, privateIp := range eni.PrivateIpSets.PrivateIpSet {
+						result[privateIp.PrivateIpAddress] = eni.NetworkInterfaceId
+					}
+				}
+			}
+
+			pageResult := &util.PaginationResult{
+				PageNumber: resp.PageNumber,
+				PageSize:   resp.PageSize,
+				TotalCount: resp.TotalCount,
+			}
+			next = pageResult.NextPage()
+			if next == nil {
+				break
+			}
+		}
+
+	}
+	return result, nil
+}
 
 func findAddress(instance *ecs.Instance) []v1.NodeAddress {
 	var addrs []v1.NodeAddress

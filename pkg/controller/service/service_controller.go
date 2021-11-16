@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"github.com/go-logr/logr"
 	"golang.org/x/time/rate"
+	discovery "k8s.io/api/discovery/v1beta1"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/util/metric"
 	"k8s.io/klog"
@@ -18,7 +20,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/record"
-	ctrlCtx "k8s.io/cloud-provider-alibaba-cloud/pkg/context"
+	ctrlCfg "k8s.io/cloud-provider-alibaba-cloud/pkg/config"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/context/shared"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/helper"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/model"
@@ -64,7 +66,7 @@ type serviceController struct {
 }
 
 func (svcC serviceController) Start(ctx context.Context) error {
-	if ctrlCtx.ControllerCFG.DryRun {
+	if ctrlCfg.ControllerCFG.DryRun {
 		initMap(svcC.recon.kubeClient)
 	}
 	return svcC.c.Start(ctx)
@@ -96,9 +98,18 @@ func add(mgr manager.Manager, r *ReconcileService) error {
 		return fmt.Errorf("watch resource svc error: %s", err.Error())
 	}
 
-	if err := c.Watch(&source.Kind{Type: &v1.Endpoints{}},
-		NewEnqueueRequestForEndpointEvent(mgr.GetEventRecorderFor("service-controller"))); err != nil {
-		return fmt.Errorf("watch resource endpoint error: %s", err.Error())
+	if utilfeature.DefaultFeatureGate.Enabled(helper.EndpointSlice) {
+		// watch endpointslice
+		if err := c.Watch(&source.Kind{Type: &discovery.EndpointSlice{}},
+			NewEnqueueRequestForEndpointSliceEvent(mgr.GetEventRecorderFor("service-controller"))); err != nil {
+			return fmt.Errorf("watch resource endpointslice error: %s", err.Error())
+		}
+	} else {
+		// watch endpoints
+		if err := c.Watch(&source.Kind{Type: &v1.Endpoints{}},
+			NewEnqueueRequestForEndpointEvent(mgr.GetEventRecorderFor("service-controller"))); err != nil {
+			return fmt.Errorf("watch resource endpoint error: %s", err.Error())
+		}
 	}
 
 	if err := c.Watch(&source.Kind{Type: &v1.Node{}},
@@ -144,7 +155,7 @@ func (m *ReconcileService) reconcile(request reconcile.Request) (err error) {
 	startTime := time.Now()
 
 	defer func() {
-		if ctrlCtx.ControllerCFG.DryRun {
+		if ctrlCfg.ControllerCFG.DryRun {
 			initial.Store(request.String(), 1)
 			if mapfull() {
 				util.ServiceLog.Info("ccm initial process finished.")
@@ -178,7 +189,7 @@ func (m *ReconcileService) reconcile(request reconcile.Request) (err error) {
 	// disable public address
 	if anno.Get(AddressType) == "" ||
 		anno.Get(AddressType) == string(model.InternetAddressType) {
-		if ctrlCtx.CloudCFG.Global.DisablePublicSLB {
+		if ctrlCfg.CloudCFG.Global.DisablePublicSLB {
 			m.record.Event(svc, v1.EventTypeWarning, helper.FailedSyncLB, "create public address slb is not allowed")
 			// do not support create public address slb, return and don't requeue
 			return nil
@@ -199,10 +210,10 @@ func (m *ReconcileService) reconcile(request reconcile.Request) (err error) {
 
 	klog.Infof("%s: ensure loadbalancer with service details, \n%+v", util.Key(svc), util.PrettyJson(svc))
 
-	if ctrlCtx.ControllerCFG.DryRun {
+	if ctrlCfg.ControllerCFG.DryRun {
 		if _, err = m.buildAndApplyModel(reqContext); err != nil {
-			m.record.Eventf(reqContext.Service, v1.EventTypeWarning, helper.FailedSyncLB,
-				"DryRun: Error syncing load balancer: %s", helper.GetLogMessage(err))
+			m.record.Event(reqContext.Service, v1.EventTypeWarning, helper.FailedSyncLB,
+				fmt.Sprintf("DryRun: Error syncing load balancer: %s", helper.GetLogMessage(err)))
 		}
 		return nil
 	}
@@ -229,28 +240,28 @@ func (m *ReconcileService) cleanupLoadBalancerResources(reqCtx *RequestContext) 
 	if helper.HasFinalizer(reqCtx.Service, ServiceFinalizer) {
 		_, err := m.buildAndApplyModel(reqCtx)
 		if err != nil && !strings.Contains(err.Error(), "LoadBalancerId does not exist") {
-			m.record.Eventf(reqCtx.Service, v1.EventTypeWarning, helper.FailedCleanLB,
-				"Error deleting load balancer: %s", helper.GetLogMessage(err))
+			m.record.Event(reqCtx.Service, v1.EventTypeWarning, helper.FailedCleanLB,
+				fmt.Sprintf("Error deleting load balancer: %s", helper.GetLogMessage(err)))
 			return err
 		}
 
 		if err := m.removeServiceHash(reqCtx.Service); err != nil {
-			m.record.Eventf(reqCtx.Service, v1.EventTypeWarning, helper.FailedRemoveHash,
-				"Error removing service hash: %s", err.Error())
+			m.record.Event(reqCtx.Service, v1.EventTypeWarning, helper.FailedRemoveHash,
+				fmt.Sprintf("Error removing service hash: %s", err.Error()))
 			return err
 		}
 
 		// When service type changes from LoadBalancer to NodePort,
 		// we need to clean Ingress attribute in service status
 		if err := m.removeServiceStatus(reqCtx, reqCtx.Service); err != nil {
-			m.record.Eventf(reqCtx.Service, v1.EventTypeWarning, helper.FailedUpdateStatus,
-				"Error removing load balancer status: %s", err.Error())
+			m.record.Event(reqCtx.Service, v1.EventTypeWarning, helper.FailedUpdateStatus,
+				fmt.Sprintf("Error removing load balancer status: %s", err.Error()))
 			return err
 		}
 
 		if err := m.finalizerManager.RemoveFinalizers(reqCtx.Ctx, reqCtx.Service, ServiceFinalizer); err != nil {
-			m.record.Eventf(reqCtx.Service, v1.EventTypeWarning, helper.FailedRemoveFinalizer,
-				"Error removing load balancer finalizer: %v", err.Error())
+			m.record.Event(reqCtx.Service, v1.EventTypeWarning, helper.FailedRemoveFinalizer,
+				fmt.Sprintf("Error removing load balancer finalizer: %v", err.Error()))
 			return err
 		}
 	}
@@ -261,27 +272,27 @@ func (m *ReconcileService) cleanupLoadBalancerResources(reqCtx *RequestContext) 
 func (m *ReconcileService) reconcileLoadBalancerResources(req *RequestContext) error {
 
 	if err := m.finalizerManager.AddFinalizers(req.Ctx, req.Service, ServiceFinalizer); err != nil {
-		m.record.Eventf(req.Service, v1.EventTypeWarning, helper.FailedAddFinalizer,
-			"Error adding finalizer: %s", err.Error())
+		m.record.Event(req.Service, v1.EventTypeWarning, helper.FailedAddFinalizer,
+			fmt.Sprintf("Error adding finalizer: %s", err.Error()))
 		return err
 	}
 
 	lb, err := m.buildAndApplyModel(req)
 	if err != nil {
-		m.record.Eventf(req.Service, v1.EventTypeWarning, helper.FailedSyncLB,
-			"Error syncing load balancer: %s", helper.GetLogMessage(err))
+		m.record.Event(req.Service, v1.EventTypeWarning, helper.FailedSyncLB,
+			fmt.Sprintf("Error syncing load balancer: %s", helper.GetLogMessage(err)))
 		return err
 	}
 
 	if err := m.addServiceHash(req.Service); err != nil {
-		m.record.Eventf(req.Service, v1.EventTypeWarning, helper.FailedAddHash,
-			"Error adding service hash: %s", err.Error())
+		m.record.Event(req.Service, v1.EventTypeWarning, helper.FailedAddHash,
+			fmt.Sprintf("Error adding service hash: %s", err.Error()))
 		return err
 	}
 
 	if err := m.updateServiceStatus(req, req.Service, lb); err != nil {
-		m.record.Eventf(req.Service, v1.EventTypeWarning, helper.FailedUpdateStatus,
-			"Error updating load balancer status: %s", err.Error())
+		m.record.Event(req.Service, v1.EventTypeWarning, helper.FailedUpdateStatus,
+			fmt.Sprintf("Error updating load balancer status: %s", err.Error()))
 		return err
 	}
 

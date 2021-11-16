@@ -1,4 +1,4 @@
-package context
+package config
 
 import (
 	"github.com/spf13/pflag"
@@ -23,7 +23,7 @@ const (
 	defaultLeaderElectionNamespace    = "kube-system"
 	defaultLeaderElectionResourceLock = "endpointsleases"
 	defaultSyncPeriod                 = 60 * time.Minute
-	defaultQPS                        = 20
+	defaultQPS                        = 20.0
 	defaultBurst                      = 30
 )
 
@@ -36,7 +36,7 @@ type RuntimeConfig struct {
 	LeaderElectionNamespace    string
 	LeaderElectionResourceLock string
 	SyncPeriod                 time.Duration
-	QPS                        int
+	QPS                        float32
 	Burst                      int
 }
 
@@ -56,7 +56,7 @@ func (c *RuntimeConfig) BindFlags(fs *pflag.FlagSet) {
 		"Resource lock to use for leader election")
 	fs.DurationVar(&c.SyncPeriod, flagSyncPeriod, defaultSyncPeriod,
 		"Period at which the controller forces the repopulation of its local object stores.")
-	fs.IntVar(&c.QPS, flagQPS, defaultQPS, "QPS to use while talking with kubernetes apiserver.")
+	fs.Float32Var(&c.QPS, flagQPS, defaultQPS, "QPS to use while talking with kubernetes apiserver.")
 	fs.IntVar(&c.Burst, flagBurst, defaultBurst, "Burst to use while talking with kubernetes apiserver.")
 }
 

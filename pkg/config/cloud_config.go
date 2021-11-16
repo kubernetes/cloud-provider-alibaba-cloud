@@ -1,4 +1,11 @@
-package context
+package config
+
+import (
+	"fmt"
+	"github.com/ghodss/yaml"
+	"io/ioutil"
+	"k8s.io/klog"
+)
 
 var CloudCFG = &CloudConfig{}
 
@@ -31,5 +38,25 @@ type CloudConfig struct {
 		// pvtz controller
 		PrivateZoneID        string `json:"privateZoneId"`
 		PrivateZoneRecordTTL int64  `json:"privateZoneRecordTTL"`
+
+		FeatureGates string `json:"featureGates"`
+	}
+}
+
+func (cc *CloudConfig) LoadCloudCFG() error {
+	content, err := ioutil.ReadFile(ControllerCFG.CloudConfig)
+	if err != nil {
+		return fmt.Errorf("read cloud config error: %s ", err.Error())
+	}
+	return yaml.Unmarshal(content, CloudCFG)
+}
+
+func (cc *CloudConfig) PrintInfo() {
+	if cc.Global.RouteTableIDS != "" {
+		klog.Infof("using user customized route table ids [%s]", cc.Global.RouteTableIDS)
+	}
+
+	if cc.Global.FeatureGates != "" {
+		klog.Infof("using feature gate: %s", cc.Global.FeatureGates)
 	}
 }

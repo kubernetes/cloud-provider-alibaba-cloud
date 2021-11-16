@@ -22,7 +22,6 @@ import (
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	nctx "k8s.io/cloud-provider-alibaba-cloud/pkg/context/node"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/helper"
 	prvd "k8s.io/cloud-provider-alibaba-cloud/pkg/provider"
 	"k8s.io/cloud-provider/api"
@@ -44,8 +43,6 @@ const (
 
 	// MAX_BATCH_NUM batch process per loop.
 	MAX_BATCH_NUM = 50
-
-	AnnotationProvidedIPAddr = "alpha.kubernetes.io/provided-node-ip"
 )
 
 var ErrNotFound = errors.New("instance not found")
@@ -113,15 +110,13 @@ func deleteNode(cnc *ReconcileNode, node *v1.Node) {
 		)
 		if err != nil {
 			log.Error(err, "failed to delete node", "node", node.Name, "prvdId", node.Spec.ProviderID)
-			cnc.record.Eventf(
-				node, v1.EventTypeWarning, helper.FailedDeleteNode, "Error deleting node: %s",
-				helper.GetLogMessage(err),
+			cnc.record.Event(
+				node, v1.EventTypeWarning, helper.FailedDeleteNode,
+				fmt.Sprintf("Error deleting node: %s", helper.GetLogMessage(err)),
 			)
 			return
 		}
-		cnc.record.Eventf(
-			ref, v1.EventTypeNormal, helper.SucceedDeleteNode, node.Name,
-		)
+		cnc.record.Event(ref, v1.EventTypeNormal, helper.SucceedDeleteNode, node.Name)
 		log.Info("delete node from cluster successfully", "node", node.Name, "prvdId", node.Spec.ProviderID)
 	}
 	go deleteOne()
@@ -151,7 +146,7 @@ func nodeConditionReady(kclient client.Client, node *v1.Node) *v1.NodeCondition 
 func findCloudECS(
 	ins prvd.IInstance, prvdId string,
 ) (*prvd.NodeAttribute, error) {
-	nodes, err := ins.ListInstances(nctx.NewEmpty(), []string{prvdId})
+	nodes, err := ins.ListInstances(context.TODO(), []string{prvdId})
 	if err != nil {
 		return nil, fmt.Errorf("cloud instance api fail, %s", err.Error())
 	}
@@ -297,7 +292,7 @@ func NodeList(kclient client.Client) (*v1.NodeList, error) {
 func isProvidedAddrExist(node *v1.Node, nodeAddresses []v1.NodeAddress) (*v1.NodeAddress, bool) {
 	var nodeIP *v1.NodeAddress
 	ipExists := false
-	addr, ok := node.ObjectMeta.Annotations[AnnotationProvidedIPAddr]
+	addr, ok := node.ObjectMeta.Annotations[api.AnnotationAlphaProvidedIPAddr]
 	if ok {
 		ipExists = true
 		for i := range nodeAddresses {

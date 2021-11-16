@@ -3,7 +3,10 @@ package service
 import (
 	"encoding/json"
 	"fmt"
+	discovery "k8s.io/api/discovery/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/util/intstr"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"strconv"
 	"strings"
 
@@ -23,17 +26,51 @@ import (
 type TrafficPolicy string
 
 const (
-	// Local externalTrafficPolicy=Local
+	// LocalTrafficPolicy externalTrafficPolicy=Local
 	LocalTrafficPolicy = TrafficPolicy("Local")
-	// Cluster externalTrafficPolicy=Cluster
+	// ClusterTrafficPolicy externalTrafficPolicy=Cluster
 	ClusterTrafficPolicy = TrafficPolicy("Cluster")
-	// ENI external traffic is forwarded to pod directly
+	// ENITrafficPolicy is forwarded to pod directly
 	ENITrafficPolicy = TrafficPolicy("ENI")
 )
 
+func NewEndpointWithENI(reqCtx *RequestContext, kubeClient client.Client) (*EndpointWithENI, error) {
+	endpointWithENI := &EndpointWithENI{}
+	endpointWithENI.setTrafficPolicy(reqCtx)
+	endpointWithENI.setAddressIpVersion(reqCtx)
+
+	nodes, err := getNodes(reqCtx, kubeClient)
+	if err != nil {
+		return nil, fmt.Errorf("get nodes error: %s", err.Error())
+	}
+	endpointWithENI.Nodes = nodes
+
+	if utilfeature.DefaultMutableFeatureGate.Enabled(helper.EndpointSlice) {
+		esList, err := getEndpointByEndpointSlice(reqCtx, kubeClient, endpointWithENI.AddressIPVersion)
+		if err != nil {
+			return nil, fmt.Errorf("get endpointslice error: %s", err.Error())
+		}
+		endpointWithENI.EndpointSlices = esList
+		reqCtx.Log.Info("backend details", "endpointslices", LogEndpointSliceList(esList))
+	} else {
+		eps, err := getEndpoints(reqCtx, kubeClient)
+		if err != nil {
+			return nil, fmt.Errorf("get endpoints error: %s", err.Error())
+		}
+		endpointWithENI.Endpoints = eps
+		reqCtx.Log.Info("backend details", "endpoints", LogEndpoints(eps))
+	}
+
+	return endpointWithENI, nil
+}
+
 type EndpointWithENI struct {
-	// TrafficPolicy external traffic policy
+	// TrafficPolicy
+	// external traffic policy.
 	TrafficPolicy TrafficPolicy
+	// AddressIPVersion
+	// it indicates the address ip version type of the backends attached to the LoadBalancer
+	AddressIPVersion model.AddressIPVersionType
 	// Nodes
 	// contains all the candidate nodes consider of LoadBalance Backends.
 	// Cloud implementation has the right to make any filter on it.
@@ -42,6 +79,9 @@ type EndpointWithENI struct {
 	// It is the direct pod location information which cloud implementation
 	// may needed for some kind of filtering. eg. direct ENI attach.
 	Endpoints *v1.Endpoints
+	// EndpointSlices
+	// contains all the endpointslices of a service
+	EndpointSlices []discovery.EndpointSlice
 }
 
 func (e *EndpointWithENI) setTrafficPolicy(reqCtx *RequestContext) {
@@ -54,6 +94,21 @@ func (e *EndpointWithENI) setTrafficPolicy(reqCtx *RequestContext) {
 		return
 	}
 	e.TrafficPolicy = ClusterTrafficPolicy
+	return
+}
+
+func (e *EndpointWithENI) setAddressIpVersion(reqCtx *RequestContext) {
+	// Only EndpointSlice support dual stack.
+	// Enable IPv6DualStack and EndpointSlice feature gates if you want to use ipv6 backends
+	if utilfeature.DefaultMutableFeatureGate.Enabled(helper.IPv6DualStack) &&
+		utilfeature.DefaultMutableFeatureGate.Enabled(helper.EndpointSlice) &&
+		reqCtx.Anno.Get(IPVersion) == string(model.IPv6) &&
+		reqCtx.Anno.Get(BackendIPVersion) == string(model.IPv6) {
+		e.AddressIPVersion = model.IPv6
+		reqCtx.Log.Info("backend address ip version is ipv6")
+		return
+	}
+	e.AddressIPVersion = model.IPv4
 	return
 }
 
@@ -71,22 +126,11 @@ type VGroupManager struct {
 
 func (mgr *VGroupManager) BuildLocalModel(reqCtx *RequestContext, m *model.LoadBalancer) error {
 	var vgs []model.VServerGroup
-	nodes, err := getNodes(reqCtx, mgr.kubeClient)
-	if err != nil {
-		return fmt.Errorf("get nodes error: %s", err.Error())
-	}
 
-	eps, err := getEndpoints(reqCtx, mgr.kubeClient)
+	candidates, err := NewEndpointWithENI(reqCtx, mgr.kubeClient)
 	if err != nil {
-		return fmt.Errorf("get endpoints error: %s", err.Error())
+		return err
 	}
-	reqCtx.Log.Info("backend details", "endpoints", LogEndpoints(*eps))
-
-	candidates := &EndpointWithENI{
-		Nodes:     nodes,
-		Endpoints: eps,
-	}
-	candidates.setTrafficPolicy(reqCtx)
 
 	for _, port := range reqCtx.Service.Spec.Ports {
 		vg, err := mgr.buildVGroupForServicePort(reqCtx, port, candidates, m.LoadBalancerAttribute.IsUserManaged)
@@ -122,6 +166,9 @@ func (mgr *VGroupManager) UpdateVServerGroup(reqCtx *RequestContext, local, remo
 	add, del, update := diff(reqCtx, remote, local)
 	if len(add) == 0 && len(del) == 0 && len(update) == 0 {
 		reqCtx.Log.Info(fmt.Sprintf("update vgroup [%s]: no change, skip reconcile", remote.VGroupId))
+	} else {
+		reqCtx.Log.Info(fmt.Sprintf("try to update vgroup [%s]: local: [%s], remote: [%s]",
+			remote.VGroupId, local.BackendInfo(), remote.BackendInfo()))
 	}
 	if len(add) > 0 {
 		if err := mgr.BatchAddVServerGroupBackendServers(reqCtx, local, add); err != nil {
@@ -196,12 +243,14 @@ func diff(reqCtx *RequestContext, remote, local model.VServerGroup) (
 		for _, l := range local.Backends {
 			if l.Type == "eni" {
 				if r.ServerId == l.ServerId &&
-					r.ServerIp == l.ServerIp {
+					r.ServerIp == l.ServerIp &&
+					r.Port == l.Port {
 					found = true
 					break
 				}
 			} else {
-				if r.ServerId == l.ServerId {
+				if r.ServerId == l.ServerId &&
+					r.Port == l.Port {
 					found = true
 					break
 				}
@@ -217,12 +266,14 @@ func diff(reqCtx *RequestContext, remote, local model.VServerGroup) (
 		for _, r := range remote.Backends {
 			if l.Type == "eni" {
 				if r.ServerId == l.ServerId &&
-					r.ServerIp == l.ServerIp {
+					r.ServerIp == l.ServerIp &&
+					r.Port == l.Port {
 					found = true
 					break
 				}
 			} else {
-				if r.ServerId == l.ServerId {
+				if r.ServerId == l.ServerId &&
+					r.Port == l.Port {
 					found = true
 					break
 				}
@@ -238,13 +289,13 @@ func diff(reqCtx *RequestContext, remote, local model.VServerGroup) (
 			if l.Type == "eni" {
 				if l.ServerId == r.ServerId &&
 					l.ServerIp == r.ServerIp &&
-					(l.Weight != r.Weight || l.Description != r.Description) {
+					(l.Port != r.Port || l.Weight != r.Weight || l.Description != r.Description) {
 					updates = append(updates, l)
 					break
 				}
 			} else {
 				if l.ServerId == r.ServerId &&
-					(l.Weight != r.Weight || l.Description != r.Description) {
+					(l.Port != r.Port || l.Weight != r.Weight || l.Description != r.Description) {
 					updates = append(updates, l)
 					break
 				}
@@ -389,6 +440,30 @@ func getEndpoints(reqCtx *RequestContext, client client.Client) (*v1.Endpoints, 
 	return eps, err
 }
 
+func getEndpointByEndpointSlice(reqCtx *RequestContext, kubeClient client.Client, ipVersion model.AddressIPVersionType) ([]discovery.EndpointSlice, error) {
+	epsList := &discovery.EndpointSliceList{}
+	err := kubeClient.List(reqCtx.Ctx, epsList, client.MatchingLabels{
+		discovery.LabelServiceName: reqCtx.Service.Name,
+	}, client.InNamespace(reqCtx.Service.Namespace))
+	if err != nil {
+		return nil, err
+	}
+
+	addressType := discovery.AddressTypeIPv4
+	if ipVersion == model.IPv6 {
+		addressType = discovery.AddressTypeIPv6
+	}
+
+	var ret []discovery.EndpointSlice
+	for _, es := range epsList.Items {
+		if es.AddressType == addressType {
+			ret = append(ret, es)
+		}
+	}
+
+	return ret, nil
+}
+
 func (mgr *VGroupManager) buildVGroupForServicePort(reqCtx *RequestContext, port v1.ServicePort,
 	candidates *EndpointWithENI, isUserManagedLB bool) (model.VServerGroup, error) {
 	vg := model.VServerGroup{
@@ -403,6 +478,11 @@ func (mgr *VGroupManager) buildVGroupForServicePort(reqCtx *RequestContext, port
 			return vg, fmt.Errorf("vgroupid parse error: %s", err.Error())
 		}
 		if vgroupId != "" {
+			// check vgroup id is existed
+			_, err = mgr.cloud.DescribeVServerGroupAttribute(reqCtx.Ctx, vgroupId)
+			if err != nil {
+				return vg, fmt.Errorf("cannot find vgroup by vgroupId %s error: %s", vgroupId, err.Error())
+			}
 			reqCtx.Log.Info(fmt.Sprintf("user managed vgroupId %s for port %d", vgroupId, port.Port))
 			vg.VGroupId = vgroupId
 			vg.IsUserManaged = true
@@ -410,10 +490,10 @@ func (mgr *VGroupManager) buildVGroupForServicePort(reqCtx *RequestContext, port
 
 		if reqCtx.Anno.Get(VGroupWeight) != "" {
 			w, err := strconv.Atoi(reqCtx.Anno.Get(VGroupWeight))
-			if err != nil || w < 1 || w > 100 {
-				return vg, fmt.Errorf("weight must be integer in range [1,100] , got [%s]", reqCtx.Anno.Get(VGroupWeight))
+			if err != nil || w < 0 || w > 100 {
+				return vg, fmt.Errorf("weight must be integer in range [0,100] , got [%s]", reqCtx.Anno.Get(VGroupWeight))
 			}
-			vg.VGroupWeight = w
+			vg.VGroupWeight = &w
 		}
 	}
 
@@ -425,7 +505,7 @@ func (mgr *VGroupManager) buildVGroupForServicePort(reqCtx *RequestContext, port
 	switch candidates.TrafficPolicy {
 	case ENITrafficPolicy:
 		reqCtx.Log.Info(fmt.Sprintf("eni mode, build backends for %s", vg.NamedKey))
-		backends, err = mgr.buildENIBackends(reqCtx, candidates, vg)
+		backends, err = mgr.buildENIBackends(candidates, vg)
 		if err != nil {
 			return vg, fmt.Errorf("build eni backends error: %s", err.Error())
 		}
@@ -446,7 +526,7 @@ func (mgr *VGroupManager) buildVGroupForServicePort(reqCtx *RequestContext, port
 	}
 
 	if len(backends) == 0 {
-		reqCtx.Recorder.Eventf(
+		reqCtx.Recorder.Event(
 			reqCtx.Service,
 			v1.EventTypeNormal,
 			helper.UnAvailableBackends,
@@ -459,14 +539,31 @@ func (mgr *VGroupManager) buildVGroupForServicePort(reqCtx *RequestContext, port
 }
 
 func setGenericBackendAttribute(candidates *EndpointWithENI, vgroup model.VServerGroup) []model.BackendAttribute {
+	if utilfeature.DefaultMutableFeatureGate.Enabled(helper.EndpointSlice) {
+		return setBackendsFromEndpointSlices(candidates, vgroup)
+	}
+	return setBackendsFromEndpoints(candidates, vgroup)
+}
+
+func setBackendsFromEndpoints(candidates *EndpointWithENI, vgroup model.VServerGroup) []model.BackendAttribute {
 	var backends []model.BackendAttribute
 
+	if len(candidates.Endpoints.Subsets) == 0 {
+		return nil
+	}
 	for _, ep := range candidates.Endpoints.Subsets {
 		var backendPort int
-		for _, p := range ep.Ports {
-			if p.Name == vgroup.ServicePort.Name {
-				backendPort = int(p.Port)
-				break
+		if vgroup.ServicePort.TargetPort.Type == intstr.Int {
+			backendPort = vgroup.ServicePort.TargetPort.IntValue()
+		} else {
+			for _, p := range ep.Ports {
+				if p.Name == vgroup.ServicePort.Name {
+					backendPort = int(p.Port)
+					break
+				}
+			}
+			if backendPort == 0 {
+				klog.Warningf("%s cannot find port according port name: %s", vgroup.VGroupName, vgroup.ServicePort.Name)
 			}
 		}
 
@@ -484,15 +581,72 @@ func setGenericBackendAttribute(candidates *EndpointWithENI, vgroup model.VServe
 	return backends
 }
 
-func (mgr *VGroupManager) buildENIBackends(reqCtx *RequestContext, candidates *EndpointWithENI, vgroup model.VServerGroup) ([]model.BackendAttribute, error) {
-	if len(candidates.Endpoints.Subsets) == 0 {
-		reqCtx.Log.Info(fmt.Sprintf("warning: vgroup %s endpoint is nil", vgroup.VGroupName))
+func setBackendsFromEndpointSlices(candidates *EndpointWithENI, vgroup model.VServerGroup) []model.BackendAttribute {
+	// used for deduplicate when endpointslice is enabled
+	// https://kubernetes.io/docs/concepts/services-networking/endpoint-slices/#duplicate-endpoints
+	endpointMap := make(map[string]bool)
+	var backends []model.BackendAttribute
+
+	if len(candidates.EndpointSlices) == 0 {
+		return nil
+	}
+
+	for _, es := range candidates.EndpointSlices {
+		var backendPort int
+		if vgroup.ServicePort.TargetPort.Type == intstr.Int {
+			backendPort = vgroup.ServicePort.TargetPort.IntValue()
+		} else {
+			for _, p := range es.Ports {
+				// be compatible with IntOrString type target port
+				if p.Name != nil && *p.Name == vgroup.ServicePort.Name {
+					if p.Port != nil {
+						backendPort = int(*p.Port)
+					}
+					break
+				}
+			}
+			if backendPort == 0 {
+				klog.Warningf("%s cannot find port according port name: %s", vgroup.VGroupName, vgroup.ServicePort.Name)
+			}
+		}
+
+		for _, ep := range es.Endpoints {
+			if ep.Conditions.Ready == nil {
+				continue
+			}
+			if !*ep.Conditions.Ready {
+				continue
+			}
+
+			for _, addr := range ep.Addresses {
+				if _, ok := endpointMap[addr]; ok {
+					continue
+				}
+				endpointMap[addr] = true
+				// NodeName of endpoint is nil, use topology.hostname instead of NodeName
+				hostName, _ := ep.Topology[v1.LabelHostname]
+				backends = append(backends, model.BackendAttribute{
+					NodeName: &hostName,
+					ServerIp: addr,
+					// set backend port to targetPort by default
+					// if backend type is ecs, update backend port to nodePort
+					Port:        backendPort,
+					Description: vgroup.VGroupName,
+				})
+			}
+		}
+	}
+
+	return backends
+}
+
+func (mgr *VGroupManager) buildENIBackends(candidates *EndpointWithENI, vgroup model.VServerGroup) ([]model.BackendAttribute, error) {
+	backends := setGenericBackendAttribute(candidates, vgroup)
+	if len(backends) == 0 {
 		return nil, nil
 	}
 
-	backends := setGenericBackendAttribute(candidates, vgroup)
-
-	backends, err := updateENIBackends(mgr, backends)
+	backends, err := updateENIBackends(mgr, backends, candidates.AddressIPVersion)
 	if err != nil {
 		return backends, err
 	}
@@ -501,12 +655,11 @@ func (mgr *VGroupManager) buildENIBackends(reqCtx *RequestContext, candidates *E
 }
 
 func (mgr *VGroupManager) buildLocalBackends(reqCtx *RequestContext, candidates *EndpointWithENI, vgroup model.VServerGroup) ([]model.BackendAttribute, error) {
-	if len(candidates.Endpoints.Subsets) == 0 {
-		reqCtx.Log.Info(fmt.Sprintf("warning: vgroup %s endpoint is nil", vgroup.VGroupName))
+	initBackends := setGenericBackendAttribute(candidates, vgroup)
+	if len(initBackends) == 0 {
 		return nil, nil
 	}
 
-	initBackends := setGenericBackendAttribute(candidates, vgroup)
 	var (
 		ecsBackends, eciBackends []model.BackendAttribute
 		err                      error
@@ -552,7 +705,7 @@ func (mgr *VGroupManager) buildLocalBackends(reqCtx *RequestContext, candidates 
 	// 2. add eci backends
 	if len(eciBackends) != 0 {
 		reqCtx.Log.Info("add eciBackends")
-		eciBackends, err = updateENIBackends(mgr, eciBackends)
+		eciBackends, err = updateENIBackends(mgr, eciBackends, candidates.AddressIPVersion)
 		if err != nil {
 			return nil, fmt.Errorf("update eci backends error: %s", err.Error())
 		}
@@ -582,12 +735,11 @@ func remoteDuplicatedECS(backends []model.BackendAttribute) []model.BackendAttri
 }
 
 func (mgr *VGroupManager) buildClusterBackends(reqCtx *RequestContext, candidates *EndpointWithENI, vgroup model.VServerGroup) ([]model.BackendAttribute, error) {
-	if len(candidates.Endpoints.Subsets) == 0 {
-		reqCtx.Log.Info(fmt.Sprintf("warning: vgroup %s endpoint is nil", vgroup.VGroupName))
+	initBackends := setGenericBackendAttribute(candidates, vgroup)
+	if len(initBackends) == 0 {
 		return nil, nil
 	}
 
-	initBackends := setGenericBackendAttribute(candidates, vgroup)
 	var (
 		ecsBackends, eciBackends []model.BackendAttribute
 		err                      error
@@ -637,7 +789,7 @@ func (mgr *VGroupManager) buildClusterBackends(reqCtx *RequestContext, candidate
 	}
 
 	if len(eciBackends) != 0 {
-		eciBackends, err = updateENIBackends(mgr, eciBackends)
+		eciBackends, err = updateENIBackends(mgr, eciBackends, candidates.AddressIPVersion)
 		if err != nil {
 			return nil, fmt.Errorf("update eci backends error: %s", err.Error())
 		}
@@ -648,41 +800,25 @@ func (mgr *VGroupManager) buildClusterBackends(reqCtx *RequestContext, candidate
 	return setWeightBackends(ENITrafficPolicy, backends, vgroup.VGroupWeight), nil
 }
 
-func updateENIBackends(mgr *VGroupManager, backends []model.BackendAttribute) ([]model.BackendAttribute, error) {
+func updateENIBackends(mgr *VGroupManager, backends []model.BackendAttribute, ipVersion model.AddressIPVersionType) (
+	[]model.BackendAttribute, error) {
 	vpcId, err := mgr.cloud.VpcID()
 	if err != nil {
 		return nil, fmt.Errorf("get vpc id from metadata error:%s", err.Error())
 	}
-	var (
-		ips       []string
-		nextToken string
-	)
+
+	var ips []string
 	for _, b := range backends {
 		ips = append(ips, b.ServerIp)
 	}
-	ecis := make(map[string]string)
-	for {
-		resp, err := mgr.cloud.DescribeNetworkInterfaces(vpcId, &ips, nextToken)
-		if err != nil {
-			return nil, fmt.Errorf("call DescribeNetworkInterfaces: %s", err.Error())
-		}
-		for _, ip := range ips {
-			for _, eni := range resp.NetworkInterfaceSets.NetworkInterfaceSet {
-				for _, privateIp := range eni.PrivateIpSets.PrivateIpSet {
-					if ip == privateIp.PrivateIpAddress {
-						ecis[ip] = eni.NetworkInterfaceId
-					}
-				}
-			}
-		}
-		if resp.NextToken == "" {
-			break
-		}
-		nextToken = resp.NextToken
+
+	result, err := mgr.cloud.DescribeNetworkInterfaces(vpcId, ips, ipVersion)
+	if err != nil {
+		return nil, fmt.Errorf("call DescribeNetworkInterfaces: %s", err.Error())
 	}
 
 	for i := range backends {
-		eniid, ok := ecis[backends[i].ServerIp]
+		eniid, ok := result[backends[i].ServerIp]
 		if !ok {
 			return nil, fmt.Errorf("can not find eniid for ip %s in vpc %s", backends[i].ServerIp, vpcId)
 		}
@@ -693,13 +829,17 @@ func updateENIBackends(mgr *VGroupManager, backends []model.BackendAttribute) ([
 	return backends, nil
 }
 
-func setWeightBackends(mode TrafficPolicy, backends []model.BackendAttribute, weight int) []model.BackendAttribute {
+func setWeightBackends(mode TrafficPolicy, backends []model.BackendAttribute, weight *int) []model.BackendAttribute {
 	// use default
-	if weight == 0 {
+	if weight == nil {
 		return podNumberAlgorithm(mode, backends)
 	}
 
-	return podPercentAlgorithm(mode, backends, weight)
+	if *weight == 0 {
+		return backends
+	}
+
+	return podPercentAlgorithm(mode, backends, *weight)
 
 }
 

@@ -35,7 +35,7 @@ import (
 	"github.com/go-cmd/cmd"
 
 	"k8s.io/apimachinery/pkg/util/wait"
-	ctrlCtx "k8s.io/cloud-provider-alibaba-cloud/pkg/context"
+	ctrlCfg "k8s.io/cloud-provider-alibaba-cloud/pkg/config"
 	prvd "k8s.io/cloud-provider-alibaba-cloud/pkg/provider"
 	"k8s.io/cloud-provider-alibaba-cloud/version"
 )
@@ -71,7 +71,7 @@ type ClientMgr struct {
 // NewClientMgr return a new client manager
 func NewClientMgr() (*ClientMgr, error) {
 	if err := loadCloudCFG(); err != nil {
-		return nil, fmt.Errorf("load cloud config %s error: %s", ctrlCtx.ControllerCFG.CloudConfig, err.Error())
+		return nil, fmt.Errorf("load cloud config %s error: %s", ctrlCfg.ControllerCFG.CloudConfig, err.Error())
 	}
 
 	meta := NewMetaData()
@@ -180,9 +180,9 @@ func (mgr *ClientMgr) Start(
 }
 
 func (mgr *ClientMgr) GetAuthMode() AuthMode {
-	if ctrlCtx.CloudCFG.Global.AccessKeyID != "" &&
-		ctrlCtx.CloudCFG.Global.AccessKeySecret != "" {
-		if ctrlCtx.CloudCFG.Global.UID != "" {
+	if ctrlCfg.CloudCFG.Global.AccessKeyID != "" &&
+		ctrlCfg.CloudCFG.Global.AccessKeySecret != "" {
+		if ctrlCfg.CloudCFG.Global.UID != "" {
 			log.Info("use assume role mode to get token")
 			return SAMode
 		} else {
@@ -230,7 +230,7 @@ func RefreshToken(mgr *ClientMgr, token *Token) error {
 		return fmt.Errorf("init pvtz sts token config: %s", err.Error())
 	}
 
-	if ctrlCtx.ControllerCFG.NetWork == "vpc" {
+	if ctrlCfg.ControllerCFG.NetWork == "vpc" {
 		setVPCEndpoint(mgr)
 	}
 
@@ -314,7 +314,7 @@ func (f *ServiceToken) NextToken() (*Token, error) {
 	}
 	status := <-cmd.NewCmd(
 		filepath.Join(f.execpath, "servicetoken"),
-		fmt.Sprintf("--uid=%s", ctrlCtx.CloudCFG.Global.UID),
+		fmt.Sprintf("--uid=%s", ctrlCfg.CloudCFG.Global.UID),
 		fmt.Sprintf("--key=%s", key),
 		fmt.Sprintf("--secret=%s", secret),
 		fmt.Sprintf("--region=%s", f.svcak.Region),
@@ -331,28 +331,28 @@ func (f *ServiceToken) NextToken() (*Token, error) {
 }
 
 func loadCloudCFG() error {
-	content, err := ioutil.ReadFile(ctrlCtx.ControllerCFG.CloudConfig)
+	content, err := ioutil.ReadFile(ctrlCfg.ControllerCFG.CloudConfig)
 	if err != nil {
 		return fmt.Errorf("read cloud config error: %s ", err.Error())
 	}
-	return yaml.Unmarshal(content, ctrlCtx.CloudCFG)
+	return yaml.Unmarshal(content, ctrlCfg.CloudCFG)
 }
 
 func loadAK() (string, string, error) {
 	var keyId, keySecret string
-	log.V(5).Info(fmt.Sprintf("load cfg from file: %s", ctrlCtx.ControllerCFG.CloudConfig))
+	log.V(5).Info(fmt.Sprintf("load cfg from file: %s", ctrlCfg.ControllerCFG.CloudConfig))
 	if err := loadCloudCFG(); err != nil {
 		return "", "", fmt.Errorf("load cloud config %s error: %v",
-			ctrlCtx.ControllerCFG.CloudConfig, err.Error())
+			ctrlCfg.ControllerCFG.CloudConfig, err.Error())
 	}
 
-	if ctrlCtx.CloudCFG.Global.AccessKeyID != "" && ctrlCtx.CloudCFG.Global.AccessKeySecret != "" {
-		key, err := base64.StdEncoding.DecodeString(ctrlCtx.CloudCFG.Global.AccessKeyID)
+	if ctrlCfg.CloudCFG.Global.AccessKeyID != "" && ctrlCfg.CloudCFG.Global.AccessKeySecret != "" {
+		key, err := base64.StdEncoding.DecodeString(ctrlCfg.CloudCFG.Global.AccessKeyID)
 		if err != nil {
 			return "", "", err
 		}
 		keyId = string(key)
-		secret, err := base64.StdEncoding.DecodeString(ctrlCtx.CloudCFG.Global.AccessKeySecret)
+		secret, err := base64.StdEncoding.DecodeString(ctrlCfg.CloudCFG.Global.AccessKeySecret)
 		if err != nil {
 			return "", "", err
 		}

@@ -156,9 +156,26 @@ func (mgr *ListenerManager) buildListenerFromServicePort(reqCtx *RequestContext,
 		listener.CertId = reqCtx.Anno.Get(CertID)
 	}
 
+	if reqCtx.Anno.Get(EnableHttp2) != "" {
+		listener.EnableHttp2 = model.FlagType(reqCtx.Anno.Get(EnableHttp2))
+	}
+
 	if reqCtx.Anno.Get(ForwardPort) != "" && listener.Protocol == model.HTTP {
-		listener.ForwardPort = forwardPort(reqCtx.Anno.Get(ForwardPort), int(port.Port))
+		forwardPort, err := forwardPort(reqCtx.Anno.Get(ForwardPort), int(port.Port))
+		if err != nil {
+			return listener, fmt.Errorf("Annotation ForwardPort error: %s ", err.Error())
+		}
+		listener.ForwardPort = forwardPort
 		listener.ListenerForward = model.OnFlag
+	}
+
+	if reqCtx.Anno.Get(IdleTimeout) != "" {
+		idleTimeout, err := strconv.Atoi(reqCtx.Anno.Get(IdleTimeout))
+		if err != nil {
+			return listener, fmt.Errorf("Annotation IdleTimeout must be integer, but got [%s]. message=[%s] ",
+				reqCtx.Anno.Get(IdleTimeout), err.Error())
+		}
+		listener.IdleTimeout = idleTimeout
 	}
 
 	// acl
@@ -202,6 +219,11 @@ func (mgr *ListenerManager) buildListenerFromServicePort(reqCtx *RequestContext,
 	}
 	if reqCtx.Anno.Get(SessionStickType) != "" {
 		listener.StickySessionType = reqCtx.Anno.Get(SessionStickType)
+	}
+
+	// x-forwarded-for
+	if reqCtx.Anno.Get(XForwardedForProto) != "" {
+		listener.XForwardedForProto = model.FlagType(reqCtx.Anno.Get(XForwardedForProto))
 	}
 
 	// health check
@@ -431,17 +453,16 @@ func (t *https) Update(reqCtx *RequestContext, action UpdateAction) error {
 	return t.mgr.cloud.SetLoadBalancerHTTPSListenerAttribute(reqCtx.Ctx, action.lbId, update)
 }
 
-func forwardPort(port string, target int) int {
+func forwardPort(port string, target int) (int, error) {
 	if port == "" {
-		return 0
+		return 0, fmt.Errorf("forward port format error, get: %s, expect 80:443", port)
 	}
 	forwarded := ""
 	tmps := strings.Split(port, ",")
 	for _, v := range tmps {
 		ports := strings.Split(v, ":")
 		if len(ports) != 2 {
-			klog.Infof("forward-port format error: %s, expect 80:443,88:6443", port)
-			continue
+			return 0, fmt.Errorf("forward port format error: %s, expect 80:443,88:6443", port)
 		}
 		if ports[0] == strconv.Itoa(int(target)) {
 			forwarded = ports[1]
@@ -451,13 +472,12 @@ func forwardPort(port string, target int) int {
 	if forwarded != "" {
 		forward, err := strconv.Atoi(forwarded)
 		if err != nil {
-			klog.Errorf("forward port is not an integer, %s", forwarded)
-			return 0
+			return 0, fmt.Errorf("forward port is not an integer, %s", forwarded)
 		}
 		klog.Infof("forward http port %d to %d", target, forward)
-		return forward
+		return forward, nil
 	}
-	return 0
+	return 0, fmt.Errorf("forward port format error: %s, expect 80:443,88:6443", port)
 }
 
 func buildActionsForListeners(reqCtx *RequestContext, local *model.LoadBalancer, remote *model.LoadBalancer) ([]CreateAction, []UpdateAction, []DeleteAction, error) {
@@ -653,20 +673,28 @@ func isNeedUpdate(reqCtx *RequestContext, local model.ListenerAttribute, remote 
 			remote.Scheduler, local.Scheduler)
 	}
 	if local.Protocol == model.TCP &&
-		local.PersistenceTimeout != nil &&
-		remote.PersistenceTimeout != local.PersistenceTimeout {
+		local.PersistenceTimeout != nil && remote.PersistenceTimeout != nil &&
+		*remote.PersistenceTimeout != *local.PersistenceTimeout {
 		needUpdate = true
 		update.PersistenceTimeout = local.PersistenceTimeout
 		updateDetail += fmt.Sprintf("PersistenceTimeout changed: %v - %v ;",
-			remote.PersistenceTimeout, local.PersistenceTimeout)
+			*remote.PersistenceTimeout, *local.PersistenceTimeout)
 	}
+	// The cert id is necessary for https, so skip to check whether it is blank
 	if local.Protocol == model.HTTPS &&
-		local.CertId != "" &&
 		remote.CertId != local.CertId {
 		needUpdate = true
 		update.CertId = local.CertId
 		updateDetail += fmt.Sprintf("CertId changed: %v - %v ;",
 			remote.CertId, local.CertId)
+	}
+	if local.Protocol == model.HTTPS &&
+		local.EnableHttp2 != "" &&
+		remote.EnableHttp2 != local.EnableHttp2 {
+		needUpdate = true
+		update.EnableHttp2 = local.EnableHttp2
+		updateDetail += fmt.Sprintf("EnableHttp2 changed: %v - %v ;",
+			remote.EnableHttp2, local.EnableHttp2)
 	}
 	// acl
 	if local.AclStatus != "" &&
@@ -691,6 +719,15 @@ func isNeedUpdate(reqCtx *RequestContext, local model.ListenerAttribute, remote 
 		update.AclType = local.AclType
 		updateDetail += fmt.Sprintf("AclType changed: %v - %v ;",
 			remote.AclType, local.AclType)
+	}
+	// idle timeout
+	if Is7LayerProtocol(local.Protocol) &&
+		local.IdleTimeout != 0 &&
+		remote.IdleTimeout != local.IdleTimeout {
+		needUpdate = true
+		update.IdleTimeout = local.IdleTimeout
+		updateDetail += fmt.Sprintf("IdleTimeout changed: %v - %v ;",
+			remote.IdleTimeout, local.IdleTimeout)
 	}
 	// session
 	if Is7LayerProtocol(local.Protocol) &&
@@ -743,6 +780,17 @@ func isNeedUpdate(reqCtx *RequestContext, local model.ListenerAttribute, remote 
 		updateDetail += fmt.Sprintf("ConnectionDrainTimeout changed: %v - %v ;",
 			remote.ConnectionDrainTimeout, local.ConnectionDrainTimeout)
 	}
+
+	//x-forwarded-for
+	if Is7LayerProtocol(local.Protocol) &&
+		local.XForwardedForProto != "" &&
+		remote.XForwardedForProto != local.XForwardedForProto {
+		needUpdate = true
+		update.XForwardedForProto = local.XForwardedForProto
+		updateDetail += fmt.Sprintf("XForwardedForProto changed: %v - %v ;",
+			remote.XForwardedForProto, local.XForwardedForProto)
+	}
+
 	// health check
 	if local.HealthCheckConnectPort != 0 &&
 		remote.HealthCheckConnectPort != local.HealthCheckConnectPort {

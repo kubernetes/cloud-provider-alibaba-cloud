@@ -3,7 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
-	ctrlCtx "k8s.io/cloud-provider-alibaba-cloud/pkg/context"
+	ctrlCfg "k8s.io/cloud-provider-alibaba-cloud/pkg/config"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/model"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/dryrun"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/util"
@@ -36,7 +36,7 @@ func (m *ModelApplier) Apply(reqCtx *RequestContext, local *model.LoadBalancer) 
 
 	serviceHashChanged := isServiceHashChanged(reqCtx.Service)
 	// apply sequence can not change, apply lb first, then vgroup, listener at last
-	if serviceHashChanged || ctrlCtx.ControllerCFG.DryRun {
+	if serviceHashChanged || ctrlCfg.ControllerCFG.DryRun {
 		if err := m.applyLoadBalancerAttribute(reqCtx, local, remote); err != nil {
 			return remote, fmt.Errorf("update lb attribute error: %s", err.Error())
 		}
@@ -54,7 +54,7 @@ func (m *ModelApplier) Apply(reqCtx *RequestContext, local *model.LoadBalancer) 
 		return remote, fmt.Errorf("update lb backends error: %s", err.Error())
 	}
 
-	if serviceHashChanged || ctrlCtx.ControllerCFG.DryRun {
+	if serviceHashChanged || ctrlCfg.ControllerCFG.DryRun {
 		if err := m.lisMgr.BuildRemoteModel(reqCtx, remote); err != nil {
 			return remote, fmt.Errorf("get lb listeners from cloud, error: %s", err.Error())
 		}
@@ -169,9 +169,15 @@ func (m *ModelApplier) applyVGroups(reqCtx *RequestContext, local *model.LoadBal
 		// create
 		if !found {
 			reqCtx.Log.Info(fmt.Sprintf("try to create vgroup %s", local.VServerGroups[i].VGroupName))
+			// to avoid add too many backends in one action, create vserver group with empty backends,
+			// then use AddVServerGroupBackendServers to add backends
 			err := m.vGroupMgr.CreateVServerGroup(reqCtx, &local.VServerGroups[i], remote.LoadBalancerAttribute.LoadBalancerId)
 			if err != nil {
 				return fmt.Errorf("EnsureVGroupCreated error: %s", err.Error())
+			}
+			if err := m.vGroupMgr.BatchAddVServerGroupBackendServers(reqCtx, local.VServerGroups[i],
+				local.VServerGroups[i].Backends); err != nil {
+				return err
 			}
 			remote.VServerGroups = append(remote.VServerGroups, local.VServerGroups[i])
 		}

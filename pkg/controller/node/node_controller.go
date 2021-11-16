@@ -9,7 +9,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/record"
-	nctx "k8s.io/cloud-provider-alibaba-cloud/pkg/context/node"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/context/shared"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/helper"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider"
@@ -52,13 +51,13 @@ type nodeController struct {
 	recon *ReconcileNode
 }
 
-// Start() function will not be called until the resource lock is acquired
+// Start this function will not be called until the resource lock is acquired
 func (controller nodeController) Start(ctx context.Context) error {
 	controller.recon.PeriodicalSync()
 	return controller.c.Start(ctx)
 }
 
-// add adds a new Controller to mgr with r as the reconcile.Reconciler
+// add a new Controller to mgr with r as the reconcile.Reconciler
 func add(mgr manager.Manager, r *ReconcileNode) error {
 	// Create a new controller
 	c, err := controller.NewUnmanaged(
@@ -174,7 +173,7 @@ func (m *ReconcileNode) doAddCloudNode(node *corev1.Node) error {
 			"k8s.aliyun.com": "true",
 			"kubernetes.ccm": "true",
 		}
-		err = m.cloud.SetInstanceTags(nctx.NewEmpty(), instance.InstanceID, tags)
+		err = m.cloud.SetInstanceTags(context.TODO(), instance.InstanceID, tags)
 		if err != nil {
 			if !strings.Contains(err.Error(), "Forbidden.RAM") {
 				log.Error(err, "fail to tag instance", "node", instance.InstanceID)
@@ -199,12 +198,16 @@ func (m *ReconcileNode) doAddCloudNode(node *corev1.Node) error {
 
 	err = wait.PollImmediate(2*time.Second, 20*time.Second, initializer)
 	if err != nil {
-		m.record.Eventf(nodeRef, corev1.EventTypeWarning, helper.FailedAddNode, "Error adding node: %s",
-			helper.GetLogMessage(err))
+		m.record.Event(
+			nodeRef,
+			corev1.EventTypeWarning,
+			helper.FailedAddNode,
+			fmt.Sprintf("Error adding node: %s", helper.GetLogMessage(err)),
+		)
 		return fmt.Errorf("doAddCloudNode %s error: %s", node.Name, err.Error())
 	}
 
-	m.record.Eventf(nodeRef, corev1.EventTypeNormal, helper.InitializedNode, "Initialize node successfully", )
+	m.record.Event(nodeRef, corev1.EventTypeNormal, helper.InitializedNode, "Initialize node successfully")
 	metric.NodeLatency.WithLabelValues("remove_taint").Observe(metric.MsSince(start))
 	log.Info("Successfully initialized node", "node", node.Name)
 
@@ -214,7 +217,7 @@ func (m *ReconcileNode) doAddCloudNode(node *corev1.Node) error {
 // syncNode sync the nodeAddress & cloud node existence
 func (m *ReconcileNode) syncNode(nodes []corev1.Node) error {
 
-	instances, err := m.cloud.ListInstances(nctx.NewEmpty(), nodeids(nodes))
+	instances, err := m.cloud.ListInstances(context.TODO(), nodeids(nodes))
 	if err != nil {
 		return fmt.Errorf("[NodeAddress] list instances from api: %s", err.Error())
 	}
@@ -264,7 +267,7 @@ func (m *ReconcileNode) syncNode(nodes []corev1.Node) error {
 		err := helper.PatchM(m.client, node, diff, helper.PatchStatus)
 		if err != nil {
 			log.Error(err, "patch node address error, wait for next retry", "node", node.Name)
-			m.record.Eventf(
+			m.record.Event(
 				nodeRef, corev1.EventTypeWarning, helper.FailedSyncNode, err.Error(),
 			)
 		}
@@ -278,7 +281,7 @@ func (m *ReconcileNode) syncNode(nodes []corev1.Node) error {
 		err = helper.PatchM(m.client, node, diff, helper.PatchAll)
 		if err != nil {
 			log.Error(err, "patch node label error, wait for next retry", "node", node.Name)
-			m.record.Eventf(
+			m.record.Event(
 				nodeRef, corev1.EventTypeWarning, helper.FailedSyncNode, err.Error(),
 			)
 		}

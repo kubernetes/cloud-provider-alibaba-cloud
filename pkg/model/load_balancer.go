@@ -1,6 +1,7 @@
 package model
 
 import (
+	"encoding/json"
 	"fmt"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -129,6 +130,7 @@ type ListenerAttribute struct {
 	AclStatus                 FlagType
 	ConnectionDrain           FlagType
 	ConnectionDrainTimeout    int // values: 10~900
+	IdleTimeout               int // values: 1~60
 	HealthCheckConnectPort    int
 	HealthCheckInterval       int      // values: 1~50
 	HealthyThreshold          int      // values: 2~10
@@ -153,20 +155,28 @@ type VServerGroup struct {
 
 	VGroupId     string
 	VGroupName   string
-	VGroupWeight int
+	VGroupWeight *int
 	Backends     []BackendAttribute
+}
+
+func (v *VServerGroup) BackendInfo() string {
+	backendJson, err := json.Marshal(v.Backends)
+	if err != nil {
+		return fmt.Sprintf("%v", v.Backends)
+	}
+	return string(backendJson)
 }
 
 type BackendAttribute struct {
 	IsUserManaged bool
 	NodeName      *string
 
-	Description string
-	ServerId    string
-	ServerIp    string
-	Weight      int
-	Port        int
-	Type        string
+	Description string `json:"description"`
+	ServerId    string `json:"serverId"`
+	ServerIp    string `json:"serverIp"`
+	Weight      int    `json:"weight"`
+	Port        int    `json:"port"`
+	Type        string `json:"type"`
 }
 
 // DEFAULT_PREFIX default prefix for listener

@@ -1,9 +1,9 @@
 package ecs
 
 import (
+	"context"
 	"encoding/base64"
 	"fmt"
-	"k8s.io/cloud-provider-alibaba-cloud/pkg/context/node"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/base"
 	"testing"
 
@@ -101,7 +101,7 @@ func TestEcsProvider_ListInstances(t *testing.T) {
 		PVTZ: nil,
 	})
 
-	cloudNodes, err := ecsProvider.ListInstances(&node.NodeContext{}, ids)
+	cloudNodes, err := ecsProvider.ListInstances(context.TODO(), ids)
 	if err != nil {
 		t.Errorf("%s", err.Error())
 	}
