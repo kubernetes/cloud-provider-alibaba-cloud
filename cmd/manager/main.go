@@ -81,11 +81,11 @@ func main() {
 	ctx := shared.NewSharedContext(cloud)
 
 	log.Info("Registering Components.")
-	if err := controller.AddToManager(mgr, ctx, ctrlCfg.ControllerCFG.EnableControllers); err != nil {
+	if err := controller.AddToManager(mgr, ctx, ctrlCfg.ControllerCFG.Controllers); err != nil {
 		log.Error(err, "add controller: %s", err.Error())
 		os.Exit(1)
 	} else {
-		log.Info(fmt.Sprintf("Loaded controllers: %v", ctrlCfg.ControllerCFG.EnableControllers))
+		log.Info(fmt.Sprintf("Loaded controllers: %v", ctrlCfg.ControllerCFG.Controllers))
 	}
 
 	// Start the Cmd
