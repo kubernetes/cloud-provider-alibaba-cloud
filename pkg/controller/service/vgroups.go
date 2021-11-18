@@ -835,10 +835,6 @@ func setWeightBackends(mode TrafficPolicy, backends []model.BackendAttribute, we
 		return podNumberAlgorithm(mode, backends)
 	}
 
-	if *weight == 0 {
-		return backends
-	}
-
 	return podPercentAlgorithm(mode, backends, *weight)
 
 }
@@ -878,6 +874,13 @@ func podNumberAlgorithm(mode TrafficPolicy, backends []model.BackendAttribute) [
 	LocalMode:    node_weight = node_pod_num/pods_num *weightSum
 */
 func podPercentAlgorithm(mode TrafficPolicy, backends []model.BackendAttribute, weight int) []model.BackendAttribute {
+	if weight == 0 {
+		for i := range backends {
+			backends[i].Weight = 0
+		}
+		return backends
+	}
+
 	if mode == ENITrafficPolicy || mode == ClusterTrafficPolicy {
 		per := weight / len(backends)
 		if weight < 1 {
