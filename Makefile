@@ -125,65 +125,33 @@ ccm-mac:
 	GOOS=darwin \
 	CGO_ENABLED=0 \
 	GO111MODULE=on \
-	go build -v -o build/bin/cloud-controller-manager \
+	go build -mod vendor -v -o build/bin/cloud-controller-manager \
        -ldflags $(ldflags) cmd/manager/main.go
-
 ccm-linux:
 	GOARCH=amd64 \
 	GOOS=linux \
 	CGO_ENABLED=0 \
 	GO111MODULE=on \
-	go build -v -o build/bin/cloud-controller-manager.amd64 \
+	go build -mod vendor -v -o build/bin/cloud-controller-manager.amd64 \
        -ldflags $(ldflags) cmd/manager/main.go
 ccm-win:
 	GOARCH=amd64 \
 	GOOS=windows \
 	CGO_ENABLED=0 \
 	GO111MODULE=on \
-	go build -v -o build/bin/cloud-controller-manager.exe \
+	go build -mod vendor -v -o build/bin/cloud-controller-manager.exe \
        -ldflags $(ldflags) cmd/manager/main.go
 ccm-arm64:
 	GOARCH=arm64 \
 	GOOS=linux \
 	CGO_ENABLED=0 \
 	GO111MODULE=on \
-	go build -v -o build/bin/cloud-controller-manager.arm64 \
+	go build -mod vendor -v -o build/bin/cloud-controller-manager.arm64 \
        -ldflags $(ldflags) cmd/manager/main.go
 # standard cleanup target
 clean: clean-cache clean-output
 
 .PHONY: all make-cache clean-cache out-dir clean-output cloud-controller-manager build install clean
 
-unit-test:
-	GO111MODULE=on go test -mod vendor -v -race -coverprofile=coverage.txt -covermode=atomic \
-		k8s.io/cloud-provider-alibaba-cloud/cloud-controller-manager \
-		k8s.io/cloud-provider-alibaba-cloud/cloud-controller-manager/controller/route
-
 check:
 	gometalinter --disable-all --skip vendor -E ineffassign -E misspell -d ./...
-
-test:
-	docker run \
-	    -e CC=$(CC) -e GOARM=$(GOARM) -e GOARCH=$(ARCH) -e CGO_ENABLED=1 \
-		-v $(SOURCE):/go/src/k8s.io/cloud-provider-alibaba-cloud \
-		-v $(HOME)/mod:/go/pkg/mod \
-		golang:1.14.1 /bin/bash -c '\
-		cd /go/src/k8s.io/cloud-provider-alibaba-cloud && \
-		go test -mod vendor -v -race -coverprofile=coverage.txt -covermode=atomic \
-        		k8s.io/cloud-provider-alibaba-cloud/cloud-controller-manager \
-        		k8s.io/cloud-provider-alibaba-cloud/cloud-controller-manager/controller/route'
-
-e2etest:
-	docker run \
-	    -e CC=$(CC) -e GOARM=$(GOARM) -e GOARCH=$(ARCH) -e CGO_ENABLED=$(CGO_ENABLED) \
-		-v $(SOURCE):/go/src/k8s.io/cloud-provider-alibaba-cloud \
-		-v $(HOME)/mod:/go/pkg/mod \
-		-v /root/.kube/config:/root/.kube/config \
-		-v /root/.kube/config.cloud:/root/.kube/config.cloud \
-		golang:1.14.1 /bin/bash -c '\
-		cd /go/src/k8s.io/cloud-provider-alibaba-cloud && \
-		go test -mod vendor -v \
-            k8s.io/cloud-provider-alibaba-cloud/cmd/e2e \
-            -test.run ^TestE2E$ \
-            --kubeconfig /root/.kube/config \
-            --cloud-config /root/.kube/config.cloud'
