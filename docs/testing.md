@@ -82,7 +82,7 @@ func TestEnsureLoadbalancerDeleted(t *testing.T) {
 
 	f.Run(
 		t,
-		"Delete Loadbalancer", "ecs",
+		"Delete Loadbalancer", "alibaba",
 		func() {
 			_, err := f.Cloud.EnsureLoadBalancer(CLUSTER_ID, f.SVC, f.Nodes)
 			if err != nil {

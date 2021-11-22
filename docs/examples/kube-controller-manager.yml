@@ -29,7 +29,7 @@ spec:
     - --allocate-node-cidrs=true
     #- --cluster-cidr=172.16.0.0/16
     - --cluster-cidr=${CLUSTER_CIDR}
-    image: registry-vpc.cn-hangzhou.aliyuncs.com/acs/kube-controller-manager-amd64:v1.10.4
+    image: registry-alibaba.cn-hangzhou.aliyuncs.com/acs/kube-controller-manager-amd64:v1.10.4
     imagePullPolicy: IfNotPresent
     livenessProbe:
       failureThreshold: 8

@@ -2,10 +2,10 @@
   "Global":
   {
     "KubernetesClusterTag":"",
-    "vpcid":"vpc-bp1sah8hqjiyusoh8ua09",
+    "vpcid":"vpc-xxxx",
     "region":"cn-hangzhou",
     "zoneid":"cn-hangzhou-b",
-    "vswitchid":"vsw-bp1fznltga17mffpjm67y",
+    "vswitchid":"vsw-xxxx",
     "accessKeyID":"base64 encoded",
     "accessKeySecret":"base64 encoded"
   }

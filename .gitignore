@@ -3,3 +3,5 @@
 projectFilesBackup/
 coverage.txt
 alicloud-controller-manager
+vendor
+/.circleci/

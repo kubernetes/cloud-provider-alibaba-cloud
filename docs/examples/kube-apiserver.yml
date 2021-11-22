@@ -46,7 +46,7 @@ spec:
     - --etcd-certfile=/etc/kubernetes/pki/etcd/etcd-client.pem
     - --etcd-keyfile=/etc/kubernetes/pki/etcd/etcd-client-key.pem
     - --cloud-provider=external
-    image: registry-vpc.cn-hangzhou.aliyuncs.com/acs/kube-apiserver-amd64:v1.10.4
+    image: registry-alibaba.cn-hangzhou.aliyuncs.com/acs/kube-apiserver-amd64:v1.10.4
     imagePullPolicy: IfNotPresent
     livenessProbe:
       failureThreshold: 8
