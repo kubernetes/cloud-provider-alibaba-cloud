@@ -201,7 +201,10 @@ func (r *ReconcileRoute) syncCloudRoute(ctx context.Context, node *corev1.Node) 
 		}
 	}
 	if utilerrors.NewAggregate(tablesErr) != nil {
-		r.updateNetworkingCondition(ctx, node, false)
+		err := r.updateNetworkingCondition(ctx, node, false)
+		if err != nil {
+			klog.Errorf("update network condition for node %s, error: %v", node.Name, err.Error())
+		}
 		return utilerrors.NewAggregate(tablesErr)
 	} else {
 		networkCondition, ok := helper.FindCondition(node.Status.Conditions, corev1.NodeNetworkUnavailable)

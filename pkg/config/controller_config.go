@@ -83,7 +83,7 @@ func (cfg *ControllerConfig) Validate() error {
 		return fmt.Errorf("cloud config cannot be empty")
 	}
 
-	if cfg.ConfigureCloudRoutes == true && cfg.ClusterCidr == "" {
+	if cfg.ConfigureCloudRoutes && cfg.ClusterCidr == "" {
 		return fmt.Errorf("--cluster-cidr must be set when --configure-cloud-routes=true")
 	}
 

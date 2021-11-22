@@ -24,13 +24,13 @@ type EventHandlerWithClient struct {
 // norm changes endpoints/services update into services
 func (e *EventHandlerWithClient) norm(o client.Object) []reconcile.Request {
 	var request []reconcile.Request
-	switch o.(type) {
+	switch o := o.(type) {
 	case *v1.Endpoints:
-		request = append(request, e.normEndpoint(o.(*v1.Endpoints))...)
+		request = append(request, e.normEndpoint(o)...)
 	case *v1.Service:
-		request = append(request, e.normService(o.(*v1.Service))...)
+		request = append(request, e.normService(o)...)
 	case *v1.Pod:
-		request = append(request, e.normPod(o.(*v1.Pod))...)
+		request = append(request, e.normPod(o)...)
 	default:
 		log.Warnf("unknown object: %s, %v", reflect.TypeOf(o), o)
 	}

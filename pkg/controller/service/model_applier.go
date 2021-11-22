@@ -202,10 +202,7 @@ func (m *ModelApplier) applyListeners(reqCtx *RequestContext, local *model.LoadB
 	sort.SliceStable(
 		createActions,
 		func(i, j int) bool {
-			if createActions[i].listener.Protocol == model.HTTPS {
-				return true
-			}
-			return false
+			return createActions[i].listener.Protocol == model.HTTPS
 		},
 	)
 	// make https at last.
@@ -213,10 +210,7 @@ func (m *ModelApplier) applyListeners(reqCtx *RequestContext, local *model.LoadB
 	sort.SliceStable(
 		deleteActions,
 		func(i, j int) bool {
-			if deleteActions[i].listener.Protocol == model.HTTPS {
-				return false
-			}
-			return true
+			return deleteActions[i].listener.Protocol != model.HTTPS
 		},
 	)
 

@@ -21,10 +21,7 @@ func (sp *ServicePredicate) filterLeaseEvents(obj client.Object) bool {
 		"kube-system/kube-controller-manager": empty,
 	}
 	target := fmt.Sprintf("%s/%s", obj.GetNamespace(), obj.GetName())
-	if avoid.Has(target) {
-		return false
-	}
-	return true
+	return !avoid.Has(target)
 }
 
 func (sp *ServicePredicate) Create(e event.CreateEvent) bool {

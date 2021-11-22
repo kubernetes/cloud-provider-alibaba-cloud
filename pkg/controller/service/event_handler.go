@@ -313,7 +313,7 @@ func (h *enqueueRequestForNodeEvent) enqueueManagedNode(queue workqueue.RateLimi
 	svcs := v1.ServiceList{}
 	err := h.client.List(context.TODO(), &svcs)
 	if err != nil {
-		util.ServiceLog.Error(err, fmt.Sprintf("fail to list services for node"),
+		util.ServiceLog.Error(err, "fail to list services for node",
 			"node", node.Name)
 		return
 	}

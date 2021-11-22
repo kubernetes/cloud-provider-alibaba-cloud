@@ -40,9 +40,9 @@ func HashString(o interface{}) string {
 
 func remove(v *interface{}) {
 	o := *v
-	switch o.(type) {
+	switch o := o.(type) {
 	case []interface{}:
-		under := o.([]interface{})
+		under := o
 		// remove empty object
 
 		for _, m := range under {
@@ -58,7 +58,7 @@ func remove(v *interface{}) {
 		}
 		*v = emit
 	case map[string]interface{}:
-		me := o.(map[string]interface{})
+		me := o
 		for k, v := range me {
 			if isHashLabel(k) {
 				delete(me, k)

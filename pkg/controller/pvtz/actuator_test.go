@@ -1,11 +1,11 @@
 package pvtz
 
 import (
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/model"
 	"testing"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	prvd "k8s.io/cloud-provider-alibaba-cloud/pkg/provider"
 )
 
 const (
@@ -24,7 +24,7 @@ var (
 		Name:      testServiceName,
 		Namespace: testServiceNamespace,
 	}
-	testDesiredAandAAAAEndpoints = map[*corev1.Service][]*prvd.PvtzEndpoint{
+	testDesiredAandAAAAEndpoints = map[*corev1.Service][]*model.PvtzEndpoint{
 		// Multiple Ingress IP LoadBalancer
 		&corev1.Service{
 			ObjectMeta: testCommonObjectMeta,
@@ -39,13 +39,13 @@ var (
 		}: {
 			{
 				Rr:     testServiceRr,
-				Type:   prvd.RecordTypeA,
-				Values: []prvd.PvtzValue{{Data: IP1}, {Data: IP2}},
+				Type:   model.RecordTypeA,
+				Values: []model.PvtzValue{{Data: IP1}, {Data: IP2}},
 			},
 			{
 				Rr:     testServiceRr,
-				Type:   prvd.RecordTypeAAAA,
-				Values: []prvd.PvtzValue{{Data: IPv61}, {Data: IPv62}},
+				Type:   model.RecordTypeAAAA,
+				Values: []model.PvtzValue{{Data: IPv61}, {Data: IPv62}},
 			},
 		},
 		// TODO Headless ClusterIP, vmock client
@@ -60,13 +60,13 @@ var (
 		}: {
 			{
 				Rr:     testServiceRr,
-				Type:   prvd.RecordTypeA,
-				Values: []prvd.PvtzValue{{Data: IP1}},
+				Type:   model.RecordTypeA,
+				Values: []model.PvtzValue{{Data: IP1}},
 			},
 			{
 				Rr:     testServiceRr,
-				Type:   prvd.RecordTypeAAAA,
-				Values: []prvd.PvtzValue{{Data: IPv61}},
+				Type:   model.RecordTypeAAAA,
+				Values: []model.PvtzValue{{Data: IPv61}},
 			},
 		},
 		// Normal NodePort
@@ -80,13 +80,13 @@ var (
 		}: {
 			{
 				Rr:     testServiceRr,
-				Type:   prvd.RecordTypeA,
-				Values: []prvd.PvtzValue{{Data: IP1}},
+				Type:   model.RecordTypeA,
+				Values: []model.PvtzValue{{Data: IP1}},
 			},
 			{
 				Rr:     testServiceRr,
-				Type:   prvd.RecordTypeAAAA,
-				Values: []prvd.PvtzValue{{Data: IPv61}},
+				Type:   model.RecordTypeAAAA,
+				Values: []model.PvtzValue{{Data: IPv61}},
 			},
 		},
 		// IPv4 ExternalName
@@ -99,8 +99,8 @@ var (
 		}: {
 			{
 				Rr:     testServiceRr,
-				Type:   prvd.RecordTypeA,
-				Values: []prvd.PvtzValue{{Data: IP1}},
+				Type:   model.RecordTypeA,
+				Values: []model.PvtzValue{{Data: IP1}},
 			},
 		},
 		// IPv6 ExternalName
@@ -113,13 +113,13 @@ var (
 		}: {
 			{
 				Rr:     testServiceRr,
-				Type:   prvd.RecordTypeAAAA,
-				Values: []prvd.PvtzValue{{Data: IPv61}},
+				Type:   model.RecordTypeAAAA,
+				Values: []model.PvtzValue{{Data: IPv61}},
 			},
 		},
 	}
 
-	testDesiredCNAMEEndpoints = map[*corev1.Service][]*prvd.PvtzEndpoint{
+	testDesiredCNAMEEndpoints = map[*corev1.Service][]*model.PvtzEndpoint{
 		// Domain ExternalName
 		&corev1.Service{
 			ObjectMeta: testCommonObjectMeta,
@@ -130,8 +130,8 @@ var (
 		}: {
 			{
 				Rr:     testServiceRr,
-				Type:   prvd.RecordTypeCNAME,
-				Values: []prvd.PvtzValue{{Data: Domain1}},
+				Type:   model.RecordTypeCNAME,
+				Values: []model.PvtzValue{{Data: Domain1}},
 			},
 		},
 	}
@@ -147,7 +147,8 @@ func TestDesiredCNAMEEndpoints(t *testing.T) {
 	testDesiredEndpoints(t, testDesiredCNAMEEndpoints, a.desiredCNAME)
 }
 
-func testDesiredEndpoints(t *testing.T, cases map[*corev1.Service][]*prvd.PvtzEndpoint, desiredFunc func(*corev1.Service) ([]*prvd.PvtzEndpoint, error)) {
+func testDesiredEndpoints(t *testing.T, cases map[*corev1.Service][]*model.PvtzEndpoint, desiredFunc func(*corev1.Service) (
+	[]*model.PvtzEndpoint, error)) {
 	i := 0
 	for k, v := range cases {
 		eps, err := desiredFunc(k)

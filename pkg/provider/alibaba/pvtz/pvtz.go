@@ -161,10 +161,7 @@ func (p *PVTZProvider) DeletePVTZ(ctx context.Context, ep *model.PvtzEndpoint) e
 }
 
 func (p *PVTZProvider) filterUnmanagedDNSRecord(record pvtz.Record) bool {
-	if strings.Contains(record.Remark, ZoneRecordRemark) {
-		return false
-	}
-	return true
+	return !strings.Contains(record.Remark, ZoneRecordRemark)
 }
 
 func (p *PVTZProvider) filterUnsupportedDNSRecordTypes(record pvtz.Record) bool {

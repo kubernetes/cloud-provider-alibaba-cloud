@@ -94,7 +94,6 @@ func (e *EndpointWithENI) setTrafficPolicy(reqCtx *RequestContext) {
 		return
 	}
 	e.TrafficPolicy = ClusterTrafficPolicy
-	return
 }
 
 func (e *EndpointWithENI) setAddressIpVersion(reqCtx *RequestContext) {
@@ -109,7 +108,6 @@ func (e *EndpointWithENI) setAddressIpVersion(reqCtx *RequestContext) {
 		return
 	}
 	e.AddressIPVersion = model.IPv4
-	return
 }
 
 func NewVGroupManager(kubeClient client.Client, cloud prvd.Provider) *VGroupManager {
@@ -624,7 +622,7 @@ func setBackendsFromEndpointSlices(candidates *EndpointWithENI, vgroup model.VSe
 				}
 				endpointMap[addr] = true
 				// NodeName of endpoint is nil, use topology.hostname instead of NodeName
-				hostName, _ := ep.Topology[v1.LabelHostname]
+				hostName := ep.Topology[v1.LabelHostname]
 				backends = append(backends, model.BackendAttribute{
 					NodeName: &hostName,
 					ServerIp: addr,
@@ -883,8 +881,8 @@ func podPercentAlgorithm(mode TrafficPolicy, backends []model.BackendAttribute, 
 
 	if mode == ENITrafficPolicy || mode == ClusterTrafficPolicy {
 		per := weight / len(backends)
-		if weight < 1 {
-			weight = 1
+		if per < 1 {
+			per = 1
 		}
 
 		for i := range backends {

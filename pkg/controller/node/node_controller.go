@@ -15,7 +15,6 @@ import (
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/util/metric"
 	"k8s.io/klog"
 	"k8s.io/klog/klogr"
-	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
@@ -84,7 +83,6 @@ var _ reconcile.Reconciler = &ReconcileNode{}
 
 // ReconcileNode reconciles a AutoRepair object
 type ReconcileNode struct {
-	cache  cache.Cache
 	cloud  prvd.Provider
 	client client.Client
 	scheme *runtime.Scheme
@@ -125,7 +123,7 @@ func (m *ReconcileNode) Reconcile(
 func (m *ReconcileNode) syncCloudNode(node *corev1.Node) error {
 	cloudTaint := findCloudTaint(node.Spec.Taints)
 	if cloudTaint == nil {
-		klog.V(5).Info("node %s is registered without cloud taint. return ok", node.Name)
+		klog.V(5).Infof("node %s is registered without cloud taint. return ok", node.Name)
 		return nil
 	}
 	return m.doAddCloudNode(node)

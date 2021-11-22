@@ -253,9 +253,7 @@ func LogEndpointSlice(es *discovery.EndpointSlice) string {
 	}
 	var epAddrList []string
 	for _, ep := range es.Endpoints {
-		for _, addr := range ep.Addresses {
-			epAddrList = append(epAddrList, addr)
-		}
+		epAddrList = append(epAddrList, ep.Addresses...)
 	}
 
 	return strings.Join(epAddrList, ",")
@@ -271,9 +269,7 @@ func LogEndpointSliceList(esList []discovery.EndpointSlice) string {
 			if ep.Conditions.Ready != nil && !*ep.Conditions.Ready {
 				continue
 			}
-			for _, addr := range ep.Addresses {
-				epAddrList = append(epAddrList, addr)
-			}
+			epAddrList = append(epAddrList, ep.Addresses...)
 		}
 	}
 

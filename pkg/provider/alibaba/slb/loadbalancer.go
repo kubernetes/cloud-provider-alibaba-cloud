@@ -50,7 +50,7 @@ func (p SLBProvider) FindLoadBalancer(ctx context.Context, mdl *model.LoadBalanc
 	if err != nil {
 		return fmt.Errorf("[%s] find loadbalancer by tag error: %s", mdl.NamespacedName, util.FormatErrorMessage(err))
 	}
-	klog.V(5).Infof("RequestId: %s, API: %s, lbId: %s", resp.RequestId, "DescribeLoadBalancers")
+	klog.V(5).Infof("RequestId: %s, API: %s", resp.RequestId, "DescribeLoadBalancers")
 
 	num := len(resp.LoadBalancers.LoadBalancer)
 	if num > 0 {

@@ -45,10 +45,9 @@ cat > ${WORKINGDIR}/cloud-config << EOF
 EOF
 if [[ "$POD_CIDR" == "" ]];
 then
-   ROUTE=" --configure-cloud-routes=false \
-      --allocate-node-cidrs=false"
+   ROUTE=" --configure-cloud-routes=false "
 else
-  ROUTE=" --route-reconciliation-period=30s \
+  ROUTE=" --route-reconciliation-period=3m \
       --configure-cloud-routes=true \
       --allocate-node-cidrs=true \
       --cluster-cidr=${POD_CIDR}"
@@ -56,9 +55,9 @@ fi
 cmd="./cloud-controller-manager \
       --kubeconfig=${WORKINGDIR}/config \
       --cloud-config=${WORKINGDIR}/cloud-config \
-      --enable-leader-select=true \
-      --loglevel=3 \
-      ${ROUTE}
+      --network="public"\
+      --v=3 \
+      ${ROUTE} \
       "
 echo
 echo "通过以下启动命令运行CCM"

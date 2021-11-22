@@ -365,9 +365,9 @@ func (vpc *MetaDataRequest) Decode(data string, api interface{}) error {
 		url, _ := vpc.Url()
 		return fmt.Errorf("metadata: alivpc decode data must not be nil. url=[%s]\n", url)
 	}
-	switch api.(type) {
+	switch api := api.(type) {
 	case *ResultList:
-		api.(*ResultList).result = strings.Split(data, "\n")
+		api.result = strings.Split(data, "\n")
 		return nil
 	case *prvd.RoleAuth:
 		return json.Unmarshal([]byte(data), api)

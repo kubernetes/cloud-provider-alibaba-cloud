@@ -106,8 +106,7 @@ func TestProviderSLB_DescribeVServerGroups(t *testing.T) {
 		vg.NamedKey = namedKey
 		vgs = append(vgs, vg)
 	}
-
-	jsonStr, err := json.Marshal(vgs)
+	jsonStr, _ := json.Marshal(vgs)
 	t.Logf(string(jsonStr))
 }
 
