@@ -155,7 +155,7 @@ clean: clean-cache clean-output
 .PHONY: all make-cache clean-cache out-dir clean-output cloud-controller-manager build install clean
 
 unit-test:
-	GO111MODULE=on go test -mod readonly -v -race -coverprofile=coverage.txt -covermode=atomic \
+	GO111MODULE=on go test -mod vendor -v -race -coverprofile=coverage.txt -covermode=atomic \
 		k8s.io/cloud-provider-alibaba-cloud/cloud-controller-manager \
 		k8s.io/cloud-provider-alibaba-cloud/cloud-controller-manager/controller/route
 
@@ -169,7 +169,7 @@ test:
 		-v $(HOME)/mod:/go/pkg/mod \
 		golang:1.14.1 /bin/bash -c '\
 		cd /go/src/k8s.io/cloud-provider-alibaba-cloud && \
-		go test -mod readonly -v -race -coverprofile=coverage.txt -covermode=atomic \
+		go test -mod vendor -v -race -coverprofile=coverage.txt -covermode=atomic \
         		k8s.io/cloud-provider-alibaba-cloud/cloud-controller-manager \
         		k8s.io/cloud-provider-alibaba-cloud/cloud-controller-manager/controller/route'
 
@@ -182,7 +182,7 @@ e2etest:
 		-v /root/.kube/config.cloud:/root/.kube/config.cloud \
 		golang:1.14.1 /bin/bash -c '\
 		cd /go/src/k8s.io/cloud-provider-alibaba-cloud && \
-		go test -mod readonly -v \
+		go test -mod vendor -v \
             k8s.io/cloud-provider-alibaba-cloud/cmd/e2e \
             -test.run ^TestE2E$ \
             --kubeconfig /root/.kube/config \
