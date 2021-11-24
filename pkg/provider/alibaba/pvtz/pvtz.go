@@ -108,7 +108,7 @@ func (p *PVTZProvider) SearchPVTZ(ctx context.Context, ep *model.PvtzEndpoint, e
 func (p *PVTZProvider) UpdatePVTZ(ctx context.Context, ep *model.PvtzEndpoint) error {
 	rlog := log.WithFields(log.Fields{"endpointRr": ep.Rr, "endpointType": ep.Type})
 	newValues := ep.Values
-	oldValues := make([]model.PvtzValue, 0)
+	var oldValues []model.PvtzValue
 	err := p.record(context.TODO(), ep)
 	if err != nil {
 		return errors.Wrap(err, "UpdatePVTZ query old zone records error")

@@ -304,23 +304,3 @@ func isProvidedAddrExist(node *v1.Node, nodeAddresses []v1.NodeAddress) (*v1.Nod
 	}
 	return nodeIP, ipExists
 }
-
-func isNodeAddressChanged(addr1, addr2 []v1.NodeAddress) bool {
-	if len(addr1) != len(addr2) {
-		return true
-	}
-	addressMap1 := map[v1.NodeAddressType]string{}
-	addressMap2 := map[v1.NodeAddressType]string{}
-
-	for i := range addr1 {
-		addressMap1[addr1[i].Type] = addr1[i].Address
-		addressMap2[addr2[i].Type] = addr2[i].Address
-	}
-
-	for k, v := range addressMap1 {
-		if addressMap2[k] != v {
-			return true
-		}
-	}
-	return false
-}

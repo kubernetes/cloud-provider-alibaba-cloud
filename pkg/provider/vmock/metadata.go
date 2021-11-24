@@ -8,7 +8,7 @@ import (
 var _ prvd.IMetaData = &MockMetaData{}
 
 type MockMetaData struct {
-	base prvd.IMetaData
+	base  prvd.IMetaData
 	vpcID string
 }
 

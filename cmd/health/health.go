@@ -1,7 +1,7 @@
 package health
 
 var (
-	CRDReady      bool
+	CRDReady      bool // CRDReady
 	CheckFuncList = []Checker{
 		&DefaultHealthCheck{}, &CustomizeHealthCheck{},
 	}

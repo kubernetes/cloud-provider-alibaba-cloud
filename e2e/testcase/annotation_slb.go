@@ -707,9 +707,7 @@ var _ = ginkgo.Describe("Test CCM Annotation slb function", func() {
 	})
 	ginkgo.It("CCM-Service-IT-Annotation-Monitor-007", func() {
 		ginkgo.By("Specify forwarding port for load balancing")
-		base := framework.NewBaseSVC(map[string]string{
-
-		})
+		base := framework.NewBaseSVC(map[string]string{})
 		dspec := &framework.TestUnit{
 			Service: base, Description: "Initializes an SVC of the specified type",
 			Mutator: func(service *v1.Service) error {
@@ -734,6 +732,3 @@ var _ = ginkgo.Describe("Test CCM Annotation slb function", func() {
 	})
 
 })
-
-
-

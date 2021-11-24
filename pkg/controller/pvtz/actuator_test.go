@@ -26,7 +26,7 @@ var (
 	}
 	testDesiredAandAAAAEndpoints = map[*corev1.Service][]*model.PvtzEndpoint{
 		// Multiple Ingress IP LoadBalancer
-		&corev1.Service{
+		{
 			ObjectMeta: testCommonObjectMeta,
 			Spec: corev1.ServiceSpec{
 				Type: corev1.ServiceTypeLoadBalancer,
@@ -50,7 +50,7 @@ var (
 		},
 		// TODO Headless ClusterIP, vmock client
 		// Normal ClusterIP
-		&corev1.Service{
+		{
 			ObjectMeta: testCommonObjectMeta,
 			Spec: corev1.ServiceSpec{
 				Type:       corev1.ServiceTypeClusterIP,
@@ -70,7 +70,7 @@ var (
 			},
 		},
 		// Normal NodePort
-		&corev1.Service{
+		{
 			ObjectMeta: testCommonObjectMeta,
 			Spec: corev1.ServiceSpec{
 				Type:       corev1.ServiceTypeNodePort,
@@ -90,7 +90,7 @@ var (
 			},
 		},
 		// IPv4 ExternalName
-		&corev1.Service{
+		{
 			ObjectMeta: testCommonObjectMeta,
 			Spec: corev1.ServiceSpec{
 				Type:         corev1.ServiceTypeExternalName,
@@ -104,7 +104,7 @@ var (
 			},
 		},
 		// IPv6 ExternalName
-		&corev1.Service{
+		{
 			ObjectMeta: testCommonObjectMeta,
 			Spec: corev1.ServiceSpec{
 				Type:         corev1.ServiceTypeExternalName,
@@ -121,7 +121,7 @@ var (
 
 	testDesiredCNAMEEndpoints = map[*corev1.Service][]*model.PvtzEndpoint{
 		// Domain ExternalName
-		&corev1.Service{
+		{
 			ObjectMeta: testCommonObjectMeta,
 			Spec: corev1.ServiceSpec{
 				Type:         corev1.ServiceTypeExternalName,

@@ -155,3 +155,13 @@ clean: clean-cache clean-output
 
 check:
 	gometalinter --disable-all --skip vendor -E ineffassign -E misspell -d ./...
+
+
+
+check: fmt lint
+
+gofmt:
+	./hack/verify-gofmt.sh
+
+golangci-lint:
+	bash -c 'golangci-lint run'

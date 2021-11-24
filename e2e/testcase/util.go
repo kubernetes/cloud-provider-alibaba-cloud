@@ -11,7 +11,6 @@ import (
 	"k8s.io/klog/v2"
 	"strconv"
 	"strings"
-	"time"
 )
 
 // Test results flag
@@ -281,7 +280,8 @@ func EnsureDeleteSVC(m *framework.Expectation) (done bool, err error) {
 	}
 	if err == nil {
 		if result.Status.String() == "Terminating" {
-			framework.Logf("namespace: %s service: %s still in %s state", m.Case.Service.Namespace, m.Case.Service.Name, result.Status.String(), time.Now())
+			framework.Logf("namespace: %s service: %s still in %s state", m.Case.Service.Namespace,
+				m.Case.Service.Name, result.Status.String())
 
 			return false, nil
 		}

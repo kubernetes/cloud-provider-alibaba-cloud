@@ -81,7 +81,7 @@ func (u *DeleteAction) RunAction(f *FrameWorkE2E) error {
 		Services(u.Service.Namespace).
 		Get(context.Background(), u.Service.Name, metav1.GetOptions{})
 	if err != nil {
-		if apierrors.IsNotFound(err){
+		if apierrors.IsNotFound(err) {
 			Logf("service not found, expected")
 			return nil
 		}
