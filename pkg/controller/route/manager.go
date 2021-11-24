@@ -80,10 +80,10 @@ func (r *ReconcileRoute) syncTableRoutes(ctx context.Context, table string, node
 	}
 
 	var clusterCIDR *net.IPNet
-	if ctrlCfg.ControllerCFG.ClusterCidr != "" {
-		_, clusterCIDR, err = net.ParseCIDR(ctrlCfg.ControllerCFG.ClusterCidr)
+	if ctrlCfg.ControllerCFG.ClusterCIDR != "" {
+		_, clusterCIDR, err = net.ParseCIDR(ctrlCfg.ControllerCFG.ClusterCIDR)
 		if err != nil {
-			return fmt.Errorf("error parse cluster cidr %s: %s", ctrlCfg.ControllerCFG.ClusterCidr, err)
+			return fmt.Errorf("error parse cluster cidr %s: %s", ctrlCfg.ControllerCFG.ClusterCIDR, err)
 		}
 	}
 

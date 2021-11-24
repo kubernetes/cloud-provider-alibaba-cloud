@@ -43,7 +43,7 @@ func newReconciler(mgr manager.Manager, ctx *shared.SharedContext) *ReconcileRou
 		record:          mgr.GetEventRecorderFor("route-controller"),
 		nodeCache:       cmap.New(),
 		configRoutes:    ctrlCfg.ControllerCFG.ConfigureCloudRoutes,
-		reconcilePeriod: ctrlCfg.ControllerCFG.RouteReconciliationPeriod,
+		reconcilePeriod: ctrlCfg.ControllerCFG.RouteReconciliationPeriod.Duration,
 	}
 	return recon
 }
