@@ -52,7 +52,7 @@ When you create an Ingress, an Albconfig object named default is automatically c
     ```bash
     kubectl -n kube-system get albconfig
     ```
-   预期输出：
+   Expected output:
     ```bash
     NAME      AGE
     default   87m
