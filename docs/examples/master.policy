@@ -81,6 +81,68 @@
         "*"
       ],
       "Effect": "Allow"
-    }
+    },
+    {
+            "Action": [
+                "alb:TagResources",
+                "alb:ListServerGroups",
+                "alb:ListServerGroupServers",
+                "alb:AddServersToServerGroup",
+                "alb:RemoveServersFromServerGroup",
+                "alb:ReplaceServersInServerGroup",
+                "alb:CreateLoadBalancer",
+                "alb:DeleteLoadBalancer",
+                "alb:UpdateLoadBalancerAttribute",
+                "alb:UpdateLoadBalancerEdition",
+                "alb:EnableLoadBalancerAccessLog",
+                "alb:DisableLoadBalancerAccessLog",
+                "alb:EnableDeletionProtection",
+                "alb:DisableDeletionProtection",
+                "alb:ListLoadBalancers",
+                "alb:GetLoadBalancerAttribute",
+                "alb:ListListeners",
+                "alb:CreateListener",
+                "alb:GetListenerAttribute",
+                "alb:UpdateListenerAttribute",
+                "alb:ListListenerCertificates",
+                "alb:AssociateAdditionalCertificatesWithListener",
+                "alb:DissociateAdditionalCertificatesFromListener",
+                "alb:DeleteListener",
+                "alb:CreateRule",
+                "alb:DeleteRule",
+                "alb:UpdateRuleAttribute",
+                "alb:CreateRules",
+                "alb:UpdateRulesAttribute",
+                "alb:DeleteRules",
+                "alb:ListRules",
+                "alb:CreateServerGroup",
+                "alb:DeleteServerGroup",
+                "alb:UpdateServerGroupAttribute",
+                "alb:DescribeZones"
+            ],
+            "Resource": "*",
+            "Effect": "Allow"
+        },
+        {
+            "Action": "ram:CreateServiceLinkedRole",
+            "Resource": "*",
+            "Effect": "Allow",
+            "Condition": {
+                "StringEquals": {
+                    "ram:ServiceName": [
+                        "alb.aliyuncs.com",
+                        "logdelivery.alb.aliyuncs.com"
+                    ]
+                }
+            }
+        },
+        {
+            "Action": [
+                "yundun-cert:DescribeSSLCertificateList",
+                "yundun-cert:DescribeSSLCertificatePublicKeyDetail"
+            ],
+            "Resource": "*",
+            "Effect": "Allow"
+        }
   ]
 }

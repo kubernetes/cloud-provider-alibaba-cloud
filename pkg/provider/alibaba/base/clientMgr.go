@@ -21,15 +21,19 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"k8s.io/klog/klogr"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
 
+	"k8s.io/klog/klogr"
+
+	"github.com/aliyun/alibaba-cloud-sdk-go/services/alb"
+	"github.com/aliyun/alibaba-cloud-sdk-go/services/cas"
 	"github.com/aliyun/alibaba-cloud-sdk-go/services/ecs"
 	"github.com/aliyun/alibaba-cloud-sdk-go/services/pvtz"
 	"github.com/aliyun/alibaba-cloud-sdk-go/services/slb"
+	"github.com/aliyun/alibaba-cloud-sdk-go/services/sls"
 	"github.com/aliyun/alibaba-cloud-sdk-go/services/vpc"
 	"github.com/ghodss/yaml"
 	"github.com/go-cmd/cmd"
@@ -66,6 +70,9 @@ type ClientMgr struct {
 	VPC  *vpc.Client
 	SLB  *slb.Client
 	PVTZ *pvtz.Client
+	ALB  *alb.Client
+	SLS  *sls.Client
+	CAS  *cas.Client
 }
 
 // NewClientMgr return a new client manager
@@ -106,6 +113,30 @@ func NewClientMgr() (*ClientMgr, error) {
 	slbcli.AppendUserAgent(KubernetesCloudControllerManager, version.Version)
 	slbcli.AppendUserAgent(AgentClusterId, CLUSTER_ID)
 
+	albcli, err := alb.NewClientWithStsToken(
+		region, "key", "secret", "")
+	if err != nil {
+		return nil, fmt.Errorf("initialize alibaba alb client: %s", err.Error())
+	}
+	albcli.AppendUserAgent(KubernetesCloudControllerManager, version.Version)
+	albcli.AppendUserAgent(AgentClusterId, CLUSTER_ID)
+
+	slscli, err := sls.NewClientWithStsToken(
+		region, "key", "secret", "")
+	if err != nil {
+		return nil, fmt.Errorf("initialize alibaba sls client: %s", err.Error())
+	}
+	slscli.AppendUserAgent(KubernetesCloudControllerManager, version.Version)
+	slscli.AppendUserAgent(AgentClusterId, CLUSTER_ID)
+
+	cascli, err := cas.NewClientWithStsToken(
+		region, "key", "secret", "")
+	if err != nil {
+		return nil, fmt.Errorf("initialize alibaba cas client: %s", err.Error())
+	}
+	cascli.AppendUserAgent(KubernetesCloudControllerManager, version.Version)
+	cascli.AppendUserAgent(AgentClusterId, CLUSTER_ID)
+
 	pvtzcli, err := pvtz.NewClientWithStsToken(
 		region, "key", "secret", "",
 	)
@@ -121,6 +152,9 @@ func NewClientMgr() (*ClientMgr, error) {
 		VPC:    vpcli,
 		SLB:    slbcli,
 		PVTZ:   pvtzcli,
+		ALB:    albcli,
+		SLS:    slscli,
+		CAS:    cascli,
 		Region: region,
 		stop:   make(<-chan struct{}, 1),
 	}
@@ -223,6 +257,27 @@ func RefreshToken(mgr *ClientMgr, token *Token) error {
 		return fmt.Errorf("init slb sts token config: %s", err.Error())
 	}
 
+	err = mgr.ALB.InitWithStsToken(
+		token.Region, token.AccessKey, token.AccessSecret, token.Token,
+	)
+	if err != nil {
+		return fmt.Errorf("init alb sts token config: %s", err.Error())
+	}
+
+	err = mgr.SLS.InitWithStsToken(
+		token.Region, token.AccessKey, token.AccessSecret, token.Token,
+	)
+	if err != nil {
+		return fmt.Errorf("init sls sts token config: %s", err.Error())
+	}
+
+	err = mgr.CAS.InitWithStsToken(
+		token.Region, token.AccessKey, token.AccessSecret, token.Token,
+	)
+	if err != nil {
+		return fmt.Errorf("init cas sts token config: %s", err.Error())
+	}
+
 	err = mgr.PVTZ.InitWithStsToken(
 		token.Region, token.AccessKey, token.AccessSecret, token.Token,
 	)
@@ -242,6 +297,9 @@ func setVPCEndpoint(mgr *ClientMgr) {
 	mgr.VPC.Network = "vpc"
 	mgr.SLB.Network = "vpc"
 	mgr.PVTZ.Network = "vpc"
+	mgr.ALB.Network = "vpc"
+	mgr.SLS.Network = "vpc"
+	mgr.CAS.Network = "vpc"
 }
 
 // Token base Token info

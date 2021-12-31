@@ -4,9 +4,11 @@ go 1.16
 
 require (
 	github.com/aliyun/alibaba-cloud-sdk-go v1.61.1240
+	github.com/eapache/channels v1.1.0
 	github.com/ghodss/yaml v1.0.0
 	github.com/go-cmd/cmd v1.2.1
 	github.com/go-logr/logr v0.4.0
+	github.com/google/go-cmp v0.5.5
 	github.com/mohae/deepcopy v0.0.0-20170603005431-491d3605edfb
 	github.com/onsi/ginkgo v1.16.4
 	github.com/onsi/gomega v1.15.0
@@ -28,6 +30,7 @@ require (
 	k8s.io/klog v1.0.0
 	k8s.io/klog/v2 v2.9.0
 	k8s.io/kubernetes v1.22.3
+	k8s.io/utils v0.0.0-20210819203725-bdf08cb9a70a
 	sigs.k8s.io/controller-runtime v0.10.3
 )
 

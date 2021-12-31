@@ -3,6 +3,10 @@ package util
 import (
 	"encoding/json"
 	"fmt"
+	"time"
+
+	"k8s.io/apimachinery/pkg/util/wait"
+
 	apiext "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -48,4 +52,31 @@ func ClusterVersionAtLeast(client *apiext.Clientset, min string) (bool, error) {
 	}
 
 	return runningVersion.AtLeast(least), nil
+}
+
+// MergeStringMap will merge multiple map[string]string into single one.
+// The merge is executed for maps argument in sequential order, if a key already exists, the value from previous map is kept.
+// e.g. MergeStringMap(map[string]string{"a": "1", "b": "2"}, map[string]string{"a": "3", "d": "4"}) == map[string]string{"a": "1", "b": "2", "d": "4"}
+func MergeStringMap(maps ...map[string]string) map[string]string {
+	ret := make(map[string]string)
+	for _, _map := range maps {
+		for k, v := range _map {
+			if _, ok := ret[k]; !ok {
+				ret[k] = v
+			}
+		}
+	}
+	return ret
+}
+func RetryImmediateOnError(interval time.Duration, timeout time.Duration, retryable func(error) bool, fn func() error) error {
+	return wait.PollImmediate(interval, timeout, func() (bool, error) {
+		err := fn()
+		if err != nil {
+			if retryable(err) {
+				return false, nil
+			}
+			return false, err
+		}
+		return true, nil
+	})
 }

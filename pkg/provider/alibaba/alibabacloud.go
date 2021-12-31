@@ -3,10 +3,13 @@ package alibaba
 import (
 	"fmt"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/alb"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/base"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/cas"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/ecs"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/pvtz"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/slb"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/sls"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/vpc"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/util/metric"
 	"k8s.io/klog"
@@ -33,6 +36,9 @@ func NewAlibabaCloud() prvd.Provider {
 		SLBProvider:  slb.NewLBProvider(mgr),
 		PVTZProvider: pvtz.NewPVTZProvider(mgr),
 		VPCProvider:  vpc.NewVPCProvider(mgr),
+		ALBProvider:  alb.NewALBProvider(mgr),
+		SLSProvider:  sls.NewSLSProvider(mgr),
+		CASProvider:  cas.NewCASProvider(mgr),
 	}
 }
 
@@ -43,5 +49,8 @@ type AlibabaCloud struct {
 	*pvtz.PVTZProvider
 	*vpc.VPCProvider
 	*slb.SLBProvider
+	*alb.ALBProvider
+	*sls.SLSProvider
+	*cas.CASProvider
 	prvd.IMetaData
 }

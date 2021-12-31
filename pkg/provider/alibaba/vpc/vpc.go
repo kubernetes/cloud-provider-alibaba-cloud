@@ -226,3 +226,36 @@ func (r *VPCProvider) DescribeEipAddresses(ctx context.Context, instanceType str
 	}
 	return ips, nil
 }
+
+func (r *VPCProvider) DescribeVSwitches(ctx context.Context, vpcID string) ([]vpc.VSwitch, error) {
+	req := vpc.CreateDescribeVSwitchesRequest()
+	req.VpcId = vpcID
+
+	var vSwitches []vpc.VSwitch
+	next := &util.Pagination{
+		PageNumber: 1,
+		PageSize:   10,
+	}
+
+	for {
+		req.PageSize = requests.NewInteger(next.PageSize)
+		req.PageNumber = requests.NewInteger(next.PageNumber)
+		resp, err := r.auth.VPC.DescribeVSwitches(req)
+		if err != nil {
+			return nil, err
+		}
+
+		vSwitches = append(vSwitches, resp.VSwitches.VSwitch...)
+
+		pageResult := &util.PaginationResult{
+			PageNumber: resp.PageNumber,
+			PageSize:   resp.PageSize,
+			TotalCount: resp.TotalCount,
+		}
+		next = pageResult.NextPage()
+		if next == nil {
+			break
+		}
+	}
+	return vSwitches, nil
+}
