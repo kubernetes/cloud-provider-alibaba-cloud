@@ -52,7 +52,7 @@ When you create an Ingress, an Albconfig object named default is automatically c
     ```bash
     kubectl -n kube-system get albconfig
     ```
-   output：
+   预期输出：
     ```bash
     NAME      AGE
     default   87m
@@ -274,6 +274,7 @@ Step 2: Configure an Ingress
              serviceName: coffee-svc
              servicePort: 80
    ```
+   The following table describes the parameters in the YAML template.
    <table class="table">
    <thead class="thead">
       <tr>
@@ -340,111 +341,111 @@ An Ingress is an API object that you can use to provide Layer 7 load balancing t
 Perform the following steps to create a simple Ingress with or without a domain name to forward requests.
 - Create a simple Ingress with a domain name.
     1. Use the following template to create a Deployment, a Service, and an Ingress. Requests to the domain name of the Ingress are forwarded to the Service.
-   ```
-   apiVersion: v1
-   kind: Service
-   metadata:
-     name: demo-service
-     namespace: default
-   spec:
-     ports:
-       - name: port1
-         port: 80
-         protocol: TCP
-         targetPort: 8080
-     selector:
-       app: demo
-     sessionAffinity: None
-     type: ClusterIP
-   
-   ---
-   apiVersion: apps/v1
-   kind: Deployment
-   metadata:
-     name: demo
-     namespace: default
-   spec:
-     replicas: 1
-     selector:
-       matchLabels:
-         app: demo
-     template:
-       metadata:
-         labels:
-           app: demo
-       spec:
-         containers:
-           - image: registry.cn-hangzhou.aliyuncs.com/alb-sample/cafe:v1
-             imagePullPolicy: IfNotPresent
-             name: demo
-             ports:
-               - containerPort: 8080
-                 protocol: TCP
-   ---
-   apiVersion: networking.k8s.io/v1beta1
-   kind: Ingress
-   metadata:
-     annotations:
-       alb.ingress.kubernetes.io/address-type: internet
-       alb.ingress.kubernetes.io/vswitch-ids: "vsw-2zeqgkyib34gw1fxs****,vsw-2zefv5qwao4przzlo****"
-       kubernetes.io/ingress.class: alb
-     name: demo
-     namespace: default
-   spec:
-     rules:
-       - host: demo.domain.ingress.top  # The domain name of the Ingress. 
-         http:
-           paths:
-             - backend:
-                 serviceName: demo-service
-                 servicePort: 80
-               path: /hello
-               pathType: ImplementationSpecific
-   ```
+        ```
+        apiVersion: v1
+           kind: Service
+           metadata:
+              name: demo-service
+              namespace: default
+           spec:
+              ports:
+                 - name: port1
+                   port: 80
+                   protocol: TCP
+                   targetPort: 8080
+              selector:
+                 app: demo
+              sessionAffinity: None
+              type: ClusterIP
+     
+           ---
+           apiVersion: apps/v1
+           kind: Deployment
+           metadata:
+              name: demo
+              namespace: default
+           spec:
+              replicas: 1
+              selector:
+                 matchLabels:
+                    app: demo
+              template:
+                 metadata:
+                    labels:
+                       app: demo
+                 spec:
+                    containers:
+                       - image: registry.cn-hangzhou.aliyuncs.com/alb-sample/cafe:v1
+                         imagePullPolicy: IfNotPresent
+                         name: demo
+                         ports:
+                            - containerPort: 8080
+                              protocol: TCP
+           ---
+           apiVersion: networking.k8s.io/v1beta1
+           kind: Ingress
+           metadata:
+              annotations:
+                 alb.ingress.kubernetes.io/address-type: internet
+                 alb.ingress.kubernetes.io/vswitch-ids: "vsw-2zeqgkyib34gw1fxs****,vsw-2zefv5qwao4przzlo****"
+                 kubernetes.io/ingress.class: alb
+              name: demo
+              namespace: default
+           spec:
+              rules:
+                 - host: demo.domain.ingress.top  # The domain name of the Ingress. 
+                   http:
+                      paths:
+                         - backend:
+                              serviceName: demo-service
+                              servicePort: 80
+                           path: /hello
+                           pathType: ImplementationSpecific
+        ```
     2. Run the following command to access the application by using the specified domain name.
 
        Replace ADDRESS with the address of the related ALB instance. You can obtain the address by running the kubectl get ing command.
-        ```bash
-        curl -H "host: demo.domain.ingress.top" <ADDRESS>/hello
-        ```
+       ```bash
+       curl -H "host: demo.domain.ingress.top" <ADDRESS>/hello
+       ```
        Expected output:
-        ```bash
-        {"hello":"coffee"}
-        ```
+       ```bash
+       {"hello":"coffee"}
+       ```
 
 - Create a simple Ingress without a domain name.
     1. Use the following template to create an Ingress:
-   ```yaml
-   apiVersion: networking.k8s.io/v1beta1
-   kind: Ingress
-   metadata:
-     annotations:
-       alb.ingress.kubernetes.io/address-type: internet
-       alb.ingress.kubernetes.io/vswitch-ids: "vsw-2zeqgkyib34gw1fxs****,vsw-2zefv5qwao4przzlo****"
-       kubernetes.io/ingress.class: alb
-     name: demo
-     namespace: default
-   spec:
-     rules:
-       - host: ""
-         http:
-           paths:
-             - backend:
-                 serviceName: demo-service
-                 servicePort: 80
-               path: /hello
-               pathType: ImplementationSpecific
-   ```
+        ```yaml
+        apiVersion: networking.k8s.io/v1beta1
+        kind: Ingress
+        metadata:
+          annotations:
+            alb.ingress.kubernetes.io/address-type: internet
+            alb.ingress.kubernetes.io/vswitch-ids: "vsw-2zeqgkyib34gw1fxs****,vsw-2zefv5qwao4przzlo****"
+            kubernetes.io/ingress.class: alb
+          name: demo
+          namespace: default
+        spec:
+          rules:
+            - host: ""
+              http:
+                paths:
+                  - backend:
+                      serviceName: demo-service
+                      servicePort: 80
+                    path: /hello
+                    pathType: ImplementationSpecific
+        ```
     2. Run the following command to access the application without using a domain name.
 
        Replace ADDRESS with the address of the related ALB instance. You can obtain the address by running the kubectl get ing command.
-        ```bash
-        curl <ADDRESS>/hello
-        ```
+       ```bash
+       curl <ADDRESS>/hello
+       ```
        Expected output:
-        ```bash
-        {"hello":"coffee"}
-        ```
+       ```bash
+       {"hello":"coffee"}
+       ```
 
 ### Forward requests based on URL paths
 
@@ -454,25 +455,25 @@ The following steps show how to configure different URL match policies.
 - Exact：exactly matches the URL path with case sensitivity.
 
     1. Use the following template to create an Ingress:
-   ```yaml
-   apiVersion: networking.k8s.io/v1beta1
-   kind: Ingress
-   metadata:
-     annotations:
-       alb.ingress.kubernetes.io/vswitch-ids: "vsw-2zeqgkyib34gw1fxs****,vsw-2zefv5qwao4przzlo****"
-       kubernetes.io/ingress.class: alb
-     name: demo-path
-     namespace: default
-   spec:
-     rules:
-       - http:
-           paths:
-           - path: /hello
-             backend:
-               serviceName: demo-service
-               servicePort: 80
-             pathType: Exact
-   ```
+        ```yaml
+        apiVersion: networking.k8s.io/v1beta1
+        kind: Ingress
+        metadata:
+          annotations:
+            alb.ingress.kubernetes.io/vswitch-ids: "vsw-2zeqgkyib34gw1fxs****,vsw-2zefv5qwao4przzlo****"
+            kubernetes.io/ingress.class: alb
+          name: demo-path
+          namespace: default
+        spec:
+          rules:
+            - http:
+                paths:
+                - path: /hello
+                  backend:
+                    serviceName: demo-service
+                    servicePort: 80
+                  pathType: Exact
+        ```
     2. Run the following command to access the application.
 
        Replace ADDRESS with the address of the related ALB instance. You can obtain the address by running the kubectl get ing command.
@@ -486,26 +487,26 @@ The following steps show how to configure different URL match policies.
 - ImplementationSpecific: the default match policy. For ALB Ingresses, the ImplementationSpecific policy has the same effect as the Exact policy. However, the controllers of Ingresses with the ImplementationSpecific policy and the controllers Ingresses with the Exact policy are implemented in different ways.
 
     1. Use the following template to create an Ingress:
-   ```yaml
-   apiVersion: networking.k8s.io/v1beta1
-   kind: Ingress
-   metadata:
-     annotations:
-       alb.ingress.kubernetes.io/address-type: internet
-       alb.ingress.kubernetes.io/vswitch-ids: "vsw-2zeqgkyib34gw1fxs****,vsw-2zefv5qwao4przzlo****"
-       kubernetes.io/ingress.class: alb
-     name: demo-path
-     namespace: default
-   spec:
-     rules:
-       - http:
-           paths:
-           - path: /hello
-             backend:
-               serviceName: demo-service
-               servicePort: 80
-             pathType: ImplementationSpecific
-   ```
+        ```yaml
+        apiVersion: networking.k8s.io/v1beta1
+        kind: Ingress
+        metadata:
+          annotations:
+            alb.ingress.kubernetes.io/address-type: internet
+            alb.ingress.kubernetes.io/vswitch-ids: "vsw-2zeqgkyib34gw1fxs****,vsw-2zefv5qwao4przzlo****"
+            kubernetes.io/ingress.class: alb
+          name: demo-path
+          namespace: default
+        spec:
+          rules:
+            - http:
+                paths:
+                - path: /hello
+                  backend:
+                    serviceName: demo-service
+                    servicePort: 80
+                  pathType: ImplementationSpecific
+        ```
     2. Run the following command to access the application.
 
        Replace ADDRESS with the address of the related ALB instance. You can obtain the address by running the kubectl get ing command.
@@ -519,26 +520,26 @@ The following steps show how to configure different URL match policies.
 - Prefix: matches based on a URL path prefix separated by forward slashes (/). The match is case-sensitive and performed on each element of the path.
 
     1. Use the following template to create an Ingress:
-   ```yaml
-   apiVersion: networking.k8s.io/v1beta1
-   kind: Ingress
-   metadata:
-     annotations:
-       alb.ingress.kubernetes.io/address-type: internet
-       alb.ingress.kubernetes.io/vswitch-ids: "vsw-2zeqgkyib34gw1fxs****,vsw-2zefv5qwao4przzlo****"
-       kubernetes.io/ingress.class: alb
-     name: demo-path-prefix
-     namespace: default
-   spec:
-     rules:
-       - http:
-           paths:
-           - path: /
-             backend:
-               serviceName: demo-service
-               servicePort: 80
-             pathType: Prefix
-   ```
+        ```yaml
+        apiVersion: networking.k8s.io/v1beta1
+        kind: Ingress
+        metadata:
+          annotations:
+            alb.ingress.kubernetes.io/address-type: internet
+            alb.ingress.kubernetes.io/vswitch-ids: "vsw-2zeqgkyib34gw1fxs****,vsw-2zefv5qwao4przzlo****"
+            kubernetes.io/ingress.class: alb
+          name: demo-path-prefix
+          namespace: default
+        spec:
+          rules:
+            - http:
+                paths:
+                - path: /
+                  backend:
+                    serviceName: demo-service
+                    servicePort: 80
+                  pathType: Prefix
+        ```
     2. Run the following command to access the application.
 
        Replace ADDRESS with the address of the related ALB instance. You can obtain the address by running the kubectl get ing command.
@@ -678,7 +679,7 @@ The following table describes the parameters in the YAML template.
 
 The ALB Ingress controller supports automatic certificate discovery. You must first create a certificate in the SSL Certificates console. Then, specify the domain name of the certificate in the Transport Layer Security (TLS) configurations of the Ingress. This way, the ALB Ingress controller can automatically match and discover the certificate based on the TLS configurations of the Ingress.
 
-1. Configure automatic certificate discovery
+1. Run the following openssl commands to create a certificate:
     ```bash
     openssl genrsa -out albtop-key.pem 4096
     openssl req -subj "/CN=demo.alb.ingress.top" -sha256  -new -key albtop-key.pem -out albtop.csr
@@ -952,3 +953,4 @@ metadata:
       </tr>
    </tbody>
 </table>
+
