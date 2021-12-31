@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/apimachinery/pkg/util/version"
+	"k8s.io/client-go/kubernetes"
 
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/ingress/reconcile/annotations"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/ingress/reconcile/store"
@@ -22,7 +22,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/record"
 	v1 "k8s.io/cloud-provider-alibaba-cloud/pkg/apis/alibabacloud/v1"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/context/shared"
@@ -53,27 +52,16 @@ const (
 func NewAlbConfigReconciler(mgr manager.Manager, ctx *shared.SharedContext) (*albconfigReconciler, error) {
 	config := Configuration{}
 	logger := ctrl.Log.WithName("controllers").WithName(albIngressControllerName)
-
+	logger.Info("start to register crds")
+	err := RegisterCRD(mgr.GetConfig())
+	if err != nil {
+		logger.Error(err, "register crd: %s", err.Error())
+		return nil, err
+	}
 	client, err := kubernetes.NewForConfig(mgr.GetConfig())
 	if err != nil {
 		return nil, err
 	}
-	// Check cluster version
-	serverVersion, err := client.Discovery().ServerVersion()
-	if err != nil {
-		return nil, fmt.Errorf("get server version: %s", err.Error())
-	}
-
-	runningVersion, err := version.ParseGeneric(serverVersion.String())
-	if err != nil {
-		return nil, fmt.Errorf("unexpected error parsing running Kubernetes version, %s", err.Error())
-	}
-
-	leastVersion, _ := version.ParseGeneric("v1.19.0")
-	if !runningVersion.AtLeast(leastVersion) {
-		logger.Info("kubernetes version should great then v1.19.0 to use ingress v1", "server version", serverVersion.GitVersion)
-	}
-
 	n := &albconfigReconciler{
 		cloud:            ctx.Provider(),
 		k8sClient:        mgr.GetClient(),

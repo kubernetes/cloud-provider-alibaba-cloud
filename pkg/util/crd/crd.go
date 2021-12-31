@@ -3,9 +3,10 @@ package crd
 import (
 	"context"
 	"fmt"
+	"time"
+
 	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/klog/klogr"
-	"time"
 
 	apiextv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	apiextcli "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
@@ -215,9 +216,9 @@ func (c *Client) validateCRD() error {
 		return fmt.Errorf("unexpected error parsing running Kubernetes version, %s", err.Error())
 	}
 
-	leastVersion, _ := version.ParseGeneric("v1.7.0")
+	leastVersion, _ := version.ParseGeneric("v1.19.0")
 	if !runningVersion.AtLeast(leastVersion) {
-		log.Info("kubernetes version should great then v1.7.0 to use crd", "server version", serverVersion.GitVersion)
+		log.Info("kubernetes version should great then v1.19.0 to use crd", "server version", serverVersion.GitVersion)
 	}
 
 	return nil

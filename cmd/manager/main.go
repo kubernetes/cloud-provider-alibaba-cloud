@@ -81,13 +81,6 @@ func main() {
 	}
 	ctx := shared.NewSharedContext(cloud)
 
-	log.Info("start to register crds")
-	err = controller.RegisterCRD(cfg)
-	if err != nil {
-		log.Error(err, "register crd: %s", err.Error())
-		os.Exit(1)
-	}
-
 	log.Info("Registering Components.")
 	if err := controller.AddToManager(mgr, ctx, ctrlCfg.ControllerCFG.Controllers); err != nil {
 		log.Error(err, "add controller: %s", err.Error())
