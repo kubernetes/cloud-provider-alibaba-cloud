@@ -10,7 +10,9 @@ rules:
       - services
       - secrets
       - endpoints
+      - configmaps
       - serviceaccounts
+      - pods
     verbs:
       - get
       - list
@@ -33,6 +35,7 @@ rules:
       - ""
     resources:
       - services/status
+      - pods/status
     verbs:
       - update
       - patch
@@ -61,6 +64,61 @@ rules:
       - update
       - create
       - delete
+  - apiGroups:
+      - apiextensions.k8s.io
+    resources:
+      - customresourcedefinitions
+    verbs:
+      - get
+      - update
+      - create
+      - delete
+  - apiGroups:
+      - networking.k8s.io
+    resources:
+      - ingresses
+    verbs:
+      - get
+      - list
+      - watch
+      - update
+      - create
+      - patch
+      - delete
+  - apiGroups:
+      - alibabacloud.com
+    resources:
+      - albconfigs
+    verbs:
+      - get
+      - list
+      - watch
+      - update
+      - create
+      - patch
+      - delete
+  - apiGroups:
+      - alibabacloud.com
+    resources:
+      - albconfigs/status
+    verbs:
+      - update
+      - patch
+  - apiGroups:
+      - networking.k8s.io
+    resources:
+      - ingresses/status
+    verbs:
+      - update
+      - patch
+  - apiGroups:
+      - discovery.k8s.io
+    resources:
+      - endpointslices
+    verbs:
+      - get
+      - list
+      - watch
 ---
 apiVersion: v1
 kind: ServiceAccount
@@ -80,6 +138,20 @@ subjects:
   - kind: ServiceAccount
     name: cloud-controller-manager
     namespace: kube-system
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cloud-config
+  namespace: kube-system
+data:
+  cloud-config.conf: |-
+    {
+        "Global": {
+            "accessKeyID": "$your-AccessKeyID-base64",
+            "accessKeySecret": "$your-AccessKeySecret-base64"
+        }
+    }
 ---
 apiVersion: apps/v1
 kind: DaemonSet
@@ -114,16 +186,15 @@ spec:
         node-role.kubernetes.io/master: ""
       containers:
         - command:
-          -  /cloud-controller-manager
+          - /cloud-controller-manager
           - --kubeconfig=/etc/kubernetes/cloud-controller-manager.conf
-          - --address=127.0.0.1
-          - --allow-untagged-cloud=true
-          - --leader-elect=true
-          - --cloud-provider=alicloud
-          - --use-service-account-credentials=true
           - --cloud-config=/etc/kubernetes/config/cloud-config.conf
-          - --configure-cloud-routes=false
-          - --allocate-node-cidrs=false
+          - --controllers=node,route,service,ingress
+          - --metrics-bind-addr=0
+          - --route-reconciliation-period=3m
+          - --configure-cloud-routes=true
+          #- --cluster-cidr=172.16.0.0/16
+          - --cluster-cidr=${CLUSTER_CIDR}
           image: registry.cn-hangzhou.aliyuncs.com/acs/cloud-controller-manager-amd64:${ImageVersion}
           livenessProbe:
             failureThreshold: 8
@@ -137,7 +208,11 @@ spec:
           name: cloud-controller-manager
           resources:
             requests:
-              cpu: 200m
+              cpu: 100m
+              memory: 200Mi
+            limits:
+              cpu: 1000m
+              memory: 2Gi
           volumeMounts:
             - mountPath: /etc/kubernetes/
               name: k8s

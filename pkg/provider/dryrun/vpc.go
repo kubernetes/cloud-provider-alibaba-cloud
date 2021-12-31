@@ -6,6 +6,8 @@ import (
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/model"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/base"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/vpc"
+
+	servicesvpc "github.com/aliyun/alibaba-cloud-sdk-go/services/vpc"
 )
 
 func NewDryRunVPC(
@@ -46,4 +48,8 @@ func (m *DryRunVPC) ListRouteTables(ctx context.Context, vpcID string) ([]string
 
 func (m *DryRunVPC) DescribeEipAddresses(ctx context.Context, instanceType string, instanceId string) ([]string, error) {
 	return m.vpc.DescribeEipAddresses(ctx, instanceType, instanceId)
+}
+
+func (m *DryRunVPC) DescribeVSwitches(ctx context.Context, vpcID string) ([]servicesvpc.VSwitch, error) {
+	return m.vpc.DescribeVSwitches(ctx, vpcID)
 }

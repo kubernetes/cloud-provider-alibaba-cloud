@@ -1,6 +1,6 @@
 
 ## Prerequisites
-- Version: kubernetes version > 1.7.2 is required.
+- Version: kubernetes version > 1.7.2 is required. If using alb ingress, kubernetes version > 1.19.0 is required
 - CloudNetwork: Only Alibaba Cloud VPC network is supported.
 
 
@@ -188,3 +188,6 @@ $ kubectl get svc
 NAME                TYPE           CLUSTER-IP    EXTERNAL-IP     PORT(S)        AGE
 nginx-example-svc   LoadBalancer   10.96.38.24   10.x.x.x        80:30536/TCP   38s
 ```
+
+## Try With Simple ALB Ingress Example
+run a sample ingress: [usage-alb.md](usage-alb.md)

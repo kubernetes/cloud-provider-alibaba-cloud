@@ -3,6 +3,10 @@ package main
 import (
 	"flag"
 	"fmt"
+	"net/http"
+	"os"
+	"runtime"
+
 	"github.com/spf13/pflag"
 	apiext "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
@@ -16,9 +20,6 @@ import (
 	"k8s.io/cloud-provider-alibaba-cloud/version"
 	"k8s.io/klog"
 	"k8s.io/klog/klogr"
-	"net/http"
-	"os"
-	"runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 	ctrl "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/manager"

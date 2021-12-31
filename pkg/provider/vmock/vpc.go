@@ -2,6 +2,7 @@ package vmock
 
 import (
 	"context"
+	servicesvpc "github.com/aliyun/alibaba-cloud-sdk-go/services/vpc"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/model"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/base"
 )
@@ -37,5 +38,8 @@ func (m *MockVPC) ListRouteTables(ctx context.Context, vpcID string) ([]string, 
 }
 
 func (m *MockVPC) DescribeEipAddresses(ctx context.Context, instanceType string, instanceId string) ([]string, error) {
+	panic("implement me")
+}
+func (m *MockVPC) DescribeVSwitches(ctx context.Context, vpcID string) ([]servicesvpc.VSwitch, error) {
 	panic("implement me")
 }
