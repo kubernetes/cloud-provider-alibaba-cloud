@@ -12,10 +12,18 @@ import (
 )
 
 func TestGetRouteTables(t *testing.T) {
-	meta := vmock.NewMockMetaData("vpc-xxx")
-	noRouteTableVPC := vmock.MockCloud{MockVPC: vmock.NewMockVPC(nil), IMetaData: meta}
-	singleRouteTableVPC := vmock.MockCloud{MockVPC: vmock.NewMockVPC(nil), IMetaData: meta}
-	multiRouteTableVPC := vmock.MockCloud{MockVPC: vmock.NewMockVPC(nil), IMetaData: meta}
+	noRouteTableVPC := vmock.MockCloud{
+		MockVPC:   vmock.NewMockVPC(nil),
+		IMetaData: vmock.NewMockMetaData("vpc-no-route-table"),
+	}
+	singleRouteTableVPC := vmock.MockCloud{
+		MockVPC:   vmock.NewMockVPC(nil),
+		IMetaData: vmock.NewMockMetaData("vpc-single-route-table"),
+	}
+	multiRouteTableVPC := vmock.MockCloud{
+		MockVPC:   vmock.NewMockVPC(nil),
+		IMetaData: vmock.NewMockMetaData("vpc-multi-route-table"),
+	}
 
 	globalCtx.CloudCFG.Global.RouteTableIDS = "table-xxx,table-yyy"
 	tables, err := getRouteTables(context.Background(), noRouteTableVPC)

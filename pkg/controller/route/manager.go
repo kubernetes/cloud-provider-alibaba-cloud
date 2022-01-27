@@ -70,6 +70,9 @@ func getRouteTables(ctx context.Context, providerIns prvd.Provider) ([]string, e
 		return nil, fmt.Errorf("alicloud: "+
 			"multiple route tables found by vpc id[%s], length(tables)=%d", ctrlCfg.CloudCFG.Global.VpcID, len(tables))
 	}
+	if len(tables) == 0 {
+		return nil, fmt.Errorf("alicloud: no route tables found by vpc id[%s]", ctrlCfg.CloudCFG.Global.VpcID)
+	}
 	return tables, nil
 }
 

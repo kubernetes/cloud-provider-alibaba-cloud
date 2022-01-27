@@ -2,7 +2,6 @@ package ecs
 
 import (
 	"context"
-	"encoding/base64"
 	"fmt"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/base"
 	"testing"
@@ -10,87 +9,22 @@ import (
 	"github.com/aliyun/alibaba-cloud-sdk-go/services/ecs"
 )
 
-func modifyUserData(client *ecs.Client, id, data string) error {
-	req := ecs.CreateModifyInstanceAttributeRequest()
-	req.InstanceId = id
-	req.UserData = data
-	_, err := client.ModifyInstanceAttribute(req)
-	return err
-}
-
-func GetUserData(client *ecs.Client, id string) (string, error) {
-	req := ecs.CreateDescribeUserDataRequest()
-	req.InstanceId = id
-	data, err := client.DescribeUserData(req)
-	if err != nil {
-		return "", fmt.Errorf("[ReplaceSystemDisk] find userdata %s: %s", id, err.Error())
+func NewECSClient() (*ecs.Client, error) {
+	var ak, sk, regionId string
+	if ak == "" || sk == "" {
+		return nil, fmt.Errorf("ak or sk is empty")
 	}
-	return data.UserData, nil
-}
-
-func TestUserData(t *testing.T) {
-	client, err := ecs.NewClientWithAccessKey(
-		"", "", "",
-	)
-	if err != nil {
-		t.Fatal(err)
-		return
-	}
-	id := "i-wz9faoi1xyw09w9r994i"
-	user, err := GetUserData(client, id)
-	if err != nil {
-		t.Fatal(err)
-		return
-	}
-	if user != "" {
-		data, err := base64.StdEncoding.DecodeString(user)
-		if err != nil {
-			t.Fatal(err)
-			return
-		}
-		t.Logf("Old UserData: [%s][%s]", user, data)
-	} else {
-		t.Logf("empty userdata")
-	}
-
-	err = modifyUserData(client, id, base64.StdEncoding.EncodeToString([]byte("exit 0;")))
-	if err != nil {
-		t.Fatal(err)
-		return
-	}
-	user, err = GetUserData(client, id)
-	if err != nil {
-		t.Fatal(err)
-		return
-	}
-	if user != "" {
-		data, err := base64.StdEncoding.DecodeString(user)
-		if err != nil {
-			t.Fatal(err)
-			return
-		}
-		t.Logf("New UserData: [%s][%s]", user, data)
-	} else {
-		t.Logf("empty userdata after modified")
-	}
+	return ecs.NewClientWithAccessKey(regionId, ak, sk)
 }
 
 func TestEcsProvider_ListInstances(t *testing.T) {
-	client, err := ecs.NewClientWithAccessKey(
-		"", "", "",
-	)
+	client, err := NewECSClient()
 	if err != nil {
-		t.Fatal(err)
+		t.Skip("fail to create ecs client, skip")
 		return
 	}
 	ids := []string{
-		"cn-hangzhou.i-bp10p8lib5ep9nu6chg",
-		"cn-shanghai.i-uf606juqu3a9tpk2fzj",
-		"cn-shanghai.i-uf606juqu3a9tpk2fzj",
-		"cn-shanghai.i-uf606juqu3a9tpk2fzj",
-		"cn-shanghai.i-uf658ihjgkfvrf6axff",
-		"cn-shanghai.i-uf61cwrwp6rs3tplf32",
-		"cn-shanghai.i-uf6jf9j3ltkgq49p1jy",
+		"cn-hangzhou.i-xxxx",
 	}
 
 	ecsProvider := NewEcsProvider(&base.ClientMgr{

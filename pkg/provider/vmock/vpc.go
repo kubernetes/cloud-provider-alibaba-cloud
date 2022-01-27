@@ -34,7 +34,15 @@ func (m *MockVPC) FindRoute(ctx context.Context, table, pvid, cidr string) (*mod
 }
 
 func (m *MockVPC) ListRouteTables(ctx context.Context, vpcID string) ([]string, error) {
-	panic("implement me")
+	switch vpcID {
+	case "vpc-no-route-table":
+		return []string{}, nil
+	case "vpc-single-route-table":
+		return []string{"route-table-1"}, nil
+	case "vpc-multi-route-table":
+		return []string{"route-table-1", "route-table-2"}, nil
+	}
+	return []string{}, nil
 }
 
 func (m *MockVPC) DescribeEipAddresses(ctx context.Context, instanceType string, instanceId string) ([]string, error) {
