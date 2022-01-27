@@ -2,7 +2,7 @@ package slb
 
 import (
 	"context"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/model"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/util"

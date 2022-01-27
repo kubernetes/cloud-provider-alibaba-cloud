@@ -11,7 +11,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/version"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 func NamespacedName(obj metav1.Object) types.NamespacedName {

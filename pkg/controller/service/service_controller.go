@@ -10,7 +10,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/util/metric"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	"os"
 	"strings"
 	"time"

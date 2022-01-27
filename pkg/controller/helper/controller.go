@@ -7,7 +7,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -17,10 +17,10 @@ import (
 
 func FindCondition(
 	conds []corev1.NodeCondition,
-	typ corev1.NodeConditionType,
+	conditionType corev1.NodeConditionType,
 ) (*corev1.NodeCondition, bool) {
 	for i := range conds {
-		if conds[i].Type == typ {
+		if conds[i].Type == conditionType {
 			return &conds[i], true
 		}
 	}

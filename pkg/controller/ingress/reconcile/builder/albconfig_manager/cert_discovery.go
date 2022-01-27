@@ -2,6 +2,7 @@ package albconfigmanager
 
 import (
 	"context"
+	"k8s.io/klog/v2"
 	"strings"
 	"sync"
 	"time"
@@ -18,7 +19,6 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -68,7 +68,7 @@ type casCertDiscovery struct {
 func (d *casCertDiscovery) Discover(ctx context.Context, tlsHosts []string) ([]string, error) {
 	domainsByCertID, err := d.loadDomainsForAllCertificates(ctx)
 	if err != nil {
-		logrus.Errorf("loadDomainsForAllCertificates err: %v", err)
+		klog.Errorf("loadDomainsForAllCertificates err: %v", err)
 		return nil, err
 	}
 	certIDs := sets.NewString()
@@ -105,14 +105,14 @@ func (d *casCertDiscovery) loadDomainsForAllCertificates(ctx context.Context) (m
 
 	certIDs, err := d.loadAllCertificateIDs(ctx)
 	if err != nil {
-		logrus.Errorf("loadAllCertificateIDs error: %v", err)
+		klog.Errorf("loadAllCertificateIDs error: %v", err)
 		return nil, err
 	}
 	domainsByCertID := make(map[string]sets.String, len(certIDs))
 	for _, certID := range certIDs {
 		certDomains, err := d.loadDomainsForCertificate(ctx, certID)
 		if err != nil {
-			logrus.Errorf("loadDomainsForCertificate error: %v", err)
+			klog.Errorf("loadDomainsForCertificate error: %v", err)
 			return nil, err
 		}
 		domainsByCertID[certID] = certDomains
@@ -144,7 +144,7 @@ func (d *casCertDiscovery) loadAllCertificateIDs(ctx context.Context) ([]string,
 			"action", DescribeSSLCertificateList)
 		resp, err := d.cloud.DescribeSSLCertificateList(ctx, req)
 		if err != nil {
-			logrus.Errorf("DescribeUserCertificateList error: %v", err)
+			klog.Errorf("DescribeUserCertificateList error: %v", err)
 			return nil, err
 		}
 		d.logger.Info("listed ssl certificate",
@@ -192,7 +192,7 @@ func (d *casCertDiscovery) loadDomainsForCertificate(ctx context.Context, certID
 		"action", DescribeSSLCertificatePublicKeyDetail)
 	resp, err := d.cloud.DescribeSSLCertificatePublicKeyDetail(ctx, req)
 	if err != nil {
-		logrus.Errorf("DescribeUserCertificateDetail error: %v", err)
+		klog.Errorf("DescribeUserCertificateDetail error: %v", err)
 		return nil, err
 	}
 	d.logger.Info("got ssl certificate",

@@ -17,7 +17,7 @@ import (
 	ctrlCfg "k8s.io/cloud-provider-alibaba-cloud/pkg/config"
 	prvd "k8s.io/cloud-provider-alibaba-cloud/pkg/provider"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/util"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 const (

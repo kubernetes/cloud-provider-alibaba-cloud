@@ -72,15 +72,15 @@ func (t *Queue) EnqueueSkippableTask(obj interface{}) {
 // enqueue enqueues ns/name of the given api object in the task queue.
 func (t *Queue) enqueue(obj interface{}, skippable bool) {
 	if t.IsShuttingDown() {
-		klog.ErrorS(nil, "queue has been shutdown, failed to enqueue", "key", obj)
+		klog.Errorf("queue has been shutdown, failed to enqueue. key: %+v", obj)
 		return
 	}
 
-	klog.V(3).InfoS("queuing", "item", obj)
+	klog.V(3).Infof("queuing, item: %+v", obj)
 	e := obj.(helper.Event)
 	key, err := t.fn(e.Obj)
 	if err != nil {
-		klog.ErrorS(err, "creating object key", "item", obj)
+		klog.Errorf("creating object key, item: %+v, error: %s", obj, err.Error())
 		return
 	}
 	t.queue.Add(Element{
@@ -111,9 +111,9 @@ func (t *Queue) worker() {
 		ts := time.Now().UnixNano()
 
 		item := key.(Element)
-		klog.V(3).InfoS("syncing", "key", item.Key)
+		klog.V(3).Infof("syncing: key: %s", item.Key)
 		if err := t.sync(key); err != nil {
-			klog.ErrorS(err, "requeuing", "key", item.Key)
+			klog.Errorf("requeuing: key: %s, error: %s", item.Key, err.Error())
 			t.queue.AddRateLimited(Element{
 				Key:   item.Key,
 				Event: item.Event,

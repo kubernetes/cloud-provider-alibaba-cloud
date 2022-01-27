@@ -2,7 +2,6 @@ package vmock
 
 import (
 	"context"
-
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/ingress/reconcile/tracking"
 
 	albsdk "github.com/aliyun/alibaba-cloud-sdk-go/services/alb"

@@ -14,7 +14,7 @@ import (
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/model"
 	prvd "k8s.io/cloud-provider-alibaba-cloud/pkg/provider"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/base"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 // IListener listener interface

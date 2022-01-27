@@ -4,7 +4,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	"reflect"
 	"strings"
 

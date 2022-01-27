@@ -158,7 +158,7 @@ check:
 
 
 
-check: fmt lint
+check: gofmt golangci-lint
 
 gofmt:
 	./hack/verify-gofmt.sh

@@ -3,6 +3,7 @@ package pvtz
 import (
 	"context"
 	"fmt"
+	"k8s.io/klog/v2/klogr"
 	"strings"
 
 	util_errors "k8s.io/apimachinery/pkg/util/errors"
@@ -13,7 +14,6 @@ import (
 	"github.com/aliyun/alibaba-cloud-sdk-go/sdk/requests"
 	"github.com/aliyun/alibaba-cloud-sdk-go/services/pvtz"
 	"github.com/pkg/errors"
-	log "github.com/sirupsen/logrus"
 )
 
 const (
@@ -106,7 +106,7 @@ func (p *PVTZProvider) SearchPVTZ(ctx context.Context, ep *model.PvtzEndpoint, e
 }
 
 func (p *PVTZProvider) UpdatePVTZ(ctx context.Context, ep *model.PvtzEndpoint) error {
-	rlog := log.WithFields(log.Fields{"endpointRr": ep.Rr, "endpointType": ep.Type})
+	rlog := klogr.New().WithValues("endpointRr", ep.Rr, "endpointType", ep.Type)
 	newValues := ep.Values
 	var oldValues []model.PvtzValue
 	err := p.record(context.TODO(), ep)
@@ -115,7 +115,7 @@ func (p *PVTZProvider) UpdatePVTZ(ctx context.Context, ep *model.PvtzEndpoint) e
 	} else {
 		oldValues = ep.Values
 	}
-	rlog.Infof("old endpoints %v, new endpoints %v", oldValues, newValues)
+	rlog.Info("updatePVTZ", "old endpoints", oldValues, "new endpoints", newValues)
 	valueToAdd := make([]string, 0)
 	for _, newVal := range newValues {
 		if !newVal.InVals(oldValues) {

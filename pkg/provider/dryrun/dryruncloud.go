@@ -1,7 +1,6 @@
 package dryrun
 
 import (
-	log "github.com/sirupsen/logrus"
 	prvd "k8s.io/cloud-provider-alibaba-cloud/pkg/provider"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/alb"
@@ -12,19 +11,20 @@ import (
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/slb"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/sls"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/vpc"
+	"k8s.io/klog/v2"
 )
 
 func NewDryRunCloud() prvd.Provider {
 	auth, err := base.NewClientMgr()
 	if err != nil {
-		log.Warnf("initialize alibaba cloud client auth: %s", err.Error())
+		klog.Warningf("initialize alibaba cloud client auth: %s", err.Error())
 	}
 	if auth == nil {
 		panic("auth should not be nil")
 	}
 	err = auth.Start(base.RefreshToken)
 	if err != nil {
-		log.Warnf("refresh token: %s", err.Error())
+		klog.Warningf("refresh token: %s", err.Error())
 	}
 
 	cloud := &alibaba.AlibabaCloud{

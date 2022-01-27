@@ -19,7 +19,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	albmodel "k8s.io/cloud-provider-alibaba-cloud/pkg/model/alb"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	albsdk "github.com/aliyun/alibaba-cloud-sdk-go/services/alb"
