@@ -1,9 +1,9 @@
 package pvtz
 
 import (
+	"k8s.io/klog/v2"
 	"reflect"
 
-	log "github.com/sirupsen/logrus"
 	v1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
@@ -32,7 +32,7 @@ func (e *EventHandlerWithClient) norm(o client.Object) []reconcile.Request {
 	case *v1.Pod:
 		request = append(request, e.normPod(o)...)
 	default:
-		log.Warnf("unknown object: %s, %v", reflect.TypeOf(o), o)
+		klog.Warningf("unknown object: %s, %v", reflect.TypeOf(o), o)
 	}
 	return request
 }

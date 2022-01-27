@@ -9,7 +9,7 @@ import (
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/helper"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/model"
 	prvd "k8s.io/cloud-provider-alibaba-cloud/pkg/provider"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	"net"
 	"strings"
 	"time"
@@ -69,6 +69,9 @@ func getRouteTables(ctx context.Context, providerIns prvd.Provider) ([]string, e
 	if len(tables) > 1 {
 		return nil, fmt.Errorf("alicloud: "+
 			"multiple route tables found by vpc id[%s], length(tables)=%d", ctrlCfg.CloudCFG.Global.VpcID, len(tables))
+	}
+	if len(tables) == 0 {
+		return nil, fmt.Errorf("alicloud: no route tables found by vpc id[%s]", ctrlCfg.CloudCFG.Global.VpcID)
 	}
 	return tables, nil
 }

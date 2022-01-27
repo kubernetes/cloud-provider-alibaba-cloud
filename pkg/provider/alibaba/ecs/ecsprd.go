@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/model"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	"strings"
 
 	v1 "k8s.io/api/core/v1"

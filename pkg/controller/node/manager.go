@@ -25,8 +25,7 @@ import (
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/helper"
 	prvd "k8s.io/cloud-provider-alibaba-cloud/pkg/provider"
 	"k8s.io/cloud-provider/api"
-	"k8s.io/cloud-provider/node/helpers"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"time"
 )
@@ -128,8 +127,8 @@ func nodeConditionReady(kclient client.Client, node *v1.Node) *v1.NodeCondition 
 	// In this case, process next node
 	var err error
 	for rep := 0; rep < RETRY_COUNT; rep++ {
-		_, ccondition := helpers.GetNodeCondition(&node.Status, v1.NodeReady)
-		if ccondition != nil {
+		ccondition, ok := helper.FindCondition(node.Status.Conditions, v1.NodeReady)
+		if ok {
 			return ccondition
 		}
 		err = kclient.Get(context.Background(), client.ObjectKey{Name: node.Name}, node)

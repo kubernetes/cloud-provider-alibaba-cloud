@@ -13,7 +13,7 @@ import (
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/ingress/reconcile/annotations"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/model/alb"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/model/alb/core"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	"github.com/pkg/errors"
 )

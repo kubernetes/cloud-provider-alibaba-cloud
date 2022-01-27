@@ -3,12 +3,12 @@ package pvtz
 import (
 	"context"
 	"fmt"
+	"k8s.io/klog/v2"
 	"net"
 	"strings"
 
 	cmap "github.com/orcaman/concurrent-map"
 	"github.com/pkg/errors"
-	log "github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	util_errors "k8s.io/apimachinery/pkg/util/errors"
@@ -54,7 +54,7 @@ func (a *Actuator) UpdateService(svc *corev1.Service) error {
 	for _, ep := range eps {
 		err := a.provider.UpdatePVTZ(context.TODO(), ep)
 		if err != nil {
-			log.Printf("update pvtz error %s", err.Error())
+			klog.Errorf("update pvtz error %s", err.Error())
 			errs = append(errs, err)
 		}
 	}
@@ -70,7 +70,7 @@ func (a *Actuator) DeleteService(svcName types.NamespacedName) error {
 				Rr: ep.Rr,
 			})
 			if err != nil {
-				log.Printf("Delete pvtz error %s", err.Error())
+				klog.Errorf("Delete pvtz error %s", err.Error())
 				errs = append(errs, err)
 			} else {
 				remains = append(remains, ep)
@@ -213,7 +213,7 @@ func (a *Actuator) desiredSRV(svc *corev1.Service) ([]*model.PvtzEndpoint, error
 			}
 		}
 		if targetPort == 0 {
-			log.Printf("unabled to get namedPort's int value for %s/%s, port %+v \n", svc.Namespace, svc.Name, servicePort)
+			klog.Errorf("unabled to get namedPort's int value for %s/%s, port %+v \n", svc.Namespace, svc.Name, servicePort)
 			continue
 		}
 		epb := epTemplate.DeepCopy()

@@ -5,7 +5,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/dryrun"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/util"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	"os"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sync"

@@ -158,10 +158,14 @@ check:
 
 
 
-check: fmt lint
+check: gofmt golangci-lint
 
 gofmt:
 	./hack/verify-gofmt.sh
 
 golangci-lint:
 	bash -c 'golangci-lint run'
+
+unit-test:
+	GO111MODULE=on go test -mod vendor -v -race -coverprofile=coverage.txt -covermode=atomic \
+		k8s.io/cloud-provider-alibaba-cloud/pkg/...

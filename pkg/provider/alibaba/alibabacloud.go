@@ -12,7 +12,7 @@ import (
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/sls"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/vpc"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/util/metric"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 func NewAlibabaCloud() prvd.Provider {

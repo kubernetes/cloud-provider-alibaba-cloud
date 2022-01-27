@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/util/version"
-	"k8s.io/klog/klogr"
+	"k8s.io/klog/v2/klogr"
 
 	apiextv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	apiextcli "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"

@@ -9,7 +9,7 @@ import (
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/helper"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/model"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/util/hash"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	"os"
 	"reflect"
 	"strings"
