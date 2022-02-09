@@ -131,7 +131,7 @@ func ResultEvent(client client.Client, status string, reason string) error {
 				klog.Infof("fire CloudControllerManagerPrecheckResult event fail: %s", err.Error())
 				return false, nil
 			}
-			klog.Infof("create event finished: %s", event.Reason)
+			klog.Infof("create event finished: %s, message: %s", event.Reason, event.Message)
 			return true, nil
 		},
 	)
