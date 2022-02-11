@@ -27,7 +27,7 @@ func TestEcsProvider_ListInstances(t *testing.T) {
 		"cn-hangzhou.i-xxxx",
 	}
 
-	ecsProvider := NewEcsProvider(&base.ClientMgr{
+	ecsProvider := NewECSProvider(&base.ClientMgr{
 		Meta: nil,
 		ECS:  client,
 		VPC:  nil,

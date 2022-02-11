@@ -21,19 +21,19 @@ const (
 	MaxNetworkInterfaceNum = 100
 )
 
-func NewEcsProvider(
+func NewECSProvider(
 	auth *base.ClientMgr,
-) *EcsProvider {
-	return &EcsProvider{auth: auth}
+) *ECSProvider {
+	return &ECSProvider{auth: auth}
 }
 
-var _ prvd.IInstance = &EcsProvider{}
+var _ prvd.IInstance = &ECSProvider{}
 
-type EcsProvider struct {
+type ECSProvider struct {
 	auth *base.ClientMgr
 }
 
-func (e *EcsProvider) ListInstances(ctx context.Context, ids []string) (map[string]*prvd.NodeAttribute, error) {
+func (e *ECSProvider) ListInstances(ctx context.Context, ids []string) (map[string]*prvd.NodeAttribute, error) {
 	nodeRegionMap := make(map[string][]string)
 	for _, id := range ids {
 		regionID, nodeID, err := util.NodeFromProviderID(id)
@@ -70,7 +70,7 @@ func (e *EcsProvider) ListInstances(ctx context.Context, ids []string) (map[stri
 	return mins, nil
 }
 
-func (e *EcsProvider) getInstances(ids []string, region string) ([]ecs.Instance, error) {
+func (e *ECSProvider) getInstances(ids []string, region string) ([]ecs.Instance, error) {
 	bids, err := json.Marshal(ids)
 	if err != nil {
 		return nil, fmt.Errorf("get instances error: %s", err.Error())
@@ -101,9 +101,7 @@ func (e *EcsProvider) getInstances(ids []string, region string) ([]ecs.Instance,
 	return ecsInstances, nil
 }
 
-func (e *EcsProvider) SetInstanceTags(
-	ctx context.Context, id string, tags map[string]string,
-) error {
+func (e *ECSProvider) SetInstanceTags(ctx context.Context, id string, tags map[string]string) error {
 	var mtag []ecs.AddTagsTag
 	for k, v := range tags {
 		mtag = append(mtag, ecs.AddTagsTag{Key: k, Value: v})
@@ -117,7 +115,7 @@ func (e *EcsProvider) SetInstanceTags(
 	return err
 }
 
-func (e *EcsProvider) DescribeNetworkInterfaces(vpcId string, ips []string, ipVersionType model.AddressIPVersionType) (map[string]string, error) {
+func (e *ECSProvider) DescribeNetworkInterfaces(vpcId string, ips []string, ipVersionType model.AddressIPVersionType) (map[string]string, error) {
 	result := make(map[string]string)
 
 	for begin := 0; begin < len(ips); begin += MaxNetworkInterfaceNum {
@@ -204,4 +202,15 @@ func findAddress(instance *ecs.Instance) []v1.NodeAddress {
 	}
 
 	return addrs
+}
+
+func (e *ECSProvider) DeleteInstance(ctx context.Context, id string) error {
+	req := ecs.CreateDeleteInstanceRequest()
+	req.InstanceId = id
+	_, err := e.auth.ECS.DeleteInstance(req)
+	if err != nil {
+		klog.Errorf("calling DeleteInstance: region=%s, instanceID=%s, message=[%s].", req.RegionId, id, err.Error())
+		return err
+	}
+	return nil
 }

@@ -29,7 +29,7 @@ func NewDryRunCloud() prvd.Provider {
 
 	cloud := &alibaba.AlibabaCloud{
 		IMetaData:    auth.Meta,
-		EcsProvider:  ecs.NewEcsProvider(auth),
+		ECSProvider:  ecs.NewECSProvider(auth),
 		SLBProvider:  slb.NewLBProvider(auth),
 		PVTZProvider: pvtz.NewPVTZProvider(auth),
 		VPCProvider:  vpc.NewVPCProvider(auth),
@@ -40,7 +40,7 @@ func NewDryRunCloud() prvd.Provider {
 
 	return &DryRunCloud{
 		IMetaData:  auth.Meta,
-		DryRunECS:  NewDryRunECS(auth, cloud.EcsProvider),
+		DryRunECS:  NewDryRunECS(auth, cloud.ECSProvider),
 		DryRunPVTZ: NewDryRunPVTZ(auth, cloud.PVTZProvider),
 		DryRunVPC:  NewDryRunVPC(auth, cloud.VPCProvider),
 		DryRunSLB:  NewDryRunSLB(auth, cloud.SLBProvider),

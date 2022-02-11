@@ -192,6 +192,61 @@ func (p SLBProvider) DescribeTags(ctx context.Context, lbId string) ([]model.Tag
 	return tags, nil
 }
 
+// UntagResources used for e2etest
+func (p SLBProvider) UntagResources(ctx context.Context, lbId string, tagKey *[]string) error {
+	req := slb.CreateUntagResourcesRequest()
+	req.ResourceId = &[]string{lbId}
+	req.ResourceType = "instance"
+	req.TagKey = tagKey
+	_, err := p.auth.SLB.UntagResources(req)
+	return err
+}
+
+// DescribeAvailableResource used for e2etest
+func (p SLBProvider) DescribeAvailableResource(ctx context.Context, addressType, AddressIPVersion string) ([]slb.AvailableResource, error) {
+	req := slb.CreateDescribeAvailableResourceRequest()
+	req.AddressType = addressType
+	req.AddressIPVersion = AddressIPVersion
+	resp, err := p.auth.SLB.DescribeAvailableResource(req)
+	if err != nil {
+		return nil, err
+	}
+	return resp.AvailableResources.AvailableResource, nil
+}
+
+// CreateAccessControlList used for e2etest
+func (p SLBProvider) CreateAccessControlList(ctx context.Context, aclName string) (string, error) {
+	req := slb.CreateCreateAccessControlListRequest()
+	req.AclName = aclName
+	resp, err := p.auth.SLB.CreateAccessControlList(req)
+	if err != nil {
+		return "", err
+	}
+	return resp.AclId, nil
+}
+
+// DeleteAccessControlList used for e2etest
+func (p SLBProvider) DeleteAccessControlList(ctx context.Context, aclId string) error {
+	req := slb.CreateDeleteAccessControlListRequest()
+	req.AclId = aclId
+	_, err := p.auth.SLB.DeleteAccessControlList(req)
+	return err
+}
+
+// DescribeServerCertificates used for e2etest
+func (p SLBProvider) DescribeServerCertificates(ctx context.Context) ([]string, error) {
+	req := slb.CreateDescribeServerCertificatesRequest()
+	resp, err := p.auth.SLB.DescribeServerCertificates(req)
+	if err != nil {
+		return nil, err
+	}
+	var certs []string
+	for _, cert := range resp.ServerCertificates.ServerCertificate {
+		certs = append(certs, cert.ServerCertificateId)
+	}
+	return certs, nil
+}
+
 func setRequest(request *slb.CreateLoadBalancerRequest, mdl *model.LoadBalancer) {
 	if mdl.LoadBalancerAttribute.AddressType != "" {
 		request.AddressType = string(mdl.LoadBalancerAttribute.AddressType)

@@ -3,6 +3,9 @@ module k8s.io/cloud-provider-alibaba-cloud
 go 1.17
 
 require (
+	github.com/alibabacloud-go/cs-20151215/v2 v2.4.5
+	github.com/alibabacloud-go/darabonba-openapi v0.1.10
+	github.com/alibabacloud-go/tea v1.1.17
 	github.com/aliyun/alibaba-cloud-sdk-go v1.61.1240
 	github.com/eapache/channels v1.1.0
 	github.com/ghodss/yaml v1.0.0

@@ -188,7 +188,7 @@ func (m *ModelApplier) applyVGroups(reqCtx *RequestContext, local *model.LoadBal
 
 func (m *ModelApplier) applyListeners(reqCtx *RequestContext, local *model.LoadBalancer, remote *model.LoadBalancer) error {
 	if local.LoadBalancerAttribute.IsUserManaged {
-		if reqCtx.Anno.isForceOverride() {
+		if !reqCtx.Anno.isForceOverride() {
 			reqCtx.Log.Info("listener override is false, skip reconcile listeners")
 			return nil
 		}

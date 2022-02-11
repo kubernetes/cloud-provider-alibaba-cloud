@@ -20,6 +20,24 @@ github.com/Azure/go-autorest/logger
 # github.com/Azure/go-autorest/tracing v0.6.0
 ## explicit; go 1.12
 github.com/Azure/go-autorest/tracing
+# github.com/alibabacloud-go/cs-20151215/v2 v2.4.5
+## explicit
+github.com/alibabacloud-go/cs-20151215/v2/client
+# github.com/alibabacloud-go/darabonba-openapi v0.1.10
+## explicit
+github.com/alibabacloud-go/darabonba-openapi/client
+# github.com/alibabacloud-go/debug v0.0.0-20190504072949-9472017b5c68
+github.com/alibabacloud-go/debug/debug
+# github.com/alibabacloud-go/endpoint-util v1.1.0
+github.com/alibabacloud-go/endpoint-util/service
+# github.com/alibabacloud-go/openapi-util v0.0.9
+github.com/alibabacloud-go/openapi-util/service
+# github.com/alibabacloud-go/tea v1.1.17
+## explicit
+github.com/alibabacloud-go/tea/tea
+github.com/alibabacloud-go/tea/utils
+# github.com/alibabacloud-go/tea-utils v1.3.9
+github.com/alibabacloud-go/tea-utils/service
 # github.com/aliyun/alibaba-cloud-sdk-go v1.61.1240
 ## explicit; go 1.13
 github.com/aliyun/alibaba-cloud-sdk-go/sdk
@@ -35,10 +53,16 @@ github.com/aliyun/alibaba-cloud-sdk-go/sdk/utils
 github.com/aliyun/alibaba-cloud-sdk-go/services/alb
 github.com/aliyun/alibaba-cloud-sdk-go/services/cas
 github.com/aliyun/alibaba-cloud-sdk-go/services/ecs
+github.com/aliyun/alibaba-cloud-sdk-go/services/ess
 github.com/aliyun/alibaba-cloud-sdk-go/services/pvtz
 github.com/aliyun/alibaba-cloud-sdk-go/services/slb
 github.com/aliyun/alibaba-cloud-sdk-go/services/sls
 github.com/aliyun/alibaba-cloud-sdk-go/services/vpc
+# github.com/aliyun/credentials-go v1.1.2
+github.com/aliyun/credentials-go/credentials
+github.com/aliyun/credentials-go/credentials/request
+github.com/aliyun/credentials-go/credentials/response
+github.com/aliyun/credentials-go/credentials/utils
 # github.com/beorn7/perks v1.0.1
 ## explicit; go 1.11
 github.com/beorn7/perks/quantile

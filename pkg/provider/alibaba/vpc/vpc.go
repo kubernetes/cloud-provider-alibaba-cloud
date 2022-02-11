@@ -227,16 +227,15 @@ func (r *VPCProvider) DescribeEipAddresses(ctx context.Context, instanceType str
 	return ips, nil
 }
 
+// DescribeVSwitches used for e2etest
 func (r *VPCProvider) DescribeVSwitches(ctx context.Context, vpcID string) ([]vpc.VSwitch, error) {
 	req := vpc.CreateDescribeVSwitchesRequest()
 	req.VpcId = vpcID
-
 	var vSwitches []vpc.VSwitch
 	next := &util.Pagination{
 		PageNumber: 1,
 		PageSize:   10,
 	}
-
 	for {
 		req.PageSize = requests.NewInteger(next.PageSize)
 		req.PageNumber = requests.NewInteger(next.PageNumber)
@@ -244,9 +243,7 @@ func (r *VPCProvider) DescribeVSwitches(ctx context.Context, vpcID string) ([]vp
 		if err != nil {
 			return nil, err
 		}
-
 		vSwitches = append(vSwitches, resp.VSwitches.VSwitch...)
-
 		pageResult := &util.PaginationResult{
 			PageNumber: resp.PageNumber,
 			PageSize:   resp.PageSize,
@@ -258,4 +255,34 @@ func (r *VPCProvider) DescribeVSwitches(ctx context.Context, vpcID string) ([]vp
 		}
 	}
 	return vSwitches, nil
+}
+
+// CreateRouteTable used for e2etest
+func (r *VPCProvider) CreateRouteTable(ctx context.Context, vpcId string, name string) (*vpc.CreateRouteTableResponse, error) {
+	req := vpc.CreateCreateRouteTableRequest()
+	req.VpcId = vpcId
+	req.RouteTableName = name
+	return r.auth.VPC.CreateRouteTable(req)
+}
+
+// CreateRouteTable used for e2etest
+func (r *VPCProvider) DeleteRouteTable(ctx context.Context, routeTableId string) (*vpc.DeleteRouteTableResponse, error) {
+	req := vpc.CreateDeleteRouteTableRequest()
+	req.RouteTableId = routeTableId
+	return r.auth.VPC.DeleteRouteTable(req)
+}
+
+// DescribeRouteTableList used for e2etest
+func (r *VPCProvider) DescribeRouteTableList(ctx context.Context, vpcId string) ([]string, error) {
+	req := vpc.CreateDescribeRouteTableListRequest()
+	req.VpcId = vpcId
+	resp, err := r.auth.VPC.DescribeRouteTableList(req)
+	if err != nil {
+		return nil, err
+	}
+	var rtIds []string
+	for _, rt := range resp.RouterTableList.RouterTableListType {
+		rtIds = append(rtIds, rt.RouteTableId)
+	}
+	return rtIds, nil
 }

@@ -1,9 +1,15 @@
 package config
 
 import (
+	"flag"
 	"fmt"
 	"github.com/spf13/pflag"
+	apiext "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/helper"
 	"k8s.io/cloud-provider/config"
+	"k8s.io/klog/v2"
+	"os"
+	sigConfig "sigs.k8s.io/controller-runtime/pkg/client/config"
 	"time"
 )
 
@@ -34,12 +40,14 @@ const (
 	defaultNetwork                   = "vpc"
 )
 
-var ControllerCFG = &ControllerConfig{}
+var ControllerCFG = &ControllerConfig{
+	CloudConfig: CloudCFG,
+}
 
 // Flag stores the configuration for global usage
 type ControllerConfig struct {
 	config.KubeCloudSharedConfiguration
-	CloudConfig                    string
+	CloudConfigPath                string
 	Controllers                    []string
 	FeatureGates                   string
 	ServiceMaxConcurrentReconciles int
@@ -48,12 +56,13 @@ type ControllerConfig struct {
 	NetWork                        string
 
 	RuntimeConfig RuntimeConfig
+	CloudConfig   *CloudConfig
 }
 
 func (cfg *ControllerConfig) BindFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&cfg.CloudProvider.Name, flagCloudProvider, defaultCloudProvider, "The provider for cloud services. Empty string for no provider.")
 	fs.StringVar(&cfg.ClusterName, flagClusterName, defaultClusterName, "The instance prefix for the cluster.")
-	fs.StringVar(&cfg.CloudConfig, flagCloudConfig, defaultCloudConfig,
+	fs.StringVar(&cfg.CloudConfigPath, flagCloudConfig, defaultCloudConfig,
 		"The path to the cloud provider configuration file. Empty string for no configuration file.")
 	fs.StringSliceVar(&cfg.Controllers, flagControllers, []string{"node", "route", "service"}, "A list of controllers to enable.")
 	fs.BoolVar(&cfg.UseServiceAccountCredentials, flagUseServiceAccountCredentials, false, "If true, use individual service account credentials for each controller.")
@@ -76,7 +85,7 @@ func (cfg *ControllerConfig) BindFlags(fs *pflag.FlagSet) {
 
 // Validate the controller configuration
 func (cfg *ControllerConfig) Validate() error {
-	if cfg.CloudConfig == "" {
+	if cfg.CloudConfigPath == "" {
 		return fmt.Errorf("cloud config cannot be empty")
 	}
 
@@ -86,6 +95,33 @@ func (cfg *ControllerConfig) Validate() error {
 
 	if cfg.RouteReconciliationPeriod.Duration < 1*time.Minute {
 		cfg.RouteReconciliationPeriod.Duration = 1 * time.Minute
+	}
+	return nil
+}
+
+func (cfg *ControllerConfig) LoadControllerConfig() error {
+	klog.InitFlags(nil)
+
+	fs := pflag.NewFlagSet("", pflag.ExitOnError)
+	fs.AddGoFlagSet(flag.CommandLine)
+	cfg.BindFlags(fs)
+
+	if err := fs.Parse(os.Args); err != nil {
+		return err
+	}
+
+	if err := cfg.Validate(); err != nil {
+		return err
+	}
+
+	if err := cfg.CloudConfig.LoadCloudCFG(); err != nil {
+		return fmt.Errorf("load cloud config error: %s", err.Error())
+	}
+	cfg.CloudConfig.PrintInfo()
+
+	if cfg.CloudConfig.Global.FeatureGates != "" {
+		apiClient := apiext.NewForConfigOrDie(sigConfig.GetConfigOrDie())
+		return helper.BindFeatureGates(apiClient, cfg.CloudConfig.Global.FeatureGates)
 	}
 	return nil
 }

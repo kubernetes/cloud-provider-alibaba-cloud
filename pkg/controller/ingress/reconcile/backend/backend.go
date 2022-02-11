@@ -11,8 +11,8 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/helper"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/ingress/reconcile/store"
+	svchelper "k8s.io/cloud-provider-alibaba-cloud/pkg/controller/service"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/model/alb"
 	prvd "k8s.io/cloud-provider-alibaba-cloud/pkg/provider"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -33,7 +33,8 @@ type Manager struct {
 }
 
 func (mgr *Manager) BuildServicePortSDKBackends(ctx context.Context, svcKey types.NamespacedName, port intstr.IntOrString) ([]alb.BackendItem, bool, error) {
-	svc, err := helper.GetService(mgr.k8sClient, svcKey)
+	svc := &v1.Service{}
+	err := mgr.k8sClient.Get(context.Background(), svcKey, svc)
 	if err != nil {
 		return nil, false, err
 	}
@@ -44,22 +45,22 @@ func (mgr *Manager) BuildServicePortSDKBackends(ctx context.Context, svcKey type
 		containsPotentialReadyEndpoints bool
 	)
 
-	policy, err := helper.GetServiceTrafficPolicy(svc)
+	policy, err := svchelper.GetServiceTrafficPolicy(svc)
 	if err != nil {
 		return nil, false, err
 	}
 	switch policy {
-	case helper.ENITrafficPolicy:
+	case svchelper.ENITrafficPolicy:
 		endpoints, containsPotentialReadyEndpoints, err = mgr.ResolveENIEndpoints(ctx, util.NamespacedName(svc), port)
 		if err != nil {
 			return modelBackends, containsPotentialReadyEndpoints, err
 		}
-	case helper.LocalTrafficPolicy:
+	case svchelper.LocalTrafficPolicy:
 		endpoints, containsPotentialReadyEndpoints, err = mgr.ResolveLocalEndpoints(ctx, util.NamespacedName(svc), port)
 		if err != nil {
 			return modelBackends, containsPotentialReadyEndpoints, err
 		}
-	case helper.ClusterTrafficPolicy:
+	case svchelper.ClusterTrafficPolicy:
 		endpoints, containsPotentialReadyEndpoints, err = mgr.ResolveClusterEndpoints(ctx, util.NamespacedName(svc), port)
 		if err != nil {
 			return modelBackends, containsPotentialReadyEndpoints, err

@@ -29,7 +29,7 @@ func findNodeByNodeName(nodes []v1.Node, nodeName string) *v1.Node {
 // providerID
 // 1) the id of the instance in the alicloud API. Use '.' to separate providerID which looks like 'cn-hangzhou.i-v98dklsmnxkkgiiil7'. The format of "REGION.NODEID"
 // 2) the id for an instance in the kubernetes API, which has 'alicloud://' prefix. e.g. alicloud://cn-hangzhou.i-v98dklsmnxkkgiiil7
-func nodeFromProviderID(providerID string) (string, string, error) {
+func NodeFromProviderID(providerID string) (string, string, error) {
 	if strings.HasPrefix(providerID, "alicloud://") {
 		k8sName := strings.Split(providerID, "://")
 		if len(k8sName) < 2 {
@@ -72,6 +72,10 @@ func isMasterNode(node *v1.Node) bool {
 
 func isLocalModeService(svc *v1.Service) bool {
 	return svc.Spec.ExternalTrafficPolicy == v1.ServiceExternalTrafficPolicyTypeLocal
+}
+
+func isClusterIPService(svc *v1.Service) bool {
+	return svc.Spec.Type == v1.ServiceTypeClusterIP
 }
 
 func isENIBackendType(svc *v1.Service) bool {
@@ -275,3 +279,18 @@ func LogEndpointSliceList(esList []discovery.EndpointSlice) string {
 
 	return strings.Join(epAddrList, ",")
 }
+
+func GetServiceTrafficPolicy(svc *v1.Service) (TrafficPolicy, error) {
+	if isENIBackendType(svc) {
+		return ENITrafficPolicy, nil
+	}
+	if isClusterIPService(svc) {
+		return "", fmt.Errorf("cluster service type just support eni mode for alb ingress")
+	}
+	if isLocalModeService(svc) {
+		return LocalTrafficPolicy, nil
+	}
+	return ClusterTrafficPolicy, nil
+}
+
+// vgroup
