@@ -9,6 +9,11 @@ import (
 
 var CloudCFG = &CloudConfig{}
 
+func init() {
+	CloudCFG.AccessKeyID = os.Getenv("ACCESS_KEY_ID")
+	CloudCFG.AccessKeySecret = os.Getenv("ACCESS_KEY_SECRET")
+}
+
 // CloudConfig wraps the settings for the Alibaba Cloud provider.
 type CloudConfig struct {
 	Global struct {
