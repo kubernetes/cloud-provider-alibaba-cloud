@@ -132,6 +132,7 @@ func loadBalancerAttrEqual(f *Framework, anno *service.AnnotationRequest, svc *v
 		}
 	}
 	if paymentType := anno.Get(service.ChargeType); paymentType != "" {
+		klog.Infof("in, chargeType: svc %s, lb %s", paymentType, lb.InternetChargeType)
 		if string(lb.InternetChargeType) != paymentType {
 			return fmt.Errorf("expected slb payment %s, got %s", paymentType, lb.InternetChargeType)
 		}
@@ -877,8 +878,8 @@ func isBackendEqual(client *client.KubeClient, reqCtx *service.RequestContext, v
 			}
 		}
 		if !found {
-			return false, fmt.Errorf("mode %s expected vgroup [%s] has backend %s, got nil, backends [%s]",
-				policy, vg.VGroupId, l.ServerIp, vg.BackendInfo())
+			return false, fmt.Errorf("mode %s expected vgroup [%s] has backend [%+v], got nil, backends [%s]",
+				policy, vg.VGroupId, l, vg.BackendInfo())
 		}
 	}
 	return true, nil

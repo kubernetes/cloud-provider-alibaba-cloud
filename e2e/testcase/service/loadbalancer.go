@@ -277,7 +277,7 @@ func RunLoadBalancerTestCases(f *framework.Framework) {
 				gomega.Expect(err).To(gomega.BeNil())
 
 				newSvc := oldSvc.DeepCopy()
-				newSvc.Annotations[service.Annotation(service.Bandwidth)] = "100"
+				newSvc.Annotations[service.Annotation(service.Bandwidth)] = "20"
 				newSvc, err = f.Client.KubeClient.PatchService(oldSvc, newSvc)
 				gomega.Expect(err).To(gomega.BeNil())
 
@@ -312,7 +312,8 @@ func RunLoadBalancerTestCases(f *framework.Framework) {
 				gomega.Expect(err).To(gomega.BeNil())
 
 				err = f.ExpectLoadBalancerEqual(newSvc)
-				gomega.Expect(err).To(gomega.BeNil())
+				// paybytraffic are effective the next day
+				gomega.Expect(err).NotTo(gomega.BeNil())
 			})
 
 			ginkgo.It("charge-type: paybybandwidth; address-type: intranet", func() {
