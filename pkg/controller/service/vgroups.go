@@ -1,12 +1,14 @@
 package service
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	discovery "k8s.io/api/discovery/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/klog/v2"
 	"strconv"
 	"strings"
 
@@ -16,7 +18,6 @@ import (
 	prvd "k8s.io/cloud-provider-alibaba-cloud/pkg/provider"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/base"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/util"
-	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -161,7 +162,7 @@ func (mgr *VGroupManager) DeleteVServerGroup(reqCtx *RequestContext, vGroupId st
 }
 
 func (mgr *VGroupManager) UpdateVServerGroup(reqCtx *RequestContext, local, remote model.VServerGroup) error {
-	add, del, update := diff(reqCtx, remote, local)
+	add, del, update := diff(remote, local)
 	if len(add) == 0 && len(del) == 0 && len(update) == 0 {
 		reqCtx.Log.Info(fmt.Sprintf("update vgroup [%s]: no change, skip reconcile", remote.VGroupId))
 	} else {
@@ -185,7 +186,35 @@ func (mgr *VGroupManager) UpdateVServerGroup(reqCtx *RequestContext, local, remo
 }
 
 func (mgr *VGroupManager) DescribeVServerGroups(reqCtx *RequestContext, lbId string) ([]model.VServerGroup, error) {
-	return mgr.cloud.DescribeVServerGroups(reqCtx.Ctx, lbId)
+	vgs, err := mgr.cloud.DescribeVServerGroups(reqCtx.Ctx, lbId)
+	if err != nil {
+		return vgs, err
+	}
+
+	reusedVgIDs, err := getVGroupIDs(reqCtx.Anno.Get(VGroupPort))
+	if err != nil {
+		return vgs, err
+	}
+
+	for i, vg := range vgs {
+		if isVGroupManagedByMyService(vg, reqCtx.Service) || isReusedVGroup(reusedVgIDs, vg.VGroupId) {
+			vs, err := mgr.cloud.DescribeVServerGroupAttribute(context.TODO(), vg.VGroupId)
+			if err != nil {
+				return vgs, err
+			}
+			for idx, backend := range vs.Backends {
+				if !isBackendManagedByMyService(reqCtx, backend) {
+					vs.Backends[idx].IsUserManaged = true
+					// if backend is managed by user, vServerGroup is also managed by user.
+					vgs[i].IsUserManaged = true
+					reqCtx.Log.Info(fmt.Sprintf("vgroup %s backend is managed by user: [%+v]",
+						vg.VGroupName, vs.Backends[idx]))
+				}
+			}
+			vgs[i].Backends = vs.Backends
+		}
+	}
+	return vgs, nil
 }
 
 func (mgr *VGroupManager) BatchAddVServerGroupBackendServers(reqCtx *RequestContext, vGroup model.VServerGroup, add interface{}) error {
@@ -224,7 +253,7 @@ func (mgr *VGroupManager) BatchUpdateVServerGroupBackendServers(reqCtx *RequestC
 		})
 }
 
-func diff(reqCtx *RequestContext, remote, local model.VServerGroup) (
+func diff(remote, local model.VServerGroup) (
 	[]model.BackendAttribute, []model.BackendAttribute, []model.BackendAttribute) {
 
 	var (
@@ -234,7 +263,7 @@ func diff(reqCtx *RequestContext, remote, local model.VServerGroup) (
 	)
 
 	for _, r := range remote.Backends {
-		if !isBackendManagedByMyService(reqCtx, r, local.VGroupName) {
+		if r.IsUserManaged {
 			continue
 		}
 		found := false
@@ -303,15 +332,9 @@ func diff(reqCtx *RequestContext, remote, local model.VServerGroup) (
 	return addition, deletions, updates
 }
 
-func isBackendManagedByMyService(reqCtx *RequestContext, remoteBackend model.BackendAttribute, localVGroupName string) bool {
-	if localVGroupName != "" {
-		return remoteBackend.Description == localVGroupName
-	}
-
+func isBackendManagedByMyService(reqCtx *RequestContext, remoteBackend model.BackendAttribute) bool {
 	namedKey, err := model.LoadVGroupNamedKey(remoteBackend.Description)
 	if err != nil {
-		reqCtx.Log.V(5).Info(fmt.Sprintf("warning: %s description %s which is managed by user, skip delete",
-			remoteBackend.ServerId, remoteBackend.Description))
 		return false
 	}
 
@@ -328,6 +351,15 @@ func isVGroupManagedByMyService(remote model.VServerGroup, service *v1.Service) 
 	return remote.NamedKey.ServiceName == service.Name &&
 		remote.NamedKey.Namespace == service.Namespace &&
 		remote.NamedKey.CID == base.CLUSTER_ID
+}
+
+func isReusedVGroup(reusedVgIDs []string, vGroupId string) bool {
+	for _, vgID := range reusedVgIDs {
+		if vGroupId == vgID {
+			return true
+		}
+	}
+	return false
 }
 
 func getNodes(reqCtx *RequestContext, client client.Client) ([]v1.Node, error) {
@@ -903,4 +935,20 @@ func podPercentAlgorithm(mode TrafficPolicy, backends []model.BackendAttribute, 
 		}
 	}
 	return backends
+}
+
+func getVGroupIDs(annotation string) ([]string, error) {
+	if annotation == "" {
+		return nil, nil
+	}
+	var ids []string
+	for _, v := range strings.Split(annotation, ",") {
+		pp := strings.Split(v, ":")
+		if len(pp) < 2 {
+			return nil, fmt.Errorf("vgroupid and "+
+				"protocol format must be like 'vsp-xxx:443' with colon separated. got=[%+v]", pp)
+		}
+		ids = append(ids, pp[0])
+	}
+	return ids, nil
 }

@@ -20,12 +20,11 @@ func (p SLBProvider) DescribeVServerGroups(ctx context.Context, lbId string) ([]
 	klog.V(5).Infof("RequestId: %s, API: %s, lbId: %s", resp.RequestId, "DescribeVServerGroups", lbId)
 	var vgs []model.VServerGroup
 	for _, v := range resp.VServerGroups.VServerGroup {
-		vg, err := p.DescribeVServerGroupAttribute(ctx, v.VServerGroupId)
-		if err != nil {
-			return vgs, util.FormatErrorMessage(err)
+		vg := model.VServerGroup{
+			VGroupId:   v.VServerGroupId,
+			VGroupName: v.VServerGroupName,
 		}
-
-		namedKey, err := model.LoadVGroupNamedKey(vg.VGroupName)
+		namedKey, err := model.LoadVGroupNamedKey(v.VServerGroupName)
 		if err != nil {
 			// add to vgs, for reusing vGroupId
 			vg.IsUserManaged = true
