@@ -32,7 +32,7 @@ KIND_BINARY_NAME?=cloud-controller-manager
 # use the official module proxy by default
 GOPROXY?=https://goproxy.cn,direct
 # default build image
-GO_VERSION?=1.16
+GO_VERSION?=1.17
 GO_IMAGE?=golang:$(GO_VERSION)
 # docker volume name, used as a go module / build cache
 CACHE_VOLUME?=cloud-controller-manager-build-cache
