@@ -67,6 +67,7 @@ const (
 	HealthCheckTimeout        = AnnotationLoadBalancerPrefix + "health-check-timeout"         // HealthCheckTimeout health check timeout
 	HealthCheckDomain         = AnnotationLoadBalancerPrefix + "health-check-domain"          // HealthCheckDomain health check domain
 	HealthCheckHTTPCode       = AnnotationLoadBalancerPrefix + "health-check-httpcode"        // HealthCheckHTTPCode health check http code
+	HealthCheckMethod         = AnnotationLoadBalancerPrefix + "health-check-method"          // HealthCheckMethod health check method for L7
 	SessionStick              = AnnotationLoadBalancerPrefix + "sticky-session"               // SessionStick sticky session
 	SessionStickType          = AnnotationLoadBalancerPrefix + "sticky-session-type"          // SessionStickType session sticky type
 	CookieTimeout             = AnnotationLoadBalancerPrefix + "cookie-timeout"               // CookieTimeout cookie timeout
@@ -77,6 +78,8 @@ const (
 	VGroupPort                = AnnotationLoadBalancerPrefix + "vgroup-port"                  // VGroupIDs binding user managed vGroup ids to ports
 	XForwardedForProto        = AnnotationLoadBalancerPrefix + "xforwardedfor-proto"          // XForwardedForProto whether to use the X-Forwarded-Proto header to retrieve the listener protocol
 	IdleTimeout               = AnnotationLoadBalancerPrefix + "idle-timeout"                 // IdleTimeout idle timeout for L7
+	RequestTimeout            = AnnotationLoadBalancerPrefix + "request-timeout"              // RequestTimeout request timeout for L7
+	EstablishedTimeout        = AnnotationLoadBalancerPrefix + "established-timeout"          // EstablishedTimeout connection established time out for TCP
 
 	// VServerBackend Attribute
 	BackendLabel      = AnnotationLoadBalancerPrefix + "backend-label"              // BackendLabel backend labels
