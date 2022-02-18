@@ -4,12 +4,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/model"
 	prvd "k8s.io/cloud-provider-alibaba-cloud/pkg/provider"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/base"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/util"
 	"k8s.io/klog/v2"
+	"reflect"
+	"strings"
 
 	"github.com/aliyun/alibaba-cloud-sdk-go/sdk/requests"
 	"github.com/aliyun/alibaba-cloud-sdk-go/sdk/utils"
@@ -38,6 +39,20 @@ func (p SLBProvider) FindLoadBalancer(ctx context.Context, mdl *model.LoadBalanc
 	}
 
 	// 2. find by tags
+	err := p.findLoadBalancerByTag(mdl)
+	if err != nil {
+		return err
+	}
+
+	// 3. find by loadbalancer name
+	if mdl.LoadBalancerAttribute.LoadBalancerId == "" {
+		return p.findLoadBalancerByName(mdl)
+	}
+
+	return nil
+}
+
+func (p SLBProvider) findLoadBalancerByTag(mdl *model.LoadBalancer) error {
 	items, err := json.Marshal(mdl.LoadBalancerAttribute.Tags)
 	if err != nil {
 		return fmt.Errorf("tags marshal error: %s", err.Error())
@@ -53,40 +68,56 @@ func (p SLBProvider) FindLoadBalancer(ctx context.Context, mdl *model.LoadBalanc
 	klog.V(5).Infof("RequestId: %s, API: %s", resp.RequestId, "DescribeLoadBalancers")
 
 	num := len(resp.LoadBalancers.LoadBalancer)
-	if num > 0 {
-		if len(resp.LoadBalancers.LoadBalancer) > 1 {
-			klog.Infof("[%s] find [%d] load balances, use the first one", mdl.NamespacedName, num)
-		}
-		// TODO Remove DescribeLoadBalancer
-		//  because DescribeLoadBalances do not return deleteprotection param, we need to call DescribeLoadBalancer() func
-		mdl.LoadBalancerAttribute.LoadBalancerId = resp.LoadBalancers.LoadBalancer[0].LoadBalancerId
-		return p.DescribeLoadBalancer(ctx, mdl)
+	if num == 0 {
+		return nil
 	}
 
-	// 3. find by loadbalancer name
-	klog.Infof("[%s] try to find loadbalancer by name %s",
-		mdl.NamespacedName, mdl.LoadBalancerAttribute.LoadBalancerName)
+	if num > 1 {
+		var lbIds []string
+		for _, lb := range resp.LoadBalancers.LoadBalancer {
+			lbIds = append(lbIds, lb.LoadBalancerId)
+		}
+		return fmt.Errorf("[%s] find multiple loadbalances by tag, lbIds[%s]", mdl.NamespacedName,
+			strings.Join(lbIds, ","))
+	}
+
+	loadResponse(resp.LoadBalancers.LoadBalancer[0], mdl)
+	klog.Infof("[%s] find loadbalancer by tag, lbId [%s]", mdl.NamespacedName,
+		resp.LoadBalancers.LoadBalancer[0].LoadBalancerId)
+	return nil
+}
+
+func (p SLBProvider) findLoadBalancerByName(mdl *model.LoadBalancer) error {
 	if mdl.LoadBalancerAttribute.LoadBalancerName == "" {
 		klog.Warningf("[%s] find loadbalancer by name error: loadbalancer name is empty.", mdl.NamespacedName.String())
 		return nil
 	}
-	req = slb.CreateDescribeLoadBalancersRequest()
+	klog.Infof("[%s] try to find loadbalancer by name %s",
+		mdl.NamespacedName, mdl.LoadBalancerAttribute.LoadBalancerName)
+	req := slb.CreateDescribeLoadBalancersRequest()
 	req.LoadBalancerName = mdl.LoadBalancerAttribute.LoadBalancerName
-	resp, err = p.auth.SLB.DescribeLoadBalancers(req)
+	resp, err := p.auth.SLB.DescribeLoadBalancers(req)
 	if err != nil {
-		return fmt.Errorf("[%s] find loadbalancer by name error: %s", mdl.NamespacedName, util.FormatErrorMessage(err))
+		return fmt.Errorf("[%s] find loadbalancer by name %s error: %s", mdl.NamespacedName,
+			req.LoadBalancerName, util.FormatErrorMessage(err))
 	}
-	num = len(resp.LoadBalancers.LoadBalancer)
-	if num > 0 {
-		if len(resp.LoadBalancers.LoadBalancer) > 1 {
-			klog.Infof("[%s] find [%d] load balances, use the first one", mdl.NamespacedName, num)
-		}
-		mdl.LoadBalancerAttribute.LoadBalancerId = resp.LoadBalancers.LoadBalancer[0].LoadBalancerId
-		// TODO Remove DescribeLoadBalancer
-		//  because DescribeLoadBalances do not return deleteprotection param, we need to call DescribeLoadBalancer() func
-		return p.DescribeLoadBalancer(ctx, mdl)
+	num := len(resp.LoadBalancers.LoadBalancer)
+	if num == 0 {
+		return nil
 	}
 
+	if num > 1 {
+		var lbIds []string
+		for _, lb := range resp.LoadBalancers.LoadBalancer {
+			lbIds = append(lbIds, lb.LoadBalancerId)
+		}
+		return fmt.Errorf("[%s] find multiple loadbalances by name, lbIds[%s]", mdl.NamespacedName,
+			strings.Join(lbIds, ","))
+	}
+
+	loadResponse(resp.LoadBalancers.LoadBalancer[0], mdl)
+	klog.Infof("[%s] find loadbalancer by name, lbId [%s]", mdl.NamespacedName,
+		mdl.LoadBalancerAttribute.LoadBalancerId)
 	return nil
 }
 
@@ -111,8 +142,13 @@ func (p SLBProvider) DescribeLoadBalancer(ctx context.Context, mdl *model.LoadBa
 	if err != nil {
 		return util.FormatErrorMessage(err)
 	}
+	if resp == nil {
+		klog.Errorf("RequestId: %s, lbId %s DescribeLoadBalancerAttribute response is nil",
+			resp.RequestId, mdl.LoadBalancerAttribute.LoadBalancerId)
+		return fmt.Errorf("DescribeLoadBalancer response is nil")
+	}
 	klog.V(5).Infof("RequestId: %s, API: %s, lbId: %s", resp.RequestId, "DescribeLoadBalancer", req.LoadBalancerId)
-	loadResponse(resp, mdl)
+	loadResponse(*resp, mdl)
 	return nil
 }
 
@@ -235,21 +271,23 @@ func setRequest(request *slb.CreateLoadBalancerRequest, mdl *model.LoadBalancer)
 	}
 }
 
-func loadResponse(resp *slb.DescribeLoadBalancerAttributeResponse, lb *model.LoadBalancer) {
-	lb.LoadBalancerAttribute.LoadBalancerId = resp.LoadBalancerId
-	lb.LoadBalancerAttribute.LoadBalancerName = resp.LoadBalancerName
-	lb.LoadBalancerAttribute.Address = resp.Address
-	lb.LoadBalancerAttribute.AddressType = model.AddressType(resp.AddressType)
-	lb.LoadBalancerAttribute.AddressIPVersion = model.AddressIPVersionType(resp.AddressIPVersion)
-	lb.LoadBalancerAttribute.NetworkType = resp.NetworkType
-	lb.LoadBalancerAttribute.VpcId = resp.VpcId
-	lb.LoadBalancerAttribute.VSwitchId = resp.VSwitchId
-	lb.LoadBalancerAttribute.Bandwidth = resp.Bandwidth
-	lb.LoadBalancerAttribute.MasterZoneId = resp.MasterZoneId
-	lb.LoadBalancerAttribute.SlaveZoneId = resp.SlaveZoneId
-	lb.LoadBalancerAttribute.DeleteProtection = model.FlagType(resp.DeleteProtection)
-	lb.LoadBalancerAttribute.InternetChargeType = model.InternetChargeType(resp.InternetChargeType)
-	lb.LoadBalancerAttribute.LoadBalancerSpec = model.LoadBalancerSpecType(resp.LoadBalancerSpec)
-	lb.LoadBalancerAttribute.ModificationProtectionStatus = model.ModificationProtectionType(resp.ModificationProtectionStatus)
-	lb.LoadBalancerAttribute.ResourceGroupId = resp.ResourceGroupId
+func loadResponse(resp interface{}, lb *model.LoadBalancer) {
+	v := reflect.ValueOf(resp)
+	lb.LoadBalancerAttribute.LoadBalancerId = v.FieldByName("LoadBalancerId").String()
+	lb.LoadBalancerAttribute.LoadBalancerName = v.FieldByName("LoadBalancerName").String()
+	lb.LoadBalancerAttribute.Address = v.FieldByName("Address").String()
+	lb.LoadBalancerAttribute.AddressType = model.AddressType(v.FieldByName("AddressType").String())
+	lb.LoadBalancerAttribute.AddressIPVersion = model.AddressIPVersionType(v.FieldByName("AddressIPVersion").String())
+	lb.LoadBalancerAttribute.NetworkType = v.FieldByName("NetworkType").String()
+	lb.LoadBalancerAttribute.VpcId = v.FieldByName("VpcId").String()
+	lb.LoadBalancerAttribute.VSwitchId = v.FieldByName("VSwitchId").String()
+	lb.LoadBalancerAttribute.Bandwidth = int(v.FieldByName("Bandwidth").Int())
+	lb.LoadBalancerAttribute.MasterZoneId = v.FieldByName("MasterZoneId").String()
+	lb.LoadBalancerAttribute.SlaveZoneId = v.FieldByName("SlaveZoneId").String()
+	lb.LoadBalancerAttribute.DeleteProtection = model.FlagType(v.FieldByName("DeleteProtection").String())
+	lb.LoadBalancerAttribute.InternetChargeType = model.InternetChargeType(v.FieldByName("InternetChargeType").String())
+	lb.LoadBalancerAttribute.LoadBalancerSpec = model.LoadBalancerSpecType(v.FieldByName("LoadBalancerSpec").String())
+	lb.LoadBalancerAttribute.ModificationProtectionStatus = model.ModificationProtectionType(
+		v.FieldByName("ModificationProtectionStatus").String())
+	lb.LoadBalancerAttribute.ResourceGroupId = v.FieldByName("ResourceGroupId").String()
 }
