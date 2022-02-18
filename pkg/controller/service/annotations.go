@@ -47,6 +47,7 @@ const (
 	DeleteProtection       = AnnotationLoadBalancerPrefix + "delete-protection"        // DeleteProtection delete protection
 	ModificationProtection = AnnotationLoadBalancerPrefix + "modification-protection"  // ModificationProtection modification type
 	ExternalIPType         = AnnotationLoadBalancerPrefix + "external-ip-type"         // ExternalIPType external ip type
+	HostName               = AnnotationLoadBalancerPrefix + "hostname"                 // HostName hostname for service.status.ingress.hostname
 
 	// Listener Attribute
 	AclStatus                 = AnnotationLoadBalancerPrefix + "acl-status"                   // AclStatus enable or disable acl on all listener
