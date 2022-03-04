@@ -5,7 +5,6 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
-	"regexp"
 	"strconv"
 
 	corev1 "k8s.io/api/core/v1"
@@ -43,8 +42,6 @@ func (t *defaultModelBuildTask) buildServerGroupResourceID(ingKey types.Namespac
 	resourceID := fmt.Sprintf("%s/%s-%s:%s", ingKey.Namespace, ingKey.Name, svcKey.Name, fmt.Sprintf("%v", port))
 	return calServerGroupResourceIDHashUUID(resourceID)
 }
-
-var invalidTargetGroupNamePattern = regexp.MustCompile("[[:^alnum:]]")
 
 func (t *defaultModelBuildTask) buildServerGroupName(ing *networking.Ingress, svc *corev1.Service, port int) string {
 	return fmt.Sprintf("%s-%s-%s", svc.Namespace, svc.Name, fmt.Sprintf("%v", port))

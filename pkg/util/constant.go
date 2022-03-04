@@ -306,8 +306,10 @@ const (
 	ListenerProtocolQUIC  = "QUIC"
 )
 
+type ContextTraceID string
+
 const (
-	TraceID = "traceID"
+	TraceID = ContextTraceID("traceID")
 )
 
 const (

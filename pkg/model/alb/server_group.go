@@ -24,7 +24,7 @@ func NewServerGroup(stack core.Manager, id string, spec ServerGroupSpec) *Server
 		Spec:         spec,
 		Status:       nil,
 	}
-	stack.AddResource(sgp)
+	_ = stack.AddResource(sgp)
 	return sgp
 }
 

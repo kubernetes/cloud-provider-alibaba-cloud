@@ -21,7 +21,7 @@ func NewListenerRule(stack core.Manager, id string, spec ListenerRuleSpec) *List
 		Spec:         spec,
 		Status:       nil,
 	}
-	stack.AddResource(lr)
+	_ = stack.AddResource(lr)
 	lr.registerDependencies(stack)
 	return lr
 }
@@ -32,7 +32,7 @@ func (lr *ListenerRule) SetStatus(status ListenerRuleStatus) {
 
 func (lr *ListenerRule) registerDependencies(stack core.Manager) {
 	for _, dep := range lr.Spec.ListenerID.Dependencies() {
-		stack.AddDependency(dep, lr)
+		_ = stack.AddDependency(dep, lr)
 	}
 }
 

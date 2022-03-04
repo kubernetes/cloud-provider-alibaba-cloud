@@ -3,10 +3,8 @@ package vmock
 import (
 	"context"
 
-	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/base"
-	casprvd "k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/cas"
-
 	cassdk "github.com/aliyun/alibaba-cloud-sdk-go/services/cas"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/base"
 )
 
 func NewMockCAS(
@@ -17,7 +15,6 @@ func NewMockCAS(
 
 type MockCAS struct {
 	auth *base.ClientMgr
-	cas  *casprvd.CASProvider
 }
 
 func (c MockCAS) DescribeSSLCertificateList(ctx context.Context, request *cassdk.DescribeSSLCertificateListRequest) (*cassdk.DescribeSSLCertificateListResponse, error) {

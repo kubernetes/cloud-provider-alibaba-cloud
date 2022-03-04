@@ -2,7 +2,6 @@ package alb
 
 import (
 	"context"
-
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/model/alb/core"
 
 	"github.com/pkg/errors"
@@ -24,7 +23,7 @@ func NewListener(stack core.Manager, id string, spec ListenerSpec) *Listener {
 		Spec:         spec,
 		Status:       nil,
 	}
-	stack.AddResource(ls)
+	_ = stack.AddResource(ls)
 	ls.registerDependencies(stack)
 	return ls
 }
@@ -47,7 +46,7 @@ func (ls *Listener) ListenerID() core.StringToken {
 
 func (ls *Listener) registerDependencies(stack core.Manager) {
 	for _, dep := range ls.Spec.LoadBalancerID.Dependencies() {
-		stack.AddDependency(dep, ls)
+		_ = stack.AddDependency(dep, ls)
 	}
 }
 

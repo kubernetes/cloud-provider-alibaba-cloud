@@ -24,8 +24,7 @@ func NewAlbLoadBalancer(stack core.Manager, id string, spec ALBLoadBalancerSpec)
 		Spec:         spec,
 		Status:       nil,
 	}
-	stack.AddResource(lb)
-	lb.registerDependencies(stack)
+	_ = stack.AddResource(lb)
 	return lb
 }
 
@@ -55,10 +54,6 @@ func (lb *AlbLoadBalancer) DNSName() core.StringToken {
 			return lb.Status.DNSName, nil
 		},
 	)
-}
-
-func (lb *AlbLoadBalancer) registerDependencies(stack core.Manager) {
-	return
 }
 
 type LoadBalancerStatus struct {

@@ -32,7 +32,7 @@ KIND_BINARY_NAME?=cloud-controller-manager
 # use the official module proxy by default
 GOPROXY?=https://goproxy.cn,direct
 # default build image
-GO_VERSION?=1.16
+GO_VERSION?=1.17
 GO_IMAGE?=golang:$(GO_VERSION)
 # docker volume name, used as a go module / build cache
 CACHE_VOLUME?=cloud-controller-manager-build-cache
@@ -100,7 +100,6 @@ cloud-controller-manager: make-cache out-dir
 # alias for building cloud-controller-manager
 build: cloud-controller-manager
 
-
 image: build
 	docker build -t $(REGISTRY):$(TAG) -f Dockerfile .
 
@@ -153,18 +152,17 @@ clean: clean-cache clean-output
 
 .PHONY: all make-cache clean-cache out-dir clean-output cloud-controller-manager build install clean
 
-check:
-	gometalinter --disable-all --skip vendor -E ineffassign -E misspell -d ./...
+.PHONY: check
+check: gofmt golint
 
-
-
-check: gofmt golangci-lint
-
+.PHONY: gofmt
 gofmt:
 	./hack/verify-gofmt.sh
 
-golangci-lint:
-	bash -c 'golangci-lint run'
+.PHONY: golint
+golint:
+	which golangci-lint 2>&1 >/dev/null || go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.44.2
+	golangci-lint run pkg/... --timeout=120s
 
 unit-test:
 	GO111MODULE=on go test -mod vendor -v -race -coverprofile=coverage.txt -covermode=atomic \

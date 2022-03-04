@@ -37,7 +37,7 @@ func (s *albLoadBalancerApplier) Apply(ctx context.Context) error {
 	traceID := ctx.Value(util.TraceID)
 
 	var resLBs []*albmodel.AlbLoadBalancer
-	s.stack.ListResources(&resLBs)
+	_ = s.stack.ListResources(&resLBs)
 
 	if len(resLBs) > 1 {
 		return fmt.Errorf("invalid res loadBalancers, at most one loadBalancer for stack: %s", s.stack.StackID())

@@ -32,7 +32,7 @@ type listenerApplier struct {
 
 func (s *listenerApplier) Apply(ctx context.Context) error {
 	var resLSs []*albmodel.Listener
-	s.stack.ListResources(&resLSs)
+	_ = s.stack.ListResources(&resLSs)
 
 	resLSsByLbID, err := mapResListenerByAlbLoadBalancerID(ctx, resLSs)
 	if err != nil {
@@ -42,7 +42,7 @@ func (s *listenerApplier) Apply(ctx context.Context) error {
 	if len(resLSsByLbID) == 0 {
 		resLSsByLbID = make(map[string][]*albmodel.Listener)
 		var resLBs []*albmodel.AlbLoadBalancer
-		s.stack.ListResources(&resLBs)
+		_ = s.stack.ListResources(&resLBs)
 		if len(resLBs) == 0 {
 			return nil
 		}

@@ -204,7 +204,7 @@ func (g *albconfigReconciler) syncIngress(obj interface{}) error {
 				return
 			}
 			lss := make([]*v1.ListenerSpec, 0)
-			ingListByPort := make(map[int32]albconfigmanager.Protocol, 0)
+			ingListByPort := make(map[int32]albconfigmanager.Protocol)
 			ingGroup, _ := g.groupLoader.Load(ctx, *groupID, ings)
 			if ingGroup.Members != nil && len(ingGroup.Members) > 0 {
 				for _, ingm := range ingGroup.Members {
@@ -290,7 +290,7 @@ func (g *albconfigReconciler) getServicePortToIngressNames(request reconcile.Req
 	var processIngressBackend = func(b networking.IngressBackend, ingName string) {
 		servicePort := b.Service.Port.Number
 		if _, ok := servicePortToIngressNames[servicePort]; !ok {
-			servicePortToIngressNames[servicePort] = make(map[string]struct{}, 0)
+			servicePortToIngressNames[servicePort] = make(map[string]struct{})
 		}
 		servicePortToIngressNames[servicePort][ingName] = struct{}{}
 	}

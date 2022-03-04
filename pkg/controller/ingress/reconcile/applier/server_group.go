@@ -96,7 +96,7 @@ func (s *serverGroupApplier) Apply(ctx context.Context) error {
 	traceID := ctx.Value(util.TraceID)
 
 	var resSGPs []*albmodel.ServerGroup
-	s.stack.ListResources(&resSGPs)
+	_ = s.stack.ListResources(&resSGPs)
 
 	sdkSGPs, err := s.findSDKServerGroups(ctx)
 	if err != nil {
@@ -299,7 +299,7 @@ func mapResServerGroupByResourceIDSGP(resSGPs []*albmodel.ServerGroup) map[strin
 }
 
 func mapSDKServerGroupByResourceIDSGP(sdkSGPs []albmodel.ServerGroupWithTags, resourceIDTagKey string) (map[string][]albmodel.ServerGroupWithTags, error) {
-	sdkSGPsByID := make(map[string][]albmodel.ServerGroupWithTags, 0)
+	sdkSGPsByID := make(map[string][]albmodel.ServerGroupWithTags)
 	for _, sdkSGP := range sdkSGPs {
 		resourceID, ok := sdkSGP.Tags[resourceIDTagKey]
 		if !ok {
