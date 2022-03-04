@@ -211,9 +211,10 @@ func (m *ReconcileService) reconcile(request reconcile.Request) (err error) {
 	klog.Infof("%s: ensure loadbalancer with service details, \n%+v", util.Key(svc), util.PrettyJson(svc))
 
 	if ctrlCfg.ControllerCFG.DryRun {
-		if _, err = m.buildAndApplyModel(reqContext); err != nil {
+		if lb, err := m.buildAndApplyModel(reqContext); err != nil {
 			m.record.Event(reqContext.Service, v1.EventTypeWarning, helper.FailedSyncLB,
-				fmt.Sprintf("DryRun: Error syncing load balancer: %s", helper.GetLogMessage(err)))
+				fmt.Sprintf("DryRun: Error syncing load balancer [%s]: %s",
+					lb.GetLoadBalancerId(), helper.GetLogMessage(err)))
 		}
 		return nil
 	}
@@ -238,10 +239,11 @@ func (m *ReconcileService) reconcile(request reconcile.Request) (err error) {
 func (m *ReconcileService) cleanupLoadBalancerResources(reqCtx *RequestContext) error {
 	reqCtx.Log.Info("service do not need lb any more, try to delete it")
 	if helper.HasFinalizer(reqCtx.Service, ServiceFinalizer) {
-		_, err := m.buildAndApplyModel(reqCtx)
+		lb, err := m.buildAndApplyModel(reqCtx)
 		if err != nil && !strings.Contains(err.Error(), "LoadBalancerId does not exist") {
 			m.record.Event(reqCtx.Service, v1.EventTypeWarning, helper.FailedCleanLB,
-				fmt.Sprintf("Error deleting load balancer: %s", helper.GetLogMessage(err)))
+				fmt.Sprintf("Error deleting load balancer [%s]: %s",
+					lb.GetLoadBalancerId(), helper.GetLogMessage(err)))
 			return err
 		}
 
@@ -280,7 +282,8 @@ func (m *ReconcileService) reconcileLoadBalancerResources(req *RequestContext) e
 	lb, err := m.buildAndApplyModel(req)
 	if err != nil {
 		m.record.Event(req.Service, v1.EventTypeWarning, helper.FailedSyncLB,
-			fmt.Sprintf("Error syncing load balancer: %s", helper.GetLogMessage(err)))
+			fmt.Sprintf("Error syncing load balancer [%s]: %s",
+				lb.GetLoadBalancerId(), helper.GetLogMessage(err)))
 		return err
 	}
 
@@ -296,7 +299,8 @@ func (m *ReconcileService) reconcileLoadBalancerResources(req *RequestContext) e
 		return err
 	}
 
-	m.record.Event(req.Service, v1.EventTypeNormal, helper.SucceedSyncLB, "Ensured load balancer")
+	m.record.Event(req.Service, v1.EventTypeNormal, helper.SucceedSyncLB,
+		fmt.Sprintf("Ensured load balancer [%s]", lb.LoadBalancerAttribute.LoadBalancerId))
 	return nil
 }
 
