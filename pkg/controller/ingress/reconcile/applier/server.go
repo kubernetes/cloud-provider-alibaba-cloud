@@ -80,8 +80,7 @@ func (s *serverApplier) Apply(ctx context.Context) error {
 		if err := s.albProvider.ReplaceALBServers(ctx, s.serverGroupID, unmatchedResEndpoints, unmatchedSDKEndpoints); err != nil {
 			return err
 		}
-		// TODO print err
-		updateTargetHealthPodCondition(ctx, s.kubeClient, k8s.BuildReadinessGatePodConditionType(), s.endpoints)
+		_ = updateTargetHealthPodCondition(ctx, s.kubeClient, k8s.BuildReadinessGatePodConditionType(), s.endpoints)
 
 		return nil
 	}
@@ -94,7 +93,7 @@ func (s *serverApplier) Apply(ctx context.Context) error {
 		if err := s.albProvider.RegisterALBServers(ctx, s.serverGroupID, unmatchedResEndpoints); err != nil {
 			return err
 		}
-		updateTargetHealthPodCondition(ctx, s.kubeClient, k8s.BuildReadinessGatePodConditionType(), s.endpoints)
+		_ = updateTargetHealthPodCondition(ctx, s.kubeClient, k8s.BuildReadinessGatePodConditionType(), s.endpoints)
 	}
 
 	return nil
@@ -166,16 +165,6 @@ func isServerStatusRemoving(status string) bool {
 type endpointAndTargetPair struct {
 	endpoint albmodel.BackendItem
 	target   albsdk.BackendServer
-}
-
-//TODO remove
-func isTrafficPolicyValid(trafficPolicy string) bool {
-	if !strings.EqualFold(trafficPolicy, util.TrafficPolicyEni) &&
-		!strings.EqualFold(trafficPolicy, util.TrafficPolicyLocal) &&
-		!strings.EqualFold(trafficPolicy, util.TrafficPolicyCluster) {
-		return false
-	}
-	return true
 }
 
 func isEniTrafficPolicy(trafficPolicy string) bool {

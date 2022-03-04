@@ -32,7 +32,7 @@ type listenerRuleApplier struct {
 
 func (s *listenerRuleApplier) Apply(ctx context.Context) error {
 	var resLRs []*albmodel.ListenerRule
-	s.stack.ListResources(&resLRs)
+	_ = s.stack.ListResources(&resLRs)
 
 	resLRsByLsID, err := mapResListenerRuleByListenerID(ctx, resLRs)
 	if err != nil {
@@ -40,7 +40,7 @@ func (s *listenerRuleApplier) Apply(ctx context.Context) error {
 	}
 
 	var resLSs []*albmodel.Listener
-	s.stack.ListResources(&resLSs)
+	_ = s.stack.ListResources(&resLSs)
 
 	resLSsByLsID, err := mapResListenerByListenerID(ctx, resLSs)
 	if err != nil {
@@ -82,58 +82,6 @@ func (s *listenerRuleApplier) Apply(ctx context.Context) error {
 }
 
 func (s *listenerRuleApplier) PostApply(ctx context.Context) error {
-	return nil
-}
-
-func (s *listenerRuleApplier) applyListenerRulesOnListener(ctx context.Context, lsID string, resLRs []*albmodel.ListenerRule) error {
-	if len(lsID) == 0 {
-		return fmt.Errorf("empty listener id when apply rules error")
-	}
-
-	traceID := ctx.Value(util.TraceID)
-
-	sdkLRs, err := s.findSDKListenersRulesOnLS(ctx, lsID)
-	if err != nil {
-		return err
-	}
-
-	matchedResAndSDKLRs, unmatchedResLRs, unmatchedSDKLRs := matchResAndSDKListenerRules(resLRs, sdkLRs)
-
-	if len(matchedResAndSDKLRs) != 0 {
-		s.logger.V(util.SynLogLevel).Info("apply rules",
-			"matchedResAndSDKLRs", matchedResAndSDKLRs,
-			"traceID", traceID)
-	}
-	if len(unmatchedResLRs) != 0 {
-		s.logger.V(util.SynLogLevel).Info("apply rules",
-			"unmatchedResLRs", unmatchedResLRs,
-			"traceID", traceID)
-	}
-	if len(unmatchedSDKLRs) != 0 {
-		s.logger.V(util.SynLogLevel).Info("apply rules",
-			"unmatchedSDKLBs", unmatchedSDKLRs,
-			"traceID", traceID)
-	}
-
-	for _, sdkLR := range unmatchedSDKLRs {
-		if err := s.albProvider.DeleteALBListenerRule(ctx, sdkLR.RuleId); err != nil {
-			return err
-		}
-	}
-	for _, resLR := range unmatchedResLRs {
-		lrStatus, err := s.albProvider.CreateALBListenerRule(ctx, resLR)
-		if err != nil {
-			return err
-		}
-		resLR.SetStatus(lrStatus)
-	}
-	for _, resAndSDKLR := range matchedResAndSDKLRs {
-		lsStatus, err := s.albProvider.UpdateALBListenerRule(ctx, resAndSDKLR.ResLR, resAndSDKLR.SdkLR)
-		if err != nil {
-			return err
-		}
-		resAndSDKLR.ResLR.SetStatus(lsStatus)
-	}
 	return nil
 }
 
@@ -243,7 +191,7 @@ func matchResAndSDKListenerRules(resLRs []*albmodel.ListenerRule, sdkLRs []albsd
 }
 
 func mapResListenerRuleByPriority(resLRs []*albmodel.ListenerRule) map[int64]*albmodel.ListenerRule {
-	resLRByPriority := make(map[int64]*albmodel.ListenerRule, 0)
+	resLRByPriority := make(map[int64]*albmodel.ListenerRule)
 	for _, resLR := range resLRs {
 		resLRByPriority[int64(resLR.Spec.Priority)] = resLR
 	}
@@ -251,7 +199,7 @@ func mapResListenerRuleByPriority(resLRs []*albmodel.ListenerRule) map[int64]*al
 }
 
 func mapSDKListenerRuleByPriority(sdkLRs []albsdk.Rule) map[int64]albsdk.Rule {
-	sdkLRByPriority := make(map[int64]albsdk.Rule, 0)
+	sdkLRByPriority := make(map[int64]albsdk.Rule)
 	for _, sdkLR := range sdkLRs {
 		priority := int64(sdkLR.Priority)
 		sdkLRByPriority[priority] = sdkLR
@@ -260,7 +208,7 @@ func mapSDKListenerRuleByPriority(sdkLRs []albsdk.Rule) map[int64]albsdk.Rule {
 }
 
 func mapResListenerRuleByListenerID(ctx context.Context, resLRs []*albmodel.ListenerRule) (map[string][]*albmodel.ListenerRule, error) {
-	resLRsByLsID := make(map[string][]*albmodel.ListenerRule, 0)
+	resLRsByLsID := make(map[string][]*albmodel.ListenerRule)
 	for _, lr := range resLRs {
 		lsID, err := lr.Spec.ListenerID.Resolve(ctx)
 		if err != nil {

@@ -783,7 +783,7 @@ func transTagMapToSDKTagResourcesTagList(tagMap map[string]string) []albsdk.TagR
 }
 
 func transTagListToMap(tagList []alb.ALBTag) map[string]string {
-	tagMap := make(map[string]string, 0)
+	tagMap := make(map[string]string)
 	for _, tag := range tagList {
 		tagMap[tag.Key] = tag.Value
 	}
@@ -791,7 +791,7 @@ func transTagListToMap(tagList []alb.ALBTag) map[string]string {
 }
 
 func transSDKTagListToMap(tagList []albsdk.Tag) map[string]string {
-	tagMap := make(map[string]string, 0)
+	tagMap := make(map[string]string)
 	for _, tag := range tagList {
 		tagMap[tag.Key] = tag.Value
 	}
@@ -844,10 +844,7 @@ func isAlbLoadBalancerEditionValid(edition string) bool {
 }
 
 func isAlbLoadBalancerLoadBalancerPayTypeValid(payType string) bool {
-	if strings.EqualFold(payType, util.LoadBalancerPayTypePostPay) {
-		return true
-	}
-	return false
+	return strings.EqualFold(payType, util.LoadBalancerPayTypePostPay)
 }
 
 func isLogProjectNameValid(logProject string) bool {

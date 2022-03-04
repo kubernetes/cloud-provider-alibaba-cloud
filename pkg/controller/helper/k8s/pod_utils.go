@@ -1,8 +1,6 @@
 package k8s
 
 import (
-	"fmt"
-
 	corev1 "k8s.io/api/core/v1"
 )
 
@@ -11,7 +9,7 @@ const TargetHealthPodConditionTypePrefix = "target-health.alb.k8s.alicloud"
 
 // BuildTargetHealthPodConditionType constructs the condition type for TargetHealth pod condition.
 func BuildReadinessGatePodConditionType() corev1.PodConditionType {
-	return corev1.PodConditionType(fmt.Sprintf("%s", TargetHealthPodConditionTypePrefix))
+	return corev1.PodConditionType(TargetHealthPodConditionTypePrefix)
 }
 
 func IsPodHasReadinessGate(pod *corev1.Pod) bool {

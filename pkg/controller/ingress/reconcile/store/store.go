@@ -383,7 +383,7 @@ func New(
 			}
 		},
 		DeleteFunc: func(obj interface{}) {
-			store.listers.Pod.Delete(obj)
+			_ = store.listers.Pod.Delete(obj)
 		},
 		UpdateFunc: func(old, cur interface{}) {
 		},
@@ -537,16 +537,6 @@ func (s *k8sStore) GetService(key string) (*corev1.Service, error) {
 	return s.listers.Service.ByKey(key)
 }
 
-// getIngress returns the Ingress matching key.
-func (s *k8sStore) getIngress(key string) (*networking.Ingress, error) {
-	ing, err := s.listers.IngressWithAnnotation.ByKey(key)
-	if err != nil {
-		return nil, err
-	}
-
-	return &ing.Ingress, nil
-}
-
 func sortIngressSlice(ingresses []*Ingress) {
 	// sort Ingresses using the CreationTimestamp field
 	sort.SliceStable(ingresses, func(i, j int) bool {
@@ -608,18 +598,4 @@ func toIngress(obj interface{}) (*networking.Ingress, bool) {
 	}
 
 	return nil, false
-}
-
-func isLoadBalancerOrNodePortService(svc *corev1.Service) bool {
-	return isLoadBalancerService(svc) || isNodePortService(svc)
-}
-func isLoadBalancerService(svc *corev1.Service) bool {
-	return svc.Spec.Type == corev1.ServiceTypeLoadBalancer
-}
-
-func isNodePortService(svc *corev1.Service) bool {
-	return svc.Spec.Type == corev1.ServiceTypeNodePort
-}
-func isLocalModeService(svc *corev1.Service) bool {
-	return svc.Spec.ExternalTrafficPolicy == corev1.ServiceExternalTrafficPolicyTypeLocal
 }

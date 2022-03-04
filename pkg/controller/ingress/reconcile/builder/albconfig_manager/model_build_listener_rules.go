@@ -27,7 +27,7 @@ const (
 
 func (t *defaultModelBuildTask) buildListenerRules(ctx context.Context, lsID core.StringToken, port int32, ingList []networking.Ingress) error {
 	var rules []alb.ListenerRule
-	carryWeight := make(map[string][]alb.ServerGroupTuple, 0)
+	carryWeight := make(map[string][]alb.ServerGroupTuple)
 	for _, ing := range ingList {
 		if v := annotations.GetStringAnnotationMutil(annotations.NginxCanary, annotations.AlbCanary, &ing); v == "true" {
 			weight := 0
@@ -97,6 +97,9 @@ func (t *defaultModelBuildTask) buildListenerRules(ctx context.Context, lsID cor
 					return errors.Wrapf(err, "ingress: %v", util.NamespacedName(&ing))
 				}
 				action2, err := t.buildAction(ctx, ing, action)
+				if err != nil {
+					return errors.Wrapf(err, "ingress: %v", util.NamespacedName(&ing))
+				}
 				lrs := alb.ListenerRuleSpec{
 					ListenerID: lsID,
 				}

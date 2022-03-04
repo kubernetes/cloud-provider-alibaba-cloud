@@ -65,7 +65,7 @@ func (m *defaultServiceManagerApplier) Apply(ctx context.Context, albProvider pr
 
 			serverApplier := NewServerApplier(m.kubeClient, albProvider, serverGroupID, backends, serviceStack.TrafficPolicy, m.logger)
 			if errOnce := serverApplier.Apply(ctx); err == nil && errOnce != nil {
-				m.logger.Error(errOnce, "synthesize servers failed", "serverGroupID", v.SdkSGP.ServerGroupId)
+				m.logger.Error(errOnce, "synthesize servers failed", "serverGroupID", serverGroupID)
 				err = errOnce
 			}
 		}(v.SdkSGP.ServerGroupId, v.ResSGP.Backends)
@@ -168,7 +168,7 @@ type resAndSDKServerGroupPair struct {
 }
 
 func mapResServerGroupByResourceID(resSGPs []albmodel.ServiceGroupWithNameKey) map[string]albmodel.ServiceGroupWithNameKey {
-	resSGPsByID := make(map[string]albmodel.ServiceGroupWithNameKey, 0)
+	resSGPsByID := make(map[string]albmodel.ServiceGroupWithNameKey)
 	for _, resSGP := range resSGPs {
 		resSGPsByID[resSGP.NamedKey.Key()] = resSGP
 	}
@@ -176,7 +176,7 @@ func mapResServerGroupByResourceID(resSGPs []albmodel.ServiceGroupWithNameKey) m
 }
 
 func mapSDKServerGroupByResourceID(sdkSGPs []albmodel.ServerGroupWithTags) map[string]albmodel.ServerGroupWithTags {
-	resSGPsByID := make(map[string]albmodel.ServerGroupWithTags, 0)
+	resSGPsByID := make(map[string]albmodel.ServerGroupWithTags)
 	for _, sdkSGP := range sdkSGPs {
 		var svcNameKey albmodel.ServerGroupNamedKey
 

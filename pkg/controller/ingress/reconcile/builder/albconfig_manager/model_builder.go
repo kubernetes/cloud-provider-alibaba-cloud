@@ -121,11 +121,6 @@ type portProtocol struct {
 	protocol Protocol
 }
 
-type FakeGateway struct {
-	loadBalancer alb.ALBLoadBalancerSpec
-	listeners    map[int]alb.ListenerSpec
-}
-
 var (
 	fakeDefaultServiceName = "fake-svc"
 )
@@ -166,7 +161,7 @@ func (t *defaultModelBuildTask) run(ctx context.Context) error {
 		return err
 	}
 
-	var lss = make(map[int32]*alb.Listener, 0)
+	var lss = make(map[int32]*alb.Listener)
 	for _, ls := range t.albconfig.Spec.Listeners {
 		modelLs, err := t.buildListener(ctx, lb.LoadBalancerID(), ls)
 		if err != nil {
@@ -264,7 +259,7 @@ func (t *defaultModelBuildTask) computeIngressInferredTLSCertIDs(ctx context.Con
 
 func ComputeIngressListenPorts(ing *networking.Ingress) (map[int32]Protocol, error) {
 	rawListenPorts := ""
-	portAndProtocols := make(map[int32]Protocol, 0)
+	portAndProtocols := make(map[int32]Protocol)
 	// http transfer to https
 	if v := annotations.GetStringAnnotationMutil(annotations.NginxSslRedirect, annotations.AlbSslRedirect, ing); v == "true" {
 		portAndProtocols[80] = ProtocolHTTP

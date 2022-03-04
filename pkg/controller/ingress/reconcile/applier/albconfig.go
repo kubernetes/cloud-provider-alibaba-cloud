@@ -54,7 +54,7 @@ func (m *defaultAlbConfigManagerApplier) Apply(ctx context.Context, stack core.M
 
 	// Reuse LoadBalancer
 	var resLBs []*albmodel.AlbLoadBalancer
-	stack.ListResources(&resLBs)
+	_ = stack.ListResources(&resLBs)
 	if len(resLBs) > 1 {
 		return fmt.Errorf("invalid res loadBalancers, at most one loadBalancer for stack: %s", stack.StackID())
 	} else if len(resLBs) == 1 {

@@ -44,8 +44,7 @@ const (
 )
 
 const (
-	albLeastZoneCount   = 2
-	vSwitchLeastIPCount = 5
+	albLeastZoneCount = 2
 )
 
 func (v *defaultVSwitchesResolver) discoveryALBZones(ctx context.Context) ([]albsdk.Zone, error) {

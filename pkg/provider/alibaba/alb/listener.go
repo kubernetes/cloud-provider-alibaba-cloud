@@ -930,17 +930,11 @@ func buildSDKCertificates(modelCerts []albmodel.Certificate) ([]albsdk.Certifica
 }
 
 func isIncorrectStatusLoadBalancerError(err error) bool {
-	if strings.Contains(err.Error(), "IncorrectStatus.LoadBalancer") {
-		return true
-	}
-	return false
+	return strings.Contains(err.Error(), "IncorrectStatus.LoadBalancer")
 }
 
 func isIncorrectStatusListenerError(err error) bool {
-	if strings.Contains(err.Error(), "IncorrectStatus.Listener") {
-		return true
-	}
-	return false
+	return strings.Contains(err.Error(), "IncorrectStatus.Listener")
 }
 
 func isHTTPSListenerProtocol(protocol string) bool {

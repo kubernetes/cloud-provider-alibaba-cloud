@@ -227,18 +227,6 @@ type IngressAnnotation interface {
 
 type ingAnnotations map[string]string
 
-func (a ingAnnotations) parseBool(name string) (bool, error) {
-	val, ok := a[name]
-	if ok {
-		b, err := strconv.ParseBool(val)
-		if err != nil {
-			return false, NewInvalidAnnotationContent(name, val)
-		}
-		return b, nil
-	}
-	return false, ErrMissingAnnotations
-}
-
 func (a ingAnnotations) parseString(name string) (string, error) {
 	val, ok := a[name]
 	if ok {
@@ -250,18 +238,6 @@ func (a ingAnnotations) parseString(name string) (string, error) {
 		return s, nil
 	}
 	return "", ErrMissingAnnotations
-}
-
-func (a ingAnnotations) parseInt(name string) (int, error) {
-	val, ok := a[name]
-	if ok {
-		i, err := strconv.Atoi(val)
-		if err != nil {
-			return 0, NewInvalidAnnotationContent(name, val)
-		}
-		return i, nil
-	}
-	return 0, ErrMissingAnnotations
 }
 
 func checkAnnotation(name string, ing *networking.Ingress) error {

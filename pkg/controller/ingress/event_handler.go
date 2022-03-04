@@ -25,10 +25,9 @@ func NewEnqueueRequestsForAlbconfigEvent(k8sClient client.Client, eventRecorder 
 var _ handler.EventHandler = (*enqueueRequestsForAlbconfigEvent)(nil)
 
 type enqueueRequestsForAlbconfigEvent struct {
-	ingressEventChan chan<- event.GenericEvent
-	k8sClient        client.Client
-	eventRecorder    record.EventRecorder
-	logger           logr.Logger
+	k8sClient     client.Client
+	eventRecorder record.EventRecorder
+	logger        logr.Logger
 }
 
 func (h *enqueueRequestsForAlbconfigEvent) Create(e event.CreateEvent, queue workqueue.RateLimitingInterface) {
