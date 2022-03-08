@@ -23,6 +23,10 @@ func (d *MockECS) ListInstances(ctx context.Context, ids []string) (map[string]*
 	return nil, nil
 }
 
+func (d *MockECS) GetInstancesByIP(ctx context.Context, ips []string) (*prvd.NodeAttribute, error) {
+	return nil, nil
+}
+
 func (d *MockECS) SetInstanceTags(ctx context.Context, id string, tags map[string]string) error {
 	return nil
 }
