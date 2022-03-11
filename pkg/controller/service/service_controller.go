@@ -328,11 +328,19 @@ func (m *ReconcileService) updateServiceStatus(reqCtx *RequestContext, svc *v1.S
 		return fmt.Errorf("lb not found, cannot not patch service status")
 	}
 
-	// EIP ExternalIPType, display the slb associated elastic ip as service external ip
+	// EIP ExternalIPType, use the slb associated elastic ip as service external ip
 	if reqCtx.Anno.Get(ExternalIPType) == "eip" {
 		ingress, err := m.setEIPAsExternalIP(reqCtx.Ctx, lb.LoadBalancerAttribute.LoadBalancerId)
 		if err != nil {
 			reqCtx.Recorder.Event(svc, v1.EventTypeWarning, "FailedSetEIPAddress", "get eip error, set external ip to slb ip")
+		}
+		newStatus.Ingress = ingress
+	}
+
+	// HostName if user set HostName annotation, use it as service.status.ingress.hostname value
+	if reqCtx.Anno.Get(HostName) != "" {
+		ingress := []v1.LoadBalancerIngress{
+			{Hostname: reqCtx.Anno.Get(HostName)},
 		}
 		newStatus.Ingress = ingress
 	}
@@ -350,7 +358,8 @@ func (m *ReconcileService) updateServiceStatus(reqCtx *RequestContext, svc *v1.S
 	// TODO: Be careful here ... what if there were other changes to the service?
 	if !v1helper.LoadBalancerStatusEqual(preStatus, newStatus) {
 		util.ServiceLog.Info(fmt.Sprintf("status: [%v] [%v]", preStatus, newStatus))
-		return retry(
+		var retErr error
+		_ = retry(
 			&wait.Backoff{
 				Duration: 1 * time.Second,
 				Steps:    3,
@@ -360,37 +369,39 @@ func (m *ReconcileService) updateServiceStatus(reqCtx *RequestContext, svc *v1.S
 			func(svc *v1.Service) error {
 				// get latest svc from the shared informer cache
 				svcOld := &v1.Service{}
-				err := m.kubeClient.Get(reqCtx.Ctx, util.NamespacedName(svc), svcOld)
-				if err != nil {
+				retErr = m.kubeClient.Get(reqCtx.Ctx, util.NamespacedName(svc), svcOld)
+				if retErr != nil {
 					return fmt.Errorf("error to get svc %s", util.Key(svc))
 				}
 				updated := svcOld.DeepCopy()
 				updated.Status.LoadBalancer = *newStatus
 				reqCtx.Log.Info(fmt.Sprintf("LoadBalancer: %v", updated.Status.LoadBalancer))
-				err = m.kubeClient.Status().Patch(reqCtx.Ctx, updated, client.MergeFrom(svcOld))
-				if err == nil {
+				retErr = m.kubeClient.Status().Patch(reqCtx.Ctx, updated, client.MergeFrom(svcOld))
+				if retErr == nil {
 					return nil
 				}
 
 				// If the object no longer exists, we don't want to recreate it. Just bail
 				// out so that we can process the delete, which we should soon be receiving
 				// if we haven't already.
-				if apierrors.IsNotFound(err) {
-					util.ServiceLog.Error(err, "not persisting update to service that no longer exists")
+				if apierrors.IsNotFound(retErr) {
+					util.ServiceLog.Error(retErr, "not persisting update to service that no longer exists")
+					retErr = nil
 					return nil
 				}
 				// TODO: Try to resolve the conflict if the change was unrelated to load
 				// balancer status. For now, just pass it up the stack.
-				if apierrors.IsConflict(err) {
+				if apierrors.IsConflict(retErr) {
 					return fmt.Errorf("not persisting update to service %s that "+
-						"has been changed since we received it: %v", util.Key(svc), err)
+						"has been changed since we received it: %v", util.Key(svc), retErr)
 				}
-				reqCtx.Log.Error(err, "failed to persist updated LoadBalancerStatus"+
+				reqCtx.Log.Error(retErr, "failed to persist updated LoadBalancerStatus"+
 					" after creating its load balancer")
-				return fmt.Errorf("retry with %s, %s", err.Error(), TRY_AGAIN)
+				return fmt.Errorf("retry with %s, %s", retErr.Error(), TRY_AGAIN)
 			},
 			svc,
 		)
+		return retErr
 	}
 	return nil
 

@@ -129,7 +129,7 @@ func isLoadBalancerReusable(service *v1.Service, tags []model.Tag, lbIp string) 
 	if len(service.Status.LoadBalancer.Ingress) > 0 {
 		found := false
 		for _, ingress := range service.Status.LoadBalancer.Ingress {
-			if ingress.IP == lbIp {
+			if ingress.IP == lbIp || (ingress.Hostname != "" && ingress.IP == "") {
 				found = true
 			}
 		}
