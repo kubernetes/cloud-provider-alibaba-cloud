@@ -795,7 +795,7 @@ func (mgr *VGroupManager) buildClusterBackends(reqCtx *RequestContext, candidate
 
 	backends := append(ecsBackends, eciBackends...)
 
-	return setWeightBackends(ENITrafficPolicy, backends, vgroup.VGroupWeight), nil
+	return setWeightBackends(ClusterTrafficPolicy, backends, vgroup.VGroupWeight), nil
 }
 
 func updateENIBackends(mgr *VGroupManager, backends []model.BackendAttribute, ipVersion model.AddressIPVersionType) (
@@ -848,7 +848,7 @@ func setWeightBackends(mode TrafficPolicy, backends []model.BackendAttribute, we
 func podNumberAlgorithm(mode TrafficPolicy, backends []model.BackendAttribute) []model.BackendAttribute {
 	if mode == ENITrafficPolicy || mode == ClusterTrafficPolicy {
 		for i := range backends {
-			backends[i].Weight = 1
+			backends[i].Weight = DefaultServerWeight
 		}
 		return backends
 	}
