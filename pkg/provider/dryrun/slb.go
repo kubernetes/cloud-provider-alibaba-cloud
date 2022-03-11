@@ -2,6 +2,7 @@ package dryrun
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -34,7 +35,7 @@ func (m *DryRunSLB) CreateLoadBalancer(ctx context.Context, mdl *model.LoadBalan
 	mtype := "CreateLoadBalancer"
 	svc := getService(ctx)
 	AddEvent(SLB, util.Key(svc), "", "CreateSLB", ERROR, "")
-	return fmt.Errorf("api %s should not be called", mtype)
+	return hintError(mtype, "need to create loadbalancer")
 }
 
 func (m *DryRunSLB) DescribeLoadBalancer(ctx context.Context, mdl *model.LoadBalancer) error {
@@ -45,42 +46,44 @@ func (m *DryRunSLB) DeleteLoadBalancer(ctx context.Context, mdl *model.LoadBalan
 	mtype := "DeleteLoadBalancer"
 	svc := getService(ctx)
 	AddEvent(SLB, util.Key(svc), mdl.LoadBalancerAttribute.LoadBalancerId, "DeleteSLB", ERROR, "")
-	return fmt.Errorf("function should not be called on start %s", mtype)
+	return hintError(mtype,
+		fmt.Sprintf("loadbalancer %s should be deleted", mdl.LoadBalancerAttribute.LoadBalancerId))
 }
 
 func (m *DryRunSLB) ModifyLoadBalancerInstanceSpec(ctx context.Context, lbId string, spec string) error {
 	mtype := "ModifyLoadBalancerInstanceSpec"
 	svc := getService(ctx)
 	AddEvent(SLB, util.Key(svc), lbId, "ModifySLBSpec", ERROR, "")
-	return fmt.Errorf("function should not be called on start %s", mtype)
+	return hintError(mtype, fmt.Sprintf("loadbalancer %s spec should be %s", lbId, spec))
 }
 
 func (m *DryRunSLB) SetLoadBalancerDeleteProtection(ctx context.Context, lbId string, flag string) error {
 	mtype := "SetLoadBalancerDeleteProtection"
 	svc := getService(ctx)
 	AddEvent(SLB, util.Key(svc), lbId, "SetSLBDeleteProtection", ERROR, "")
-	return fmt.Errorf("function should not be called on start %s", mtype)
+	return hintError(mtype, fmt.Sprintf("loadbalancer %s DeleteProtection should be %s", lbId, flag))
 }
 
 func (m *DryRunSLB) SetLoadBalancerName(ctx context.Context, lbId string, name string) error {
 	mtype := "SetLoadBalancerName"
 	svc := getService(ctx)
 	AddEvent(SLB, util.Key(svc), lbId, "SetSLBName", ERROR, "")
-	return fmt.Errorf("function should not be called on start %s", mtype)
+	return hintError(mtype, fmt.Sprintf("loadbalancer %s name should be %s", lbId, name))
 }
 
 func (m *DryRunSLB) ModifyLoadBalancerInternetSpec(ctx context.Context, lbId string, chargeType string, bandwidth int) error {
 	mtype := "ModifyLoadBalancerInternetSpec"
 	svc := getService(ctx)
 	AddEvent(SLB, util.Key(svc), lbId, "ModifyInternetSpec", ERROR, "")
-	return fmt.Errorf("function should not be called on start %s", mtype)
+	return hintError(mtype, fmt.Sprintf("loadbalancer %s chargeType should be %s, bandwidth %d",
+		lbId, chargeType, bandwidth))
 }
 
 func (m *DryRunSLB) SetLoadBalancerModificationProtection(ctx context.Context, lbId string, flag string) error {
 	mtype := "SetLoadBalancerModificationProtection"
 	svc := getService(ctx)
 	AddEvent(SLB, util.Key(svc), lbId, "SetSLBModificationProtection", ERROR, "")
-	return fmt.Errorf("function should not be called on start %s", mtype)
+	return hintError(mtype, fmt.Sprintf("loadbalancer %s ModificationProtection should be %s", lbId, flag))
 }
 
 func (m *DryRunSLB) AddTags(ctx context.Context, lbId string, tags string) error {
@@ -101,7 +104,7 @@ func (m *DryRunSLB) StartLoadBalancerListener(ctx context.Context, lbId string, 
 	svc := getService(ctx)
 	AddEvent(SLB, fmt.Sprintf("%s/%d", util.Key(svc), port), lbId, "StartListener",
 		ERROR, "")
-	return fmt.Errorf("function should not be called on start %s", mtype)
+	return hintError(mtype, fmt.Sprintf("loadbalancer %s listener %d should be running", lbId, port))
 }
 
 func (m *DryRunSLB) StopLoadBalancerListener(ctx context.Context, lbId string, port int) error {
@@ -109,14 +112,14 @@ func (m *DryRunSLB) StopLoadBalancerListener(ctx context.Context, lbId string, p
 	svc := getService(ctx)
 	AddEvent(SLB, fmt.Sprintf("%s/%d", util.Key(svc), port), lbId, "StopListener",
 		ERROR, "")
-	return fmt.Errorf("function should not be called on start %s", mtype)
+	return hintError(mtype, fmt.Sprintf("loadbalancer %s listener %d should be stopped", lbId, port))
 }
 
 func (m *DryRunSLB) DeleteLoadBalancerListener(ctx context.Context, lbId string, port int) error {
 	mtype := "DeleteLoadBalancerListener"
 	svc := getService(ctx)
 	AddEvent(SLB, fmt.Sprintf("%s/%d", util.Key(svc), port), lbId, "DeleteListener", ERROR, "")
-	return fmt.Errorf("function should not be called on start %s", mtype)
+	return hintError(mtype, fmt.Sprintf("loadbalancer %s listener %d should be deleted", lbId, port))
 }
 
 func (m *DryRunSLB) CreateLoadBalancerTCPListener(ctx context.Context, lbId string, listener model.ListenerAttribute) error {
@@ -124,7 +127,8 @@ func (m *DryRunSLB) CreateLoadBalancerTCPListener(ctx context.Context, lbId stri
 	svc := getService(ctx)
 	AddEvent(SLB, fmt.Sprintf("%s/%d", util.Key(svc), listener.ListenerPort), lbId,
 		"CreateListener", ERROR, "")
-	return fmt.Errorf("function should not be called on start %s", mtype)
+	return hintError(mtype, fmt.Sprintf("loadbalancer %s listener %d should be created",
+		lbId, listener.ListenerPort))
 }
 
 func (m *DryRunSLB) SetLoadBalancerTCPListenerAttribute(ctx context.Context, lbId string, listener model.ListenerAttribute) error {
@@ -133,7 +137,8 @@ func (m *DryRunSLB) SetLoadBalancerTCPListenerAttribute(ctx context.Context, lbI
 	reason := getDryRunMsg(ctx)
 	AddEvent(SLB, fmt.Sprintf("%s/%d", util.Key(svc), listener.ListenerPort), lbId,
 		"UpdateListener", ERROR, reason)
-	return fmt.Errorf("function should not be called on start %s, called reason: %s", mtype, reason)
+	return hintError(mtype, fmt.Sprintf("loadbalancer %s listener %d should be updated, %s",
+		lbId, listener.ListenerPort, reason))
 }
 
 func (m *DryRunSLB) CreateLoadBalancerUDPListener(ctx context.Context, lbId string, listener model.ListenerAttribute) error {
@@ -141,7 +146,8 @@ func (m *DryRunSLB) CreateLoadBalancerUDPListener(ctx context.Context, lbId stri
 	svc := getService(ctx)
 	AddEvent(SLB, fmt.Sprintf("%s/%d", util.Key(svc), listener.ListenerPort), lbId,
 		"CreateListener", ERROR, "")
-	return fmt.Errorf("function should not be called on start %s", mtype)
+	return hintError(mtype, fmt.Sprintf("loadbalancer %s listener %d should be created",
+		lbId, listener.ListenerPort))
 }
 
 func (m *DryRunSLB) SetLoadBalancerUDPListenerAttribute(ctx context.Context, lbId string, listener model.ListenerAttribute) error {
@@ -150,7 +156,8 @@ func (m *DryRunSLB) SetLoadBalancerUDPListenerAttribute(ctx context.Context, lbI
 	reason := getDryRunMsg(ctx)
 	AddEvent(SLB, fmt.Sprintf("%s/%d", util.Key(svc), listener.ListenerPort), lbId,
 		"UpdateListener", ERROR, reason)
-	return fmt.Errorf("function should not be called on start %s, called reason: %s", mtype, reason)
+	return hintError(mtype, fmt.Sprintf("loadbalancer %s listener %d should be updated, %s",
+		lbId, listener.ListenerPort, reason))
 }
 
 func (m *DryRunSLB) CreateLoadBalancerHTTPListener(ctx context.Context, lbId string, listener model.ListenerAttribute) error {
@@ -158,7 +165,8 @@ func (m *DryRunSLB) CreateLoadBalancerHTTPListener(ctx context.Context, lbId str
 	svc := getService(ctx)
 	AddEvent(SLB, fmt.Sprintf("%s/%d", util.Key(svc), listener.ListenerPort), lbId,
 		"CreateListener", ERROR, "")
-	return fmt.Errorf("function should not be called on start %s", mtype)
+	return hintError(mtype, fmt.Sprintf("loadbalancer %s listener %d should be created",
+		lbId, listener.ListenerPort))
 }
 
 func (m *DryRunSLB) SetLoadBalancerHTTPListenerAttribute(ctx context.Context, lbId string, listener model.ListenerAttribute) error {
@@ -167,7 +175,8 @@ func (m *DryRunSLB) SetLoadBalancerHTTPListenerAttribute(ctx context.Context, lb
 	reason := getDryRunMsg(ctx)
 	AddEvent(SLB, fmt.Sprintf("%s/%d", util.Key(svc), listener.ListenerPort), lbId,
 		"UpdateListener", ERROR, reason)
-	return fmt.Errorf("function should not be called on start %s, called reason: %s", mtype, reason)
+	return hintError(mtype, fmt.Sprintf("loadbalancer %s listener %d should be updated, %s",
+		lbId, listener.ListenerPort, reason))
 }
 
 func (m *DryRunSLB) CreateLoadBalancerHTTPSListener(ctx context.Context, lbId string, listener model.ListenerAttribute) error {
@@ -175,7 +184,8 @@ func (m *DryRunSLB) CreateLoadBalancerHTTPSListener(ctx context.Context, lbId st
 	svc := getService(ctx)
 	AddEvent(SLB, fmt.Sprintf("%s/%d", util.Key(svc), listener.ListenerPort), lbId, "CreateListener",
 		ERROR, "")
-	return fmt.Errorf("function should not be called on start %s", mtype)
+	return hintError(mtype, fmt.Sprintf("loadbalancer %s listener %d should be created",
+		lbId, listener.ListenerPort))
 }
 
 func (m *DryRunSLB) SetLoadBalancerHTTPSListenerAttribute(ctx context.Context, lbId string, listener model.ListenerAttribute) error {
@@ -184,7 +194,8 @@ func (m *DryRunSLB) SetLoadBalancerHTTPSListenerAttribute(ctx context.Context, l
 	reason := getDryRunMsg(ctx)
 	AddEvent(SLB, fmt.Sprintf("%s/%d", util.Key(svc), listener.ListenerPort), lbId,
 		"UpdateListener", ERROR, reason)
-	return fmt.Errorf("function should not be called on start %s, called reason: %s", mtype, reason)
+	return hintError(mtype, fmt.Sprintf("loadbalancer %s listener %d should be updated, %s",
+		lbId, listener.ListenerPort, reason))
 }
 
 // VServerGroup
@@ -211,7 +222,7 @@ func (m *DryRunSLB) DeleteVServerGroup(ctx context.Context, vGroupId string) err
 	lbId := getSlb(ctx)
 	AddEvent(SLB, fmt.Sprintf("%s/%s", util.Key(svc), vGroupId), lbId,
 		"DeleteVgroup", ERROR, "")
-	return fmt.Errorf("function should not be called on start %s", mtype)
+	return hintError(mtype, fmt.Sprintf("loadbalancer %s vgroup %s should be deleted", lbId, vGroupId))
 }
 
 /*
@@ -232,11 +243,22 @@ func (m *DryRunSLB) RemoveVServerGroupBackendServers(ctx context.Context, vGroup
 	lbId := getSlb(ctx)
 	AddEvent(SLB, fmt.Sprintf("%s/%s", util.Key(svc), vGroupId), lbId,
 		"RemoveVgroup", ERROR, "")
-	return fmt.Errorf("function should not be called on start %s", mtype)
+	return hintError(mtype, fmt.Sprintf("loadbalancer %s vgroup %s backends %s should be deleted",
+		lbId, vGroupId, backends))
 }
 
 func (m *DryRunSLB) SetVServerGroupAttribute(ctx context.Context, vGroupId string, backends string) error {
-	return m.slb.SetVServerGroupAttribute(ctx, vGroupId, backends)
+	var updates []model.DryRunBackendAttribute
+	err := json.Unmarshal([]byte(backends), &updates)
+	if err != nil {
+		return fmt.Errorf("unmarshal [%s] error: %s", backends, err.Error())
+
+	}
+	dryRunStr, err := json.Marshal(updates)
+	if err != nil {
+		return fmt.Errorf("marshal [%+v] error: %s", updates, err.Error())
+	}
+	return m.slb.SetVServerGroupAttribute(ctx, vGroupId, string(dryRunStr))
 }
 
 func (m *DryRunSLB) ModifyVServerGroupBackendServers(ctx context.Context, vGroupId string, old string, new string) error {
@@ -245,7 +267,7 @@ func (m *DryRunSLB) ModifyVServerGroupBackendServers(ctx context.Context, vGroup
 	lbId := getSlb(ctx)
 	AddEvent(SLB, fmt.Sprintf("%s/VGroupID/%s", util.Key(svc), vGroupId), lbId,
 		"ModifyVgroup", ERROR, "")
-	return fmt.Errorf("function should not be called on start %s", mtype)
+	return hintError(mtype, fmt.Sprintf("loadbalancer %s vgroup %s backends should be %s", lbId, vGroupId, new))
 }
 
 func getService(ctx context.Context) *v1.Service {
@@ -291,4 +313,8 @@ func getDryRunMsg(ctx context.Context) string {
 		return ""
 	}
 	return msg
+}
+
+func hintError(openapi, msg string) error {
+	return fmt.Errorf("OpenAPI: %s, Message: %s", openapi, msg)
 }
