@@ -259,7 +259,7 @@ func (m *ModelApplier) cleanup(reqCtx *RequestContext, local *model.LoadBalancer
 					vg.VGroupName, vg.VGroupId))
 				var del []model.BackendAttribute
 				for _, remote := range vg.Backends {
-					if isBackendManagedByMyService(reqCtx, remote, "") {
+					if !remote.IsUserManaged {
 						del = append(del, remote)
 					}
 				}
