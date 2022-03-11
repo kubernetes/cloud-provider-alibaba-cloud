@@ -78,7 +78,7 @@ type ClientMgr struct {
 // NewClientMgr return a new client manager
 func NewClientMgr() (*ClientMgr, error) {
 	if err := ctrlCfg.CloudCFG.LoadCloudCFG(); err != nil {
-		return nil, fmt.Errorf("load cloud config %s error: %s", ctrlCfg.ControllerCFG.CloudConfig, err.Error())
+		return nil, fmt.Errorf("load cloud config %s error: %s", ctrlCfg.ControllerCFG.CloudConfigPath, err.Error())
 	}
 
 	meta := NewMetaData()
@@ -400,10 +400,10 @@ func (f *ServiceToken) NextToken() (*Token, error) {
 
 func LoadAK() (string, string, error) {
 	var keyId, keySecret string
-	log.V(5).Info(fmt.Sprintf("load cfg from file: %s", ctrlCfg.ControllerCFG.CloudConfig))
+	log.V(5).Info(fmt.Sprintf("load cfg from file: %s", ctrlCfg.ControllerCFG.CloudConfigPath))
 	if err := ctrlCfg.CloudCFG.LoadCloudCFG(); err != nil {
 		return "", "", fmt.Errorf("load cloud config %s error: %v",
-			ctrlCfg.ControllerCFG.CloudConfig, err.Error())
+			ctrlCfg.ControllerCFG.CloudConfigPath, err.Error())
 	}
 
 	if ctrlCfg.CloudCFG.Global.AccessKeyID != "" && ctrlCfg.CloudCFG.Global.AccessKeySecret != "" {
