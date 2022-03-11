@@ -476,10 +476,13 @@ func (mgr *VGroupManager) buildVGroupForServicePort(reqCtx *RequestContext, port
 			return vg, fmt.Errorf("vgroupid parse error: %s", err.Error())
 		}
 		if vgroupId != "" {
-			// check vgroup id is existed
-			_, err = mgr.cloud.DescribeVServerGroupAttribute(reqCtx.Ctx, vgroupId)
+			exist, err := isVGroupIdExist(mgr, reqCtx, vgroupId)
 			if err != nil {
-				return vg, fmt.Errorf("cannot find vgroup by vgroupId %s error: %s", vgroupId, err.Error())
+				return vg, fmt.Errorf("find vgroupId %s of lb %s error: %s", vgroupId,
+					reqCtx.Anno.Get(LoadBalancerId), err.Error())
+			}
+			if !exist {
+				return vg, fmt.Errorf("can not find vgroupId %s in lb %s", vgroupId, reqCtx.Anno.Get(LoadBalancerId))
 			}
 			reqCtx.Log.Info(fmt.Sprintf("user managed vgroupId %s for port %d", vgroupId, port.Port))
 			vg.VGroupId = vgroupId
@@ -534,6 +537,20 @@ func (mgr *VGroupManager) buildVGroupForServicePort(reqCtx *RequestContext, port
 
 	vg.Backends = backends
 	return vg, nil
+}
+
+func isVGroupIdExist(mgr *VGroupManager, reqCtx *RequestContext, vgroupId string) (bool, error) {
+	// check vgroup id is existed
+	vgroups, err := mgr.cloud.DescribeVServerGroups(reqCtx.Ctx, reqCtx.Anno.Get(LoadBalancerId))
+	if err != nil {
+		return false, fmt.Errorf("cannot find vgroup by vgroupId %s error: %s", vgroupId, err.Error())
+	}
+	for _, v := range vgroups {
+		if v.VGroupId == vgroupId {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 func setGenericBackendAttribute(candidates *EndpointWithENI, vgroup model.VServerGroup) []model.BackendAttribute {
