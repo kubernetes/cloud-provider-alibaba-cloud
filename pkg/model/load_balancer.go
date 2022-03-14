@@ -68,6 +68,13 @@ type LoadBalancer struct {
 	VServerGroups         []VServerGroup
 }
 
+func (l *LoadBalancer) GetLoadBalancerId() string {
+	if l == nil {
+		return "not found"
+	}
+	return l.LoadBalancerAttribute.LoadBalancerId
+}
+
 type LoadBalancerAttribute struct {
 	IsUserManaged bool
 

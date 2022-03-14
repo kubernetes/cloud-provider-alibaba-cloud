@@ -182,11 +182,11 @@ func setFields(node *v1.Node, ins *prvd.NodeAttribute, cfgRoute bool) {
 			"node %s, Adding node label from cloud provider: %s=%s, %s=%s",
 			node.Name,
 			v1.LabelZoneFailureDomain, ins.Zone,
-			v1.LabelZoneFailureDomainStable, ins.Zone,
+			v1.LabelTopologyZone, ins.Zone,
 		)
 		modify := func(n *v1.Node) {
 			n.Labels[v1.LabelZoneFailureDomain] = ins.Zone
-			n.Labels[v1.LabelZoneFailureDomainStable] = ins.Zone
+			n.Labels[v1.LabelTopologyZone] = ins.Zone
 		}
 		modifiers = append(modifiers, modify)
 	}
@@ -196,11 +196,11 @@ func setFields(node *v1.Node, ins *prvd.NodeAttribute, cfgRoute bool) {
 			"node %s,Adding node label from cloud provider: %s=%s, %s=%s",
 			node.Name,
 			v1.LabelZoneRegion, ins.Region,
-			v1.LabelZoneRegionStable, ins.Region,
+			v1.LabelTopologyRegion, ins.Region,
 		)
 		modify := func(n *v1.Node) {
 			n.Labels[v1.LabelZoneRegion] = ins.Region
-			n.Labels[v1.LabelZoneRegionStable] = ins.Region
+			n.Labels[v1.LabelTopologyRegion] = ins.Region
 		}
 		modifiers = append(modifiers, modify)
 	}

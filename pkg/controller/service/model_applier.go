@@ -40,10 +40,16 @@ func (m *ModelApplier) Apply(reqCtx *RequestContext, local *model.LoadBalancer) 
 		if err := m.applyLoadBalancerAttribute(reqCtx, local, remote); err != nil {
 			return remote, fmt.Errorf("update lb attribute error: %s", err.Error())
 		}
-		// if remote slb is not exist, return
-		if remote.LoadBalancerAttribute.LoadBalancerId == "" {
+	}
+
+	if remote.LoadBalancerAttribute.LoadBalancerId == "" {
+		// delete loadbalancer: return nil
+		if needDeleteLoadBalancer(reqCtx.Service) {
 			return remote, nil
 		}
+		// update loadbalancer: return error
+		return remote, fmt.Errorf("alicloud: can not find loadbalancer by tag [%s:%s]",
+			TAGKEY, reqCtx.Anno.GetDefaultLoadBalancerName())
 	}
 	reqCtx.Ctx = context.WithValue(reqCtx.Ctx, dryrun.ContextSLB, remote.LoadBalancerAttribute.LoadBalancerId)
 
