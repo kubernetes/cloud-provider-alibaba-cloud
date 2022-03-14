@@ -24,7 +24,7 @@ func CreateACKClient() (*ACKClient, error) {
 func TestACKClient_DescribeClusterDetail(t *testing.T) {
 	client, err := CreateACKClient()
 	if err != nil {
-		t.Fatalf(err.Error())
+		t.Skip("fail to create ack client, skip")
 	}
 
 	resp, err := client.DescribeClusterDetail("<your-cluster-id>")
@@ -37,7 +37,7 @@ func TestACKClient_DescribeClusterDetail(t *testing.T) {
 func TestACKClient_ScaleOutCluster(t *testing.T) {
 	client, err := CreateACKClient()
 	if err != nil {
-		t.Fatalf(err.Error())
+		t.Skip("fail to create ack client, skip")
 	}
 
 	err = client.ScaleOutCluster("<your-cluster-id>", 1)
@@ -49,7 +49,7 @@ func TestACKClient_ScaleOutCluster(t *testing.T) {
 func TestACKClient_DeleteClusterNodes(t *testing.T) {
 	client, err := CreateACKClient()
 	if err != nil {
-		t.Fatalf(err.Error())
+		t.Skip("fail to create ack client, skip")
 	}
 
 	err = client.DeleteClusterNodes("<your-cluster-id>", "<your-node-name>")
@@ -61,7 +61,7 @@ func TestACKClient_DeleteClusterNodes(t *testing.T) {
 func TestACKClient_DescribeClusterAddonsVersion(t *testing.T) {
 	client, err := CreateACKClient()
 	if err != nil {
-		t.Fatalf(err.Error())
+		t.Skip("fail to create ack client, skip")
 	}
 
 	addon, err := client.DescribeClusterAddonsUpgradeStatus("<your-cluster-id>", "terway-eniip")
@@ -74,8 +74,9 @@ func TestACKClient_DescribeClusterAddonsVersion(t *testing.T) {
 func TestNewACKClient_ModifyClusterConfiguration(t *testing.T) {
 	client, err := CreateACKClient()
 	if err != nil {
-		t.Fatalf(err.Error())
+		t.Skip("fail to create ack client, skip")
 	}
+
 	configs := make(map[string]string)
 	configs["RouteTableIDS"] = ""
 
