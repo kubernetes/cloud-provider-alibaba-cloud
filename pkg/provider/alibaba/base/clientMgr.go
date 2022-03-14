@@ -20,7 +20,6 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -31,11 +30,11 @@ import (
 	"github.com/aliyun/alibaba-cloud-sdk-go/services/alb"
 	"github.com/aliyun/alibaba-cloud-sdk-go/services/cas"
 	"github.com/aliyun/alibaba-cloud-sdk-go/services/ecs"
+	"github.com/aliyun/alibaba-cloud-sdk-go/services/ess"
 	"github.com/aliyun/alibaba-cloud-sdk-go/services/pvtz"
 	"github.com/aliyun/alibaba-cloud-sdk-go/services/slb"
 	"github.com/aliyun/alibaba-cloud-sdk-go/services/sls"
 	"github.com/aliyun/alibaba-cloud-sdk-go/services/vpc"
-	"github.com/ghodss/yaml"
 	"github.com/go-cmd/cmd"
 
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -73,12 +72,13 @@ type ClientMgr struct {
 	ALB  *alb.Client
 	SLS  *sls.Client
 	CAS  *cas.Client
+	ESS  *ess.Client
 }
 
 // NewClientMgr return a new client manager
 func NewClientMgr() (*ClientMgr, error) {
-	if err := loadCloudCFG(); err != nil {
-		return nil, fmt.Errorf("load cloud config %s error: %s", ctrlCfg.ControllerCFG.CloudConfig, err.Error())
+	if err := ctrlCfg.CloudCFG.LoadCloudCFG(); err != nil {
+		return nil, fmt.Errorf("load cloud config %s error: %s", ctrlCfg.ControllerCFG.CloudConfigPath, err.Error())
 	}
 
 	meta := NewMetaData()
@@ -146,6 +146,15 @@ func NewClientMgr() (*ClientMgr, error) {
 	pvtzcli.AppendUserAgent(KubernetesCloudControllerManager, version.Version)
 	pvtzcli.AppendUserAgent(AgentClusterId, CLUSTER_ID)
 
+	esscli, err := ess.NewClientWithStsToken(
+		region, "key", "secret", "",
+	)
+	if err != nil {
+		return nil, fmt.Errorf("initialize alibaba pvtz client: %s", err.Error())
+	}
+	esscli.AppendUserAgent(KubernetesCloudControllerManager, version.Version)
+	esscli.AppendUserAgent(AgentClusterId, CLUSTER_ID)
+
 	auth := &ClientMgr{
 		Meta:   meta,
 		ECS:    ecli,
@@ -155,6 +164,7 @@ func NewClientMgr() (*ClientMgr, error) {
 		ALB:    albcli,
 		SLS:    slscli,
 		CAS:    cascli,
+		ESS:    esscli,
 		Region: region,
 		stop:   make(<-chan struct{}, 1),
 	}
@@ -320,7 +330,7 @@ type TokenAuth interface {
 type AkAuthToken struct{ ak *Token }
 
 func (f *AkAuthToken) NextToken() (*Token, error) {
-	key, secret, err := loadAK()
+	key, secret, err := LoadAK()
 	if err != nil {
 		return f.ak, err
 	}
@@ -366,7 +376,7 @@ type ServiceToken struct {
 }
 
 func (f *ServiceToken) NextToken() (*Token, error) {
-	key, secret, err := loadAK()
+	key, secret, err := LoadAK()
 	if err != nil {
 		return nil, err
 	}
@@ -388,20 +398,12 @@ func (f *ServiceToken) NextToken() (*Token, error) {
 	return token, nil
 }
 
-func loadCloudCFG() error {
-	content, err := ioutil.ReadFile(ctrlCfg.ControllerCFG.CloudConfig)
-	if err != nil {
-		return fmt.Errorf("read cloud config error: %s ", err.Error())
-	}
-	return yaml.Unmarshal(content, ctrlCfg.CloudCFG)
-}
-
-func loadAK() (string, string, error) {
+func LoadAK() (string, string, error) {
 	var keyId, keySecret string
-	log.V(5).Info(fmt.Sprintf("load cfg from file: %s", ctrlCfg.ControllerCFG.CloudConfig))
-	if err := loadCloudCFG(); err != nil {
+	log.V(5).Info(fmt.Sprintf("load cfg from file: %s", ctrlCfg.ControllerCFG.CloudConfigPath))
+	if err := ctrlCfg.CloudCFG.LoadCloudCFG(); err != nil {
 		return "", "", fmt.Errorf("load cloud config %s error: %v",
-			ctrlCfg.ControllerCFG.CloudConfig, err.Error())
+			ctrlCfg.ControllerCFG.CloudConfigPath, err.Error())
 	}
 
 	if ctrlCfg.CloudCFG.Global.AccessKeyID != "" && ctrlCfg.CloudCFG.Global.AccessKeySecret != "" {

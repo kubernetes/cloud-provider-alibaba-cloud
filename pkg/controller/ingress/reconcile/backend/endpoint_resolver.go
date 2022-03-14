@@ -3,12 +3,13 @@ package backend
 import (
 	"context"
 	"fmt"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/helper"
 
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/util"
 
-	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/helper"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/helper/k8s"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/ingress/reconcile/store"
+	svcctrl "k8s.io/cloud-provider-alibaba-cloud/pkg/controller/service"
 
 	pkgModel "k8s.io/cloud-provider-alibaba-cloud/pkg/model"
 
@@ -169,7 +170,11 @@ func (r *defaultEndpointResolver) ResolveLocalEndpoints(ctx context.Context, svc
 
 	svcNodePort := svcPort.NodePort
 
-	nodes, err := helper.GetNodes(svc, r.k8sClient)
+	reqCtx := &svcctrl.RequestContext{
+		Service: svc,
+		Anno:    &svcctrl.AnnotationRequest{Service: svc},
+	}
+	nodes, err := svcctrl.GetNodes(reqCtx, r.k8sClient)
 	if err != nil {
 		return nil, containsPotentialReadyEndpoints, err
 	}
@@ -197,7 +202,7 @@ func (r *defaultEndpointResolver) ResolveLocalEndpoints(ctx context.Context, svc
 			continue
 		}
 
-		_, id, err := helper.NodeFromProviderID(node.Spec.ProviderID)
+		_, id, err := svcctrl.NodeFromProviderID(node.Spec.ProviderID)
 		if err != nil {
 			return nil, containsPotentialReadyEndpoints, err
 		}
@@ -228,8 +233,11 @@ func (r *defaultEndpointResolver) ResolveClusterEndpoints(ctx context.Context, s
 	}
 
 	svcNodePort := svcPort.NodePort
-
-	nodes, err := helper.GetNodes(svc, r.k8sClient)
+	reqCtx := &svcctrl.RequestContext{
+		Service: svc,
+		Anno:    &svcctrl.AnnotationRequest{Service: svc},
+	}
+	nodes, err := svcctrl.GetNodes(reqCtx, r.k8sClient)
 	if err != nil {
 		return nil, containsPotentialReadyEndpoints, err
 	}
@@ -240,7 +248,7 @@ func (r *defaultEndpointResolver) ResolveClusterEndpoints(ctx context.Context, s
 		if helper.HasExcludeLabel(&node) {
 			continue
 		}
-		_, id, err := helper.NodeFromProviderID(node.Spec.ProviderID)
+		_, id, err := svcctrl.NodeFromProviderID(node.Spec.ProviderID)
 		if err != nil {
 			return nil, containsPotentialReadyEndpoints, fmt.Errorf("normal parse providerid: %s. "+
 				"expected: ${regionid}.${nodeid}, %s", node.Spec.ProviderID, err.Error())

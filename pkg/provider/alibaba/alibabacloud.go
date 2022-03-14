@@ -32,7 +32,7 @@ func NewAlibabaCloud() prvd.Provider {
 
 	return &AlibabaCloud{
 		IMetaData:    mgr.Meta,
-		EcsProvider:  ecs.NewEcsProvider(mgr),
+		ECSProvider:  ecs.NewECSProvider(mgr),
 		SLBProvider:  slb.NewLBProvider(mgr),
 		PVTZProvider: pvtz.NewPVTZProvider(mgr),
 		VPCProvider:  vpc.NewVPCProvider(mgr),
@@ -45,7 +45,7 @@ func NewAlibabaCloud() prvd.Provider {
 var _ prvd.Provider = AlibabaCloud{}
 
 type AlibabaCloud struct {
-	*ecs.EcsProvider
+	*ecs.ECSProvider
 	*pvtz.PVTZProvider
 	*vpc.VPCProvider
 	*slb.SLBProvider

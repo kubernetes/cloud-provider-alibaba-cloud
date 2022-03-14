@@ -184,7 +184,7 @@ func (m *ReconcileService) reconcile(request reconcile.Request) (err error) {
 		util.ServiceLog.Error(err, "reconcile: get service failed", "service", request.NamespacedName)
 		return err
 	}
-	anno := &AnnotationRequest{svc: svc}
+	anno := &AnnotationRequest{Service: svc}
 
 	// disable public address
 	if anno.Get(AddressType) == "" ||

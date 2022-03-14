@@ -40,7 +40,7 @@ func NewEndpointWithENI(reqCtx *RequestContext, kubeClient client.Client) (*Endp
 	endpointWithENI.setTrafficPolicy(reqCtx)
 	endpointWithENI.setAddressIpVersion(reqCtx)
 
-	nodes, err := getNodes(reqCtx, kubeClient)
+	nodes, err := GetNodes(reqCtx, kubeClient)
 	if err != nil {
 		return nil, fmt.Errorf("get nodes error: %s", err.Error())
 	}
@@ -362,7 +362,7 @@ func isReusedVGroup(reusedVgIDs []string, vGroupId string) bool {
 	return false
 }
 
-func getNodes(reqCtx *RequestContext, client client.Client) ([]v1.Node, error) {
+func GetNodes(reqCtx *RequestContext, client client.Client) ([]v1.Node, error) {
 	nodeList := v1.NodeList{}
 	err := client.List(reqCtx.Ctx, &nodeList)
 	if err != nil {
@@ -737,7 +737,7 @@ func (mgr *VGroupManager) buildLocalBackends(reqCtx *RequestContext, candidates 
 			continue
 		}
 
-		_, id, err := nodeFromProviderID(node.Spec.ProviderID)
+		_, id, err := NodeFromProviderID(node.Spec.ProviderID)
 		if err != nil {
 			return nil, fmt.Errorf("parse providerid: %s. "+
 				"expected: ${regionid}.${nodeid}, %s", node.Spec.ProviderID, err.Error())
@@ -795,7 +795,7 @@ func (mgr *VGroupManager) buildClusterBackends(reqCtx *RequestContext, candidate
 			reqCtx.Log.Info("node has exclude label which cannot be added to lb backend", "node", node.Name)
 			continue
 		}
-		_, id, err := nodeFromProviderID(node.Spec.ProviderID)
+		_, id, err := NodeFromProviderID(node.Spec.ProviderID)
 		if err != nil {
 			return nil, fmt.Errorf("normal parse providerid: %s. "+
 				"expected: ${regionid}.${nodeid}, %s", node.Spec.ProviderID, err.Error())

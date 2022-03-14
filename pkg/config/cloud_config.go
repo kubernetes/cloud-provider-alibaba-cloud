@@ -44,7 +44,7 @@ type CloudConfig struct {
 }
 
 func (cc *CloudConfig) LoadCloudCFG() error {
-	content, err := ioutil.ReadFile(ControllerCFG.CloudConfig)
+	content, err := ioutil.ReadFile(ControllerCFG.CloudConfigPath)
 	if err != nil {
 		return fmt.Errorf("read cloud config error: %s ", err.Error())
 	}

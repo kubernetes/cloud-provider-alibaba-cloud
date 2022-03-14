@@ -10,14 +10,14 @@ import (
 
 func NewDryRunECS(
 	auth *base.ClientMgr,
-	ecs *ecs.EcsProvider,
+	ecs *ecs.ECSProvider,
 ) *DryRunECS {
 	return &DryRunECS{auth: auth, ecs: ecs}
 }
 
 type DryRunECS struct {
 	auth *base.ClientMgr
-	ecs  *ecs.EcsProvider
+	ecs  *ecs.ECSProvider
 }
 
 var _ prvd.IInstance = &DryRunECS{}

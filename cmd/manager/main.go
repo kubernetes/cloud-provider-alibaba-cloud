@@ -1,21 +1,16 @@
 package main
 
 import (
-	"flag"
 	"fmt"
-	"k8s.io/klog/v2"
 	"net/http"
 	"os"
 	"runtime"
 
-	"github.com/spf13/pflag"
-	apiext "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 	"k8s.io/client-go/rest"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/apis"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/context/shared"
-	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/helper"
 	prvd "k8s.io/cloud-provider-alibaba-cloud/pkg/provider"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/dryrun"
@@ -44,7 +39,7 @@ func main() {
 	ctrl.SetLogger(klogr.New())
 	printVersion()
 
-	err := loadControllerConfig()
+	err := ctrlCfg.ControllerCFG.LoadControllerConfig()
 	if err != nil {
 		log.Error(err, "unable to load controller config")
 		os.Exit(1)
@@ -111,31 +106,4 @@ func main() {
 		os.Exit(1)
 	}
 
-}
-
-func loadControllerConfig() error {
-	klog.InitFlags(nil)
-
-	fs := pflag.NewFlagSet("", pflag.ExitOnError)
-	fs.AddGoFlagSet(flag.CommandLine)
-	ctrlCfg.ControllerCFG.BindFlags(fs)
-
-	if err := fs.Parse(os.Args); err != nil {
-		return err
-	}
-
-	if err := ctrlCfg.ControllerCFG.Validate(); err != nil {
-		return err
-	}
-
-	if err := ctrlCfg.CloudCFG.LoadCloudCFG(); err != nil {
-		return fmt.Errorf("load cloud config error: %s", err.Error())
-	}
-	ctrlCfg.CloudCFG.PrintInfo()
-
-	if ctrlCfg.CloudCFG.Global.FeatureGates != "" {
-		apiClient := apiext.NewForConfigOrDie(config.GetConfigOrDie())
-		return helper.BindFeatureGates(apiClient, ctrlCfg.CloudCFG.Global.FeatureGates)
-	}
-	return nil
 }
