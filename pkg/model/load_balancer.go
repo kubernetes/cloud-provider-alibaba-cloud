@@ -131,6 +131,8 @@ type ListenerAttribute struct {
 	ConnectionDrain           FlagType
 	ConnectionDrainTimeout    int // values: 10~900
 	IdleTimeout               int // values: 1~60
+	RequestTimeout            int // values: 1~180, http & https
+	EstablishedTimeout        int // values: 10~900, tcp
 	HealthCheckConnectPort    int
 	HealthCheckInterval       int      // values: 1~50
 	HealthyThreshold          int      // values: 2~10
@@ -142,6 +144,7 @@ type ListenerAttribute struct {
 	HealthCheckDomain         string   // tcp & http & https
 	HealthCheckURI            string   // tcp & http & https
 	HealthCheckHttpCode       string   // tcp & http & https
+	HealthCheckMethod         string   // http & https
 
 	// The following parameters can be set to the default value.
 	// Use the pointer type to distinguish. If the user does not set the param, the param is nil

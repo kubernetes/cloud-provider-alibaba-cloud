@@ -152,6 +152,15 @@ func (mgr *ListenerManager) buildListenerFromServicePort(reqCtx *RequestContext,
 		listener.PersistenceTimeout = &timeout
 	}
 
+	if reqCtx.Anno.Get(EstablishedTimeout) != "" {
+		establishedTimeout, err := strconv.Atoi(reqCtx.Anno.Get(EstablishedTimeout))
+		if err != nil {
+			return listener, fmt.Errorf("Annotation EstablishedTimeout must be integer, but got [%s]. message=[%s] ",
+				reqCtx.Anno.Get(EstablishedTimeout), err.Error())
+		}
+		listener.EstablishedTimeout = establishedTimeout
+	}
+
 	if reqCtx.Anno.Get(CertID) != "" {
 		listener.CertId = reqCtx.Anno.Get(CertID)
 	}
@@ -176,6 +185,15 @@ func (mgr *ListenerManager) buildListenerFromServicePort(reqCtx *RequestContext,
 				reqCtx.Anno.Get(IdleTimeout), err.Error())
 		}
 		listener.IdleTimeout = idleTimeout
+	}
+
+	if reqCtx.Anno.Get(RequestTimeout) != "" {
+		requestTimeout, err := strconv.Atoi(reqCtx.Anno.Get(RequestTimeout))
+		if err != nil {
+			return listener, fmt.Errorf("Annotation RequestTimeout must be integer, but got [%s]. message=[%s] ",
+				reqCtx.Anno.Get(RequestTimeout), err.Error())
+		}
+		listener.RequestTimeout = requestTimeout
 	}
 
 	// acl
@@ -289,6 +307,9 @@ func (mgr *ListenerManager) buildListenerFromServicePort(reqCtx *RequestContext,
 				reqCtx.Anno.Get(HealthCheckTimeout), err.Error())
 		}
 		listener.HealthCheckTimeout = timeout
+	}
+	if reqCtx.Anno.Get(HealthCheckMethod) != "" {
+		listener.HealthCheckMethod = reqCtx.Anno.Get(HealthCheckMethod)
 	}
 
 	return listener, nil
@@ -680,6 +701,14 @@ func isNeedUpdate(reqCtx *RequestContext, local model.ListenerAttribute, remote 
 		updateDetail += fmt.Sprintf("lb PersistenceTimeout %v should be changed to %v;",
 			*remote.PersistenceTimeout, *local.PersistenceTimeout)
 	}
+	if local.Protocol == model.TCP &&
+		local.EstablishedTimeout != 0 &&
+		remote.EstablishedTimeout != local.EstablishedTimeout {
+		needUpdate = true
+		update.EstablishedTimeout = local.EstablishedTimeout
+		updateDetail += fmt.Sprintf("EstablishedTimeout changed: %v - %v ;",
+			remote.EstablishedTimeout, local.EstablishedTimeout)
+	}
 	// The cert id is necessary for https, so skip to check whether it is blank
 	if local.Protocol == model.HTTPS &&
 		remote.CertId != local.CertId {
@@ -728,6 +757,15 @@ func isNeedUpdate(reqCtx *RequestContext, local model.ListenerAttribute, remote 
 		update.IdleTimeout = local.IdleTimeout
 		updateDetail += fmt.Sprintf("lb IdleTimeout %v should be changed to %v;",
 			remote.IdleTimeout, local.IdleTimeout)
+	}
+	// request timeout
+	if Is7LayerProtocol(local.Protocol) &&
+		local.RequestTimeout != 0 &&
+		remote.RequestTimeout != local.RequestTimeout {
+		needUpdate = true
+		update.RequestTimeout = local.RequestTimeout
+		updateDetail += fmt.Sprintf("RequestTimeout changed: %v - %v ;",
+			remote.RequestTimeout, local.RequestTimeout)
 	}
 	// session
 	if Is7LayerProtocol(local.Protocol) &&
@@ -875,6 +913,14 @@ func isNeedUpdate(reqCtx *RequestContext, local model.ListenerAttribute, remote 
 		update.HealthCheckTimeout = local.HealthCheckTimeout
 		updateDetail += fmt.Sprintf("lb HealthCheckTimeout %v should be changed to %v;",
 			remote.HealthCheckTimeout, local.HealthCheckTimeout)
+	}
+	if Is7LayerProtocol(local.Protocol) &&
+		local.HealthCheckMethod != "" &&
+		remote.HealthCheckMethod != local.HealthCheckMethod {
+		needUpdate = true
+		update.HealthCheckMethod = local.HealthCheckMethod
+		updateDetail += fmt.Sprintf("HealthCheckMethod changed: %v - %v ;",
+			remote.HealthCheckMethod, local.HealthCheckMethod)
 	}
 
 	reqCtx.Ctx = context.WithValue(reqCtx.Ctx, dryrun.ContextMessage, updateDetail)
