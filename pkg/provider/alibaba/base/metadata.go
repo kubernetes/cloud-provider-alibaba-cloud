@@ -534,17 +534,19 @@ func (m *CfgMetaData) VswitchID() (string, error) {
 		return m.base.VswitchID()
 	}
 
-	for _, vz := range strings.Split(ctrlCfg.CloudCFG.Global.VswitchID, ",") {
-		attr := strings.Split(vz, ":")
-		if len(attr) == 2 {
-			klog.Infof("use vsw %s as default from %s", attr[1], ctrlCfg.CloudCFG.Global.VswitchID)
-			return attr[1], nil
-		}
-		klog.Infof("simple vswitchid mode, %s", ctrlCfg.CloudCFG.Global.VswitchID)
+	vsws := strings.Split(ctrlCfg.CloudCFG.Global.VswitchID, ",")
+	if len(vsws) == 0 {
+		klog.Infof("parse vswitchid error, use vsw %s as default", ctrlCfg.CloudCFG.Global.VswitchID)
 		return ctrlCfg.CloudCFG.Global.VswitchID, nil
 	}
 
-	klog.Infof("parse vswitchid error, fall back to simple mode: %s", ctrlCfg.CloudCFG.Global.VswitchID)
+	attr := strings.Split(vsws[0], ":")
+	if len(attr) == 2 {
+		klog.Infof("use vsw %s as default from %s", attr[1], ctrlCfg.CloudCFG.Global.VswitchID)
+		return attr[1], nil
+	}
+
+	klog.Infof("use vsw %s as default", ctrlCfg.CloudCFG.Global.VswitchID)
 	return ctrlCfg.CloudCFG.Global.VswitchID, nil
 }
 
