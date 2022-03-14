@@ -783,9 +783,6 @@ func remoteDuplicatedECS(backends []model.BackendAttribute) []model.BackendAttri
 
 func (mgr *VGroupManager) buildClusterBackends(reqCtx *RequestContext, candidates *EndpointWithENI, vgroup model.VServerGroup) ([]model.BackendAttribute, error) {
 	initBackends := setGenericBackendAttribute(candidates, vgroup)
-	if len(initBackends) == 0 {
-		return nil, nil
-	}
 
 	var (
 		ecsBackends, eciBackends []model.BackendAttribute
