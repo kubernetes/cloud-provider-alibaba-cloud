@@ -533,30 +533,20 @@ func (m *CfgMetaData) VswitchID() (string, error) {
 		// get vswitch id from meta server
 		return m.base.VswitchID()
 	}
-	zlist := strings.Split(ctrlCfg.CloudCFG.Global.VswitchID, ",")
-	if len(zlist) == 1 {
-		vSwitchs := strings.Split(ctrlCfg.CloudCFG.Global.VswitchID, ":")
-		if len(vSwitchs) == 2 {
-			klog.Infof("only one vswitchid mode, %s", vSwitchs[1])
-			return vSwitchs[1], nil
-		}
-		klog.Infof("simple vswitchid mode, %s", ctrlCfg.CloudCFG.Global.VswitchID)
+
+	vsws := strings.Split(ctrlCfg.CloudCFG.Global.VswitchID, ",")
+	if len(vsws) == 0 {
+		klog.Infof("parse vswitchid error, use vsw %s as default", ctrlCfg.CloudCFG.Global.VswitchID)
 		return ctrlCfg.CloudCFG.Global.VswitchID, nil
 	}
-	mzone, err := m.Zone()
-	if err != nil {
-		return "", fmt.Errorf("retrieve vswitchid error for %s", err.Error())
+
+	attr := strings.Split(vsws[0], ":")
+	if len(attr) == 2 {
+		klog.Infof("use vsw %s as default from %s", attr[1], ctrlCfg.CloudCFG.Global.VswitchID)
+		return attr[1], nil
 	}
-	for _, zone := range zlist {
-		vs := strings.Split(zone, ":")
-		if len(vs) != 2 {
-			return "", fmt.Errorf("cloud-config vswitch format error: %s", ctrlCfg.CloudCFG.Global.VswitchID)
-		}
-		if vs[0] == "" || vs[0] == mzone {
-			return vs[1], nil
-		}
-	}
-	klog.Infof("zone[%s] match failed, fallback with simple vswitch id mode, [%s]", mzone, ctrlCfg.CloudCFG.Global.VswitchID)
+
+	klog.Infof("use vsw %s as default", ctrlCfg.CloudCFG.Global.VswitchID)
 	return ctrlCfg.CloudCFG.Global.VswitchID, nil
 }
 
