@@ -430,6 +430,7 @@ func setHTTPSListenerValue(req interface{}, listener *model.ListenerAttribute) {
 func loadTCPListener(config slb.TCPListenerConfig, listener *model.ListenerAttribute) {
 	persistenceTimeout := config.PersistenceTimeout
 	listener.PersistenceTimeout = &persistenceTimeout
+	listener.EstablishedTimeout = config.EstablishedTimeout
 	listener.ConnectionDrain = model.FlagType(config.ConnectionDrain)
 	listener.ConnectionDrainTimeout = config.ConnectionDrainTimeout
 	listener.HealthyThreshold = config.HealthyThreshold
@@ -458,6 +459,7 @@ func loadHTTPListener(config slb.HTTPListenerConfig, listener *model.ListenerAtt
 	listener.StickySessionType = config.StickySessionType
 	listener.CookieTimeout = config.CookieTimeout
 	listener.Cookie = config.Cookie
+	listener.RequestTimeout = config.RequestTimeout
 	listener.XForwardedForProto = model.FlagType(config.XForwardedForProto)
 	listener.IdleTimeout = config.IdleTimeout
 	listener.HealthCheck = model.FlagType(config.HealthCheck)
@@ -469,6 +471,7 @@ func loadHTTPListener(config slb.HTTPListenerConfig, listener *model.ListenerAtt
 	listener.HealthCheckInterval = config.HealthCheckInterval
 	listener.HealthCheckConnectPort = config.HealthCheckConnectPort
 	listener.HealthCheckHttpCode = config.HealthCheckHttpCode
+	listener.HealthCheckMethod = config.HealthCheckMethod
 	listener.ListenerForward = model.FlagType(config.ListenerForward)
 	listener.ForwardPort = config.ForwardPort
 }
@@ -478,6 +481,7 @@ func loadHTTPSListener(config slb.HTTPSListenerConfig, listener *model.ListenerA
 	listener.StickySessionType = config.StickySessionType
 	listener.CookieTimeout = config.CookieTimeout
 	listener.Cookie = config.Cookie
+	listener.RequestTimeout = config.RequestTimeout
 	listener.XForwardedForProto = model.FlagType(config.XForwardedForProto)
 	listener.IdleTimeout = config.IdleTimeout
 	listener.HealthCheck = model.FlagType(config.HealthCheck)
@@ -489,6 +493,7 @@ func loadHTTPSListener(config slb.HTTPSListenerConfig, listener *model.ListenerA
 	listener.HealthCheckInterval = config.HealthCheckInterval
 	listener.HealthCheckConnectPort = config.HealthCheckConnectPort
 	listener.HealthCheckHttpCode = config.HealthCheckHttpCode
+	listener.HealthCheckMethod = config.HealthCheckMethod
 	listener.CertId = config.ServerCertificateId
 	listener.EnableHttp2 = model.FlagType(config.EnableHttp2)
 }

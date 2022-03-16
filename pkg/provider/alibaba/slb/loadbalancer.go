@@ -33,7 +33,7 @@ func (p SLBProvider) FindLoadBalancer(ctx context.Context, mdl *model.LoadBalanc
 
 	// 1. find by loadbalancer id
 	if mdl.LoadBalancerAttribute.LoadBalancerId != "" {
-		klog.Infof("[%s] try to find loadbalancer by id %s",
+		klog.Infof("[%s] find loadbalancer by id, LoadBalancerId [%s]",
 			mdl.NamespacedName, mdl.LoadBalancerAttribute.LoadBalancerId)
 		return p.DescribeLoadBalancer(ctx, mdl)
 	}
@@ -43,12 +43,24 @@ func (p SLBProvider) FindLoadBalancer(ctx context.Context, mdl *model.LoadBalanc
 	if err != nil {
 		return err
 	}
-
-	// 3. find by loadbalancer name
-	if mdl.LoadBalancerAttribute.LoadBalancerId == "" {
-		return p.findLoadBalancerByName(mdl)
+	if mdl.LoadBalancerAttribute.LoadBalancerId != "" {
+		klog.Infof("[%s] find loadbalancer by tag, LoadBalancerId [%s]",
+			mdl.NamespacedName, mdl.LoadBalancerAttribute.LoadBalancerId)
+		return nil
 	}
 
+	// 3. find by loadbalancer name
+	err = p.findLoadBalancerByName(mdl)
+	if err != nil {
+		return err
+	}
+	if mdl.LoadBalancerAttribute.LoadBalancerId != "" {
+		klog.Infof("[%s] find loadbalancer by name, LoadBalancerId [%s]",
+			mdl.NamespacedName, mdl.LoadBalancerAttribute.LoadBalancerId)
+		return nil
+	}
+
+	klog.Infof("[%s] find no loadbalancer", mdl.NamespacedName)
 	return nil
 }
 
@@ -82,8 +94,6 @@ func (p SLBProvider) findLoadBalancerByTag(mdl *model.LoadBalancer) error {
 	}
 
 	loadResponse(resp.LoadBalancers.LoadBalancer[0], mdl)
-	klog.Infof("[%s] find loadbalancer by tag, lbId [%s]", mdl.NamespacedName,
-		resp.LoadBalancers.LoadBalancer[0].LoadBalancerId)
 	return nil
 }
 
@@ -116,8 +126,6 @@ func (p SLBProvider) findLoadBalancerByName(mdl *model.LoadBalancer) error {
 	}
 
 	loadResponse(resp.LoadBalancers.LoadBalancer[0], mdl)
-	klog.Infof("[%s] find loadbalancer by name, lbId [%s]", mdl.NamespacedName,
-		mdl.LoadBalancerAttribute.LoadBalancerId)
 	return nil
 }
 
