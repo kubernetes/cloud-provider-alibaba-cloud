@@ -33,7 +33,7 @@ func (p SLBProvider) FindLoadBalancer(ctx context.Context, mdl *model.LoadBalanc
 
 	// 1. find by loadbalancer id
 	if mdl.LoadBalancerAttribute.LoadBalancerId != "" {
-		klog.Infof("[%s] try to find loadbalancer by id %s",
+		klog.Infof("[%s] find loadbalancer by id, LoadBalancerId [%s]",
 			mdl.NamespacedName, mdl.LoadBalancerAttribute.LoadBalancerId)
 		return p.DescribeLoadBalancer(ctx, mdl)
 	}
@@ -43,12 +43,24 @@ func (p SLBProvider) FindLoadBalancer(ctx context.Context, mdl *model.LoadBalanc
 	if err != nil {
 		return err
 	}
-
-	// 3. find by loadbalancer name
-	if mdl.LoadBalancerAttribute.LoadBalancerId == "" {
-		return p.findLoadBalancerByName(mdl)
+	if mdl.LoadBalancerAttribute.LoadBalancerId != "" {
+		klog.Infof("[%s] find loadbalancer by tag, LoadBalancerId [%s]",
+			mdl.NamespacedName, mdl.LoadBalancerAttribute.LoadBalancerId)
+		return nil
 	}
 
+	// 3. find by loadbalancer name
+	err = p.findLoadBalancerByName(mdl)
+	if err != nil {
+		return err
+	}
+	if mdl.LoadBalancerAttribute.LoadBalancerId != "" {
+		klog.Infof("[%s] find loadbalancer by name, LoadBalancerId [%s]",
+			mdl.NamespacedName, mdl.LoadBalancerAttribute.LoadBalancerId)
+		return nil
+	}
+
+	klog.Infof("[%s] find no loadbalancer", mdl.NamespacedName)
 	return nil
 }
 
@@ -82,8 +94,6 @@ func (p SLBProvider) findLoadBalancerByTag(mdl *model.LoadBalancer) error {
 	}
 
 	loadResponse(resp.LoadBalancers.LoadBalancer[0], mdl)
-	klog.Infof("[%s] find loadbalancer by tag, lbId [%s]", mdl.NamespacedName,
-		resp.LoadBalancers.LoadBalancer[0].LoadBalancerId)
 	return nil
 }
 
@@ -116,8 +126,6 @@ func (p SLBProvider) findLoadBalancerByName(mdl *model.LoadBalancer) error {
 	}
 
 	loadResponse(resp.LoadBalancers.LoadBalancer[0], mdl)
-	klog.Infof("[%s] find loadbalancer by name, lbId [%s]", mdl.NamespacedName,
-		mdl.LoadBalancerAttribute.LoadBalancerId)
 	return nil
 }
 
@@ -340,9 +348,20 @@ func loadResponse(resp interface{}, lb *model.LoadBalancer) {
 	lb.LoadBalancerAttribute.MasterZoneId = v.FieldByName("MasterZoneId").String()
 	lb.LoadBalancerAttribute.SlaveZoneId = v.FieldByName("SlaveZoneId").String()
 	lb.LoadBalancerAttribute.DeleteProtection = model.FlagType(v.FieldByName("DeleteProtection").String())
-	lb.LoadBalancerAttribute.InternetChargeType = model.InternetChargeType(v.FieldByName("InternetChargeType").String())
 	lb.LoadBalancerAttribute.LoadBalancerSpec = model.LoadBalancerSpecType(v.FieldByName("LoadBalancerSpec").String())
 	lb.LoadBalancerAttribute.ModificationProtectionStatus = model.ModificationProtectionType(
 		v.FieldByName("ModificationProtectionStatus").String())
 	lb.LoadBalancerAttribute.ResourceGroupId = v.FieldByName("ResourceGroupId").String()
+
+	switch t := resp.(type) {
+	// DescribeLoadBalancers
+	case slb.LoadBalancer:
+		lb.LoadBalancerAttribute.InternetChargeType = model.InternetChargeType(v.FieldByName("InternetChargeTypeAlias").String())
+	// DescribeLoadBalancerAttribute
+	case slb.DescribeLoadBalancerAttributeResponse:
+		lb.LoadBalancerAttribute.InternetChargeType = model.InternetChargeType(v.FieldByName("InternetChargeType").String())
+	default:
+		klog.Errorf("not support type: %T", t)
+	}
+
 }
