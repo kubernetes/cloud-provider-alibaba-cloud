@@ -50,7 +50,7 @@ func (p SLBProvider) FindLoadBalancer(ctx context.Context, mdl *model.LoadBalanc
 	}
 
 	// 3. find by loadbalancer name
-	err = p.findLoadBalancerByName(mdl)
+	err = p.FindLoadBalancerByName(mdl)
 	if err != nil {
 		return err
 	}
@@ -97,7 +97,7 @@ func (p SLBProvider) findLoadBalancerByTag(mdl *model.LoadBalancer) error {
 	return nil
 }
 
-func (p SLBProvider) findLoadBalancerByName(mdl *model.LoadBalancer) error {
+func (p SLBProvider) FindLoadBalancerByName(mdl *model.LoadBalancer) error {
 	if mdl.LoadBalancerAttribute.LoadBalancerName == "" {
 		klog.Warningf("[%s] find loadbalancer by name error: loadbalancer name is empty.", mdl.NamespacedName.String())
 		return nil
@@ -267,6 +267,23 @@ func (p SLBProvider) CreateAccessControlList(ctx context.Context, aclName string
 		return "", err
 	}
 	return resp.AclId, nil
+}
+
+// DescribeAccessControlList used for e2etest
+func (p SLBProvider) DescribeAccessControlList(ctx context.Context, aclName string) (string, error) {
+	req := slb.CreateDescribeAccessControlListsRequest()
+	req.AclName = aclName
+	resp, err := p.auth.SLB.DescribeAccessControlLists(req)
+	if err != nil {
+		if strings.Contains(err.Error(), "NotFound") {
+			return "", nil
+		}
+		return "", err
+	}
+	if len(resp.Acls.Acl) == 0 {
+		return "", nil
+	}
+	return resp.Acls.Acl[0].AclId, nil
 }
 
 // DeleteAccessControlList used for e2etest

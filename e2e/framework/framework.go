@@ -110,12 +110,16 @@ func (f *Framework) CreateCloudResource() error {
 				AddressType:      model.InternetAddressType,
 				LoadBalancerSpec: model.S1Small,
 				RegionId:         region,
-				LoadBalancerName: client.Namespace + "-internet-slb",
+				LoadBalancerName: fmt.Sprintf("%s-%s-slb", options.TestConfig.ClusterId, "internet"),
 			},
 		}
-		err := f.Client.CloudClient.CreateLoadBalancer(context.TODO(), slbM)
-		if err != nil {
-			return fmt.Errorf("create internet slb error: %s", err.Error())
+		if err := f.Client.CloudClient.FindLoadBalancerByName(slbM); err != nil {
+			return err
+		}
+		if slbM.LoadBalancerAttribute.LoadBalancerId == "" {
+			if err := f.Client.CloudClient.CreateLoadBalancer(context.TODO(), slbM); err != nil {
+				return fmt.Errorf("create internet slb error: %s", err.Error())
+			}
 		}
 		options.TestConfig.InternetLoadBalancerID = slbM.LoadBalancerAttribute.LoadBalancerId
 		f.CreatedResource[options.TestConfig.InternetLoadBalancerID] = SLBResource
@@ -146,29 +150,48 @@ func (f *Framework) CreateCloudResource() error {
 				LoadBalancerSpec: model.S1Small,
 				RegionId:         region,
 				VSwitchId:        vswId,
-				LoadBalancerName: client.Namespace + "-intranet-slb",
+				LoadBalancerName: fmt.Sprintf("%s-%s-slb", options.TestConfig.ClusterId, "intranet"),
 			},
 		}
-		if err := f.Client.CloudClient.CreateLoadBalancer(context.TODO(), slbM); err != nil {
-			return fmt.Errorf("create intranet slb error: %s", err.Error())
+		if err := f.Client.CloudClient.FindLoadBalancerByName(slbM); err != nil {
+			return err
+		}
+		if slbM.LoadBalancerAttribute.LoadBalancerId == "" {
+			if err := f.Client.CloudClient.CreateLoadBalancer(context.TODO(), slbM); err != nil {
+				return fmt.Errorf("create intranet slb error: %s", err.Error())
+			}
 		}
 		options.TestConfig.IntranetLoadBalancerID = slbM.LoadBalancerAttribute.LoadBalancerId
 		f.CreatedResource[options.TestConfig.IntranetLoadBalancerID] = SLBResource
 	}
 
 	if options.TestConfig.AclID == "" {
-		aclId, err := f.Client.CloudClient.CreateAccessControlList(context.TODO(), client.Namespace+"-acl-1")
+		aclName := fmt.Sprintf("%s-acl-%s", options.TestConfig.ClusterId, "a")
+		aclId, err := f.Client.CloudClient.DescribeAccessControlList(context.TODO(), aclName)
 		if err != nil {
-			return fmt.Errorf("CreateAccessControlList error: %s", err.Error())
+			return fmt.Errorf("DescribeAccessControlList error: %s", err.Error())
+		}
+		if aclId == "" {
+			aclId, err = f.Client.CloudClient.CreateAccessControlList(context.TODO(), aclName)
+			if err != nil {
+				return fmt.Errorf("CreateAccessControlList error: %s", err.Error())
+			}
 		}
 		options.TestConfig.AclID = aclId
 		f.CreatedResource[aclId] = ACLResource
 	}
 
 	if options.TestConfig.AclID2 == "" {
-		aclId, err := f.Client.CloudClient.CreateAccessControlList(context.TODO(), client.Namespace+"-acl-2")
+		aclName := fmt.Sprintf("%s-acl-%s", options.TestConfig.ClusterId, "b")
+		aclId, err := f.Client.CloudClient.DescribeAccessControlList(context.TODO(), aclName)
 		if err != nil {
-			return fmt.Errorf("CreateAccessControlList error: %s", err.Error())
+			return fmt.Errorf("DescribeAccessControlList error: %s", err.Error())
+		}
+		if aclId == "" {
+			aclId, err = f.Client.CloudClient.CreateAccessControlList(context.TODO(), aclName)
+			if err != nil {
+				return fmt.Errorf("CreateAccessControlList error: %s", err.Error())
+			}
 		}
 		options.TestConfig.AclID2 = aclId
 		f.CreatedResource[aclId] = ACLResource

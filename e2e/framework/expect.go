@@ -199,6 +199,16 @@ func loadBalancerAttrEqual(f *Framework, anno *service.AnnotationRequest, svc *v
 			return fmt.Errorf("expected slb networkType %s, got %s", networkType, lb.NetworkType)
 		}
 	}
+
+	if hostName := anno.Get(service.HostName); hostName != "" {
+		if len(svc.Status.LoadBalancer.Ingress) != 1 ||
+			svc.Status.LoadBalancer.Ingress[0].Hostname != hostName ||
+			svc.Status.LoadBalancer.Ingress[0].IP != "" {
+			return fmt.Errorf("svc ingress hostname %v is not equal to hostname %s",
+				svc.Status.LoadBalancer.Ingress, hostName)
+		}
+	}
+
 	if eipAnno := anno.Get(service.ExternalIPType); eipAnno == "eip" {
 		eips, err := f.Client.CloudClient.DescribeEipAddresses(context.TODO(), string(vpc.SlbInstance), lb.LoadBalancerId)
 		if err != nil {
@@ -208,12 +218,22 @@ func loadBalancerAttrEqual(f *Framework, anno *service.AnnotationRequest, svc *v
 			return fmt.Errorf("lb %s has %d eips", lb.LoadBalancerId, len(eips))
 		}
 
-		if len(svc.Status.LoadBalancer.Ingress) != 1 ||
-			svc.Status.LoadBalancer.Ingress[0].IP != eips[0] {
+		// hostname annotation takes effect first.
+		// if set hostname annotation, ip should be nil
+		if anno.Get(service.HostName) == "" &&
+			(len(svc.Status.LoadBalancer.Ingress) != 1 ||
+				svc.Status.LoadBalancer.Ingress[0].IP != eips[0]) {
 			return fmt.Errorf("svc ingress ip %v is not equal to eip %s",
 				svc.Status.LoadBalancer.Ingress, eips[0])
 		}
+	}
 
+	if anno.Get(service.ExternalIPType) == "" && anno.Get(service.HostName) == "" {
+		if len(svc.Status.LoadBalancer.Ingress) != 1 ||
+			svc.Status.LoadBalancer.Ingress[0].IP != lb.Address {
+			return fmt.Errorf("svc ingress ip %v is not equal to slb ip %s",
+				svc.Status.LoadBalancer.Ingress, lb.Address)
+		}
 	}
 	return nil
 }
@@ -402,6 +422,15 @@ func tcpEqual(reqCtx *service.RequestContext, local v1.ServicePort, remote model
 			return fmt.Errorf("expected slb persistenceTimeout %d, got %d", timeout, remote.PersistenceTimeout)
 		}
 	}
+	if establishedTimeout := reqCtx.Anno.Get(service.EstablishedTimeout); establishedTimeout != "" {
+		timeout, err := strconv.Atoi(establishedTimeout)
+		if err != nil {
+			return fmt.Errorf("establishedTimeout %s parse error: %s", establishedTimeout, err.Error())
+		}
+		if remote.EstablishedTimeout != timeout {
+			return fmt.Errorf("expected slb establishedTimeout %d, got %d", timeout, remote.EstablishedTimeout)
+		}
+	}
 	if healthCheckConnectTimeout := reqCtx.Anno.Get(service.HealthCheckConnectTimeout); healthCheckConnectTimeout != "" {
 		timeout, err := strconv.Atoi(healthCheckConnectTimeout)
 		if err != nil {
@@ -519,6 +548,11 @@ func httpEqual(reqCtx *service.RequestContext, local v1.ServicePort, remote mode
 					return fmt.Errorf("expected slb healthCheckTimeout %d, got %d", timeout, remote.HealthCheckTimeout)
 				}
 			}
+			if healthCheckMethod := reqCtx.Anno.Get(service.HealthCheckMethod); healthCheckMethod != "" {
+				if remote.HealthCheckMethod != healthCheckMethod {
+					return fmt.Errorf("expected slb healthCheckMethod %s, got %s", healthCheckMethod, remote.HealthCheckMethod)
+				}
+			}
 		}
 	}
 
@@ -553,6 +587,15 @@ func httpEqual(reqCtx *service.RequestContext, local v1.ServicePort, remote mode
 	if xForwardedForProto := reqCtx.Anno.Get(service.XForwardedForProto); xForwardedForProto != "" {
 		if string(remote.XForwardedForProto) != xForwardedForProto {
 			return fmt.Errorf("expected slb XForwardedForProto %s, got %s", xForwardedForProto, remote.XForwardedForProto)
+		}
+	}
+	if requestTimeout := reqCtx.Anno.Get(service.RequestTimeout); requestTimeout != "" {
+		timeout, err := strconv.Atoi(requestTimeout)
+		if err != nil {
+			return fmt.Errorf("requestTimeout %s parse error: %s", requestTimeout, err.Error())
+		}
+		if remote.RequestTimeout != timeout {
+			return fmt.Errorf("expected slb requestTimeout %d, got %d", timeout, remote.RequestTimeout)
 		}
 	}
 	if idleTimeout := reqCtx.Anno.Get(service.IdleTimeout); idleTimeout != "" {
@@ -616,6 +659,11 @@ func httpsEqual(reqCtx *service.RequestContext, local v1.ServicePort, remote mod
 					return fmt.Errorf("expected slb healthCheckTimeout %d, got %d", timeout, remote.HealthCheckTimeout)
 				}
 			}
+			if healthCheckMethod := reqCtx.Anno.Get(service.HealthCheckMethod); healthCheckMethod != "" {
+				if remote.HealthCheckMethod != healthCheckMethod {
+					return fmt.Errorf("expected slb healthCheckMethod %s, got %s", healthCheckMethod, remote.HealthCheckMethod)
+				}
+			}
 		}
 	}
 
@@ -673,6 +721,15 @@ func httpsEqual(reqCtx *service.RequestContext, local v1.ServicePort, remote mod
 	if enableHttp2 := reqCtx.Anno.Get(service.EnableHttp2); enableHttp2 != "" {
 		if string(remote.EnableHttp2) != enableHttp2 {
 			return fmt.Errorf("expected slb enableHttp2 %s, got %s", enableHttp2, remote.EnableHttp2)
+		}
+	}
+	if requestTimeout := reqCtx.Anno.Get(service.RequestTimeout); requestTimeout != "" {
+		timeout, err := strconv.Atoi(requestTimeout)
+		if err != nil {
+			return fmt.Errorf("requestTimeout %s parse error: %s", requestTimeout, err.Error())
+		}
+		if remote.RequestTimeout != timeout {
+			return fmt.Errorf("expected slb requestTimeout %d, got %d", timeout, remote.RequestTimeout)
 		}
 	}
 	return nil
@@ -1297,7 +1354,9 @@ func (f *Framework) FindLoadBalancer() (*v1.Service, *model.LoadBalancer, error)
 		if err != nil {
 			return false, nil
 		}
-		if len(svc.Status.LoadBalancer.Ingress) == 1 && svc.Status.LoadBalancer.Ingress[0].IP != "" {
+		if len(svc.Status.LoadBalancer.Ingress) == 1 &&
+			(svc.Status.LoadBalancer.Ingress[0].IP != "" ||
+				svc.Status.LoadBalancer.Ingress[0].Hostname != "") {
 			return true, nil
 		}
 		return false, nil
