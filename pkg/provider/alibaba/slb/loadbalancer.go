@@ -348,9 +348,20 @@ func loadResponse(resp interface{}, lb *model.LoadBalancer) {
 	lb.LoadBalancerAttribute.MasterZoneId = v.FieldByName("MasterZoneId").String()
 	lb.LoadBalancerAttribute.SlaveZoneId = v.FieldByName("SlaveZoneId").String()
 	lb.LoadBalancerAttribute.DeleteProtection = model.FlagType(v.FieldByName("DeleteProtection").String())
-	lb.LoadBalancerAttribute.InternetChargeType = model.InternetChargeType(v.FieldByName("InternetChargeType").String())
 	lb.LoadBalancerAttribute.LoadBalancerSpec = model.LoadBalancerSpecType(v.FieldByName("LoadBalancerSpec").String())
 	lb.LoadBalancerAttribute.ModificationProtectionStatus = model.ModificationProtectionType(
 		v.FieldByName("ModificationProtectionStatus").String())
 	lb.LoadBalancerAttribute.ResourceGroupId = v.FieldByName("ResourceGroupId").String()
+
+	switch t := resp.(type) {
+	// DescribeLoadBalancers
+	case slb.LoadBalancer:
+		lb.LoadBalancerAttribute.InternetChargeType = model.InternetChargeType(v.FieldByName("InternetChargeTypeAlias").String())
+	// DescribeLoadBalancerAttribute
+	case slb.DescribeLoadBalancerAttributeResponse:
+		lb.LoadBalancerAttribute.InternetChargeType = model.InternetChargeType(v.FieldByName("InternetChargeType").String())
+	default:
+		klog.Errorf("not support type: %T", t)
+	}
+
 }
