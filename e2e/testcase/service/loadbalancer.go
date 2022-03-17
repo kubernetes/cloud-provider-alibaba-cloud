@@ -265,6 +265,68 @@ func RunLoadBalancerTestCases(f *framework.Framework) {
 
 		})
 
+		ginkgo.Context("hostname", func() {
+			ginkgo.It("add hostname", func() {
+				svc, err := f.Client.KubeClient.CreateServiceByAnno(map[string]string{
+					service.Annotation(service.HostName): "www.test.com",
+				})
+				gomega.Expect(err).To(gomega.BeNil())
+				err = f.ExpectLoadBalancerEqual(svc)
+				gomega.Expect(err).To(gomega.BeNil())
+
+			})
+			ginkgo.It("remove hostname", func() {
+				oldsvc, err := f.Client.KubeClient.CreateServiceByAnno(map[string]string{
+					service.Annotation(service.HostName): "www.test.com",
+				})
+				gomega.Expect(err).To(gomega.BeNil())
+				err = f.ExpectLoadBalancerEqual(oldsvc)
+				gomega.Expect(err).To(gomega.BeNil())
+
+				newsvc := oldsvc.DeepCopy()
+				delete(newsvc.Annotations, service.HostName)
+				newsvc, err = f.Client.KubeClient.PatchService(oldsvc, newsvc)
+				gomega.Expect(err).To(gomega.BeNil())
+			})
+			ginkgo.It("update hostname", func() {
+				oldSvc, err := f.Client.KubeClient.CreateServiceByAnno(map[string]string{
+					service.Annotation(service.HostName): "www.test.com",
+				})
+				gomega.Expect(err).To(gomega.BeNil())
+				err = f.ExpectLoadBalancerEqual(oldSvc)
+				gomega.Expect(err).To(gomega.BeNil())
+
+				updateSvc := oldSvc.DeepCopy()
+				updateSvc.Annotations[service.Annotation(service.HostName)] = "www.update.com"
+				updateSvc, err = f.Client.KubeClient.PatchService(oldSvc, updateSvc)
+				gomega.Expect(err).To(gomega.BeNil())
+				err = f.ExpectLoadBalancerEqual(updateSvc)
+				gomega.Expect(err).To(gomega.BeNil())
+
+			})
+			if options.TestConfig.EipLoadBalancerID != "" {
+				ginkgo.It("reuse intranet lb with eip && add hostname", func() {
+					svc, err := f.Client.KubeClient.CreateServiceByAnno(map[string]string{
+						service.Annotation(service.LoadBalancerId):   options.TestConfig.EipLoadBalancerID,
+						service.Annotation(service.OverrideListener): "true",
+						service.Annotation(service.ExternalIPType):   "eip",
+						service.Annotation(service.HostName):         "www.test.com",
+					})
+					gomega.Expect(err).To(gomega.BeNil())
+					err = f.ExpectLoadBalancerEqual(svc)
+					gomega.Expect(err).To(gomega.BeNil())
+
+					newsvc := svc.DeepCopy()
+					delete(newsvc.Annotations, service.Annotation(service.HostName))
+					newsvc, err = f.Client.KubeClient.PatchService(svc, newsvc)
+					gomega.Expect(err).To(gomega.BeNil())
+
+					err = f.ExpectLoadBalancerEqual(newsvc)
+					gomega.Expect(err).To(gomega.BeNil())
+				})
+			}
+		})
+
 		ginkgo.Context("charge type", func() {
 			ginkgo.It("charge-type: paybybandwidth", func() {
 				oldSvc, err := f.Client.KubeClient.CreateServiceByAnno(map[string]string{

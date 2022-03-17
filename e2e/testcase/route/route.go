@@ -5,10 +5,12 @@ import (
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
 	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/cloud-provider-alibaba-cloud/e2e/framework"
 	"k8s.io/cloud-provider-alibaba-cloud/e2e/options"
 	ctrlCfg "k8s.io/cloud-provider-alibaba-cloud/pkg/config"
 	"strings"
+	"time"
 )
 
 func RunRouteControllerTestCases(f *framework.Framework) {
@@ -46,8 +48,11 @@ func RunRouteControllerTestCases(f *framework.Framework) {
 					routes, err := f.Client.CloudClient.ListRoute(context.TODO(), resp.RouteTableId)
 					gomega.Expect(err).To(gomega.BeNil())
 					for _, t := range routes {
-						err = f.Client.CloudClient.DeleteRoute(context.TODO(), resp.RouteTableId,
-							t.ProviderId, t.DestinationCIDR)
+						err = wait.PollImmediate(5*time.Second, 2*time.Minute, func() (done bool, err error) {
+							retErr := f.Client.CloudClient.DeleteRoute(context.TODO(), resp.RouteTableId,
+								t.ProviderId, t.DestinationCIDR)
+							return retErr == nil, nil
+						})
 						gomega.Expect(err).To(gomega.BeNil())
 					}
 					_, err = f.Client.CloudClient.DeleteRouteTable(context.TODO(), resp.RouteTableId)

@@ -1,8 +1,6 @@
 package node
 
 import (
-	"time"
-
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
@@ -31,7 +29,6 @@ func RunNodeControllerTestCases(f *framework.Framework) {
 				_, err = f.Client.KubeClient.PatchNodeStatus(oldNode, newNode)
 				gomega.Expect(err).To(gomega.BeNil())
 
-				time.Sleep(5 * time.Minute)
 				err = f.ExpectNodeEqual()
 				gomega.Expect(err).To(gomega.BeNil())
 			})
@@ -42,7 +39,6 @@ func RunNodeControllerTestCases(f *framework.Framework) {
 				err = f.Client.KubeClient.LabelNode(oldNode.Name, v1.LabelInstanceType, "test-type")
 				gomega.Expect(err).To(gomega.BeNil())
 
-				time.Sleep(5 * time.Minute)
 				err = f.ExpectNodeEqual()
 				gomega.Expect(err).To(gomega.BeNil())
 			})

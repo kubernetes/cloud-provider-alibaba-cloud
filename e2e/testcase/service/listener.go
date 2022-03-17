@@ -220,7 +220,8 @@ func RunListenerTestCases(f *framework.Framework) {
 			if options.TestConfig.CertID != "" {
 				ginkgo.It("idle-timeout: 10 -> 40", func() {
 					oldsvc, err := f.Client.KubeClient.CreateServiceByAnno(map[string]string{
-						service.Annotation(service.ProtocolPort): "http:80",
+						service.Annotation(service.ProtocolPort): "https:443",
+						service.Annotation(service.CertID):       options.TestConfig.CertID,
 						service.Annotation(service.IdleTimeout):  "10",
 					})
 					gomega.Expect(err).To(gomega.BeNil())
@@ -237,6 +238,50 @@ func RunListenerTestCases(f *framework.Framework) {
 					gomega.Expect(err).To(gomega.BeNil())
 				})
 			}
+		})
+
+		ginkgo.Context("request timeout", func() {
+			ginkgo.It("request-timeout: 1 -> 40", func() {
+				oldsvc, err := f.Client.KubeClient.CreateServiceByAnno(map[string]string{
+					service.Annotation(service.ProtocolPort):   "https:443",
+					service.Annotation(service.CertID):         options.TestConfig.CertID,
+					service.Annotation(service.RequestTimeout): "1",
+				})
+				gomega.Expect(err).To(gomega.BeNil())
+				err = f.ExpectLoadBalancerEqual(oldsvc)
+				gomega.Expect(err).To(gomega.BeNil())
+
+				// modify
+				newsvc := oldsvc.DeepCopy()
+				newsvc.Annotations[service.Annotation(service.RequestTimeout)] = "40"
+				newsvc, err = f.Client.KubeClient.PatchService(oldsvc, newsvc)
+				gomega.Expect(err).To(gomega.BeNil())
+
+				err = f.ExpectLoadBalancerEqual(newsvc)
+				gomega.Expect(err).To(gomega.BeNil())
+			})
+			if options.TestConfig.CertID != "" {
+				ginkgo.It("request-timeout: 100 -> 180", func() {
+					oldsvc, err := f.Client.KubeClient.CreateServiceByAnno(map[string]string{
+						service.Annotation(service.ProtocolPort):   "https:443",
+						service.Annotation(service.CertID):         options.TestConfig.CertID,
+						service.Annotation(service.RequestTimeout): "100",
+					})
+					gomega.Expect(err).To(gomega.BeNil())
+					err = f.ExpectLoadBalancerEqual(oldsvc)
+					gomega.Expect(err).To(gomega.BeNil())
+
+					// modify
+					newsvc := oldsvc.DeepCopy()
+					newsvc.Annotations[service.Annotation(service.RequestTimeout)] = "180"
+					newsvc, err = f.Client.KubeClient.PatchService(oldsvc, newsvc)
+					gomega.Expect(err).To(gomega.BeNil())
+
+					err = f.ExpectLoadBalancerEqual(newsvc)
+					gomega.Expect(err).To(gomega.BeNil())
+				})
+			}
+
 		})
 
 		if options.TestConfig.CertID != "" {
@@ -295,6 +340,7 @@ func RunListenerTestCases(f *framework.Framework) {
 					service.Annotation(service.HealthyThreshold):    "5",
 					service.Annotation(service.UnhealthyThreshold):  "5",
 					service.Annotation(service.HealthCheckInterval): "3",
+					service.Annotation(service.HealthCheckMethod):   "head",
 					service.Annotation(service.HealthCheckHTTPCode): "http_3xx",
 					service.Annotation(service.HealthCheckDomain):   "192.168.0.3",
 					service.Annotation(service.HealthCheckURI):      "/test/index.html",
@@ -308,6 +354,7 @@ func RunListenerTestCases(f *framework.Framework) {
 				newsvc.Annotations[service.Annotation(service.HealthyThreshold)] = "4"
 				newsvc.Annotations[service.Annotation(service.UnhealthyThreshold)] = "4"
 				newsvc.Annotations[service.Annotation(service.HealthCheckInterval)] = "2"
+				newsvc.Annotations[service.Annotation(service.HealthCheckMethod)] = "get"
 				newsvc.Annotations[service.Annotation(service.HealthCheckHTTPCode)] = "http_2xx"
 				newsvc.Annotations[service.Annotation(service.HealthCheckDomain)] = "192.168.0.2"
 				newsvc.Annotations[service.Annotation(service.HealthCheckURI)] = "/test/index1.html"
@@ -326,6 +373,7 @@ func RunListenerTestCases(f *framework.Framework) {
 					service.Annotation(service.UnhealthyThreshold):  "5",
 					service.Annotation(service.HealthCheckInterval): "3",
 					service.Annotation(service.HealthCheckHTTPCode): "http_3xx",
+					service.Annotation(service.HealthCheckMethod):   "get",
 					service.Annotation(service.HealthCheckDomain):   "192.168.0.3",
 					service.Annotation(service.HealthCheckURI):      "/test/index.html",
 				})
@@ -348,6 +396,7 @@ func RunListenerTestCases(f *framework.Framework) {
 					service.Annotation(service.CertID):              options.TestConfig.CertID,
 					service.Annotation(service.HealthCheckType):     model.HTTP,
 					service.Annotation(service.HealthCheckFlag):     string(model.OnFlag),
+					service.Annotation(service.HealthCheckMethod):   "head",
 					service.Annotation(service.HealthCheckTimeout):  "8",
 					service.Annotation(service.HealthyThreshold):    "5",
 					service.Annotation(service.UnhealthyThreshold):  "5",
@@ -361,6 +410,7 @@ func RunListenerTestCases(f *framework.Framework) {
 				gomega.Expect(err).To(gomega.BeNil())
 
 				newsvc := oldsvc.DeepCopy()
+				newsvc.Annotations[service.Annotation(service.HealthCheckMethod)] = "get"
 				newsvc.Annotations[service.Annotation(service.HealthCheckTimeout)] = "10"
 				newsvc.Annotations[service.Annotation(service.HealthyThreshold)] = "4"
 				newsvc.Annotations[service.Annotation(service.UnhealthyThreshold)] = "4"
@@ -422,6 +472,24 @@ func RunListenerTestCases(f *framework.Framework) {
 				newsvc, err = f.Client.KubeClient.PatchService(oldsvc, newsvc)
 				gomega.Expect(err).To(gomega.BeNil())
 
+				err = f.ExpectLoadBalancerEqual(newsvc)
+				gomega.Expect(err).To(gomega.BeNil())
+			})
+		})
+
+		ginkgo.Context("established timeout", func() {
+			ginkgo.It("established timeout: 20->10", func() {
+				oldsvc, err := f.Client.KubeClient.CreateServiceByAnno(map[string]string{
+					service.Annotation(service.EstablishedTimeout): "20",
+				})
+				gomega.Expect(err).To(gomega.BeNil())
+				err = f.ExpectLoadBalancerEqual(oldsvc)
+				gomega.Expect(err).To(gomega.BeNil())
+
+				newsvc := oldsvc.DeepCopy()
+				newsvc.Annotations[service.Annotation(service.EstablishedTimeout)] = "10"
+				newsvc, err = f.Client.KubeClient.PatchService(oldsvc, newsvc)
+				gomega.Expect(err).To(gomega.BeNil())
 				err = f.ExpectLoadBalancerEqual(newsvc)
 				gomega.Expect(err).To(gomega.BeNil())
 			})
