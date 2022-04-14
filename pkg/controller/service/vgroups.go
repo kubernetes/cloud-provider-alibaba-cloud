@@ -421,11 +421,6 @@ func needExcludeFromLB(reqCtx *RequestContext, node *v1.Node) bool {
 	// need to keep the node who has exclude label in order to be compatible with vk node
 	// It's safe because these nodes will be filtered in build backends func
 
-	if isMasterNode(node) {
-		klog.V(5).Infof("[%s] node %s is master node, skip adding it to lb", util.Key(reqCtx.Service), node.Name)
-		return true
-	}
-
 	// filter unscheduled node
 	if node.Spec.Unschedulable && reqCtx.Anno.Get(RemoveUnscheduled) != "" {
 		if reqCtx.Anno.Get(RemoveUnscheduled) == string(model.OnFlag) {
