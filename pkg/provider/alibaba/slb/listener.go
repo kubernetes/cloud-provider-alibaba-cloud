@@ -425,6 +425,10 @@ func setHTTPSListenerValue(req interface{}, listener *model.ListenerAttribute) {
 		requestTimeout := v.FieldByName("RequestTimeout")
 		requestTimeout.SetString(strconv.Itoa(listener.RequestTimeout))
 	}
+	if listener.TLSCipherPolicy != "" {
+		tlsPolicy := v.FieldByName("TLSCipherPolicy")
+		tlsPolicy.SetString(listener.TLSCipherPolicy)
+	}
 }
 
 func loadTCPListener(config slb.TCPListenerConfig, listener *model.ListenerAttribute) {
@@ -496,4 +500,5 @@ func loadHTTPSListener(config slb.HTTPSListenerConfig, listener *model.ListenerA
 	listener.HealthCheckMethod = config.HealthCheckMethod
 	listener.CertId = config.ServerCertificateId
 	listener.EnableHttp2 = model.FlagType(config.EnableHttp2)
+	listener.TLSCipherPolicy = config.TLSCipherPolicy
 }
