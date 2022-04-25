@@ -43,9 +43,9 @@ func GetLogMessage(err error) string {
 		return ""
 	}
 	var message string
-	sub := re.FindSubmatch([]byte(err.Error()))
+	sub := re.FindStringSubmatch(err.Error())
 	if len(sub) > 1 {
-		message = string(sub[1])
+		message = sub[1]
 	} else {
 		message = err.Error()
 	}
