@@ -2,31 +2,11 @@ package service
 
 import (
 	"github.com/stretchr/testify/assert"
-	v1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/intstr"
 	"testing"
 )
 
 func TestIsServiceHashChanged(t *testing.T) {
-	base := &v1.Service{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:        "test",
-			Namespace:   "default",
-			Annotations: make(map[string]string),
-		},
-		Spec: v1.ServiceSpec{
-			Ports: []v1.ServicePort{
-				{
-					Name:       "http",
-					Port:       80,
-					TargetPort: intstr.FromInt(80),
-					Protocol:   v1.ProtocolTCP,
-				},
-			},
-			Type: v1.ServiceTypeLoadBalancer,
-		},
-	}
+	base := getDefaultService()
 	base.Annotations[Annotation(LoadBalancerName)] = "slb-base"
 	baseHash := getServiceHash(base)
 
