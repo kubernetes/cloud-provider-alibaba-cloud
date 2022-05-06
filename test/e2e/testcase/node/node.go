@@ -4,8 +4,8 @@ import (
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/cloud-provider-alibaba-cloud/e2e/framework"
-	"k8s.io/cloud-provider-alibaba-cloud/e2e/options"
+	"k8s.io/cloud-provider-alibaba-cloud/test/e2e/framework"
+	"k8s.io/cloud-provider-alibaba-cloud/test/e2e/options"
 )
 
 func RunNodeControllerTestCases(f *framework.Framework) {

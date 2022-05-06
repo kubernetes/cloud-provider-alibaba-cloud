@@ -6,12 +6,12 @@ import (
 
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/util"
 
-	"k8s.io/cloud-provider-alibaba-cloud/e2e/client"
-	"k8s.io/cloud-provider-alibaba-cloud/e2e/framework"
-	"k8s.io/cloud-provider-alibaba-cloud/e2e/options"
-	"k8s.io/cloud-provider-alibaba-cloud/e2e/testcase/node"
-	"k8s.io/cloud-provider-alibaba-cloud/e2e/testcase/route"
-	"k8s.io/cloud-provider-alibaba-cloud/e2e/testcase/service"
+	"k8s.io/cloud-provider-alibaba-cloud/test/e2e/client"
+	"k8s.io/cloud-provider-alibaba-cloud/test/e2e/framework"
+	"k8s.io/cloud-provider-alibaba-cloud/test/e2e/options"
+	"k8s.io/cloud-provider-alibaba-cloud/test/e2e/testcase/node"
+	"k8s.io/cloud-provider-alibaba-cloud/test/e2e/testcase/route"
+	"k8s.io/cloud-provider-alibaba-cloud/test/e2e/testcase/service"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/test/e2e/framework/ginkgowrapper"
 

@@ -6,11 +6,11 @@ import (
 	"strings"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/cloud-provider-alibaba-cloud/e2e/client"
-	"k8s.io/cloud-provider-alibaba-cloud/e2e/options"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/service"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/model"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/util"
+	"k8s.io/cloud-provider-alibaba-cloud/test/e2e/client"
+	"k8s.io/cloud-provider-alibaba-cloud/test/e2e/options"
 	"k8s.io/klog/v2"
 )
 

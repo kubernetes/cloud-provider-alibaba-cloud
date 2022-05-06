@@ -4,31 +4,26 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/util/wait"
+	ctrlCfg "k8s.io/cloud-provider-alibaba-cloud/pkg/config"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/helper"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/service"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/model"
+	prvd "k8s.io/cloud-provider-alibaba-cloud/pkg/provider"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/base"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/vpc"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/util"
+	"k8s.io/cloud-provider-alibaba-cloud/test/e2e/client"
+	"k8s.io/cloud-provider-alibaba-cloud/test/e2e/options"
+	"k8s.io/cloud-provider/api"
+	"k8s.io/klog/v2"
 	"os"
 	"strconv"
 	"strings"
 	"time"
-
-	"k8s.io/apimachinery/pkg/api/errors"
-
-	"k8s.io/cloud-provider-alibaba-cloud/e2e/options"
-
-	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/vpc"
-
-	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/util/intstr"
-	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/cloud-provider-alibaba-cloud/e2e/client"
-	ctrlCfg "k8s.io/cloud-provider-alibaba-cloud/pkg/config"
-	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/helper"
-	prvd "k8s.io/cloud-provider-alibaba-cloud/pkg/provider"
-	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/base"
-	"k8s.io/cloud-provider/api"
-	"k8s.io/klog/v2"
-
-	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/service"
-	"k8s.io/cloud-provider-alibaba-cloud/pkg/model"
-	"k8s.io/cloud-provider-alibaba-cloud/pkg/util"
 )
 
 func (f *Framework) ExpectLoadBalancerEqual(svc *v1.Service) error {

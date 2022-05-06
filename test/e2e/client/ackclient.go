@@ -2,7 +2,7 @@ package client
 
 import (
 	"fmt"
-	"k8s.io/cloud-provider-alibaba-cloud/e2e/options"
+	"k8s.io/cloud-provider-alibaba-cloud/test/e2e/options"
 	"time"
 
 	cs "github.com/alibabacloud-go/cs-20151215/v2/client"
