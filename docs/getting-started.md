@@ -12,7 +12,16 @@ kubeadm is an official installation tool for kubernetes. You could bring up a si
 
 1. Install Docker or other CRI runtime: https://kubernetes.io/docs/setup/cri/
 2. Install kubeadm, kubelet and kubectl: https://kubernetes.io/docs/setup/independent/install-kubeadm/
-3. Update kubelet info with provider id info and restart kubelet: You should provide ```--hostname-override=${REGION_ID}.${INSTANCE_ID} --provider-id=${REGION_ID}.${INSTANCE_ID}``` arguments in all of your kubelet unit file. The format is ```${REGION_ID}.${INSTANCE_ID}```. See [kubelet.service](examples/kubelet.service) for more details.
+3. **MUST** update kubelet info with provider id info and restart kubelet for each node, e.g.
+```bash
+if [[ 0 -eq `grep '\--provider-id' /etc/systemd/system/kubelet.service.d/10-kubeadm.conf|wc -l` ]]; then
+  META_EP=http://100.100.100.200/latest/meta-data
+  provider_id=`curl -s $META_EP/region-id`.`curl -s $META_EP/instance-id`
+  sed -i "s/--cloud-provider=external/--cloud-provider=external --hostname-override=${provider_id} --provider-id=${provider_id}/g" /etc/systemd/system/kubelet.service.d/10-kubeadm.conf
+  systemctl daemon-reload
+  systemctl restart kubelet
+fi
+```
 4. Init kubeadm: Be advised that kubeadm accepts a number of certain parameters to customize your cluster with kubeadm.conf file. If you want to use your own secure ETCD cluster or image repository, you may find the template [kubeadm.conf](examples/kubeadm.conf) or [kubeadm-new.conf for k8s 1.12+](examples/kubeadm-new.conf) is useful. 
 
 Run the command below to initialize a kubernetes cluster.
@@ -23,11 +32,6 @@ kubeadm init --config kubeadm.conf
 >> Note:
 1. ```cloudProvider: external``` is required to set in kubeadm.conf file for you to deploy alibaba out-of-tree cloudprovider.
 2. Set ```imageRepository: registry-vpc.${region}.aliyuncs.com/acs``` is a best practice to enable you the ability to pull image faster in China (for example: cn-hangzhou or cn-hongkong).
-3. If you are not sure how to find your ECS instance's ID and region id, try to run these command in your ECS instance:
-```bash
-$ META_EP=http://100.100.100.200/latest/meta-data
-$ echo `curl -s $META_EP/region-id`.`curl -s $META_EP/instance-id`
-```
 
 ### Set up a supported Kubernetes Cluster using rke 
 

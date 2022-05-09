@@ -1,90 +1,100 @@
 {
-  "Version": "1",
-  "Statement": [
-    {
-      "Action": [
-        "ecs:Describe*",
-        "ecs:AttachDisk",
-        "ecs:CreateDisk",
-        "ecs:CreateSnapshot",
-        "ecs:CreateRouteEntry",
-        "ecs:DeleteDisk",
-        "ecs:DeleteSnapshot",
-        "ecs:DeleteRouteEntry",
-        "ecs:DetachDisk",
-        "ecs:ModifyAutoSnapshotPolicyEx",
-        "ecs:ModifyDiskAttribute",
-        "ecs:CreateNetworkInterface",
-        "ecs:DescribeNetworkInterfaces",
-        "ecs:AttachNetworkInterface",
-        "ecs:DetachNetworkInterface",
-        "ecs:DeleteNetworkInterface",
-        "ecs:DescribeInstanceAttribute"
-      ],
-      "Resource": [
-        "*"
-      ],
-      "Effect": "Allow"
-    },
-    {
-      "Action": [
-        "cr:Get*",
-        "cr:List*",
-        "cr:PullRepository"
-      ],
-      "Resource": [
-        "*"
-      ],
-      "Effect": "Allow"
-    },
-    {
-      "Action": [
-        "slb:*"
-      ],
-      "Resource": [
-        "*"
-      ],
-      "Effect": "Allow"
-    },
-    {
-      "Action": [
-        "cms:*"
-      ],
-      "Resource": [
-        "*"
-      ],
-      "Effect": "Allow"
-    },
-    {
-      "Action": [
-        "vpc:*"
-      ],
-      "Resource": [
-        "*"
-      ],
-      "Effect": "Allow"
-    },
-    {
-      "Action": [
-        "log:*"
-      ],
-      "Resource": [
-        "*"
-      ],
-      "Effect": "Allow"
-    },
-    {
-      "Action": [
-        "nas:*"
-      ],
-      "Resource": [
-        "*"
-      ],
-      "Effect": "Allow"
-    },
-    {
+    "Version": "1",
+    "Statement": [
+        {
+            "Action": [
+                "ecs:Describe*",
+                "ecs:CreateRouteEntry",
+                "ecs:DeleteRouteEntry",
+                "ecs:CreateNetworkInterface",
+                "ecs:DeleteNetworkInterface",
+                "ecs:CreateNetworkInterfacePermission",
+                "ecs:DeleteNetworkInterfacePermission",
+                "ecs:ModifyInstanceAttribute",
+                "ecs:AttachKeyPair",
+                "ecs:StopInstance",
+                "ecs:StartInstance",
+                "ecs:ReplaceSystemDisk"
+            ],
+            "Resource": [
+                "*"
+            ],
+            "Effect": "Allow"
+        },
+        {
+            "Action": [
+                "slb:Describe*",
+                "slb:CreateLoadBalancer",
+                "slb:DeleteLoadBalancer",
+                "slb:ModifyLoadBalancerInternetSpec",
+                "slb:RemoveBackendServers",
+                "slb:AddBackendServers",
+                "slb:RemoveTags",
+                "slb:AddTags",
+                "slb:StopLoadBalancerListener",
+                "slb:StartLoadBalancerListener",
+                "slb:SetLoadBalancerHTTPListenerAttribute",
+                "slb:SetLoadBalancerHTTPSListenerAttribute",
+                "slb:SetLoadBalancerTCPListenerAttribute",
+                "slb:SetLoadBalancerUDPListenerAttribute",
+                "slb:CreateLoadBalancerHTTPSListener",
+                "slb:CreateLoadBalancerHTTPListener",
+                "slb:CreateLoadBalancerTCPListener",
+                "slb:CreateLoadBalancerUDPListener",
+                "slb:DeleteLoadBalancerListener",
+                "slb:CreateVServerGroup",
+                "slb:DescribeVServerGroups",
+                "slb:DeleteVServerGroup",
+                "slb:SetVServerGroupAttribute",
+                "slb:DescribeVServerGroupAttribute",
+                "slb:ModifyVServerGroupBackendServers",
+                "slb:AddVServerGroupBackendServers",
+                "slb:ModifyLoadBalancerInstanceSpec",
+                "slb:ModifyLoadBalancerInternetSpec",
+                "slb:SetLoadBalancerModificationProtection",
+                "slb:SetLoadBalancerDeleteProtection",
+                "slb:SetLoadBalancerName",
+                "slb:RemoveVServerGroupBackendServers"
+            ],
+            "Resource": [
+                "*"
+            ],
+            "Effect": "Allow"
+        },
+        {
+            "Action": [
+                "vpc:Describe*",
+                "vpc:DeleteRouteEntry",
+                "vpc:CreateRouteEntry"
+            ],
+            "Resource": [
+                "*"
+            ],
+            "Effect": "Allow"
+        },
+        {
+            "Action": [
+                "log:AnalyzeProductLog",
+                "log:CreateIndex",
+                "log:UpdateIndex",
+                "log:DeleteIndex",
+                "log:CreateLogStore",
+                "log:UpdateLogStore",
+                "log:DeleteLogStore",
+                "log:CreateDashboard",
+                "log:UpdateDashboard",
+                "log:DeleteDashboard"
+            ],
+            "Resource": [
+                "acs:log:*:*:project/*/logstore/alb_*",
+                "acs:log:*:*:project/*/dashboard/*"
+            ],
+            "Effect": "Allow"
+        },
+        {
             "Action": [
                 "alb:TagResources",
+                "alb:UnTagResources",
                 "alb:ListServerGroups",
                 "alb:ListServerGroupServers",
                 "alb:AddServersToServerGroup",
@@ -144,5 +154,5 @@
             "Resource": "*",
             "Effect": "Allow"
         }
-  ]
+    ]
 }
