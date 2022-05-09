@@ -96,9 +96,9 @@ func (m *ModelApplier) applyLoadBalancerAttribute(reqCtx *RequestContext, local 
 				return fmt.Errorf("delete loadbalancer [%s] error: %s",
 					remote.LoadBalancerAttribute.LoadBalancerId, err.Error())
 			}
+			reqCtx.Log.Info(fmt.Sprintf("successfully delete slb %s", remote.LoadBalancerAttribute.LoadBalancerId))
 			remote.LoadBalancerAttribute.LoadBalancerId = ""
 			remote.LoadBalancerAttribute.Address = ""
-			reqCtx.Log.Info(fmt.Sprintf("successfully delete slb %s", remote.LoadBalancerAttribute.LoadBalancerId))
 			return nil
 		}
 		reqCtx.Log.Info(fmt.Sprintf("slb %s is reused, skip delete it", remote.LoadBalancerAttribute.LoadBalancerId))
@@ -155,7 +155,8 @@ func (m *ModelApplier) applyVGroups(reqCtx *RequestContext, local *model.LoadBal
 				break
 			}
 			// find by vgroup name
-			if local.VServerGroups[i].VGroupName == rv.VGroupName {
+			if local.VServerGroups[i].VGroupId == "" &&
+				local.VServerGroups[i].VGroupName == rv.VGroupName {
 				found = true
 				local.VServerGroups[i].VGroupId = rv.VGroupId
 				old = rv

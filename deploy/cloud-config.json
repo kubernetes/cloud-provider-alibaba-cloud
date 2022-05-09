@@ -1,0 +1,11 @@
+{
+  "Global": {
+    "KubernetesClusterTag": "",
+    "vpcid": "vpc-xxxx",
+    "region": "cn-hangzhou",
+    "zoneid": "cn-hangzhou-b",
+    "vswitchid": "vsw-xxxx",
+    "accessKeyID": "base64 encoded",
+    "accessKeySecret": "base64 encoded"
+  }
+}
