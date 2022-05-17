@@ -189,14 +189,6 @@ type BackendAttribute struct {
 	Type        string `json:"type"`
 }
 
-// DryRunBackendAttribute only used in DryRun mode, for updating backend description in dry run mode
-type DryRunBackendAttribute struct {
-	Description string `json:"description"`
-	ServerId    string `json:"serverId"`
-	ServerIp    string `json:"serverIp"`
-	Type        string `json:"type"`
-}
-
 // DEFAULT_PREFIX default prefix for listener
 var DEFAULT_PREFIX = "k8s"
 
