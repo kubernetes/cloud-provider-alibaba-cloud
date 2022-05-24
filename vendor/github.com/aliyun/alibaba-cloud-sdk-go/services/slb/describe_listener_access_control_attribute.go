@@ -85,9 +85,9 @@ type DescribeListenerAccessControlAttributeRequest struct {
 // DescribeListenerAccessControlAttributeResponse is the response struct for api DescribeListenerAccessControlAttribute
 type DescribeListenerAccessControlAttributeResponse struct {
 	*responses.BaseResponse
-	RequestId           string `json:"RequestId" xml:"RequestId"`
-	AccessControlStatus string `json:"AccessControlStatus" xml:"AccessControlStatus"`
 	SourceItems         string `json:"SourceItems" xml:"SourceItems"`
+	AccessControlStatus string `json:"AccessControlStatus" xml:"AccessControlStatus"`
+	RequestId           string `json:"RequestId" xml:"RequestId"`
 }
 
 // CreateDescribeListenerAccessControlAttributeRequest creates a request to invoke DescribeListenerAccessControlAttribute API

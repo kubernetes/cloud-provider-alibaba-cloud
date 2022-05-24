@@ -95,8 +95,8 @@ type CreateDomainExtensionServerCertificate struct {
 // CreateDomainExtensionResponse is the response struct for api CreateDomainExtension
 type CreateDomainExtensionResponse struct {
 	*responses.BaseResponse
-	RequestId         string `json:"RequestId" xml:"RequestId"`
 	ListenerPort      int    `json:"ListenerPort" xml:"ListenerPort"`
+	RequestId         string `json:"RequestId" xml:"RequestId"`
 	DomainExtensionId string `json:"DomainExtensionId" xml:"DomainExtensionId"`
 }
 

@@ -85,9 +85,9 @@ type SetVServerGroupAttributeRequest struct {
 // SetVServerGroupAttributeResponse is the response struct for api SetVServerGroupAttribute
 type SetVServerGroupAttributeResponse struct {
 	*responses.BaseResponse
-	RequestId        string                                   `json:"RequestId" xml:"RequestId"`
 	VServerGroupId   string                                   `json:"VServerGroupId" xml:"VServerGroupId"`
 	VServerGroupName string                                   `json:"VServerGroupName" xml:"VServerGroupName"`
+	RequestId        string                                   `json:"RequestId" xml:"RequestId"`
 	BackendServers   BackendServersInSetVServerGroupAttribute `json:"BackendServers" xml:"BackendServers"`
 }
 

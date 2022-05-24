@@ -85,8 +85,8 @@ type ModifyVServerGroupBackendServersRequest struct {
 // ModifyVServerGroupBackendServersResponse is the response struct for api ModifyVServerGroupBackendServers
 type ModifyVServerGroupBackendServersResponse struct {
 	*responses.BaseResponse
-	RequestId      string                                           `json:"RequestId" xml:"RequestId"`
 	VServerGroupId string                                           `json:"VServerGroupId" xml:"VServerGroupId"`
+	RequestId      string                                           `json:"RequestId" xml:"RequestId"`
 	BackendServers BackendServersInModifyVServerGroupBackendServers `json:"BackendServers" xml:"BackendServers"`
 }
 

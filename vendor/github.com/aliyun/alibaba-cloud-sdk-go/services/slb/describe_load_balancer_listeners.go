@@ -84,10 +84,10 @@ type DescribeLoadBalancerListenersRequest struct {
 // DescribeLoadBalancerListenersResponse is the response struct for api DescribeLoadBalancerListeners
 type DescribeLoadBalancerListenersResponse struct {
 	*responses.BaseResponse
-	MaxResults int                                       `json:"MaxResults" xml:"MaxResults"`
 	NextToken  string                                    `json:"NextToken" xml:"NextToken"`
 	RequestId  string                                    `json:"RequestId" xml:"RequestId"`
 	TotalCount int                                       `json:"TotalCount" xml:"TotalCount"`
+	MaxResults int                                       `json:"MaxResults" xml:"MaxResults"`
 	Listeners  []ListenerInDescribeLoadBalancerListeners `json:"Listeners" xml:"Listeners"`
 }
 

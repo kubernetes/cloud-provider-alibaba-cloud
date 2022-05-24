@@ -79,6 +79,7 @@ type DescribeCommandsRequest struct {
 	Provider             string           `position:"Query" name:"Provider"`
 	ContentEncoding      string           `position:"Query" name:"ContentEncoding"`
 	PageSize             requests.Integer `position:"Query" name:"PageSize"`
+	Latest               requests.Boolean `position:"Query" name:"Latest"`
 	ResourceOwnerAccount string           `position:"Query" name:"ResourceOwnerAccount"`
 	OwnerAccount         string           `position:"Query" name:"OwnerAccount"`
 	OwnerId              requests.Integer `position:"Query" name:"OwnerId"`
@@ -88,10 +89,10 @@ type DescribeCommandsRequest struct {
 // DescribeCommandsResponse is the response struct for api DescribeCommands
 type DescribeCommandsResponse struct {
 	*responses.BaseResponse
-	RequestId  string   `json:"RequestId" xml:"RequestId"`
-	TotalCount int64    `json:"TotalCount" xml:"TotalCount"`
-	PageNumber int64    `json:"PageNumber" xml:"PageNumber"`
 	PageSize   int64    `json:"PageSize" xml:"PageSize"`
+	RequestId  string   `json:"RequestId" xml:"RequestId"`
+	PageNumber int64    `json:"PageNumber" xml:"PageNumber"`
+	TotalCount int64    `json:"TotalCount" xml:"TotalCount"`
 	Commands   Commands `json:"Commands" xml:"Commands"`
 }
 
