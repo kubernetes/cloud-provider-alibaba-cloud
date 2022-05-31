@@ -313,7 +313,7 @@ func (r *ReconcileRoute) reconcileForCluster() {
 		r.record.Event(
 			&corev1.Event{ObjectMeta: metav1.ObjectMeta{Name: "route-controller"}},
 			corev1.EventTypeWarning, helper.FailedSyncRoute,
-			"Error reconciling route, get route tables failed.",
+			fmt.Sprintf("Reconciling route error: %s", err.Error()),
 		)
 	}
 
