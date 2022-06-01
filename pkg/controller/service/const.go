@@ -2,9 +2,10 @@ package service
 
 // Service related
 const (
-	ServiceFinalizer = "service.k8s.alibaba/resources"
-	CCMClass         = "service.beta.kubernetes.io/class"
-	LabelServiceHash = "service.beta.kubernetes.io/hash"
+	ServiceFinalizer    = "service.k8s.alibaba/resources"
+	CCMClass            = "service.beta.kubernetes.io/class"
+	LabelServiceHash    = "service.beta.kubernetes.io/hash"
+	LabelLoadBalancerId = "service.k8s.alibaba/loadbalancer-id"
 )
 
 // Node related
