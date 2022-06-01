@@ -17,12 +17,13 @@ package alb
 
 // BackendServer is a nested struct in alb response
 type BackendServer struct {
-	Description   string `json:"Description" xml:"Description"`
-	Port          int    `json:"Port" xml:"Port"`
-	ServerId      string `json:"ServerId" xml:"ServerId"`
-	ServerIp      string `json:"ServerIp" xml:"ServerIp"`
-	ServerType    string `json:"ServerType" xml:"ServerType"`
-	Status        string `json:"Status" xml:"Status"`
-	Weight        int    `json:"Weight" xml:"Weight"`
-	ServerGroupId string `json:"ServerGroupId" xml:"ServerGroupId"`
+	Description     string `json:"Description" xml:"Description"`
+	Port            int    `json:"Port" xml:"Port"`
+	ServerId        string `json:"ServerId" xml:"ServerId"`
+	ServerIp        string `json:"ServerIp" xml:"ServerIp"`
+	ServerType      string `json:"ServerType" xml:"ServerType"`
+	Status          string `json:"Status" xml:"Status"`
+	Weight          int    `json:"Weight" xml:"Weight"`
+	ServerGroupId   string `json:"ServerGroupId" xml:"ServerGroupId"`
+	RemoteIpEnabled bool   `json:"RemoteIpEnabled" xml:"RemoteIpEnabled"`
 }

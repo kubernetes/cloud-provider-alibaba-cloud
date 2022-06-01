@@ -74,6 +74,7 @@ type SetLoadBalancerUDPListenerAttributeRequest struct {
 	ResourceOwnerId           requests.Integer                                `position:"Query" name:"ResourceOwnerId"`
 	HealthCheckURI            string                                          `position:"Query" name:"HealthCheckURI"`
 	AclStatus                 string                                          `position:"Query" name:"AclStatus"`
+	FullNatEnabled            requests.Boolean                                `position:"Query" name:"FullNatEnabled"`
 	AclType                   string                                          `position:"Query" name:"AclType"`
 	MasterSlaveServerGroup    string                                          `position:"Query" name:"MasterSlaveServerGroup"`
 	FailoverStrategy          string                                          `position:"Query" name:"FailoverStrategy"`

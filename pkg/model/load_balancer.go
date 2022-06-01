@@ -24,6 +24,11 @@ type InternetChargeType string
 
 const PayByBandwidth = InternetChargeType("paybybandwidth")
 
+// InstanceChargeType slb instance charge type
+type InstanceChargeType string
+
+const PayBySpec = InstanceChargeType("PayBySpec")
+
 type AddressIPVersionType string
 
 const (
@@ -86,6 +91,7 @@ type LoadBalancerAttribute struct {
 	NetworkType                  string
 	Bandwidth                    int
 	InternetChargeType           InternetChargeType
+	InstanceChargeType           InstanceChargeType
 	DeleteProtection             FlagType
 	ModificationProtectionStatus ModificationProtectionType
 	ResourceGroupId              string

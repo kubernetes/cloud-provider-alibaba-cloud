@@ -82,6 +82,7 @@ type CreateInstanceRequest struct {
 	PrivatePoolOptionsMatchCriteria string                    `position:"Query" name:"PrivatePoolOptions.MatchCriteria"`
 	HostName                        string                    `position:"Query" name:"HostName"`
 	Password                        string                    `position:"Query" name:"Password"`
+	SystemDisk                      CreateInstanceSystemDisk  `position:"Query" name:"SystemDisk"  type:"Struct"`
 	DeploymentSetGroupNo            requests.Integer          `position:"Query" name:"DeploymentSetGroupNo"`
 	StorageSetPartitionNumber       requests.Integer          `position:"Query" name:"StorageSetPartitionNumber"`
 	Tag                             *[]CreateInstanceTag      `position:"Query" name:"Tag"  type:"Repeated"`
@@ -140,9 +141,17 @@ type CreateInstanceRequest struct {
 	SystemDiskDescription           string                    `position:"Query" name:"SystemDisk.Description"`
 }
 
+// CreateInstanceSystemDisk is a repeated param struct in CreateInstanceRequest
+type CreateInstanceSystemDisk struct {
+	Encrypted        string `name:"Encrypted"`
+	EncryptAlgorithm string `name:"EncryptAlgorithm"`
+	StorageClusterId string `name:"StorageClusterId"`
+	KMSKeyId         string `name:"KMSKeyId"`
+}
+
 // CreateInstanceTag is a repeated param struct in CreateInstanceRequest
 type CreateInstanceTag struct {
-	Value string `name:"value"`
+	Value string `name:"Value"`
 	Key   string `name:"Key"`
 }
 
@@ -162,6 +171,7 @@ type CreateInstanceDataDisk struct {
 	PerformanceLevel   string `name:"PerformanceLevel"`
 	EncryptAlgorithm   string `name:"EncryptAlgorithm"`
 	Description        string `name:"Description"`
+	StorageClusterId   string `name:"StorageClusterId"`
 	Category           string `name:"Category"`
 	KMSKeyId           string `name:"KMSKeyId"`
 	Device             string `name:"Device"`

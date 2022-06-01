@@ -87,8 +87,8 @@ type ModifyLoadBalancerPayTypeRequest struct {
 // ModifyLoadBalancerPayTypeResponse is the response struct for api ModifyLoadBalancerPayType
 type ModifyLoadBalancerPayTypeResponse struct {
 	*responses.BaseResponse
-	RequestId string `json:"RequestId" xml:"RequestId"`
 	OrderId   int64  `json:"OrderId" xml:"OrderId"`
+	RequestId string `json:"RequestId" xml:"RequestId"`
 }
 
 // CreateModifyLoadBalancerPayTypeRequest creates a request to invoke ModifyLoadBalancerPayType API
