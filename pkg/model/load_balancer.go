@@ -130,6 +130,8 @@ type ListenerAttribute struct {
 	Bandwidth                 int // values: -1 or 1~5120
 	Scheduler                 string
 	CertId                    string
+	CACertId                  string
+	TLSCipherPolicy           string
 	ForwardPort               int
 	EnableHttp2               FlagType
 	StickySession             FlagType

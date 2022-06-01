@@ -165,6 +165,15 @@ func (mgr *ListenerManager) buildListenerFromServicePort(reqCtx *RequestContext,
 		listener.CertId = reqCtx.Anno.Get(CertID)
 	}
 
+	if reqCtx.Anno.Get(CACertID) != "" {
+		listener.CACertId = reqCtx.Anno.Get(CACertID)
+	}
+
+	if reqCtx.Anno.Get(TLSCipherPolicy) != "" {
+		listener.TLSCipherPolicy = reqCtx.Anno.Get(TLSCipherPolicy)
+
+	}
+
 	if reqCtx.Anno.Get(EnableHttp2) != "" {
 		listener.EnableHttp2 = model.FlagType(reqCtx.Anno.Get(EnableHttp2))
 	}
@@ -341,7 +350,6 @@ func (t *tcp) Update(reqCtx *RequestContext, action UpdateAction) error {
 		reqCtx.Log.Info(fmt.Sprintf("update listener: tcp [%d] did not change, skip", action.local.ListenerPort))
 		return nil
 	}
-	reqCtx.Log.Info(fmt.Sprintf("update listener: tcp [%d] try to update [%#v]", update.ListenerPort, update))
 	return t.mgr.cloud.SetLoadBalancerTCPListenerAttribute(reqCtx.Ctx, action.lbId, update)
 }
 
@@ -371,7 +379,6 @@ func (t *udp) Update(reqCtx *RequestContext, action UpdateAction) error {
 		reqCtx.Log.Info(fmt.Sprintf("update listener: udp [%d] did not change, skip", action.local.ListenerPort))
 		return nil
 	}
-	reqCtx.Log.Info(fmt.Sprintf("update listener: udp [%d] updated [%v]", update.ListenerPort, update))
 	return t.mgr.cloud.SetLoadBalancerUDPListenerAttribute(reqCtx.Ctx, action.lbId, update)
 }
 
@@ -438,7 +445,6 @@ func (t *http) Update(reqCtx *RequestContext, action UpdateAction) error {
 		reqCtx.Log.Info(fmt.Sprintf("update listener: http [%d] did not change, skip", action.local.ListenerPort))
 		return nil
 	}
-	reqCtx.Log.Info(fmt.Sprintf("update listener: http [%d] update [%+v]", update.ListenerPort, update))
 	return t.mgr.cloud.SetLoadBalancerHTTPListenerAttribute(reqCtx.Ctx, action.lbId, update)
 
 }
@@ -470,7 +476,6 @@ func (t *https) Update(reqCtx *RequestContext, action UpdateAction) error {
 		reqCtx.Log.Info(fmt.Sprintf("update listener: https [%d] did not change, skip", action.local.ListenerPort))
 		return nil
 	}
-	reqCtx.Log.Info(fmt.Sprintf("update listener: https [%d] updated [%v]", update.ListenerPort, update))
 	return t.mgr.cloud.SetLoadBalancerHTTPSListenerAttribute(reqCtx.Ctx, action.lbId, update)
 }
 
@@ -709,22 +714,42 @@ func isNeedUpdate(reqCtx *RequestContext, local model.ListenerAttribute, remote 
 		updateDetail += fmt.Sprintf("EstablishedTimeout changed: %v - %v ;",
 			remote.EstablishedTimeout, local.EstablishedTimeout)
 	}
-	// The cert id is necessary for https, so skip to check whether it is blank
-	if local.Protocol == model.HTTPS &&
-		remote.CertId != local.CertId {
-		needUpdate = true
-		update.CertId = local.CertId
-		updateDetail += fmt.Sprintf("lb CertId %v should be changed to %v;",
-			remote.CertId, local.CertId)
+
+	// only for https
+	if local.Protocol == model.HTTPS {
+		// The cert id is necessary for https, so skip to check whether it is blank
+		if remote.CertId != local.CertId {
+			needUpdate = true
+			update.CertId = local.CertId
+			updateDetail += fmt.Sprintf("lb CertId %v should be changed to %v;",
+				remote.CertId, local.CertId)
+		}
+
+		if local.CACertId != "" && remote.CACertId != local.CACertId {
+			needUpdate = true
+			update.CACertId = local.CACertId
+			updateDetail += fmt.Sprintf("lb CACertId %v should be changed to %v;",
+				remote.CACertId, local.CACertId)
+		}
+
+		if local.EnableHttp2 != "" &&
+			remote.EnableHttp2 != local.EnableHttp2 {
+			needUpdate = true
+			update.EnableHttp2 = local.EnableHttp2
+			updateDetail += fmt.Sprintf("lb EnableHttp2 %v should be changed to %v;",
+				remote.EnableHttp2, local.EnableHttp2)
+		}
+
+		if local.TLSCipherPolicy != "" &&
+			remote.TLSCipherPolicy != local.TLSCipherPolicy {
+			needUpdate = true
+			update.TLSCipherPolicy = local.TLSCipherPolicy
+			updateDetail += fmt.Sprintf("lb TLSCipherPolicy %v should be changed to %v;",
+				remote.TLSCipherPolicy, local.TLSCipherPolicy)
+		}
+
 	}
-	if local.Protocol == model.HTTPS &&
-		local.EnableHttp2 != "" &&
-		remote.EnableHttp2 != local.EnableHttp2 {
-		needUpdate = true
-		update.EnableHttp2 = local.EnableHttp2
-		updateDetail += fmt.Sprintf("lb EnableHttp2 %v should be changed to %v;",
-			remote.EnableHttp2, local.EnableHttp2)
-	}
+
 	// acl
 	if local.AclStatus != "" &&
 		remote.AclStatus != local.AclStatus {
@@ -923,8 +948,10 @@ func isNeedUpdate(reqCtx *RequestContext, local model.ListenerAttribute, remote 
 			remote.HealthCheckMethod, local.HealthCheckMethod)
 	}
 
-	reqCtx.Ctx = context.WithValue(reqCtx.Ctx, dryrun.ContextMessage, updateDetail)
-	reqCtx.Log.Info(fmt.Sprintf("try to update listener %d, detail %s", local.ListenerPort, updateDetail))
+	if needUpdate {
+		reqCtx.Ctx = context.WithValue(reqCtx.Ctx, dryrun.ContextMessage, updateDetail)
+		reqCtx.Log.Info(fmt.Sprintf("update listener: %s [%d] changed, detail %s", local.Protocol, local.ListenerPort, updateDetail))
+	}
 	return needUpdate, update
 }
 
