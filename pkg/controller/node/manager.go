@@ -142,15 +142,46 @@ func nodeConditionReady(kclient client.Client, node *v1.Node) *v1.NodeCondition 
 	return nil
 }
 
-func findCloudECS(
-	ins prvd.IInstance, prvdId string,
-) (*prvd.NodeAttribute, error) {
-	nodes, err := ins.ListInstances(context.TODO(), []string{prvdId})
+func findCloudECS(ins prvd.IInstance, node *v1.Node) (*prvd.NodeAttribute, error) {
+	if node.Spec.ProviderID != "" {
+		return findCloudECSById(ins, node)
+	} else {
+		return findCloudECSByIp(ins, node)
+	}
+}
+
+func findCloudECSById(ins prvd.IInstance, node *v1.Node) (*prvd.NodeAttribute, error) {
+	klog.Infof("try to find ecs for node %s by provider id %s", node.Name, node.Spec.ProviderID)
+	nodes, err := ins.ListInstances(context.TODO(), []string{node.Spec.ProviderID})
 	if err != nil {
 		return nil, fmt.Errorf("cloud instance api fail, %s", err.Error())
 	}
-	cloudIns, ok := nodes[prvdId]
+	cloudIns, ok := nodes[node.Spec.ProviderID]
 	if !ok || cloudIns == nil {
+		return nil, ErrNotFound
+	}
+	return cloudIns, nil
+}
+
+func findCloudECSByIp(ins prvd.IInstance, node *v1.Node) (*prvd.NodeAttribute, error) {
+	var internalIP []string
+	for _, addr := range node.Status.Addresses {
+		if addr.Type == v1.NodeInternalIP {
+			internalIP = append(internalIP, addr.Address)
+		}
+	}
+	if len(internalIP) != 1 {
+		klog.Infof("try to find ecs for node %s by internal ip, error: internal ip [%v] not single",
+			internalIP, node.Name)
+		return nil, ErrNotFound
+	}
+
+	klog.Infof("try to find ecs for node %s by internal ip %v", node.Name, internalIP)
+	cloudIns, err := ins.GetInstancesByIP(context.TODO(), internalIP)
+	if err != nil {
+		return nil, fmt.Errorf("list instances by ip %s fail: %s", node.Name, err.Error())
+	}
+	if cloudIns == nil {
 		return nil, ErrNotFound
 	}
 	return cloudIns, nil
@@ -201,6 +232,20 @@ func setFields(node *v1.Node, ins *prvd.NodeAttribute, cfgRoute bool) {
 		modify := func(n *v1.Node) {
 			n.Labels[v1.LabelZoneRegion] = ins.Region
 			n.Labels[v1.LabelTopologyRegion] = ins.Region
+		}
+		modifiers = append(modifiers, modify)
+	}
+
+	if node.Spec.ProviderID == "" && ins.InstanceID != "" {
+		prvdId := fmt.Sprintf("%s.%s", ins.Region, ins.InstanceID)
+		klog.V(5).Infof(
+			"node %s,Adding provider id from cloud provider: %s=%s, %s=%s",
+			node.Name,
+			node.Spec.ProviderID,
+			prvdId,
+		)
+		modify := func(n *v1.Node) {
+			n.Spec.ProviderID = prvdId
 		}
 		modifiers = append(modifiers, modify)
 	}

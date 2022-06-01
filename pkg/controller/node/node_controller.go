@@ -132,19 +132,13 @@ func (m *ReconcileNode) syncCloudNode(node *corev1.Node) error {
 // This processes nodes that were added into the cluster, and cloud initialize them if appropriate
 func (m *ReconcileNode) doAddCloudNode(node *corev1.Node) error {
 	start := time.Now()
-	prvdId := node.Spec.ProviderID
-	if prvdId == "" {
-		log.Info(fmt.Sprintf("warning: provider id not exist, skip %s initialize", node.Name))
-		return nil
-	}
-
-	instance, err := findCloudECS(m.cloud, prvdId)
+	instance, err := findCloudECS(m.cloud, node)
 	if err != nil {
 		if err == ErrNotFound {
-			log.Info("cloud instance %s not found", node.Name)
+			log.Info("cloud instance not found", "node", node.Name)
 			return nil
 		}
-		log.Error(err, "fail to find ecs", "providerId", prvdId)
+		log.Error(err, "fail to find ecs", "node", node.Name)
 		return fmt.Errorf("find ecs: %s", err.Error())
 	}
 

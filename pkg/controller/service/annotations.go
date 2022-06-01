@@ -5,8 +5,8 @@ import (
 	"strings"
 
 	v1 "k8s.io/api/core/v1"
+	ctrlCfg "k8s.io/cloud-provider-alibaba-cloud/pkg/config"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/model"
-	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/base"
 )
 
 // prefix
@@ -19,7 +19,6 @@ const (
 
 const (
 	TAGKEY   = "kubernetes.do.not.delete"
-	ACKKEY   = "ack.aliyun.com"
 	REUSEKEY = "kubernetes.reused.by.user"
 )
 
@@ -145,8 +144,8 @@ func (n *AnnotationRequest) GetDefaultTags() []model.Tag {
 			TagValue: n.GetDefaultLoadBalancerName(),
 		},
 		{
-			TagKey:   ACKKEY,
-			TagValue: base.CLUSTER_ID,
+			TagKey:   ctrlCfg.CloudCFG.Global.KubernetesClusterTag,
+			TagValue: ctrlCfg.CloudCFG.Global.ClusterID,
 		},
 	}
 }

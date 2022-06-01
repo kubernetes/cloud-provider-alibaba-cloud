@@ -83,7 +83,6 @@ func NewClientMgr() (*ClientMgr, error) {
 	}
 
 	meta := NewMetaData()
-	CLUSTER_ID = meta.ClusterID()
 	region, err := meta.Region()
 	if err != nil {
 		return nil, fmt.Errorf("can not determin region: %s", err.Error())
