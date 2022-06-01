@@ -56,17 +56,6 @@ func canNodeSkipEventHandler(node *v1.Node) bool {
 		klog.V(5).Infof("node %s has exclude label, skip", node.Name)
 		return true
 	}
-	if isMasterNode(node) {
-		klog.V(5).Infof("node %s is master node, skip", node.Name)
-		return true
-	}
-	return false
-}
-
-func isMasterNode(node *v1.Node) bool {
-	if _, isMaster := node.Labels[LabelNodeRoleMaster]; isMaster {
-		return true
-	}
 	return false
 }
 
