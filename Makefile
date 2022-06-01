@@ -36,7 +36,7 @@ BUILD_DATE=$(shell date +%Y-%m-%dT%H:%M:%S%z)
 ldflags="-s -w -X $(VERSION_PKG).Version=$(TAG) -X $(VERSION_PKG).GitCommit=${GIT_COMMIT} -X ${VERSION_PKG}.BuildDate=${BUILD_DATE}"
 
 .PHONY: cloud-controller-manager
-cloud-controller-manager: gofmt unit-test
+cloud-controller-manager: gofmt
 	@echo + Building cloud-controller-manager binary
 	GOARCH=${TARGETARCH} \
 	GOOS=${TARGETOS} \

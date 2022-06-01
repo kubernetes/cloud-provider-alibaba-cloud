@@ -20,6 +20,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -299,6 +300,8 @@ func RefreshToken(mgr *ClientMgr, token *Token) error {
 		setVPCEndpoint(mgr)
 	}
 
+	setCustomizedEndpoint(mgr)
+
 	return nil
 }
 
@@ -310,6 +313,33 @@ func setVPCEndpoint(mgr *ClientMgr) {
 	mgr.ALB.Network = "vpc"
 	mgr.SLS.Network = "vpc"
 	mgr.CAS.Network = "vpc"
+}
+
+func setCustomizedEndpoint(mgr *ClientMgr) {
+	if ecsEndpoint, err := parseURL(os.Getenv("ECS_ENDPOINT")); err == nil && ecsEndpoint != "" {
+		mgr.ECS.Domain = ecsEndpoint
+	}
+	if vpcEndpoint, err := parseURL(os.Getenv("VPC_ENDPOINT")); err == nil && vpcEndpoint != "" {
+		mgr.VPC.Domain = vpcEndpoint
+	}
+	if slbEndpoint, err := parseURL(os.Getenv("SLB_ENDPOINT")); err == nil && slbEndpoint != "" {
+		mgr.SLB.Domain = slbEndpoint
+	}
+}
+
+func parseURL(str string) (string, error) {
+	if str == "" {
+		return "", nil
+	}
+
+	if !strings.HasPrefix(str, "http") {
+		str = "http://" + str
+	}
+	u, err := url.Parse(str)
+	if err != nil {
+		return "", err
+	}
+	return u.Host, nil
 }
 
 // Token base Token info
