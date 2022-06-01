@@ -166,6 +166,8 @@ func (m *ModelApplier) applyVGroups(reqCtx *RequestContext, local *model.LoadBal
 
 		// update
 		if found {
+			reqCtx.Log.Info(fmt.Sprintf("try to update vgroup %s, VGroupId %s", local.VServerGroups[i].VGroupName,
+				local.VServerGroups[i].VGroupId))
 			if err := m.vGroupMgr.UpdateVServerGroup(reqCtx, local.VServerGroups[i], old); err != nil {
 				return fmt.Errorf("EnsureVGroupUpdated error: %s", err.Error())
 			}

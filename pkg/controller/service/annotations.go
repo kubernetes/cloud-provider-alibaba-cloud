@@ -81,7 +81,6 @@ const (
 	IdleTimeout               = AnnotationLoadBalancerPrefix + "idle-timeout"                 // IdleTimeout idle timeout for L7
 	RequestTimeout            = AnnotationLoadBalancerPrefix + "request-timeout"              // RequestTimeout request timeout for L7
 	EstablishedTimeout        = AnnotationLoadBalancerPrefix + "established-timeout"          // EstablishedTimeout connection established time out for TCP
-	TLSCipherPolicy           = AnnotationLoadBalancerPrefix + "tls-cipher-policy"            //TLSCipherPolicy TLS security policy for https
 
 	// VServerBackend Attribute
 	BackendLabel      = AnnotationLoadBalancerPrefix + "backend-label"              // BackendLabel backend labels

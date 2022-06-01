@@ -954,48 +954,6 @@ func RunListenerTestCases(f *framework.Framework) {
 				})
 			})
 
-			ginkgo.Context("tls-cipher-policy", func() {
-				ginkgo.It("tls-cipher-policy: tls_cipher_policy_1_1", func() {
-					svc, err := f.Client.KubeClient.CreateServiceByAnno(map[string]string{
-						service.Annotation(service.ProtocolPort):    "https:443",
-						service.Annotation(service.CertID):          options.TestConfig.CertID,
-						service.Annotation(service.TLSCipherPolicy): "tls_cipher_policy_1_1",
-					})
-					gomega.Expect(err).To(gomega.BeNil())
-					err = f.ExpectLoadBalancerEqual(svc)
-					gomega.Expect(err).To(gomega.BeNil())
-				})
-				ginkgo.It("tls-cipher-policy: tls_cipher_policy_1_1 -> tls_cipher_policy_1_2", func() {
-					oldsvc, err := f.Client.KubeClient.CreateServiceByAnno(map[string]string{
-						service.Annotation(service.ProtocolPort):    "https:443",
-						service.Annotation(service.CertID):          options.TestConfig.CertID,
-						service.Annotation(service.TLSCipherPolicy): "tls_cipher_policy_1_1",
-					})
-					gomega.Expect(err).To(gomega.BeNil())
-					err = f.ExpectLoadBalancerEqual(oldsvc)
-					gomega.Expect(err).To(gomega.BeNil())
-
-					newsvc := oldsvc.DeepCopy()
-					newsvc.Annotations[service.Annotation(service.ProtocolPort)] = "https:443"
-					newsvc.Annotations[service.Annotation(service.CertID)] = options.TestConfig.CertID
-					newsvc.Annotations[service.Annotation(service.TLSCipherPolicy)] = "tls_cipher_policy_1_2"
-					newsvc, err = f.Client.KubeClient.PatchService(oldsvc, newsvc)
-					gomega.Expect(err).To(gomega.BeNil())
-					err = f.ExpectLoadBalancerEqual(newsvc)
-					gomega.Expect(err).To(gomega.BeNil())
-				})
-				ginkgo.It("tls-cipher-policy: not exist policy", func() {
-					svc, err := f.Client.KubeClient.CreateServiceByAnno(map[string]string{
-						service.Annotation(service.ProtocolPort):    "https:443",
-						service.Annotation(service.CertID):          options.TestConfig.CertID,
-						service.Annotation(service.TLSCipherPolicy): "tls_cipher_policy_no_exist",
-					})
-					gomega.Expect(err).To(gomega.BeNil())
-					err = f.ExpectLoadBalancerEqual(svc)
-					gomega.Expect(err).NotTo(gomega.BeNil())
-				})
-			})
-
 		}
 
 		ginkgo.Context("service port", func() {
