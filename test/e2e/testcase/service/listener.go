@@ -996,6 +996,41 @@ func RunListenerTestCases(f *framework.Framework) {
 				})
 			})
 
+			if options.TestConfig.CACertID != "" {
+				ginkgo.Context("ca-cert", func() {
+					svc, err := f.Client.KubeClient.CreateServiceByAnno(map[string]string{
+						service.Annotation(service.ProtocolPort): "https:443",
+						service.Annotation(service.CertID):       options.TestConfig.CertID,
+						service.Annotation(service.CACertID):     options.TestConfig.CACertID,
+					})
+					gomega.Expect(err).To(gomega.BeNil())
+					err = f.ExpectLoadBalancerEqual(svc)
+					gomega.Expect(err).To(gomega.BeNil())
+				})
+
+				ginkgo.Context("ca-cert: not exist -> exist", func() {
+					oldsvc, err := f.Client.KubeClient.CreateServiceByAnno(map[string]string{
+						service.Annotation(service.ProtocolPort): "https:443",
+						service.Annotation(service.CertID):       options.TestConfig.CertID,
+						service.Annotation(service.CACertID):     "not-exist-ca-cert",
+					})
+					gomega.Expect(err).To(gomega.BeNil())
+					err = f.ExpectLoadBalancerEqual(oldsvc)
+					gomega.Expect(err).NotTo(gomega.BeNil())
+
+					newsvc := oldsvc.DeepCopy()
+					newsvc.Annotations[service.Annotation(service.CACertID)] = options.TestConfig.CACertID
+					newsvc, err = f.Client.KubeClient.PatchService(oldsvc, newsvc)
+					gomega.Expect(err).To(gomega.BeNil())
+					err = f.ExpectLoadBalancerEqual(newsvc)
+					gomega.Expect(err).To(gomega.BeNil())
+				})
+
+				ginkgo.Context("ca-cert: delete", func() {
+
+				})
+
+			}
 		}
 
 		ginkgo.Context("service port", func() {

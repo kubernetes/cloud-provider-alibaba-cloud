@@ -116,29 +116,33 @@ func loadBalancerAttrEqual(f *Framework, anno *service.AnnotationRequest, svc *v
 			return fmt.Errorf("expected slb id %s, got %s", id, lb.LoadBalancerId)
 		}
 	}
-	if spec := anno.Get(service.Spec); spec != "" {
-		if string(lb.LoadBalancerSpec) != spec {
+
+	if anno.Get(service.InstanceChargeType) == "" || anno.Get(service.InstanceChargeType) == string(model.PayBySpec) {
+		if spec := anno.Get(service.Spec); string(lb.LoadBalancerSpec) != spec {
 			return fmt.Errorf("expected slb spec %s, got %s", spec, lb.LoadBalancerSpec)
 		}
+
+		if paymentType := anno.Get(service.ChargeType); paymentType != "" {
+			klog.Infof("in, chargeType: svc %s, lb %s", paymentType, lb.InternetChargeType)
+			if string(lb.InternetChargeType) != paymentType {
+				return fmt.Errorf("expected slb payment %s, got %s", paymentType, lb.InternetChargeType)
+			}
+			if paymentType == string(model.PayByBandwidth) {
+				if Bandwidth := anno.Get(service.Bandwidth); Bandwidth != "" {
+					if strconv.Itoa(lb.Bandwidth) != Bandwidth {
+						return fmt.Errorf("expected slb Bandwidth %s, got %d", Bandwidth, lb.Bandwidth)
+					}
+				}
+			}
+		}
 	}
+
 	if AddressType := anno.Get(service.AddressType); AddressType != "" {
 		if string(lb.AddressType) != AddressType {
 			return fmt.Errorf("expected slb AddressType %s, got %s", AddressType, lb.AddressType)
 		}
 	}
-	if paymentType := anno.Get(service.ChargeType); paymentType != "" {
-		klog.Infof("in, chargeType: svc %s, lb %s", paymentType, lb.InternetChargeType)
-		if string(lb.InternetChargeType) != paymentType {
-			return fmt.Errorf("expected slb payment %s, got %s", paymentType, lb.InternetChargeType)
-		}
-		if paymentType == string(model.PayByBandwidth) {
-			if Bandwidth := anno.Get(service.Bandwidth); Bandwidth != "" {
-				if strconv.Itoa(lb.Bandwidth) != Bandwidth {
-					return fmt.Errorf("expected slb Bandwidth %s, got %d", Bandwidth, lb.Bandwidth)
-				}
-			}
-		}
-	}
+
 	if LoadBalancerName := anno.Get(service.LoadBalancerName); LoadBalancerName != "" {
 		if lb.LoadBalancerName != LoadBalancerName {
 			return fmt.Errorf("expected slb name %s, got %s", LoadBalancerName, lb.LoadBalancerName)
@@ -713,6 +717,11 @@ func httpsEqual(reqCtx *service.RequestContext, local v1.ServicePort, remote mod
 			return fmt.Errorf("expected slb certId %s, got %s", certId, remote.CertId)
 		}
 	}
+	if caCertId := reqCtx.Anno.Get(service.CACertID); caCertId != "" {
+		if remote.CACertId != caCertId {
+			return fmt.Errorf("expected slb caCertId %s, got %s", caCertId, remote.CACertId)
+		}
+	}
 	if enableHttp2 := reqCtx.Anno.Get(service.EnableHttp2); enableHttp2 != "" {
 		if string(remote.EnableHttp2) != enableHttp2 {
 			return fmt.Errorf("expected slb enableHttp2 %s, got %s", enableHttp2, remote.EnableHttp2)
@@ -725,6 +734,11 @@ func httpsEqual(reqCtx *service.RequestContext, local v1.ServicePort, remote mod
 		}
 		if remote.RequestTimeout != timeout {
 			return fmt.Errorf("expected slb requestTimeout %d, got %d", timeout, remote.RequestTimeout)
+		}
+	}
+	if tls := reqCtx.Anno.Get(service.TLSCipherPolicy); tls != "" {
+		if remote.TLSCipherPolicy != tls {
+			return fmt.Errorf("expected slb tls %d, got %d", tls, remote.TLSCipherPolicy)
 		}
 	}
 	return nil
@@ -1141,8 +1155,10 @@ func isNodeExcludeFromLoadBalancer(node *v1.Node, anno *service.AnnotationReques
 		}
 	}
 
-	if _, isMaster := node.Labels[service.LabelNodeRoleMaster]; isMaster {
-		return true
+	for _, taint := range node.Spec.Taints {
+		if taint.Key == service.ToBeDeletedTaint {
+			return true
+		}
 	}
 
 	if _, exclude := node.Labels[service.LabelNodeExcludeBalancer]; exclude {
@@ -1278,6 +1294,29 @@ func (f *Framework) DeleteRouteEntry(node *v1.Node) error {
 				klog.Infof("successfully delete route for node %s,ins id: %s,cidr: %s",
 					node.Name, node.Spec.ProviderID, node.Spec.PodCIDR)
 			}
+		}
+	}
+	return nil
+}
+
+func (f *Framework) AddRouteEntry(prvdId, cidr string) error {
+	tables, err := f.Client.CloudClient.ListRouteTables(context.TODO(), options.TestConfig.VPCID)
+	if err != nil {
+		return err
+	}
+
+	for _, t := range tables {
+		var createErr error
+		err := wait.PollImmediate(3*time.Second, 12*time.Second, func() (done bool, err error) {
+			_, createErr = f.Client.CloudClient.CreateRoute(context.TODO(), t, prvdId, cidr)
+			if createErr != nil {
+				return false, nil
+			}
+			createErr = nil
+			return true, nil
+		})
+		if err != nil {
+			return fmt.Errorf("add route entry error: %s, create error: %v", err.Error(), createErr)
 		}
 	}
 	return nil

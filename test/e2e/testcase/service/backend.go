@@ -140,6 +140,31 @@ func RunBackendTestCases(f *framework.Framework) {
 			})
 		})
 
+		ginkgo.Context("to-be-deleted-taint", func() {
+			ginkgo.It("node: to-be-deleted-taint", func() {
+				taint := v1.Taint{
+					Key: service.ToBeDeletedTaint,
+				}
+				// add ToBeDeletedTaint
+				node, err := f.Client.KubeClient.GetLatestNode()
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(node).NotTo(gomega.BeNil())
+				err = f.Client.KubeClient.AddTaint(node.Name, taint)
+				gomega.Expect(err).To(gomega.BeNil())
+
+				oldSvc, err := f.Client.KubeClient.CreateServiceByAnno(nil)
+				gomega.Expect(err).To(gomega.BeNil())
+				err = f.ExpectLoadBalancerEqual(oldSvc)
+				gomega.Expect(err).To(gomega.BeNil())
+
+				err = f.Client.KubeClient.RemoveTaint(node.Name, taint)
+				gomega.Expect(err).To(gomega.BeNil())
+				err = f.ExpectLoadBalancerEqual(oldSvc)
+				gomega.Expect(err).To(gomega.BeNil())
+			})
+
+		})
+
 		if options.TestConfig.Network == options.Terway {
 			ginkgo.Context("backend-type", func() {
 				ginkgo.It("backend-type: eni", func() {
