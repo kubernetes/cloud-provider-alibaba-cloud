@@ -495,6 +495,11 @@ func (client *KubeClient) AddTaint(nodeName string, taint v1.Taint) error {
 		if err != nil {
 			return false, nil
 		}
+		for _, taint := range n.Spec.Taints {
+			if taint.Key == taint.Key {
+				return true, nil
+			}
+		}
 		n.Spec.Taints = append(n.Spec.Taints, taint)
 		_, err = client.CoreV1().Nodes().Update(context.TODO(), n, metav1.UpdateOptions{})
 		if err != nil {

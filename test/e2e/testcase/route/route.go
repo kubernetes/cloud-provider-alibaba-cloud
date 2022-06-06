@@ -44,7 +44,7 @@ func RunRouteControllerTestCases(f *framework.Framework) {
 					err = f.DeleteRouteEntry(&nodes[0])
 					gomega.Expect(err).To(gomega.BeNil())
 
-					err = f.AddRouteEntry(nodes[1].Spec.PodCIDR, nodes[0].Spec.PodCIDR)
+					err = f.AddRouteEntry(nodes[1].Spec.ProviderID, nodes[0].Spec.PodCIDR)
 					gomega.Expect(err).To(gomega.BeNil())
 				}
 

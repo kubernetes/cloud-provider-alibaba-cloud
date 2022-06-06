@@ -2,6 +2,7 @@ package service
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
@@ -143,7 +144,9 @@ func RunBackendTestCases(f *framework.Framework) {
 		ginkgo.Context("to-be-deleted-taint", func() {
 			ginkgo.It("node: to-be-deleted-taint", func() {
 				taint := v1.Taint{
-					Key: service.ToBeDeletedTaint,
+					Key:    service.ToBeDeletedTaint,
+					Value:  fmt.Sprint(time.Now().Unix()),
+					Effect: v1.TaintEffectNoSchedule,
 				}
 				// add ToBeDeletedTaint
 				node, err := f.Client.KubeClient.GetLatestNode()

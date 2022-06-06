@@ -355,6 +355,9 @@ func setRequest(request *slb.CreateLoadBalancerRequest, mdl *model.LoadBalancer)
 	if mdl.LoadBalancerAttribute.SlaveZoneId != "" {
 		request.SlaveZoneId = mdl.LoadBalancerAttribute.SlaveZoneId
 	}
+	if mdl.LoadBalancerAttribute.InstanceChargeType != "" {
+		request.InstanceChargeType = string(mdl.LoadBalancerAttribute.InstanceChargeType)
+	}
 	if mdl.LoadBalancerAttribute.LoadBalancerSpec != "" {
 		request.LoadBalancerSpec = string(mdl.LoadBalancerAttribute.LoadBalancerSpec)
 	}

@@ -106,6 +106,28 @@ func (f *Framework) ExpectLoadBalancerClean(svc *v1.Service, remote *model.LoadB
 	return nil
 }
 
+func (f *Framework) ExpectLoadBalancerDeleted(svc *v1.Service) error {
+	reqCtx := &service.RequestContext{
+		Service: svc,
+		Anno:    service.NewAnnotationRequest(svc),
+	}
+	lbManager := service.NewLoadBalancerManager(f.Client.CloudClient)
+
+	return wait.PollImmediate(5*time.Second, 30*time.Second, func() (done bool, err error) {
+		lbMdl := &model.LoadBalancer{
+			NamespacedName: util.NamespacedName(svc),
+		}
+		err = lbManager.Find(reqCtx, lbMdl)
+		if err != nil {
+			return false, err
+		}
+		if lbMdl.LoadBalancerAttribute.LoadBalancerId != "" {
+			return false, nil
+		}
+		return true, nil
+	})
+}
+
 func isOverride(anno *service.AnnotationRequest) bool {
 	return anno.Get(service.LoadBalancerId) != "" && anno.Get(service.OverrideListener) == "true"
 }
@@ -117,8 +139,8 @@ func loadBalancerAttrEqual(f *Framework, anno *service.AnnotationRequest, svc *v
 		}
 	}
 
-	if anno.Get(service.InstanceChargeType) == "" || anno.Get(service.InstanceChargeType) == string(model.PayBySpec) {
-		if spec := anno.Get(service.Spec); string(lb.LoadBalancerSpec) != spec {
+	if model.InstanceChargeType(anno.Get(service.InstanceChargeType)).IsPayBySpec() {
+		if spec := anno.Get(service.Spec); spec != "" && string(lb.LoadBalancerSpec) != spec {
 			return fmt.Errorf("expected slb spec %s, got %s", spec, lb.LoadBalancerSpec)
 		}
 
@@ -1307,12 +1329,20 @@ func (f *Framework) AddRouteEntry(prvdId, cidr string) error {
 
 	for _, t := range tables {
 		var createErr error
-		err := wait.PollImmediate(3*time.Second, 12*time.Second, func() (done bool, err error) {
+		err := wait.PollImmediate(5*time.Second, 20*time.Second, func() (done bool, err error) {
 			_, createErr = f.Client.CloudClient.CreateRoute(context.TODO(), t, prvdId, cidr)
 			if createErr != nil {
+				if strings.Contains(createErr.Error(), "InvalidCIDRBlock.Duplicate") {
+					route, findErr := f.Client.CloudClient.FindRoute(context.TODO(), t, prvdId, cidr)
+					if findErr == nil && route != nil {
+						return true, nil
+					}
+					// fail fast, wait next time reconcile
+					return false, findErr
+				}
+				klog.Errorf("Backoff creating route: %s", createErr.Error())
 				return false, nil
 			}
-			createErr = nil
 			return true, nil
 		})
 		if err != nil {

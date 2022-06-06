@@ -322,7 +322,7 @@ func (m *ReconcileService) buildAndApplyModel(reqCtx *RequestContext) (*model.Lo
 	// apply model
 	remoteModel, err := m.applier.Apply(reqCtx, localModel)
 	if err != nil {
-		return nil, fmt.Errorf("apply model error: %s", err.Error())
+		return remoteModel, fmt.Errorf("apply model error: %s", err.Error())
 	}
 	return remoteModel, nil
 }
