@@ -3,16 +3,14 @@ package vpc
 import (
 	"context"
 	"fmt"
-	"strings"
-
+	"github.com/aliyun/alibaba-cloud-sdk-go/sdk/requests"
+	"github.com/aliyun/alibaba-cloud-sdk-go/services/vpc"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/model"
 	prvd "k8s.io/cloud-provider-alibaba-cloud/pkg/provider"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/base"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/util"
 	"k8s.io/klog/v2"
-
-	"github.com/aliyun/alibaba-cloud-sdk-go/sdk/requests"
-	"github.com/aliyun/alibaba-cloud-sdk-go/services/vpc"
+	"strings"
 )
 
 type AssociatedInstanceType string
@@ -96,7 +94,9 @@ func (r *VPCProvider) providerIDFromInstanceId(instanceID string) (pvid string, 
 	return util.ProviderIDFromInstance(r.region, instanceID), nil
 }
 
-func (r *VPCProvider) CreateRoute(ctx context.Context, table string, provideID string, destinationCIDR string) (*model.Route, error) {
+func (r *VPCProvider) CreateRoute(
+	ctx context.Context, table string, provideID string, destinationCIDR string,
+) (*model.Route, error) {
 	createRouteEntryRequest := vpc.CreateCreateRouteEntryRequest()
 	createRouteEntryRequest.RouteTableId = table
 	createRouteEntryRequest.DestinationCidrBlock = destinationCIDR
@@ -192,7 +192,9 @@ func (r *VPCProvider) listRouteBatch(table, nextToken string, routes *[]*model.R
 	return nil
 }
 
-func (r *VPCProvider) DescribeEipAddresses(ctx context.Context, instanceType string, instanceId string) ([]string, error) {
+func (r *VPCProvider) DescribeEipAddresses(ctx context.Context, instanceType string, instanceId string) (
+	[]string, error,
+) {
 	req := vpc.CreateDescribeEipAddressesRequest()
 	req.AssociatedInstanceType = instanceType
 	req.AssociatedInstanceId = instanceId
@@ -258,7 +260,9 @@ func (r *VPCProvider) DescribeVSwitches(ctx context.Context, vpcID string) ([]vp
 }
 
 // CreateRouteTable used for e2etest
-func (r *VPCProvider) CreateRouteTable(ctx context.Context, vpcId string, name string) (*vpc.CreateRouteTableResponse, error) {
+func (r *VPCProvider) CreateRouteTable(ctx context.Context, vpcId string, name string) (
+	*vpc.CreateRouteTableResponse, error,
+) {
 	req := vpc.CreateCreateRouteTableRequest()
 	req.VpcId = vpcId
 	req.RouteTableName = name
@@ -266,7 +270,9 @@ func (r *VPCProvider) CreateRouteTable(ctx context.Context, vpcId string, name s
 }
 
 // CreateRouteTable used for e2etest
-func (r *VPCProvider) DeleteRouteTable(ctx context.Context, routeTableId string) (*vpc.DeleteRouteTableResponse, error) {
+func (r *VPCProvider) DeleteRouteTable(ctx context.Context, routeTableId string) (
+	*vpc.DeleteRouteTableResponse, error,
+) {
 	req := vpc.CreateDeleteRouteTableRequest()
 	req.RouteTableId = routeTableId
 	return r.auth.VPC.DeleteRouteTable(req)
