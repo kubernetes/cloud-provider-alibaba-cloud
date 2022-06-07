@@ -8,7 +8,7 @@ import (
 func TestGetLoadBalancerId(t *testing.T) {
 	var lb *LoadBalancer
 	id := lb.GetLoadBalancerId()
-	assert.Equal(t, id, "not found")
+	assert.Equal(t, id, "")
 
 	lb2 := &LoadBalancer{}
 	id2 := lb2.GetLoadBalancerId()

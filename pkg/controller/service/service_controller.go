@@ -247,7 +247,7 @@ func (m *ReconcileService) cleanupLoadBalancerResources(reqCtx *RequestContext) 
 			return err
 		}
 
-		if err := m.removeServiceHash(reqCtx.Service); err != nil {
+		if err := m.removeServiceLabels(reqCtx.Service); err != nil {
 			m.record.Event(reqCtx.Service, v1.EventTypeWarning, helper.FailedRemoveHash,
 				fmt.Sprintf("Error removing service hash: %s", err.Error()))
 			return err
@@ -287,7 +287,7 @@ func (m *ReconcileService) reconcileLoadBalancerResources(req *RequestContext) e
 		return err
 	}
 
-	if err := m.addServiceHash(req.Service); err != nil {
+	if err := m.addServiceLabels(req.Service, lb.GetLoadBalancerId()); err != nil {
 		m.record.Event(req.Service, v1.EventTypeWarning, helper.FailedAddHash,
 			fmt.Sprintf("Error adding service hash: %s", err.Error()))
 		return err
@@ -465,23 +465,34 @@ func (m *ReconcileService) removeServiceStatus(reqCtx *RequestContext, svc *v1.S
 
 }
 
-func (m *ReconcileService) addServiceHash(svc *v1.Service) error {
+func (m *ReconcileService) addServiceLabels(svc *v1.Service, lbId string) error {
 	updated := svc.DeepCopy()
 	if updated.Labels == nil {
 		updated.Labels = make(map[string]string)
 	}
 	serviceHash := getServiceHash(svc)
 	updated.Labels[LabelServiceHash] = serviceHash
+	if lbId != "" {
+		updated.Labels[LabelLoadBalancerId] = lbId
+	}
 	if err := m.kubeClient.Status().Patch(context.Background(), updated, client.MergeFrom(svc)); err != nil {
 		return fmt.Errorf("%s failed to add service hash:, error: %s", util.Key(svc), err.Error())
 	}
 	return nil
 }
 
-func (m *ReconcileService) removeServiceHash(svc *v1.Service) error {
+func (m *ReconcileService) removeServiceLabels(svc *v1.Service) error {
 	updated := svc.DeepCopy()
+	needUpdate := false
 	if _, ok := updated.Labels[LabelServiceHash]; ok {
 		delete(updated.Labels, LabelServiceHash)
+		needUpdate = true
+	}
+	if _, ok := updated.Labels[LabelLoadBalancerId]; ok {
+		delete(updated.Labels, LabelLoadBalancerId)
+		needUpdate = true
+	}
+	if needUpdate {
 		if err := m.kubeClient.Status().Patch(context.Background(), updated, client.MergeFrom(svc)); err != nil {
 			return fmt.Errorf("%s failed to remove service hash:, error: %s", util.Key(svc), err.Error())
 		}
