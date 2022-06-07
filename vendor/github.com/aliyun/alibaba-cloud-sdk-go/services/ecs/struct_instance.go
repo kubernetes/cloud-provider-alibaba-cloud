@@ -81,10 +81,12 @@ type Instance struct {
 	SpotStrategy                    string                               `json:"SpotStrategy" xml:"SpotStrategy"`
 	SpotDuration                    int                                  `json:"SpotDuration" xml:"SpotDuration"`
 	DeletionProtection              bool                                 `json:"DeletionProtection" xml:"DeletionProtection"`
+	SpotInterruptionBehavior        string                               `json:"SpotInterruptionBehavior" xml:"SpotInterruptionBehavior"`
 	SecurityGroupIds                SecurityGroupIdsInDescribeInstances  `json:"SecurityGroupIds" xml:"SecurityGroupIds"`
 	InnerIpAddress                  InnerIpAddressInDescribeInstances    `json:"InnerIpAddress" xml:"InnerIpAddress"`
 	PublicIpAddress                 PublicIpAddressInDescribeInstances   `json:"PublicIpAddress" xml:"PublicIpAddress"`
 	RdmaIpAddress                   RdmaIpAddress                        `json:"RdmaIpAddress" xml:"RdmaIpAddress"`
+	ImageOptions                    ImageOptions                         `json:"ImageOptions" xml:"ImageOptions"`
 	DedicatedHostAttribute          DedicatedHostAttribute               `json:"DedicatedHostAttribute" xml:"DedicatedHostAttribute"`
 	EcsCapacityReservationAttr      EcsCapacityReservationAttr           `json:"EcsCapacityReservationAttr" xml:"EcsCapacityReservationAttr"`
 	HibernationOptions              HibernationOptions                   `json:"HibernationOptions" xml:"HibernationOptions"`

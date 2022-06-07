@@ -84,8 +84,8 @@ type AddVServerGroupBackendServersRequest struct {
 // AddVServerGroupBackendServersResponse is the response struct for api AddVServerGroupBackendServers
 type AddVServerGroupBackendServersResponse struct {
 	*responses.BaseResponse
-	RequestId      string                                        `json:"RequestId" xml:"RequestId"`
 	VServerGroupId string                                        `json:"VServerGroupId" xml:"VServerGroupId"`
+	RequestId      string                                        `json:"RequestId" xml:"RequestId"`
 	BackendServers BackendServersInAddVServerGroupBackendServers `json:"BackendServers" xml:"BackendServers"`
 }
 

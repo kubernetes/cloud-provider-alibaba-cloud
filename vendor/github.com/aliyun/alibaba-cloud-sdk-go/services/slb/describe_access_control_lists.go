@@ -94,11 +94,11 @@ type DescribeAccessControlListsTag struct {
 // DescribeAccessControlListsResponse is the response struct for api DescribeAccessControlLists
 type DescribeAccessControlListsResponse struct {
 	*responses.BaseResponse
+	PageNumber int    `json:"PageNumber" xml:"PageNumber"`
+	PageSize   int    `json:"PageSize" xml:"PageSize"`
 	RequestId  string `json:"RequestId" xml:"RequestId"`
 	TotalCount int    `json:"TotalCount" xml:"TotalCount"`
-	PageSize   int    `json:"PageSize" xml:"PageSize"`
 	Count      int    `json:"Count" xml:"Count"`
-	PageNumber int    `json:"PageNumber" xml:"PageNumber"`
 	Acls       Acls   `json:"Acls" xml:"Acls"`
 }
 

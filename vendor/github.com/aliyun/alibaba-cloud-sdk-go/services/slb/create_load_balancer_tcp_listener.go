@@ -74,6 +74,7 @@ type CreateLoadBalancerTCPListenerRequest struct {
 	ResourceOwnerId                requests.Integer                          `position:"Query" name:"ResourceOwnerId"`
 	HealthCheckURI                 string                                    `position:"Query" name:"HealthCheckURI"`
 	AclStatus                      string                                    `position:"Query" name:"AclStatus"`
+	FullNatEnabled                 requests.Boolean                          `position:"Query" name:"FullNatEnabled"`
 	HealthCheckTcpFastCloseEnabled requests.Boolean                          `position:"Query" name:"HealthCheckTcpFastCloseEnabled"`
 	AclType                        string                                    `position:"Query" name:"AclType"`
 	EstablishedTimeout             requests.Integer                          `position:"Query" name:"EstablishedTimeout"`

@@ -84,8 +84,8 @@ type CreateTLSCipherPolicyRequest struct {
 // CreateTLSCipherPolicyResponse is the response struct for api CreateTLSCipherPolicy
 type CreateTLSCipherPolicyResponse struct {
 	*responses.BaseResponse
-	RequestId         string `json:"RequestId" xml:"RequestId"`
 	TLSCipherPolicyId string `json:"TLSCipherPolicyId" xml:"TLSCipherPolicyId"`
+	RequestId         string `json:"RequestId" xml:"RequestId"`
 }
 
 // CreateCreateTLSCipherPolicyRequest creates a request to invoke CreateTLSCipherPolicy API

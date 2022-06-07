@@ -85,8 +85,8 @@ type CreateVServerGroupRequest struct {
 // CreateVServerGroupResponse is the response struct for api CreateVServerGroup
 type CreateVServerGroupResponse struct {
 	*responses.BaseResponse
-	RequestId      string                             `json:"RequestId" xml:"RequestId"`
 	VServerGroupId string                             `json:"VServerGroupId" xml:"VServerGroupId"`
+	RequestId      string                             `json:"RequestId" xml:"RequestId"`
 	BackendServers BackendServersInCreateVServerGroup `json:"BackendServers" xml:"BackendServers"`
 }
 
