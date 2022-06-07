@@ -70,7 +70,7 @@ type LoadBalancer struct {
 
 func (l *LoadBalancer) GetLoadBalancerId() string {
 	if l == nil {
-		return "not found"
+		return ""
 	}
 	return l.LoadBalancerAttribute.LoadBalancerId
 }
