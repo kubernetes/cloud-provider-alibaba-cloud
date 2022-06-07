@@ -12,29 +12,41 @@ import (
 	"k8s.io/klog/v2"
 	"net"
 	"strings"
+	"sync"
 	"time"
 )
 
 var (
 	createBackoff = wait.Backoff{
-		Duration: 4 * time.Second,
+		Duration: 5 * time.Second,
 		Steps:    3,
 		Factor:   2,
 		Jitter:   1,
 	}
+	// Alibaba cloud do not support creating route concurrently.
+	routeLock = sync.Mutex{}
 )
 
-func createRouteForInstance(ctx context.Context, table, providerID, cidr string, providerIns prvd.IVPC) (*model.Route, error) {
+func createRouteForInstance(ctx context.Context, table, providerID, cidr string, providerIns prvd.IVPC) (
+	*model.Route, error,
+) {
+	routeLock.Lock()
+	defer routeLock.Unlock()
 	var (
 		route    *model.Route
 		innerErr error
+		findErr  error
 	)
 	err := wait.ExponentialBackoff(createBackoff, func() (bool, error) {
 		route, innerErr = providerIns.CreateRoute(ctx, table, providerID, cidr)
 		if innerErr != nil {
-			if strings.Contains(innerErr.Error(), "not found") {
-				klog.Infof("not found route %s", innerErr.Error())
-				return true, nil
+			if strings.Contains(innerErr.Error(), "InvalidCIDRBlock.Duplicate") {
+				route, findErr = providerIns.FindRoute(ctx, table, providerID, cidr)
+				if findErr == nil && route != nil {
+					return true, nil
+				}
+				// fail fast, wait next time reconcile
+				return false, innerErr
 			}
 			klog.Errorf("Backoff creating route: %s", innerErr.Error())
 			return false, nil
@@ -49,7 +61,8 @@ func createRouteForInstance(ctx context.Context, table, providerID, cidr string,
 }
 
 func deleteRouteForInstance(ctx context.Context, table, providerID, cidr string, providerIns prvd.IVPC) error {
-	klog.Infof("delete route for node: %v", providerID)
+	routeLock.Lock()
+	defer routeLock.Unlock()
 	return providerIns.DeleteRoute(ctx, table, providerID, cidr)
 }
 
@@ -63,15 +76,13 @@ func getRouteTables(ctx context.Context, providerIns prvd.Provider) ([]string, e
 	}
 	tables, err := providerIns.ListRouteTables(ctx, vpcId)
 	if err != nil {
-		return nil, fmt.Errorf("alicloud: "+
-			"can not found routetable by id[%s], error: %v", ctrlCfg.CloudCFG.Global.VpcID, err)
+		return nil, fmt.Errorf("can not found route table by id[%s], error: %v", ctrlCfg.CloudCFG.Global.VpcID, err)
 	}
 	if len(tables) > 1 {
-		return nil, fmt.Errorf("alicloud: "+
-			"multiple route tables found by vpc id[%s], length(tables)=%d", ctrlCfg.CloudCFG.Global.VpcID, len(tables))
+		return nil, fmt.Errorf("multiple route tables found by vpc id[%s], length(tables)=%d", ctrlCfg.CloudCFG.Global.VpcID, len(tables))
 	}
 	if len(tables) == 0 {
-		return nil, fmt.Errorf("alicloud: no route tables found by vpc id[%s]", ctrlCfg.CloudCFG.Global.VpcID)
+		return nil, fmt.Errorf("no route tables found by vpc id[%s]", ctrlCfg.CloudCFG.Global.VpcID)
 	}
 	return tables, nil
 }
@@ -99,22 +110,17 @@ func (r *ReconcileRoute) syncTableRoutes(ctx context.Context, table string, node
 		if !contains {
 			continue
 		}
-		if conflictWithNodes(route.DestinationCIDR, nodes) {
-			klog.Infof("delete route %s, %s", route.Name, route.DestinationCIDR)
+		if conflictWithNodes(route, nodes) {
 			if err = deleteRouteForInstance(ctx, table, route.ProviderId, route.DestinationCIDR, r.cloud); err != nil {
-				klog.Errorf("Could not delete route %s %s from table %s, %s", route.Name, route.DestinationCIDR, table, err.Error())
+				klog.Errorf("Could not delete conflict route %s %s from table %s, %s", route.Name, route.DestinationCIDR, table, err.Error())
 				continue
 			}
-			klog.Infof("Delete route %s, %s from table %s SUCCESS.", route.Name, route.DestinationCIDR, table)
+			klog.Infof("Delete conflict route %s, %s from table %s SUCCESS.", route.Name, route.DestinationCIDR, table)
 		}
 	}
-	for _, node := range nodes.Items {
-		if !r.configRoutes || helper.HasExcludeLabel(&node) {
-			continue
-		}
 
-		readyCondition, ok := helper.FindCondition(node.Status.Conditions, v1.NodeReady)
-		if ok && readyCondition.Status == v1.ConditionUnknown {
+	for _, node := range nodes.Items {
+		if !needSyncRoute(&node) {
 			continue
 		}
 
@@ -130,13 +136,6 @@ func (r *ReconcileRoute) syncTableRoutes(ctx context.Context, table string, node
 
 		err = r.addRouteForNode(ctx, table, ipv4RouteCidr, prvdId, &node, routes)
 		if err != nil {
-			klog.Errorf("try create route error: %s", err.Error())
-			r.record.Event(
-				&node,
-				v1.EventTypeWarning,
-				"CreateRouteFailed",
-				fmt.Sprintf("Create Route Failed for %s reason: %s", table, err),
-			)
 			continue
 		}
 
@@ -150,7 +149,7 @@ func (r *ReconcileRoute) syncTableRoutes(ctx context.Context, table string, node
 	return nil
 }
 
-func conflictWithNodes(route string, nodes *v1.NodeList) bool {
+func conflictWithNodes(route *model.Route, nodes *v1.NodeList) bool {
 	for _, node := range nodes.Items {
 		ipv4Cidr, _, err := getIPv4RouteForNode(&node)
 		if err != nil {
@@ -160,13 +159,13 @@ func conflictWithNodes(route string, nodes *v1.NodeList) bool {
 		if ipv4Cidr == nil {
 			continue
 		}
-		_, contains, err := containsRoute(ipv4Cidr, route)
+		equal, contains, err := containsRoute(ipv4Cidr, route.DestinationCIDR)
 		if err != nil {
 			klog.Errorf("error get conflict state from node: %v and route: %v", node.Name, route)
 			continue
 		}
-		if contains {
-			klog.Warningf("conflict route with node %v(%v) found, route: %v", node.Name, ipv4Cidr, route)
+		if contains || (equal && route.ProviderId != node.Spec.ProviderID) {
+			klog.Warningf("conflict route with node %v(%v) found, route: %+v", node.Name, ipv4Cidr, route)
 			return true
 		}
 
@@ -174,7 +173,9 @@ func conflictWithNodes(route string, nodes *v1.NodeList) bool {
 	return false
 }
 
-func findRoute(ctx context.Context, table, pvid, cidr string, cachedRoutes []*model.Route, providerIns prvd.IVPC) (*model.Route, error) {
+func findRoute(
+	ctx context.Context, table, pvid, cidr string, cachedRoutes []*model.Route, providerIns prvd.IVPC,
+) (*model.Route, error) {
 	if pvid == "" && cidr == "" {
 		return nil, fmt.Errorf("empty query condition")
 	}
@@ -221,4 +222,24 @@ func containsRoute(outside *net.IPNet, insideRoute string) (containsEqual bool, 
 		return false, false, nil
 	}
 	return true, true, nil
+}
+
+func needSyncRoute(node *v1.Node) bool {
+	if helper.HasExcludeLabel(node) {
+		klog.Infof("node %s has exclude label, skip creating route", node.Name)
+		return false
+	}
+
+	readyCondition, ok := helper.FindCondition(node.Status.Conditions, v1.NodeReady)
+	if ok && readyCondition.Status == v1.ConditionUnknown {
+		klog.Infof("node %s is in unknown status, skip creating route", node.Name)
+		return false
+	}
+
+	if node.DeletionTimestamp != nil {
+		klog.Infof("node %s has deletionTimestamp, skip creating route", node.Name)
+		return false
+	}
+
+	return true
 }
