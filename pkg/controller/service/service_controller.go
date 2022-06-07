@@ -157,11 +157,12 @@ func (m *ReconcileService) reconcile(request reconcile.Request) (err error) {
 	defer func() {
 		if ctrlCfg.ControllerCFG.DryRun {
 			initial.Store(request.String(), 1)
+			util.ServiceLog.Info("DryRun: reconcile finished", "service", request.NamespacedName.String())
 			if mapfull() {
 				util.ServiceLog.Info("ccm initial process finished.")
 				err := dryrun.ResultEvent(m.kubeClient, dryrun.SUCCESS, "ccm initial process finished")
 				if err != nil {
-					util.ServiceLog.Error(err, "write precheck event failed")
+					util.ServiceLog.Error(err, "write precheck event failed", "service", request.NamespacedName.String())
 				}
 				os.Exit(0)
 			}
@@ -212,6 +213,7 @@ func (m *ReconcileService) reconcile(request reconcile.Request) (err error) {
 
 	if ctrlCfg.ControllerCFG.DryRun {
 		if lb, err := m.buildAndApplyModel(reqContext); err != nil {
+			reqContext.Log.Error(err, "DryRun: reconcile loadbalancer failed")
 			m.record.Event(reqContext.Service, v1.EventTypeWarning, helper.FailedSyncLB,
 				fmt.Sprintf("DryRun: Error syncing load balancer [%s]: %s",
 					lb.GetLoadBalancerId(), helper.GetLogMessage(err)))

@@ -2,7 +2,6 @@ package dryrun
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -248,17 +247,8 @@ func (m *DryRunSLB) RemoveVServerGroupBackendServers(ctx context.Context, vGroup
 }
 
 func (m *DryRunSLB) SetVServerGroupAttribute(ctx context.Context, vGroupId string, backends string) error {
-	var updates []model.DryRunBackendAttribute
-	err := json.Unmarshal([]byte(backends), &updates)
-	if err != nil {
-		return fmt.Errorf("unmarshal [%s] error: %s", backends, err.Error())
-
-	}
-	dryRunStr, err := json.Marshal(updates)
-	if err != nil {
-		return fmt.Errorf("marshal [%+v] error: %s", updates, err.Error())
-	}
-	return m.slb.SetVServerGroupAttribute(ctx, vGroupId, string(dryRunStr))
+	// skip set VServerGroup attribute in DryRun mode. Backends will be reconciled when upgrading.
+	return nil
 }
 
 func (m *DryRunSLB) ModifyVServerGroupBackendServers(ctx context.Context, vGroupId string, old string, new string) error {
