@@ -211,6 +211,14 @@ func (p SLBProvider) SetLoadBalancerModificationProtection(ctx context.Context, 
 	return util.FormatErrorMessage(err)
 }
 
+func (p SLBProvider) ModifyLoadBalancerInstanceChargeType(ctx context.Context, lbId string, instanceChargeType string) error {
+	req := slb.CreateModifyLoadBalancerInstanceChargeTypeRequest()
+	req.LoadBalancerId = lbId
+	req.InstanceChargeType = instanceChargeType
+	_, err := p.auth.SLB.ModifyLoadBalancerInstanceChargeType(req)
+	return util.FormatErrorMessage(err)
+}
+
 func (p SLBProvider) AddTags(ctx context.Context, lbId string, tags string) error {
 	req := slb.CreateAddTagsRequest()
 	req.LoadBalancerId = lbId
@@ -369,6 +377,7 @@ func loadResponse(resp interface{}, lb *model.LoadBalancer) {
 	lb.LoadBalancerAttribute.ModificationProtectionStatus = model.ModificationProtectionType(
 		v.FieldByName("ModificationProtectionStatus").String())
 	lb.LoadBalancerAttribute.ResourceGroupId = v.FieldByName("ResourceGroupId").String()
+	lb.LoadBalancerAttribute.InstanceChargeType = model.InstanceChargeType(v.FieldByName("InstanceChargeType").String())
 
 	switch t := resp.(type) {
 	// DescribeLoadBalancers
