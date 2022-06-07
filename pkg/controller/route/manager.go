@@ -120,7 +120,7 @@ func (r *ReconcileRoute) syncTableRoutes(ctx context.Context, table string, node
 	}
 
 	for _, node := range nodes.Items {
-		if !r.configRoutes || !needSyncRoute(&node) {
+		if !needSyncRoute(&node) {
 			continue
 		}
 

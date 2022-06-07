@@ -110,6 +110,11 @@ type ReconcileRoute struct {
 }
 
 func (r *ReconcileRoute) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
+	// if do not need route, skip all node events
+	if !r.configRoutes {
+		return reconcile.Result{}, nil
+	}
+
 	reconcileNode := &corev1.Node{}
 	err := r.client.Get(context.TODO(), request.NamespacedName, reconcileNode)
 	if err != nil {
@@ -161,7 +166,7 @@ func (r *ReconcileRoute) Reconcile(ctx context.Context, request reconcile.Reques
 }
 
 func (r *ReconcileRoute) syncCloudRoute(ctx context.Context, node *corev1.Node) error {
-	if !r.configRoutes || !needSyncRoute(node) {
+	if !needSyncRoute(node) {
 		return nil
 	}
 
