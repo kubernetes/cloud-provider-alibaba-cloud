@@ -292,5 +292,3 @@ func GetServiceTrafficPolicy(svc *v1.Service) (TrafficPolicy, error) {
 	}
 	return ClusterTrafficPolicy, nil
 }
-
-// vgroup

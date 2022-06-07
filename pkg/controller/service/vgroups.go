@@ -426,6 +426,14 @@ func needExcludeFromLB(reqCtx *RequestContext, node *v1.Node) bool {
 		return true
 	}
 
+	// Remove nodes that are about to be deleted by the cluster autoscaler.
+	for _, taint := range node.Spec.Taints {
+		if taint.Key == ToBeDeletedTaint {
+			klog.V(4).Infof("Ignoring node %v with autoscaler taint %+v", node.Name, taint)
+			return false
+		}
+	}
+
 	// filter unscheduled node
 	if node.Spec.Unschedulable && reqCtx.Anno.Get(RemoveUnscheduled) != "" {
 		if reqCtx.Anno.Get(RemoveUnscheduled) == string(model.OnFlag) {
