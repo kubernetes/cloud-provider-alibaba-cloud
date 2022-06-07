@@ -161,17 +161,11 @@ func (mgr *ListenerManager) buildListenerFromServicePort(reqCtx *RequestContext,
 		listener.EstablishedTimeout = establishedTimeout
 	}
 
-	if reqCtx.Anno.Get(CertID) != "" {
-		listener.CertId = reqCtx.Anno.Get(CertID)
-	}
-
-	if reqCtx.Anno.Get(CACertID) != "" {
-		listener.CACertId = reqCtx.Anno.Get(CACertID)
-	}
+	listener.CertId = reqCtx.Anno.Get(CertID)
+	listener.CACertId = reqCtx.Anno.Get(CACertID)
 
 	if reqCtx.Anno.Get(TLSCipherPolicy) != "" {
 		listener.TLSCipherPolicy = reqCtx.Anno.Get(TLSCipherPolicy)
-
 	}
 
 	if reqCtx.Anno.Get(EnableHttp2) != "" {
@@ -725,7 +719,7 @@ func isNeedUpdate(reqCtx *RequestContext, local model.ListenerAttribute, remote 
 				remote.CertId, local.CertId)
 		}
 
-		if local.CACertId != "" && remote.CACertId != local.CACertId {
+		if remote.CACertId != local.CACertId {
 			needUpdate = true
 			update.CACertId = local.CACertId
 			updateDetail += fmt.Sprintf("lb CACertId %v should be changed to %v;",

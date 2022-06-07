@@ -409,14 +409,13 @@ func setHTTPSListenerValue(req interface{}, listener *model.ListenerAttribute) {
 		xForwardedForProto := v.FieldByName("XForwardedForProto")
 		xForwardedForProto.SetString(string(listener.XForwardedForProto))
 	}
-	if listener.CertId != "" {
-		certId := v.FieldByName("ServerCertificateId")
-		certId.SetString(listener.CertId)
-	}
-	if listener.CACertId != "" {
-		caCertId := v.FieldByName("CACertificateId")
-		caCertId.SetString(listener.CACertId)
-	}
+
+	certId := v.FieldByName("ServerCertificateId")
+	certId.SetString(listener.CertId)
+
+	caCertId := v.FieldByName("CACertificateId")
+	caCertId.SetString(listener.CACertId)
+
 	if listener.IdleTimeout != 0 {
 		idleTimeout := v.FieldByName("IdleTimeout")
 		idleTimeout.SetString(strconv.Itoa(listener.IdleTimeout))
