@@ -27,7 +27,9 @@ const PayByBandwidth = InternetChargeType("paybybandwidth")
 // InstanceChargeType slb instance charge type
 type InstanceChargeType string
 
-const PayBySpec = InstanceChargeType("PayBySpec")
+func (t InstanceChargeType) IsPayBySpec() bool {
+	return t == "" || strings.ToLower(string(t)) == "paybyspec"
+}
 
 type AddressIPVersionType string
 

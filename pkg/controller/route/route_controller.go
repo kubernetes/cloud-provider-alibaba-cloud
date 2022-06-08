@@ -152,7 +152,7 @@ func (r *ReconcileRoute) Reconcile(ctx context.Context, request reconcile.Reques
 
 	err = r.syncCloudRoute(ctx, reconcileNode)
 	if err != nil {
-		klog.Errorf("sync cloud route failed, node: %s, err: %s", reconcileNode.Name, err.Error())
+		klog.Errorf("add route for node %s failed, err: %s", reconcileNode.Name, err.Error())
 		nodeRef := &corev1.ObjectReference{
 			Kind:      "Node",
 			Name:      reconcileNode.Name,
@@ -305,6 +305,9 @@ func (r *ReconcileRoute) periodicalSync() {
 func (r *ReconcileRoute) reconcileForCluster() {
 	ctx := context.Background()
 	start := time.Now()
+	defer func() {
+		metric.RouteLatency.WithLabelValues("reconcile").Observe(metric.MsSince(start))
+	}()
 
 	nodes, err := node.NodeList(r.client)
 	if err != nil {
@@ -320,20 +323,25 @@ func (r *ReconcileRoute) reconcileForCluster() {
 			corev1.EventTypeWarning, helper.FailedSyncRoute,
 			fmt.Sprintf("Reconciling route error: %s", err.Error()),
 		)
+		return
 	}
 
+	var failedTableIds []string
 	for _, table := range tables {
-		// Sync for Nodes
-		err := r.syncTableRoutes(ctx, table, nodes)
-		if err != nil {
+		// Sync for nodes
+		if err := r.syncTableRoutes(ctx, table, nodes); err != nil {
+			failedTableIds = append(failedTableIds, table)
 			klog.Errorf("sync route tables error: sync table [%s] error: %s", table, err.Error())
-			r.record.Event(
-				&corev1.Event{ObjectMeta: metav1.ObjectMeta{Name: "route-controller"}},
-				corev1.EventTypeWarning, helper.FailedSyncRoute,
-				fmt.Sprintf("Error reconciling route, reconcile table [%s] failed", table),
-			)
 		}
 	}
-	metric.RouteLatency.WithLabelValues("reconcile").Observe(metric.MsSince(start))
-	klog.Infof("sync route tables successfully, tables [%s]", strings.Join(tables, ","))
+
+	if len(failedTableIds) != 0 {
+		r.record.Event(
+			&corev1.Event{ObjectMeta: metav1.ObjectMeta{Name: "route-controller"}},
+			corev1.EventTypeWarning, helper.FailedSyncRoute,
+			fmt.Sprintf("Error reconciling route, reconcile table [%s] failed", strings.Join(failedTableIds, ",")),
+		)
+	} else {
+		klog.Infof("sync route tables successfully, tables [%s]", strings.Join(tables, ","))
+	}
 }
