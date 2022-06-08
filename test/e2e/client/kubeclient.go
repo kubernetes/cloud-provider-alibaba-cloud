@@ -460,6 +460,9 @@ func (client *KubeClient) UnLabelNode(nodeName string, key string) error {
 func (client *KubeClient) UnscheduledNode(nodeName string) error {
 	return wait.PollImmediate(2*time.Second, time.Minute, func() (done bool, err error) {
 		n, err := client.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
+		if err != nil || n == nil {
+			return false, nil
+		}
 		n.Spec.Unschedulable = true
 		_, err = client.CoreV1().Nodes().Update(context.TODO(), n, metav1.UpdateOptions{})
 		if err != nil {
@@ -473,6 +476,9 @@ func (client *KubeClient) UnscheduledNode(nodeName string) error {
 func (client *KubeClient) ScheduledNode(nodeName string) error {
 	return wait.PollImmediate(2*time.Second, time.Minute, func() (done bool, err error) {
 		n, err := client.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
+		if err != nil || n == nil {
+			return false, nil
+		}
 		n.Spec.Unschedulable = false
 		_, err = client.CoreV1().Nodes().Update(context.TODO(), n, metav1.UpdateOptions{})
 		if err != nil {
@@ -481,6 +487,47 @@ func (client *KubeClient) ScheduledNode(nodeName string) error {
 		return true, nil
 	})
 
+}
+
+func (client *KubeClient) AddTaint(nodeName string, taint v1.Taint) error {
+	return wait.PollImmediate(2*time.Second, 30*time.Second, func() (done bool, err error) {
+		n, err := client.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
+		if err != nil {
+			return false, nil
+		}
+		for _, taint := range n.Spec.Taints {
+			if taint.Key == taint.Key {
+				return true, nil
+			}
+		}
+		n.Spec.Taints = append(n.Spec.Taints, taint)
+		_, err = client.CoreV1().Nodes().Update(context.TODO(), n, metav1.UpdateOptions{})
+		if err != nil {
+			return false, nil
+		}
+		return true, nil
+	})
+}
+
+func (client *KubeClient) RemoveTaint(nodeName string, taint v1.Taint) error {
+	return wait.PollImmediate(2*time.Second, 30*time.Second, func() (done bool, err error) {
+		n, err := client.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
+		if err != nil {
+			return false, nil
+		}
+		var updateTaints []v1.Taint
+		for _, t := range n.Spec.Taints {
+			if t.Key == taint.Key {
+				continue
+			}
+			updateTaints = append(updateTaints, t)
+		}
+		_, err = client.CoreV1().Nodes().Update(context.TODO(), n, metav1.UpdateOptions{})
+		if err != nil {
+			return false, nil
+		}
+		return true, nil
+	})
 }
 
 func (client *KubeClient) ListNodes() ([]v1.Node, error) {
@@ -503,9 +550,6 @@ func (client *KubeClient) GetLatestNode() (*v1.Node, error) {
 	var ret v1.Node
 	for _, node := range nodeList.Items {
 		if helper.HasExcludeLabel(&node) {
-			continue
-		}
-		if _, isMaster := node.Labels[service.LabelNodeRoleMaster]; isMaster {
 			continue
 		}
 		if _, exclude := node.Labels[service.LabelNodeExcludeBalancer]; exclude {

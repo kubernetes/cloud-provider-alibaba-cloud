@@ -202,5 +202,15 @@ func (client *E2EClient) InitOptions() error {
 			}
 		}
 	}
+
+	if options.TestConfig.CACertID == "" {
+		cacerts, err := client.CloudClient.DescribeCACertificates(context.TODO())
+		if err != nil {
+			return fmt.Errorf("DescribeCACertificates error: %s", err.Error())
+		}
+		if len(cacerts) > 0 {
+			options.TestConfig.CACertID = cacerts[0]
+		}
+	}
 	return nil
 }

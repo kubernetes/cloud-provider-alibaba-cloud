@@ -46,6 +46,7 @@ func createRouteForInstance(ctx context.Context, table, providerID, cidr string,
 					return true, nil
 				}
 				// fail fast, wait next time reconcile
+				klog.Errorf("Backoff creating route: same cidr with different providerID, %s", innerErr.Error())
 				return false, innerErr
 			}
 			klog.Errorf("Backoff creating route: %s", innerErr.Error())

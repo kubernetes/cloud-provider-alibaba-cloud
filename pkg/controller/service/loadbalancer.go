@@ -113,8 +113,7 @@ func (mgr *LoadBalancerManager) Update(reqCtx *RequestContext, local, remote *mo
 	}
 
 	// only supports pay by spec instances
-	if local.LoadBalancerAttribute.InstanceChargeType == model.PayBySpec ||
-		local.LoadBalancerAttribute.InstanceChargeType == "" {
+	if local.LoadBalancerAttribute.InstanceChargeType.IsPayBySpec() {
 		// update chargeType & bandwidth
 		needUpdate, charge, bandwidth := false, remote.LoadBalancerAttribute.InternetChargeType, remote.LoadBalancerAttribute.Bandwidth
 		if local.LoadBalancerAttribute.InternetChargeType != "" &&
@@ -216,14 +215,16 @@ func (mgr *LoadBalancerManager) BuildLocalModel(reqCtx *RequestContext, mdl *mod
 	mdl.LoadBalancerAttribute.AddressType = model.AddressType(reqCtx.Anno.Get(AddressType))
 	mdl.LoadBalancerAttribute.InternetChargeType = model.InternetChargeType(reqCtx.Anno.Get(ChargeType))
 	mdl.LoadBalancerAttribute.InstanceChargeType = model.InstanceChargeType(reqCtx.Anno.Get(InstanceChargeType))
-	bandwidth := reqCtx.Anno.Get(Bandwidth)
-	if bandwidth != "" {
-		i, err := strconv.Atoi(bandwidth)
-		if err != nil &&
-			mdl.LoadBalancerAttribute.InternetChargeType == model.PayByBandwidth {
-			return fmt.Errorf("bandwidth must be integer, got [%s], error: %s", bandwidth, err.Error())
+	if mdl.LoadBalancerAttribute.InstanceChargeType.IsPayBySpec() {
+		bandwidth := reqCtx.Anno.Get(Bandwidth)
+		if bandwidth != "" {
+			i, err := strconv.Atoi(bandwidth)
+			if err != nil {
+				return fmt.Errorf("bandwidth must be integer, got [%s], error: %s", bandwidth, err.Error())
+			}
+			mdl.LoadBalancerAttribute.Bandwidth = i
 		}
-		mdl.LoadBalancerAttribute.Bandwidth = i
+		mdl.LoadBalancerAttribute.LoadBalancerSpec = model.LoadBalancerSpecType(reqCtx.Anno.Get(Spec))
 	}
 	if reqCtx.Anno.Get(LoadBalancerId) != "" {
 		mdl.LoadBalancerAttribute.LoadBalancerId = reqCtx.Anno.Get(LoadBalancerId)
@@ -233,7 +234,6 @@ func (mgr *LoadBalancerManager) BuildLocalModel(reqCtx *RequestContext, mdl *mod
 	mdl.LoadBalancerAttribute.VSwitchId = reqCtx.Anno.Get(VswitchId)
 	mdl.LoadBalancerAttribute.MasterZoneId = reqCtx.Anno.Get(MasterZoneID)
 	mdl.LoadBalancerAttribute.SlaveZoneId = reqCtx.Anno.Get(SlaveZoneID)
-	mdl.LoadBalancerAttribute.LoadBalancerSpec = model.LoadBalancerSpecType(reqCtx.Anno.Get(Spec))
 	mdl.LoadBalancerAttribute.ResourceGroupId = reqCtx.Anno.Get(ResourceGroupId)
 	mdl.LoadBalancerAttribute.AddressIPVersion = model.AddressIPVersionType(reqCtx.Anno.Get(IPVersion))
 	mdl.LoadBalancerAttribute.DeleteProtection = model.FlagType(reqCtx.Anno.Get(DeleteProtection))
@@ -282,7 +282,8 @@ func setModelDefaultValue(mgr *LoadBalancerManager, mdl *model.LoadBalancer, ann
 		}
 	}
 
-	if mdl.LoadBalancerAttribute.LoadBalancerSpec == "" {
+	if mdl.LoadBalancerAttribute.InstanceChargeType.IsPayBySpec() &&
+		mdl.LoadBalancerAttribute.LoadBalancerSpec == "" {
 		mdl.LoadBalancerAttribute.LoadBalancerSpec = model.LoadBalancerSpecType(anno.GetDefaultValue(Spec))
 	}
 

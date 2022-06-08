@@ -623,6 +623,64 @@ func RunLoadBalancerTestCases(f *framework.Framework) {
 			})
 		}
 
+		ginkgo.Context("instance-charge-type", func() {
+			ginkgo.It("instance-charge-type: PayByCLCU", func() {
+				svc, err := f.Client.KubeClient.CreateServiceByAnno(map[string]string{
+					service.Annotation(service.InstanceChargeType): "PayByCLCU",
+				})
+				gomega.Expect(err).To(gomega.BeNil())
+				err = f.ExpectLoadBalancerEqual(svc)
+				gomega.Expect(err).To(gomega.BeNil())
+			})
+			ginkgo.It("instance-charge-type: PayBySpec -> PayByCLCU", func() {
+				oldsvc, err := f.Client.KubeClient.CreateServiceByAnno(map[string]string{
+					service.Annotation(service.InstanceChargeType): "PayBySpec",
+				})
+				gomega.Expect(err).To(gomega.BeNil())
+				err = f.ExpectLoadBalancerEqual(oldsvc)
+				gomega.Expect(err).To(gomega.BeNil())
+
+				newsvc := oldsvc.DeepCopy()
+				newsvc.Annotations[service.Annotation(service.InstanceChargeType)] = "PayByCLCU"
+				newsvc, err = f.Client.KubeClient.PatchService(oldsvc, newsvc)
+				gomega.Expect(err).To(gomega.BeNil())
+				err = f.ExpectLoadBalancerEqual(newsvc)
+				gomega.Expect(err).To(gomega.BeNil())
+			})
+			ginkgo.It("instance-charge-type: PayByCLCU -> PayBySpec", func() {
+				oldsvc, err := f.Client.KubeClient.CreateServiceByAnno(map[string]string{
+					service.Annotation(service.InstanceChargeType): "PayByCLCU",
+				})
+				gomega.Expect(err).To(gomega.BeNil())
+				err = f.ExpectLoadBalancerEqual(oldsvc)
+				gomega.Expect(err).To(gomega.BeNil())
+
+				newsvc := oldsvc.DeepCopy()
+				delete(newsvc.Annotations, service.Annotation(service.InstanceChargeType))
+				newsvc.Annotations[service.Annotation(service.Spec)] = model.S1Small
+				newsvc, err = f.Client.KubeClient.PatchService(oldsvc, newsvc)
+				gomega.Expect(err).To(gomega.BeNil())
+				err = f.ExpectLoadBalancerEqual(newsvc)
+				gomega.Expect(err).NotTo(gomega.BeNil())
+			})
+			ginkgo.It("instance-charge-type: PayByCLCU & spec annotation", func() {
+				oldsvc, err := f.Client.KubeClient.CreateServiceByAnno(map[string]string{
+					service.Annotation(service.InstanceChargeType): "PayBySpec",
+					service.Annotation(service.Spec):               model.S1Small,
+				})
+				gomega.Expect(err).To(gomega.BeNil())
+				err = f.ExpectLoadBalancerEqual(oldsvc)
+				gomega.Expect(err).To(gomega.BeNil())
+
+				newsvc := oldsvc.DeepCopy()
+				newsvc.Annotations[service.Annotation(service.Spec)] = "slb.s2.small"
+				newsvc, err = f.Client.KubeClient.PatchService(oldsvc, newsvc)
+				gomega.Expect(err).To(gomega.BeNil())
+				err = f.ExpectLoadBalancerEqual(newsvc)
+				gomega.Expect(err).To(gomega.BeNil())
+			})
+		})
+
 		ginkgo.Context("annotation prefix", func() {
 			ginkgo.It("annotation prefix", func() {
 				_, err := f.Client.KubeClient.CreateServiceByAnno(map[string]string{
@@ -633,6 +691,19 @@ func RunLoadBalancerTestCases(f *framework.Framework) {
 				_, slb, err := f.FindLoadBalancer()
 				gomega.Expect(err).To(gomega.BeNil())
 				gomega.Expect(string(slb.LoadBalancerAttribute.LoadBalancerSpec)).To(gomega.Equal(model.S1Small))
+			})
+		})
+
+		ginkgo.Context("service label", func() {
+			ginkgo.It("find slb", func() {
+				svc, err := f.Client.KubeClient.CreateServiceByAnno(nil)
+				gomega.Expect(err).To(gomega.BeNil())
+				err = f.ExpectLoadBalancerEqual(svc)
+				gomega.Expect(err).To(gomega.BeNil())
+
+				svc, err = f.Client.KubeClient.GetService()
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(svc.Labels).Should(gomega.HaveKey(service.LabelLoadBalancerId))
 			})
 		})
 
@@ -666,11 +737,12 @@ func RunLoadBalancerTestCases(f *framework.Framework) {
 				_, err = f.Client.KubeClient.PatchService(oldSvc, npSvc)
 				gomega.Expect(err).To(gomega.BeNil())
 
-				gomega.Eventually(func(g gomega.Gomega) {
-					_, lb, err := f.FindLoadBalancer()
-					g.Expect(lb).To(gomega.BeNil())
-					g.Expect(err).NotTo(gomega.BeNil())
-				}).Should(gomega.Succeed())
+				err = f.ExpectLoadBalancerDeleted(npSvc)
+				gomega.Expect(err).To(gomega.BeNil())
+				svc, err := f.Client.KubeClient.GetService()
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(svc.Labels).ShouldNot(gomega.HaveKey(service.LabelServiceHash))
+				gomega.Expect(svc.Labels).ShouldNot(gomega.HaveKey(service.LabelLoadBalancerId))
 			})
 			ginkgo.It("type: ClusterIP -> LoadBalancer", func() {
 				svc := f.Client.KubeClient.DefaultService()

@@ -431,8 +431,8 @@ func needExcludeFromLB(reqCtx *RequestContext, node *v1.Node) bool {
 	// Remove nodes that are about to be deleted by the cluster autoscaler.
 	for _, taint := range node.Spec.Taints {
 		if taint.Key == ToBeDeletedTaint {
-			klog.V(4).Infof("Ignoring node %v with autoscaler taint %+v", node.Name, taint)
-			return false
+			klog.Infof("Ignoring node %v with autoscaler taint %+v", node.Name, taint)
+			return true
 		}
 	}
 

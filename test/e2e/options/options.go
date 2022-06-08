@@ -35,6 +35,7 @@ type E2EConfig struct {
 	SlaveZoneID  string `json:"SlaveZoneID"`
 	CertID       string `json:"CertID"`
 	CertID2      string `json:"CertID2"`
+	CACertID     string `json:"CACertID"`
 
 	// created automatically if AllowCreateCloudResource=true
 	InternetLoadBalancerID string `json:"InternetLoadBalancerID"`
@@ -66,6 +67,7 @@ func (e *E2EConfig) BindFlags() {
 	flag.StringVar(&e.VSwitchID2, "vswitch-id-2", "", "vsw-id")
 	flag.StringVar(&e.CertID, "cert-id", "", "cert id")
 	flag.StringVar(&e.CertID2, "cert-id-2", "", "cert id")
+	flag.StringVar(&e.CACertID, "ca-cert-id", "", "ca-cert id")
 	flag.StringVar(&e.VServerGroupID, "vserver-group-id", "", "vserver group id")
 	flag.StringVar(&e.VServerGroupID2, "vserver-group-id-2", "", "vserver group id")
 }
