@@ -409,10 +409,10 @@ func setHTTPSListenerValue(req interface{}, listener *model.ListenerAttribute) {
 		xForwardedForProto := v.FieldByName("XForwardedForProto")
 		xForwardedForProto.SetString(string(listener.XForwardedForProto))
 	}
-	if listener.CertId != "" {
-		certId := v.FieldByName("ServerCertificateId")
-		certId.SetString(listener.CertId)
-	}
+
+	certId := v.FieldByName("ServerCertificateId")
+	certId.SetString(listener.CertId)
+
 	if listener.IdleTimeout != 0 {
 		idleTimeout := v.FieldByName("IdleTimeout")
 		idleTimeout.SetString(strconv.Itoa(listener.IdleTimeout))
@@ -424,6 +424,10 @@ func setHTTPSListenerValue(req interface{}, listener *model.ListenerAttribute) {
 	if listener.RequestTimeout != 0 {
 		requestTimeout := v.FieldByName("RequestTimeout")
 		requestTimeout.SetString(strconv.Itoa(listener.RequestTimeout))
+	}
+	if listener.TLSCipherPolicy != "" {
+		tlsPolicy := v.FieldByName("TLSCipherPolicy")
+		tlsPolicy.SetString(listener.TLSCipherPolicy)
 	}
 }
 
@@ -496,4 +500,5 @@ func loadHTTPSListener(config slb.HTTPSListenerConfig, listener *model.ListenerA
 	listener.HealthCheckMethod = config.HealthCheckMethod
 	listener.CertId = config.ServerCertificateId
 	listener.EnableHttp2 = model.FlagType(config.EnableHttp2)
+	listener.TLSCipherPolicy = config.TLSCipherPolicy
 }
