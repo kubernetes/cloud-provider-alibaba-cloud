@@ -4,11 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"k8s.io/cloud-provider-alibaba-cloud/pkg/model"
 	"k8s.io/klog/v2"
 	"strings"
 
 	v1 "k8s.io/api/core/v1"
+	ctrlCfg "k8s.io/cloud-provider-alibaba-cloud/pkg/config"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/model"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/base"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/util"
@@ -68,6 +69,49 @@ func (e *ECSProvider) ListInstances(ctx context.Context, ids []string) (map[stri
 		}
 	}
 	return mins, nil
+}
+
+func (e *ECSProvider) GetInstancesByIP(ctx context.Context, ips []string) (*prvd.NodeAttribute, error) {
+	req := ecs.CreateDescribeInstancesRequest()
+	req.InstanceNetworkType = "vpc"
+	bips, err := json.Marshal(ips)
+	if err != nil {
+		return nil, fmt.Errorf("node ips %v marshal error: %s", ips, err.Error())
+	}
+	req.PrivateIpAddresses = string(bips)
+	req.VpcId, err = e.auth.Meta.VpcID()
+	if err != nil {
+		return nil, fmt.Errorf("get vpc id error: %s", err.Error())
+	}
+	req.Tag = &[]ecs.DescribeInstancesTag{
+		{
+			Key:   ctrlCfg.CloudCFG.Global.KubernetesClusterTag,
+			Value: ctrlCfg.CloudCFG.Global.ClusterID,
+		},
+	}
+	resp, err := e.auth.ECS.DescribeInstances(req)
+	if err != nil {
+		klog.V(5).Infof("RequestId: %s, API: %s, ips: %s", resp.RequestId, "DescribeInstances", req.PrivateIpAddresses)
+		return nil, fmt.Errorf("describe instances by ip %s error: %s", ips, err.Error())
+	}
+
+	if len(resp.Instances.Instance) == 0 {
+		return nil, nil
+	}
+
+	if len(resp.Instances.Instance) > 1 {
+		return nil, fmt.Errorf("find multiple instances by ip %s", ips)
+	}
+
+	ins := resp.Instances.Instance[0]
+
+	return &prvd.NodeAttribute{
+		InstanceID:   ins.InstanceId,
+		InstanceType: ins.InstanceType,
+		Addresses:    findAddress(&ins),
+		Zone:         ins.ZoneId,
+		Region:       e.auth.Region,
+	}, nil
 }
 
 func (e *ECSProvider) getInstances(ids []string, region string) ([]ecs.Instance, error) {

@@ -48,6 +48,13 @@ func (cc *CloudConfig) LoadCloudCFG() error {
 	if err != nil {
 		return fmt.Errorf("read cloud config error: %s ", err.Error())
 	}
+	// set default value
+	if cc.Global.KubernetesClusterTag == "" {
+		cc.Global.KubernetesClusterTag = "ack.aliyun.com"
+	}
+	if cc.Global.ClusterID == "" {
+		cc.Global.ClusterID = "clusterid"
+	}
 	return yaml.Unmarshal(content, CloudCFG)
 }
 

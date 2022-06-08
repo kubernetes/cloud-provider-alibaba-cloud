@@ -125,7 +125,7 @@ func isServiceHashChanged(service *v1.Service) bool {
 
 func isLoadBalancerReusable(service *v1.Service, tags []model.Tag, lbIp string) (bool, string) {
 	for _, tag := range tags {
-		if tag.TagKey == TAGKEY || tag.TagKey == ACKKEY {
+		if tag.TagKey == TAGKEY || tag.TagKey == ctrlCfg.CloudCFG.Global.KubernetesClusterTag {
 			return false, "can not reuse loadbalancer created by kubernetes."
 		}
 	}
