@@ -84,8 +84,8 @@ type SetBackendServersRequest struct {
 // SetBackendServersResponse is the response struct for api SetBackendServers
 type SetBackendServersResponse struct {
 	*responses.BaseResponse
-	RequestId      string                            `json:"RequestId" xml:"RequestId"`
 	LoadBalancerId string                            `json:"LoadBalancerId" xml:"LoadBalancerId"`
+	RequestId      string                            `json:"RequestId" xml:"RequestId"`
 	BackendServers BackendServersInSetBackendServers `json:"BackendServers" xml:"BackendServers"`
 }
 

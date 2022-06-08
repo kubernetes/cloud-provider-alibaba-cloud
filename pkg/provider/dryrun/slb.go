@@ -85,6 +85,13 @@ func (m *DryRunSLB) SetLoadBalancerModificationProtection(ctx context.Context, l
 	return hintError(mtype, fmt.Sprintf("loadbalancer %s ModificationProtection should be %s", lbId, flag))
 }
 
+func (m *DryRunSLB) ModifyLoadBalancerInstanceChargeType(ctx context.Context, lbId string, instanceChargeType string) error {
+	mtype := "ModifyLoadBalancerInstanceChargeType"
+	svc := getService(ctx)
+	AddEvent(SLB, util.Key(svc), lbId, "ModifyLoadBalancerInstanceChargeType", ERROR, "")
+	return hintError(mtype, fmt.Sprintf("loadbalancer %s ModifyLoadBalancerInstanceChargeType should be %s", lbId, instanceChargeType))
+}
+
 func (m *DryRunSLB) AddTags(ctx context.Context, lbId string, tags string) error {
 	return m.slb.AddTags(ctx, lbId, tags)
 }

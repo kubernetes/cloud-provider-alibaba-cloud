@@ -85,8 +85,8 @@ type SetTLSCipherPolicyAttributeRequest struct {
 // SetTLSCipherPolicyAttributeResponse is the response struct for api SetTLSCipherPolicyAttribute
 type SetTLSCipherPolicyAttributeResponse struct {
 	*responses.BaseResponse
-	RequestId string `json:"RequestId" xml:"RequestId"`
 	TaskId    string `json:"TaskId" xml:"TaskId"`
+	RequestId string `json:"RequestId" xml:"RequestId"`
 }
 
 // CreateSetTLSCipherPolicyAttributeRequest creates a request to invoke SetTLSCipherPolicyAttribute API

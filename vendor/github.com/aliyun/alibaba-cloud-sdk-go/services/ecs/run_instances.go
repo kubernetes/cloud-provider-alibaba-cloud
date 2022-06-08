@@ -79,6 +79,8 @@ type RunInstancesRequest struct {
 	PrivatePoolOptionsMatchCriteria          string                          `position:"Query" name:"PrivatePoolOptions.MatchCriteria"`
 	HostName                                 string                          `position:"Query" name:"HostName"`
 	Password                                 string                          `position:"Query" name:"Password"`
+	SystemDisk                               RunInstancesSystemDisk          `position:"Query" name:"SystemDisk"  type:"Struct"`
+	ImageOptions                             RunInstancesImageOptions        `position:"Query" name:"ImageOptions"  type:"Struct"`
 	DeploymentSetGroupNo                     requests.Integer                `position:"Query" name:"DeploymentSetGroupNo"`
 	SystemDiskAutoSnapshotPolicyId           string                          `position:"Query" name:"SystemDisk.AutoSnapshotPolicyId"`
 	CpuOptionsCore                           requests.Integer                `position:"Query" name:"CpuOptions.Core"`
@@ -157,6 +159,21 @@ type RunInstancesRequest struct {
 	SystemDiskDescription                    string                          `position:"Query" name:"SystemDisk.Description"`
 }
 
+// RunInstancesSystemDisk is a repeated param struct in RunInstancesRequest
+type RunInstancesSystemDisk struct {
+	StorageClusterId string `name:"StorageClusterId"`
+	ProvisionedIops  string `name:"ProvisionedIops"`
+	BurstingEnabled  string `name:"BurstingEnabled"`
+	Encrypted        string `name:"Encrypted"`
+	KMSKeyId         string `name:"KMSKeyId"`
+	EncryptAlgorithm string `name:"EncryptAlgorithm"`
+}
+
+// RunInstancesImageOptions is a repeated param struct in RunInstancesRequest
+type RunInstancesImageOptions struct {
+	LoginAsNonRoot string `name:"LoginAsNonRoot"`
+}
+
 // RunInstancesArn is a repeated param struct in RunInstancesRequest
 type RunInstancesArn struct {
 	RoleType      string `name:"RoleType"`
@@ -172,13 +189,18 @@ type RunInstancesTag struct {
 
 // RunInstancesNetworkInterface is a repeated param struct in RunInstancesRequest
 type RunInstancesNetworkInterface struct {
-	VSwitchId            string    `name:"VSwitchId"`
-	NetworkInterfaceName string    `name:"NetworkInterfaceName"`
-	Description          string    `name:"Description"`
-	SecurityGroupId      string    `name:"SecurityGroupId"`
-	PrimaryIpAddress     string    `name:"PrimaryIpAddress"`
-	QueueNumber          string    `name:"QueueNumber"`
-	SecurityGroupIds     *[]string `name:"SecurityGroupIds" type:"Repeated"`
+	VSwitchId                   string    `name:"VSwitchId"`
+	NetworkInterfaceName        string    `name:"NetworkInterfaceName"`
+	Description                 string    `name:"Description"`
+	SecurityGroupId             string    `name:"SecurityGroupId"`
+	PrimaryIpAddress            string    `name:"PrimaryIpAddress"`
+	QueueNumber                 string    `name:"QueueNumber"`
+	SecurityGroupIds            *[]string `name:"SecurityGroupIds" type:"Repeated"`
+	NetworkInterfaceTrafficMode string    `name:"NetworkInterfaceTrafficMode"`
+	QueuePairNumber             string    `name:"QueuePairNumber"`
+	InstanceType                string    `name:"InstanceType"`
+	Ipv6AddressCount            string    `name:"Ipv6AddressCount"`
+	Ipv6Address                 *[]string `name:"Ipv6Address" type:"Repeated"`
 }
 
 // RunInstancesDataDisk is a repeated param struct in RunInstancesRequest
@@ -195,6 +217,9 @@ type RunInstancesDataDisk struct {
 	EncryptAlgorithm     string `name:"EncryptAlgorithm"`
 	DeleteWithInstance   string `name:"DeleteWithInstance"`
 	KMSKeyId             string `name:"KMSKeyId"`
+	StorageClusterId     string `name:"StorageClusterId"`
+	ProvisionedIops      string `name:"ProvisionedIops"`
+	BurstingEnabled      string `name:"BurstingEnabled"`
 }
 
 // RunInstancesResponse is the response struct for api RunInstances

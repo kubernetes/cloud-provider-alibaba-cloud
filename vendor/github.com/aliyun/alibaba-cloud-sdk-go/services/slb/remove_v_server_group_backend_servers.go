@@ -84,8 +84,8 @@ type RemoveVServerGroupBackendServersRequest struct {
 // RemoveVServerGroupBackendServersResponse is the response struct for api RemoveVServerGroupBackendServers
 type RemoveVServerGroupBackendServersResponse struct {
 	*responses.BaseResponse
-	RequestId      string                                           `json:"RequestId" xml:"RequestId"`
 	VServerGroupId string                                           `json:"VServerGroupId" xml:"VServerGroupId"`
+	RequestId      string                                           `json:"RequestId" xml:"RequestId"`
 	BackendServers BackendServersInRemoveVServerGroupBackendServers `json:"BackendServers" xml:"BackendServers"`
 }
 

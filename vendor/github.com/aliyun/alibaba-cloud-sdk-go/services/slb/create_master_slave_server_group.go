@@ -85,8 +85,8 @@ type CreateMasterSlaveServerGroupRequest struct {
 // CreateMasterSlaveServerGroupResponse is the response struct for api CreateMasterSlaveServerGroup
 type CreateMasterSlaveServerGroupResponse struct {
 	*responses.BaseResponse
-	RequestId                 string                                                  `json:"RequestId" xml:"RequestId"`
 	MasterSlaveServerGroupId  string                                                  `json:"MasterSlaveServerGroupId" xml:"MasterSlaveServerGroupId"`
+	RequestId                 string                                                  `json:"RequestId" xml:"RequestId"`
 	MasterSlaveBackendServers MasterSlaveBackendServersInCreateMasterSlaveServerGroup `json:"MasterSlaveBackendServers" xml:"MasterSlaveBackendServers"`
 }
 

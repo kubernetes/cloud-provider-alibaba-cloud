@@ -86,10 +86,10 @@ type ListTLSCipherPoliciesRequest struct {
 // ListTLSCipherPoliciesResponse is the response struct for api ListTLSCipherPolicies
 type ListTLSCipherPoliciesResponse struct {
 	*responses.BaseResponse
-	RequestId         string            `json:"RequestId" xml:"RequestId"`
 	NextToken         string            `json:"NextToken" xml:"NextToken"`
-	IsTruncated       bool              `json:"IsTruncated" xml:"IsTruncated"`
+	RequestId         string            `json:"RequestId" xml:"RequestId"`
 	TotalCount        int               `json:"TotalCount" xml:"TotalCount"`
+	IsTruncated       bool              `json:"IsTruncated" xml:"IsTruncated"`
 	TLSCipherPolicies []TLSCipherPolicy `json:"TLSCipherPolicies" xml:"TLSCipherPolicies"`
 }
 

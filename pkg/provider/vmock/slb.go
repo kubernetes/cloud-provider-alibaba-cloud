@@ -78,6 +78,9 @@ func (m *MockCLB) SetLoadBalancerName(ctx context.Context, lbId string, name str
 func (m *MockCLB) ModifyLoadBalancerInternetSpec(ctx context.Context, lbId string, chargeType string, bandwidth int) error {
 	return nil
 }
+func (m *MockCLB) ModifyLoadBalancerInstanceChargeType(ctx context.Context, lbId string, instanceChargeType string) error {
+	return nil
+}
 func (m *MockCLB) SetLoadBalancerModificationProtection(ctx context.Context, lbId string, flag string) error {
 	return nil
 }

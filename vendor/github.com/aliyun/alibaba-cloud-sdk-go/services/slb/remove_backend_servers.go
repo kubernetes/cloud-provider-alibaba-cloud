@@ -84,8 +84,8 @@ type RemoveBackendServersRequest struct {
 // RemoveBackendServersResponse is the response struct for api RemoveBackendServers
 type RemoveBackendServersResponse struct {
 	*responses.BaseResponse
-	RequestId      string                               `json:"RequestId" xml:"RequestId"`
 	LoadBalancerId string                               `json:"LoadBalancerId" xml:"LoadBalancerId"`
+	RequestId      string                               `json:"RequestId" xml:"RequestId"`
 	BackendServers BackendServersInRemoveBackendServers `json:"BackendServers" xml:"BackendServers"`
 }
 
