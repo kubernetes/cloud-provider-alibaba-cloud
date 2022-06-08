@@ -219,13 +219,11 @@ func (mgr *LoadBalancerManager) BuildLocalModel(reqCtx *RequestContext, mdl *mod
 		bandwidth := reqCtx.Anno.Get(Bandwidth)
 		if bandwidth != "" {
 			i, err := strconv.Atoi(bandwidth)
-			if err != nil &&
-				mdl.LoadBalancerAttribute.InternetChargeType == model.PayByBandwidth {
+			if err != nil {
 				return fmt.Errorf("bandwidth must be integer, got [%s], error: %s", bandwidth, err.Error())
 			}
 			mdl.LoadBalancerAttribute.Bandwidth = i
 		}
-
 		mdl.LoadBalancerAttribute.LoadBalancerSpec = model.LoadBalancerSpecType(reqCtx.Anno.Get(Spec))
 	}
 	if reqCtx.Anno.Get(LoadBalancerId) != "" {

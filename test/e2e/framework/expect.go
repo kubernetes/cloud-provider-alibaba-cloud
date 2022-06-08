@@ -106,6 +106,28 @@ func (f *Framework) ExpectLoadBalancerClean(svc *v1.Service, remote *model.LoadB
 	return nil
 }
 
+func (f *Framework) ExpectLoadBalancerDeleted(svc *v1.Service) error {
+	reqCtx := &service.RequestContext{
+		Service: svc,
+		Anno:    service.NewAnnotationRequest(svc),
+	}
+	lbManager := service.NewLoadBalancerManager(f.Client.CloudClient)
+
+	return wait.PollImmediate(5*time.Second, 30*time.Second, func() (done bool, err error) {
+		lbMdl := &model.LoadBalancer{
+			NamespacedName: util.NamespacedName(svc),
+		}
+		err = lbManager.Find(reqCtx, lbMdl)
+		if err != nil {
+			return false, err
+		}
+		if lbMdl.LoadBalancerAttribute.LoadBalancerId != "" {
+			return false, nil
+		}
+		return true, nil
+	})
+}
+
 func isOverride(anno *service.AnnotationRequest) bool {
 	return anno.Get(service.LoadBalancerId) != "" && anno.Get(service.OverrideListener) == "true"
 }
@@ -116,29 +138,33 @@ func loadBalancerAttrEqual(f *Framework, anno *service.AnnotationRequest, svc *v
 			return fmt.Errorf("expected slb id %s, got %s", id, lb.LoadBalancerId)
 		}
 	}
-	if spec := anno.Get(service.Spec); spec != "" {
-		if string(lb.LoadBalancerSpec) != spec {
+
+	if model.InstanceChargeType(anno.Get(service.InstanceChargeType)).IsPayBySpec() {
+		if spec := anno.Get(service.Spec); spec != "" && string(lb.LoadBalancerSpec) != spec {
 			return fmt.Errorf("expected slb spec %s, got %s", spec, lb.LoadBalancerSpec)
 		}
+
+		if paymentType := anno.Get(service.ChargeType); paymentType != "" {
+			klog.Infof("in, chargeType: svc %s, lb %s", paymentType, lb.InternetChargeType)
+			if string(lb.InternetChargeType) != paymentType {
+				return fmt.Errorf("expected slb payment %s, got %s", paymentType, lb.InternetChargeType)
+			}
+			if paymentType == string(model.PayByBandwidth) {
+				if Bandwidth := anno.Get(service.Bandwidth); Bandwidth != "" {
+					if strconv.Itoa(lb.Bandwidth) != Bandwidth {
+						return fmt.Errorf("expected slb Bandwidth %s, got %d", Bandwidth, lb.Bandwidth)
+					}
+				}
+			}
+		}
 	}
+
 	if AddressType := anno.Get(service.AddressType); AddressType != "" {
 		if string(lb.AddressType) != AddressType {
 			return fmt.Errorf("expected slb AddressType %s, got %s", AddressType, lb.AddressType)
 		}
 	}
-	if paymentType := anno.Get(service.ChargeType); paymentType != "" {
-		klog.Infof("in, chargeType: svc %s, lb %s", paymentType, lb.InternetChargeType)
-		if string(lb.InternetChargeType) != paymentType {
-			return fmt.Errorf("expected slb payment %s, got %s", paymentType, lb.InternetChargeType)
-		}
-		if paymentType == string(model.PayByBandwidth) {
-			if Bandwidth := anno.Get(service.Bandwidth); Bandwidth != "" {
-				if strconv.Itoa(lb.Bandwidth) != Bandwidth {
-					return fmt.Errorf("expected slb Bandwidth %s, got %d", Bandwidth, lb.Bandwidth)
-				}
-			}
-		}
-	}
+
 	if LoadBalancerName := anno.Get(service.LoadBalancerName); LoadBalancerName != "" {
 		if lb.LoadBalancerName != LoadBalancerName {
 			return fmt.Errorf("expected slb name %s, got %s", LoadBalancerName, lb.LoadBalancerName)
@@ -727,6 +753,11 @@ func httpsEqual(reqCtx *service.RequestContext, local v1.ServicePort, remote mod
 			return fmt.Errorf("expected slb requestTimeout %d, got %d", timeout, remote.RequestTimeout)
 		}
 	}
+	if tls := reqCtx.Anno.Get(service.TLSCipherPolicy); tls != "" {
+		if remote.TLSCipherPolicy != tls {
+			return fmt.Errorf("expected slb tls %d, got %d", tls, remote.TLSCipherPolicy)
+		}
+	}
 	return nil
 }
 
@@ -1145,6 +1176,12 @@ func isNodeExcludeFromLoadBalancer(node *v1.Node, anno *service.AnnotationReques
 		return true
 	}
 
+	for _, taint := range node.Spec.Taints {
+		if taint.Key == service.ToBeDeletedTaint {
+			return true
+		}
+	}
+
 	if _, exclude := node.Labels[service.LabelNodeExcludeBalancer]; exclude {
 		return true
 	}
@@ -1278,6 +1315,37 @@ func (f *Framework) DeleteRouteEntry(node *v1.Node) error {
 				klog.Infof("successfully delete route for node %s,ins id: %s,cidr: %s",
 					node.Name, node.Spec.ProviderID, node.Spec.PodCIDR)
 			}
+		}
+	}
+	return nil
+}
+
+func (f *Framework) AddRouteEntry(prvdId, cidr string) error {
+	tables, err := f.Client.CloudClient.ListRouteTables(context.TODO(), options.TestConfig.VPCID)
+	if err != nil {
+		return err
+	}
+
+	for _, t := range tables {
+		var createErr error
+		err := wait.PollImmediate(5*time.Second, 20*time.Second, func() (done bool, err error) {
+			_, createErr = f.Client.CloudClient.CreateRoute(context.TODO(), t, prvdId, cidr)
+			if createErr != nil {
+				if strings.Contains(createErr.Error(), "InvalidCIDRBlock.Duplicate") {
+					route, findErr := f.Client.CloudClient.FindRoute(context.TODO(), t, prvdId, cidr)
+					if findErr == nil && route != nil {
+						return true, nil
+					}
+					// fail fast, wait next time reconcile
+					return false, findErr
+				}
+				klog.Errorf("Backoff creating route: %s", createErr.Error())
+				return false, nil
+			}
+			return true, nil
+		})
+		if err != nil {
+			return fmt.Errorf("add route entry error: %s, create error: %v", err.Error(), createErr)
 		}
 	}
 	return nil

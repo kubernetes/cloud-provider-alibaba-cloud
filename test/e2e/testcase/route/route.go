@@ -36,6 +36,23 @@ func RunRouteControllerTestCases(f *framework.Framework) {
 			})
 		})
 
+		ginkgo.Context("conflict route entry", func() {
+			ginkgo.It("conflict route entry", func() {
+				nodes, err := f.Client.KubeClient.ListNodes()
+				gomega.Expect(err).To(gomega.BeNil())
+				if len(nodes) > 1 {
+					err = f.DeleteRouteEntry(&nodes[0])
+					gomega.Expect(err).To(gomega.BeNil())
+
+					err = f.AddRouteEntry(nodes[1].Spec.ProviderID, nodes[0].Spec.PodCIDR)
+					gomega.Expect(err).To(gomega.BeNil())
+				}
+
+				err = f.ExpectRouteEqual()
+				gomega.Expect(err).To(gomega.BeNil())
+			})
+		})
+
 		ginkgo.Context("multi vpc tables", func() {
 			ginkgo.It("multi vpc tables", func() {
 				// create route table
