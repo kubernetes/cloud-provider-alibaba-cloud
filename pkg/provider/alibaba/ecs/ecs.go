@@ -79,6 +79,10 @@ func (e *ECSProvider) GetInstancesByIP(ctx context.Context, ips []string) (*prvd
 		return nil, fmt.Errorf("node ips %v marshal error: %s", ips, err.Error())
 	}
 	req.PrivateIpAddresses = string(bips)
+	req.VpcId, err = e.auth.Meta.VpcID()
+	if err != nil {
+		return nil, fmt.Errorf("get vpc id error: %s", err.Error())
+	}
 	req.Tag = &[]ecs.DescribeInstancesTag{
 		{
 			Key:   ctrlCfg.CloudCFG.Global.KubernetesClusterTag,
