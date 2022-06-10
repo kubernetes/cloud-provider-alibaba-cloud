@@ -21,7 +21,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
-	"strings"
 	"time"
 )
 
@@ -184,18 +183,6 @@ func (m *ReconcileNode) doAddCloudNode(node *corev1.Node) error {
 		if err != nil {
 			log.Error(err, "fail to patch node", "node", node.Name)
 			return false, nil
-		}
-		tags := map[string]string{
-			"k8s.aliyun.com": "true",
-			"kubernetes.ccm": "true",
-		}
-		err = m.cloud.SetInstanceTags(context.TODO(), instance.InstanceID, tags)
-		if err != nil {
-			if !strings.Contains(err.Error(), "Forbidden.RAM") {
-				log.Error(err, "fail to tag instance", "node", instance.InstanceID)
-				//retry
-				return false, nil
-			}
 		}
 
 		log.Info("finished remove uninitialized cloud taints", "node", node.Name)

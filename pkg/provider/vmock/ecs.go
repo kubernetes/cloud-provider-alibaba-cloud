@@ -27,10 +27,6 @@ func (d *MockECS) GetInstancesByIP(ctx context.Context, ips []string) (*prvd.Nod
 	return nil, nil
 }
 
-func (d *MockECS) SetInstanceTags(ctx context.Context, id string, tags map[string]string) error {
-	return nil
-}
-
 func (d *MockECS) DescribeNetworkInterfaces(vpcId string, ips []string, ipVersionType model.AddressIPVersionType) (map[string]string, error) {
 	eniids := make(map[string]string)
 	for _, ip := range ips {
