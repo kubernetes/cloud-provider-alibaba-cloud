@@ -1167,6 +1167,9 @@ func (f *Framework) ExpectNodeEqual() error {
 		}
 		var instanceIds []string
 		for _, node := range nodes {
+			if isVKNode(node) {
+				continue
+			}
 			for _, taint := range node.Spec.Taints {
 				if taint.Key == api.TaintExternalCloudProvider {
 					retErr = fmt.Errorf("node %s has uninitialized taint", node.Name)
@@ -1181,6 +1184,8 @@ func (f *Framework) ExpectNodeEqual() error {
 			}
 			instanceIds = append(instanceIds, node.Spec.ProviderID)
 		}
+		klog.Infof("will check %d instanceIds:%s", len(instanceIds), instanceIds)
+		
 		instances, err := f.Client.CloudClient.ListInstances(context.TODO(), instanceIds)
 		if err != nil {
 			retErr = err
