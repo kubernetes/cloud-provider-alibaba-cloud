@@ -65,6 +65,9 @@ func canNodeSkipEventHandler(node *v1.Node) bool {
 
 func isMasterNode(node *v1.Node) bool {
 	if _, isMaster := node.Labels[LabelNodeRoleMaster]; isMaster {
+		if _, include := node.Labels[LabelNodeBalancerIncludeMaster]; include {
+			return false
+		}
 		return true
 	}
 	return false
