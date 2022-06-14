@@ -1159,7 +1159,7 @@ func isVKNode(node v1.Node) bool {
 
 func (f *Framework) ExpectNodeEqual() error {
 	var retErr error
-	_ = wait.PollImmediate(30*time.Second, 5*time.Minute, func() (done bool, err error) {
+	_ = wait.PollImmediate(30*time.Second, 7*time.Minute, func() (done bool, err error) {
 		nodes, err := f.Client.KubeClient.ListNodes()
 		if err != nil {
 			retErr = err
@@ -1185,7 +1185,7 @@ func (f *Framework) ExpectNodeEqual() error {
 			instanceIds = append(instanceIds, node.Spec.ProviderID)
 		}
 		klog.Infof("will check %d instanceIds:%s", len(instanceIds), instanceIds)
-		
+
 		instances, err := f.Client.CloudClient.ListInstances(context.TODO(), instanceIds)
 		if err != nil {
 			retErr = err
@@ -1240,13 +1240,25 @@ func findCloudTaint(taints []v1.Taint) *v1.Taint {
 func isNodeAndInsEqual(node v1.Node, ins *prvd.NodeAttribute) bool {
 	typeEqual := node.Labels[v1.LabelInstanceType] == ins.InstanceType &&
 		node.Labels[v1.LabelInstanceTypeStable] == ins.InstanceType
-
+	if typeEqual == false {
+		klog.Errorf("node.Labels[v1.LabelInstanceType]:%s,node.Labels[v1.LabelInstanceTypeStable]:%s, ins.InstanceType:%s",
+			node.Labels[v1.LabelInstanceType], node.Labels[v1.LabelInstanceTypeStable], ins.InstanceType)
+		return false
+	}
 	zoneEqual := node.Labels[v1.LabelZoneFailureDomain] == ins.Zone &&
 		node.Labels[v1.LabelZoneFailureDomainStable] == ins.Zone
-
+	if zoneEqual == false {
+		klog.Errorf("node.Labels[v1.LabelZoneFailureDomain]:%s,node.Labels[v1.LabelZoneFailureDomainStable]:%s, ins.Zone:%s",
+			node.Labels[v1.LabelZoneFailureDomain], node.Labels[v1.LabelZoneFailureDomainStable], ins.Zone)
+		return false
+	}
 	regionEqual := node.Labels[v1.LabelZoneRegion] == ins.Region &&
 		node.Labels[v1.LabelZoneRegionStable] == ins.Region
-
+	if zoneEqual == false {
+		klog.Errorf("node.Labels[v1.LabelZoneRegion]:%s,node.Labels[v1.LabelZoneRegionStable]:%s, ins.Region:%s",
+			node.Labels[v1.LabelZoneRegion], node.Labels[v1.LabelZoneRegionStable], ins.Region)
+		return false
+	}
 	for _, add1 := range ins.Addresses {
 		found := false
 		for _, add2 := range node.Status.Addresses {
@@ -1256,6 +1268,8 @@ func isNodeAndInsEqual(node v1.Node, ins *prvd.NodeAttribute) bool {
 			}
 		}
 		if !found {
+			klog.Errorf("node address:%#v", node.Status.Addresses)
+			klog.Errorf("instance Addresses spec:%#v", ins.Addresses)
 			return false
 		}
 	}
