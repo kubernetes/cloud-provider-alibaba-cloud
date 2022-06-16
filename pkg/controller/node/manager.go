@@ -179,7 +179,7 @@ func findCloudECSByIp(ins prvd.IInstance, node *v1.Node) (*prvd.NodeAttribute, e
 	klog.Infof("try to find ecs for node %s by internal ip %v", node.Name, internalIP)
 	cloudIns, err := ins.GetInstancesByIP(context.TODO(), internalIP)
 	if err != nil {
-		return nil, fmt.Errorf("list instances by ip fail: %s", err.Error())
+		return nil, fmt.Errorf("list instances by ip %s fail: %s", node.Name, err.Error())
 	}
 	if cloudIns == nil {
 		return nil, ErrNotFound

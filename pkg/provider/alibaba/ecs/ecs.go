@@ -95,9 +95,12 @@ func (e *ECSProvider) GetInstancesByIP(ctx context.Context, ips []string) (*prvd
 		return nil, fmt.Errorf("describe instances by ip %s error: %s", ips, err.Error())
 	}
 
-	if len(resp.Instances.Instance) != 1 {
-		klog.V(5).Infof("RequestId: %s, API: %s, ips: %s", resp.RequestId, "DescribeInstances", req.PrivateIpAddresses)
-		return nil, fmt.Errorf("find none or multiple instances by ip %s", ips)
+	if len(resp.Instances.Instance) == 0 {
+		return nil, nil
+	}
+
+	if len(resp.Instances.Instance) > 1 {
+		return nil, fmt.Errorf("find multiple instances by ip %s", ips)
 	}
 
 	ins := resp.Instances.Instance[0]

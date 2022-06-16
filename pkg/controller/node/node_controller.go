@@ -126,36 +126,12 @@ func (m *ReconcileNode) syncCloudNode(node *corev1.Node) error {
 		klog.V(5).Infof("node %s is registered without cloud taint. return ok", node.Name)
 		return nil
 	}
-
-	start := time.Now()
-	defer func() {
-		metric.NodeLatency.WithLabelValues("remove_taint").Observe(metric.MsSince(start))
-	}()
-
-	nodeRef := &corev1.ObjectReference{
-		Kind:      "Node",
-		Name:      node.Name,
-		UID:       types.UID(node.Name),
-		Namespace: "",
-	}
-
-	err := m.doAddCloudNode(node)
-	if err != nil {
-		m.record.Event(
-			nodeRef,
-			corev1.EventTypeWarning,
-			helper.FailedAddNode,
-			fmt.Sprintf("Error adding node: %s", helper.GetLogMessage(err)),
-		)
-		return fmt.Errorf("doAddCloudNode %s error: %s", node.Name, err.Error())
-	}
-	m.record.Event(nodeRef, corev1.EventTypeNormal, helper.InitializedNode, "Initialize node successfully")
-	log.Info("Successfully initialized node", "node", node.Name)
-	return nil
+	return m.doAddCloudNode(node)
 }
 
 // This processes nodes that were added into the cluster, and cloud initialize them if appropriate
 func (m *ReconcileNode) doAddCloudNode(node *corev1.Node) error {
+	start := time.Now()
 	instance, err := findCloudECS(m.cloud, node)
 	if err != nil {
 		if err == ErrNotFound {
@@ -204,7 +180,30 @@ func (m *ReconcileNode) doAddCloudNode(node *corev1.Node) error {
 		_ = m.syncNode([]corev1.Node{*node})
 		return true, nil
 	}
-	return wait.PollImmediate(5*time.Second, 20*time.Second, initializer)
+
+	nodeRef := &corev1.ObjectReference{
+		Kind:      "Node",
+		Name:      node.Name,
+		UID:       types.UID(node.Name),
+		Namespace: "",
+	}
+
+	err = wait.PollImmediate(2*time.Second, 20*time.Second, initializer)
+	if err != nil {
+		m.record.Event(
+			nodeRef,
+			corev1.EventTypeWarning,
+			helper.FailedAddNode,
+			fmt.Sprintf("Error adding node: %s", helper.GetLogMessage(err)),
+		)
+		return fmt.Errorf("doAddCloudNode %s error: %s", node.Name, err.Error())
+	}
+
+	m.record.Event(nodeRef, corev1.EventTypeNormal, helper.InitializedNode, "Initialize node successfully")
+	metric.NodeLatency.WithLabelValues("remove_taint").Observe(metric.MsSince(start))
+	log.Info("Successfully initialized node", "node", node.Name)
+
+	return nil
 }
 
 // syncNode sync the nodeAddress & cloud node existence
