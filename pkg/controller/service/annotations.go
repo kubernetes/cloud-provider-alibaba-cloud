@@ -5,8 +5,9 @@ import (
 	"strings"
 
 	v1 "k8s.io/api/core/v1"
-	ctrlCfg "k8s.io/cloud-provider-alibaba-cloud/pkg/config"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/model"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/base"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/util"
 )
 
 // prefix
@@ -144,8 +145,8 @@ func (n *AnnotationRequest) GetDefaultTags() []model.Tag {
 			TagValue: n.GetDefaultLoadBalancerName(),
 		},
 		{
-			TagKey:   ctrlCfg.CloudCFG.Global.KubernetesClusterTag,
-			TagValue: ctrlCfg.CloudCFG.Global.ClusterID,
+			TagKey:   util.ClusterTagKey,
+			TagValue: base.CLUSTER_ID,
 		},
 	}
 }

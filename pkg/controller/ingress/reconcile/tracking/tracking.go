@@ -43,7 +43,7 @@ func (p *defaultTrackingProvider) AlbConfigTagKey() string {
 }
 
 func (p *defaultTrackingProvider) ClusterNameTagKey() string {
-	return util.ClusterNameTagKey
+	return util.ClusterTagKey
 }
 
 func (p *defaultTrackingProvider) StackTags(stack core.Manager) map[string]string {

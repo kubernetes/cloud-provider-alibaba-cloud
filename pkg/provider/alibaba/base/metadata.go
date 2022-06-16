@@ -584,7 +584,7 @@ func (m *CfgMetaData) RamRoleToken(role string) (prvd.RoleAuth, error) {
 
 func (m *CfgMetaData) ClusterID() string {
 	if ctrlCfg.CloudCFG.Global.ClusterID != "" {
-		CLUSTER_ID = ctrlCfg.CloudCFG.Global.ClusterID
+		return ctrlCfg.CloudCFG.Global.ClusterID
 	}
 	return CLUSTER_ID
 }
