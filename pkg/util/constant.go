@@ -171,7 +171,7 @@ const ConcurrentMaxSleepMillisecondTime = 200
 const IndexKeyServiceRefName = "spec.serviceRef.name"
 
 const (
-	ClusterNameTagKey      = "ack.aliyun.com"
+	ClusterTagKey          = "ack.aliyun.com"
 	ServiceNamespaceTagKey = IngressTagKeyPrefix + "/service_ns"
 	ServiceNameTagKey      = IngressTagKeyPrefix + "/service_name"
 	ServicePortTagKey      = IngressTagKeyPrefix + "/service_port"

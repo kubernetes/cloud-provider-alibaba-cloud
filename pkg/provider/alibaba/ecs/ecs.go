@@ -85,8 +85,7 @@ func (e *ECSProvider) GetInstancesByIP(ctx context.Context, ips []string) (*prvd
 	}
 	req.Tag = &[]ecs.DescribeInstancesTag{
 		{
-			Key:   ctrlCfg.CloudCFG.Global.KubernetesClusterTag,
-			Value: ctrlCfg.CloudCFG.Global.ClusterID,
+			Key: ctrlCfg.CloudCFG.GetKubernetesClusterTag(),
 		},
 	}
 	resp, err := e.auth.ECS.DescribeInstances(req)

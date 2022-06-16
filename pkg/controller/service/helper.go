@@ -8,6 +8,7 @@ import (
 	ctrlCfg "k8s.io/cloud-provider-alibaba-cloud/pkg/config"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/helper"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/model"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/util"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/util/hash"
 	"k8s.io/klog/v2"
 	"os"
@@ -125,7 +126,9 @@ func isServiceHashChanged(service *v1.Service) bool {
 
 func isLoadBalancerReusable(service *v1.Service, tags []model.Tag, lbIp string) (bool, string) {
 	for _, tag := range tags {
-		if tag.TagKey == TAGKEY || tag.TagKey == ctrlCfg.CloudCFG.Global.KubernetesClusterTag {
+		// the tag of the apiserver slb is "ack.aliyun.com": "${clusterid}",
+		// so can not reuse slbs which have ack.aliyun.com tag key.
+		if tag.TagKey == TAGKEY || tag.TagKey == util.ClusterTagKey {
 			return false, "can not reuse loadbalancer created by kubernetes."
 		}
 	}

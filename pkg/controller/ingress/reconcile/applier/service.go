@@ -80,7 +80,7 @@ func (m *defaultServiceManagerApplier) Apply(ctx context.Context, albProvider pr
 
 func NewServiceStackApplier(albProvider prvd.Provider, serviceStack *albmodel.ServiceManager, logger logr.Logger) *serviceStackApplier {
 	tagFilters := make(map[string]string)
-	tagFilters[util.ClusterNameTagKey] = serviceStack.ClusterID
+	tagFilters[util.ClusterTagKey] = serviceStack.ClusterID
 	tagFilters[util.ServiceNamespaceTagKey] = serviceStack.Namespace
 	tagFilters[util.ServiceNameTagKey] = serviceStack.Name
 
@@ -181,7 +181,7 @@ func mapSDKServerGroupByResourceID(sdkSGPs []albmodel.ServerGroupWithTags) map[s
 		var svcNameKey albmodel.ServerGroupNamedKey
 
 		tags := sdkSGP.Tags
-		if v, ok := tags[util.ClusterNameTagKey]; ok {
+		if v, ok := tags[util.ClusterTagKey]; ok {
 			svcNameKey.ClusterID = v
 		} else {
 			continue

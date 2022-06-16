@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/ghodss/yaml"
 	"io/ioutil"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/util"
 	"k8s.io/klog/v2"
 )
 
@@ -48,14 +49,14 @@ func (cc *CloudConfig) LoadCloudCFG() error {
 	if err != nil {
 		return fmt.Errorf("read cloud config error: %s ", err.Error())
 	}
-	// set default value
-	if cc.Global.KubernetesClusterTag == "" {
-		cc.Global.KubernetesClusterTag = "ack.aliyun.com"
-	}
-	if cc.Global.ClusterID == "" {
-		cc.Global.ClusterID = "clusterid"
-	}
 	return yaml.Unmarshal(content, CloudCFG)
+}
+
+func (cc *CloudConfig) GetKubernetesClusterTag() string {
+	if cc.Global.KubernetesClusterTag == "" {
+		return util.ClusterTagKey
+	}
+	return cc.Global.KubernetesClusterTag
 }
 
 func (cc *CloudConfig) PrintInfo() {
