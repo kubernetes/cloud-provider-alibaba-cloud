@@ -7,6 +7,11 @@ import (
 	"k8s.io/klog/v2"
 )
 
+const (
+	clusterID         = "clusterid"
+	clusterNameTagKey = "ack.aliyun.com"
+)
+
 var CloudCFG = &CloudConfig{}
 
 // CloudConfig wraps the settings for the Alibaba Cloud provider.
@@ -48,14 +53,17 @@ func (cc *CloudConfig) LoadCloudCFG() error {
 	if err != nil {
 		return fmt.Errorf("read cloud config error: %s ", err.Error())
 	}
+	if err := yaml.Unmarshal(content, CloudCFG); err != nil {
+		return err
+	}
 	// set default value
-	if cc.Global.KubernetesClusterTag == "" {
-		cc.Global.KubernetesClusterTag = "ack.aliyun.com"
+	if CloudCFG.Global.ClusterID == "" {
+		CloudCFG.Global.ClusterID = clusterID
 	}
-	if cc.Global.ClusterID == "" {
-		cc.Global.ClusterID = "clusterid"
+	if CloudCFG.Global.KubernetesClusterTag == "" {
+		CloudCFG.Global.KubernetesClusterTag = clusterNameTagKey
 	}
-	return yaml.Unmarshal(content, CloudCFG)
+	return nil
 }
 
 func (cc *CloudConfig) PrintInfo() {

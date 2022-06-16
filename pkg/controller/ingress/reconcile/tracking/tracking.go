@@ -2,6 +2,7 @@ package tracking
 
 import (
 	"fmt"
+	ctrlCfg "k8s.io/cloud-provider-alibaba-cloud/pkg/config"
 
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/util"
 
@@ -43,7 +44,7 @@ func (p *defaultTrackingProvider) AlbConfigTagKey() string {
 }
 
 func (p *defaultTrackingProvider) ClusterNameTagKey() string {
-	return util.ClusterNameTagKey
+	return ctrlCfg.CloudCFG.Global.KubernetesClusterTag
 }
 
 func (p *defaultTrackingProvider) StackTags(stack core.Manager) map[string]string {

@@ -83,6 +83,7 @@ func NewClientMgr() (*ClientMgr, error) {
 	}
 
 	meta := NewMetaData()
+	clusterID := meta.ClusterID()
 	region, err := meta.Region()
 	if err != nil {
 		return nil, fmt.Errorf("can not determin region: %s", err.Error())
@@ -95,7 +96,7 @@ func NewClientMgr() (*ClientMgr, error) {
 		return nil, fmt.Errorf("initialize alibaba ecs client: %s", err.Error())
 	}
 	ecli.AppendUserAgent(KubernetesCloudControllerManager, version.Version)
-	ecli.AppendUserAgent(AgentClusterId, CLUSTER_ID)
+	ecli.AppendUserAgent(AgentClusterId, clusterID)
 
 	vpcli, err := vpc.NewClientWithStsToken(
 		region, "key", "secret", "")
@@ -103,7 +104,7 @@ func NewClientMgr() (*ClientMgr, error) {
 		return nil, fmt.Errorf("initialize alibaba vpc client: %s", err.Error())
 	}
 	vpcli.AppendUserAgent(KubernetesCloudControllerManager, version.Version)
-	vpcli.AppendUserAgent(AgentClusterId, CLUSTER_ID)
+	vpcli.AppendUserAgent(AgentClusterId, clusterID)
 
 	slbcli, err := slb.NewClientWithStsToken(
 		region, "key", "secret", "")
@@ -111,7 +112,7 @@ func NewClientMgr() (*ClientMgr, error) {
 		return nil, fmt.Errorf("initialize alibaba slb client: %s", err.Error())
 	}
 	slbcli.AppendUserAgent(KubernetesCloudControllerManager, version.Version)
-	slbcli.AppendUserAgent(AgentClusterId, CLUSTER_ID)
+	slbcli.AppendUserAgent(AgentClusterId, clusterID)
 
 	albcli, err := alb.NewClientWithStsToken(
 		region, "key", "secret", "")
@@ -119,7 +120,7 @@ func NewClientMgr() (*ClientMgr, error) {
 		return nil, fmt.Errorf("initialize alibaba alb client: %s", err.Error())
 	}
 	albcli.AppendUserAgent(KubernetesCloudControllerManager, version.Version)
-	albcli.AppendUserAgent(AgentClusterId, CLUSTER_ID)
+	albcli.AppendUserAgent(AgentClusterId, clusterID)
 
 	slscli, err := sls.NewClientWithStsToken(
 		region, "key", "secret", "")
@@ -127,7 +128,7 @@ func NewClientMgr() (*ClientMgr, error) {
 		return nil, fmt.Errorf("initialize alibaba sls client: %s", err.Error())
 	}
 	slscli.AppendUserAgent(KubernetesCloudControllerManager, version.Version)
-	slscli.AppendUserAgent(AgentClusterId, CLUSTER_ID)
+	slscli.AppendUserAgent(AgentClusterId, clusterID)
 
 	cascli, err := cas.NewClientWithStsToken(
 		region, "key", "secret", "")
@@ -135,7 +136,7 @@ func NewClientMgr() (*ClientMgr, error) {
 		return nil, fmt.Errorf("initialize alibaba cas client: %s", err.Error())
 	}
 	cascli.AppendUserAgent(KubernetesCloudControllerManager, version.Version)
-	cascli.AppendUserAgent(AgentClusterId, CLUSTER_ID)
+	cascli.AppendUserAgent(AgentClusterId, clusterID)
 
 	pvtzcli, err := pvtz.NewClientWithStsToken(
 		region, "key", "secret", "",
@@ -144,7 +145,7 @@ func NewClientMgr() (*ClientMgr, error) {
 		return nil, fmt.Errorf("initialize alibaba pvtz client: %s", err.Error())
 	}
 	pvtzcli.AppendUserAgent(KubernetesCloudControllerManager, version.Version)
-	pvtzcli.AppendUserAgent(AgentClusterId, CLUSTER_ID)
+	pvtzcli.AppendUserAgent(AgentClusterId, clusterID)
 
 	esscli, err := ess.NewClientWithStsToken(
 		region, "key", "secret", "",
@@ -153,7 +154,7 @@ func NewClientMgr() (*ClientMgr, error) {
 		return nil, fmt.Errorf("initialize alibaba pvtz client: %s", err.Error())
 	}
 	esscli.AppendUserAgent(KubernetesCloudControllerManager, version.Version)
-	esscli.AppendUserAgent(AgentClusterId, CLUSTER_ID)
+	esscli.AppendUserAgent(AgentClusterId, clusterID)
 
 	auth := &ClientMgr{
 		Meta:   meta,

@@ -49,8 +49,6 @@ const (
 	RAM_SECURITY       = "ram/security-credentials"
 )
 
-var CLUSTER_ID = "clusterid"
-
 type IMetaDataRequest interface {
 	Version(version string) IMetaDataRequest
 	ResourceType(rtype string) IMetaDataRequest
@@ -277,10 +275,7 @@ func (m *BaseMetaData) RamRoleToken(role string) (prvd.RoleAuth, error) {
 }
 
 func (m *BaseMetaData) ClusterID() string {
-	if ctrlCfg.CloudCFG.Global.ClusterID != "" {
-		return ctrlCfg.CloudCFG.Global.ClusterID
-	}
-	return CLUSTER_ID
+	return ctrlCfg.CloudCFG.Global.ClusterID
 }
 
 type requestMock func(resource string) (string, error)
@@ -583,8 +578,5 @@ func (m *CfgMetaData) RamRoleToken(role string) (prvd.RoleAuth, error) {
 }
 
 func (m *CfgMetaData) ClusterID() string {
-	if ctrlCfg.CloudCFG.Global.ClusterID != "" {
-		CLUSTER_ID = ctrlCfg.CloudCFG.Global.ClusterID
-	}
-	return CLUSTER_ID
+	return ctrlCfg.CloudCFG.Global.ClusterID
 }

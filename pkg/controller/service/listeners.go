@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/mohae/deepcopy"
+	ctrlCfg "k8s.io/cloud-provider-alibaba-cloud/pkg/config"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/dryrun"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/util"
 	"strconv"
@@ -13,7 +14,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/model"
 	prvd "k8s.io/cloud-provider-alibaba-cloud/pkg/provider"
-	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/base"
 	"k8s.io/klog/v2"
 )
 
@@ -114,7 +114,7 @@ func (mgr *ListenerManager) buildListenerFromServicePort(reqCtx *RequestContext,
 	listener := model.ListenerAttribute{
 		NamedKey: &model.ListenerNamedKey{
 			Prefix:      model.DEFAULT_PREFIX,
-			CID:         base.CLUSTER_ID,
+			CID:         mgr.cloud.ClusterID(),
 			Namespace:   reqCtx.Service.Namespace,
 			ServiceName: reqCtx.Service.Name,
 			Port:        port.Port,
@@ -639,7 +639,7 @@ func getVGroupNamedKey(svc *v1.Service, servicePort v1.ServicePort) *model.VGrou
 	return &model.VGroupNamedKey{
 		Prefix:      model.DEFAULT_PREFIX,
 		Namespace:   svc.Namespace,
-		CID:         base.CLUSTER_ID,
+		CID:         ctrlCfg.CloudCFG.Global.ClusterID,
 		VGroupPort:  vGroupPort,
 		ServiceName: svc.Name}
 }
@@ -959,5 +959,5 @@ func isPortManagedByMyService(local *model.LoadBalancer, n model.ListenerAttribu
 
 	return n.NamedKey.ServiceName == local.NamespacedName.Name &&
 		n.NamedKey.Namespace == local.NamespacedName.Namespace &&
-		n.NamedKey.CID == base.CLUSTER_ID
+		n.NamedKey.CID == ctrlCfg.CloudCFG.Global.ClusterID
 }

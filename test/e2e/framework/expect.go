@@ -13,7 +13,6 @@ import (
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/service"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/model"
 	prvd "k8s.io/cloud-provider-alibaba-cloud/pkg/provider"
-	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/base"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/vpc"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/util"
 	"k8s.io/cloud-provider-alibaba-cloud/test/e2e/client"
@@ -347,7 +346,7 @@ func protocol(annotation string, port v1.ServicePort) (string, error) {
 func genericListenerEqual(reqCtx *service.RequestContext, local v1.ServicePort, remote model.ListenerAttribute) error {
 	nameKey := &model.ListenerNamedKey{
 		Prefix:      model.DEFAULT_PREFIX,
-		CID:         base.CLUSTER_ID,
+		CID:         ctrlCfg.CloudCFG.Global.ClusterID,
 		Namespace:   reqCtx.Service.Namespace,
 		ServiceName: reqCtx.Service.Name,
 		Port:        local.Port,
@@ -855,7 +854,7 @@ func getVGroupName(svc *v1.Service, servicePort v1.ServicePort) string {
 	namedKey := &model.VGroupNamedKey{
 		Prefix:      model.DEFAULT_PREFIX,
 		Namespace:   svc.Namespace,
-		CID:         base.CLUSTER_ID,
+		CID:         ctrlCfg.CloudCFG.Global.ClusterID,
 		VGroupPort:  vGroupPort,
 		ServiceName: svc.Name}
 	return namedKey.Key()

@@ -8,6 +8,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	ctrlCfg "k8s.io/cloud-provider-alibaba-cloud/pkg/config"
 	"k8s.io/klog/v2"
 	"strconv"
 	"strings"
@@ -16,7 +17,6 @@ import (
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/helper"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/model"
 	prvd "k8s.io/cloud-provider-alibaba-cloud/pkg/provider"
-	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/base"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/util"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -342,7 +342,7 @@ func isBackendManagedByMyService(reqCtx *RequestContext, remoteBackend model.Bac
 
 	return namedKey.ServiceName == reqCtx.Service.Name &&
 		namedKey.Namespace == reqCtx.Service.Namespace &&
-		namedKey.CID == base.CLUSTER_ID
+		namedKey.CID == ctrlCfg.CloudCFG.Global.ClusterID
 }
 
 func isVGroupManagedByMyService(remote model.VServerGroup, service *v1.Service) bool {
@@ -352,7 +352,7 @@ func isVGroupManagedByMyService(remote model.VServerGroup, service *v1.Service) 
 
 	return remote.NamedKey.ServiceName == service.Name &&
 		remote.NamedKey.Namespace == service.Namespace &&
-		remote.NamedKey.CID == base.CLUSTER_ID
+		remote.NamedKey.CID == ctrlCfg.CloudCFG.Global.ClusterID
 }
 
 func isReusedVGroup(reusedVgIDs []string, vGroupId string) bool {
