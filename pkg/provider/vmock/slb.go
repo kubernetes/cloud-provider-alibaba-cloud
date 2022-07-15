@@ -207,13 +207,13 @@ func (m *MockCLB) DescribeLoadBalancerListeners(ctx context.Context, lbId string
 
 	return nil, nil
 }
-func (m *MockCLB) StartLoadBalancerListener(ctx context.Context, lbId string, port int) error {
+func (m *MockCLB) StartLoadBalancerListener(ctx context.Context, lbId string, port int, proto string) error {
 	return nil
 }
-func (m *MockCLB) StopLoadBalancerListener(ctx context.Context, lbId string, port int) error {
+func (m *MockCLB) StopLoadBalancerListener(ctx context.Context, lbId string, port int, proto string) error {
 	return nil
 }
-func (m *MockCLB) DeleteLoadBalancerListener(ctx context.Context, lbId string, port int) error {
+func (m *MockCLB) DeleteLoadBalancerListener(ctx context.Context, lbId string, port int, proto string) error {
 	return nil
 }
 func (m *MockCLB) CreateLoadBalancerTCPListener(ctx context.Context, lbId string, listener model.ListenerAttribute) error {

@@ -74,7 +74,7 @@ func (mgr *ListenerManager) Create(reqCtx *svcCtx.RequestContext, action CreateA
 
 func (mgr *ListenerManager) Delete(reqCtx *svcCtx.RequestContext, action DeleteAction) error {
 	reqCtx.Log.Info(fmt.Sprintf("delete listener %d", action.listener.ListenerPort))
-	return mgr.cloud.DeleteLoadBalancerListener(reqCtx.Ctx, action.lbId, action.listener.ListenerPort)
+	return mgr.cloud.DeleteLoadBalancerListener(reqCtx.Ctx, action.lbId, action.listener.ListenerPort, action.listener.Protocol)
 }
 
 func (mgr *ListenerManager) Update(reqCtx *svcCtx.RequestContext, action UpdateAction) error {
@@ -335,12 +335,12 @@ func (t *tcp) Create(reqCtx *svcCtx.RequestContext, action CreateAction) error {
 		return fmt.Errorf("create tcp listener %d error: %s", action.listener.ListenerPort, err.Error())
 	}
 	reqCtx.Log.Info(fmt.Sprintf("create listener tcp [%d]", action.listener.ListenerPort))
-	return t.mgr.cloud.StartLoadBalancerListener(reqCtx.Ctx, action.lbId, action.listener.ListenerPort)
+	return t.mgr.cloud.StartLoadBalancerListener(reqCtx.Ctx, action.lbId, action.listener.ListenerPort, action.listener.Protocol)
 }
 
 func (t *tcp) Update(reqCtx *svcCtx.RequestContext, action UpdateAction) error {
 	if action.remote.Status == model.Stopped {
-		err := t.mgr.cloud.StartLoadBalancerListener(reqCtx.Ctx, action.lbId, action.local.ListenerPort)
+		err := t.mgr.cloud.StartLoadBalancerListener(reqCtx.Ctx, action.lbId, action.local.ListenerPort, action.local.Protocol)
 		if err != nil {
 			return fmt.Errorf("start tcp listener %d error: %s", action.local.ListenerPort, err.Error())
 		}
@@ -364,12 +364,12 @@ func (t *udp) Create(reqCtx *svcCtx.RequestContext, action CreateAction) error {
 		return fmt.Errorf("create udp listener %d error: %s", action.listener.ListenerPort, err.Error())
 	}
 	reqCtx.Log.Info(fmt.Sprintf("create listener udp [%d]", action.listener.ListenerPort))
-	return t.mgr.cloud.StartLoadBalancerListener(reqCtx.Ctx, action.lbId, action.listener.ListenerPort)
+	return t.mgr.cloud.StartLoadBalancerListener(reqCtx.Ctx, action.lbId, action.listener.ListenerPort, action.listener.Protocol)
 }
 
 func (t *udp) Update(reqCtx *svcCtx.RequestContext, action UpdateAction) error {
 	if action.remote.Status == model.Stopped {
-		err := t.mgr.cloud.StartLoadBalancerListener(reqCtx.Ctx, action.lbId, action.local.ListenerPort)
+		err := t.mgr.cloud.StartLoadBalancerListener(reqCtx.Ctx, action.lbId, action.local.ListenerPort, action.local.Protocol)
 		if err != nil {
 			return fmt.Errorf("start udp listener %d error: %s", action.local.ListenerPort, err.Error())
 		}
@@ -393,13 +393,13 @@ func (t *http) Create(reqCtx *svcCtx.RequestContext, action CreateAction) error 
 		return fmt.Errorf("create http listener %d error: %s", action.listener.ListenerPort, err.Error())
 	}
 	reqCtx.Log.Info(fmt.Sprintf("create listener http [%d]", action.listener.ListenerPort))
-	return t.mgr.cloud.StartLoadBalancerListener(reqCtx.Ctx, action.lbId, action.listener.ListenerPort)
+	return t.mgr.cloud.StartLoadBalancerListener(reqCtx.Ctx, action.lbId, action.listener.ListenerPort, action.listener.Protocol)
 
 }
 
 func (t *http) Update(reqCtx *svcCtx.RequestContext, action UpdateAction) error {
 	if action.remote.Status == model.Stopped {
-		err := t.mgr.cloud.StartLoadBalancerListener(reqCtx.Ctx, action.lbId, action.local.ListenerPort)
+		err := t.mgr.cloud.StartLoadBalancerListener(reqCtx.Ctx, action.lbId, action.local.ListenerPort, action.local.Protocol)
 		if err != nil {
 			return fmt.Errorf("start http listener %d error: %s", action.local.ListenerPort, err.Error())
 		}
@@ -460,13 +460,13 @@ func (t *https) Create(reqCtx *svcCtx.RequestContext, action CreateAction) error
 		return fmt.Errorf("create https listener %d error: %s", action.listener.ListenerPort, err.Error())
 	}
 	reqCtx.Log.Info(fmt.Sprintf("create listener https [%d]", action.listener.ListenerPort))
-	return t.mgr.cloud.StartLoadBalancerListener(reqCtx.Ctx, action.lbId, action.listener.ListenerPort)
+	return t.mgr.cloud.StartLoadBalancerListener(reqCtx.Ctx, action.lbId, action.listener.ListenerPort, action.listener.Protocol)
 
 }
 
 func (t *https) Update(reqCtx *svcCtx.RequestContext, action UpdateAction) error {
 	if action.remote.Status == model.Stopped {
-		err := t.mgr.cloud.StartLoadBalancerListener(reqCtx.Ctx, action.lbId, action.local.ListenerPort)
+		err := t.mgr.cloud.StartLoadBalancerListener(reqCtx.Ctx, action.lbId, action.local.ListenerPort, action.local.Protocol)
 		if err != nil {
 			return fmt.Errorf("start https listener %d error: %s", action.local.ListenerPort, err.Error())
 		}
@@ -522,29 +522,19 @@ func buildActionsForListeners(reqCtx *svcCtx.RequestContext, local *model.LoadBa
 		}
 	}
 
-	// For updations and deletions
+	// For update and deletions
 	for _, rlis := range remote.Listeners {
 		found := false
 		for _, llis := range local.Listeners {
-			if rlis.ListenerPort == llis.ListenerPort {
+			if rlis.ListenerPort == llis.ListenerPort && rlis.Protocol == llis.Protocol {
 				found = true
-				// protocol match, do update
-				if rlis.Protocol == llis.Protocol {
-					updateActions = append(updateActions,
-						UpdateAction{
-							lbId:   remote.LoadBalancerAttribute.LoadBalancerId,
-							local:  llis,
-							remote: rlis,
-						})
-				} else {
-					// protocol not match, need to recreate
-					deleteActions = append(deleteActions,
-						DeleteAction{
-							lbId:     remote.LoadBalancerAttribute.LoadBalancerId,
-							listener: rlis,
-						})
-					reqCtx.Log.Info(fmt.Sprintf("update listener: port [%d] match while protocol not, need recreate", llis.ListenerPort))
-				}
+				// listener and protocol match, do update
+				updateActions = append(updateActions,
+					UpdateAction{
+						lbId:   remote.LoadBalancerAttribute.LoadBalancerId,
+						local:  llis,
+						remote: rlis,
+					})
 			}
 		}
 		// Do not delete any listener that no longer managed by my service
@@ -566,13 +556,8 @@ func buildActionsForListeners(reqCtx *svcCtx.RequestContext, local *model.LoadBa
 	for _, llis := range local.Listeners {
 		found := false
 		for _, rlis := range remote.Listeners {
-			if llis.ListenerPort == rlis.ListenerPort {
-				// port match
-				if llis.Protocol != rlis.Protocol {
-					// protocol does not match, do add listener
-					break
-				}
-				// port matched. updated. skip
+			if llis.ListenerPort == rlis.ListenerPort && llis.Protocol == rlis.Protocol {
+				// port and protocol matched. updated. skip
 				found = true
 			}
 		}
