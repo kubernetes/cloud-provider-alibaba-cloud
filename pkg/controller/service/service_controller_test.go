@@ -48,8 +48,8 @@ func getFakeKubeClient() client.Client {
 				Status: v1.NodeStatus{
 					Conditions: []v1.NodeCondition{
 						{
-							Reason: "KubeletReady",
-							Status: "True",
+							Reason: string(v1.NodeReady),
+							Status: v1.ConditionTrue,
 						},
 					},
 				},
@@ -65,8 +65,8 @@ func getFakeKubeClient() client.Client {
 				Status: v1.NodeStatus{
 					Conditions: []v1.NodeCondition{
 						{
-							Reason: "KubeletReady",
-							Status: "True",
+							Reason: string(v1.NodeReady),
+							Status: v1.ConditionTrue,
 						},
 					},
 				},
