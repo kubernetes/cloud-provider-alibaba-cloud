@@ -68,6 +68,9 @@ func isMasterNode(node *v1.Node) bool {
 	if _, isMaster := node.Labels[LabelNodeRoleMaster]; isMaster {
 		return true
 	}
+	if _, ok := node.Labels[LabelNodeControlPlane]; ok {
+		return true
+	}
 	return false
 }
 

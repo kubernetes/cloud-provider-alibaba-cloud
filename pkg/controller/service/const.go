@@ -10,8 +10,9 @@ const (
 
 // Node related
 const (
-	LabelNodeRoleMaster = "node-role.kubernetes.io/master"
-	LabelNodeTypeVK     = "virtual-kubelet"
+	LabelNodeRoleMaster   = "node-role.kubernetes.io/master"
+	LabelNodeControlPlane = "node-role.kubernetes.io/control-plane"
+	LabelNodeTypeVK       = "virtual-kubelet"
 	// LabelNodeExcludeBalancer specifies that the node should be
 	// exclude from loadbalancers created by a cloud provider.
 	LabelNodeExcludeBalancer = "alpha.service-controller.kubernetes.io/exclude-balancer"

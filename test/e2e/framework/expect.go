@@ -1176,6 +1176,10 @@ func isNodeExcludeFromLoadBalancer(node *v1.Node, anno *service.AnnotationReques
 		return true
 	}
 
+	if _, isMaster := node.Labels[service.LabelNodeControlPlane]; isMaster {
+		return true
+	}
+
 	for _, taint := range node.Spec.Taints {
 		if taint.Key == service.ToBeDeletedTaint {
 			return true
