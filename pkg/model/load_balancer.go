@@ -31,6 +31,10 @@ func (t InstanceChargeType) IsPayBySpec() bool {
 	return t == "" || strings.ToLower(string(t)) == "paybyspec"
 }
 
+func (t InstanceChargeType) IsPayByCLCU() bool {
+	return strings.ToLower(string(t)) == "paybyclcu"
+}
+
 type AddressIPVersionType string
 
 const (

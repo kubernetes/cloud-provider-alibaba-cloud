@@ -95,7 +95,7 @@ type ILoadBalancer interface {
 	DescribeLoadBalancer(ctx context.Context, mdl *model.LoadBalancer) error
 	DeleteLoadBalancer(ctx context.Context, mdl *model.LoadBalancer) error
 	ModifyLoadBalancerInstanceSpec(ctx context.Context, lbId string, spec string) error
-	ModifyLoadBalancerInstanceChargeType(ctx context.Context, lbId string, instanceChargeType string) error
+	ModifyLoadBalancerInstanceChargeType(ctx context.Context, lbId string, instanceChargeType string, spec string) error
 	SetLoadBalancerDeleteProtection(ctx context.Context, lbId string, flag string) error
 	SetLoadBalancerName(ctx context.Context, lbId string, name string) error
 	ModifyLoadBalancerInternetSpec(ctx context.Context, lbId string, chargeType string, bandwidth int) error
