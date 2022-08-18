@@ -6,7 +6,7 @@ const (
 	RouteEntryTypeCustom     = "Custom"
 )
 
-//Route external route for node
+// Route external route for node
 type Route struct {
 	Name            string
 	DestinationCIDR string

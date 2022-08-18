@@ -232,8 +232,8 @@ func (m *DryRunSLB) DeleteVServerGroup(ctx context.Context, vGroupId string) err
 }
 
 /*
- From v1.9.3.239-g40d97e1-aliyun, ccm support ecs and eni together.
- If a svc who has ecs and eni backends together, it's normal to call the AddVServerGroupBackendServers api to add eci backend.
+From v1.9.3.239-g40d97e1-aliyun, ccm support ecs and eni together.
+If a svc who has ecs and eni backends together, it's normal to call the AddVServerGroupBackendServers api to add eci backend.
 */
 func (m *DryRunSLB) AddVServerGroupBackendServers(ctx context.Context, vGroupId string, backends string) error {
 	mtype := "AddVServerGroupBackendServers"
