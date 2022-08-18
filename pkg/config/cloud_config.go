@@ -3,9 +3,9 @@ package config
 import (
 	"fmt"
 	"github.com/ghodss/yaml"
-	"io/ioutil"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/util"
 	"k8s.io/klog/v2"
+	"os"
 )
 
 var CloudCFG = &CloudConfig{}
@@ -45,7 +45,7 @@ type CloudConfig struct {
 }
 
 func (cc *CloudConfig) LoadCloudCFG() error {
-	content, err := ioutil.ReadFile(ControllerCFG.CloudConfigPath)
+	content, err := os.ReadFile(ControllerCFG.CloudConfigPath)
 	if err != nil {
 		return fmt.Errorf("read cloud config error: %s ", err.Error())
 	}

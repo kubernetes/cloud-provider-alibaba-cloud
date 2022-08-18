@@ -20,7 +20,7 @@ const (
 	DeleteTimestampChanged = "DeleteTimestampChanged"
 )
 
-//NodeEventReason
+// NodeEventReason
 const (
 	FailedDeleteNode  = "DeleteNodeFailed"
 	FailedAddNode     = "AddNodeFailed"
@@ -29,7 +29,7 @@ const (
 	InitializedNode   = "InitializedNode"
 )
 
-//RouteEventReason
+// RouteEventReason
 const (
 	FailedCreateRoute  = "CreateRouteFailed"
 	FailedSyncRoute    = "SyncRouteFailed"
