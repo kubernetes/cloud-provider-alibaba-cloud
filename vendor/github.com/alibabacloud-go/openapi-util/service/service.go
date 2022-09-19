@@ -341,6 +341,10 @@ func getCanonicalHeaders(headers map[string]*string) (string, []string) {
 }
 
 func getCanonicalQueryString(query map[string]*string) string {
+	canonicalQueryString := ""
+	if tea.BoolValue(util.IsUnset(query)) {
+		return canonicalQueryString
+	}
 	tmp := make(map[string]string)
 	for k, v := range query {
 		tmp[k] = tea.StringValue(v)
@@ -350,7 +354,6 @@ func getCanonicalQueryString(query map[string]*string) string {
 
 	// Sort the temp by the ascending order
 	hs.Sort()
-	canonicalQueryString := ""
 	for i := range hs.Keys {
 		if hs.Vals[i] != "" {
 			canonicalQueryString += "&" + hs.Keys[i] + "=" + url.QueryEscape(hs.Vals[i])

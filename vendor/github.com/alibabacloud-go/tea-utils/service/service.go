@@ -34,6 +34,7 @@ type RuntimeOptions struct {
 	MaxIdleConns   *int    `json:"maxIdleConns" xml:"maxIdleConns"`
 	Socks5Proxy    *string `json:"socks5Proxy" xml:"socks5Proxy"`
 	Socks5NetWork  *string `json:"socks5NetWork" xml:"socks5NetWork"`
+	KeepAlive      *bool   `json:"keepAlive" xml:"keepAlive"`
 }
 
 func (s RuntimeOptions) String() string {
@@ -114,6 +115,11 @@ func (s *RuntimeOptions) SetSocks5NetWork(v string) *RuntimeOptions {
 	return s
 }
 
+func (s *RuntimeOptions) SetKeepAlive(v bool) *RuntimeOptions {
+	s.KeepAlive = &v
+	return s
+}
+
 func ReadAsString(body io.Reader) (*string, error) {
 	byt, err := ioutil.ReadAll(body)
 	if err != nil {
@@ -170,7 +176,24 @@ func DefaultString(reaStr, defaultStr *string) *string {
 }
 
 func ToJSONString(a interface{}) *string {
-	byt, _ := json.Marshal(a)
+	switch v := a.(type) {
+	case *string:
+		return v
+	case string:
+		return tea.String(v)
+	case []byte:
+		return tea.String(string(v))
+	case io.Reader:
+		byt, err := ioutil.ReadAll(v)
+		if err != nil {
+			return nil
+		}
+		return tea.String(string(byt))
+	}
+	byt, err := json.Marshal(a)
+	if err != nil {
+		return nil
+	}
 	return tea.String(string(byt))
 }
 
