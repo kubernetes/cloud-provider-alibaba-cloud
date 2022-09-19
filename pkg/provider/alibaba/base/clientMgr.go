@@ -20,6 +20,8 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	openapi "github.com/alibabacloud-go/darabonba-openapi/client"
+	"github.com/alibabacloud-go/tea/tea"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -38,6 +40,7 @@ import (
 	"github.com/aliyun/alibaba-cloud-sdk-go/services/vpc"
 	"github.com/go-cmd/cmd"
 
+	nlb "github.com/alibabacloud-go/nlb-20220430/client"
 	"k8s.io/apimachinery/pkg/util/wait"
 	ctrlCfg "k8s.io/cloud-provider-alibaba-cloud/pkg/config"
 	prvd "k8s.io/cloud-provider-alibaba-cloud/pkg/provider"
@@ -71,6 +74,7 @@ type ClientMgr struct {
 	SLB  *slb.Client
 	PVTZ *pvtz.Client
 	ALB  *alb.Client
+	NLB  *nlb.Client
 	SLS  *sls.Client
 	CAS  *cas.Client
 	ESS  *ess.Client
@@ -156,6 +160,17 @@ func NewClientMgr() (*ClientMgr, error) {
 	esscli.AppendUserAgent(KubernetesCloudControllerManager, version.Version)
 	esscli.AppendUserAgent(AgentClusterId, CLUSTER_ID)
 
+	// new sdk
+	nlbcli, err := nlb.NewClient(&openapi.Config{
+		RegionId:        tea.String(region),
+		AccessKeyId:     tea.String("key"),
+		AccessKeySecret: tea.String("secret"),
+		UserAgent:       tea.String(getUserAgent()),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("initialize alibaba nlb client: %s", err.Error())
+	}
+
 	auth := &ClientMgr{
 		Meta:   meta,
 		ECS:    ecli,
@@ -163,6 +178,7 @@ func NewClientMgr() (*ClientMgr, error) {
 		SLB:    slbcli,
 		PVTZ:   pvtzcli,
 		ALB:    albcli,
+		NLB:    nlbcli,
 		SLS:    slscli,
 		CAS:    cascli,
 		ESS:    esscli,
@@ -296,6 +312,18 @@ func RefreshToken(mgr *ClientMgr, token *Token) error {
 		return fmt.Errorf("init pvtz sts token config: %s", err.Error())
 	}
 
+	err = mgr.NLB.Init(&openapi.Config{
+		RegionId:        tea.String(token.Region),
+		AccessKeyId:     tea.String(token.AccessKey),
+		AccessKeySecret: tea.String(token.AccessSecret),
+		SecurityToken:   tea.String(token.Token),
+		UserAgent:       tea.String(getUserAgent()),
+	})
+
+	if err != nil {
+		return fmt.Errorf("init nlb sts token config: %s", err.Error())
+	}
+
 	if ctrlCfg.ControllerCFG.NetWork == "vpc" {
 		setVPCEndpoint(mgr)
 	}
@@ -313,6 +341,7 @@ func setVPCEndpoint(mgr *ClientMgr) {
 	mgr.ALB.Network = "vpc"
 	mgr.SLS.Network = "vpc"
 	mgr.CAS.Network = "vpc"
+	mgr.NLB.Network = tea.String("vpc")
 }
 
 func setCustomizedEndpoint(mgr *ClientMgr) {
@@ -460,4 +489,16 @@ func LoadAK() (string, string, error) {
 	}
 
 	return keyId, keySecret, nil
+}
+
+func getUserAgent() string {
+	agents := map[string]string{
+		KubernetesCloudControllerManager: version.Version,
+		AgentClusterId:                   CLUSTER_ID,
+	}
+	ret := ""
+	for k, v := range agents {
+		ret += fmt.Sprintf(" %s/%s", k, v)
+	}
+	return ret
 }

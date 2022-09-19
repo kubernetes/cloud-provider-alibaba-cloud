@@ -7,6 +7,7 @@ import (
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/base"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/cas"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/ecs"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/nlb"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/pvtz"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/slb"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/sls"
@@ -36,6 +37,7 @@ func NewDryRunCloud() prvd.Provider {
 		ALBProvider:  alb.NewALBProvider(auth),
 		SLSProvider:  sls.NewSLSProvider(auth),
 		CASProvider:  cas.NewCASProvider(auth),
+		NLBProvider:  nlb.NewNLBProvider(auth),
 	}
 
 	return &DryRunCloud{
@@ -47,6 +49,7 @@ func NewDryRunCloud() prvd.Provider {
 		DryRunALB:  NewDryRunALB(auth, cloud.ALBProvider),
 		DryRunSLS:  NewDryRunSLS(auth, cloud.SLSProvider),
 		DryRunCAS:  NewDryRunCAS(auth, cloud.CASProvider),
+		DryRunNLB:  NewDryRunNLB(auth, cloud.NLBProvider),
 	}
 }
 
@@ -60,5 +63,6 @@ type DryRunCloud struct {
 	*DryRunALB
 	*DryRunSLS
 	*DryRunCAS
+	*DryRunNLB
 	prvd.IMetaData
 }

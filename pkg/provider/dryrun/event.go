@@ -38,6 +38,7 @@ const (
 	ContextService = ContextKey("ctx.service")
 	ContextMessage = ContextKey("ctx.msg")
 	ContextSLB     = ContextKey("ctx.slb")
+	ContextNLB     = ContextKey("ctx.nlb")
 )
 
 const BATCHSIZE = 20

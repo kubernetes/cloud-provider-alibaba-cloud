@@ -5,6 +5,8 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/model"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/model/tag"
+	prvd "k8s.io/cloud-provider-alibaba-cloud/pkg/provider"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/base"
 	"k8s.io/klog/v2"
 )
@@ -14,6 +16,8 @@ func NewMockCLB(
 ) *MockCLB {
 	return &MockCLB{auth: auth}
 }
+
+var _ prvd.ILoadBalancer = &MockCLB{}
 
 type MockCLB struct {
 	auth *base.ClientMgr
@@ -84,10 +88,10 @@ func (m *MockCLB) ModifyLoadBalancerInstanceChargeType(ctx context.Context, lbId
 func (m *MockCLB) SetLoadBalancerModificationProtection(ctx context.Context, lbId string, flag string) error {
 	return nil
 }
-func (m *MockCLB) AddTags(ctx context.Context, lbId string, tags string) error {
+func (m *MockCLB) TagCLBResource(ctx context.Context, resourceId string, tags []tag.Tag) error {
 	return nil
 }
-func (m *MockCLB) DescribeTags(ctx context.Context, lbId string) ([]model.Tag, error) {
+func (m *MockCLB) ListCLBTagResources(ctx context.Context, lbId string) ([]tag.Tag, error) {
 	return nil, nil
 }
 
