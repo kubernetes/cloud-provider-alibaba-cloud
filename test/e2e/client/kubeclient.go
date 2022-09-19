@@ -17,7 +17,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/helper"
-	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/service"
 	"k8s.io/klog/v2"
 )
 
@@ -73,9 +72,40 @@ func (client *KubeClient) CreateServiceByAnno(anno map[string]string) (*v1.Servi
 	return client.CoreV1().Services(Namespace).Create(context.TODO(), svc, metav1.CreateOptions{})
 }
 
+func (client *KubeClient) CreateNLBServiceByAnno(anno map[string]string) (*v1.Service, error) {
+	svc := client.DefaultService()
+	lbClass := helper.NLBClass
+	svc.Spec.LoadBalancerClass = &lbClass
+	svc.Annotations = anno
+
+	return client.CoreV1().Services(Namespace).Create(context.TODO(), svc, metav1.CreateOptions{})
+}
+
 func (client *KubeClient) CreateServiceWithStringTargetPort(anno map[string]string) (*v1.Service, error) {
 	svc := client.DefaultService()
 	svc.Annotations = anno
+	svc.Spec.Ports = []v1.ServicePort{
+		{
+			Name:       "http",
+			Port:       80,
+			TargetPort: intstr.FromString("http"),
+			Protocol:   v1.ProtocolTCP,
+		},
+		{
+			Name:       "https",
+			Port:       443,
+			TargetPort: intstr.FromString("https"),
+			Protocol:   v1.ProtocolTCP,
+		},
+	}
+	return client.CoreV1().Services(Namespace).Create(context.TODO(), svc, metav1.CreateOptions{})
+}
+
+func (client *KubeClient) CreateNLBServiceWithStringTargetPort(anno map[string]string) (*v1.Service, error) {
+	lbClass := helper.NLBClass
+	svc := client.DefaultService()
+	svc.Annotations = anno
+	svc.Spec.LoadBalancerClass = &lbClass
 	svc.Spec.Ports = []v1.ServicePort{
 		{
 			Name:       "http",
@@ -140,9 +170,52 @@ func (client *KubeClient) CreateServiceWithoutSelector(anno map[string]string) (
 	return client.CoreV1().Services(Namespace).Create(context.TODO(), svc, metav1.CreateOptions{})
 }
 
+func (client *KubeClient) CreateNLBServiceWithoutSelector(anno map[string]string) (*v1.Service, error) {
+	lbClass := helper.NLBClass
+	svc := &v1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        Service,
+			Namespace:   Namespace,
+			Annotations: anno,
+		},
+		Spec: v1.ServiceSpec{
+			Ports: []v1.ServicePort{
+				{
+					Name:       "http",
+					Port:       80,
+					TargetPort: intstr.FromInt(80),
+					Protocol:   v1.ProtocolTCP,
+				},
+				{
+					Name:       "https",
+					Port:       443,
+					TargetPort: intstr.FromInt(80),
+					Protocol:   v1.ProtocolTCP,
+				},
+			},
+			Type:              v1.ServiceTypeLoadBalancer,
+			LoadBalancerClass: &lbClass,
+		},
+	}
+
+	return client.CoreV1().Services(Namespace).Create(context.TODO(), svc, metav1.CreateOptions{})
+}
+
 func (client *KubeClient) DeleteService() error {
-	return wait.PollImmediate(3*time.Second, time.Minute, func() (done bool, err error) {
+	return wait.PollImmediate(3*time.Second, 5*time.Minute, func() (done bool, err error) {
 		err = client.CoreV1().Services(Namespace).Delete(context.TODO(), Service, metav1.DeleteOptions{})
+		if err != nil {
+			if apierrors.IsNotFound(err) {
+				return true, nil
+			}
+		}
+		return false, nil
+	})
+}
+
+func (client *KubeClient) DeleteServiceByName(name string) error {
+	return wait.PollImmediate(3*time.Second, 3*time.Minute, func() (done bool, err error) {
+		err = client.CoreV1().Services(Namespace).Delete(context.TODO(), name, metav1.DeleteOptions{})
 		if err != nil {
 			if apierrors.IsNotFound(err) {
 				return true, nil
@@ -242,7 +315,7 @@ func (client *KubeClient) CreateDeployment() error {
 					Containers: []v1.Container{
 						{
 							Name:            "nginx",
-							Image:           "nginx:1.9.7",
+							Image:           "registry.cn-hangzhou.aliyuncs.com/acs-sample/nginx:latest",
 							ImagePullPolicy: "Always",
 							Ports: []v1.ContainerPort{
 								{
@@ -552,10 +625,10 @@ func (client *KubeClient) GetLatestNode() (*v1.Node, error) {
 		if helper.HasExcludeLabel(&node) {
 			continue
 		}
-		if _, exclude := node.Labels[service.LabelNodeExcludeBalancer]; exclude {
+		if _, exclude := node.Labels[helper.LabelNodeExcludeBalancer]; exclude {
 			continue
 		}
-		if _, isVK := node.Labels[service.LabelNodeTypeVK]; isVK {
+		if _, isVK := node.Labels[helper.LabelNodeTypeVK]; isVK {
 			continue
 		}
 		if ret.Name == "" {

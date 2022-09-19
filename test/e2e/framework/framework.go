@@ -3,11 +3,12 @@ package framework
 import (
 	"context"
 	"fmt"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/service/reconcile/annotation"
 	"strings"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/service"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/model"
+	nlbmodel "k8s.io/cloud-provider-alibaba-cloud/pkg/model/nlb"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/util"
 	"k8s.io/cloud-provider-alibaba-cloud/test/e2e/client"
 	"k8s.io/cloud-provider-alibaba-cloud/test/e2e/options"
@@ -18,6 +19,7 @@ type ResourceType string
 
 const (
 	SLBResource = "SLB"
+	NLBResource = "NLB"
 	ACLResource = "ACL"
 )
 
@@ -86,7 +88,7 @@ func (f *Framework) AfterEach() error {
 		}
 		return err
 	}
-	if svc.Annotations[service.Annotation(service.LoadBalancerId)] == "" {
+	if svc.Annotations[annotation.Annotation(annotation.LoadBalancerId)] == "" {
 		if remote.LoadBalancerAttribute.LoadBalancerId == "" {
 			return nil
 		} else {
@@ -98,8 +100,14 @@ func (f *Framework) AfterEach() error {
 }
 
 func (f *Framework) CreateCloudResource() error {
+	// todo: create nlb resource
 	f.CreatedResource = make(map[string]string, 0)
 	region, err := f.Client.CloudClient.Region()
+	if err != nil {
+		return err
+	}
+
+	zoneMappings, err := parseZoneMappings(options.TestConfig.NLBZoneMaps)
 	if err != nil {
 		return err
 	}
@@ -163,6 +171,50 @@ func (f *Framework) CreateCloudResource() error {
 		}
 		options.TestConfig.IntranetLoadBalancerID = slbM.LoadBalancerAttribute.LoadBalancerId
 		f.CreatedResource[options.TestConfig.IntranetLoadBalancerID] = SLBResource
+	}
+
+	if options.TestConfig.InternetNetworkLoadBalancerID == "" {
+		slbM := &nlbmodel.NetworkLoadBalancer{
+			LoadBalancerAttribute: &nlbmodel.LoadBalancerAttribute{
+				AddressType:  nlbmodel.InternetAddressType,
+				ZoneMappings: zoneMappings,
+				VpcId:        options.TestConfig.VPCID,
+				Name:         fmt.Sprintf("%s-%s-nlb", options.TestConfig.ClusterId, "internet"),
+			},
+		}
+
+		if err := f.Client.CloudClient.FindNLBByName(context.TODO(), slbM); err != nil {
+			return err
+		}
+		if slbM.LoadBalancerAttribute.LoadBalancerId == "" {
+			if err := f.Client.CloudClient.CreateNLB(context.TODO(), slbM); err != nil {
+				return fmt.Errorf("create internet nlb error: %s", err.Error())
+			}
+		}
+		options.TestConfig.InternetNetworkLoadBalancerID = slbM.LoadBalancerAttribute.LoadBalancerId
+		f.CreatedResource[options.TestConfig.InternetNetworkLoadBalancerID] = NLBResource
+	}
+
+	if options.TestConfig.IntranetNetworkLoadBalancerID == "" {
+		slbM := &nlbmodel.NetworkLoadBalancer{
+			LoadBalancerAttribute: &nlbmodel.LoadBalancerAttribute{
+				AddressType:  nlbmodel.IntranetAddressType,
+				ZoneMappings: zoneMappings,
+				VpcId:        options.TestConfig.VPCID,
+				Name:         fmt.Sprintf("%s-%s-nlb", options.TestConfig.ClusterId, "intranet"),
+			},
+		}
+
+		if err := f.Client.CloudClient.FindNLBByName(context.TODO(), slbM); err != nil {
+			return err
+		}
+		if slbM.LoadBalancerAttribute.LoadBalancerId == "" {
+			if err := f.Client.CloudClient.CreateNLB(context.TODO(), slbM); err != nil {
+				return fmt.Errorf("create intranet nlb error: %s", err.Error())
+			}
+		}
+		options.TestConfig.IntranetNetworkLoadBalancerID = slbM.LoadBalancerAttribute.LoadBalancerId
+		f.CreatedResource[options.TestConfig.IntranetNetworkLoadBalancerID] = NLBResource
 	}
 
 	if options.TestConfig.AclID == "" {
@@ -232,11 +284,29 @@ func (f *Framework) CleanCloudResources() error {
 			if err := f.DeleteLoadBalancer(key); err != nil {
 				return err
 			}
+		case NLBResource:
+			if err := f.DeleteNetworkLoadBalancer(key); err != nil {
+				return err
+			}
 		case ACLResource:
 			if err := f.Client.CloudClient.DeleteAccessControlList(context.TODO(), key); err != nil {
 				return err
 			}
 		}
+	}
+	return nil
+}
+
+func (f *Framework) DeleteNetworkLoadBalancer(lbid string) error {
+	slbM := &nlbmodel.NetworkLoadBalancer{
+		LoadBalancerAttribute: &nlbmodel.LoadBalancerAttribute{
+			LoadBalancerId: lbid,
+		},
+	}
+
+	err := f.Client.CloudClient.DeleteNLB(context.TODO(), slbM)
+	if err != nil {
+		return err
 	}
 	return nil
 }

@@ -3,11 +3,13 @@ package client
 import (
 	"context"
 	"fmt"
+	vpcsdk "github.com/aliyun/alibaba-cloud-sdk-go/services/vpc"
 	"k8s.io/client-go/kubernetes"
 	ctrlCfg "k8s.io/cloud-provider-alibaba-cloud/pkg/config"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/base"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/ecs"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/nlb"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/pvtz"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/slb"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/vpc"
@@ -51,6 +53,7 @@ func NewClient() (*E2EClient, error) {
 		SLBProvider:  slb.NewLBProvider(mgr),
 		PVTZProvider: pvtz.NewPVTZProvider(mgr),
 		VPCProvider:  vpc.NewVPCProvider(mgr),
+		NLBProvider:  nlb.NewNLBProvider(mgr),
 	}
 
 	cfg := config.GetConfigOrDie()
@@ -210,6 +213,59 @@ func (client *E2EClient) InitOptions() error {
 		}
 		if len(cacerts) > 0 {
 			options.TestConfig.CACertID = cacerts[0]
+		}
+	}
+
+	if options.TestConfig.NLBZoneMaps == "" {
+		regions, err := client.CloudClient.NLBRegionIds()
+		if err != nil {
+			return err
+		}
+
+		found := false
+		for _, r := range regions {
+			if r == *ack.RegionId {
+				found = true
+				break
+			}
+		}
+		if found {
+			zones, err := client.CloudClient.NLBZoneIds(*ack.RegionId)
+			vsws, err := client.CloudClient.DescribeVSwitches(context.TODO(), *ack.VpcId)
+			if err != nil {
+				return err
+			}
+
+			var results []vpcsdk.VSwitch
+			zoneMaps := make(map[string]bool)
+			for _, vsw := range vsws {
+				for _, zone := range zones {
+					if vsw.ZoneId == zone && !zoneMaps[zone] {
+						results = append(results, vsw)
+						zoneMaps[zone] = true
+						break
+					}
+				}
+
+				if len(results) >= 2 {
+					break
+				}
+			}
+
+			if len(results) >= 2 {
+				var mappings []string
+				for _, vsw := range results {
+					mappings = append(mappings, fmt.Sprintf("%s:%s", vsw.ZoneId, vsw.VSwitchId))
+				}
+
+				options.TestConfig.NLBZoneMaps = strings.Join(mappings, ",")
+				klog.Infof("NLBZoneMaps set to [%s]", options.TestConfig.NLBZoneMaps)
+			} else {
+				klog.Warningf("no enough vswitches in nlb supported zones, supported zones in region %s are [%v]", *ack.RegionId, zones)
+			}
+
+		} else {
+			klog.Warningf("region %s does not support nlb, ZoneMaps is empty", *ack.RegionId)
 		}
 	}
 	return nil

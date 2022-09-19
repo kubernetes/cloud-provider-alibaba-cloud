@@ -10,8 +10,11 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	ctrlCfg "k8s.io/cloud-provider-alibaba-cloud/pkg/config"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/helper"
-	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/service"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/service/clbv1"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/service/reconcile/annotation"
+	svcCtx "k8s.io/cloud-provider-alibaba-cloud/pkg/controller/service/reconcile/context"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/model"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/model/tag"
 	prvd "k8s.io/cloud-provider-alibaba-cloud/pkg/provider"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/base"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/vpc"
@@ -27,9 +30,9 @@ import (
 )
 
 func (f *Framework) ExpectLoadBalancerEqual(svc *v1.Service) error {
-	reqCtx := &service.RequestContext{
+	reqCtx := &svcCtx.RequestContext{
 		Service: svc,
-		Anno:    service.NewAnnotationRequest(svc),
+		Anno:    annotation.NewAnnotationRequest(svc),
 	}
 
 	var retErr error
@@ -48,7 +51,7 @@ func (f *Framework) ExpectLoadBalancerEqual(svc *v1.Service) error {
 			return false, nil
 		}
 
-		if reqCtx.Anno.Get(service.LoadBalancerId) == "" || isOverride(reqCtx.Anno) {
+		if reqCtx.Anno.Get(annotation.LoadBalancerId) == "" || isOverride(reqCtx.Anno) {
 			if err := listenerAttrEqual(reqCtx, remote.Listeners); err != nil {
 				retErr = err
 				return false, nil
@@ -107,11 +110,11 @@ func (f *Framework) ExpectLoadBalancerClean(svc *v1.Service, remote *model.LoadB
 }
 
 func (f *Framework) ExpectLoadBalancerDeleted(svc *v1.Service) error {
-	reqCtx := &service.RequestContext{
+	reqCtx := &svcCtx.RequestContext{
 		Service: svc,
-		Anno:    service.NewAnnotationRequest(svc),
+		Anno:    annotation.NewAnnotationRequest(svc),
 	}
-	lbManager := service.NewLoadBalancerManager(f.Client.CloudClient)
+	lbManager := clbv1.NewLoadBalancerManager(f.Client.CloudClient)
 
 	return wait.PollImmediate(5*time.Second, 30*time.Second, func() (done bool, err error) {
 		lbMdl := &model.LoadBalancer{
@@ -128,29 +131,29 @@ func (f *Framework) ExpectLoadBalancerDeleted(svc *v1.Service) error {
 	})
 }
 
-func isOverride(anno *service.AnnotationRequest) bool {
-	return anno.Get(service.LoadBalancerId) != "" && anno.Get(service.OverrideListener) == "true"
+func isOverride(anno *annotation.AnnotationRequest) bool {
+	return anno.Get(annotation.LoadBalancerId) != "" && anno.Get(annotation.OverrideListener) == "true"
 }
 
-func loadBalancerAttrEqual(f *Framework, anno *service.AnnotationRequest, svc *v1.Service, lb model.LoadBalancerAttribute) error {
-	if id := anno.Get(service.LoadBalancerId); id != "" {
+func loadBalancerAttrEqual(f *Framework, anno *annotation.AnnotationRequest, svc *v1.Service, lb model.LoadBalancerAttribute) error {
+	if id := anno.Get(annotation.LoadBalancerId); id != "" {
 		if lb.LoadBalancerId != id {
 			return fmt.Errorf("expected slb id %s, got %s", id, lb.LoadBalancerId)
 		}
 	}
 
-	if model.InstanceChargeType(anno.Get(service.InstanceChargeType)).IsPayBySpec() {
-		if spec := anno.Get(service.Spec); spec != "" && string(lb.LoadBalancerSpec) != spec {
+	if model.InstanceChargeType(anno.Get(annotation.InstanceChargeType)).IsPayBySpec() {
+		if spec := anno.Get(annotation.Spec); spec != "" && string(lb.LoadBalancerSpec) != spec {
 			return fmt.Errorf("expected slb spec %s, got %s", spec, lb.LoadBalancerSpec)
 		}
 
-		if paymentType := anno.Get(service.ChargeType); paymentType != "" {
+		if paymentType := anno.Get(annotation.ChargeType); paymentType != "" {
 			klog.Infof("in, chargeType: svc %s, lb %s", paymentType, lb.InternetChargeType)
 			if string(lb.InternetChargeType) != paymentType {
 				return fmt.Errorf("expected slb payment %s, got %s", paymentType, lb.InternetChargeType)
 			}
 			if paymentType == string(model.PayByBandwidth) {
-				if Bandwidth := anno.Get(service.Bandwidth); Bandwidth != "" {
+				if Bandwidth := anno.Get(annotation.Bandwidth); Bandwidth != "" {
 					if strconv.Itoa(lb.Bandwidth) != Bandwidth {
 						return fmt.Errorf("expected slb Bandwidth %s, got %d", Bandwidth, lb.Bandwidth)
 					}
@@ -159,50 +162,50 @@ func loadBalancerAttrEqual(f *Framework, anno *service.AnnotationRequest, svc *v
 		}
 	}
 
-	if AddressType := anno.Get(service.AddressType); AddressType != "" {
+	if AddressType := anno.Get(annotation.AddressType); AddressType != "" {
 		if string(lb.AddressType) != AddressType {
 			return fmt.Errorf("expected slb AddressType %s, got %s", AddressType, lb.AddressType)
 		}
 	}
 
-	if LoadBalancerName := anno.Get(service.LoadBalancerName); LoadBalancerName != "" {
+	if LoadBalancerName := anno.Get(annotation.LoadBalancerName); LoadBalancerName != "" {
 		if lb.LoadBalancerName != LoadBalancerName {
 			return fmt.Errorf("expected slb name %s, got %s", LoadBalancerName, lb.LoadBalancerName)
 		}
 	}
-	if VSwitchId := anno.Get(service.VswitchId); VSwitchId != "" {
+	if VSwitchId := anno.Get(annotation.VswitchId); VSwitchId != "" {
 		if lb.VSwitchId != VSwitchId {
 			return fmt.Errorf("expected slb VswitchId %s, got %s", VSwitchId, lb.VSwitchId)
 		}
 	}
-	if MasterZoneId := anno.Get(service.MasterZoneID); MasterZoneId != "" {
+	if MasterZoneId := anno.Get(annotation.MasterZoneID); MasterZoneId != "" {
 		if lb.MasterZoneId != MasterZoneId {
 			return fmt.Errorf("expected slb MasterZoneId %s, got %s", MasterZoneId, lb.MasterZoneId)
 		}
 	}
-	if SlaveZoneId := anno.Get(service.SlaveZoneID); SlaveZoneId != "" {
+	if SlaveZoneId := anno.Get(annotation.SlaveZoneID); SlaveZoneId != "" {
 		if lb.SlaveZoneId != SlaveZoneId {
 			return fmt.Errorf("expected slb SlaveZoneId %s, got%s ", SlaveZoneId, lb.SlaveZoneId)
 		}
 	}
-	if DeleteProtection := anno.Get(service.DeleteProtection); DeleteProtection != "" {
+	if DeleteProtection := anno.Get(annotation.DeleteProtection); DeleteProtection != "" {
 		if string(lb.DeleteProtection) != DeleteProtection {
 			return fmt.Errorf("expected slb DeleteProtection %s, got %s", DeleteProtection, lb.DeleteProtection)
 		}
 	}
-	if ModificationProtectionStatus := anno.Get(service.ModificationProtection); ModificationProtectionStatus != "" {
+	if ModificationProtectionStatus := anno.Get(annotation.ModificationProtection); ModificationProtectionStatus != "" {
 		if string(lb.ModificationProtectionStatus) != ModificationProtectionStatus {
 			return fmt.Errorf("expected slb ModificationProtectionStatus %s, got %s",
 				ModificationProtectionStatus, lb.ModificationProtectionStatus)
 		}
 	}
-	if ResourceGroupId := anno.Get(service.ResourceGroupId); ResourceGroupId != "" {
+	if ResourceGroupId := anno.Get(annotation.ResourceGroupId); ResourceGroupId != "" {
 		if lb.ResourceGroupId != ResourceGroupId {
 			return fmt.Errorf("expected lb ResourceGroupId %s, got %s", ResourceGroupId, lb.ResourceGroupId)
 		}
 	}
-	if AdditionalTags := anno.Get(service.AdditionalTags); AdditionalTags != "" {
-		tags, err := f.Client.CloudClient.DescribeTags(context.TODO(), lb.LoadBalancerId)
+	if AdditionalTags := anno.Get(annotation.AdditionalTags); AdditionalTags != "" {
+		tags, err := f.Client.CloudClient.ListCLBTagResources(context.TODO(), lb.LoadBalancerId)
 		if err != nil {
 			return err
 		}
@@ -210,18 +213,18 @@ func loadBalancerAttrEqual(f *Framework, anno *service.AnnotationRequest, svc *v
 			return fmt.Errorf("expected slb AdditionalTags %s, got %s", AdditionalTags, lb.Tags)
 		}
 	}
-	if IPVersion := anno.Get(service.IPVersion); IPVersion != "" {
+	if IPVersion := anno.Get(annotation.IPVersion); IPVersion != "" {
 		if string(lb.AddressIPVersion) != IPVersion {
 			return fmt.Errorf("expected slb IPVersion %s, got %s", IPVersion, lb.AddressIPVersion)
 		}
 	}
-	if networkType := anno.Get(service.SLBNetworkType); networkType != "" {
+	if networkType := anno.Get(annotation.SLBNetworkType); networkType != "" {
 		if lb.NetworkType != networkType {
 			return fmt.Errorf("expected slb networkType %s, got %s", networkType, lb.NetworkType)
 		}
 	}
 
-	if hostName := anno.Get(service.HostName); hostName != "" {
+	if hostName := anno.Get(annotation.HostName); hostName != "" {
 		if len(svc.Status.LoadBalancer.Ingress) != 1 ||
 			svc.Status.LoadBalancer.Ingress[0].Hostname != hostName ||
 			svc.Status.LoadBalancer.Ingress[0].IP != "" {
@@ -230,7 +233,7 @@ func loadBalancerAttrEqual(f *Framework, anno *service.AnnotationRequest, svc *v
 		}
 	}
 
-	if eipAnno := anno.Get(service.ExternalIPType); eipAnno == "eip" {
+	if eipAnno := anno.Get(annotation.ExternalIPType); eipAnno == "eip" {
 		eips, err := f.Client.CloudClient.DescribeEipAddresses(context.TODO(), string(vpc.SlbInstance), lb.LoadBalancerId)
 		if err != nil {
 			return err
@@ -241,7 +244,7 @@ func loadBalancerAttrEqual(f *Framework, anno *service.AnnotationRequest, svc *v
 
 		// hostname annotation takes effect first.
 		// if set hostname annotation, ip should be nil
-		if anno.Get(service.HostName) == "" &&
+		if anno.Get(annotation.HostName) == "" &&
 			(len(svc.Status.LoadBalancer.Ingress) != 1 ||
 				svc.Status.LoadBalancer.Ingress[0].IP != eips[0]) {
 			return fmt.Errorf("svc ingress ip %v is not equal to eip %s",
@@ -249,7 +252,7 @@ func loadBalancerAttrEqual(f *Framework, anno *service.AnnotationRequest, svc *v
 		}
 	}
 
-	if anno.Get(service.ExternalIPType) == "" && anno.Get(service.HostName) == "" {
+	if anno.Get(annotation.ExternalIPType) == "" && anno.Get(annotation.HostName) == "" {
 		if len(svc.Status.LoadBalancer.Ingress) != 1 ||
 			svc.Status.LoadBalancer.Ingress[0].IP != lb.Address {
 			return fmt.Errorf("svc ingress ip %v is not equal to slb ip %s",
@@ -259,12 +262,12 @@ func loadBalancerAttrEqual(f *Framework, anno *service.AnnotationRequest, svc *v
 	return nil
 }
 
-func tagsEqual(tagSvc string, tagSlb []model.Tag) bool {
+func tagsEqual(tagSvc string, tagSlb []tag.Tag) bool {
 	tags := strings.Split(tagSvc, ",")
 	for _, m := range tags {
 		found := false
 		for _, v := range tagSlb {
-			if m == fmt.Sprintf("%s=%s", v.TagKey, v.TagValue) {
+			if m == fmt.Sprintf("%s=%s", v.Key, v.Value) {
 				found = true
 				break
 			}
@@ -276,9 +279,9 @@ func tagsEqual(tagSvc string, tagSlb []model.Tag) bool {
 	return true
 }
 
-func listenerAttrEqual(reqCtx *service.RequestContext, remote []model.ListenerAttribute) error {
+func listenerAttrEqual(reqCtx *svcCtx.RequestContext, remote []model.ListenerAttribute) error {
 	for _, port := range reqCtx.Service.Spec.Ports {
-		proto, err := protocol(reqCtx.Anno.Get(service.ProtocolPort), port)
+		proto, err := protocol(reqCtx.Anno.Get(annotation.ProtocolPort), port)
 		if err != nil {
 			return err
 		}
@@ -344,7 +347,7 @@ func protocol(annotation string, port v1.ServicePort) (string, error) {
 	return strings.ToLower(string(port.Protocol)), nil
 }
 
-func genericListenerEqual(reqCtx *service.RequestContext, local v1.ServicePort, remote model.ListenerAttribute) error {
+func genericListenerEqual(reqCtx *svcCtx.RequestContext, local v1.ServicePort, remote model.ListenerAttribute) error {
 	nameKey := &model.ListenerNamedKey{
 		Prefix:      model.DEFAULT_PREFIX,
 		CID:         base.CLUSTER_ID,
@@ -356,24 +359,24 @@ func genericListenerEqual(reqCtx *service.RequestContext, local v1.ServicePort, 
 		return fmt.Errorf("expected listener description %s, got %s", nameKey.Key(), remote.Description)
 	}
 
-	if aclStatus := reqCtx.Anno.Get(service.AclStatus); aclStatus != "" {
+	if aclStatus := reqCtx.Anno.Get(annotation.AclStatus); aclStatus != "" {
 		if string(remote.AclStatus) != aclStatus {
 			return fmt.Errorf("expected slb aclStatus %s, got %s", aclStatus, remote.AclStatus)
 		}
 		if aclStatus == string(model.OnFlag) {
-			if aclID := reqCtx.Anno.Get(service.AclID); aclID != "" {
+			if aclID := reqCtx.Anno.Get(annotation.AclID); aclID != "" {
 				if remote.AclId != aclID {
 					return fmt.Errorf("expected slb aclID %s, got %s", aclID, remote.AclId)
 				}
 			}
-			if aclType := reqCtx.Anno.Get(service.AclType); aclType != "" {
+			if aclType := reqCtx.Anno.Get(annotation.AclType); aclType != "" {
 				if remote.AclType != aclType {
 					return fmt.Errorf("expected slb aclType %s, got %s", aclType, remote.AclType)
 				}
 			}
 		}
 	}
-	if scheduler := reqCtx.Anno.Get(service.Scheduler); scheduler != "" {
+	if scheduler := reqCtx.Anno.Get(annotation.Scheduler); scheduler != "" {
 		if remote.Scheduler != scheduler {
 			return fmt.Errorf("expected slb scheduler %s, got %s", scheduler, remote.Scheduler)
 		}
@@ -382,8 +385,8 @@ func genericListenerEqual(reqCtx *service.RequestContext, local v1.ServicePort, 
 	return nil
 }
 
-func genericHealthCheckEqual(reqCtx *service.RequestContext, local v1.ServicePort, remote model.ListenerAttribute) error {
-	if healthCheckConnectPort := reqCtx.Anno.Get(service.HealthCheckConnectPort); healthCheckConnectPort != "" {
+func genericHealthCheckEqual(reqCtx *svcCtx.RequestContext, local v1.ServicePort, remote model.ListenerAttribute) error {
+	if healthCheckConnectPort := reqCtx.Anno.Get(annotation.HealthCheckConnectPort); healthCheckConnectPort != "" {
 		port, err := strconv.Atoi(healthCheckConnectPort)
 		if err != nil {
 			return fmt.Errorf("healthCheckConnectPort %s parse error: %s", healthCheckConnectPort, err.Error())
@@ -393,7 +396,7 @@ func genericHealthCheckEqual(reqCtx *service.RequestContext, local v1.ServicePor
 		}
 	}
 
-	if healthCheckInterval := reqCtx.Anno.Get(service.HealthCheckInterval); healthCheckInterval != "" {
+	if healthCheckInterval := reqCtx.Anno.Get(annotation.HealthCheckInterval); healthCheckInterval != "" {
 		interval, err := strconv.Atoi(healthCheckInterval)
 		if err != nil {
 			return fmt.Errorf("healthCheckInterval %s parse error: %s", healthCheckInterval, err.Error())
@@ -403,7 +406,7 @@ func genericHealthCheckEqual(reqCtx *service.RequestContext, local v1.ServicePor
 		}
 	}
 
-	if healthyThreshold := reqCtx.Anno.Get(service.HealthyThreshold); healthyThreshold != "" {
+	if healthyThreshold := reqCtx.Anno.Get(annotation.HealthyThreshold); healthyThreshold != "" {
 		threshold, err := strconv.Atoi(healthyThreshold)
 		if err != nil {
 			return fmt.Errorf("healthyThreshold %s parse error: %s", healthyThreshold, err.Error())
@@ -413,7 +416,7 @@ func genericHealthCheckEqual(reqCtx *service.RequestContext, local v1.ServicePor
 		}
 	}
 
-	if unhealthyThreshold := reqCtx.Anno.Get(service.UnhealthyThreshold); unhealthyThreshold != "" {
+	if unhealthyThreshold := reqCtx.Anno.Get(annotation.UnhealthyThreshold); unhealthyThreshold != "" {
 		threshold, err := strconv.Atoi(unhealthyThreshold)
 		if err != nil {
 			return fmt.Errorf("unhealthyThreshold %s parse error: %s", unhealthyThreshold, err.Error())
@@ -425,7 +428,7 @@ func genericHealthCheckEqual(reqCtx *service.RequestContext, local v1.ServicePor
 	return nil
 }
 
-func tcpEqual(reqCtx *service.RequestContext, local v1.ServicePort, remote model.ListenerAttribute) error {
+func tcpEqual(reqCtx *svcCtx.RequestContext, local v1.ServicePort, remote model.ListenerAttribute) error {
 	if err := genericListenerEqual(reqCtx, local, remote); err != nil {
 		return err
 	}
@@ -434,7 +437,7 @@ func tcpEqual(reqCtx *service.RequestContext, local v1.ServicePort, remote model
 		return nil
 	}
 
-	if persistenceTimeout := reqCtx.Anno.Get(service.PersistenceTimeout); persistenceTimeout != "" {
+	if persistenceTimeout := reqCtx.Anno.Get(annotation.PersistenceTimeout); persistenceTimeout != "" {
 		timeout, err := strconv.Atoi(persistenceTimeout)
 		if err != nil {
 			return fmt.Errorf("persistenceTimeout %s parse error: %s", persistenceTimeout, err.Error())
@@ -443,7 +446,7 @@ func tcpEqual(reqCtx *service.RequestContext, local v1.ServicePort, remote model
 			return fmt.Errorf("expected slb persistenceTimeout %d, got %d", timeout, remote.PersistenceTimeout)
 		}
 	}
-	if establishedTimeout := reqCtx.Anno.Get(service.EstablishedTimeout); establishedTimeout != "" {
+	if establishedTimeout := reqCtx.Anno.Get(annotation.EstablishedTimeout); establishedTimeout != "" {
 		timeout, err := strconv.Atoi(establishedTimeout)
 		if err != nil {
 			return fmt.Errorf("establishedTimeout %s parse error: %s", establishedTimeout, err.Error())
@@ -452,7 +455,7 @@ func tcpEqual(reqCtx *service.RequestContext, local v1.ServicePort, remote model
 			return fmt.Errorf("expected slb establishedTimeout %d, got %d", timeout, remote.EstablishedTimeout)
 		}
 	}
-	if healthCheckConnectTimeout := reqCtx.Anno.Get(service.HealthCheckConnectTimeout); healthCheckConnectTimeout != "" {
+	if healthCheckConnectTimeout := reqCtx.Anno.Get(annotation.HealthCheckConnectTimeout); healthCheckConnectTimeout != "" {
 		timeout, err := strconv.Atoi(healthCheckConnectTimeout)
 		if err != nil {
 			return fmt.Errorf("healthCheckConnectTimeout %s parse error: %s", healthCheckConnectTimeout, err.Error())
@@ -461,32 +464,32 @@ func tcpEqual(reqCtx *service.RequestContext, local v1.ServicePort, remote model
 			return fmt.Errorf("expected slb healthCheckConnectTimeout %d, got %d", timeout, remote.HealthCheckConnectTimeout)
 		}
 	}
-	if healthCheckHttpCode := reqCtx.Anno.Get(service.HealthCheckHTTPCode); healthCheckHttpCode != "" {
+	if healthCheckHttpCode := reqCtx.Anno.Get(annotation.HealthCheckHTTPCode); healthCheckHttpCode != "" {
 		if remote.HealthCheckHttpCode != healthCheckHttpCode {
 			return fmt.Errorf("expected slb healthCheckHttpCode %s, got %s", healthCheckHttpCode, remote.HealthCheckHttpCode)
 		}
 	}
-	if healthCheckURI := reqCtx.Anno.Get(service.HealthCheckURI); healthCheckURI != "" {
+	if healthCheckURI := reqCtx.Anno.Get(annotation.HealthCheckURI); healthCheckURI != "" {
 		if remote.HealthCheckURI != healthCheckURI {
 			return fmt.Errorf("expected slb healthCheckURI %s, got %s", healthCheckURI, remote.HealthCheckURI)
 		}
 	}
-	if healthCheckType := reqCtx.Anno.Get(service.HealthCheckType); healthCheckType != "" {
+	if healthCheckType := reqCtx.Anno.Get(annotation.HealthCheckType); healthCheckType != "" {
 		if remote.HealthCheckType != healthCheckType {
 			return fmt.Errorf("expected slb healthCheckType %s, got %s", healthCheckType, remote.HealthCheckType)
 		}
 	}
-	if healthCheckDomain := reqCtx.Anno.Get(service.HealthCheckDomain); healthCheckDomain != "" {
+	if healthCheckDomain := reqCtx.Anno.Get(annotation.HealthCheckDomain); healthCheckDomain != "" {
 		if remote.HealthCheckDomain != healthCheckDomain {
 			return fmt.Errorf("expected slb healthCheckDomain %s, got %s", healthCheckDomain, remote.HealthCheckDomain)
 		}
 	}
-	if connectionDrain := reqCtx.Anno.Get(service.ConnectionDrain); connectionDrain != "" {
+	if connectionDrain := reqCtx.Anno.Get(annotation.ConnectionDrain); connectionDrain != "" {
 		if string(remote.ConnectionDrain) != connectionDrain {
 			return fmt.Errorf("expected slb connectionDrain %s, got %s", connectionDrain, remote.ConnectionDrain)
 		}
 	}
-	if drainTimeout := reqCtx.Anno.Get(service.ConnectionDrainTimeout); drainTimeout != "" {
+	if drainTimeout := reqCtx.Anno.Get(annotation.ConnectionDrainTimeout); drainTimeout != "" {
 		timeout, err := strconv.Atoi(drainTimeout)
 		if err != nil {
 			return fmt.Errorf("connectionDrainTimeout %s parse error: %s", drainTimeout, err.Error())
@@ -498,7 +501,7 @@ func tcpEqual(reqCtx *service.RequestContext, local v1.ServicePort, remote model
 	return nil
 }
 
-func udpEqual(reqCtx *service.RequestContext, local v1.ServicePort, remote model.ListenerAttribute) error {
+func udpEqual(reqCtx *svcCtx.RequestContext, local v1.ServicePort, remote model.ListenerAttribute) error {
 	if err := genericListenerEqual(reqCtx, local, remote); err != nil {
 		return err
 	}
@@ -506,7 +509,7 @@ func udpEqual(reqCtx *service.RequestContext, local v1.ServicePort, remote model
 	if err := genericHealthCheckEqual(reqCtx, local, remote); err != nil {
 		return nil
 	}
-	if healthCheckConnectTimeout := reqCtx.Anno.Get(service.HealthCheckConnectTimeout); healthCheckConnectTimeout != "" {
+	if healthCheckConnectTimeout := reqCtx.Anno.Get(annotation.HealthCheckConnectTimeout); healthCheckConnectTimeout != "" {
 		timeout, err := strconv.Atoi(healthCheckConnectTimeout)
 		if err != nil {
 			return fmt.Errorf("healthCheckConnectTimeout %s parse error: %s", healthCheckConnectTimeout, err.Error())
@@ -515,12 +518,12 @@ func udpEqual(reqCtx *service.RequestContext, local v1.ServicePort, remote model
 			return fmt.Errorf("expected slb healthCheckConnectTimeout %d, got %d", timeout, remote.HealthCheckConnectTimeout)
 		}
 	}
-	if connectionDrain := reqCtx.Anno.Get(service.ConnectionDrain); connectionDrain != "" {
+	if connectionDrain := reqCtx.Anno.Get(annotation.ConnectionDrain); connectionDrain != "" {
 		if string(remote.ConnectionDrain) != connectionDrain {
 			return fmt.Errorf("expected slb connectionDrain %s, got %s", connectionDrain, remote.ConnectionDrain)
 		}
 	}
-	if drainTimeout := reqCtx.Anno.Get(service.ConnectionDrainTimeout); drainTimeout != "" {
+	if drainTimeout := reqCtx.Anno.Get(annotation.ConnectionDrainTimeout); drainTimeout != "" {
 		timeout, err := strconv.Atoi(drainTimeout)
 		if err != nil {
 			return fmt.Errorf("connectionDrainTimeout %s parse error: %s", drainTimeout, err.Error())
@@ -532,12 +535,12 @@ func udpEqual(reqCtx *service.RequestContext, local v1.ServicePort, remote model
 	return nil
 }
 
-func httpEqual(reqCtx *service.RequestContext, local v1.ServicePort, remote model.ListenerAttribute) error {
+func httpEqual(reqCtx *svcCtx.RequestContext, local v1.ServicePort, remote model.ListenerAttribute) error {
 	if err := genericListenerEqual(reqCtx, local, remote); err != nil {
 		return err
 	}
 	// health check for http is off by default
-	if healthCheck := reqCtx.Anno.Get(service.HealthCheckFlag); healthCheck != "" {
+	if healthCheck := reqCtx.Anno.Get(annotation.HealthCheckFlag); healthCheck != "" {
 		if string(remote.HealthCheck) != healthCheck {
 			return fmt.Errorf("expected slb healthCheck %s, got %s", healthCheck, remote.HealthCheck)
 		}
@@ -545,22 +548,22 @@ func httpEqual(reqCtx *service.RequestContext, local v1.ServicePort, remote mode
 			if err := genericHealthCheckEqual(reqCtx, local, remote); err != nil {
 				return nil
 			}
-			if healthCheckHttpCode := reqCtx.Anno.Get(service.HealthCheckHTTPCode); healthCheckHttpCode != "" {
+			if healthCheckHttpCode := reqCtx.Anno.Get(annotation.HealthCheckHTTPCode); healthCheckHttpCode != "" {
 				if remote.HealthCheckHttpCode != healthCheckHttpCode {
 					return fmt.Errorf("expected slb healthCheckHttpCode %s, got %s", healthCheckHttpCode, remote.HealthCheckHttpCode)
 				}
 			}
-			if healthCheckURI := reqCtx.Anno.Get(service.HealthCheckURI); healthCheckURI != "" {
+			if healthCheckURI := reqCtx.Anno.Get(annotation.HealthCheckURI); healthCheckURI != "" {
 				if remote.HealthCheckURI != healthCheckURI {
 					return fmt.Errorf("expected slb healthCheckURI %s, got %s", healthCheckURI, remote.HealthCheckURI)
 				}
 			}
-			if healthCheckDomain := reqCtx.Anno.Get(service.HealthCheckDomain); healthCheckDomain != "" {
+			if healthCheckDomain := reqCtx.Anno.Get(annotation.HealthCheckDomain); healthCheckDomain != "" {
 				if remote.HealthCheckDomain != healthCheckDomain {
 					return fmt.Errorf("expected slb healthCheckDomain %s, got %s", healthCheckDomain, remote.HealthCheckDomain)
 				}
 			}
-			if healthCheckTimeout := reqCtx.Anno.Get(service.HealthCheckTimeout); healthCheckTimeout != "" {
+			if healthCheckTimeout := reqCtx.Anno.Get(annotation.HealthCheckTimeout); healthCheckTimeout != "" {
 				timeout, err := strconv.Atoi(healthCheckTimeout)
 				if err != nil {
 					return fmt.Errorf("healthCheckTimeout %s parse error: %s", healthCheckTimeout, err.Error())
@@ -569,7 +572,7 @@ func httpEqual(reqCtx *service.RequestContext, local v1.ServicePort, remote mode
 					return fmt.Errorf("expected slb healthCheckTimeout %d, got %d", timeout, remote.HealthCheckTimeout)
 				}
 			}
-			if healthCheckMethod := reqCtx.Anno.Get(service.HealthCheckMethod); healthCheckMethod != "" {
+			if healthCheckMethod := reqCtx.Anno.Get(annotation.HealthCheckMethod); healthCheckMethod != "" {
 				if remote.HealthCheckMethod != healthCheckMethod {
 					return fmt.Errorf("expected slb healthCheckMethod %s, got %s", healthCheckMethod, remote.HealthCheckMethod)
 				}
@@ -577,22 +580,22 @@ func httpEqual(reqCtx *service.RequestContext, local v1.ServicePort, remote mode
 		}
 	}
 
-	if stickySession := reqCtx.Anno.Get(service.SessionStick); stickySession != "" {
+	if stickySession := reqCtx.Anno.Get(annotation.SessionStick); stickySession != "" {
 		if string(remote.StickySession) != stickySession {
 			return fmt.Errorf("expected slb stickySession %s, got %s", stickySession, remote.StickySession)
 		}
 		if stickySession == string(model.OnFlag) {
-			if stickySessionType := reqCtx.Anno.Get(service.SessionStickType); stickySessionType != "" {
+			if stickySessionType := reqCtx.Anno.Get(annotation.SessionStickType); stickySessionType != "" {
 				if remote.StickySessionType != stickySessionType {
 					return fmt.Errorf("expected slb stickySessionType %s, got %s", stickySessionType, remote.StickySessionType)
 				}
 			}
-			if cookie := reqCtx.Anno.Get(service.Cookie); cookie != "" {
+			if cookie := reqCtx.Anno.Get(annotation.Cookie); cookie != "" {
 				if remote.Cookie != cookie {
 					return fmt.Errorf("expected slb cookie %s, got %s", cookie, remote.Cookie)
 				}
 			}
-			if cookieTimeout := reqCtx.Anno.Get(service.CookieTimeout); cookieTimeout != "" {
+			if cookieTimeout := reqCtx.Anno.Get(annotation.CookieTimeout); cookieTimeout != "" {
 				timeout, err := strconv.Atoi(cookieTimeout)
 				if err != nil {
 					return fmt.Errorf("cookieTimeout %s parse error: %s", cookieTimeout, err.Error())
@@ -605,12 +608,12 @@ func httpEqual(reqCtx *service.RequestContext, local v1.ServicePort, remote mode
 
 	}
 
-	if xForwardedForProto := reqCtx.Anno.Get(service.XForwardedForProto); xForwardedForProto != "" {
+	if xForwardedForProto := reqCtx.Anno.Get(annotation.XForwardedForProto); xForwardedForProto != "" {
 		if string(remote.XForwardedForProto) != xForwardedForProto {
 			return fmt.Errorf("expected slb XForwardedForProto %s, got %s", xForwardedForProto, remote.XForwardedForProto)
 		}
 	}
-	if requestTimeout := reqCtx.Anno.Get(service.RequestTimeout); requestTimeout != "" {
+	if requestTimeout := reqCtx.Anno.Get(annotation.RequestTimeout); requestTimeout != "" {
 		timeout, err := strconv.Atoi(requestTimeout)
 		if err != nil {
 			return fmt.Errorf("requestTimeout %s parse error: %s", requestTimeout, err.Error())
@@ -619,7 +622,7 @@ func httpEqual(reqCtx *service.RequestContext, local v1.ServicePort, remote mode
 			return fmt.Errorf("expected slb requestTimeout %d, got %d", timeout, remote.RequestTimeout)
 		}
 	}
-	if idleTimeout := reqCtx.Anno.Get(service.IdleTimeout); idleTimeout != "" {
+	if idleTimeout := reqCtx.Anno.Get(annotation.IdleTimeout); idleTimeout != "" {
 		timeout, err := strconv.Atoi(idleTimeout)
 		if err != nil {
 			return fmt.Errorf("idleTimeout %s parse error: %s", idleTimeout, err.Error())
@@ -628,7 +631,7 @@ func httpEqual(reqCtx *service.RequestContext, local v1.ServicePort, remote mode
 			return fmt.Errorf("expected slb idleTimeout %d, got %d", timeout, remote.IdleTimeout)
 		}
 	}
-	if forwardPort := reqCtx.Anno.Get(service.ForwardPort); forwardPort != "" {
+	if forwardPort := reqCtx.Anno.Get(annotation.ForwardPort); forwardPort != "" {
 		fPort, err := getForwardPort(forwardPort, int(local.Port))
 		if err != nil {
 			return fmt.Errorf("forwardPort [%s] parse error: %s", forwardPort, err.Error())
@@ -643,12 +646,12 @@ func httpEqual(reqCtx *service.RequestContext, local v1.ServicePort, remote mode
 	return nil
 }
 
-func httpsEqual(reqCtx *service.RequestContext, local v1.ServicePort, remote model.ListenerAttribute) error {
+func httpsEqual(reqCtx *svcCtx.RequestContext, local v1.ServicePort, remote model.ListenerAttribute) error {
 	if err := genericListenerEqual(reqCtx, local, remote); err != nil {
 		return err
 	}
 	// health check for https is off by default
-	if healthCheck := reqCtx.Anno.Get(service.HealthCheckFlag); healthCheck != "" {
+	if healthCheck := reqCtx.Anno.Get(annotation.HealthCheckFlag); healthCheck != "" {
 		if string(remote.HealthCheck) != healthCheck {
 			return fmt.Errorf("expected slb healthCheck %s, got %s", healthCheck, remote.HealthCheck)
 		}
@@ -656,22 +659,22 @@ func httpsEqual(reqCtx *service.RequestContext, local v1.ServicePort, remote mod
 			if err := genericHealthCheckEqual(reqCtx, local, remote); err != nil {
 				return nil
 			}
-			if healthCheckHttpCode := reqCtx.Anno.Get(service.HealthCheckHTTPCode); healthCheckHttpCode != "" {
+			if healthCheckHttpCode := reqCtx.Anno.Get(annotation.HealthCheckHTTPCode); healthCheckHttpCode != "" {
 				if remote.HealthCheckHttpCode != healthCheckHttpCode {
 					return fmt.Errorf("expected slb healthCheckHttpCode %s, got %s", healthCheckHttpCode, remote.HealthCheckHttpCode)
 				}
 			}
-			if healthCheckURI := reqCtx.Anno.Get(service.HealthCheckURI); healthCheckURI != "" {
+			if healthCheckURI := reqCtx.Anno.Get(annotation.HealthCheckURI); healthCheckURI != "" {
 				if remote.HealthCheckURI != healthCheckURI {
 					return fmt.Errorf("expected slb healthCheckURI %s, got %s", healthCheckURI, remote.HealthCheckURI)
 				}
 			}
-			if healthCheckDomain := reqCtx.Anno.Get(service.HealthCheckDomain); healthCheckDomain != "" {
+			if healthCheckDomain := reqCtx.Anno.Get(annotation.HealthCheckDomain); healthCheckDomain != "" {
 				if remote.HealthCheckDomain != healthCheckDomain {
 					return fmt.Errorf("expected slb healthCheckDomain %s, got %s", healthCheckDomain, remote.HealthCheckDomain)
 				}
 			}
-			if healthCheckTimeout := reqCtx.Anno.Get(service.HealthCheckTimeout); healthCheckTimeout != "" {
+			if healthCheckTimeout := reqCtx.Anno.Get(annotation.HealthCheckTimeout); healthCheckTimeout != "" {
 				timeout, err := strconv.Atoi(healthCheckTimeout)
 				if err != nil {
 					return fmt.Errorf("healthCheckTimeout %s parse error: %s", healthCheckTimeout, err.Error())
@@ -680,7 +683,7 @@ func httpsEqual(reqCtx *service.RequestContext, local v1.ServicePort, remote mod
 					return fmt.Errorf("expected slb healthCheckTimeout %d, got %d", timeout, remote.HealthCheckTimeout)
 				}
 			}
-			if healthCheckMethod := reqCtx.Anno.Get(service.HealthCheckMethod); healthCheckMethod != "" {
+			if healthCheckMethod := reqCtx.Anno.Get(annotation.HealthCheckMethod); healthCheckMethod != "" {
 				if remote.HealthCheckMethod != healthCheckMethod {
 					return fmt.Errorf("expected slb healthCheckMethod %s, got %s", healthCheckMethod, remote.HealthCheckMethod)
 				}
@@ -688,23 +691,23 @@ func httpsEqual(reqCtx *service.RequestContext, local v1.ServicePort, remote mod
 		}
 	}
 
-	if stickySession := reqCtx.Anno.Get(service.SessionStick); stickySession != "" {
+	if stickySession := reqCtx.Anno.Get(annotation.SessionStick); stickySession != "" {
 		if string(remote.StickySession) != stickySession {
 			return fmt.Errorf("expected slb stickySession %s, got %s", stickySession, remote.StickySession)
 		}
 
 		if stickySession == string(model.OnFlag) {
-			if stickySessionType := reqCtx.Anno.Get(service.SessionStickType); stickySessionType != "" {
+			if stickySessionType := reqCtx.Anno.Get(annotation.SessionStickType); stickySessionType != "" {
 				if remote.StickySessionType != stickySessionType {
 					return fmt.Errorf("expected slb stickySessionType %s, got %s", stickySessionType, remote.StickySessionType)
 				}
 			}
-			if cookie := reqCtx.Anno.Get(service.Cookie); cookie != "" {
+			if cookie := reqCtx.Anno.Get(annotation.Cookie); cookie != "" {
 				if remote.Cookie != cookie {
 					return fmt.Errorf("expected slb cookie %s, got %s", cookie, remote.Cookie)
 				}
 			}
-			if cookieTimeout := reqCtx.Anno.Get(service.CookieTimeout); cookieTimeout != "" {
+			if cookieTimeout := reqCtx.Anno.Get(annotation.CookieTimeout); cookieTimeout != "" {
 				timeout, err := strconv.Atoi(cookieTimeout)
 				if err != nil {
 					return fmt.Errorf("cookieTimeout %s parse error: %s", cookieTimeout, err.Error())
@@ -716,7 +719,7 @@ func httpsEqual(reqCtx *service.RequestContext, local v1.ServicePort, remote mod
 		}
 	}
 
-	if idleTimeout := reqCtx.Anno.Get(service.IdleTimeout); idleTimeout != "" {
+	if idleTimeout := reqCtx.Anno.Get(annotation.IdleTimeout); idleTimeout != "" {
 		timeout, err := strconv.Atoi(idleTimeout)
 		if err != nil {
 			return fmt.Errorf("idleTimeout %s parse error: %s", idleTimeout, err.Error())
@@ -725,7 +728,7 @@ func httpsEqual(reqCtx *service.RequestContext, local v1.ServicePort, remote mod
 			return fmt.Errorf("expected slb idleTimeout %d, got %d", timeout, remote.IdleTimeout)
 		}
 	}
-	if xForwardedForProto := reqCtx.Anno.Get(service.XForwardedForProto); xForwardedForProto != "" {
+	if xForwardedForProto := reqCtx.Anno.Get(annotation.XForwardedForProto); xForwardedForProto != "" {
 		if string(remote.XForwardedForProto) != xForwardedForProto {
 			return fmt.Errorf("expected slb XForwardedForProto %s, got %s", xForwardedForProto, remote.XForwardedForProto)
 		}
@@ -734,17 +737,17 @@ func httpsEqual(reqCtx *service.RequestContext, local v1.ServicePort, remote mod
 			return fmt.Errorf("expected slb XForwardedForProto default %s, got %s", model.OffFlag, remote.XForwardedForProto)
 		}
 	}
-	if certId := reqCtx.Anno.Get(service.CertID); certId != "" {
+	if certId := reqCtx.Anno.Get(annotation.CertID); certId != "" {
 		if remote.CertId != certId {
 			return fmt.Errorf("expected slb certId %s, got %s", certId, remote.CertId)
 		}
 	}
-	if enableHttp2 := reqCtx.Anno.Get(service.EnableHttp2); enableHttp2 != "" {
+	if enableHttp2 := reqCtx.Anno.Get(annotation.EnableHttp2); enableHttp2 != "" {
 		if string(remote.EnableHttp2) != enableHttp2 {
 			return fmt.Errorf("expected slb enableHttp2 %s, got %s", enableHttp2, remote.EnableHttp2)
 		}
 	}
-	if requestTimeout := reqCtx.Anno.Get(service.RequestTimeout); requestTimeout != "" {
+	if requestTimeout := reqCtx.Anno.Get(annotation.RequestTimeout); requestTimeout != "" {
 		timeout, err := strconv.Atoi(requestTimeout)
 		if err != nil {
 			return fmt.Errorf("requestTimeout %s parse error: %s", requestTimeout, err.Error())
@@ -753,7 +756,7 @@ func httpsEqual(reqCtx *service.RequestContext, local v1.ServicePort, remote mod
 			return fmt.Errorf("expected slb requestTimeout %d, got %d", timeout, remote.RequestTimeout)
 		}
 	}
-	if tls := reqCtx.Anno.Get(service.TLSCipherPolicy); tls != "" {
+	if tls := reqCtx.Anno.Get(annotation.TLSCipherPolicy); tls != "" {
 		if remote.TLSCipherPolicy != tls {
 			return fmt.Errorf("expected slb tls %d, got %d", tls, remote.TLSCipherPolicy)
 		}
@@ -776,15 +779,15 @@ func getForwardPort(anno string, port int) (int, error) {
 	return 0, fmt.Errorf("cannot find port %d forward port in anno %s", port, anno)
 }
 
-func vsgAttrEqual(f *Framework, reqCtx *service.RequestContext, remote *model.LoadBalancer) error {
+func vsgAttrEqual(f *Framework, reqCtx *svcCtx.RequestContext, remote *model.LoadBalancer) error {
 	for _, port := range reqCtx.Service.Spec.Ports {
 		name := getVGroupName(reqCtx.Service, port)
 		var (
 			vGroupId string
 			err      error
 		)
-		if vGroupAnno := reqCtx.Anno.Get(service.VGroupPort); vGroupAnno != "" {
-			vGroupId, err = getVGroupID(reqCtx.Anno.Get(service.VGroupPort), port)
+		if vGroupAnno := reqCtx.Anno.Get(annotation.VGroupPort); vGroupAnno != "" {
+			vGroupId, err = getVGroupID(reqCtx.Anno.Get(annotation.VGroupPort), port)
 			if err != nil {
 				return fmt.Errorf("parse vgroup port annotation %s error: %s", vGroupAnno, err.Error())
 			}
@@ -804,7 +807,7 @@ func vsgAttrEqual(f *Framework, reqCtx *service.RequestContext, remote *model.Lo
 				if isOverride(reqCtx.Anno) && !isUsedByPort(vg, remote.Listeners) {
 					return fmt.Errorf("port %d do not use vgroup id: %s", port.Port, vg.VGroupId)
 				}
-				if weight := reqCtx.Anno.Get(service.VGroupWeight); weight != "" {
+				if weight := reqCtx.Anno.Get(annotation.VGroupWeight); weight != "" {
 					w, err := strconv.Atoi(weight)
 					if err != nil {
 						return fmt.Errorf("parse weight err")
@@ -862,8 +865,8 @@ func getVGroupName(svc *v1.Service, servicePort v1.ServicePort) string {
 }
 
 func isENIBackendType(svc *v1.Service) bool {
-	if svc.Annotations[service.BackendType] != "" {
-		return svc.Annotations[service.BackendType] == model.ENIBackendType
+	if svc.Annotations[helper.BackendType] != "" {
+		return svc.Annotations[helper.BackendType] == model.ENIBackendType
 	}
 
 	if os.Getenv("SERVICE_FORCE_BACKEND_ENI") != "" {
@@ -882,17 +885,17 @@ func isUsedByPort(vg model.VServerGroup, listeners []model.ListenerAttribute) bo
 	return false
 }
 
-func getTrafficPolicy(reqCtx *service.RequestContext) service.TrafficPolicy {
+func getTrafficPolicy(reqCtx *svcCtx.RequestContext) helper.TrafficPolicy {
 	if isENIBackendType(reqCtx.Service) {
-		return service.ENITrafficPolicy
+		return helper.ENITrafficPolicy
 	}
 	if reqCtx.Service.Spec.ExternalTrafficPolicy == v1.ServiceExternalTrafficPolicyTypeLocal {
-		return service.LocalTrafficPolicy
+		return helper.LocalTrafficPolicy
 	}
-	return service.ClusterTrafficPolicy
+	return helper.ClusterTrafficPolicy
 }
 
-func isBackendEqual(client *client.KubeClient, reqCtx *service.RequestContext, vg model.VServerGroup) (bool, error) {
+func isBackendEqual(client *client.KubeClient, reqCtx *svcCtx.RequestContext, vg model.VServerGroup) (bool, error) {
 	policy := getTrafficPolicy(reqCtx)
 	endpoints, err := client.GetEndpoint()
 	if err != nil {
@@ -909,17 +912,17 @@ func isBackendEqual(client *client.KubeClient, reqCtx *service.RequestContext, v
 
 	var backends []model.BackendAttribute
 	switch policy {
-	case service.ENITrafficPolicy:
+	case helper.ENITrafficPolicy:
 		backends, err = buildENIBackends(reqCtx.Anno, endpoints, vg)
 		if err != nil {
 			return false, err
 		}
-	case service.LocalTrafficPolicy:
+	case helper.LocalTrafficPolicy:
 		backends, err = buildLocalBackends(reqCtx.Anno, endpoints, nodes, vg)
 		if err != nil {
 			return false, err
 		}
-	case service.ClusterTrafficPolicy:
+	case helper.ClusterTrafficPolicy:
 		backends, err = buildClusterBackends(reqCtx.Anno, endpoints, nodes, vg)
 		if err != nil {
 			return false, err
@@ -928,7 +931,7 @@ func isBackendEqual(client *client.KubeClient, reqCtx *service.RequestContext, v
 	for _, l := range backends {
 		found := false
 		for _, r := range vg.Backends {
-			if policy == service.ENITrafficPolicy {
+			if policy == helper.ENITrafficPolicy {
 				if l.ServerIp == r.ServerIp &&
 					l.Port == r.Port &&
 					l.Type == model.ENIBackendType {
@@ -968,7 +971,7 @@ func isBackendEqual(client *client.KubeClient, reqCtx *service.RequestContext, v
 	return true, nil
 }
 
-func buildENIBackends(anno *service.AnnotationRequest, ep *v1.Endpoints, vg model.VServerGroup) ([]model.BackendAttribute, error) {
+func buildENIBackends(anno *annotation.AnnotationRequest, ep *v1.Endpoints, vg model.VServerGroup) ([]model.BackendAttribute, error) {
 	var ret []model.BackendAttribute
 	for _, subset := range ep.Subsets {
 		backendPort := getBackendPort(vg.ServicePort, subset)
@@ -981,10 +984,10 @@ func buildENIBackends(anno *service.AnnotationRequest, ep *v1.Endpoints, vg mode
 			})
 		}
 	}
-	return setWeightBackends(service.ENITrafficPolicy, ret, vg.VGroupWeight), nil
+	return setWeightBackends(helper.ENITrafficPolicy, ret, vg.VGroupWeight), nil
 }
 
-func buildLocalBackends(anno *service.AnnotationRequest, ep *v1.Endpoints, nodes []v1.Node, vg model.VServerGroup) ([]model.BackendAttribute, error) {
+func buildLocalBackends(anno *annotation.AnnotationRequest, ep *v1.Endpoints, nodes []v1.Node, vg model.VServerGroup) ([]model.BackendAttribute, error) {
 	var ret []model.BackendAttribute
 	for _, subset := range ep.Subsets {
 		for _, addr := range subset.Addresses {
@@ -999,7 +1002,7 @@ func buildLocalBackends(anno *service.AnnotationRequest, ep *v1.Endpoints, nodes
 				continue
 			}
 
-			_, id, err := service.NodeFromProviderID(node.Spec.ProviderID)
+			_, id, err := helper.NodeFromProviderID(node.Spec.ProviderID)
 			if err != nil {
 				return nil, fmt.Errorf("providerID %s parse error: %s", node.Spec.ProviderID, err.Error())
 			}
@@ -1017,16 +1020,16 @@ func buildLocalBackends(anno *service.AnnotationRequest, ep *v1.Endpoints, nodes
 		return nil, fmt.Errorf("build eci backends error: %s", err.Error())
 	}
 
-	return setWeightBackends(service.LocalTrafficPolicy, append(ret, eciBackends...), vg.VGroupWeight), nil
+	return setWeightBackends(helper.LocalTrafficPolicy, append(ret, eciBackends...), vg.VGroupWeight), nil
 }
 
-func buildClusterBackends(anno *service.AnnotationRequest, ep *v1.Endpoints, nodes []v1.Node, vg model.VServerGroup) ([]model.BackendAttribute, error) {
+func buildClusterBackends(anno *annotation.AnnotationRequest, ep *v1.Endpoints, nodes []v1.Node, vg model.VServerGroup) ([]model.BackendAttribute, error) {
 	var ret []model.BackendAttribute
 	for _, n := range nodes {
 		if isNodeExcludeFromLoadBalancer(&n, anno) {
 			continue
 		}
-		_, id, err := service.NodeFromProviderID(n.Spec.ProviderID)
+		_, id, err := helper.NodeFromProviderID(n.Spec.ProviderID)
 		if err != nil {
 			return nil, fmt.Errorf("providerID %s parse error: %s", n.Spec.ProviderID, err.Error())
 		}
@@ -1042,7 +1045,7 @@ func buildClusterBackends(anno *service.AnnotationRequest, ep *v1.Endpoints, nod
 	if err != nil {
 		return nil, fmt.Errorf("build eci backends error: %s", err.Error())
 	}
-	return setWeightBackends(service.ClusterTrafficPolicy, append(ret, eciBackends...), vg.VGroupWeight), nil
+	return setWeightBackends(helper.ClusterTrafficPolicy, append(ret, eciBackends...), vg.VGroupWeight), nil
 }
 
 func buildECIBackends(ep *v1.Endpoints, nodes []v1.Node, vg model.VServerGroup) ([]model.BackendAttribute, error) {
@@ -1070,7 +1073,7 @@ func buildECIBackends(ep *v1.Endpoints, nodes []v1.Node, vg model.VServerGroup) 
 	return ret, nil
 }
 
-func setWeightBackends(mode service.TrafficPolicy, backends []model.BackendAttribute, weight *int) []model.BackendAttribute {
+func setWeightBackends(mode helper.TrafficPolicy, backends []model.BackendAttribute, weight *int) []model.BackendAttribute {
 	// use default
 	if weight == nil {
 		return podNumberAlgorithm(mode, backends)
@@ -1079,10 +1082,10 @@ func setWeightBackends(mode service.TrafficPolicy, backends []model.BackendAttri
 	return podPercentAlgorithm(mode, backends, *weight)
 }
 
-func podNumberAlgorithm(mode service.TrafficPolicy, backends []model.BackendAttribute) []model.BackendAttribute {
-	if mode == service.ENITrafficPolicy || mode == service.ClusterTrafficPolicy {
+func podNumberAlgorithm(mode helper.TrafficPolicy, backends []model.BackendAttribute) []model.BackendAttribute {
+	if mode == helper.ENITrafficPolicy || mode == helper.ClusterTrafficPolicy {
 		for i := range backends {
-			backends[i].Weight = service.DefaultServerWeight
+			backends[i].Weight = clbv1.DefaultServerWeight
 		}
 		return backends
 	}
@@ -1098,7 +1101,7 @@ func podNumberAlgorithm(mode service.TrafficPolicy, backends []model.BackendAttr
 	return backends
 }
 
-func podPercentAlgorithm(mode service.TrafficPolicy, backends []model.BackendAttribute, weight int) []model.BackendAttribute {
+func podPercentAlgorithm(mode helper.TrafficPolicy, backends []model.BackendAttribute, weight int) []model.BackendAttribute {
 	if weight == 0 {
 		for i := range backends {
 			backends[i].Weight = 0
@@ -1106,7 +1109,7 @@ func podPercentAlgorithm(mode service.TrafficPolicy, backends []model.BackendAtt
 		return backends
 	}
 
-	if mode == service.ENITrafficPolicy || mode == service.ClusterTrafficPolicy {
+	if mode == helper.ENITrafficPolicy || mode == helper.ClusterTrafficPolicy {
 		per := weight / len(backends)
 		if per < 1 {
 			per = 1
@@ -1155,34 +1158,34 @@ func findNodeByNodeName(nodes []v1.Node, nodeName string) *v1.Node {
 	return nil
 }
 
-func isNodeExcludeFromLoadBalancer(node *v1.Node, anno *service.AnnotationRequest) bool {
+func isNodeExcludeFromLoadBalancer(node *v1.Node, anno *annotation.AnnotationRequest) bool {
 	if helper.HasExcludeLabel(node) {
 		return true
 	}
 
-	if anno.Get(service.BackendLabel) != "" {
-		if _, include := node.Labels[anno.Get(service.BackendLabel)]; !include {
+	if anno.Get(annotation.BackendLabel) != "" {
+		if _, include := node.Labels[anno.Get(annotation.BackendLabel)]; !include {
 			return true
 		}
 	}
 
-	if node.Spec.Unschedulable && anno.Get(service.RemoveUnscheduled) != "" {
-		if anno.Get(service.RemoveUnscheduled) == string(model.OnFlag) {
+	if node.Spec.Unschedulable && anno.Get(annotation.RemoveUnscheduled) != "" {
+		if anno.Get(annotation.RemoveUnscheduled) == string(model.OnFlag) {
 			return true
 		}
 	}
 
-	if _, isMaster := node.Labels[service.LabelNodeRoleMaster]; isMaster {
+	if _, isMaster := node.Labels[helper.LabelNodeRoleMaster]; isMaster {
 		return true
 	}
 
 	for _, taint := range node.Spec.Taints {
-		if taint.Key == service.ToBeDeletedTaint {
+		if taint.Key == helper.ToBeDeletedTaint {
 			return true
 		}
 	}
 
-	if _, exclude := node.Labels[service.LabelNodeExcludeBalancer]; exclude {
+	if _, exclude := node.Labels[helper.LabelNodeExcludeBalancer]; exclude {
 		return true
 	}
 
@@ -1191,7 +1194,7 @@ func isNodeExcludeFromLoadBalancer(node *v1.Node, anno *service.AnnotationReques
 
 func isVKNode(node v1.Node) bool {
 	label, ok := node.Labels["type"]
-	return ok && label == service.LabelNodeTypeVK
+	return ok && label == helper.LabelNodeTypeVK
 }
 
 func (f *Framework) ExpectNodeEqual() error {
@@ -1233,7 +1236,7 @@ func (f *Framework) ExpectNodeEqual() error {
 			if isVKNode(node) {
 				continue
 			}
-			_, id, err := service.NodeFromProviderID(node.Spec.ProviderID)
+			_, id, err := helper.NodeFromProviderID(node.Spec.ProviderID)
 			if err != nil {
 				retErr = err
 				return false, nil
@@ -1439,14 +1442,14 @@ func (f *Framework) FindLoadBalancer() (*v1.Service, *model.LoadBalancer, error)
 }
 
 func buildRemoteModel(f *Framework, svc *v1.Service) (*model.LoadBalancer, error) {
-	builder := &service.ModelBuilder{
-		LoadBalancerMgr: service.NewLoadBalancerManager(f.Client.CloudClient),
-		ListenerMgr:     service.NewListenerManager(f.Client.CloudClient),
-		VGroupMgr:       service.NewVGroupManager(f.Client.RuntimeClient, f.Client.CloudClient),
+	builder := &clbv1.ModelBuilder{
+		LoadBalancerMgr: clbv1.NewLoadBalancerManager(f.Client.CloudClient),
+		ListenerMgr:     clbv1.NewListenerManager(f.Client.CloudClient),
+		VGroupMgr:       clbv1.NewVGroupManager(f.Client.RuntimeClient, f.Client.CloudClient),
 	}
-	reqCtx := &service.RequestContext{
+	reqCtx := &svcCtx.RequestContext{
 		Service: svc,
-		Anno:    service.NewAnnotationRequest(svc),
+		Anno:    annotation.NewAnnotationRequest(svc),
 	}
-	return builder.Instance(service.RemoteModel).Build(reqCtx)
+	return builder.Instance(clbv1.RemoteModel).Build(reqCtx)
 }
