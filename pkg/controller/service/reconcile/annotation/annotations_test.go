@@ -1,8 +1,10 @@
-package service
+package annotation
 
 import (
 	"github.com/stretchr/testify/assert"
-	"k8s.io/apimachinery/pkg/types"
+	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"testing"
 )
 
@@ -50,7 +52,29 @@ func TestGetDefaultValue(t *testing.T) {
 
 func TestGetDefaultLoadBalancerName(t *testing.T) {
 	svc := getDefaultService()
-	svc.UID = types.UID(SvcUID)
+	svc.UID = "5e4dbfc9-c2ae-4642-b033-5607860aef6a"
 	anno := NewAnnotationRequest(svc)
 	assert.Equal(t, anno.GetDefaultLoadBalancerName(), "a5e4dbfc9c2ae4642b0335607860aef6")
+}
+
+func getDefaultService() *v1.Service {
+	return &v1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        "test",
+			Namespace:   "default",
+			Annotations: make(map[string]string),
+		},
+		Spec: v1.ServiceSpec{
+			Ports: []v1.ServicePort{
+				{
+					Name:       "tcp",
+					Port:       80,
+					TargetPort: intstr.FromInt(80),
+					NodePort:   80,
+					Protocol:   v1.ProtocolTCP,
+				},
+			},
+			Type: v1.ServiceTypeLoadBalancer,
+		},
+	}
 }

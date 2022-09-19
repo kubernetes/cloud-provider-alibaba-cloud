@@ -1,4 +1,4 @@
-package service
+package clbv1
 
 import (
 	"fmt"
@@ -8,7 +8,9 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	ctrlCfg "k8s.io/cloud-provider-alibaba-cloud/pkg/config"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/helper"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/service/reconcile/annotation"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/model"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/vmock"
 	"testing"
@@ -56,7 +58,7 @@ func TestCreateLB(t *testing.T) {
 			Protocol:   v1.ProtocolTCP,
 		},
 	}
-	svc.Annotations[Annotation(ProtocolPort)] = "tcp:80,udp:53,http:8080,https:443"
+	svc.Annotations[annotation.Annotation(annotation.ProtocolPort)] = "tcp:80,udp:53,http:8080,https:443"
 
 	reqCtx := getReqCtx(svc)
 	localModel, err := builder.Instance(LocalModel).Build(reqCtx)
@@ -110,48 +112,48 @@ func TestSyncLB(t *testing.T) {
 			Protocol:   v1.ProtocolTCP,
 		},
 	}
-	svc.Annotations[Annotation(LoadBalancerId)] = vmock.ExistLBID
-	svc.Annotations[Annotation(OverrideListener)] = "true"
-	svc.Annotations[Annotation(Spec)] = "slb.s2.small"
-	svc.Annotations[Annotation(ChargeType)] = "paybybandwidth"
-	svc.Annotations[Annotation(Bandwidth)] = "5"
-	svc.Annotations[Annotation(DeleteProtection)] = "off"
-	svc.Annotations[Annotation(LoadBalancerName)] = "new-lb-name"
-	svc.Annotations[Annotation(ModificationProtection)] = "NonProtection"
+	svc.Annotations[annotation.Annotation(annotation.LoadBalancerId)] = vmock.ExistLBID
+	svc.Annotations[annotation.Annotation(annotation.OverrideListener)] = "true"
+	svc.Annotations[annotation.Annotation(annotation.Spec)] = "slb.s2.small"
+	svc.Annotations[annotation.Annotation(annotation.ChargeType)] = "paybybandwidth"
+	svc.Annotations[annotation.Annotation(annotation.Bandwidth)] = "5"
+	svc.Annotations[annotation.Annotation(annotation.DeleteProtection)] = "off"
+	svc.Annotations[annotation.Annotation(annotation.LoadBalancerName)] = "new-lb-name"
+	svc.Annotations[annotation.Annotation(annotation.ModificationProtection)] = "NonProtection"
 
-	svc.Annotations[Annotation(AclID)] = "acl-id"
-	svc.Annotations[Annotation(AclStatus)] = string(model.OnFlag)
-	svc.Annotations[Annotation(AclType)] = "white"
-	svc.Annotations[Annotation(Scheduler)] = "wrr"
-	svc.Annotations[Annotation(PersistenceTimeout)] = "10"
-	svc.Annotations[Annotation(EstablishedTimeout)] = "12"
-	svc.Annotations[Annotation(EnableHttp2)] = "false"
-	svc.Annotations[Annotation(IdleTimeout)] = "60"
-	svc.Annotations[Annotation(RequestTimeout)] = "30"
-	svc.Annotations[Annotation(ConnectionDrain)] = "on"
-	svc.Annotations[Annotation(ConnectionDrainTimeout)] = "30"
-	svc.Annotations[Annotation(Cookie)] = "test-cookie"
-	svc.Annotations[Annotation(CookieTimeout)] = "60"
-	svc.Annotations[Annotation(SessionStick)] = "on"
-	svc.Annotations[Annotation(SessionStickType)] = "insert"
-	svc.Annotations[Annotation(XForwardedForProto)] = "on"
+	svc.Annotations[annotation.Annotation(annotation.AclID)] = "acl-id"
+	svc.Annotations[annotation.Annotation(annotation.AclStatus)] = string(model.OnFlag)
+	svc.Annotations[annotation.Annotation(annotation.AclType)] = "white"
+	svc.Annotations[annotation.Annotation(annotation.Scheduler)] = "wrr"
+	svc.Annotations[annotation.Annotation(annotation.PersistenceTimeout)] = "10"
+	svc.Annotations[annotation.Annotation(annotation.EstablishedTimeout)] = "12"
+	svc.Annotations[annotation.Annotation(annotation.EnableHttp2)] = "false"
+	svc.Annotations[annotation.Annotation(annotation.IdleTimeout)] = "60"
+	svc.Annotations[annotation.Annotation(annotation.RequestTimeout)] = "30"
+	svc.Annotations[annotation.Annotation(annotation.ConnectionDrain)] = "on"
+	svc.Annotations[annotation.Annotation(annotation.ConnectionDrainTimeout)] = "30"
+	svc.Annotations[annotation.Annotation(annotation.Cookie)] = "test-cookie"
+	svc.Annotations[annotation.Annotation(annotation.CookieTimeout)] = "60"
+	svc.Annotations[annotation.Annotation(annotation.SessionStick)] = "on"
+	svc.Annotations[annotation.Annotation(annotation.SessionStickType)] = "insert"
+	svc.Annotations[annotation.Annotation(annotation.XForwardedForProto)] = "on"
 
-	svc.Annotations[Annotation(ProtocolPort)] = "tcp:80,udp:53,http:8080,https:443"
-	svc.Annotations[Annotation(CertID)] = "cert-id"
-	svc.Annotations[Annotation(ForwardPort)] = "8080:443"
+	svc.Annotations[annotation.Annotation(annotation.ProtocolPort)] = "tcp:80,udp:53,http:8080,https:443"
+	svc.Annotations[annotation.Annotation(annotation.CertID)] = "cert-id"
+	svc.Annotations[annotation.Annotation(annotation.ForwardPort)] = "8080:443"
 
-	svc.Annotations[Annotation(HealthyThreshold)] = "6"
-	svc.Annotations[Annotation(UnhealthyThreshold)] = "5"
-	svc.Annotations[Annotation(HealthCheckConnectTimeout)] = "3"
-	svc.Annotations[Annotation(HealthCheckConnectPort)] = "80"
-	svc.Annotations[Annotation(HealthCheckInterval)] = "5"
-	svc.Annotations[Annotation(HealthCheckDomain)] = "foo2.bar.com"
-	svc.Annotations[Annotation(HealthCheckURI)] = "/test2/index.html"
-	svc.Annotations[Annotation(HealthCheckHTTPCode)] = "http_2xx,http_3xx"
-	svc.Annotations[Annotation(HealthCheckType)] = "tcp"
-	svc.Annotations[Annotation(HealthCheckFlag)] = "on"
-	svc.Annotations[Annotation(HealthCheckTimeout)] = "3"
-	svc.Annotations[Annotation(HealthCheckMethod)] = "get"
+	svc.Annotations[annotation.Annotation(annotation.HealthyThreshold)] = "6"
+	svc.Annotations[annotation.Annotation(annotation.UnhealthyThreshold)] = "5"
+	svc.Annotations[annotation.Annotation(annotation.HealthCheckConnectTimeout)] = "3"
+	svc.Annotations[annotation.Annotation(annotation.HealthCheckConnectPort)] = "80"
+	svc.Annotations[annotation.Annotation(annotation.HealthCheckInterval)] = "5"
+	svc.Annotations[annotation.Annotation(annotation.HealthCheckDomain)] = "foo2.bar.com"
+	svc.Annotations[annotation.Annotation(annotation.HealthCheckURI)] = "/test2/index.html"
+	svc.Annotations[annotation.Annotation(annotation.HealthCheckHTTPCode)] = "http_2xx,http_3xx"
+	svc.Annotations[annotation.Annotation(annotation.HealthCheckType)] = "tcp"
+	svc.Annotations[annotation.Annotation(annotation.HealthCheckFlag)] = "on"
+	svc.Annotations[annotation.Annotation(annotation.HealthCheckTimeout)] = "3"
+	svc.Annotations[annotation.Annotation(annotation.HealthCheckMethod)] = "get"
 
 	reqCtx := getReqCtx(svc)
 	localModel, err := builder.Instance(LocalModel).Build(reqCtx)
@@ -177,9 +179,9 @@ func TestDeleteLB(t *testing.T) {
 	// delete auto-created lb
 	svc := getDefaultService()
 	svc.UID = types.UID(SvcUID)
-	svc.ObjectMeta.Finalizers = []string{ServiceFinalizer}
+	svc.ObjectMeta.Finalizers = []string{helper.ServiceFinalizer}
 	svc.ObjectMeta.DeletionTimestamp = &metav1.Time{Time: time.Now()}
-	svc.Labels = map[string]string{LabelServiceHash: getServiceHash(svc)}
+	svc.Labels = map[string]string{helper.LabelServiceHash: helper.GetServiceHash(svc)}
 	reqCtx := getReqCtx(svc)
 	localModel, err := builder.Instance(LocalModel).Build(reqCtx)
 	if err != nil {
@@ -192,8 +194,8 @@ func TestDeleteLB(t *testing.T) {
 
 	// reuse slb
 	reqCtx = getReqCtx(getDefaultService())
-	reqCtx.Service.Annotations[Annotation(LoadBalancerId)] = "exist-lb"
-	reqCtx.Service.Annotations[Annotation(OverrideListener)] = "true"
+	reqCtx.Service.Annotations[annotation.Annotation(annotation.LoadBalancerId)] = "exist-lb"
+	reqCtx.Service.Annotations[annotation.Annotation(annotation.OverrideListener)] = "true"
 	reqCtx.Service.ObjectMeta.Finalizers = []string{"service.k8s.alibaba/resources"}
 	reqCtx.Service.ObjectMeta.DeletionTimestamp = &metav1.Time{Time: time.Now()}
 
@@ -292,7 +294,7 @@ func TestSyncVGroups(t *testing.T) {
 
 	// eni mode
 	reqCtx = getReqCtx(svc.DeepCopy())
-	reqCtx.Service.Annotations = map[string]string{BackendType: model.ENIBackendType}
+	reqCtx.Service.Annotations = map[string]string{annotation.BackendType: model.ENIBackendType}
 	reqCtx.Service.UID = types.UID(SvcUID)
 	localModel, err = builder.Instance(LocalModel).Build(reqCtx)
 	if err != nil {
@@ -305,9 +307,9 @@ func TestSyncVGroups(t *testing.T) {
 
 	// reuse vServerGroup: cluster traffic policy
 	reqCtx = getReqCtx(getDefaultService())
-	reqCtx.Service.Annotations[Annotation(LoadBalancerId)] = vmock.ExistLBID
-	reqCtx.Service.Annotations[Annotation(VGroupPort)] = fmt.Sprintf("%s:%d", vmock.ExistVGroupID, 80)
-	reqCtx.Service.Annotations[Annotation(VGroupWeight)] = "80"
+	reqCtx.Service.Annotations[annotation.Annotation(annotation.LoadBalancerId)] = vmock.ExistLBID
+	reqCtx.Service.Annotations[annotation.Annotation(annotation.VGroupPort)] = fmt.Sprintf("%s:%d", vmock.ExistVGroupID, 80)
+	reqCtx.Service.Annotations[annotation.Annotation(annotation.VGroupWeight)] = "80"
 	localModel, err = builder.Instance(LocalModel).Build(reqCtx)
 	if err != nil {
 		t.Error(err)
@@ -319,9 +321,9 @@ func TestSyncVGroups(t *testing.T) {
 
 	// reuse vServerGroup: local traffic policy
 	reqCtx = getReqCtx(getDefaultService())
-	reqCtx.Service.Annotations[Annotation(LoadBalancerId)] = vmock.ExistLBID
-	reqCtx.Service.Annotations[Annotation(VGroupPort)] = fmt.Sprintf("%s:%d", vmock.ExistVGroupID, 80)
-	reqCtx.Service.Annotations[Annotation(VGroupWeight)] = "0"
+	reqCtx.Service.Annotations[annotation.Annotation(annotation.LoadBalancerId)] = vmock.ExistLBID
+	reqCtx.Service.Annotations[annotation.Annotation(annotation.VGroupPort)] = fmt.Sprintf("%s:%d", vmock.ExistVGroupID, 80)
+	reqCtx.Service.Annotations[annotation.Annotation(annotation.VGroupWeight)] = "0"
 	reqCtx.Service.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyTypeLocal
 	localModel, err = builder.Instance(LocalModel).Build(reqCtx)
 	if err != nil {
@@ -333,7 +335,7 @@ func TestSyncVGroups(t *testing.T) {
 	}
 
 	// EndpointSlice
-	_ = utilfeature.DefaultMutableFeatureGate.SetFromMap(map[string]bool{string(helper.EndpointSlice): true})
+	_ = utilfeature.DefaultMutableFeatureGate.SetFromMap(map[string]bool{string(ctrlCfg.EndpointSlice): true})
 	reqCtx = getReqCtx(getDefaultService())
 	localModel, err = builder.Instance(LocalModel).Build(reqCtx)
 	if err != nil {
@@ -343,11 +345,11 @@ func TestSyncVGroups(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	_ = utilfeature.DefaultMutableFeatureGate.SetFromMap(map[string]bool{string(helper.EndpointSlice): false})
+	_ = utilfeature.DefaultMutableFeatureGate.SetFromMap(map[string]bool{string(ctrlCfg.EndpointSlice): false})
 
 	// filter out by label
 	reqCtx = getReqCtx(getDefaultService())
-	reqCtx.Service.Annotations[Annotation(BackendLabel)] = "app=nginx"
+	reqCtx.Service.Annotations[annotation.Annotation(annotation.BackendLabel)] = "app=nginx"
 	localModel, err = builder.Instance(LocalModel).Build(reqCtx)
 	if err != nil {
 		t.Error(err)
@@ -368,7 +370,7 @@ func TestSyncVGroups(t *testing.T) {
 			Protocol:   v1.ProtocolTCP,
 		},
 	}
-	reqCtx.Service.Annotations[BackendType] = model.ENIBackendType
+	reqCtx.Service.Annotations[annotation.BackendType] = model.ENIBackendType
 	localModel, err = builder.Instance(LocalModel).Build(reqCtx)
 	if err != nil {
 		t.Error(err)

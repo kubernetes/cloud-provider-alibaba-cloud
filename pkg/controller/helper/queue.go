@@ -1,16 +1,13 @@
-package k8s
+package helper
 
 import (
 	"fmt"
 	"time"
 
-	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/helper"
-
 	"k8s.io/klog/v2"
 
 	"golang.org/x/time/rate"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
@@ -40,7 +37,7 @@ type Queue struct {
 // Element represents one item of the queue
 type Element struct {
 	Key         interface{}
-	Event       helper.Event
+	Event       Event
 	IsSkippable bool
 }
 
@@ -77,7 +74,7 @@ func (t *Queue) enqueue(obj interface{}, skippable bool) {
 	}
 
 	klog.V(3).Infof("queuing, item: %+v", obj)
-	e := obj.(helper.Event)
+	e := obj.(Event)
 	key, err := t.fn(e.Obj)
 	if err != nil {
 		klog.Errorf("creating object key, item: %+v, error: %s", obj, err.Error())
@@ -85,7 +82,7 @@ func (t *Queue) enqueue(obj interface{}, skippable bool) {
 	}
 	t.queue.Add(Element{
 		Key:   key,
-		Event: obj.(helper.Event),
+		Event: obj.(Event),
 	})
 }
 
@@ -172,17 +169,4 @@ func NewCustomTaskQueue(syncFn func(interface{}) error, fn func(interface{}) (in
 	}
 
 	return q
-}
-
-// GetDummyObject returns a valid object that can be used in the Queue
-func GetDummyObject(name string) *metav1.ObjectMeta {
-	return &metav1.ObjectMeta{
-		Name: name,
-	}
-}
-func GetServiceDummyObject(name, namespace string) *metav1.ObjectMeta {
-	return &metav1.ObjectMeta{
-		Name:      name,
-		Namespace: namespace,
-	}
 }

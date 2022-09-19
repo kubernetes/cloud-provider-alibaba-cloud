@@ -5,6 +5,7 @@ import (
 	"fmt"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/model/tag"
 	"strconv"
 	"strings"
 )
@@ -34,8 +35,9 @@ func (t InstanceChargeType) IsPayBySpec() bool {
 type AddressIPVersionType string
 
 const (
-	IPv4 = AddressIPVersionType("ipv4")
-	IPv6 = AddressIPVersionType("ipv6")
+	IPv4      = AddressIPVersionType("ipv4")
+	IPv6      = AddressIPVersionType("ipv6")
+	DualStack = AddressIPVersionType("dualstack")
 )
 
 type LoadBalancerSpecType string
@@ -101,7 +103,7 @@ type LoadBalancerAttribute struct {
 	MasterZoneId                 string
 	SlaveZoneId                  string
 	AddressIPVersion             AddressIPVersionType
-	Tags                         []Tag
+	Tags                         []tag.Tag
 
 	// parameters are immutable
 	RegionId                     string
@@ -283,9 +285,4 @@ func LoadVGroupNamedKey(key string) (*VGroupNamedKey, error) {
 		ServiceName: metas[2],
 		VGroupPort:  metas[1],
 		Prefix:      DEFAULT_PREFIX}, nil
-}
-
-type Tag struct {
-	TagValue string
-	TagKey   string
 }

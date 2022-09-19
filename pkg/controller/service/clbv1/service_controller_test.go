@@ -1,4 +1,4 @@
-package service
+package clbv1
 
 import (
 	"context"
@@ -11,6 +11,8 @@ import (
 	"k8s.io/client-go/tools/record"
 	ctrlCfg "k8s.io/cloud-provider-alibaba-cloud/pkg/config"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/helper"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/service/reconcile/annotation"
+	svcCtx "k8s.io/cloud-provider-alibaba-cloud/pkg/controller/service/reconcile/context"
 	prvd "k8s.io/cloud-provider-alibaba-cloud/pkg/provider"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/vmock"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/util"
@@ -99,7 +101,7 @@ func getFakeKubeClient() client.Client {
 				ObjectMeta: metav1.ObjectMeta{
 					Name:        hostSvcName,
 					Namespace:   NS,
-					Annotations: map[string]string{Annotation(HostName): "foo.bar.com"},
+					Annotations: map[string]string{annotation.Annotation(annotation.HostName): "foo.bar.com"},
 				},
 				Spec: v1.ServiceSpec{
 					Type: v1.ServiceTypeLoadBalancer,
@@ -109,7 +111,7 @@ func getFakeKubeClient() client.Client {
 				ObjectMeta: metav1.ObjectMeta{
 					Name:        eipSvcName,
 					Namespace:   NS,
-					Annotations: map[string]string{Annotation(ExternalIPType): "eip"},
+					Annotations: map[string]string{annotation.Annotation(annotation.ExternalIPType): "eip"},
 				},
 				Spec: v1.ServiceSpec{
 					Type: v1.ServiceTypeLoadBalancer,
@@ -250,11 +252,11 @@ func getDefaultService() *v1.Service {
 	}
 }
 
-func getReqCtx(svc *v1.Service) *RequestContext {
-	return &RequestContext{
+func getReqCtx(svc *v1.Service) *svcCtx.RequestContext {
+	return &svcCtx.RequestContext{
 		Ctx:     context.TODO(),
 		Service: svc,
-		Anno:    NewAnnotationRequest(svc),
+		Anno:    annotation.NewAnnotationRequest(svc),
 		Log:     util.ServiceLog.WithValues("service", util.Key(svc)),
 	}
 }

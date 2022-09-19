@@ -1,13 +1,18 @@
-package service
+package clbv1
 
 import (
-	"encoding/json"
 	"fmt"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/helper"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/service/reconcile/annotation"
+	svcCtx "k8s.io/cloud-provider-alibaba-cloud/pkg/controller/service/reconcile/context"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/model"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/model/tag"
 	prvd "k8s.io/cloud-provider-alibaba-cloud/pkg/provider"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/util"
 	"strconv"
 )
+
+const MaxLBTagNum = 10
 
 func NewLoadBalancerManager(cloud prvd.Provider) *LoadBalancerManager {
 	return &LoadBalancerManager{
@@ -19,10 +24,10 @@ type LoadBalancerManager struct {
 	cloud prvd.Provider
 }
 
-func (mgr *LoadBalancerManager) Find(reqCtx *RequestContext, mdl *model.LoadBalancer) error {
+func (mgr *LoadBalancerManager) Find(reqCtx *svcCtx.RequestContext, mdl *model.LoadBalancer) error {
 	// 1. set load balancer id
-	if reqCtx.Anno.Get(LoadBalancerId) != "" {
-		mdl.LoadBalancerAttribute.LoadBalancerId = reqCtx.Anno.Get(LoadBalancerId)
+	if reqCtx.Anno.Get(annotation.LoadBalancerId) != "" {
+		mdl.LoadBalancerAttribute.LoadBalancerId = reqCtx.Anno.Get(annotation.LoadBalancerId)
 	}
 
 	// 2. set default loadbalancer name
@@ -31,16 +36,16 @@ func (mgr *LoadBalancerManager) Find(reqCtx *RequestContext, mdl *model.LoadBala
 
 	// 3. set default loadbalancer tag
 	// filter tags using logic operator OR, so only TAGKEY tag can be added
-	mdl.LoadBalancerAttribute.Tags = []model.Tag{
+	mdl.LoadBalancerAttribute.Tags = []tag.Tag{
 		{
-			TagKey:   TAGKEY,
-			TagValue: reqCtx.Anno.GetDefaultLoadBalancerName(),
+			Key:   helper.TAGKEY,
+			Value: reqCtx.Anno.GetDefaultLoadBalancerName(),
 		},
 	}
 	return mgr.cloud.FindLoadBalancer(reqCtx.Ctx, mdl)
 }
 
-func (mgr *LoadBalancerManager) Create(reqCtx *RequestContext, local *model.LoadBalancer) error {
+func (mgr *LoadBalancerManager) Create(reqCtx *svcCtx.RequestContext, local *model.LoadBalancer) error {
 	if err := setModelDefaultValue(mgr, local, reqCtx.Anno); err != nil {
 		return fmt.Errorf("set model default value error: %s", err.Error())
 	}
@@ -49,14 +54,10 @@ func (mgr *LoadBalancerManager) Create(reqCtx *RequestContext, local *model.Load
 		return fmt.Errorf("create slb error: %s", err.Error())
 	}
 
-	tags, err := json.Marshal(local.LoadBalancerAttribute.Tags)
-	if err != nil {
-		return fmt.Errorf("marshal tags error: %s", err.Error())
-	}
-	return mgr.cloud.AddTags(reqCtx.Ctx, local.LoadBalancerAttribute.LoadBalancerId, string(tags))
+	return mgr.cloud.TagCLBResource(reqCtx.Ctx, local.LoadBalancerAttribute.LoadBalancerId, local.LoadBalancerAttribute.Tags)
 }
 
-func (mgr *LoadBalancerManager) Delete(reqCtx *RequestContext, remote *model.LoadBalancer) error {
+func (mgr *LoadBalancerManager) Delete(reqCtx *svcCtx.RequestContext, remote *model.LoadBalancer) error {
 	if remote.LoadBalancerAttribute.LoadBalancerId == "" {
 		return nil
 	}
@@ -77,18 +78,18 @@ func (mgr *LoadBalancerManager) Delete(reqCtx *RequestContext, remote *model.Loa
 
 }
 
-func (mgr *LoadBalancerManager) Update(reqCtx *RequestContext, local, remote *model.LoadBalancer) error {
+func (mgr *LoadBalancerManager) Update(reqCtx *svcCtx.RequestContext, local, remote *model.LoadBalancer) error {
 	lbId := remote.LoadBalancerAttribute.LoadBalancerId
 	reqCtx.Log.Info(fmt.Sprintf("found load balancer [%s], try to update load balancer attribute", lbId))
 
 	// update tag
-	var tag model.Tag
+	var lbTag tag.Tag
 	if local.LoadBalancerAttribute.IsUserManaged {
-		tag = model.Tag{TagKey: REUSEKEY, TagValue: "true"}
+		lbTag = tag.Tag{Key: helper.REUSEKEY, Value: "true"}
 	} else {
-		tag = model.Tag{TagKey: TAGKEY, TagValue: reqCtx.Anno.GetDefaultLoadBalancerName()}
+		lbTag = tag.Tag{Key: helper.TAGKEY, Value: reqCtx.Anno.GetDefaultLoadBalancerName()}
 	}
-	if err := mgr.addTagIfNotExist(reqCtx, *remote, tag); err != nil {
+	if err := mgr.addTagIfNotExist(reqCtx, *remote, lbTag); err != nil {
 		return fmt.Errorf("AddTags: %s", err.Error())
 	}
 
@@ -211,12 +212,12 @@ func (mgr *LoadBalancerManager) Update(reqCtx *RequestContext, local, remote *mo
 }
 
 // Build build load balancer attribute for local model
-func (mgr *LoadBalancerManager) BuildLocalModel(reqCtx *RequestContext, mdl *model.LoadBalancer) error {
-	mdl.LoadBalancerAttribute.AddressType = model.AddressType(reqCtx.Anno.Get(AddressType))
-	mdl.LoadBalancerAttribute.InternetChargeType = model.InternetChargeType(reqCtx.Anno.Get(ChargeType))
-	mdl.LoadBalancerAttribute.InstanceChargeType = model.InstanceChargeType(reqCtx.Anno.Get(InstanceChargeType))
+func (mgr *LoadBalancerManager) BuildLocalModel(reqCtx *svcCtx.RequestContext, mdl *model.LoadBalancer) error {
+	mdl.LoadBalancerAttribute.AddressType = model.AddressType(reqCtx.Anno.Get(annotation.AddressType))
+	mdl.LoadBalancerAttribute.InternetChargeType = model.InternetChargeType(reqCtx.Anno.Get(annotation.ChargeType))
+	mdl.LoadBalancerAttribute.InstanceChargeType = model.InstanceChargeType(reqCtx.Anno.Get(annotation.InstanceChargeType))
 	if mdl.LoadBalancerAttribute.InstanceChargeType.IsPayBySpec() {
-		bandwidth := reqCtx.Anno.Get(Bandwidth)
+		bandwidth := reqCtx.Anno.Get(annotation.Bandwidth)
 		if bandwidth != "" {
 			i, err := strconv.Atoi(bandwidth)
 			if err != nil {
@@ -224,26 +225,26 @@ func (mgr *LoadBalancerManager) BuildLocalModel(reqCtx *RequestContext, mdl *mod
 			}
 			mdl.LoadBalancerAttribute.Bandwidth = i
 		}
-		mdl.LoadBalancerAttribute.LoadBalancerSpec = model.LoadBalancerSpecType(reqCtx.Anno.Get(Spec))
+		mdl.LoadBalancerAttribute.LoadBalancerSpec = model.LoadBalancerSpecType(reqCtx.Anno.Get(annotation.Spec))
 	}
-	if reqCtx.Anno.Get(LoadBalancerId) != "" {
-		mdl.LoadBalancerAttribute.LoadBalancerId = reqCtx.Anno.Get(LoadBalancerId)
+	if reqCtx.Anno.Get(annotation.LoadBalancerId) != "" {
+		mdl.LoadBalancerAttribute.LoadBalancerId = reqCtx.Anno.Get(annotation.LoadBalancerId)
 		mdl.LoadBalancerAttribute.IsUserManaged = true
 	}
-	mdl.LoadBalancerAttribute.LoadBalancerName = reqCtx.Anno.Get(LoadBalancerName)
-	mdl.LoadBalancerAttribute.VSwitchId = reqCtx.Anno.Get(VswitchId)
-	mdl.LoadBalancerAttribute.MasterZoneId = reqCtx.Anno.Get(MasterZoneID)
-	mdl.LoadBalancerAttribute.SlaveZoneId = reqCtx.Anno.Get(SlaveZoneID)
-	mdl.LoadBalancerAttribute.ResourceGroupId = reqCtx.Anno.Get(ResourceGroupId)
-	mdl.LoadBalancerAttribute.AddressIPVersion = model.AddressIPVersionType(reqCtx.Anno.Get(IPVersion))
-	mdl.LoadBalancerAttribute.DeleteProtection = model.FlagType(reqCtx.Anno.Get(DeleteProtection))
+	mdl.LoadBalancerAttribute.LoadBalancerName = reqCtx.Anno.Get(annotation.LoadBalancerName)
+	mdl.LoadBalancerAttribute.VSwitchId = reqCtx.Anno.Get(annotation.VswitchId)
+	mdl.LoadBalancerAttribute.MasterZoneId = reqCtx.Anno.Get(annotation.MasterZoneID)
+	mdl.LoadBalancerAttribute.SlaveZoneId = reqCtx.Anno.Get(annotation.SlaveZoneID)
+	mdl.LoadBalancerAttribute.ResourceGroupId = reqCtx.Anno.Get(annotation.ResourceGroupId)
+	mdl.LoadBalancerAttribute.AddressIPVersion = model.AddressIPVersionType(reqCtx.Anno.Get(annotation.IPVersion))
+	mdl.LoadBalancerAttribute.DeleteProtection = model.FlagType(reqCtx.Anno.Get(annotation.DeleteProtection))
 	mdl.LoadBalancerAttribute.ModificationProtectionStatus =
-		model.ModificationProtectionType(reqCtx.Anno.Get(ModificationProtection))
+		model.ModificationProtectionType(reqCtx.Anno.Get(annotation.ModificationProtection))
 	mdl.LoadBalancerAttribute.Tags = reqCtx.Anno.GetLoadBalancerAdditionalTags()
 	return nil
 }
 
-func (mgr *LoadBalancerManager) BuildRemoteModel(reqCtx *RequestContext, mdl *model.LoadBalancer) error {
+func (mgr *LoadBalancerManager) BuildRemoteModel(reqCtx *svcCtx.RequestContext, mdl *model.LoadBalancer) error {
 	return mgr.Find(reqCtx, mdl)
 }
 
@@ -258,9 +259,9 @@ func equalsAddressIPVersion(local, remote model.AddressIPVersionType) bool {
 	return local == remote
 }
 
-func setModelDefaultValue(mgr *LoadBalancerManager, mdl *model.LoadBalancer, anno *AnnotationRequest) error {
+func setModelDefaultValue(mgr *LoadBalancerManager, mdl *model.LoadBalancer, anno *annotation.AnnotationRequest) error {
 	if mdl.LoadBalancerAttribute.AddressType == "" {
-		mdl.LoadBalancerAttribute.AddressType = model.AddressType(anno.GetDefaultValue(AddressType))
+		mdl.LoadBalancerAttribute.AddressType = model.AddressType(anno.GetDefaultValue(annotation.AddressType))
 	}
 
 	if mdl.LoadBalancerAttribute.LoadBalancerName == "" {
@@ -284,15 +285,15 @@ func setModelDefaultValue(mgr *LoadBalancerManager, mdl *model.LoadBalancer, ann
 
 	if mdl.LoadBalancerAttribute.InstanceChargeType.IsPayBySpec() &&
 		mdl.LoadBalancerAttribute.LoadBalancerSpec == "" {
-		mdl.LoadBalancerAttribute.LoadBalancerSpec = model.LoadBalancerSpecType(anno.GetDefaultValue(Spec))
+		mdl.LoadBalancerAttribute.LoadBalancerSpec = model.LoadBalancerSpecType(anno.GetDefaultValue(annotation.Spec))
 	}
 
 	if mdl.LoadBalancerAttribute.DeleteProtection == "" {
-		mdl.LoadBalancerAttribute.DeleteProtection = model.FlagType(anno.GetDefaultValue(DeleteProtection))
+		mdl.LoadBalancerAttribute.DeleteProtection = model.FlagType(anno.GetDefaultValue(annotation.DeleteProtection))
 	}
 
 	if mdl.LoadBalancerAttribute.ModificationProtectionStatus == "" {
-		mdl.LoadBalancerAttribute.ModificationProtectionStatus = model.ModificationProtectionType(anno.GetDefaultValue(ModificationProtection))
+		mdl.LoadBalancerAttribute.ModificationProtectionStatus = model.ModificationProtectionType(anno.GetDefaultValue(annotation.ModificationProtection))
 		mdl.LoadBalancerAttribute.ModificationProtectionReason = model.ModificationProtectionReason
 	}
 
@@ -300,15 +301,14 @@ func setModelDefaultValue(mgr *LoadBalancerManager, mdl *model.LoadBalancer, ann
 	return nil
 }
 
-func (mgr *LoadBalancerManager) addTagIfNotExist(reqCtx *RequestContext, remote model.LoadBalancer, newTag model.Tag) error {
+func (mgr *LoadBalancerManager) addTagIfNotExist(reqCtx *svcCtx.RequestContext, remote model.LoadBalancer, newTag tag.Tag) error {
 	for _, tag := range remote.LoadBalancerAttribute.Tags {
-		if tag.TagKey == newTag.TagKey {
+		if tag.Key == newTag.Key {
 			return nil
 		}
 	}
 	if len(remote.LoadBalancerAttribute.Tags) < MaxLBTagNum {
-		tagsBytes, _ := json.Marshal([]model.Tag{newTag})
-		return mgr.cloud.AddTags(reqCtx.Ctx, remote.LoadBalancerAttribute.LoadBalancerId, string(tagsBytes))
+		return mgr.cloud.TagCLBResource(reqCtx.Ctx, remote.LoadBalancerAttribute.LoadBalancerId, []tag.Tag{newTag})
 	}
 	util.ServiceLog.Info("warning: total tags more than 10, can not add more tags")
 	return nil

@@ -1,9 +1,13 @@
-package service
+package clbv1
 
 import (
 	"context"
 	"fmt"
 	"github.com/mohae/deepcopy"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/helper"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/service/reconcile/annotation"
+	svcCtx "k8s.io/cloud-provider-alibaba-cloud/pkg/controller/service/reconcile/context"
+
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/dryrun"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/util"
 	"strconv"
@@ -13,14 +17,17 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/model"
 	prvd "k8s.io/cloud-provider-alibaba-cloud/pkg/provider"
+
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/base"
 	"k8s.io/klog/v2"
 )
 
+const DefaultListenerBandwidth = -1
+
 // IListener listener interface
 type IListenerManager interface {
-	Create(reqCtx *RequestContext, action CreateAction) error
-	Update(reqCtx *RequestContext, action UpdateAction) error
+	Create(reqCtx *svcCtx.RequestContext, action CreateAction) error
+	Update(reqCtx *svcCtx.RequestContext, action UpdateAction) error
 }
 
 type CreateAction struct {
@@ -49,7 +56,7 @@ type ListenerManager struct {
 	cloud prvd.Provider
 }
 
-func (mgr *ListenerManager) Create(reqCtx *RequestContext, action CreateAction) error {
+func (mgr *ListenerManager) Create(reqCtx *svcCtx.RequestContext, action CreateAction) error {
 	switch strings.ToLower(action.listener.Protocol) {
 	case model.TCP:
 		return (&tcp{mgr}).Create(reqCtx, action)
@@ -65,12 +72,12 @@ func (mgr *ListenerManager) Create(reqCtx *RequestContext, action CreateAction) 
 
 }
 
-func (mgr *ListenerManager) Delete(reqCtx *RequestContext, action DeleteAction) error {
+func (mgr *ListenerManager) Delete(reqCtx *svcCtx.RequestContext, action DeleteAction) error {
 	reqCtx.Log.Info(fmt.Sprintf("delete listener %d", action.listener.ListenerPort))
 	return mgr.cloud.DeleteLoadBalancerListener(reqCtx.Ctx, action.lbId, action.listener.ListenerPort)
 }
 
-func (mgr *ListenerManager) Update(reqCtx *RequestContext, action UpdateAction) error {
+func (mgr *ListenerManager) Update(reqCtx *svcCtx.RequestContext, action UpdateAction) error {
 	switch strings.ToLower(action.local.Protocol) {
 	case model.TCP:
 		return (&tcp{mgr}).Update(reqCtx, action)
@@ -86,11 +93,11 @@ func (mgr *ListenerManager) Update(reqCtx *RequestContext, action UpdateAction) 
 }
 
 // Describe Describe all listeners at once
-func (mgr *ListenerManager) Describe(reqCtx *RequestContext, lbId string) ([]model.ListenerAttribute, error) {
+func (mgr *ListenerManager) Describe(reqCtx *svcCtx.RequestContext, lbId string) ([]model.ListenerAttribute, error) {
 	return mgr.cloud.DescribeLoadBalancerListeners(reqCtx.Ctx, lbId)
 }
 
-func (mgr *ListenerManager) BuildLocalModel(reqCtx *RequestContext, mdl *model.LoadBalancer) error {
+func (mgr *ListenerManager) BuildLocalModel(reqCtx *svcCtx.RequestContext, mdl *model.LoadBalancer) error {
 	for _, port := range reqCtx.Service.Spec.Ports {
 		listener, err := mgr.buildListenerFromServicePort(reqCtx, port)
 		if err != nil {
@@ -101,7 +108,7 @@ func (mgr *ListenerManager) BuildLocalModel(reqCtx *RequestContext, mdl *model.L
 	return nil
 }
 
-func (mgr *ListenerManager) BuildRemoteModel(reqCtx *RequestContext, mdl *model.LoadBalancer) error {
+func (mgr *ListenerManager) BuildRemoteModel(reqCtx *svcCtx.RequestContext, mdl *model.LoadBalancer) error {
 	listeners, err := mgr.Describe(reqCtx, mdl.LoadBalancerAttribute.LoadBalancerId)
 	if err != nil {
 		return fmt.Errorf("DescribeLoadBalancerListeners error:%s", err.Error())
@@ -110,7 +117,7 @@ func (mgr *ListenerManager) BuildRemoteModel(reqCtx *RequestContext, mdl *model.
 	return nil
 }
 
-func (mgr *ListenerManager) buildListenerFromServicePort(reqCtx *RequestContext, port v1.ServicePort) (model.ListenerAttribute, error) {
+func (mgr *ListenerManager) buildListenerFromServicePort(reqCtx *svcCtx.RequestContext, port v1.ServicePort) (model.ListenerAttribute, error) {
 	listener := model.ListenerAttribute{
 		NamedKey: &model.ListenerNamedKey{
 			Prefix:      model.DEFAULT_PREFIX,
@@ -125,54 +132,54 @@ func (mgr *ListenerManager) buildListenerFromServicePort(reqCtx *RequestContext,
 	listener.Description = listener.NamedKey.Key()
 	listener.VGroupName = getVGroupNamedKey(reqCtx.Service, port).Key()
 
-	proto, err := protocol(reqCtx.Anno.Get(ProtocolPort), port)
+	proto, err := protocol(reqCtx.Anno.Get(annotation.ProtocolPort), port)
 	if err != nil {
 		return listener, err
 	}
 	listener.Protocol = proto
 
-	if reqCtx.Anno.Get(VGroupPort) != "" {
-		vGroupId, err := vgroup(reqCtx.Anno.Get(VGroupPort), port)
+	if reqCtx.Anno.Get(annotation.VGroupPort) != "" {
+		vGroupId, err := vgroup(reqCtx.Anno.Get(annotation.VGroupPort), port)
 		if err != nil {
 			return listener, err
 		}
 		listener.VGroupId = vGroupId
 	}
 
-	if reqCtx.Anno.Get(Scheduler) != "" {
-		listener.Scheduler = reqCtx.Anno.Get(Scheduler)
+	if reqCtx.Anno.Get(annotation.Scheduler) != "" {
+		listener.Scheduler = reqCtx.Anno.Get(annotation.Scheduler)
 	}
 
-	if reqCtx.Anno.Get(PersistenceTimeout) != "" {
-		timeout, err := strconv.Atoi(reqCtx.Anno.Get(PersistenceTimeout))
+	if reqCtx.Anno.Get(annotation.PersistenceTimeout) != "" {
+		timeout, err := strconv.Atoi(reqCtx.Anno.Get(annotation.PersistenceTimeout))
 		if err != nil {
 			return listener, fmt.Errorf("Annotation persistence timeout must be integer, but got [%s]. message=[%s] ",
-				reqCtx.Anno.Get(PersistenceTimeout), err.Error())
+				reqCtx.Anno.Get(annotation.PersistenceTimeout), err.Error())
 		}
 		listener.PersistenceTimeout = &timeout
 	}
 
-	if reqCtx.Anno.Get(EstablishedTimeout) != "" {
-		establishedTimeout, err := strconv.Atoi(reqCtx.Anno.Get(EstablishedTimeout))
+	if reqCtx.Anno.Get(annotation.EstablishedTimeout) != "" {
+		establishedTimeout, err := strconv.Atoi(reqCtx.Anno.Get(annotation.EstablishedTimeout))
 		if err != nil {
 			return listener, fmt.Errorf("Annotation EstablishedTimeout must be integer, but got [%s]. message=[%s] ",
-				reqCtx.Anno.Get(EstablishedTimeout), err.Error())
+				reqCtx.Anno.Get(annotation.EstablishedTimeout), err.Error())
 		}
 		listener.EstablishedTimeout = establishedTimeout
 	}
 
-	listener.CertId = reqCtx.Anno.Get(CertID)
+	listener.CertId = reqCtx.Anno.Get(annotation.CertID)
 
-	if reqCtx.Anno.Get(TLSCipherPolicy) != "" {
-		listener.TLSCipherPolicy = reqCtx.Anno.Get(TLSCipherPolicy)
+	if reqCtx.Anno.Get(annotation.TLSCipherPolicy) != "" {
+		listener.TLSCipherPolicy = reqCtx.Anno.Get(annotation.TLSCipherPolicy)
 	}
 
-	if reqCtx.Anno.Get(EnableHttp2) != "" {
-		listener.EnableHttp2 = model.FlagType(reqCtx.Anno.Get(EnableHttp2))
+	if reqCtx.Anno.Get(annotation.EnableHttp2) != "" {
+		listener.EnableHttp2 = model.FlagType(reqCtx.Anno.Get(annotation.EnableHttp2))
 	}
 
-	if reqCtx.Anno.Get(ForwardPort) != "" && listener.Protocol == model.HTTP {
-		forwardPort, err := forwardPort(reqCtx.Anno.Get(ForwardPort), int(port.Port))
+	if reqCtx.Anno.Get(annotation.ForwardPort) != "" && listener.Protocol == model.HTTP {
+		forwardPort, err := forwardPort(reqCtx.Anno.Get(annotation.ForwardPort), int(port.Port))
 		if err != nil {
 			return listener, fmt.Errorf("Annotation ForwardPort error: %s ", err.Error())
 		}
@@ -180,138 +187,138 @@ func (mgr *ListenerManager) buildListenerFromServicePort(reqCtx *RequestContext,
 		listener.ListenerForward = model.OnFlag
 	}
 
-	if reqCtx.Anno.Get(IdleTimeout) != "" {
-		idleTimeout, err := strconv.Atoi(reqCtx.Anno.Get(IdleTimeout))
+	if reqCtx.Anno.Get(annotation.IdleTimeout) != "" {
+		idleTimeout, err := strconv.Atoi(reqCtx.Anno.Get(annotation.IdleTimeout))
 		if err != nil {
 			return listener, fmt.Errorf("Annotation IdleTimeout must be integer, but got [%s]. message=[%s] ",
-				reqCtx.Anno.Get(IdleTimeout), err.Error())
+				reqCtx.Anno.Get(annotation.IdleTimeout), err.Error())
 		}
 		listener.IdleTimeout = idleTimeout
 	}
 
-	if reqCtx.Anno.Get(RequestTimeout) != "" {
-		requestTimeout, err := strconv.Atoi(reqCtx.Anno.Get(RequestTimeout))
+	if reqCtx.Anno.Get(annotation.RequestTimeout) != "" {
+		requestTimeout, err := strconv.Atoi(reqCtx.Anno.Get(annotation.RequestTimeout))
 		if err != nil {
 			return listener, fmt.Errorf("Annotation RequestTimeout must be integer, but got [%s]. message=[%s] ",
-				reqCtx.Anno.Get(RequestTimeout), err.Error())
+				reqCtx.Anno.Get(annotation.RequestTimeout), err.Error())
 		}
 		listener.RequestTimeout = requestTimeout
 	}
 
 	// acl
-	if reqCtx.Anno.Get(AclStatus) != "" {
-		listener.AclStatus = model.FlagType(reqCtx.Anno.Get(AclStatus))
+	if reqCtx.Anno.Get(annotation.AclStatus) != "" {
+		listener.AclStatus = model.FlagType(reqCtx.Anno.Get(annotation.AclStatus))
 	}
-	if reqCtx.Anno.Get(AclType) != "" {
-		listener.AclType = reqCtx.Anno.Get(AclType)
+	if reqCtx.Anno.Get(annotation.AclType) != "" {
+		listener.AclType = reqCtx.Anno.Get(annotation.AclType)
 	}
-	if reqCtx.Anno.Get(AclID) != "" {
-		listener.AclId = reqCtx.Anno.Get(AclID)
+	if reqCtx.Anno.Get(annotation.AclID) != "" {
+		listener.AclId = reqCtx.Anno.Get(annotation.AclID)
 	}
 
 	// connection drain
-	if reqCtx.Anno.Get(ConnectionDrain) != "" {
-		listener.ConnectionDrain = model.FlagType(reqCtx.Anno.Get(ConnectionDrain))
+	if reqCtx.Anno.Get(annotation.ConnectionDrain) != "" {
+		listener.ConnectionDrain = model.FlagType(reqCtx.Anno.Get(annotation.ConnectionDrain))
 	}
-	if reqCtx.Anno.Get(ConnectionDrainTimeout) != "" {
-		timeout, err := strconv.Atoi(reqCtx.Anno.Get(ConnectionDrainTimeout))
+	if reqCtx.Anno.Get(annotation.ConnectionDrainTimeout) != "" {
+		timeout, err := strconv.Atoi(reqCtx.Anno.Get(annotation.ConnectionDrainTimeout))
 		if err != nil {
 			return listener, fmt.Errorf("Annotation ConnectionDrainTimeout must be integer, but got [%s]. message=[%s] ",
-				reqCtx.Anno.Get(ConnectionDrainTimeout), err.Error())
+				reqCtx.Anno.Get(annotation.ConnectionDrainTimeout), err.Error())
 		}
 		listener.ConnectionDrainTimeout = timeout
 	}
 
 	// cookie
-	if reqCtx.Anno.Get(Cookie) != "" {
-		listener.Cookie = reqCtx.Anno.Get(Cookie)
+	if reqCtx.Anno.Get(annotation.Cookie) != "" {
+		listener.Cookie = reqCtx.Anno.Get(annotation.Cookie)
 	}
-	if reqCtx.Anno.Get(CookieTimeout) != "" {
-		timeout, err := strconv.Atoi(reqCtx.Anno.Get(CookieTimeout))
+	if reqCtx.Anno.Get(annotation.CookieTimeout) != "" {
+		timeout, err := strconv.Atoi(reqCtx.Anno.Get(annotation.CookieTimeout))
 		if err != nil {
 			return listener, fmt.Errorf("Annotation CookieTimeout must be integer, but got [%s]. message=[%s] ",
-				reqCtx.Anno.Get(CookieTimeout), err.Error())
+				reqCtx.Anno.Get(annotation.CookieTimeout), err.Error())
 		}
 		listener.CookieTimeout = timeout
 	}
-	if reqCtx.Anno.Get(SessionStick) != "" {
-		listener.StickySession = model.FlagType(reqCtx.Anno.Get(SessionStick))
+	if reqCtx.Anno.Get(annotation.SessionStick) != "" {
+		listener.StickySession = model.FlagType(reqCtx.Anno.Get(annotation.SessionStick))
 	}
-	if reqCtx.Anno.Get(SessionStickType) != "" {
-		listener.StickySessionType = reqCtx.Anno.Get(SessionStickType)
+	if reqCtx.Anno.Get(annotation.SessionStickType) != "" {
+		listener.StickySessionType = reqCtx.Anno.Get(annotation.SessionStickType)
 	}
 
 	// x-forwarded-for
-	if reqCtx.Anno.Get(XForwardedForProto) != "" {
-		listener.XForwardedForProto = model.FlagType(reqCtx.Anno.Get(XForwardedForProto))
+	if reqCtx.Anno.Get(annotation.XForwardedForProto) != "" {
+		listener.XForwardedForProto = model.FlagType(reqCtx.Anno.Get(annotation.XForwardedForProto))
 	}
 
 	// health check
-	if reqCtx.Anno.Get(HealthyThreshold) != "" {
-		t, err := strconv.Atoi(reqCtx.Anno.Get(HealthyThreshold))
+	if reqCtx.Anno.Get(annotation.HealthyThreshold) != "" {
+		t, err := strconv.Atoi(reqCtx.Anno.Get(annotation.HealthyThreshold))
 		if err != nil {
 			return listener, fmt.Errorf("Annotation HealthyThreshold must be integer, but got [%s]. message=[%s] ",
-				reqCtx.Anno.Get(HealthyThreshold), err.Error())
+				reqCtx.Anno.Get(annotation.HealthyThreshold), err.Error())
 		}
 		listener.HealthyThreshold = t
 	}
-	if reqCtx.Anno.Get(UnhealthyThreshold) != "" {
-		t, err := strconv.Atoi(reqCtx.Anno.Get(UnhealthyThreshold))
+	if reqCtx.Anno.Get(annotation.UnhealthyThreshold) != "" {
+		t, err := strconv.Atoi(reqCtx.Anno.Get(annotation.UnhealthyThreshold))
 		if err != nil {
 			return listener, fmt.Errorf("Annotation UnhealthyThreshold must be integer, but got [%s]. message=[%s] ",
-				reqCtx.Anno.Get(UnhealthyThreshold), err.Error())
+				reqCtx.Anno.Get(annotation.UnhealthyThreshold), err.Error())
 		}
 		listener.UnhealthyThreshold = t
 	}
-	if reqCtx.Anno.Get(HealthCheckConnectTimeout) != "" {
-		timeout, err := strconv.Atoi(reqCtx.Anno.Get(HealthCheckConnectTimeout))
+	if reqCtx.Anno.Get(annotation.HealthCheckConnectTimeout) != "" {
+		timeout, err := strconv.Atoi(reqCtx.Anno.Get(annotation.HealthCheckConnectTimeout))
 		if err != nil {
 			return listener, fmt.Errorf("Annotation HealthCheckConnectTimeout must be integer, but got [%s]. message=[%s] ",
-				reqCtx.Anno.Get(HealthCheckConnectTimeout), err.Error())
+				reqCtx.Anno.Get(annotation.HealthCheckConnectTimeout), err.Error())
 		}
 		listener.HealthCheckConnectTimeout = timeout
 	}
-	if reqCtx.Anno.Get(HealthCheckConnectPort) != "" {
-		port, err := strconv.Atoi(reqCtx.Anno.Get(HealthCheckConnectPort))
+	if reqCtx.Anno.Get(annotation.HealthCheckConnectPort) != "" {
+		port, err := strconv.Atoi(reqCtx.Anno.Get(annotation.HealthCheckConnectPort))
 		if err != nil {
 			return listener, fmt.Errorf("Annotation HealthCheckConnectPort must be integer, but got [%s]. message=[%s] ",
-				reqCtx.Anno.Get(HealthCheckConnectPort), err.Error())
+				reqCtx.Anno.Get(annotation.HealthCheckConnectPort), err.Error())
 		}
 		listener.HealthCheckConnectPort = port
 	}
-	if reqCtx.Anno.Get(HealthCheckInterval) != "" {
-		t, err := strconv.Atoi(reqCtx.Anno.Get(HealthCheckInterval))
+	if reqCtx.Anno.Get(annotation.HealthCheckInterval) != "" {
+		t, err := strconv.Atoi(reqCtx.Anno.Get(annotation.HealthCheckInterval))
 		if err != nil {
 			return listener, fmt.Errorf("Annotation HealthCheckInterval must be integer, but got [%s]. message=[%s] ",
-				reqCtx.Anno.Get(HealthCheckInterval), err.Error())
+				reqCtx.Anno.Get(annotation.HealthCheckInterval), err.Error())
 		}
 		listener.HealthCheckInterval = t
 	}
-	if reqCtx.Anno.Get(HealthCheckDomain) != "" {
-		listener.HealthCheckDomain = reqCtx.Anno.Get(HealthCheckDomain)
+	if reqCtx.Anno.Get(annotation.HealthCheckDomain) != "" {
+		listener.HealthCheckDomain = reqCtx.Anno.Get(annotation.HealthCheckDomain)
 	}
-	if reqCtx.Anno.Get(HealthCheckURI) != "" {
-		listener.HealthCheckURI = reqCtx.Anno.Get(HealthCheckURI)
+	if reqCtx.Anno.Get(annotation.HealthCheckURI) != "" {
+		listener.HealthCheckURI = reqCtx.Anno.Get(annotation.HealthCheckURI)
 	}
-	if reqCtx.Anno.Get(HealthCheckHTTPCode) != "" {
-		listener.HealthCheckHttpCode = reqCtx.Anno.Get(HealthCheckHTTPCode)
+	if reqCtx.Anno.Get(annotation.HealthCheckHTTPCode) != "" {
+		listener.HealthCheckHttpCode = reqCtx.Anno.Get(annotation.HealthCheckHTTPCode)
 	}
-	if reqCtx.Anno.Get(HealthCheckType) != "" {
-		listener.HealthCheckType = reqCtx.Anno.Get(HealthCheckType)
+	if reqCtx.Anno.Get(annotation.HealthCheckType) != "" {
+		listener.HealthCheckType = reqCtx.Anno.Get(annotation.HealthCheckType)
 	}
-	if reqCtx.Anno.Get(HealthCheckFlag) != "" {
-		listener.HealthCheck = model.FlagType(reqCtx.Anno.Get(HealthCheckFlag))
+	if reqCtx.Anno.Get(annotation.HealthCheckFlag) != "" {
+		listener.HealthCheck = model.FlagType(reqCtx.Anno.Get(annotation.HealthCheckFlag))
 	}
-	if reqCtx.Anno.Get(HealthCheckTimeout) != "" {
-		timeout, err := strconv.Atoi(reqCtx.Anno.Get(HealthCheckTimeout))
+	if reqCtx.Anno.Get(annotation.HealthCheckTimeout) != "" {
+		timeout, err := strconv.Atoi(reqCtx.Anno.Get(annotation.HealthCheckTimeout))
 		if err != nil {
 			return listener, fmt.Errorf("Annotation HealthCheckTimeout must be integer, but got [%s]. message=[%s] ",
-				reqCtx.Anno.Get(HealthCheckTimeout), err.Error())
+				reqCtx.Anno.Get(annotation.HealthCheckTimeout), err.Error())
 		}
 		listener.HealthCheckTimeout = timeout
 	}
-	if reqCtx.Anno.Get(HealthCheckMethod) != "" {
-		listener.HealthCheckMethod = reqCtx.Anno.Get(HealthCheckMethod)
+	if reqCtx.Anno.Get(annotation.HealthCheckMethod) != "" {
+		listener.HealthCheckMethod = reqCtx.Anno.Get(annotation.HealthCheckMethod)
 	}
 
 	return listener, nil
@@ -321,7 +328,7 @@ type tcp struct {
 	mgr *ListenerManager
 }
 
-func (t *tcp) Create(reqCtx *RequestContext, action CreateAction) error {
+func (t *tcp) Create(reqCtx *svcCtx.RequestContext, action CreateAction) error {
 	setDefaultValueForListener(&action.listener)
 	err := t.mgr.cloud.CreateLoadBalancerTCPListener(reqCtx.Ctx, action.lbId, action.listener)
 	if err != nil {
@@ -331,7 +338,7 @@ func (t *tcp) Create(reqCtx *RequestContext, action CreateAction) error {
 	return t.mgr.cloud.StartLoadBalancerListener(reqCtx.Ctx, action.lbId, action.listener.ListenerPort)
 }
 
-func (t *tcp) Update(reqCtx *RequestContext, action UpdateAction) error {
+func (t *tcp) Update(reqCtx *svcCtx.RequestContext, action UpdateAction) error {
 	if action.remote.Status == model.Stopped {
 		err := t.mgr.cloud.StartLoadBalancerListener(reqCtx.Ctx, action.lbId, action.local.ListenerPort)
 		if err != nil {
@@ -350,7 +357,7 @@ type udp struct {
 	mgr *ListenerManager
 }
 
-func (t *udp) Create(reqCtx *RequestContext, action CreateAction) error {
+func (t *udp) Create(reqCtx *svcCtx.RequestContext, action CreateAction) error {
 	setDefaultValueForListener(&action.listener)
 	err := t.mgr.cloud.CreateLoadBalancerUDPListener(reqCtx.Ctx, action.lbId, action.listener)
 	if err != nil {
@@ -360,7 +367,7 @@ func (t *udp) Create(reqCtx *RequestContext, action CreateAction) error {
 	return t.mgr.cloud.StartLoadBalancerListener(reqCtx.Ctx, action.lbId, action.listener.ListenerPort)
 }
 
-func (t *udp) Update(reqCtx *RequestContext, action UpdateAction) error {
+func (t *udp) Update(reqCtx *svcCtx.RequestContext, action UpdateAction) error {
 	if action.remote.Status == model.Stopped {
 		err := t.mgr.cloud.StartLoadBalancerListener(reqCtx.Ctx, action.lbId, action.local.ListenerPort)
 		if err != nil {
@@ -379,7 +386,7 @@ type http struct {
 	mgr *ListenerManager
 }
 
-func (t *http) Create(reqCtx *RequestContext, action CreateAction) error {
+func (t *http) Create(reqCtx *svcCtx.RequestContext, action CreateAction) error {
 	setDefaultValueForListener(&action.listener)
 	err := t.mgr.cloud.CreateLoadBalancerHTTPListener(reqCtx.Ctx, action.lbId, action.listener)
 	if err != nil {
@@ -390,7 +397,7 @@ func (t *http) Create(reqCtx *RequestContext, action CreateAction) error {
 
 }
 
-func (t *http) Update(reqCtx *RequestContext, action UpdateAction) error {
+func (t *http) Update(reqCtx *svcCtx.RequestContext, action UpdateAction) error {
 	if action.remote.Status == model.Stopped {
 		err := t.mgr.cloud.StartLoadBalancerListener(reqCtx.Ctx, action.lbId, action.local.ListenerPort)
 		if err != nil {
@@ -446,7 +453,7 @@ type https struct {
 	mgr *ListenerManager
 }
 
-func (t *https) Create(reqCtx *RequestContext, action CreateAction) error {
+func (t *https) Create(reqCtx *svcCtx.RequestContext, action CreateAction) error {
 	setDefaultValueForListener(&action.listener)
 	err := t.mgr.cloud.CreateLoadBalancerHTTPSListener(reqCtx.Ctx, action.lbId, action.listener)
 	if err != nil {
@@ -457,7 +464,7 @@ func (t *https) Create(reqCtx *RequestContext, action CreateAction) error {
 
 }
 
-func (t *https) Update(reqCtx *RequestContext, action UpdateAction) error {
+func (t *https) Update(reqCtx *svcCtx.RequestContext, action UpdateAction) error {
 	if action.remote.Status == model.Stopped {
 		err := t.mgr.cloud.StartLoadBalancerListener(reqCtx.Ctx, action.lbId, action.local.ListenerPort)
 		if err != nil {
@@ -499,7 +506,7 @@ func forwardPort(port string, target int) (int, error) {
 	return 0, fmt.Errorf("forward port format error: %s, expect 80:443,88:6443", port)
 }
 
-func buildActionsForListeners(reqCtx *RequestContext, local *model.LoadBalancer, remote *model.LoadBalancer) ([]CreateAction, []UpdateAction, []DeleteAction, error) {
+func buildActionsForListeners(reqCtx *svcCtx.RequestContext, local *model.LoadBalancer, remote *model.LoadBalancer) ([]CreateAction, []UpdateAction, []DeleteAction, error) {
 	var (
 		createActions []CreateAction
 		updateActions []UpdateAction
@@ -626,7 +633,7 @@ func vgroup(annotation string, port v1.ServicePort) (string, error) {
 
 func getVGroupNamedKey(svc *v1.Service, servicePort v1.ServicePort) *model.VGroupNamedKey {
 	vGroupPort := ""
-	if isENIBackendType(svc) {
+	if helper.IsENIBackendType(svc) {
 		switch servicePort.TargetPort.Type {
 		case intstr.Int:
 			vGroupPort = fmt.Sprintf("%d", servicePort.TargetPort.IntValue())
@@ -657,7 +664,7 @@ func setDefaultValueForListener(n *model.ListenerAttribute) {
 		}
 	}
 
-	if Is7LayerProtocol(n.Protocol) {
+	if helper.Is7LayerProtocol(n.Protocol) {
 		if n.HealthCheck == "" {
 			n.HealthCheck = model.OffFlag
 		}
@@ -667,7 +674,7 @@ func setDefaultValueForListener(n *model.ListenerAttribute) {
 	}
 }
 
-func isNeedUpdate(reqCtx *RequestContext, local model.ListenerAttribute, remote model.ListenerAttribute) (bool, model.ListenerAttribute) {
+func isNeedUpdate(reqCtx *svcCtx.RequestContext, local model.ListenerAttribute, remote model.ListenerAttribute) (bool, model.ListenerAttribute) {
 	update := deepcopy.Copy(remote).(model.ListenerAttribute)
 	needUpdate := false
 	updateDetail := ""
@@ -760,7 +767,7 @@ func isNeedUpdate(reqCtx *RequestContext, local model.ListenerAttribute, remote 
 			remote.AclType, local.AclType)
 	}
 	// idle timeout
-	if Is7LayerProtocol(local.Protocol) &&
+	if helper.Is7LayerProtocol(local.Protocol) &&
 		local.IdleTimeout != 0 &&
 		remote.IdleTimeout != local.IdleTimeout {
 		needUpdate = true
@@ -769,7 +776,7 @@ func isNeedUpdate(reqCtx *RequestContext, local model.ListenerAttribute, remote 
 			remote.IdleTimeout, local.IdleTimeout)
 	}
 	// request timeout
-	if Is7LayerProtocol(local.Protocol) &&
+	if helper.Is7LayerProtocol(local.Protocol) &&
 		local.RequestTimeout != 0 &&
 		remote.RequestTimeout != local.RequestTimeout {
 		needUpdate = true
@@ -778,7 +785,7 @@ func isNeedUpdate(reqCtx *RequestContext, local model.ListenerAttribute, remote 
 			remote.RequestTimeout, local.RequestTimeout)
 	}
 	// session
-	if Is7LayerProtocol(local.Protocol) &&
+	if helper.Is7LayerProtocol(local.Protocol) &&
 		local.StickySession != "" &&
 		remote.StickySession != local.StickySession {
 		needUpdate = true
@@ -786,7 +793,7 @@ func isNeedUpdate(reqCtx *RequestContext, local model.ListenerAttribute, remote 
 		updateDetail += fmt.Sprintf("lb StickySession %v should be changed to %v;",
 			remote.StickySession, local.StickySession)
 	}
-	if Is7LayerProtocol(local.Protocol) &&
+	if helper.Is7LayerProtocol(local.Protocol) &&
 		local.StickySessionType != "" &&
 		remote.StickySessionType != local.StickySessionType {
 		needUpdate = true
@@ -794,7 +801,7 @@ func isNeedUpdate(reqCtx *RequestContext, local model.ListenerAttribute, remote 
 		updateDetail += fmt.Sprintf("lb StickySessionType %v should be changed to %v;",
 			remote.StickySessionType, local.StickySessionType)
 	}
-	if Is7LayerProtocol(local.Protocol) &&
+	if helper.Is7LayerProtocol(local.Protocol) &&
 		local.Cookie != "" &&
 		remote.Cookie != local.Cookie {
 		needUpdate = true
@@ -802,7 +809,7 @@ func isNeedUpdate(reqCtx *RequestContext, local model.ListenerAttribute, remote 
 		updateDetail += fmt.Sprintf("lb Cookie %v should be changed to %v;",
 			remote.Cookie, local.Cookie)
 	}
-	if Is7LayerProtocol(local.Protocol) &&
+	if helper.Is7LayerProtocol(local.Protocol) &&
 		local.CookieTimeout != 0 &&
 		remote.CookieTimeout != local.CookieTimeout {
 		needUpdate = true
@@ -811,7 +818,7 @@ func isNeedUpdate(reqCtx *RequestContext, local model.ListenerAttribute, remote 
 			remote.CookieTimeout, local.CookieTimeout)
 	}
 	// connection drain
-	if Is4LayerProtocol(local.Protocol) &&
+	if helper.Is4LayerProtocol(local.Protocol) &&
 		local.ConnectionDrain != "" &&
 		remote.ConnectionDrain != local.ConnectionDrain {
 		needUpdate = true
@@ -819,7 +826,7 @@ func isNeedUpdate(reqCtx *RequestContext, local model.ListenerAttribute, remote 
 		updateDetail += fmt.Sprintf("lb ConnectionDrain %v should be changed to %v;",
 			remote.ConnectionDrain, local.ConnectionDrain)
 	}
-	if Is4LayerProtocol(local.Protocol) &&
+	if helper.Is4LayerProtocol(local.Protocol) &&
 		local.ConnectionDrain == model.OnFlag &&
 		local.ConnectionDrainTimeout != 0 &&
 		remote.ConnectionDrainTimeout != local.ConnectionDrainTimeout {
@@ -830,7 +837,7 @@ func isNeedUpdate(reqCtx *RequestContext, local model.ListenerAttribute, remote 
 	}
 
 	//x-forwarded-for
-	if Is7LayerProtocol(local.Protocol) &&
+	if helper.Is7LayerProtocol(local.Protocol) &&
 		local.XForwardedForProto != "" &&
 		remote.XForwardedForProto != local.XForwardedForProto {
 		needUpdate = true
@@ -900,7 +907,7 @@ func isNeedUpdate(reqCtx *RequestContext, local model.ListenerAttribute, remote 
 		updateDetail += fmt.Sprintf("lb HealthCheckHttpCode %v should be changed to %v;",
 			remote.HealthCheckHttpCode, local.HealthCheckHttpCode)
 	}
-	if Is4LayerProtocol(local.Protocol) &&
+	if helper.Is4LayerProtocol(local.Protocol) &&
 		local.HealthCheckConnectTimeout != 0 &&
 		remote.HealthCheckConnectTimeout != local.HealthCheckConnectTimeout {
 		needUpdate = true
@@ -908,7 +915,7 @@ func isNeedUpdate(reqCtx *RequestContext, local model.ListenerAttribute, remote 
 		updateDetail += fmt.Sprintf("lb HealthCheckConnectTimeout %v should be changed to %v;",
 			remote.HealthCheckConnectTimeout, local.HealthCheckConnectTimeout)
 	}
-	if Is7LayerProtocol(local.Protocol) &&
+	if helper.Is7LayerProtocol(local.Protocol) &&
 		local.HealthCheck != "" &&
 		remote.HealthCheck != local.HealthCheck {
 		needUpdate = true
@@ -916,7 +923,7 @@ func isNeedUpdate(reqCtx *RequestContext, local model.ListenerAttribute, remote 
 		updateDetail += fmt.Sprintf("lb HealthCheck %v should be changed to %v;",
 			remote.HealthCheck, local.HealthCheck)
 	}
-	if Is7LayerProtocol(local.Protocol) &&
+	if helper.Is7LayerProtocol(local.Protocol) &&
 		local.HealthCheckTimeout != 0 &&
 		remote.HealthCheckTimeout != local.HealthCheckTimeout {
 		needUpdate = true
@@ -924,7 +931,7 @@ func isNeedUpdate(reqCtx *RequestContext, local model.ListenerAttribute, remote 
 		updateDetail += fmt.Sprintf("lb HealthCheckTimeout %v should be changed to %v;",
 			remote.HealthCheckTimeout, local.HealthCheckTimeout)
 	}
-	if Is7LayerProtocol(local.Protocol) &&
+	if helper.Is7LayerProtocol(local.Protocol) &&
 		local.HealthCheckMethod != "" &&
 		remote.HealthCheckMethod != local.HealthCheckMethod {
 		needUpdate = true

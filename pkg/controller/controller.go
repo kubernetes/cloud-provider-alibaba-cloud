@@ -8,7 +8,9 @@ import (
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/node"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/pvtz"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/route"
-	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/service"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/service/clbv1"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/service/nlbv2"
+
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 )
 
@@ -16,9 +18,10 @@ func init() {
 	controllerMap = map[string]func(manager.Manager, *shared.SharedContext) error{
 		"node":    node.Add,
 		"route":   route.Add,
-		"service": service.Add,
+		"service": clbv1.Add,
 		"ingress": ingress.Add,
 		"pvtz":    pvtz.Add,
+		"nlb":     nlbv2.Add,
 	}
 }
 

@@ -1,13 +1,15 @@
-package service
+package clbv1
 
 import (
 	"context"
 	"encoding/json"
 	"fmt"
-	discovery "k8s.io/api/discovery/v1beta1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	ctrlCfg "k8s.io/cloud-provider-alibaba-cloud/pkg/config"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/service/reconcile/annotation"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/service/reconcile/backend"
+	svcCtx "k8s.io/cloud-provider-alibaba-cloud/pkg/controller/service/reconcile/context"
 	"k8s.io/klog/v2"
 	"strconv"
 	"strings"
@@ -21,95 +23,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-// EndpointWithENI
-// Currently, EndpointWithENI accept two kind of backend
-// normal nodes of type []*v1.Node, and endpoints of type *v1.Endpoints
-type TrafficPolicy string
-
-const (
-	// LocalTrafficPolicy externalTrafficPolicy=Local
-	LocalTrafficPolicy = TrafficPolicy("Local")
-	// ClusterTrafficPolicy externalTrafficPolicy=Cluster
-	ClusterTrafficPolicy = TrafficPolicy("Cluster")
-	// ENITrafficPolicy is forwarded to pod directly
-	ENITrafficPolicy = TrafficPolicy("ENI")
-)
-
-func NewEndpointWithENI(reqCtx *RequestContext, kubeClient client.Client) (*EndpointWithENI, error) {
-	endpointWithENI := &EndpointWithENI{}
-	endpointWithENI.setTrafficPolicy(reqCtx)
-	endpointWithENI.setAddressIpVersion(reqCtx)
-
-	nodes, err := GetNodes(reqCtx, kubeClient)
-	if err != nil {
-		return nil, fmt.Errorf("get nodes error: %s", err.Error())
-	}
-	endpointWithENI.Nodes = nodes
-
-	if utilfeature.DefaultMutableFeatureGate.Enabled(helper.EndpointSlice) {
-		esList, err := getEndpointByEndpointSlice(reqCtx, kubeClient, endpointWithENI.AddressIPVersion)
-		if err != nil {
-			return nil, fmt.Errorf("get endpointslice error: %s", err.Error())
-		}
-		endpointWithENI.EndpointSlices = esList
-		reqCtx.Log.Info("backend details", "endpointslices", LogEndpointSliceList(esList))
-	} else {
-		eps, err := getEndpoints(reqCtx, kubeClient)
-		if err != nil {
-			return nil, fmt.Errorf("get endpoints error: %s", err.Error())
-		}
-		endpointWithENI.Endpoints = eps
-		reqCtx.Log.Info("backend details", "endpoints", LogEndpoints(eps))
-	}
-
-	return endpointWithENI, nil
-}
-
-type EndpointWithENI struct {
-	// TrafficPolicy
-	// external traffic policy.
-	TrafficPolicy TrafficPolicy
-	// AddressIPVersion
-	// it indicates the address ip version type of the backends attached to the LoadBalancer
-	AddressIPVersion model.AddressIPVersionType
-	// Nodes
-	// contains all the candidate nodes consider of LoadBalance Backends.
-	// Cloud implementation has the right to make any filter on it.
-	Nodes []v1.Node
-	// Endpoints
-	// It is the direct pod location information which cloud implementation
-	// may needed for some kind of filtering. eg. direct ENI attach.
-	Endpoints *v1.Endpoints
-	// EndpointSlices
-	// contains all the endpointslices of a service
-	EndpointSlices []discovery.EndpointSlice
-}
-
-func (e *EndpointWithENI) setTrafficPolicy(reqCtx *RequestContext) {
-	if isENIBackendType(reqCtx.Service) {
-		e.TrafficPolicy = ENITrafficPolicy
-		return
-	}
-	if isLocalModeService(reqCtx.Service) {
-		e.TrafficPolicy = LocalTrafficPolicy
-		return
-	}
-	e.TrafficPolicy = ClusterTrafficPolicy
-}
-
-func (e *EndpointWithENI) setAddressIpVersion(reqCtx *RequestContext) {
-	// Only EndpointSlice support dual stack.
-	// Enable IPv6DualStack and EndpointSlice feature gates if you want to use ipv6 backends
-	if utilfeature.DefaultMutableFeatureGate.Enabled(helper.IPv6DualStack) &&
-		utilfeature.DefaultMutableFeatureGate.Enabled(helper.EndpointSlice) &&
-		reqCtx.Anno.Get(IPVersion) == string(model.IPv6) &&
-		reqCtx.Anno.Get(BackendIPVersion) == string(model.IPv6) {
-		e.AddressIPVersion = model.IPv6
-		reqCtx.Log.Info("backend address ip version is ipv6")
-		return
-	}
-	e.AddressIPVersion = model.IPv4
-}
+const DefaultServerWeight = 100
 
 func NewVGroupManager(kubeClient client.Client, cloud prvd.Provider) *VGroupManager {
 	return &VGroupManager{
@@ -123,10 +37,10 @@ type VGroupManager struct {
 	cloud      prvd.Provider
 }
 
-func (mgr *VGroupManager) BuildLocalModel(reqCtx *RequestContext, m *model.LoadBalancer) error {
+func (mgr *VGroupManager) BuildLocalModel(reqCtx *svcCtx.RequestContext, m *model.LoadBalancer) error {
 	var vgs []model.VServerGroup
 
-	candidates, err := NewEndpointWithENI(reqCtx, mgr.kubeClient)
+	candidates, err := backend.NewEndpointWithENI(reqCtx, mgr.kubeClient)
 	if err != nil {
 		return err
 	}
@@ -142,7 +56,7 @@ func (mgr *VGroupManager) BuildLocalModel(reqCtx *RequestContext, m *model.LoadB
 	return nil
 }
 
-func (mgr *VGroupManager) BuildRemoteModel(reqCtx *RequestContext, m *model.LoadBalancer) error {
+func (mgr *VGroupManager) BuildRemoteModel(reqCtx *svcCtx.RequestContext, m *model.LoadBalancer) error {
 	vgs, err := mgr.DescribeVServerGroups(reqCtx, m.LoadBalancerAttribute.LoadBalancerId)
 	if err != nil {
 		return fmt.Errorf("DescribeVServerGroups error: %s", err.Error())
@@ -151,17 +65,17 @@ func (mgr *VGroupManager) BuildRemoteModel(reqCtx *RequestContext, m *model.Load
 	return nil
 }
 
-func (mgr *VGroupManager) CreateVServerGroup(reqCtx *RequestContext, vg *model.VServerGroup, lbId string) error {
+func (mgr *VGroupManager) CreateVServerGroup(reqCtx *svcCtx.RequestContext, vg *model.VServerGroup, lbId string) error {
 	reqCtx.Log.Info(fmt.Sprintf("create vgroup %s", vg.VGroupName))
 	return mgr.cloud.CreateVServerGroup(reqCtx.Ctx, vg, lbId)
 }
 
-func (mgr *VGroupManager) DeleteVServerGroup(reqCtx *RequestContext, vGroupId string) error {
+func (mgr *VGroupManager) DeleteVServerGroup(reqCtx *svcCtx.RequestContext, vGroupId string) error {
 	reqCtx.Log.Info(fmt.Sprintf("delete vgroup %s", vGroupId))
 	return mgr.cloud.DeleteVServerGroup(reqCtx.Ctx, vGroupId)
 }
 
-func (mgr *VGroupManager) UpdateVServerGroup(reqCtx *RequestContext, local, remote model.VServerGroup) error {
+func (mgr *VGroupManager) UpdateVServerGroup(reqCtx *svcCtx.RequestContext, local, remote model.VServerGroup) error {
 	add, del, update := diff(remote, local)
 	if len(add) == 0 && len(del) == 0 && len(update) == 0 {
 		reqCtx.Log.Info(fmt.Sprintf("reconcile vgroup: [%s] not change, skip reconcile", remote.VGroupId),
@@ -187,13 +101,13 @@ func (mgr *VGroupManager) UpdateVServerGroup(reqCtx *RequestContext, local, remo
 	return nil
 }
 
-func (mgr *VGroupManager) DescribeVServerGroups(reqCtx *RequestContext, lbId string) ([]model.VServerGroup, error) {
+func (mgr *VGroupManager) DescribeVServerGroups(reqCtx *svcCtx.RequestContext, lbId string) ([]model.VServerGroup, error) {
 	vgs, err := mgr.cloud.DescribeVServerGroups(reqCtx.Ctx, lbId)
 	if err != nil {
 		return vgs, err
 	}
 
-	reusedVgIDs, err := getVGroupIDs(reqCtx.Anno.Get(VGroupPort))
+	reusedVgIDs, err := getVGroupIDs(reqCtx.Anno.Get(annotation.VGroupPort))
 	if err != nil {
 		return vgs, err
 	}
@@ -219,8 +133,8 @@ func (mgr *VGroupManager) DescribeVServerGroups(reqCtx *RequestContext, lbId str
 	return vgs, nil
 }
 
-func (mgr *VGroupManager) BatchAddVServerGroupBackendServers(reqCtx *RequestContext, vGroup model.VServerGroup, add interface{}) error {
-	return Batch(add, MaxBackendNum,
+func (mgr *VGroupManager) BatchAddVServerGroupBackendServers(reqCtx *svcCtx.RequestContext, vGroup model.VServerGroup, add interface{}) error {
+	return backend.Batch(add, backend.MaxBackendNum,
 		func(list []interface{}) error {
 			additions, err := json.Marshal(list)
 			if err != nil {
@@ -231,8 +145,8 @@ func (mgr *VGroupManager) BatchAddVServerGroupBackendServers(reqCtx *RequestCont
 		})
 }
 
-func (mgr *VGroupManager) BatchRemoveVServerGroupBackendServers(reqCtx *RequestContext, vGroup model.VServerGroup, del interface{}) error {
-	return Batch(del, MaxBackendNum,
+func (mgr *VGroupManager) BatchRemoveVServerGroupBackendServers(reqCtx *svcCtx.RequestContext, vGroup model.VServerGroup, del interface{}) error {
+	return backend.Batch(del, backend.MaxBackendNum,
 		func(list []interface{}) error {
 			deletions, err := json.Marshal(list)
 			if err != nil {
@@ -243,8 +157,8 @@ func (mgr *VGroupManager) BatchRemoveVServerGroupBackendServers(reqCtx *RequestC
 		})
 }
 
-func (mgr *VGroupManager) BatchUpdateVServerGroupBackendServers(reqCtx *RequestContext, vGroup model.VServerGroup, update interface{}) error {
-	return Batch(update, MaxBackendNum,
+func (mgr *VGroupManager) BatchUpdateVServerGroupBackendServers(reqCtx *svcCtx.RequestContext, vGroup model.VServerGroup, update interface{}) error {
+	return backend.Batch(update, backend.MaxBackendNum,
 		func(list []interface{}) error {
 			updateJson, err := json.Marshal(list)
 			if err != nil {
@@ -334,7 +248,7 @@ func diff(remote, local model.VServerGroup) (
 	return addition, deletions, updates
 }
 
-func isBackendManagedByMyService(reqCtx *RequestContext, remoteBackend model.BackendAttribute) bool {
+func isBackendManagedByMyService(reqCtx *svcCtx.RequestContext, remoteBackend model.BackendAttribute) bool {
 	namedKey, err := model.LoadVGroupNamedKey(remoteBackend.Description)
 	if err != nil {
 		return false
@@ -364,156 +278,16 @@ func isReusedVGroup(reusedVgIDs []string, vGroupId string) bool {
 	return false
 }
 
-func GetNodes(reqCtx *RequestContext, client client.Client) ([]v1.Node, error) {
-	nodeList := v1.NodeList{}
-	err := client.List(reqCtx.Ctx, &nodeList)
-	if err != nil {
-		return nil, fmt.Errorf("get nodes error: %s", err.Error())
-	}
-
-	// 1. filter by label
-	items := nodeList.Items
-	if reqCtx.Anno.Get(BackendLabel) != "" {
-		items, err = filterOutByLabel(nodeList.Items, reqCtx.Anno.Get(BackendLabel))
-		if err != nil {
-			return nil, fmt.Errorf("filter nodes by label error: %s", err.Error())
-		}
-	}
-
-	var nodes []v1.Node
-	for _, n := range items {
-		if needExcludeFromLB(reqCtx, &n) {
-			continue
-		}
-		nodes = append(nodes, n)
-	}
-
-	return nodes, nil
-}
-
-func filterOutByLabel(nodes []v1.Node, labels string) ([]v1.Node, error) {
-	if labels == "" {
-		return nodes, nil
-	}
-	var result []v1.Node
-	lbl := strings.Split(labels, ",")
-	var records []string
-	for _, node := range nodes {
-		found := true
-		for _, v := range lbl {
-			l := strings.Split(v, "=")
-			if len(l) < 2 {
-				return []v1.Node{}, fmt.Errorf("parse backend label: %s, [k1=v1,k2=v2]", v)
-			}
-			if nv, exist := node.Labels[l[0]]; !exist || nv != l[1] {
-				found = false
-				break
-			}
-		}
-		if found {
-			result = append(result, node)
-			records = append(records, node.Name)
-		}
-	}
-	klog.V(4).Infof("accept nodes backend labels[%s], %v", labels, records)
-	return result, nil
-}
-
-func needExcludeFromLB(reqCtx *RequestContext, node *v1.Node) bool {
-	// need to keep the node who has exclude label in order to be compatible with vk node
-	// It's safe because these nodes will be filtered in build backends func
-
-	if isMasterNode(node) {
-		klog.V(5).Infof("[%s] node %s is master node, skip adding it to lb", util.Key(reqCtx.Service), node.Name)
-		return true
-	}
-
-	// Remove nodes that are about to be deleted by the cluster autoscaler.
-	for _, taint := range node.Spec.Taints {
-		if taint.Key == ToBeDeletedTaint {
-			klog.Infof("Ignoring node %v with autoscaler taint %+v", node.Name, taint)
-			return true
-		}
-	}
-
-	// filter unscheduled node
-	if node.Spec.Unschedulable && reqCtx.Anno.Get(RemoveUnscheduled) != "" {
-		if reqCtx.Anno.Get(RemoveUnscheduled) == string(model.OnFlag) {
-			reqCtx.Log.Info("node is unschedulable, skip add to lb", "node", node.Name)
-			return true
-		}
-	}
-
-	// ignore vk node condition check.
-	// Even if the vk node is NotReady, it still can be added to lb. Because the eci pod that actually joins the lb, not a vk node
-	if label, ok := node.Labels["type"]; ok && label == LabelNodeTypeVK {
-		return false
-	}
-
-	// If we have no info, don't accept
-	if len(node.Status.Conditions) == 0 {
-		reqCtx.Log.Info("node condition is nil, skip add to lb", "node", node.Name)
-		return true
-	}
-
-	for _, cond := range node.Status.Conditions {
-		// We consider the node for load balancing only when its NodeReady
-		// condition status is ConditionTrue
-		if cond.Type == v1.NodeReady &&
-			cond.Status != v1.ConditionTrue {
-			reqCtx.Log.Info(fmt.Sprintf("node not ready with %v condition, status %v", cond.Type, cond.Status),
-				"node", node.Name)
-			return true
-		}
-	}
-
-	return false
-}
-
-func getEndpoints(reqCtx *RequestContext, client client.Client) (*v1.Endpoints, error) {
-	eps := &v1.Endpoints{}
-	err := client.Get(reqCtx.Ctx, util.NamespacedName(reqCtx.Service), eps)
-	if err != nil && apierrors.IsNotFound(err) {
-		reqCtx.Log.Info("warning: endpoint not found")
-		return eps, nil
-	}
-	return eps, err
-}
-
-func getEndpointByEndpointSlice(reqCtx *RequestContext, kubeClient client.Client, ipVersion model.AddressIPVersionType) ([]discovery.EndpointSlice, error) {
-	epsList := &discovery.EndpointSliceList{}
-	err := kubeClient.List(reqCtx.Ctx, epsList, client.MatchingLabels{
-		discovery.LabelServiceName: reqCtx.Service.Name,
-	}, client.InNamespace(reqCtx.Service.Namespace))
-	if err != nil {
-		return nil, err
-	}
-
-	addressType := discovery.AddressTypeIPv4
-	if ipVersion == model.IPv6 {
-		addressType = discovery.AddressTypeIPv6
-	}
-
-	var ret []discovery.EndpointSlice
-	for _, es := range epsList.Items {
-		if es.AddressType == addressType {
-			ret = append(ret, es)
-		}
-	}
-
-	return ret, nil
-}
-
-func (mgr *VGroupManager) buildVGroupForServicePort(reqCtx *RequestContext, port v1.ServicePort,
-	candidates *EndpointWithENI, isUserManagedLB bool) (model.VServerGroup, error) {
+func (mgr *VGroupManager) buildVGroupForServicePort(reqCtx *svcCtx.RequestContext, port v1.ServicePort,
+	candidates *backend.EndpointWithENI, isUserManagedLB bool) (model.VServerGroup, error) {
 	vg := model.VServerGroup{
 		NamedKey:    getVGroupNamedKey(reqCtx.Service, port),
 		ServicePort: port,
 	}
 	vg.VGroupName = vg.NamedKey.Key()
 
-	if isUserManagedLB && reqCtx.Anno.Get(VGroupPort) != "" {
-		vgroupId, err := vgroup(reqCtx.Anno.Get(VGroupPort), port)
+	if isUserManagedLB && reqCtx.Anno.Get(annotation.VGroupPort) != "" {
+		vgroupId, err := vgroup(reqCtx.Anno.Get(annotation.VGroupPort), port)
 		if err != nil {
 			return vg, fmt.Errorf("vgroupid parse error: %s", err.Error())
 		}
@@ -521,20 +295,22 @@ func (mgr *VGroupManager) buildVGroupForServicePort(reqCtx *RequestContext, port
 			exist, err := isVGroupIdExist(mgr, reqCtx, vgroupId)
 			if err != nil {
 				return vg, fmt.Errorf("find vgroupId %s of lb %s error: %s", vgroupId,
-					reqCtx.Anno.Get(LoadBalancerId), err.Error())
+					reqCtx.Anno.Get(annotation.LoadBalancerId), err.Error())
 			}
 			if !exist {
-				return vg, fmt.Errorf("can not find vgroupId %s in lb %s", vgroupId, reqCtx.Anno.Get(LoadBalancerId))
+				return vg, fmt.Errorf("can not find vgroupId %s in lb %s",
+					vgroupId, reqCtx.Anno.Get(annotation.LoadBalancerId))
 			}
 			reqCtx.Log.Info(fmt.Sprintf("user managed vgroupId %s for port %d", vgroupId, port.Port))
 			vg.VGroupId = vgroupId
 			vg.IsUserManaged = true
 		}
 
-		if reqCtx.Anno.Get(VGroupWeight) != "" {
-			w, err := strconv.Atoi(reqCtx.Anno.Get(VGroupWeight))
+		if reqCtx.Anno.Get(annotation.VGroupWeight) != "" {
+			w, err := strconv.Atoi(reqCtx.Anno.Get(annotation.VGroupWeight))
 			if err != nil || w < 0 || w > 100 {
-				return vg, fmt.Errorf("weight must be integer in range [0,100] , got [%s]", reqCtx.Anno.Get(VGroupWeight))
+				return vg, fmt.Errorf("weight must be integer in range [0,100] , got [%s]",
+					reqCtx.Anno.Get(annotation.VGroupWeight))
 			}
 			vg.VGroupWeight = &w
 		}
@@ -546,19 +322,19 @@ func (mgr *VGroupManager) buildVGroupForServicePort(reqCtx *RequestContext, port
 		err      error
 	)
 	switch candidates.TrafficPolicy {
-	case ENITrafficPolicy:
+	case helper.ENITrafficPolicy:
 		reqCtx.Log.Info(fmt.Sprintf("eni mode, build backends for %s", vg.NamedKey))
 		backends, err = mgr.buildENIBackends(candidates, vg)
 		if err != nil {
 			return vg, fmt.Errorf("build eni backends error: %s", err.Error())
 		}
-	case LocalTrafficPolicy:
+	case helper.LocalTrafficPolicy:
 		reqCtx.Log.Info(fmt.Sprintf("local mode, build backends for %s", vg.NamedKey))
 		backends, err = mgr.buildLocalBackends(reqCtx, candidates, vg)
 		if err != nil {
 			return vg, fmt.Errorf("build local backends error: %s", err.Error())
 		}
-	case ClusterTrafficPolicy:
+	case helper.ClusterTrafficPolicy:
 		reqCtx.Log.Info(fmt.Sprintf("cluster mode, build backends for %s", vg.NamedKey))
 		backends, err = mgr.buildClusterBackends(reqCtx, candidates, vg)
 		if err != nil {
@@ -581,9 +357,9 @@ func (mgr *VGroupManager) buildVGroupForServicePort(reqCtx *RequestContext, port
 	return vg, nil
 }
 
-func isVGroupIdExist(mgr *VGroupManager, reqCtx *RequestContext, vgroupId string) (bool, error) {
+func isVGroupIdExist(mgr *VGroupManager, reqCtx *svcCtx.RequestContext, vgroupId string) (bool, error) {
 	// check vgroup id is existed
-	vgroups, err := mgr.cloud.DescribeVServerGroups(reqCtx.Ctx, reqCtx.Anno.Get(LoadBalancerId))
+	vgroups, err := mgr.cloud.DescribeVServerGroups(reqCtx.Ctx, reqCtx.Anno.Get(annotation.LoadBalancerId))
 	if err != nil {
 		return false, fmt.Errorf("cannot find vgroup by vgroupId %s error: %s", vgroupId, err.Error())
 	}
@@ -595,14 +371,14 @@ func isVGroupIdExist(mgr *VGroupManager, reqCtx *RequestContext, vgroupId string
 	return false, nil
 }
 
-func setGenericBackendAttribute(candidates *EndpointWithENI, vgroup model.VServerGroup) []model.BackendAttribute {
-	if utilfeature.DefaultMutableFeatureGate.Enabled(helper.EndpointSlice) {
+func setGenericBackendAttribute(candidates *backend.EndpointWithENI, vgroup model.VServerGroup) []model.BackendAttribute {
+	if utilfeature.DefaultMutableFeatureGate.Enabled(ctrlCfg.EndpointSlice) {
 		return setBackendsFromEndpointSlices(candidates, vgroup)
 	}
 	return setBackendsFromEndpoints(candidates, vgroup)
 }
 
-func setBackendsFromEndpoints(candidates *EndpointWithENI, vgroup model.VServerGroup) []model.BackendAttribute {
+func setBackendsFromEndpoints(candidates *backend.EndpointWithENI, vgroup model.VServerGroup) []model.BackendAttribute {
 	var backends []model.BackendAttribute
 
 	if len(candidates.Endpoints.Subsets) == 0 {
@@ -638,7 +414,7 @@ func setBackendsFromEndpoints(candidates *EndpointWithENI, vgroup model.VServerG
 	return backends
 }
 
-func setBackendsFromEndpointSlices(candidates *EndpointWithENI, vgroup model.VServerGroup) []model.BackendAttribute {
+func setBackendsFromEndpointSlices(candidates *backend.EndpointWithENI, vgroup model.VServerGroup) []model.BackendAttribute {
 	// used for deduplicate when endpointslice is enabled
 	// https://kubernetes.io/docs/concepts/services-networking/endpoint-slices/#duplicate-endpoints
 	endpointMap := make(map[string]bool)
@@ -697,7 +473,7 @@ func setBackendsFromEndpointSlices(candidates *EndpointWithENI, vgroup model.VSe
 	return backends
 }
 
-func (mgr *VGroupManager) buildENIBackends(candidates *EndpointWithENI, vgroup model.VServerGroup) ([]model.BackendAttribute, error) {
+func (mgr *VGroupManager) buildENIBackends(candidates *backend.EndpointWithENI, vgroup model.VServerGroup) ([]model.BackendAttribute, error) {
 	backends := setGenericBackendAttribute(candidates, vgroup)
 	if len(backends) == 0 {
 		return nil, nil
@@ -708,10 +484,10 @@ func (mgr *VGroupManager) buildENIBackends(candidates *EndpointWithENI, vgroup m
 		return backends, err
 	}
 
-	return setWeightBackends(ENITrafficPolicy, backends, vgroup.VGroupWeight), nil
+	return setWeightBackends(helper.ENITrafficPolicy, backends, vgroup.VGroupWeight), nil
 }
 
-func (mgr *VGroupManager) buildLocalBackends(reqCtx *RequestContext, candidates *EndpointWithENI, vgroup model.VServerGroup) ([]model.BackendAttribute, error) {
+func (mgr *VGroupManager) buildLocalBackends(reqCtx *svcCtx.RequestContext, candidates *backend.EndpointWithENI, vgroup model.VServerGroup) ([]model.BackendAttribute, error) {
 	initBackends := setGenericBackendAttribute(candidates, vgroup)
 	if len(initBackends) == 0 {
 		return nil, nil
@@ -730,24 +506,24 @@ func (mgr *VGroupManager) buildLocalBackends(reqCtx *RequestContext, candidates 
 			return nil, fmt.Errorf("add ecs backends for service[%s] error, NodeName is nil for ip %s ",
 				util.Key(reqCtx.Service), backend.ServerIp)
 		}
-		node := findNodeByNodeName(candidates.Nodes, *backend.NodeName)
+		node := helper.FindNodeByNodeName(candidates.Nodes, *backend.NodeName)
 		if node == nil {
 			reqCtx.Log.Info(fmt.Sprintf("warning: can not find correspond node %s for endpoint %s", *backend.NodeName, backend.ServerIp))
 			continue
 		}
 
 		// check if the node is virtual node, virtual node add as eci backend
-		if node.Labels["type"] == LabelNodeTypeVK {
+		if node.Labels["type"] == helper.LabelNodeTypeVK {
 			eciBackends = append(eciBackends, backend)
 			continue
 		}
 
-		if isNodeExcludeFromLoadBalancer(node) {
+		if helper.IsNodeExcludeFromLoadBalancer(node) {
 			reqCtx.Log.Info("node has exclude label which cannot be added to lb backend", "node", node.Name)
 			continue
 		}
 
-		_, id, err := NodeFromProviderID(node.Spec.ProviderID)
+		_, id, err := helper.NodeFromProviderID(node.Spec.ProviderID)
 		if err != nil {
 			return nil, fmt.Errorf("parse providerid: %s. "+
 				"expected: ${regionid}.${nodeid}, %s", node.Spec.ProviderID, err.Error())
@@ -771,7 +547,7 @@ func (mgr *VGroupManager) buildLocalBackends(reqCtx *RequestContext, candidates 
 	backends := append(ecsBackends, eciBackends...)
 
 	// 3. set weight
-	backends = setWeightBackends(LocalTrafficPolicy, backends, vgroup.VGroupWeight)
+	backends = setWeightBackends(helper.LocalTrafficPolicy, backends, vgroup.VGroupWeight)
 
 	// 4. remove duplicated ecs
 	return remoteDuplicatedECS(backends), nil
@@ -791,7 +567,7 @@ func remoteDuplicatedECS(backends []model.BackendAttribute) []model.BackendAttri
 
 }
 
-func (mgr *VGroupManager) buildClusterBackends(reqCtx *RequestContext, candidates *EndpointWithENI, vgroup model.VServerGroup) ([]model.BackendAttribute, error) {
+func (mgr *VGroupManager) buildClusterBackends(reqCtx *svcCtx.RequestContext, candidates *backend.EndpointWithENI, vgroup model.VServerGroup) ([]model.BackendAttribute, error) {
 	initBackends := setGenericBackendAttribute(candidates, vgroup)
 
 	var (
@@ -801,11 +577,11 @@ func (mgr *VGroupManager) buildClusterBackends(reqCtx *RequestContext, candidate
 
 	// 1. add ecs backends. add all cluster nodes.
 	for _, node := range candidates.Nodes {
-		if isNodeExcludeFromLoadBalancer(&node) {
+		if helper.IsNodeExcludeFromLoadBalancer(&node) {
 			reqCtx.Log.Info("node has exclude label which cannot be added to lb backend", "node", node.Name)
 			continue
 		}
-		_, id, err := NodeFromProviderID(node.Spec.ProviderID)
+		_, id, err := helper.NodeFromProviderID(node.Spec.ProviderID)
 		if err != nil {
 			return nil, fmt.Errorf("normal parse providerid: %s. "+
 				"expected: ${regionid}.${nodeid}, %s", node.Spec.ProviderID, err.Error())
@@ -829,14 +605,14 @@ func (mgr *VGroupManager) buildClusterBackends(reqCtx *RequestContext, candidate
 			return nil, fmt.Errorf("add ecs backends for service[%s] error, NodeName is nil for ip %s ",
 				util.Key(reqCtx.Service), backend.ServerIp)
 		}
-		node := findNodeByNodeName(candidates.Nodes, *backend.NodeName)
+		node := helper.FindNodeByNodeName(candidates.Nodes, *backend.NodeName)
 		if node == nil {
 			reqCtx.Log.Info(fmt.Sprintf("warning: can not find correspond node %s for endpoint %s", *backend.NodeName, backend.ServerIp))
 			continue
 		}
 
 		// check if the node is VK
-		if node.Labels["type"] == LabelNodeTypeVK {
+		if node.Labels["type"] == helper.LabelNodeTypeVK {
 			eciBackends = append(eciBackends, backend)
 			continue
 		}
@@ -851,7 +627,7 @@ func (mgr *VGroupManager) buildClusterBackends(reqCtx *RequestContext, candidate
 
 	backends := append(ecsBackends, eciBackends...)
 
-	return setWeightBackends(ClusterTrafficPolicy, backends, vgroup.VGroupWeight), nil
+	return setWeightBackends(helper.ClusterTrafficPolicy, backends, vgroup.VGroupWeight), nil
 }
 
 func updateENIBackends(mgr *VGroupManager, backends []model.BackendAttribute, ipVersion model.AddressIPVersionType) (
@@ -883,7 +659,7 @@ func updateENIBackends(mgr *VGroupManager, backends []model.BackendAttribute, ip
 	return backends, nil
 }
 
-func setWeightBackends(mode TrafficPolicy, backends []model.BackendAttribute, weight *int) []model.BackendAttribute {
+func setWeightBackends(mode helper.TrafficPolicy, backends []model.BackendAttribute, weight *int) []model.BackendAttribute {
 	// use default
 	if weight == nil {
 		return podNumberAlgorithm(mode, backends)
@@ -901,8 +677,8 @@ func setWeightBackends(mode TrafficPolicy, backends []model.BackendAttribute, we
 	ENIMode:      podWeight = 1
 	LocalMode:    node_weight = nodePodNum
 */
-func podNumberAlgorithm(mode TrafficPolicy, backends []model.BackendAttribute) []model.BackendAttribute {
-	if mode == ENITrafficPolicy || mode == ClusterTrafficPolicy {
+func podNumberAlgorithm(mode helper.TrafficPolicy, backends []model.BackendAttribute) []model.BackendAttribute {
+	if mode == helper.ENITrafficPolicy || mode == helper.ClusterTrafficPolicy {
 		for i := range backends {
 			backends[i].Weight = DefaultServerWeight
 		}
@@ -927,7 +703,7 @@ func podNumberAlgorithm(mode TrafficPolicy, backends []model.BackendAttribute) [
 	ENIMode:      pod_weight = weightSum/podsNum
 	LocalMode:    node_weight = node_pod_num/pods_num *weightSum
 */
-func podPercentAlgorithm(mode TrafficPolicy, backends []model.BackendAttribute, weight int) []model.BackendAttribute {
+func podPercentAlgorithm(mode helper.TrafficPolicy, backends []model.BackendAttribute, weight int) []model.BackendAttribute {
 	if weight == 0 {
 		for i := range backends {
 			backends[i].Weight = 0
@@ -935,7 +711,7 @@ func podPercentAlgorithm(mode TrafficPolicy, backends []model.BackendAttribute, 
 		return backends
 	}
 
-	if mode == ENITrafficPolicy || mode == ClusterTrafficPolicy {
+	if mode == helper.ENITrafficPolicy || mode == helper.ClusterTrafficPolicy {
 		per := weight / len(backends)
 		if per < 1 {
 			per = 1

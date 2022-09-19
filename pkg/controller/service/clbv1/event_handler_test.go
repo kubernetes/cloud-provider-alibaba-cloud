@@ -1,4 +1,4 @@
-package service
+package clbv1
 
 import (
 	"context"
@@ -10,6 +10,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
+	helper "k8s.io/cloud-provider-alibaba-cloud/pkg/controller/helper"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/service/reconcile/annotation"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"testing"
 	"time"
@@ -19,14 +21,14 @@ func TestEnqueueRequestForServiceEvent(t *testing.T) {
 	h := NewEnqueueRequestForServiceEvent(record.NewFakeRecorder(100))
 	queue := workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter())
 	svc := getDefaultService()
-	svc.Annotations[Annotation(Spec)] = "slb.s1.small"
+	svc.Annotations[annotation.Annotation(annotation.Spec)] = "slb.s1.small"
 	// create event
 	h.Create(event.CreateEvent{Object: svc}, queue)
 	// delete event
 	h.Delete(event.DeleteEvent{Object: svc}, queue)
 	// update event
 	newSvc := svc.DeepCopy()
-	newSvc.Annotations[Annotation(Spec)] = "slb.s2.small"
+	newSvc.Annotations[annotation.Annotation(annotation.Spec)] = "slb.s2.small"
 	h.Update(event.UpdateEvent{ObjectOld: svc, ObjectNew: newSvc}, queue)
 
 }
@@ -35,7 +37,7 @@ func TestNeedUpdate(t *testing.T) {
 	fakeRecord := record.NewFakeRecorder(100)
 
 	oldSvc := getDefaultService()
-	oldSvc.Annotations[Annotation(Spec)] = "slb.s1.small"
+	oldSvc.Annotations[annotation.Annotation(annotation.Spec)] = "slb.s1.small"
 
 	newSvc := oldSvc.DeepCopy()
 	newSvc.Spec.Type = v1.ServiceTypeClusterIP
@@ -46,7 +48,7 @@ func TestNeedUpdate(t *testing.T) {
 	assert.Equal(t, needUpdate(oldSvc, newSvc, fakeRecord), true)
 
 	newSvc = oldSvc.DeepCopy()
-	oldSvc.Annotations[Annotation(Spec)] = "slb.s2.small"
+	oldSvc.Annotations[annotation.Annotation(annotation.Spec)] = "slb.s2.small"
 	assert.Equal(t, needUpdate(oldSvc, newSvc, fakeRecord), true)
 
 	newSvc = oldSvc.DeepCopy()
@@ -69,7 +71,7 @@ func TestNeedAdd(t *testing.T) {
 	assert.Equal(t, needAdd(svc), true)
 
 	newSvc := svc.DeepCopy()
-	newSvc.Labels = map[string]string{LabelServiceHash: getServiceHash(newSvc)}
+	newSvc.Finalizers = []string{helper.ServiceFinalizer}
 	newSvc.Spec.Type = v1.ServiceTypeClusterIP
 	assert.Equal(t, needAdd(newSvc), true)
 

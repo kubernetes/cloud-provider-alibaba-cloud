@@ -1,4 +1,4 @@
-package service
+package clbv1
 
 import (
 	"context"
@@ -23,9 +23,6 @@ func initMap(client client.Client) {
 
 	length := 0
 	for _, m := range svcs.Items {
-		if !isServiceProcessNeeded(&m) {
-			continue
-		}
 		if !needAdd(&m) {
 			continue
 		}

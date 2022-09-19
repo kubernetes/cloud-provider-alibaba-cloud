@@ -11,7 +11,7 @@ import (
 
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/util"
 
-	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/helper/k8s"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/helper"
 
 	prvd "k8s.io/cloud-provider-alibaba-cloud/pkg/provider"
 
@@ -63,7 +63,7 @@ func (s *serverGroupApplier) addServerToServerGroup(ctx context.Context, serverG
 	if err := s.albProvider.RegisterALBServers(ctx, serverGroupID, backends); err != nil {
 		return err
 	}
-	err = updateTargetHealthPodCondition(ctx, s.kubeClient, k8s.BuildReadinessGatePodConditionType(), backends)
+	err = updateTargetHealthPodCondition(ctx, s.kubeClient, helper.BuildReadinessGatePodConditionType(), backends)
 	if err != nil {
 		return err
 	}

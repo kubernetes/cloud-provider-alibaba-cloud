@@ -116,18 +116,22 @@ func TestProviderSLB_DescribeVServerGroups(t *testing.T) {
 	t.Logf(string(jsonStr))
 }
 
-func TestSLBProvider_AddTags(t *testing.T) {
+func TestSLBProvider_TagCLBResource(t *testing.T) {
 	client, err := NewSLBClient()
 	if err != nil {
 		t.Skip("fail to create slb client, skip")
 	}
 
-	tags := []model.Tag{{TagKey: "testkey", TagValue: "testvalue"}}
-	tagBytes, _ := json.Marshal(tags)
-	req := slb.CreateAddTagsRequest()
-	req.LoadBalancerId = "lb-xxxxx"
-	req.Tags = string(tagBytes)
-	_, err = client.AddTags(req)
+	req := slb.CreateTagResourcesRequest()
+	req.ResourceId = &[]string{"lb-xxxx"}
+	req.ResourceType = "instance"
+	req.Tag = &[]slb.TagResourcesTag{
+		{
+			Key:   "testkey",
+			Value: "testvalue",
+		},
+	}
+	_, err = client.TagResources(req)
 	if err != nil {
 		panic(err)
 	}

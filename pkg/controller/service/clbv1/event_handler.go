@@ -1,4 +1,4 @@
-package service
+package clbv1
 
 import (
 	"context"
@@ -12,6 +12,7 @@ import (
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/helper"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/util"
+	"k8s.io/klog/v2"
 	"reflect"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/event"
@@ -45,7 +46,7 @@ func (h *enqueueRequestForServiceEvent) Update(e event.UpdateEvent, queue workqu
 
 	if ok1 && ok2 && needUpdate(oldSvc, newSvc, h.eventRecorder) {
 		util.ServiceLog.Info("controller: service update event", "service", util.Key(oldSvc))
-		h.enqueueManagedService(queue, oldSvc)
+		h.enqueueManagedService(queue, newSvc)
 	}
 }
 
@@ -59,11 +60,6 @@ func (h *enqueueRequestForServiceEvent) Generic(e event.GenericEvent, queue work
 }
 
 func (h *enqueueRequestForServiceEvent) enqueueManagedService(queue workqueue.RateLimitingInterface, service *v1.Service) {
-	if !isServiceProcessNeeded(service) {
-		util.ServiceLog.Info("ccm class not empty, skip process", "service", util.Key(service))
-		return
-	}
-
 	queue.Add(reconcile.Request{
 		NamespacedName: types.NamespacedName{
 			Namespace: service.Namespace,
@@ -73,14 +69,17 @@ func (h *enqueueRequestForServiceEvent) enqueueManagedService(queue workqueue.Ra
 	util.ServiceLog.Info("enqueue", "service", util.Key(service), "queueLen", queue.Len())
 }
 
-func isServiceProcessNeeded(svc *v1.Service) bool { return svc.Annotations[CCMClass] == "" }
-
 func needUpdate(oldSvc, newSvc *v1.Service, recorder record.EventRecorder) bool {
-	if !needLoadBalancer(oldSvc) && !needLoadBalancer(newSvc) {
+	if !helper.NeedCLB(oldSvc) && !helper.NeedCLB(newSvc) {
 		return false
 	}
 
-	if needLoadBalancer(oldSvc) != needLoadBalancer(newSvc) {
+	if helper.NeedCLB(oldSvc) != helper.NeedCLB(newSvc) {
+		if newSvc.Annotations[helper.LoadBalancerClass] != "" {
+			util.ServiceLog.Info(fmt.Sprintf("service has LoadBalancerClass %s, skip update", newSvc.Annotations[helper.LoadBalancerClass]),
+				"service", util.Key(oldSvc))
+			return false
+		}
 		util.ServiceLog.Info(fmt.Sprintf("TypeChanged %v - %v", oldSvc.Spec.Type, newSvc.Spec.Type),
 			"service", util.Key(oldSvc))
 		recorder.Event(
@@ -140,14 +139,13 @@ func needUpdate(oldSvc, newSvc *v1.Service, recorder record.EventRecorder) bool 
 }
 
 func needAdd(newService *v1.Service) bool {
-	if needLoadBalancer(newService) {
+	if helper.NeedCLB(newService) {
 		return true
 	}
 
 	// was LoadBalancer
-	_, ok := newService.Labels[LabelServiceHash]
-	if ok {
-		util.ServiceLog.Info("service has hash label, which may was LoadBalancer", "service", util.Key(newService))
+	if helper.HasFinalizer(newService, helper.ServiceFinalizer) {
+		util.ServiceLog.Info("service has service finalizer, which may was LoadBalancer", "service", util.Key(newService))
 		return true
 	}
 	return false
@@ -186,7 +184,7 @@ func (h *enqueueRequestForEndpointEvent) Update(e event.UpdateEvent, queue workq
 		!reflect.DeepEqual(ep1.Subsets, ep2.Subsets) {
 		util.ServiceLog.Info("controller: endpoint update event", "endpoint", util.Key(ep1))
 		util.ServiceLog.Info(fmt.Sprintf("endpoints before [%s], afeter [%s]",
-			LogEndpoints(ep1), LogEndpoints(ep2)), "endpoint", util.Key(ep1))
+			helper.LogEndpoints(ep1), helper.LogEndpoints(ep2)), "endpoint", util.Key(ep1))
 		h.enqueueManagedEndpoint(queue, ep1)
 	}
 }
@@ -238,13 +236,7 @@ func isEndpointProcessNeeded(ep *v1.Endpoints, client client.Client) bool {
 		return false
 	}
 
-	if !isServiceProcessNeeded(svc) {
-		util.ServiceLog.Info("endpoint change: service class not empty, skip reconcile",
-			"endpoint", util.Key(ep))
-		return false
-	}
-
-	if !needLoadBalancer(svc) {
+	if !helper.NeedCLB(svc) {
 		// it is safe not to reconcile endpoints which belongs to the non-loadbalancer svc
 		util.ServiceLog.V(5).Info("endpoint change: loadBalancer is not needed, skip",
 			"endpoint", util.Key(ep))
@@ -319,10 +311,7 @@ func (h *enqueueRequestForNodeEvent) enqueueManagedNode(queue workqueue.RateLimi
 	}
 
 	for _, v := range svcs.Items {
-		if !needLoadBalancer(&v) {
-			continue
-		}
-		if !isServiceProcessNeeded(&v) {
+		if !helper.NeedCLB(&v) {
 			continue
 		}
 		queue.Add(reconcile.Request{
@@ -368,7 +357,8 @@ func (h *enqueueRequestForEndpointSliceEvent) Update(e event.UpdateEvent, queue 
 	if ok1 && ok2 && isEndpointSliceProcessNeeded(es1, h.client) &&
 		isEndpointSliceUpdateNeeded(es1, es2) {
 		util.ServiceLog.Info("controller: endpointslice update event", "endpointslice", util.Key(es1))
-		util.ServiceLog.Info(fmt.Sprintf("endpoints before [%s], afeter [%s]", LogEndpointSlice(es1), LogEndpointSlice(es2)), "endpointslice", util.Key(es1))
+		util.ServiceLog.Info(fmt.Sprintf("endpoints before [%s], afeter [%s]",
+			helper.LogEndpointSlice(es1), helper.LogEndpointSlice(es2)), "endpointslice", util.Key(es1))
 		h.enqueueManagedEndpointSlice(queue, es1)
 	}
 }
@@ -425,13 +415,7 @@ func isEndpointSliceProcessNeeded(es *discovery.EndpointSlice, client client.Cli
 		return false
 	}
 
-	if !isServiceProcessNeeded(svc) {
-		util.ServiceLog.Info("endpointslice change: service class not empty, skip reconcile",
-			"endpointslice", util.Key(es))
-		return false
-	}
-
-	if !needLoadBalancer(svc) {
+	if !helper.NeedCLB(svc) {
 		// it is safe not to reconcile endpointslice which belongs to the non-loadbalancer svc
 		util.ServiceLog.V(5).Info("endpointslice change: loadBalancer is not needed, skip",
 			"endpointslice", util.Key(es))
@@ -504,5 +488,22 @@ func nodeLabelsChanged(nodeName string, oldL, newL map[string]string) bool {
 		}
 	}
 	// no need for reverse compare
+	return false
+}
+
+// only for node event
+func canNodeSkipEventHandler(node *v1.Node) bool {
+	if node == nil || node.Labels == nil {
+		return false
+	}
+
+	if helper.HasExcludeLabel(node) {
+		klog.V(5).Infof("node %s has exclude label, skip", node.Name)
+		return true
+	}
+	if helper.IsMasterNode(node) {
+		klog.V(5).Infof("node %s is master node, skip", node.Name)
+		return true
+	}
 	return false
 }

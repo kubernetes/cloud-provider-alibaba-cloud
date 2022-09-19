@@ -1,13 +1,16 @@
-package service
+package clbv1
 
 import (
 	"fmt"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/helper"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/service/reconcile/annotation"
+	svcCtx "k8s.io/cloud-provider-alibaba-cloud/pkg/controller/service/reconcile/context"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/model"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/util"
 )
 
 type IModelBuilder interface {
-	Build(reqCtx *RequestContext) (*model.LoadBalancer, error)
+	Build(reqCtx *svcCtx.RequestContext) (*model.LoadBalancer, error)
 }
 
 type ModelType string
@@ -45,20 +48,20 @@ func (builder *ModelBuilder) Instance(modelType ModelType) IModelBuilder {
 	return &localModel{builder}
 }
 
-func (builder *ModelBuilder) BuildModel(reqCtx *RequestContext, modelType ModelType) (*model.LoadBalancer, error) {
+func (builder *ModelBuilder) BuildModel(reqCtx *svcCtx.RequestContext, modelType ModelType) (*model.LoadBalancer, error) {
 	return builder.Instance(modelType).Build(reqCtx)
 }
 
 // localModel build model according to the Kubernetes cluster info
 type localModel struct{ *ModelBuilder }
 
-func (c localModel) Build(reqCtx *RequestContext) (*model.LoadBalancer, error) {
+func (c localModel) Build(reqCtx *svcCtx.RequestContext) (*model.LoadBalancer, error) {
 	lbMdl := &model.LoadBalancer{
 		NamespacedName: util.NamespacedName(reqCtx.Service),
 	}
 	// if the service do not need loadbalancer any more, return directly.
-	if needDeleteLoadBalancer(reqCtx.Service) {
-		if reqCtx.Anno.Get(LoadBalancerId) != "" {
+	if helper.NeedDeleteLoadBalancer(reqCtx.Service) {
+		if reqCtx.Anno.Get(annotation.LoadBalancerId) != "" {
 			lbMdl.LoadBalancerAttribute.IsUserManaged = true
 		}
 		return lbMdl, nil
@@ -79,7 +82,7 @@ func (c localModel) Build(reqCtx *RequestContext) (*model.LoadBalancer, error) {
 // localModel build model according to the cloud loadbalancer info
 type remoteModel struct{ *ModelBuilder }
 
-func (c remoteModel) Build(reqCtx *RequestContext) (*model.LoadBalancer, error) {
+func (c remoteModel) Build(reqCtx *svcCtx.RequestContext) (*model.LoadBalancer, error) {
 	lbMdl := &model.LoadBalancer{
 		NamespacedName: util.NamespacedName(reqCtx.Service),
 	}

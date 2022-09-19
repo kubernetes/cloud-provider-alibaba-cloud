@@ -1,4 +1,4 @@
-package service
+package clbv1
 
 import (
 	"fmt"

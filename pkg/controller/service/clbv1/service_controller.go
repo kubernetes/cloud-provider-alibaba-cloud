@@ -1,4 +1,4 @@
-package service
+package clbv1
 
 import (
 	"context"
@@ -9,6 +9,8 @@ import (
 	discovery "k8s.io/api/discovery/v1beta1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/util/workqueue"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/service/reconcile/annotation"
+	svcCtx "k8s.io/cloud-provider-alibaba-cloud/pkg/controller/service/reconcile/context"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/util/metric"
 	"k8s.io/klog/v2"
 	"os"
@@ -87,6 +89,7 @@ func add(mgr manager.Manager, r *ReconcileService) error {
 			Reconciler:              r,
 			MaxConcurrentReconciles: 2,
 			RateLimiter:             rateLimit,
+			RecoverPanic:            true,
 		},
 	)
 	if err != nil {
@@ -98,7 +101,7 @@ func add(mgr manager.Manager, r *ReconcileService) error {
 		return fmt.Errorf("watch resource svc error: %s", err.Error())
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(helper.EndpointSlice) {
+	if utilfeature.DefaultFeatureGate.Enabled(ctrlCfg.EndpointSlice) {
 		// watch endpointslice
 		if err := c.Watch(&source.Kind{Type: &discovery.EndpointSlice{}},
 			NewEnqueueRequestForEndpointSliceEvent(mgr.GetEventRecorderFor("service-controller"))); err != nil {
@@ -143,14 +146,6 @@ func (m *ReconcileService) Reconcile(_ context.Context, request reconcile.Reques
 	return reconcile.Result{}, m.reconcile(request)
 }
 
-type RequestContext struct {
-	Ctx      context.Context
-	Service  *v1.Service
-	Anno     *AnnotationRequest
-	Log      logr.Logger
-	Recorder record.EventRecorder
-}
-
 func (m *ReconcileService) reconcile(request reconcile.Request) (err error) {
 	startTime := time.Now()
 
@@ -185,11 +180,11 @@ func (m *ReconcileService) reconcile(request reconcile.Request) (err error) {
 		util.ServiceLog.Error(err, "reconcile: get service failed", "service", request.NamespacedName)
 		return err
 	}
-	anno := &AnnotationRequest{Service: svc}
+	anno := &annotation.AnnotationRequest{Service: svc}
 
 	// disable public address
-	if anno.Get(AddressType) == "" ||
-		anno.Get(AddressType) == string(model.InternetAddressType) {
+	if anno.Get(annotation.AddressType) == "" ||
+		anno.Get(annotation.AddressType) == string(model.InternetAddressType) {
 		if ctrlCfg.CloudCFG.Global.DisablePublicSLB {
 			m.record.Event(svc, v1.EventTypeWarning, helper.FailedSyncLB, "create public address slb is not allowed")
 			// do not support create public address slb, return and don't requeue
@@ -201,7 +196,7 @@ func (m *ReconcileService) reconcile(request reconcile.Request) (err error) {
 	ctx := context.Background()
 	ctx = context.WithValue(ctx, dryrun.ContextService, svc)
 
-	reqContext := &RequestContext{
+	reqContext := &svcCtx.RequestContext{
 		Ctx:      ctx,
 		Service:  svc,
 		Anno:     anno,
@@ -222,7 +217,7 @@ func (m *ReconcileService) reconcile(request reconcile.Request) (err error) {
 	}
 
 	// check to see whither if loadbalancer deletion is needed
-	if needDeleteLoadBalancer(svc) {
+	if helper.NeedDeleteLoadBalancer(svc) {
 		err = m.cleanupLoadBalancerResources(reqContext)
 	} else {
 		err = m.reconcileLoadBalancerResources(reqContext)
@@ -238,9 +233,9 @@ func (m *ReconcileService) reconcile(request reconcile.Request) (err error) {
 	return nil
 }
 
-func (m *ReconcileService) cleanupLoadBalancerResources(reqCtx *RequestContext) error {
+func (m *ReconcileService) cleanupLoadBalancerResources(reqCtx *svcCtx.RequestContext) error {
 	reqCtx.Log.Info("service do not need lb any more, try to delete it")
-	if helper.HasFinalizer(reqCtx.Service, ServiceFinalizer) {
+	if helper.HasFinalizer(reqCtx.Service, helper.ServiceFinalizer) {
 		lb, err := m.buildAndApplyModel(reqCtx)
 		if err != nil && !strings.Contains(err.Error(), "LoadBalancerId does not exist") {
 			m.record.Event(reqCtx.Service, v1.EventTypeWarning, helper.FailedCleanLB,
@@ -263,7 +258,7 @@ func (m *ReconcileService) cleanupLoadBalancerResources(reqCtx *RequestContext) 
 			return err
 		}
 
-		if err := m.finalizerManager.RemoveFinalizers(reqCtx.Ctx, reqCtx.Service, ServiceFinalizer); err != nil {
+		if err := m.finalizerManager.RemoveFinalizers(reqCtx.Ctx, reqCtx.Service, helper.ServiceFinalizer); err != nil {
 			m.record.Event(reqCtx.Service, v1.EventTypeWarning, helper.FailedRemoveFinalizer,
 				fmt.Sprintf("Error removing load balancer finalizer: %v", err.Error()))
 			return err
@@ -273,9 +268,9 @@ func (m *ReconcileService) cleanupLoadBalancerResources(reqCtx *RequestContext) 
 	return nil
 }
 
-func (m *ReconcileService) reconcileLoadBalancerResources(req *RequestContext) error {
+func (m *ReconcileService) reconcileLoadBalancerResources(req *svcCtx.RequestContext) error {
 
-	if err := m.finalizerManager.AddFinalizers(req.Ctx, req.Service, ServiceFinalizer); err != nil {
+	if err := m.finalizerManager.AddFinalizers(req.Ctx, req.Service, helper.ServiceFinalizer); err != nil {
 		m.record.Event(req.Service, v1.EventTypeWarning, helper.FailedAddFinalizer,
 			fmt.Sprintf("Error adding finalizer: %s", err.Error()))
 		return err
@@ -306,7 +301,7 @@ func (m *ReconcileService) reconcileLoadBalancerResources(req *RequestContext) e
 	return nil
 }
 
-func (m *ReconcileService) buildAndApplyModel(reqCtx *RequestContext) (*model.LoadBalancer, error) {
+func (m *ReconcileService) buildAndApplyModel(reqCtx *svcCtx.RequestContext) (*model.LoadBalancer, error) {
 
 	// build local model
 	localModel, err := m.builder.BuildModel(reqCtx, LocalModel)
@@ -327,7 +322,7 @@ func (m *ReconcileService) buildAndApplyModel(reqCtx *RequestContext) (*model.Lo
 	return remoteModel, nil
 }
 
-func (m *ReconcileService) updateServiceStatus(reqCtx *RequestContext, svc *v1.Service, lb *model.LoadBalancer) error {
+func (m *ReconcileService) updateServiceStatus(reqCtx *svcCtx.RequestContext, svc *v1.Service, lb *model.LoadBalancer) error {
 	preStatus := svc.Status.LoadBalancer.DeepCopy()
 	newStatus := &v1.LoadBalancerStatus{}
 	if lb == nil {
@@ -335,7 +330,7 @@ func (m *ReconcileService) updateServiceStatus(reqCtx *RequestContext, svc *v1.S
 	}
 
 	// EIP ExternalIPType, use the slb associated elastic ip as service external ip
-	if reqCtx.Anno.Get(ExternalIPType) == "eip" {
+	if reqCtx.Anno.Get(annotation.ExternalIPType) == "eip" {
 		ingress, err := m.setEIPAsExternalIP(reqCtx.Ctx, lb.LoadBalancerAttribute.LoadBalancerId)
 		if err != nil {
 			reqCtx.Recorder.Event(svc, v1.EventTypeWarning, "FailedSetEIPAddress", "get eip error, set external ip to slb ip")
@@ -344,9 +339,9 @@ func (m *ReconcileService) updateServiceStatus(reqCtx *RequestContext, svc *v1.S
 	}
 
 	// HostName if user set HostName annotation, use it as service.status.ingress.hostname value
-	if reqCtx.Anno.Get(HostName) != "" {
+	if reqCtx.Anno.Get(annotation.HostName) != "" {
 		ingress := []v1.LoadBalancerIngress{
-			{Hostname: reqCtx.Anno.Get(HostName)},
+			{Hostname: reqCtx.Anno.Get(annotation.HostName)},
 		}
 		newStatus.Ingress = ingress
 	}
@@ -365,7 +360,7 @@ func (m *ReconcileService) updateServiceStatus(reqCtx *RequestContext, svc *v1.S
 	if !v1helper.LoadBalancerStatusEqual(preStatus, newStatus) {
 		util.ServiceLog.Info(fmt.Sprintf("status: [%v] [%v]", preStatus, newStatus))
 		var retErr error
-		_ = retry(
+		_ = helper.Retry(
 			&wait.Backoff{
 				Duration: 1 * time.Second,
 				Steps:    3,
@@ -403,7 +398,7 @@ func (m *ReconcileService) updateServiceStatus(reqCtx *RequestContext, svc *v1.S
 				}
 				reqCtx.Log.Error(retErr, "failed to persist updated LoadBalancerStatus"+
 					" after creating its load balancer")
-				return fmt.Errorf("retry with %s, %s", retErr.Error(), TRY_AGAIN)
+				return fmt.Errorf("retry with %s, %s", retErr.Error(), helper.TRY_AGAIN)
 			},
 			svc,
 		)
@@ -413,7 +408,7 @@ func (m *ReconcileService) updateServiceStatus(reqCtx *RequestContext, svc *v1.S
 
 }
 
-func (m *ReconcileService) removeServiceStatus(reqCtx *RequestContext, svc *v1.Service) error {
+func (m *ReconcileService) removeServiceStatus(reqCtx *svcCtx.RequestContext, svc *v1.Service) error {
 	preStatus := svc.Status.LoadBalancer.DeepCopy()
 	newStatus := &v1.LoadBalancerStatus{}
 
@@ -421,7 +416,7 @@ func (m *ReconcileService) removeServiceStatus(reqCtx *RequestContext, svc *v1.S
 	// TODO: Be careful here ... what if there were other changes to the service?
 	if !v1helper.LoadBalancerStatusEqual(preStatus, newStatus) {
 		util.ServiceLog.Info(fmt.Sprintf("status: [%v] [%v]", preStatus, newStatus))
-		return retry(
+		return helper.Retry(
 			&wait.Backoff{
 				Duration: 1 * time.Second,
 				Steps:    3,
@@ -458,7 +453,7 @@ func (m *ReconcileService) removeServiceStatus(reqCtx *RequestContext, svc *v1.S
 				}
 				reqCtx.Log.Error(err, "failed to persist updated LoadBalancerStatus"+
 					" after creating its load balancer")
-				return fmt.Errorf("retry with %s, %s", err.Error(), TRY_AGAIN)
+				return fmt.Errorf("retry with %s, %s", err.Error(), helper.TRY_AGAIN)
 			},
 			svc,
 		)
@@ -472,10 +467,10 @@ func (m *ReconcileService) addServiceLabels(svc *v1.Service, lbId string) error 
 	if updated.Labels == nil {
 		updated.Labels = make(map[string]string)
 	}
-	serviceHash := getServiceHash(svc)
-	updated.Labels[LabelServiceHash] = serviceHash
+	serviceHash := helper.GetServiceHash(svc)
+	updated.Labels[helper.LabelServiceHash] = serviceHash
 	if lbId != "" {
-		updated.Labels[LabelLoadBalancerId] = lbId
+		updated.Labels[helper.LabelLoadBalancerId] = lbId
 	}
 	if err := m.kubeClient.Status().Patch(context.Background(), updated, client.MergeFrom(svc)); err != nil {
 		return fmt.Errorf("%s failed to add service hash:, error: %s", util.Key(svc), err.Error())
@@ -486,12 +481,12 @@ func (m *ReconcileService) addServiceLabels(svc *v1.Service, lbId string) error 
 func (m *ReconcileService) removeServiceLabels(svc *v1.Service) error {
 	updated := svc.DeepCopy()
 	needUpdate := false
-	if _, ok := updated.Labels[LabelServiceHash]; ok {
-		delete(updated.Labels, LabelServiceHash)
+	if _, ok := updated.Labels[helper.LabelServiceHash]; ok {
+		delete(updated.Labels, helper.LabelServiceHash)
 		needUpdate = true
 	}
-	if _, ok := updated.Labels[LabelLoadBalancerId]; ok {
-		delete(updated.Labels, LabelLoadBalancerId)
+	if _, ok := updated.Labels[helper.LabelLoadBalancerId]; ok {
+		delete(updated.Labels, helper.LabelLoadBalancerId)
 		needUpdate = true
 	}
 	if needUpdate {

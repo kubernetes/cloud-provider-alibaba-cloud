@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"github.com/spf13/pflag"
 	apiext "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
-	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/helper"
 	"k8s.io/cloud-provider/config"
 	"k8s.io/klog/v2"
 	"os"
@@ -121,7 +120,7 @@ func (cfg *ControllerConfig) LoadControllerConfig() error {
 
 	if cfg.CloudConfig.Global.FeatureGates != "" {
 		apiClient := apiext.NewForConfigOrDie(sigConfig.GetConfigOrDie())
-		return helper.BindFeatureGates(apiClient, cfg.CloudConfig.Global.FeatureGates)
+		return BindFeatureGates(apiClient, cfg.CloudConfig.Global.FeatureGates)
 	}
 	return nil
 }

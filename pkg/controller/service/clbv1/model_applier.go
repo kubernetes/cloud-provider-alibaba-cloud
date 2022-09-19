@@ -1,10 +1,14 @@
-package service
+package clbv1
 
 import (
 	"context"
 	"fmt"
+	v1 "k8s.io/api/core/v1"
 	ctrlCfg "k8s.io/cloud-provider-alibaba-cloud/pkg/config"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/helper"
+	svcCtx "k8s.io/cloud-provider-alibaba-cloud/pkg/controller/service/reconcile/context"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/model"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/model/tag"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/dryrun"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/util"
 	"sort"
@@ -24,7 +28,7 @@ type ModelApplier struct {
 	vGroupMgr *VGroupManager
 }
 
-func (m *ModelApplier) Apply(reqCtx *RequestContext, local *model.LoadBalancer) (*model.LoadBalancer, error) {
+func (m *ModelApplier) Apply(reqCtx *svcCtx.RequestContext, local *model.LoadBalancer) (*model.LoadBalancer, error) {
 	remote := &model.LoadBalancer{
 		NamespacedName: util.NamespacedName(reqCtx.Service),
 	}
@@ -34,7 +38,7 @@ func (m *ModelApplier) Apply(reqCtx *RequestContext, local *model.LoadBalancer) 
 		return remote, fmt.Errorf("get load balancer attribute from cloud, error: %s", err.Error())
 	}
 
-	serviceHashChanged := isServiceHashChanged(reqCtx.Service)
+	serviceHashChanged := helper.IsServiceHashChanged(reqCtx.Service)
 	// apply sequence can not change, apply lb first, then vgroup, listener at last
 	if serviceHashChanged || ctrlCfg.ControllerCFG.DryRun {
 		if err := m.applyLoadBalancerAttribute(reqCtx, local, remote); err != nil {
@@ -44,12 +48,12 @@ func (m *ModelApplier) Apply(reqCtx *RequestContext, local *model.LoadBalancer) 
 
 	if remote.LoadBalancerAttribute.LoadBalancerId == "" {
 		// delete loadbalancer: return nil
-		if needDeleteLoadBalancer(reqCtx.Service) {
+		if helper.NeedDeleteLoadBalancer(reqCtx.Service) {
 			return remote, nil
 		}
 		// update loadbalancer: return error
 		return remote, fmt.Errorf("alicloud: can not find loadbalancer by tag [%s:%s]",
-			TAGKEY, reqCtx.Anno.GetDefaultLoadBalancerName())
+			helper.TAGKEY, reqCtx.Anno.GetDefaultLoadBalancerName())
 	}
 	reqCtx.Ctx = context.WithValue(reqCtx.Ctx, dryrun.ContextSLB, remote.LoadBalancerAttribute.LoadBalancerId)
 
@@ -76,7 +80,7 @@ func (m *ModelApplier) Apply(reqCtx *RequestContext, local *model.LoadBalancer) 
 	return remote, nil
 }
 
-func (m *ModelApplier) applyLoadBalancerAttribute(reqCtx *RequestContext, local *model.LoadBalancer, remote *model.LoadBalancer) error {
+func (m *ModelApplier) applyLoadBalancerAttribute(reqCtx *svcCtx.RequestContext, local *model.LoadBalancer, remote *model.LoadBalancer) error {
 	if local == nil {
 		return fmt.Errorf("local model is nil")
 	}
@@ -89,7 +93,7 @@ func (m *ModelApplier) applyLoadBalancerAttribute(reqCtx *RequestContext, local 
 	}
 
 	// delete slb
-	if needDeleteLoadBalancer(reqCtx.Service) {
+	if helper.NeedDeleteLoadBalancer(reqCtx.Service) {
 		if !local.LoadBalancerAttribute.IsUserManaged {
 			err := m.slbMgr.Delete(reqCtx, remote)
 			if err != nil {
@@ -106,7 +110,7 @@ func (m *ModelApplier) applyLoadBalancerAttribute(reqCtx *RequestContext, local 
 
 	// create slb
 	if remote.LoadBalancerAttribute.LoadBalancerId == "" {
-		if isServiceOwnIngress(reqCtx.Service) {
+		if helper.IsServiceOwnIngress(reqCtx.Service) {
 			return fmt.Errorf("alicloud: can not find loadbalancer, but it's defined in service [%v] "+
 				"this may happen when you delete the loadbalancer", reqCtx.Service.Status.LoadBalancer.Ingress[0].IP)
 		}
@@ -124,14 +128,14 @@ func (m *ModelApplier) applyLoadBalancerAttribute(reqCtx *RequestContext, local 
 		return nil
 	}
 
-	tags, err := m.slbMgr.cloud.DescribeTags(reqCtx.Ctx, remote.LoadBalancerAttribute.LoadBalancerId)
+	tags, err := m.slbMgr.cloud.ListCLBTagResources(reqCtx.Ctx, remote.LoadBalancerAttribute.LoadBalancerId)
 	if err != nil {
 		return fmt.Errorf("DescribeTags: %s", err.Error())
 	}
 	remote.LoadBalancerAttribute.Tags = tags
 
 	// check whether slb can be reused
-	if !needDeleteLoadBalancer(reqCtx.Service) && local.LoadBalancerAttribute.IsUserManaged {
+	if !helper.NeedDeleteLoadBalancer(reqCtx.Service) && local.LoadBalancerAttribute.IsUserManaged {
 		if ok, reason := isLoadBalancerReusable(reqCtx.Service, tags, remote.LoadBalancerAttribute.Address); !ok {
 			return fmt.Errorf("alicloud: the loadbalancer %s can not be reused, %s",
 				remote.LoadBalancerAttribute.LoadBalancerId, reason)
@@ -142,7 +146,7 @@ func (m *ModelApplier) applyLoadBalancerAttribute(reqCtx *RequestContext, local 
 
 }
 
-func (m *ModelApplier) applyVGroups(reqCtx *RequestContext, local *model.LoadBalancer, remote *model.LoadBalancer) error {
+func (m *ModelApplier) applyVGroups(reqCtx *svcCtx.RequestContext, local *model.LoadBalancer, remote *model.LoadBalancer) error {
 	for i := range local.VServerGroups {
 		found := false
 		var old model.VServerGroup
@@ -191,9 +195,9 @@ func (m *ModelApplier) applyVGroups(reqCtx *RequestContext, local *model.LoadBal
 	return nil
 }
 
-func (m *ModelApplier) applyListeners(reqCtx *RequestContext, local *model.LoadBalancer, remote *model.LoadBalancer) error {
+func (m *ModelApplier) applyListeners(reqCtx *svcCtx.RequestContext, local *model.LoadBalancer, remote *model.LoadBalancer) error {
 	if local.LoadBalancerAttribute.IsUserManaged {
-		if !reqCtx.Anno.isForceOverride() {
+		if !reqCtx.Anno.IsForceOverride() {
 			reqCtx.Log.Info("listener override is false, skip reconcile listeners")
 			return nil
 		}
@@ -244,7 +248,7 @@ func (m *ModelApplier) applyListeners(reqCtx *RequestContext, local *model.LoadB
 	return nil
 }
 
-func (m *ModelApplier) cleanup(reqCtx *RequestContext, local *model.LoadBalancer, remote *model.LoadBalancer) error {
+func (m *ModelApplier) cleanup(reqCtx *svcCtx.RequestContext, local *model.LoadBalancer, remote *model.LoadBalancer) error {
 	// clean up vServerGroup
 	vgs := remote.VServerGroups
 	for _, vg := range vgs {
@@ -285,4 +289,29 @@ func (m *ModelApplier) cleanup(reqCtx *RequestContext, local *model.LoadBalancer
 		}
 	}
 	return nil
+}
+
+func isLoadBalancerReusable(service *v1.Service, tags []tag.Tag, lbIp string) (bool, string) {
+	for _, tag := range tags {
+		// the tag of the apiserver slb is "ack.aliyun.com": "${clusterid}",
+		// so can not reuse slbs which have ack.aliyun.com tag key.
+		if tag.Key == helper.TAGKEY || tag.Key == util.ClusterTagKey {
+			return false, "can not reuse loadbalancer created by kubernetes."
+		}
+	}
+
+	if len(service.Status.LoadBalancer.Ingress) > 0 {
+		found := false
+		for _, ingress := range service.Status.LoadBalancer.Ingress {
+			if ingress.IP == lbIp || (ingress.Hostname != "" && ingress.IP == "") {
+				found = true
+			}
+		}
+		if !found {
+			return false, fmt.Sprintf("service has been associated with ip [%v], cannot be bound to ip [%s]",
+				service.Status.LoadBalancer.Ingress[0].IP, lbIp)
+		}
+	}
+
+	return true, ""
 }

@@ -1,4 +1,4 @@
-package k8s
+package helper
 
 import (
 	"context"

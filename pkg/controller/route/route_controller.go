@@ -69,6 +69,7 @@ func add(mgr manager.Manager, r *ReconcileRoute) error {
 		controller.Options{
 			Reconciler:              r,
 			MaxConcurrentReconciles: 1,
+			RecoverPanic:            true,
 		},
 	)
 	if err != nil {
