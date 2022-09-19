@@ -142,21 +142,19 @@ func loadBalancerAttrEqual(f *Framework, anno *annotation.AnnotationRequest, svc
 		}
 	}
 
-	if model.InstanceChargeType(anno.Get(annotation.InstanceChargeType)).IsPayBySpec() {
-		if spec := anno.Get(annotation.Spec); spec != "" && string(lb.LoadBalancerSpec) != spec {
-			return fmt.Errorf("expected slb spec %s, got %s", spec, lb.LoadBalancerSpec)
-		}
+	if spec := anno.Get(annotation.Spec); spec != "" && string(lb.LoadBalancerSpec) != spec {
+		return fmt.Errorf("expected slb spec %s, got %s", spec, lb.LoadBalancerSpec)
+	}
 
-		if paymentType := anno.Get(annotation.ChargeType); paymentType != "" {
-			klog.Infof("in, chargeType: svc %s, lb %s", paymentType, lb.InternetChargeType)
-			if string(lb.InternetChargeType) != paymentType {
-				return fmt.Errorf("expected slb payment %s, got %s", paymentType, lb.InternetChargeType)
-			}
-			if paymentType == string(model.PayByBandwidth) {
-				if Bandwidth := anno.Get(annotation.Bandwidth); Bandwidth != "" {
-					if strconv.Itoa(lb.Bandwidth) != Bandwidth {
-						return fmt.Errorf("expected slb Bandwidth %s, got %d", Bandwidth, lb.Bandwidth)
-					}
+	if paymentType := anno.Get(annotation.ChargeType); paymentType != "" {
+		klog.Infof("in, chargeType: svc %s, lb %s", paymentType, lb.InternetChargeType)
+		if string(lb.InternetChargeType) != paymentType {
+			return fmt.Errorf("expected slb payment %s, got %s", paymentType, lb.InternetChargeType)
+		}
+		if paymentType == string(model.PayByBandwidth) {
+			if Bandwidth := anno.Get(annotation.Bandwidth); Bandwidth != "" {
+				if strconv.Itoa(lb.Bandwidth) != Bandwidth {
+					return fmt.Errorf("expected slb Bandwidth %s, got %d", Bandwidth, lb.Bandwidth)
 				}
 			}
 		}

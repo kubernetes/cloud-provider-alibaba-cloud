@@ -86,11 +86,11 @@ func (m *DryRunSLB) SetLoadBalancerModificationProtection(ctx context.Context, l
 	return hintError(mtype, fmt.Sprintf("loadbalancer %s ModificationProtection should be %s", lbId, flag))
 }
 
-func (m *DryRunSLB) ModifyLoadBalancerInstanceChargeType(ctx context.Context, lbId string, instanceChargeType string) error {
+func (m *DryRunSLB) ModifyLoadBalancerInstanceChargeType(ctx context.Context, lbId string, instanceChargeType string, spec string) error {
 	mtype := "ModifyLoadBalancerInstanceChargeType"
 	svc := getService(ctx)
 	AddEvent(SLB, util.Key(svc), lbId, "ModifyLoadBalancerInstanceChargeType", ERROR, "")
-	return hintError(mtype, fmt.Sprintf("loadbalancer %s ModifyLoadBalancerInstanceChargeType should be %s", lbId, instanceChargeType))
+	return hintError(mtype, fmt.Sprintf("loadbalancer %s ModifyLoadBalancerInstanceChargeType should be %s with spec [%s]", lbId, instanceChargeType, spec))
 }
 
 // Tag
@@ -234,8 +234,8 @@ func (m *DryRunSLB) DeleteVServerGroup(ctx context.Context, vGroupId string) err
 }
 
 /*
- From v1.9.3.239-g40d97e1-aliyun, ccm support ecs and eni together.
- If a svc who has ecs and eni backends together, it's normal to call the AddVServerGroupBackendServers api to add eci backend.
+From v1.9.3.239-g40d97e1-aliyun, ccm support ecs and eni together.
+If a svc who has ecs and eni backends together, it's normal to call the AddVServerGroupBackendServers api to add eci backend.
 */
 func (m *DryRunSLB) AddVServerGroupBackendServers(ctx context.Context, vGroupId string, backends string) error {
 	mtype := "AddVServerGroupBackendServers"

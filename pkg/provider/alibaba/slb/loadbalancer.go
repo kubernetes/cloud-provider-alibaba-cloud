@@ -220,10 +220,11 @@ func (p SLBProvider) SetLoadBalancerModificationProtection(ctx context.Context, 
 	return util.SDKError("SetLoadBalancerModificationProtection", err)
 }
 
-func (p SLBProvider) ModifyLoadBalancerInstanceChargeType(ctx context.Context, lbId string, instanceChargeType string) error {
+func (p SLBProvider) ModifyLoadBalancerInstanceChargeType(ctx context.Context, lbId string, instanceChargeType string, spec string) error {
 	req := slb.CreateModifyLoadBalancerInstanceChargeTypeRequest()
 	req.LoadBalancerId = lbId
 	req.InstanceChargeType = instanceChargeType
+	req.LoadBalancerSpec = spec
 	_, err := p.auth.SLB.ModifyLoadBalancerInstanceChargeType(req)
 	return util.SDKError("ModifyLoadBalancerInstanceChargeType", err)
 }

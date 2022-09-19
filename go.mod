@@ -7,7 +7,7 @@ require (
 	github.com/alibabacloud-go/darabonba-openapi v0.1.18
 	github.com/alibabacloud-go/nlb-20220430 v1.0.5
 	github.com/alibabacloud-go/tea v1.1.19
-	github.com/aliyun/alibaba-cloud-sdk-go v1.61.1607
+	github.com/aliyun/alibaba-cloud-sdk-go v1.61.1727
 	github.com/eapache/channels v1.1.0
 	github.com/ghodss/yaml v1.0.0
 	github.com/go-cmd/cmd v1.2.1

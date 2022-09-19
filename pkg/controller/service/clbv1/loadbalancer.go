@@ -113,61 +113,69 @@ func (mgr *LoadBalancerManager) Update(reqCtx *svcCtx.RequestContext, local, rem
 		return fmt.Errorf("alicloud: can not change ResourceGroupId once created")
 	}
 
-	// only supports pay by spec instances
-	if local.LoadBalancerAttribute.InstanceChargeType.IsPayBySpec() {
-		// update chargeType & bandwidth
-		needUpdate, charge, bandwidth := false, remote.LoadBalancerAttribute.InternetChargeType, remote.LoadBalancerAttribute.Bandwidth
-		if local.LoadBalancerAttribute.InternetChargeType != "" &&
-			local.LoadBalancerAttribute.InternetChargeType != remote.LoadBalancerAttribute.InternetChargeType {
-			needUpdate = true
-			charge = local.LoadBalancerAttribute.InternetChargeType
-			reqCtx.Log.Info(fmt.Sprintf("update lb: internet chargeType changed([%s] - [%s])",
-				remote.LoadBalancerAttribute.InternetChargeType, local.LoadBalancerAttribute.InternetChargeType),
-				"lbId", lbId)
-		}
-		if local.LoadBalancerAttribute.Bandwidth != 0 &&
-			local.LoadBalancerAttribute.Bandwidth != remote.LoadBalancerAttribute.Bandwidth &&
-			local.LoadBalancerAttribute.InternetChargeType == model.PayByBandwidth {
-			needUpdate = true
-			bandwidth = local.LoadBalancerAttribute.Bandwidth
-			reqCtx.Log.Info(fmt.Sprintf("update lb: bandwidth changed([%d] - [%d])",
-				remote.LoadBalancerAttribute.Bandwidth, local.LoadBalancerAttribute.Bandwidth),
-				"lbId", lbId)
-		}
-		if needUpdate {
-			if remote.LoadBalancerAttribute.AddressType == model.InternetAddressType {
-				reqCtx.Log.Info(fmt.Sprintf("update lb: modify loadbalancer: chargeType=%s, bandwidth=%d", charge, bandwidth),
-					"lbId", lbId)
-				if err := mgr.cloud.ModifyLoadBalancerInternetSpec(reqCtx.Ctx, lbId, string(charge), bandwidth); err != nil {
-					return fmt.Errorf("ModifyLoadBalancerInternetSpec: %s", err.Error())
-				}
-			} else {
-				reqCtx.Log.Info("update lb: only internet loadbalancer is allowed to modify bandwidth and pay type",
-					"lbId", lbId)
-			}
+	// need to change instance chargeType first
+	if local.LoadBalancerAttribute.InstanceChargeType != "" &&
+		local.LoadBalancerAttribute.InstanceChargeType != remote.LoadBalancerAttribute.InstanceChargeType {
+		spec := ""
+		if local.LoadBalancerAttribute.LoadBalancerSpec == "" {
+			spec = reqCtx.Anno.GetDefaultValue(annotation.Spec)
+		} else {
+			spec = string(local.LoadBalancerAttribute.LoadBalancerSpec)
 		}
 
-		// update instance spec
-		if local.LoadBalancerAttribute.LoadBalancerSpec != "" &&
-			local.LoadBalancerAttribute.LoadBalancerSpec != remote.LoadBalancerAttribute.LoadBalancerSpec {
-			reqCtx.Log.Info(fmt.Sprintf("update lb: loadbalancerSpec changed ([%s] - [%s])",
-				remote.LoadBalancerAttribute.LoadBalancerSpec, local.LoadBalancerAttribute.LoadBalancerSpec),
-				"lbId", lbId)
-			if err := mgr.cloud.ModifyLoadBalancerInstanceSpec(reqCtx.Ctx, lbId,
-				string(local.LoadBalancerAttribute.LoadBalancerSpec)); err != nil {
-				return fmt.Errorf("ModifyLoadBalancerInstanceSpec: %s", err.Error())
-			}
+		reqCtx.Log.Info(fmt.Sprintf("update lb: InstanceChargeType changed ([%s] - [%s], internetChargeType: [%s], spec: [%s])",
+			remote.LoadBalancerAttribute.InstanceChargeType, local.LoadBalancerAttribute.InstanceChargeType,
+			local.LoadBalancerAttribute.InternetChargeType, spec),
+			"lbId", lbId)
+
+		if err := mgr.cloud.ModifyLoadBalancerInstanceChargeType(reqCtx.Ctx, lbId,
+			string(local.LoadBalancerAttribute.InstanceChargeType), spec); err != nil {
+			return fmt.Errorf("ModifyLoadBalancerInstanceChargeType: %s", err.Error())
 		}
 	}
 
-	if local.LoadBalancerAttribute.InstanceChargeType != "" &&
-		local.LoadBalancerAttribute.InstanceChargeType != remote.LoadBalancerAttribute.InstanceChargeType {
-		reqCtx.Log.Info(fmt.Sprintf("update lb: InstanceChargeType changed ([%s] - [%s])",
-			remote.LoadBalancerAttribute.InstanceChargeType, local.LoadBalancerAttribute.InstanceChargeType),
+	// update chargeType & bandwidth
+	needUpdate, charge, bandwidth := false, remote.LoadBalancerAttribute.InternetChargeType, remote.LoadBalancerAttribute.Bandwidth
+	if local.LoadBalancerAttribute.InternetChargeType != "" &&
+		local.LoadBalancerAttribute.InternetChargeType != remote.LoadBalancerAttribute.InternetChargeType {
+		needUpdate = true
+		charge = local.LoadBalancerAttribute.InternetChargeType
+		reqCtx.Log.Info(fmt.Sprintf("update lb: internet chargeType changed([%s] - [%s])",
+			remote.LoadBalancerAttribute.InternetChargeType, local.LoadBalancerAttribute.InternetChargeType),
 			"lbId", lbId)
-		if err := mgr.cloud.ModifyLoadBalancerInstanceChargeType(reqCtx.Ctx, lbId,
-			string(local.LoadBalancerAttribute.InstanceChargeType)); err != nil {
-			return fmt.Errorf("ModifyLoadBalancerInstanceChargeType: %s", err.Error())
+	}
+	if local.LoadBalancerAttribute.Bandwidth != 0 &&
+		local.LoadBalancerAttribute.Bandwidth != remote.LoadBalancerAttribute.Bandwidth &&
+		local.LoadBalancerAttribute.InternetChargeType == model.PayByBandwidth {
+		needUpdate = true
+		bandwidth = local.LoadBalancerAttribute.Bandwidth
+		reqCtx.Log.Info(fmt.Sprintf("update lb: bandwidth changed([%d] - [%d])",
+			remote.LoadBalancerAttribute.Bandwidth, local.LoadBalancerAttribute.Bandwidth),
+			"lbId", lbId)
+	}
+
+	if needUpdate {
+		if remote.LoadBalancerAttribute.AddressType == model.InternetAddressType {
+			reqCtx.Log.Info(fmt.Sprintf("update lb: modify loadbalancer: chargeType=%s, bandwidth=%d", charge, bandwidth),
+				"lbId", lbId)
+			if err := mgr.cloud.ModifyLoadBalancerInternetSpec(reqCtx.Ctx, lbId, string(charge), bandwidth); err != nil {
+				return fmt.Errorf("ModifyLoadBalancerInternetSpec: %s", err.Error())
+			}
+		} else {
+			reqCtx.Log.Info("update lb: only internet loadbalancer is allowed to modify bandwidth and pay type",
+				"lbId", lbId)
+		}
+	}
+
+	// update instance spec
+	if local.LoadBalancerAttribute.LoadBalancerSpec != "" &&
+		local.LoadBalancerAttribute.LoadBalancerSpec != remote.LoadBalancerAttribute.LoadBalancerSpec {
+		reqCtx.Log.Info(fmt.Sprintf("update lb: loadbalancerSpec changed ([%s] - [%s])",
+			remote.LoadBalancerAttribute.LoadBalancerSpec, local.LoadBalancerAttribute.LoadBalancerSpec),
+			"lbId", lbId)
+		if err := mgr.cloud.ModifyLoadBalancerInstanceSpec(reqCtx.Ctx, lbId,
+			string(local.LoadBalancerAttribute.LoadBalancerSpec)); err != nil {
+			return fmt.Errorf("ModifyLoadBalancerInstanceSpec: %s", err.Error())
 		}
 	}
 
@@ -216,17 +224,17 @@ func (mgr *LoadBalancerManager) BuildLocalModel(reqCtx *svcCtx.RequestContext, m
 	mdl.LoadBalancerAttribute.AddressType = model.AddressType(reqCtx.Anno.Get(annotation.AddressType))
 	mdl.LoadBalancerAttribute.InternetChargeType = model.InternetChargeType(reqCtx.Anno.Get(annotation.ChargeType))
 	mdl.LoadBalancerAttribute.InstanceChargeType = model.InstanceChargeType(reqCtx.Anno.Get(annotation.InstanceChargeType))
-	if mdl.LoadBalancerAttribute.InstanceChargeType.IsPayBySpec() {
-		bandwidth := reqCtx.Anno.Get(annotation.Bandwidth)
-		if bandwidth != "" {
-			i, err := strconv.Atoi(bandwidth)
-			if err != nil {
-				return fmt.Errorf("bandwidth must be integer, got [%s], error: %s", bandwidth, err.Error())
-			}
-			mdl.LoadBalancerAttribute.Bandwidth = i
+	mdl.LoadBalancerAttribute.LoadBalancerSpec = model.LoadBalancerSpecType(reqCtx.Anno.Get(annotation.Spec))
+	bandwidth := reqCtx.Anno.Get(annotation.Bandwidth)
+	if bandwidth != "" {
+		i, err := strconv.Atoi(bandwidth)
+		if err != nil {
+			return fmt.Errorf("bandwidth must be integer, got [%s], error: %s", bandwidth, err.Error())
 		}
-		mdl.LoadBalancerAttribute.LoadBalancerSpec = model.LoadBalancerSpecType(reqCtx.Anno.Get(annotation.Spec))
+		mdl.LoadBalancerAttribute.Bandwidth = i
 	}
+	mdl.LoadBalancerAttribute.LoadBalancerSpec = model.LoadBalancerSpecType(reqCtx.Anno.Get(annotation.Spec))
+
 	if reqCtx.Anno.Get(annotation.LoadBalancerId) != "" {
 		mdl.LoadBalancerAttribute.LoadBalancerId = reqCtx.Anno.Get(annotation.LoadBalancerId)
 		mdl.LoadBalancerAttribute.IsUserManaged = true
