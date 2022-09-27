@@ -119,12 +119,7 @@ func (p *NLBProvider) CreateNLBServerGroup(ctx context.Context, sg *nlbmodel.Ser
 		req.ResourceGroupId = tea.String(sg.ResourceGroupId)
 	}
 	// health check
-	if sg.HealthCheckConfig == nil {
-		// enable health check by default
-		req.HealthCheckConfig = &nlb.CreateServerGroupRequestHealthCheckConfig{
-			HealthCheckEnabled: tea.Bool(true),
-		}
-	} else {
+	if sg.HealthCheckConfig != nil {
 		req.HealthCheckConfig = &nlb.CreateServerGroupRequestHealthCheckConfig{
 			HealthCheckEnabled: sg.HealthCheckConfig.HealthCheckEnabled,
 		}
@@ -173,24 +168,32 @@ func (p *NLBProvider) CreateNLBServerGroup(ctx context.Context, sg *nlbmodel.Ser
 
 	sg.ServerGroupId = tea.StringValue(resp.Body.ServerGroupId)
 
-	return wait.PollImmediate(3*time.Second, 10*time.Second, func() (done bool, err error) {
+	var (
+		getResp *nlb.ListServerGroupsResponse
+		retErr  error
+	)
+
+	_ = wait.PollImmediate(3*time.Second, 10*time.Second, func() (bool, error) {
 		getReq := &nlb.ListServerGroupsRequest{}
 		getReq.ServerGroupIds = []*string{tea.String(sg.ServerGroupId)}
 
-		getResp, err := p.auth.NLB.ListServerGroups(getReq)
-		if err != nil {
-			return false, util.SDKError("ListServerGroups", err)
+		getResp, retErr = p.auth.NLB.ListServerGroups(getReq)
+		if retErr != nil {
+			retErr = util.SDKError("ListServerGroups", retErr)
+			return false, retErr
 		}
 		if getResp == nil || getResp.Body == nil {
-			klog.Errorf("OpenAPI ListServerGroups resp is nil, req: %+v", getReq)
+			retErr = fmt.Errorf("OpenAPI ListServerGroups resp is nil, req: %+v", getReq)
 			return false, nil
 		}
 		if tea.StringValue(getResp.Body.ServerGroups[0].ServerGroupStatus) == "Creating" {
 			klog.V(5).Infof("%s is still in creating status, wait next time", sg.ServerGroupId)
 			return false, nil
 		}
-		return true, nil
+		retErr = nil
+		return true, retErr
 	})
+	return retErr
 }
 
 func (p *NLBProvider) DeleteNLBServerGroup(ctx context.Context, sgId string) error {
@@ -286,7 +289,7 @@ func (p *NLBProvider) AddNLBServers(ctx context.Context, sgId string, backends [
 	if resp == nil || resp.Body == nil {
 		return fmt.Errorf("OpenAPI AddServersToServerGroup resp is nil")
 	}
-	return p.waitJobFinish(tea.StringValue(resp.Body.JobId))
+	return p.waitJobFinish("AddServersToServerGroup", tea.StringValue(resp.Body.JobId))
 }
 
 func (p *NLBProvider) RemoveNLBServers(ctx context.Context, sgId string, backends []nlbmodel.ServerGroupServer,
@@ -314,7 +317,7 @@ func (p *NLBProvider) RemoveNLBServers(ctx context.Context, sgId string, backend
 	if resp == nil || resp.Body == nil {
 		return fmt.Errorf("OpenAPI RemoveServersFromServerGroup resp is nil")
 	}
-	return p.waitJobFinish(tea.StringValue(resp.Body.JobId))
+	return p.waitJobFinish("RemoveServersFromServerGroup", tea.StringValue(resp.Body.JobId))
 }
 
 func (p *NLBProvider) UpdateNLBServers(ctx context.Context, sgId string, backends []nlbmodel.ServerGroupServer,
@@ -344,7 +347,7 @@ func (p *NLBProvider) UpdateNLBServers(ctx context.Context, sgId string, backend
 	if resp == nil || resp.Body == nil {
 		return fmt.Errorf("OpenAPI UpdateServerGroupServersAttribute resp is nil")
 	}
-	return p.waitJobFinish(tea.StringValue(resp.Body.JobId))
+	return p.waitJobFinish("UpdateServerGroupServersAttribute", tea.StringValue(resp.Body.JobId))
 }
 
 func (p *NLBProvider) ListNLBServers(ctx context.Context, sgId string) ([]nlbmodel.ServerGroupServer, error) {

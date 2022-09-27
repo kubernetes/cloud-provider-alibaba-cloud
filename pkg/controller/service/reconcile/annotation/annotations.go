@@ -123,7 +123,6 @@ func NewAnnotationRequest(svc *v1.Service) *AnnotationRequest {
 	return &AnnotationRequest{svc}
 }
 
-// TODO get all annotations value from Get()
 func (n *AnnotationRequest) Get(k string) string {
 	if n.Service == nil {
 		return ""

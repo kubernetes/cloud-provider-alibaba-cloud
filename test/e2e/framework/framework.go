@@ -100,7 +100,6 @@ func (f *Framework) AfterEach() error {
 }
 
 func (f *Framework) CreateCloudResource() error {
-	// todo: create nlb resource
 	f.CreatedResource = make(map[string]string, 0)
 	region, err := f.Client.CloudClient.Region()
 	if err != nil {

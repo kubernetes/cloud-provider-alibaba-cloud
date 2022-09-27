@@ -8,7 +8,6 @@ import (
 	nlbmodel "k8s.io/cloud-provider-alibaba-cloud/pkg/model/nlb"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/util"
 	"k8s.io/klog/v2"
-	"strings"
 )
 
 func (p *NLBProvider) ListNLBListeners(ctx context.Context, lbId string) ([]*nlbmodel.ListenerAttribute, error) {
@@ -63,13 +62,7 @@ func (p *NLBProvider) ListNLBListeners(ctx context.Context, lbId string) ([]*nlb
 		}
 		n.CaEnabled = lis.CaEnabled
 		n.Cps = lis.Cps
-		// TODO ProxyProtocolEnabled will be changed to bool
-		if strings.EqualFold(tea.StringValue(lis.ProxyProtocolEnabled), "true") {
-			n.ProxyProtocolEnabled = tea.Bool(true)
-		} else {
-			n.ProxyProtocolEnabled = tea.Bool(false)
-		}
-
+		n.ProxyProtocolEnabled = lis.ProxyProtocolEnabled
 		nameKey, err := nlbmodel.LoadNLBListenerNamedKey(n.ListenerDescription)
 		if err != nil {
 			n.IsUserManaged = true
@@ -146,7 +139,7 @@ func (p *NLBProvider) DeleteNLBListener(ctx context.Context, listenerId string) 
 	if resp == nil || resp.Body == nil {
 		return fmt.Errorf("OpenAPI DeleteNLBListener resp is nil")
 	}
-	return p.waitJobFinish(tea.StringValue(resp.Body.JobId))
+	return p.waitJobFinish("DeleteListener", tea.StringValue(resp.Body.JobId))
 }
 
 func (p *NLBProvider) StartNLBListener(ctx context.Context, listenerId string) error {

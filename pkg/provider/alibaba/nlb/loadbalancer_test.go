@@ -2,7 +2,7 @@ package nlb
 
 import (
 	"fmt"
-	openapi "github.com/alibabacloud-go/darabonba-openapi/client"
+	openapi "github.com/alibabacloud-go/darabonba-openapi/v2/client"
 	nlb "github.com/alibabacloud-go/nlb-20220430/client"
 	"github.com/alibabacloud-go/tea/tea"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -136,7 +136,7 @@ func TestGetLoadBalancer(t *testing.T) {
 	)
 
 	lbId := "nlb-xxx"
-	_ = wait.PollImmediate(30*time.Second, 1*time.Minute, func() (bool, error) {
+	_ = wait.PollImmediate(20*time.Second, 1*time.Minute, func() (bool, error) {
 		req := &nlb.GetLoadBalancerAttributeRequest{}
 		req.LoadBalancerId = tea.String(lbId)
 

@@ -80,7 +80,8 @@ func (p *NLBProvider) DescribeNLB(ctx context.Context, mdl *nlbmodel.NetworkLoad
 
 		resp, retErr = p.auth.NLB.GetLoadBalancerAttribute(req)
 		if retErr != nil {
-			return false, util.SDKError("GetLoadBalancerAttribute", retErr)
+			retErr = util.SDKError("GetLoadBalancerAttribute", retErr)
+			return false, retErr
 		}
 
 		if resp == nil || resp.Body == nil {
@@ -95,7 +96,7 @@ func (p *NLBProvider) DescribeNLB(ctx context.Context, mdl *nlbmodel.NetworkLoad
 		}
 
 		retErr = nil
-		return true, nil
+		return true, retErr
 	})
 
 	if retErr != nil {
@@ -151,7 +152,7 @@ func (p *NLBProvider) DeleteNLB(ctx context.Context, mdl *nlbmodel.NetworkLoadBa
 	if resp == nil || resp.Body == nil {
 		return fmt.Errorf("OpenAPI DeleteNLB resp is nil")
 	}
-	return p.waitJobFinish(tea.StringValue(resp.Body.JobId), 20*time.Second, 3*time.Minute)
+	return p.waitJobFinish("DeleteLoadBalancer", tea.StringValue(resp.Body.JobId), 20*time.Second, 3*time.Minute)
 }
 
 func (p *NLBProvider) UpdateNLB(ctx context.Context, mdl *nlbmodel.NetworkLoadBalancer) error {
@@ -208,18 +209,8 @@ func (p *NLBProvider) TagNLBResource(ctx context.Context, resourceId string, res
 		})
 	}
 
-	// TODO remove me
-	// return util.FormatErrorMessage(err)
-	return wait.PollImmediate(3*time.Second, 20*time.Second, func() (done bool, err error) {
-		_, err = p.auth.NLB.TagResources(req)
-		if err != nil {
-			if strings.Contains(err.Error(), "ResourceNotFound") {
-				return false, nil
-			}
-			return false, err
-		}
-		return true, nil
-	})
+	_, err := p.auth.NLB.TagResources(req)
+	return util.SDKError("TagResources", err)
 }
 
 func (p *NLBProvider) ListNLBTagResources(ctx context.Context, lbId string) ([]tag.Tag, error) {
@@ -373,7 +364,7 @@ const (
 	DefaultRetryTimeout  = 30 * time.Second
 )
 
-func (p *NLBProvider) waitJobFinish(jobId string, args ...time.Duration) error {
+func (p *NLBProvider) waitJobFinish(api, jobId string, args ...time.Duration) error {
 	var interval, timeout time.Duration
 	if len(args) < 2 {
 		interval = DefaultRetryInterval
@@ -382,20 +373,27 @@ func (p *NLBProvider) waitJobFinish(jobId string, args ...time.Duration) error {
 		interval = args[0]
 		timeout = args[1]
 	}
-	return wait.PollImmediate(interval, timeout, func() (done bool, err error) {
+	var (
+		resp   *nlb.GetJobStatusResponse
+		retErr error
+	)
+	_ = wait.PollImmediate(interval, timeout, func() (bool, error) {
 		req := &nlb.GetJobStatusRequest{}
 		req.JobId = tea.String(jobId)
-		resp, err := p.auth.NLB.GetJobStatus(req)
-		if err != nil {
-			return false, util.SDKError("GetJobStatus", err)
+		resp, retErr = p.auth.NLB.GetJobStatus(req)
+		if retErr != nil {
+			retErr = util.SDKError(fmt.Sprintf("%s-GetJobStatus", api), retErr)
+			return false, retErr
 		}
 		if resp == nil || resp.Body == nil {
-			klog.Errorf("OpenAPI GetJobStatus resp is nil, JobId: %s", jobId)
+			retErr = fmt.Errorf("OpenAPI %s GetJobStatus resp is nil, JobId: %s", api, jobId)
 			return false, nil
 		}
 
-		return tea.StringValue(resp.Body.Status) == "Succeeded", nil
+		retErr = nil
+		return tea.StringValue(resp.Body.Status) == "Succeeded", retErr
 	})
+	return retErr
 }
 
 // NLBRegionIds used for e2etest

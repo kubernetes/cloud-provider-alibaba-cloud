@@ -83,10 +83,6 @@ func (mgr *ListenerManager) buildListenerFromServicePort(reqCtx *svcCtx.RequestC
 	}
 	if reqCtx.Anno.Get(annotation.TLSCipherPolicy) != "" {
 		listener.SecurityPolicyId = reqCtx.Anno.Get(annotation.TLSCipherPolicy)
-	} else if isTCPSSL(listener.ListenerProtocol) {
-		// TODO remove
-		// set default value
-		listener.SecurityPolicyId = "tls_cipher_policy_1_0"
 	}
 
 	if reqCtx.Anno.Get(annotation.ProxyProtocol) != "" {

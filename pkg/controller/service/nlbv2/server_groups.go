@@ -640,7 +640,6 @@ func updateENIBackends(mgr *ServerGroupManager, backends []nlbmodel.ServerGroupS
 	return backends, nil
 }
 
-// TODO: duplicate code
 func setWeightBackends(mode helper.TrafficPolicy, backends []nlbmodel.ServerGroupServer, weight *int) []nlbmodel.ServerGroupServer {
 	// use default
 	if weight == nil {
