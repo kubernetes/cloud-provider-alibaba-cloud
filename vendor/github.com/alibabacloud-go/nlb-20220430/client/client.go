@@ -5,10 +5,10 @@
 package client
 
 import (
-	openapi "github.com/alibabacloud-go/darabonba-openapi/client"
+	openapi "github.com/alibabacloud-go/darabonba-openapi/v2/client"
 	endpointutil "github.com/alibabacloud-go/endpoint-util/service"
 	openapiutil "github.com/alibabacloud-go/openapi-util/service"
-	util "github.com/alibabacloud-go/tea-utils/service"
+	util "github.com/alibabacloud-go/tea-utils/v2/service"
 	"github.com/alibabacloud-go/tea/tea"
 )
 
@@ -582,7 +582,6 @@ func (s *CreateLoadBalancerRequestZoneMappings) SetZoneId(v string) *CreateLoadB
 }
 
 type CreateLoadBalancerResponseBody struct {
-	JobId          *string `json:"JobId,omitempty" xml:"JobId,omitempty"`
 	LoadbalancerId *string `json:"LoadbalancerId,omitempty" xml:"LoadbalancerId,omitempty"`
 	OrderId        *int64  `json:"OrderId,omitempty" xml:"OrderId,omitempty"`
 	RequestId      *string `json:"RequestId,omitempty" xml:"RequestId,omitempty"`
@@ -594,11 +593,6 @@ func (s CreateLoadBalancerResponseBody) String() string {
 
 func (s CreateLoadBalancerResponseBody) GoString() string {
 	return s.String()
-}
-
-func (s *CreateLoadBalancerResponseBody) SetJobId(v string) *CreateLoadBalancerResponseBody {
-	s.JobId = &v
-	return s
 }
 
 func (s *CreateLoadBalancerResponseBody) SetLoadbalancerId(v string) *CreateLoadBalancerResponseBody {
@@ -758,6 +752,7 @@ func (s *CreateSecurityPolicyResponse) SetBody(v *CreateSecurityPolicyResponseBo
 
 type CreateServerGroupRequest struct {
 	AddressIPVersion        *string                                    `json:"AddressIPVersion,omitempty" xml:"AddressIPVersion,omitempty"`
+	AnyPortEnabled          *bool                                      `json:"AnyPortEnabled,omitempty" xml:"AnyPortEnabled,omitempty"`
 	ClientToken             *string                                    `json:"ClientToken,omitempty" xml:"ClientToken,omitempty"`
 	ConnectionDrainEnabled  *bool                                      `json:"ConnectionDrainEnabled,omitempty" xml:"ConnectionDrainEnabled,omitempty"`
 	ConnectionDrainTimeout  *int32                                     `json:"ConnectionDrainTimeout,omitempty" xml:"ConnectionDrainTimeout,omitempty"`
@@ -783,6 +778,11 @@ func (s CreateServerGroupRequest) GoString() string {
 
 func (s *CreateServerGroupRequest) SetAddressIPVersion(v string) *CreateServerGroupRequest {
 	s.AddressIPVersion = &v
+	return s
+}
+
+func (s *CreateServerGroupRequest) SetAnyPortEnabled(v bool) *CreateServerGroupRequest {
+	s.AnyPortEnabled = &v
 	return s
 }
 
@@ -1941,10 +1941,10 @@ type GetListenerAttributeResponseBody struct {
 	ListenerStatus       *string   `json:"ListenerStatus,omitempty" xml:"ListenerStatus,omitempty"`
 	LoadBalancerId       *string   `json:"LoadBalancerId,omitempty" xml:"LoadBalancerId,omitempty"`
 	Mss                  *int32    `json:"Mss,omitempty" xml:"Mss,omitempty"`
-	ProxyProtocolEnabled *string   `json:"ProxyProtocolEnabled,omitempty" xml:"ProxyProtocolEnabled,omitempty"`
+	ProxyProtocolEnabled *bool     `json:"ProxyProtocolEnabled,omitempty" xml:"ProxyProtocolEnabled,omitempty"`
 	RegionId             *string   `json:"RegionId,omitempty" xml:"RegionId,omitempty"`
 	RequestId            *string   `json:"RequestId,omitempty" xml:"RequestId,omitempty"`
-	SecSensorEnabled     *string   `json:"SecSensorEnabled,omitempty" xml:"SecSensorEnabled,omitempty"`
+	SecSensorEnabled     *bool     `json:"SecSensorEnabled,omitempty" xml:"SecSensorEnabled,omitempty"`
 	SecurityPolicyId     *string   `json:"SecurityPolicyId,omitempty" xml:"SecurityPolicyId,omitempty"`
 	ServerGroupId        *string   `json:"ServerGroupId,omitempty" xml:"ServerGroupId,omitempty"`
 	StartPort            *string   `json:"StartPort,omitempty" xml:"StartPort,omitempty"`
@@ -2033,7 +2033,7 @@ func (s *GetListenerAttributeResponseBody) SetMss(v int32) *GetListenerAttribute
 	return s
 }
 
-func (s *GetListenerAttributeResponseBody) SetProxyProtocolEnabled(v string) *GetListenerAttributeResponseBody {
+func (s *GetListenerAttributeResponseBody) SetProxyProtocolEnabled(v bool) *GetListenerAttributeResponseBody {
 	s.ProxyProtocolEnabled = &v
 	return s
 }
@@ -2048,7 +2048,7 @@ func (s *GetListenerAttributeResponseBody) SetRequestId(v string) *GetListenerAt
 	return s
 }
 
-func (s *GetListenerAttributeResponseBody) SetSecSensorEnabled(v string) *GetListenerAttributeResponseBody {
+func (s *GetListenerAttributeResponseBody) SetSecSensorEnabled(v bool) *GetListenerAttributeResponseBody {
 	s.SecSensorEnabled = &v
 	return s
 }
@@ -2835,7 +2835,7 @@ func (s *ListListenersResponseBody) SetTotalCount(v int32) *ListListenersRespons
 }
 
 type ListListenersResponseBodyListeners struct {
-	AlpnEnabled          *string   `json:"AlpnEnabled,omitempty" xml:"AlpnEnabled,omitempty"`
+	AlpnEnabled          *bool     `json:"AlpnEnabled,omitempty" xml:"AlpnEnabled,omitempty"`
 	AlpnPolicy           *string   `json:"AlpnPolicy,omitempty" xml:"AlpnPolicy,omitempty"`
 	CaCertificateIds     []*string `json:"CaCertificateIds,omitempty" xml:"CaCertificateIds,omitempty" type:"Repeated"`
 	CaEnabled            *bool     `json:"CaEnabled,omitempty" xml:"CaEnabled,omitempty"`
@@ -2850,9 +2850,9 @@ type ListListenersResponseBodyListeners struct {
 	ListenerStatus       *string   `json:"ListenerStatus,omitempty" xml:"ListenerStatus,omitempty"`
 	LoadBalancerId       *string   `json:"LoadBalancerId,omitempty" xml:"LoadBalancerId,omitempty"`
 	Mss                  *int32    `json:"Mss,omitempty" xml:"Mss,omitempty"`
-	ProxyProtocolEnabled *string   `json:"ProxyProtocolEnabled,omitempty" xml:"ProxyProtocolEnabled,omitempty"`
+	ProxyProtocolEnabled *bool     `json:"ProxyProtocolEnabled,omitempty" xml:"ProxyProtocolEnabled,omitempty"`
 	RegionId             *string   `json:"RegionId,omitempty" xml:"RegionId,omitempty"`
-	SecSensorEnabled     *string   `json:"SecSensorEnabled,omitempty" xml:"SecSensorEnabled,omitempty"`
+	SecSensorEnabled     *bool     `json:"SecSensorEnabled,omitempty" xml:"SecSensorEnabled,omitempty"`
 	SecurityPolicyId     *string   `json:"SecurityPolicyId,omitempty" xml:"SecurityPolicyId,omitempty"`
 	ServerGroupId        *string   `json:"ServerGroupId,omitempty" xml:"ServerGroupId,omitempty"`
 	StartPort            *string   `json:"StartPort,omitempty" xml:"StartPort,omitempty"`
@@ -2866,7 +2866,7 @@ func (s ListListenersResponseBodyListeners) GoString() string {
 	return s.String()
 }
 
-func (s *ListListenersResponseBodyListeners) SetAlpnEnabled(v string) *ListListenersResponseBodyListeners {
+func (s *ListListenersResponseBodyListeners) SetAlpnEnabled(v bool) *ListListenersResponseBodyListeners {
 	s.AlpnEnabled = &v
 	return s
 }
@@ -2941,7 +2941,7 @@ func (s *ListListenersResponseBodyListeners) SetMss(v int32) *ListListenersRespo
 	return s
 }
 
-func (s *ListListenersResponseBodyListeners) SetProxyProtocolEnabled(v string) *ListListenersResponseBodyListeners {
+func (s *ListListenersResponseBodyListeners) SetProxyProtocolEnabled(v bool) *ListListenersResponseBodyListeners {
 	s.ProxyProtocolEnabled = &v
 	return s
 }
@@ -2951,7 +2951,7 @@ func (s *ListListenersResponseBodyListeners) SetRegionId(v string) *ListListener
 	return s
 }
 
-func (s *ListListenersResponseBodyListeners) SetSecSensorEnabled(v string) *ListListenersResponseBodyListeners {
+func (s *ListListenersResponseBodyListeners) SetSecSensorEnabled(v bool) *ListListenersResponseBodyListeners {
 	s.SecSensorEnabled = &v
 	return s
 }
@@ -4041,6 +4041,7 @@ func (s *ListServerGroupsResponseBody) SetTotalCount(v int32) *ListServerGroupsR
 type ListServerGroupsResponseBodyServerGroups struct {
 	AddressIPVersion        *string                                              `json:"AddressIPVersion,omitempty" xml:"AddressIPVersion,omitempty"`
 	AliUid                  *int64                                               `json:"AliUid,omitempty" xml:"AliUid,omitempty"`
+	AnyPortEnabled          *bool                                                `json:"AnyPortEnabled,omitempty" xml:"AnyPortEnabled,omitempty"`
 	ConnectionDrainEnabled  *bool                                                `json:"ConnectionDrainEnabled,omitempty" xml:"ConnectionDrainEnabled,omitempty"`
 	ConnectionDrainTimeout  *int32                                               `json:"ConnectionDrainTimeout,omitempty" xml:"ConnectionDrainTimeout,omitempty"`
 	HealthCheck             *ListServerGroupsResponseBodyServerGroupsHealthCheck `json:"HealthCheck,omitempty" xml:"HealthCheck,omitempty" type:"Struct"`
@@ -4074,6 +4075,11 @@ func (s *ListServerGroupsResponseBodyServerGroups) SetAddressIPVersion(v string)
 
 func (s *ListServerGroupsResponseBodyServerGroups) SetAliUid(v int64) *ListServerGroupsResponseBodyServerGroups {
 	s.AliUid = &v
+	return s
+}
+
+func (s *ListServerGroupsResponseBodyServerGroups) SetAnyPortEnabled(v bool) *ListServerGroupsResponseBodyServerGroups {
+	s.AnyPortEnabled = &v
 	return s
 }
 
@@ -6700,6 +6706,10 @@ func (client *Client) CreateServerGroupWithOptions(request *CreateServerGroupReq
 	body := map[string]interface{}{}
 	if !tea.BoolValue(util.IsUnset(request.AddressIPVersion)) {
 		body["AddressIPVersion"] = request.AddressIPVersion
+	}
+
+	if !tea.BoolValue(util.IsUnset(request.AnyPortEnabled)) {
+		body["AnyPortEnabled"] = request.AnyPortEnabled
 	}
 
 	if !tea.BoolValue(util.IsUnset(request.ClientToken)) {
