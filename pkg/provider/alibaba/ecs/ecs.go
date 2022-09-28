@@ -141,20 +141,6 @@ func (e *ECSProvider) getInstances(ids []string, region string) ([]ecs.Instance,
 	return ecsInstances, nil
 }
 
-func (e *ECSProvider) SetInstanceTags(ctx context.Context, id string, tags map[string]string) error {
-	var mtag []ecs.AddTagsTag
-	for k, v := range tags {
-		mtag = append(mtag, ecs.AddTagsTag{Key: k, Value: v})
-	}
-	req := ecs.CreateAddTagsRequest()
-	req.ResourceId = id
-	req.Tag = &mtag
-	req.ResourceType = "instance"
-
-	_, err := e.auth.ECS.AddTags(req)
-	return err
-}
-
 func (e *ECSProvider) DescribeNetworkInterfaces(vpcId string, ips []string, ipVersionType model.AddressIPVersionType) (map[string]string, error) {
 	result := make(map[string]string)
 
