@@ -3,7 +3,6 @@ package pvtz
 import (
 	"context"
 	"fmt"
-
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -45,6 +44,7 @@ func addServiceReconciler(mgr manager.Manager, ctx *shared.SharedContext) error 
 		controller.Options{
 			Reconciler:              r,
 			MaxConcurrentReconciles: 1,
+			RecoverPanic:            true,
 		},
 	)
 	if err != nil {

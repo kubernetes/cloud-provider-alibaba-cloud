@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"github.com/spf13/pflag"
 	apiext "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
-	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/helper"
 	"k8s.io/cloud-provider/config"
 	"k8s.io/klog/v2"
 	"os"
@@ -64,7 +63,7 @@ func (cfg *ControllerConfig) BindFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&cfg.ClusterName, flagClusterName, defaultClusterName, "The instance prefix for the cluster.")
 	fs.StringVar(&cfg.CloudConfigPath, flagCloudConfig, defaultCloudConfig,
 		"The path to the cloud provider configuration file. Empty string for no configuration file.")
-	fs.StringSliceVar(&cfg.Controllers, flagControllers, []string{"node", "route", "service"}, "A list of controllers to enable.")
+	fs.StringSliceVar(&cfg.Controllers, flagControllers, []string{"node", "route", "service", "nlb"}, "A list of controllers to enable.")
 	fs.BoolVar(&cfg.UseServiceAccountCredentials, flagUseServiceAccountCredentials, false, "If true, use individual service account credentials for each controller.")
 	fs.BoolVar(&cfg.ConfigureCloudRoutes, flagConfigureCloudRoutes, defaultConfigureCloudRoutes, "Should CIDRs allocated by allocate-node-cidrs be configured on the cloud provider.")
 	fs.StringVar(&cfg.ClusterCIDR, flagClusterCidr, "", "CIDR Range for Pods in cluster. Requires --allocate-node-cidrs to be true.")
@@ -121,7 +120,7 @@ func (cfg *ControllerConfig) LoadControllerConfig() error {
 
 	if cfg.CloudConfig.Global.FeatureGates != "" {
 		apiClient := apiext.NewForConfigOrDie(sigConfig.GetConfigOrDie())
-		return helper.BindFeatureGates(apiClient, cfg.CloudConfig.Global.FeatureGates)
+		return BindFeatureGates(apiClient, cfg.CloudConfig.Global.FeatureGates)
 	}
 	return nil
 }

@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	svcctrl "k8s.io/cloud-provider-alibaba-cloud/pkg/controller/service"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/helper"
 
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/ingress/reconcile/backend"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/model/alb"
@@ -35,7 +35,7 @@ func (b defaultServiceManagerBuilder) Build(ctx context.Context, svcStackCtx *al
 	port2Backends := make(map[int32][]alb.BackendItem)
 	containsPotentialReadyEndpoints := false
 	if !svcStackCtx.IsServiceNotFound {
-		policy, err := svcctrl.GetServiceTrafficPolicy(svcStackCtx.Service)
+		policy, err := helper.GetServiceTrafficPolicy(svcStackCtx.Service)
 		if err != nil {
 			return nil, err
 		}

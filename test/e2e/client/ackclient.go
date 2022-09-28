@@ -5,8 +5,8 @@ import (
 	"k8s.io/cloud-provider-alibaba-cloud/test/e2e/options"
 	"time"
 
-	cs "github.com/alibabacloud-go/cs-20151215/v2/client"
-	openapi "github.com/alibabacloud-go/darabonba-openapi/client"
+	cs "github.com/alibabacloud-go/cs-20151215/v3/client"
+	openapi "github.com/alibabacloud-go/darabonba-openapi/v2/client"
 	"github.com/alibabacloud-go/tea/tea"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/base"

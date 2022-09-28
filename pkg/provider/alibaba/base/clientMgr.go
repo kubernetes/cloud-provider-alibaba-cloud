@@ -20,14 +20,17 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	openapi "github.com/alibabacloud-go/darabonba-openapi/v2/client"
+	"github.com/alibabacloud-go/tea/tea"
+	"github.com/aliyun/alibaba-cloud-sdk-go/sdk/auth/credentials"
+	"net/http"
 	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
 
-	"k8s.io/klog/v2/klogr"
-
+	"github.com/aliyun/alibaba-cloud-sdk-go/sdk"
 	"github.com/aliyun/alibaba-cloud-sdk-go/services/alb"
 	"github.com/aliyun/alibaba-cloud-sdk-go/services/cas"
 	"github.com/aliyun/alibaba-cloud-sdk-go/services/ecs"
@@ -37,7 +40,9 @@ import (
 	"github.com/aliyun/alibaba-cloud-sdk-go/services/sls"
 	"github.com/aliyun/alibaba-cloud-sdk-go/services/vpc"
 	"github.com/go-cmd/cmd"
+	"k8s.io/klog/v2/klogr"
 
+	nlb "github.com/alibabacloud-go/nlb-20220430/client"
 	"k8s.io/apimachinery/pkg/util/wait"
 	ctrlCfg "k8s.io/cloud-provider-alibaba-cloud/pkg/config"
 	prvd "k8s.io/cloud-provider-alibaba-cloud/pkg/provider"
@@ -71,6 +76,7 @@ type ClientMgr struct {
 	SLB  *slb.Client
 	PVTZ *pvtz.Client
 	ALB  *alb.Client
+	NLB  *nlb.Client
 	SLS  *sls.Client
 	CAS  *cas.Client
 	ESS  *ess.Client
@@ -89,72 +95,73 @@ func NewClientMgr() (*ClientMgr, error) {
 		return nil, fmt.Errorf("can not determin region: %s", err.Error())
 	}
 
-	ecli, err := ecs.NewClientWithStsToken(
-		region, "key", "secret", "",
-	)
+	credential := &credentials.StsTokenCredential{
+		AccessKeyId:       "key",
+		AccessKeySecret:   "secret",
+		AccessKeyStsToken: "",
+	}
+
+	ecli, err := ecs.NewClientWithOptions(region, clientCfg(), credential)
 	if err != nil {
 		return nil, fmt.Errorf("initialize alibaba ecs client: %s", err.Error())
 	}
 	ecli.AppendUserAgent(KubernetesCloudControllerManager, version.Version)
 	ecli.AppendUserAgent(AgentClusterId, CLUSTER_ID)
 
-	vpcli, err := vpc.NewClientWithStsToken(
-		region, "key", "secret", "")
+	vpcli, err := vpc.NewClientWithOptions(region, clientCfg(), credential)
 	if err != nil {
 		return nil, fmt.Errorf("initialize alibaba vpc client: %s", err.Error())
 	}
 	vpcli.AppendUserAgent(KubernetesCloudControllerManager, version.Version)
 	vpcli.AppendUserAgent(AgentClusterId, CLUSTER_ID)
 
-	slbcli, err := slb.NewClientWithStsToken(
-		region, "key", "secret", "")
+	slbcli, err := slb.NewClientWithOptions(region, clientCfg(), credential)
 	if err != nil {
 		return nil, fmt.Errorf("initialize alibaba slb client: %s", err.Error())
 	}
 	slbcli.AppendUserAgent(KubernetesCloudControllerManager, version.Version)
 	slbcli.AppendUserAgent(AgentClusterId, CLUSTER_ID)
 
-	albcli, err := alb.NewClientWithStsToken(
-		region, "key", "secret", "")
+	albcli, err := alb.NewClientWithOptions(region, clientCfg(), credential)
 	if err != nil {
 		return nil, fmt.Errorf("initialize alibaba alb client: %s", err.Error())
 	}
 	albcli.AppendUserAgent(KubernetesCloudControllerManager, version.Version)
 	albcli.AppendUserAgent(AgentClusterId, CLUSTER_ID)
 
-	slscli, err := sls.NewClientWithStsToken(
-		region, "key", "secret", "")
+	slscli, err := sls.NewClientWithOptions(region, clientCfg(), credential)
 	if err != nil {
 		return nil, fmt.Errorf("initialize alibaba sls client: %s", err.Error())
 	}
 	slscli.AppendUserAgent(KubernetesCloudControllerManager, version.Version)
 	slscli.AppendUserAgent(AgentClusterId, CLUSTER_ID)
 
-	cascli, err := cas.NewClientWithStsToken(
-		region, "key", "secret", "")
+	cascli, err := cas.NewClientWithOptions(region, clientCfg(), credential)
 	if err != nil {
 		return nil, fmt.Errorf("initialize alibaba cas client: %s", err.Error())
 	}
 	cascli.AppendUserAgent(KubernetesCloudControllerManager, version.Version)
 	cascli.AppendUserAgent(AgentClusterId, CLUSTER_ID)
 
-	pvtzcli, err := pvtz.NewClientWithStsToken(
-		region, "key", "secret", "",
-	)
+	pvtzcli, err := pvtz.NewClientWithOptions(region, clientCfg(), credential)
 	if err != nil {
 		return nil, fmt.Errorf("initialize alibaba pvtz client: %s", err.Error())
 	}
 	pvtzcli.AppendUserAgent(KubernetesCloudControllerManager, version.Version)
 	pvtzcli.AppendUserAgent(AgentClusterId, CLUSTER_ID)
 
-	esscli, err := ess.NewClientWithStsToken(
-		region, "key", "secret", "",
-	)
+	esscli, err := ess.NewClientWithOptions(region, clientCfg(), credential)
 	if err != nil {
 		return nil, fmt.Errorf("initialize alibaba pvtz client: %s", err.Error())
 	}
 	esscli.AppendUserAgent(KubernetesCloudControllerManager, version.Version)
 	esscli.AppendUserAgent(AgentClusterId, CLUSTER_ID)
+
+	// new sdk
+	nlbcli, err := nlb.NewClient(openapiCfg(region, credential))
+	if err != nil {
+		return nil, fmt.Errorf("initialize alibaba nlb client: %s", err.Error())
+	}
 
 	auth := &ClientMgr{
 		Meta:   meta,
@@ -163,6 +170,7 @@ func NewClientMgr() (*ClientMgr, error) {
 		SLB:    slbcli,
 		PVTZ:   pvtzcli,
 		ALB:    albcli,
+		NLB:    nlbcli,
 		SLS:    slscli,
 		CAS:    cascli,
 		ESS:    esscli,
@@ -247,53 +255,51 @@ func (mgr *ClientMgr) GetAuthMode() AuthMode {
 
 func RefreshToken(mgr *ClientMgr, token *Token) error {
 	log.V(5).Info("refresh token", "region", token.Region)
-	err := mgr.ECS.InitWithStsToken(
-		token.Region, token.AccessKey, token.AccessSecret, token.Token,
-	)
+	credential := &credentials.StsTokenCredential{
+		AccessKeyId:       token.AccessKey,
+		AccessKeySecret:   token.AccessSecret,
+		AccessKeyStsToken: token.Token,
+	}
+
+	err := mgr.ECS.InitWithOptions(token.Region, clientCfg(), credential)
 	if err != nil {
 		return fmt.Errorf("init ecs sts token config: %s", err.Error())
 	}
 
-	err = mgr.VPC.InitWithStsToken(
-		token.Region, token.AccessKey, token.AccessSecret, token.Token,
-	)
+	err = mgr.VPC.InitWithOptions(token.Region, clientCfg(), credential)
 	if err != nil {
 		return fmt.Errorf("init vpc sts token config: %s", err.Error())
 	}
 
-	err = mgr.SLB.InitWithStsToken(
-		token.Region, token.AccessKey, token.AccessSecret, token.Token,
-	)
+	err = mgr.SLB.InitWithOptions(token.Region, clientCfg(), credential)
 	if err != nil {
 		return fmt.Errorf("init slb sts token config: %s", err.Error())
 	}
 
-	err = mgr.ALB.InitWithStsToken(
-		token.Region, token.AccessKey, token.AccessSecret, token.Token,
-	)
+	err = mgr.ALB.InitWithOptions(token.Region, clientCfg(), credential)
 	if err != nil {
 		return fmt.Errorf("init alb sts token config: %s", err.Error())
 	}
 
-	err = mgr.SLS.InitWithStsToken(
-		token.Region, token.AccessKey, token.AccessSecret, token.Token,
-	)
+	err = mgr.SLS.InitWithOptions(token.Region, clientCfg(), credential)
 	if err != nil {
 		return fmt.Errorf("init sls sts token config: %s", err.Error())
 	}
 
-	err = mgr.CAS.InitWithStsToken(
-		token.Region, token.AccessKey, token.AccessSecret, token.Token,
-	)
+	err = mgr.CAS.InitWithOptions(token.Region, clientCfg(), credential)
 	if err != nil {
 		return fmt.Errorf("init cas sts token config: %s", err.Error())
 	}
 
-	err = mgr.PVTZ.InitWithStsToken(
-		token.Region, token.AccessKey, token.AccessSecret, token.Token,
-	)
+	err = mgr.PVTZ.InitWithOptions(token.Region, clientCfg(), credential)
 	if err != nil {
 		return fmt.Errorf("init pvtz sts token config: %s", err.Error())
+	}
+
+	err = mgr.NLB.Init(openapiCfg(token.Region, credential))
+
+	if err != nil {
+		return fmt.Errorf("init nlb sts token config: %s", err.Error())
 	}
 
 	if ctrlCfg.ControllerCFG.NetWork == "vpc" {
@@ -313,6 +319,7 @@ func setVPCEndpoint(mgr *ClientMgr) {
 	mgr.ALB.Network = "vpc"
 	mgr.SLS.Network = "vpc"
 	mgr.CAS.Network = "vpc"
+	mgr.NLB.Network = tea.String("vpc")
 }
 
 func setCustomizedEndpoint(mgr *ClientMgr) {
@@ -340,6 +347,33 @@ func parseURL(str string) (string, error) {
 		return "", err
 	}
 	return u.Host, nil
+}
+
+func clientCfg() *sdk.Config {
+	scheme := "HTTPS"
+	if os.Getenv("ALICLOUD_CLIENT_SCHEME") == "HTTP" {
+		scheme = "HTTP"
+	}
+	return &sdk.Config{
+		Timeout:   20 * time.Second,
+		Transport: http.DefaultTransport,
+		Scheme:    scheme,
+	}
+}
+
+func openapiCfg(region string, credential *credentials.StsTokenCredential) *openapi.Config {
+	scheme := "HTTPS"
+	if os.Getenv("ALICLOUD_CLIENT_SCHEME") == "HTTP" {
+		scheme = "HTTP"
+	}
+	return &openapi.Config{
+		UserAgent:       tea.String(getUserAgent()),
+		Protocol:        tea.String(scheme),
+		RegionId:        tea.String(region),
+		AccessKeyId:     tea.String(credential.AccessKeyId),
+		AccessKeySecret: tea.String(credential.AccessKeySecret),
+		SecurityToken:   tea.String(credential.AccessKeyStsToken),
+	}
 }
 
 // Token base Token info
@@ -415,7 +449,6 @@ func (f *ServiceToken) NextToken() (*Token, error) {
 		fmt.Sprintf("--uid=%s", ctrlCfg.CloudCFG.Global.UID),
 		fmt.Sprintf("--key=%s", key),
 		fmt.Sprintf("--secret=%s", secret),
-		fmt.Sprintf("--region=%s", f.svcak.Region),
 	).Start()
 	if status.Error != nil {
 		return nil, fmt.Errorf("invoke servicetoken: %s", status.Error.Error())
@@ -460,4 +493,16 @@ func LoadAK() (string, string, error) {
 	}
 
 	return keyId, keySecret, nil
+}
+
+func getUserAgent() string {
+	agents := map[string]string{
+		KubernetesCloudControllerManager: version.Version,
+		AgentClusterId:                   CLUSTER_ID,
+	}
+	ret := ""
+	for k, v := range agents {
+		ret += fmt.Sprintf(" %s/%s", k, v)
+	}
+	return ret
 }

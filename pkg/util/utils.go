@@ -3,6 +3,7 @@ package util
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -79,4 +80,24 @@ func RetryImmediateOnError(interval time.Duration, timeout time.Duration, retrya
 		}
 		return true, nil
 	})
+}
+
+func IsStringSliceEqual(s1, s2 []string) bool {
+	if len(s1) != len(s2) {
+		return false
+	}
+
+	for _, i := range s1 {
+		found := false
+		for _, j := range s2 {
+			if strings.EqualFold(i, j) {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return false
+		}
+	}
+	return true
 }

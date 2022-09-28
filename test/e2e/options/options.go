@@ -24,6 +24,7 @@ type E2EConfig struct {
 	VPCLoadBalancerID string `json:"VPCLoadBalancerID"` // lb in other vpc
 	EipLoadBalancerID string `json:"EipLoadBalancerID"` // intranet slb with eip
 	ResourceGroupID   string `json:"ResourceGroupID"`
+	NLBZoneMaps       string `json:"NLBZoneMaps"`
 
 	// described by cluster info
 	Network      string `json:"network"`
@@ -36,14 +37,19 @@ type E2EConfig struct {
 	CertID       string `json:"CertID"`
 	CertID2      string `json:"CertID2"`
 	CACertID     string `json:"CACertID"`
+	NLBCertID    string `json:"NLBCertID"`
+	NLBCertID2   string `json:"NLBCertID2"`
+	NLBCACertID  string `json:"NLBCACertID"`
 
 	// created automatically if AllowCreateCloudResource=true
-	InternetLoadBalancerID string `json:"InternetLoadBalancerID"`
-	IntranetLoadBalancerID string `json:"IntranetLoadBalancerID"`
-	VServerGroupID         string `json:"VServerGroupID"`  // vServerGroupID of InternetLoadBalancerID
-	VServerGroupID2        string `json:"VServerGroupID2"` // vServerGroupID of InternetLoadBalancerID
-	AclID                  string `json:"AclID"`
-	AclID2                 string `json:"AclID2"`
+	InternetLoadBalancerID        string `json:"InternetLoadBalancerID"`
+	IntranetLoadBalancerID        string `json:"IntranetLoadBalancerID"`
+	InternetNetworkLoadBalancerID string `json:"InternetNetworkLoadBalancerID"`
+	IntranetNetworkLoadBalancerID string `json:"IntranetNetworkLoadbalancerID"`
+	VServerGroupID                string `json:"VServerGroupID"`  // vServerGroupID of InternetLoadBalancerID
+	VServerGroupID2               string `json:"VServerGroupID2"` // vServerGroupID of InternetLoadBalancerID
+	AclID                         string `json:"AclID"`
+	AclID2                        string `json:"AclID2"`
 }
 
 func (e *E2EConfig) BindFlags() {
@@ -61,15 +67,21 @@ func (e *E2EConfig) BindFlags() {
 	flag.StringVar(&e.Network, "network", "", "the network type of kubernetes, values: flannel or terway")
 	flag.StringVar(&e.IntranetLoadBalancerID, "intranet-lb-id", "", "reused intranet slb id")
 	flag.StringVar(&e.InternetLoadBalancerID, "internet-lb-id", "", "reused internet slb id")
+	flag.StringVar(&e.IntranetNetworkLoadBalancerID, "intranet-nlb-id", "", "reused intranet nlb id")
+	flag.StringVar(&e.InternetNetworkLoadBalancerID, "internet-nlb-id", "", "reused internet nlb id")
 	flag.StringVar(&e.AclID, "acl-id", "", "acl id")
 	flag.StringVar(&e.AclID2, "acl-id-2", "", "acl id")
 	flag.StringVar(&e.VSwitchID, "vswitch-id", "", "vsw-id")
 	flag.StringVar(&e.VSwitchID2, "vswitch-id-2", "", "vsw-id")
 	flag.StringVar(&e.CertID, "cert-id", "", "cert id")
 	flag.StringVar(&e.CertID2, "cert-id-2", "", "cert id")
+	flag.StringVar(&e.NLBCertID, "nlb-cert-id", "", "nlb cert id (in yundun console)")
+	flag.StringVar(&e.NLBCertID2, "nlb-cert-id-2", "", "nlb cert id 2 (in yundun console")
 	flag.StringVar(&e.CACertID, "ca-cert-id", "", "ca-cert id")
+	flag.StringVar(&e.NLBCACertID, "nlb-ca-cert-id", "", "nlb ca-cert id")
 	flag.StringVar(&e.VServerGroupID, "vserver-group-id", "", "vserver group id")
 	flag.StringVar(&e.VServerGroupID2, "vserver-group-id-2", "", "vserver group id")
+	flag.StringVar(&e.NLBZoneMaps, "nlb-zone-maps", "", "nlb zone maps")
 }
 
 func (e *E2EConfig) Validate() error {

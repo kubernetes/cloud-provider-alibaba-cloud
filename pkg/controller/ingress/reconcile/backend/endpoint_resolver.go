@@ -3,14 +3,13 @@ package backend
 import (
 	"context"
 	"fmt"
-	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/helper"
-
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/service/reconcile/annotation"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/service/reconcile/backend"
+	svcCtx "k8s.io/cloud-provider-alibaba-cloud/pkg/controller/service/reconcile/context"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/util"
 
-	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/helper/k8s"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/helper"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/ingress/reconcile/store"
-	svcctrl "k8s.io/cloud-provider-alibaba-cloud/pkg/controller/service"
-
 	pkgModel "k8s.io/cloud-provider-alibaba-cloud/pkg/model"
 
 	corev1 "k8s.io/api/core/v1"
@@ -121,10 +120,10 @@ func (r *defaultEndpointResolver) resolvePodEndpoints(ctx context.Context, svc *
 				return nil, false, err
 			}
 
-			if !k8s.IsPodHasReadinessGate(pod) {
+			if !helper.IsPodHasReadinessGate(pod) {
 				continue
 			}
-			if !k8s.IsPodContainersReady(pod) {
+			if !helper.IsPodContainersReady(pod) {
 				containsPotentialReadyEndpoints = true
 				continue
 			}
@@ -170,11 +169,11 @@ func (r *defaultEndpointResolver) ResolveLocalEndpoints(ctx context.Context, svc
 
 	svcNodePort := svcPort.NodePort
 
-	reqCtx := &svcctrl.RequestContext{
+	reqCtx := &svcCtx.RequestContext{
 		Service: svc,
-		Anno:    &svcctrl.AnnotationRequest{Service: svc},
+		Anno:    &annotation.AnnotationRequest{Service: svc},
 	}
-	nodes, err := svcctrl.GetNodes(reqCtx, r.k8sClient)
+	nodes, err := backend.GetNodes(reqCtx, r.k8sClient)
 	if err != nil {
 		return nil, containsPotentialReadyEndpoints, err
 	}
@@ -202,7 +201,7 @@ func (r *defaultEndpointResolver) ResolveLocalEndpoints(ctx context.Context, svc
 			continue
 		}
 
-		_, id, err := svcctrl.NodeFromProviderID(node.Spec.ProviderID)
+		_, id, err := helper.NodeFromProviderID(node.Spec.ProviderID)
 		if err != nil {
 			return nil, containsPotentialReadyEndpoints, err
 		}
@@ -233,11 +232,11 @@ func (r *defaultEndpointResolver) ResolveClusterEndpoints(ctx context.Context, s
 	}
 
 	svcNodePort := svcPort.NodePort
-	reqCtx := &svcctrl.RequestContext{
+	reqCtx := &svcCtx.RequestContext{
 		Service: svc,
-		Anno:    &svcctrl.AnnotationRequest{Service: svc},
+		Anno:    &annotation.AnnotationRequest{Service: svc},
 	}
-	nodes, err := svcctrl.GetNodes(reqCtx, r.k8sClient)
+	nodes, err := backend.GetNodes(reqCtx, r.k8sClient)
 	if err != nil {
 		return nil, containsPotentialReadyEndpoints, err
 	}
@@ -248,7 +247,7 @@ func (r *defaultEndpointResolver) ResolveClusterEndpoints(ctx context.Context, s
 		if helper.HasExcludeLabel(&node) {
 			continue
 		}
-		_, id, err := svcctrl.NodeFromProviderID(node.Spec.ProviderID)
+		_, id, err := helper.NodeFromProviderID(node.Spec.ProviderID)
 		if err != nil {
 			return nil, containsPotentialReadyEndpoints, fmt.Errorf("normal parse providerid: %s. "+
 				"expected: ${regionid}.${nodeid}, %s", node.Spec.ProviderID, err.Error())

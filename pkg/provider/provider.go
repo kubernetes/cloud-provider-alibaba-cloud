@@ -2,11 +2,13 @@ package prvd
 
 import (
 	"context"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/model/tag"
 	"time"
 
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/ingress/reconcile/tracking"
 
 	albmodel "k8s.io/cloud-provider-alibaba-cloud/pkg/model/alb"
+	nlbmodel "k8s.io/cloud-provider-alibaba-cloud/pkg/model/nlb"
 
 	"github.com/aliyun/alibaba-cloud-sdk-go/services/alb"
 	"github.com/aliyun/alibaba-cloud-sdk-go/services/cas"
@@ -23,6 +25,7 @@ type Provider interface {
 	ILoadBalancer
 	IPrivateZone
 	IALB
+	INLB
 	ISLS
 	ICAS
 }
@@ -99,8 +102,6 @@ type ILoadBalancer interface {
 	SetLoadBalancerName(ctx context.Context, lbId string, name string) error
 	ModifyLoadBalancerInternetSpec(ctx context.Context, lbId string, chargeType string, bandwidth int) error
 	SetLoadBalancerModificationProtection(ctx context.Context, lbId string, flag string) error
-	AddTags(ctx context.Context, lbId string, tags string) error
-	DescribeTags(ctx context.Context, lbId string) ([]model.Tag, error)
 
 	// Listener
 	DescribeLoadBalancerListeners(ctx context.Context, lbId string) ([]model.ListenerAttribute, error)
@@ -125,6 +126,10 @@ type ILoadBalancer interface {
 	RemoveVServerGroupBackendServers(ctx context.Context, vGroupId string, backends string) error
 	SetVServerGroupAttribute(ctx context.Context, vGroupId string, backends string) error
 	ModifyVServerGroupBackendServers(ctx context.Context, vGroupId string, old string, new string) error
+
+	// Tag
+	TagCLBResource(ctx context.Context, resourceId string, tags []tag.Tag) error
+	ListCLBTagResources(ctx context.Context, lbId string) ([]tag.Tag, error)
 }
 
 type IPrivateZone interface {
@@ -180,4 +185,34 @@ type IALB interface {
 	// ALB Tags
 	ListALBServerGroupsWithTags(ctx context.Context, tagFilters map[string]string) ([]albmodel.ServerGroupWithTags, error)
 	ListALBsWithTags(ctx context.Context, tagFilters map[string]string) ([]albmodel.AlbLoadBalancerWithTags, error)
+}
+
+type INLB interface {
+	//Tag
+	TagNLBResource(ctx context.Context, resourceId string, resourceType nlbmodel.TagResourceType, tags []tag.Tag) error
+	ListNLBTagResources(ctx context.Context, lbId string) ([]tag.Tag, error)
+	// NetworkLoadBalancer
+	FindNLB(ctx context.Context, mdl *nlbmodel.NetworkLoadBalancer) error
+	DescribeNLB(ctx context.Context, mdl *nlbmodel.NetworkLoadBalancer) error
+	CreateNLB(ctx context.Context, mdl *nlbmodel.NetworkLoadBalancer) error
+	DeleteNLB(ctx context.Context, mdl *nlbmodel.NetworkLoadBalancer) error
+	UpdateNLB(ctx context.Context, mdl *nlbmodel.NetworkLoadBalancer) error
+	UpdateNLBAddressType(ctx context.Context, mdl *nlbmodel.NetworkLoadBalancer) error
+	UpdateNLBZones(ctx context.Context, mdl *nlbmodel.NetworkLoadBalancer) error
+
+	// ServerGroup
+	ListNLBServerGroups(ctx context.Context, tags []tag.Tag) ([]*nlbmodel.ServerGroup, error)
+	CreateNLBServerGroup(ctx context.Context, sg *nlbmodel.ServerGroup) error
+	DeleteNLBServerGroup(ctx context.Context, sgId string) error
+	UpdateNLBServerGroup(ctx context.Context, sg *nlbmodel.ServerGroup) error
+	AddNLBServers(ctx context.Context, sgId string, backends []nlbmodel.ServerGroupServer) error
+	RemoveNLBServers(ctx context.Context, sgId string, backends []nlbmodel.ServerGroupServer) error
+	UpdateNLBServers(ctx context.Context, sgId string, backends []nlbmodel.ServerGroupServer) error
+
+	// Listener
+	ListNLBListeners(ctx context.Context, lbId string) ([]*nlbmodel.ListenerAttribute, error)
+	CreateNLBListener(ctx context.Context, lbId string, lis *nlbmodel.ListenerAttribute) error
+	UpdateNLBListener(ctx context.Context, lis *nlbmodel.ListenerAttribute) error
+	DeleteNLBListener(ctx context.Context, listenerId string) error
+	StartNLBListener(ctx context.Context, listenerId string) error
 }

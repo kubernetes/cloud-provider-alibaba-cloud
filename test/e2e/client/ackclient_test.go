@@ -1,8 +1,8 @@
 package client
 
 import (
-	cs "github.com/alibabacloud-go/cs-20151215/v2/client"
-	openapi "github.com/alibabacloud-go/darabonba-openapi/client"
+	cs "github.com/alibabacloud-go/cs-20151215/v3/client"
+	openapi "github.com/alibabacloud-go/darabonba-openapi/v2/client"
 	"testing"
 )
 

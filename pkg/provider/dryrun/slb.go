@@ -6,6 +6,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/model"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/model/tag"
 	prvd "k8s.io/cloud-provider-alibaba-cloud/pkg/provider"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/base"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/slb"
@@ -92,12 +93,13 @@ func (m *DryRunSLB) ModifyLoadBalancerInstanceChargeType(ctx context.Context, lb
 	return hintError(mtype, fmt.Sprintf("loadbalancer %s ModifyLoadBalancerInstanceChargeType should be %s with spec [%s]", lbId, instanceChargeType, spec))
 }
 
-func (m *DryRunSLB) AddTags(ctx context.Context, lbId string, tags string) error {
-	return m.slb.AddTags(ctx, lbId, tags)
+// Tag
+func (m *DryRunSLB) TagCLBResource(ctx context.Context, resourceId string, tags []tag.Tag) error {
+	return nil
 }
 
-func (m *DryRunSLB) DescribeTags(ctx context.Context, lbId string) ([]model.Tag, error) {
-	return m.slb.DescribeTags(ctx, lbId)
+func (m *DryRunSLB) ListCLBTagResources(ctx context.Context, lbId string) ([]tag.Tag, error) {
+	return m.slb.ListCLBTagResources(ctx, lbId)
 }
 
 // Listener

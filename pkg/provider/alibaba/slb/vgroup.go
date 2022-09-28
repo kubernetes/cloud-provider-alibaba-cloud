@@ -15,7 +15,7 @@ func (p SLBProvider) DescribeVServerGroups(ctx context.Context, lbId string) ([]
 	req.LoadBalancerId = lbId
 	resp, err := p.auth.SLB.DescribeVServerGroups(req)
 	if err != nil {
-		return nil, util.FormatErrorMessage(err)
+		return nil, util.SDKError("DescribeVServerGroups", err)
 	}
 	klog.V(5).Infof("RequestId: %s, API: %s, lbId: %s", resp.RequestId, "DescribeVServerGroups", lbId)
 	var vgs []model.VServerGroup
@@ -42,7 +42,7 @@ func (p SLBProvider) CreateVServerGroup(ctx context.Context, vg *model.VServerGr
 	// create vserver group with empty backends to avoid reach the limit of backends per action
 	resp, err := p.auth.SLB.CreateVServerGroup(req)
 	if err != nil {
-		return util.FormatErrorMessage(err)
+		return util.SDKError("CreateVServerGroup", err)
 	}
 	vg.VGroupId = resp.VServerGroupId
 	return nil
@@ -53,7 +53,7 @@ func (p SLBProvider) DescribeVServerGroupAttribute(ctx context.Context, vGroupId
 	req.VServerGroupId = vGroupId
 	resp, err := p.auth.SLB.DescribeVServerGroupAttribute(req)
 	if err != nil {
-		return model.VServerGroup{}, util.FormatErrorMessage(err)
+		return model.VServerGroup{}, util.SDKError("DescribeVServerGroupAttribute", err)
 	}
 	klog.V(5).Infof("RequestId: %s, API: %s, vGroupId: %s", resp.RequestId, "DescribeVServerGroupAttribute", vGroupId)
 	vg := setVServerGroupFromResponse(resp)
@@ -65,7 +65,7 @@ func (p SLBProvider) DeleteVServerGroup(ctx context.Context, vGroupId string) er
 	req := slb.CreateDeleteVServerGroupRequest()
 	req.VServerGroupId = vGroupId
 	_, err := p.auth.SLB.DeleteVServerGroup(req)
-	return util.FormatErrorMessage(err)
+	return util.SDKError("DeleteVServerGroup", err)
 }
 
 func (p SLBProvider) AddVServerGroupBackendServers(ctx context.Context, vGroupId string, backends string) error {
@@ -73,7 +73,7 @@ func (p SLBProvider) AddVServerGroupBackendServers(ctx context.Context, vGroupId
 	req.VServerGroupId = vGroupId
 	req.BackendServers = backends
 	_, err := p.auth.SLB.AddVServerGroupBackendServers(req)
-	return util.FormatErrorMessage(err)
+	return util.SDKError("AddVServerGroupBackendServers", err)
 
 }
 
@@ -82,7 +82,7 @@ func (p SLBProvider) RemoveVServerGroupBackendServers(ctx context.Context, vGrou
 	req.VServerGroupId = vGroupId
 	req.BackendServers = backends
 	_, err := p.auth.SLB.RemoveVServerGroupBackendServers(req)
-	return util.FormatErrorMessage(err)
+	return util.SDKError("RemoveVServerGroupBackendServers", err)
 }
 
 func (p SLBProvider) SetVServerGroupAttribute(ctx context.Context, vGroupId string, backends string) error {
@@ -90,7 +90,7 @@ func (p SLBProvider) SetVServerGroupAttribute(ctx context.Context, vGroupId stri
 	req.VServerGroupId = vGroupId
 	req.BackendServers = backends
 	_, err := p.auth.SLB.SetVServerGroupAttribute(req)
-	return util.FormatErrorMessage(err)
+	return util.SDKError("SetVServerGroupAttribute", err)
 }
 
 func (p SLBProvider) ModifyVServerGroupBackendServers(ctx context.Context, vGroupId string, old string, new string) error {
@@ -99,7 +99,7 @@ func (p SLBProvider) ModifyVServerGroupBackendServers(ctx context.Context, vGrou
 	req.OldBackendServers = old
 	req.NewBackendServers = new
 	_, err := p.auth.SLB.ModifyVServerGroupBackendServers(req)
-	return util.FormatErrorMessage(err)
+	return util.SDKError("ModifyVServerGroupBackendServers", err)
 }
 
 func setVServerGroupFromResponse(resp *slb.DescribeVServerGroupAttributeResponse) model.VServerGroup {

@@ -11,8 +11,8 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/helper"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/ingress/reconcile/store"
-	svchelper "k8s.io/cloud-provider-alibaba-cloud/pkg/controller/service"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/model/alb"
 	prvd "k8s.io/cloud-provider-alibaba-cloud/pkg/provider"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -45,22 +45,22 @@ func (mgr *Manager) BuildServicePortSDKBackends(ctx context.Context, svcKey type
 		containsPotentialReadyEndpoints bool
 	)
 
-	policy, err := svchelper.GetServiceTrafficPolicy(svc)
+	policy, err := helper.GetServiceTrafficPolicy(svc)
 	if err != nil {
 		return nil, false, err
 	}
 	switch policy {
-	case svchelper.ENITrafficPolicy:
+	case helper.ENITrafficPolicy:
 		endpoints, containsPotentialReadyEndpoints, err = mgr.ResolveENIEndpoints(ctx, util.NamespacedName(svc), port)
 		if err != nil {
 			return modelBackends, containsPotentialReadyEndpoints, err
 		}
-	case svchelper.LocalTrafficPolicy:
+	case helper.LocalTrafficPolicy:
 		endpoints, containsPotentialReadyEndpoints, err = mgr.ResolveLocalEndpoints(ctx, util.NamespacedName(svc), port)
 		if err != nil {
 			return modelBackends, containsPotentialReadyEndpoints, err
 		}
-	case svchelper.ClusterTrafficPolicy:
+	case helper.ClusterTrafficPolicy:
 		endpoints, containsPotentialReadyEndpoints, err = mgr.ResolveClusterEndpoints(ctx, util.NamespacedName(svc), port)
 		if err != nil {
 			return modelBackends, containsPotentialReadyEndpoints, err

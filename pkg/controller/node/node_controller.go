@@ -63,6 +63,7 @@ func add(mgr manager.Manager, r *ReconcileNode) error {
 		controller.Options{
 			Reconciler:              r,
 			MaxConcurrentReconciles: 1,
+			RecoverPanic:            true,
 		},
 	)
 	if err != nil {

@@ -26,7 +26,6 @@ import (
 	v1 "k8s.io/cloud-provider-alibaba-cloud/pkg/apis/alibabacloud/v1"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/context/shared"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/helper"
-	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/helper/k8s"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/ingress/reconcile/applier"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/ingress/reconcile/backend"
 	albconfigmanager "k8s.io/cloud-provider-alibaba-cloud/pkg/controller/ingress/reconcile/builder/albconfig_manager"
@@ -66,7 +65,7 @@ func NewAlbConfigReconciler(mgr manager.Manager, ctx *shared.SharedContext) (*al
 		cloud:            ctx.Provider(),
 		k8sClient:        mgr.GetClient(),
 		groupLoader:      albconfigmanager.NewDefaultGroupLoader(mgr.GetClient(), annotations.NewSuffixAnnotationParser(annotations.DefaultAnnotationsPrefix)),
-		referenceIndexer: k8s.NewDefaultReferenceIndexer(),
+		referenceIndexer: helper.NewDefaultReferenceIndexer(),
 		eventRecorder:    mgr.GetEventRecorderFor("ingress"),
 		stackMarshaller:  NewDefaultStackMarshaller(),
 		logger:           logger,
@@ -91,8 +90,8 @@ func NewAlbConfigReconciler(mgr manager.Manager, ctx *shared.SharedContext) (*al
 		config.DisableCatchAll)
 	n.serverBuilder = servicemanager.NewDefaultServiceStackBuilder(backend.NewBackendManager(n.store, mgr.GetClient(), ctx.Provider(), logger))
 	n.albconfigApplier = applier.NewAlbConfigManagerApplier(n.store, mgr.GetClient(), ctx.Provider(), util.IngressTagKeyPrefix, logger)
-	n.syncQueue = k8s.NewTaskQueue(n.syncIngress)
-	n.syncServersQueue = k8s.NewTaskQueue(n.syncServers)
+	n.syncQueue = helper.NewTaskQueue(n.syncIngress)
+	n.syncServersQueue = helper.NewTaskQueue(n.syncServers)
 	go n.Start()
 	return n, nil
 }
@@ -111,7 +110,7 @@ type albconfigReconciler struct {
 	cloud            prvd.Provider
 	k8sClient        client.Client
 	groupLoader      albconfigmanager.GroupLoader
-	referenceIndexer k8s.ReferenceIndexer
+	referenceIndexer helper.ReferenceIndexer
 	eventRecorder    record.EventRecorder
 	stackMarshaller  StackMarshaller
 	logger           logr.Logger
@@ -129,8 +128,8 @@ type albconfigReconciler struct {
 	stopLock                *sync.Mutex
 	groupFinalizerManager   albconfigmanager.FinalizerManager
 	k8sFinalizerManager     helper.FinalizerManager
-	syncQueue               *k8s.Queue
-	syncServersQueue        *k8s.Queue
+	syncQueue               *helper.Queue
+	syncServersQueue        *helper.Queue
 	maxConcurrentReconciles int
 }
 
@@ -168,7 +167,7 @@ func (g *albconfigReconciler) syncIngress(obj interface{}) error {
 	g.logger.Info("start syncIngress")
 	traceID := sdkutils.GetUUID()
 	ctx := context.WithValue(context.Background(), util.TraceID, traceID)
-	e := obj.(k8s.Element)
+	e := obj.(helper.Element)
 	evt := e.Event
 	ings := g.store.ListIngresses()
 
@@ -243,7 +242,7 @@ func (g *albconfigReconciler) syncServers(obj interface{}) error {
 	traceID := sdkutils.GetUUID()
 	ctx := context.WithValue(context.Background(), util.TraceID, traceID)
 
-	e := obj.(k8s.Element)
+	e := obj.(helper.Element)
 	evt := e.Event
 
 	startTime := time.Now()
