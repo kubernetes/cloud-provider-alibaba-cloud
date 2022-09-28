@@ -209,7 +209,7 @@ func parseZoneMappings(zoneMaps string) ([]nlbmodel.ZoneMapping, error) {
 		ret = append(ret, zoneMap)
 	}
 
-	if len(ret) < 0 {
+	if len(ret) == 0 {
 		return nil, fmt.Errorf("ZoneMapping format error, expect [zone-a:vsw-id-1,zone-b:vsw-id-2], got %s", zoneMaps)
 	}
 	return ret, nil

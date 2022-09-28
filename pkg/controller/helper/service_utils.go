@@ -14,16 +14,28 @@ import (
 	"time"
 )
 
+// Finalizer
 const (
-	ServiceFinalizer    = "service.k8s.alibaba/resources"
-	NLBFinalizer        = "service.k8s.alibaba/nlb"
-	LoadBalancerClass   = "service.beta.kubernetes.io/class"
-	NLBClass            = "alibabacloud.com/nlb"
+	ServiceFinalizer = "service.k8s.alibaba/resources"
+	NLBFinalizer     = "service.k8s.alibaba/nlb"
+)
+
+// annotation
+const (
+	BackendType       = "service.beta.kubernetes.io/backend-type"
+	LoadBalancerClass = "service.beta.kubernetes.io/class"
+)
+
+// load balancer class
+const NLBClass = "alibabacloud.com/nlb"
+
+// label
+const (
 	LabelServiceHash    = "service.beta.kubernetes.io/hash"
 	LabelLoadBalancerId = "service.k8s.alibaba/loadbalancer-id"
+)
 
-	BackendType = "service.beta.kubernetes.io/backend-type"
-
+const (
 	TAGKEY   = "kubernetes.do.not.delete"
 	REUSEKEY = "kubernetes.reused.by.user"
 )
