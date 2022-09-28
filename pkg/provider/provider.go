@@ -76,7 +76,6 @@ type NodeAttribute struct {
 type IInstance interface {
 	ListInstances(ctx context.Context, ids []string) (map[string]*NodeAttribute, error)
 	GetInstancesByIP(ctx context.Context, ips []string) (*NodeAttribute, error)
-	SetInstanceTags(ctx context.Context, id string, tags map[string]string) error
 	// DescribeNetworkInterfaces query one or more elastic network interfaces (ENIs)
 	DescribeNetworkInterfaces(vpcId string, ips []string, ipVersionType model.AddressIPVersionType) (map[string]string, error)
 }
