@@ -89,13 +89,20 @@ func PatchM(mclient client.Client, target client.Object, getter func(runtime.Obj
 }
 
 func FindCondition(conds []v1.NodeCondition, conditionType v1.NodeConditionType) (*v1.NodeCondition, bool) {
+	var retCon *v1.NodeCondition
 	for i := range conds {
 		if conds[i].Type == conditionType {
-			return &conds[i], true
+			if retCon == nil || retCon.LastHeartbeatTime.Before(&conds[i].LastHeartbeatTime) {
+				retCon = &conds[i]
+			}
 		}
 	}
-	// condition not found, do not trigger repair
-	return &v1.NodeCondition{}, false
+
+	if retCon == nil {
+		return &v1.NodeCondition{}, false
+	} else {
+		return retCon, true
+	}
 }
 
 func HasExcludeLabel(node *v1.Node) bool {
