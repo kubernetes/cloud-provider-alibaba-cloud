@@ -33,10 +33,12 @@ func TestUpdateNetworkingCondition(t *testing.T) {
 		Status: v1.NodeStatus{
 			Conditions: []v1.NodeCondition{
 				{
+					Type:   v1.NodeReady,
 					Reason: string(v1.NodeReady),
 					Status: v1.ConditionTrue,
 				},
 				{
+					Type:   v1.NodeNetworkUnavailable,
 					Reason: string(v1.NodeNetworkUnavailable),
 					Status: v1.ConditionTrue,
 				},
@@ -55,7 +57,7 @@ func TestUpdateNetworkingCondition(t *testing.T) {
 		t.Error(err)
 	}
 
-	networkCondition, ok := helper.FindCondition(node.Status.Conditions, v1.NodeNetworkUnavailable)
+	networkCondition, ok := helper.FindCondition(updatedNode.Status.Conditions, v1.NodeNetworkUnavailable)
 	if !ok || networkCondition.Status != v1.ConditionFalse {
 		t.Error("node condition update failed")
 	}
@@ -97,10 +99,12 @@ func getFakeKubeClient() client.Client {
 				Status: v1.NodeStatus{
 					Conditions: []v1.NodeCondition{
 						{
+							Type:   v1.NodeReady,
 							Reason: string(v1.NodeReady),
 							Status: v1.ConditionTrue,
 						},
 						{
+							Type:   v1.NodeNetworkUnavailable,
 							Reason: string(v1.NodeNetworkUnavailable),
 							Status: v1.ConditionTrue,
 						},
@@ -118,10 +122,12 @@ func getFakeKubeClient() client.Client {
 				Status: v1.NodeStatus{
 					Conditions: []v1.NodeCondition{
 						{
+							Type:   v1.NodeReady,
 							Reason: string(v1.NodeReady),
 							Status: v1.ConditionTrue,
 						},
 						{
+							Type:   v1.NodeNetworkUnavailable,
 							Reason: string(v1.NodeNetworkUnavailable),
 							Status: v1.ConditionFalse,
 						},

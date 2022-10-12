@@ -140,11 +140,8 @@ func (r *ReconcileRoute) syncTableRoutes(ctx context.Context, table string, node
 			continue
 		}
 
-		networkCondition, ok := helper.FindCondition(node.Status.Conditions, v1.NodeNetworkUnavailable)
-		if !ok || networkCondition.Status != v1.ConditionFalse {
-			if err := r.updateNetworkingCondition(ctx, &node, true); err != nil {
-				klog.Errorf("update node %s network condition err: %s", node.Name, err.Error())
-			}
+		if err := r.updateNetworkingCondition(ctx, &node, true); err != nil {
+			klog.Errorf("update node %s network condition err: %s", node.Name, err.Error())
 		}
 	}
 	return nil
