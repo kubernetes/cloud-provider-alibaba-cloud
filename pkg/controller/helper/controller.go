@@ -19,13 +19,20 @@ func FindCondition(
 	conds []corev1.NodeCondition,
 	conditionType corev1.NodeConditionType,
 ) (*corev1.NodeCondition, bool) {
+	var retCon *corev1.NodeCondition
 	for i := range conds {
 		if conds[i].Type == conditionType {
-			return &conds[i], true
+			if retCon == nil || retCon.LastHeartbeatTime.Before(&conds[i].LastHeartbeatTime) {
+				retCon = &conds[i]
+			}
 		}
 	}
-	// condition not found, do not trigger repair
-	return &corev1.NodeCondition{}, false
+
+	if retCon == nil {
+		return &corev1.NodeCondition{}, false
+	} else {
+		return retCon, true
+	}
 }
 
 func NewDelay(d int) reconcile.Result {

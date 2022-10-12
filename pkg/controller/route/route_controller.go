@@ -200,11 +200,6 @@ func (r *ReconcileRoute) syncCloudRoute(ctx context.Context, node *corev1.Node) 
 		}
 		return utilerrors.NewAggregate(tablesErr)
 	} else {
-		networkCondition, ok := helper.FindCondition(node.Status.Conditions, corev1.NodeNetworkUnavailable)
-		if ok && networkCondition.Status == corev1.ConditionFalse {
-			// Update condition only if it doesn't reflect the current state.
-			return nil
-		}
 		return r.updateNetworkingCondition(ctx, node, true)
 	}
 }
@@ -263,28 +258,43 @@ func (r *ReconcileRoute) addRouteForNode(
 }
 
 func (r *ReconcileRoute) updateNetworkingCondition(ctx context.Context, node *corev1.Node, routeCreated bool) error {
+	networkCondition, ok := helper.FindCondition(node.Status.Conditions, corev1.NodeNetworkUnavailable)
+	if routeCreated && ok && networkCondition.Status == corev1.ConditionFalse {
+		klog.V(2).Infof("set node %v with NodeNetworkUnavailable=false was canceled because it is already set", node.Name)
+		return nil
+	}
+
+	if !routeCreated && ok && networkCondition.Status == corev1.ConditionTrue {
+		klog.V(2).Infof("set node %v with NodeNetworkUnavailable=true was canceled because it is already set", node.Name)
+		return nil
+	}
+
+	klog.Infof("Patching node status %v with %v previous condition was:%+v", node.Name, routeCreated, networkCondition)
 	var err error
 	for i := 0; i < updateNodeStatusMaxRetries; i++ {
 		// Patch could also fail, even though the chance is very slim. So we still do
 		// patch in the retry loop.
-		patch := client.MergeFrom(node.DeepCopy())
-		condition, ok := helper.FindCondition(node.Status.Conditions, corev1.NodeNetworkUnavailable)
-		condition.Type = corev1.NodeNetworkUnavailable
-		condition.LastHeartbeatTime = metav1.Now()
-		condition.LastTransitionTime = metav1.Now()
-		if routeCreated {
-			condition.Status = corev1.ConditionFalse
-			condition.Reason = "RouteCreated"
-			condition.Message = "RouteController created a route"
-		} else {
-			condition.Status = corev1.ConditionTrue
-			condition.Reason = "NoRouteCreated"
-			condition.Message = "RouteController failed to create a route"
+		diff := func(copy runtime.Object) (client.Object, error) {
+			nins := copy.(*corev1.Node)
+			condition, ok := helper.FindCondition(nins.Status.Conditions, corev1.NodeNetworkUnavailable)
+			condition.Type = corev1.NodeNetworkUnavailable
+			condition.LastTransitionTime = metav1.Now()
+			condition.LastHeartbeatTime = metav1.Now()
+			if routeCreated {
+				condition.Status = corev1.ConditionFalse
+				condition.Reason = "RouteCreated"
+				condition.Message = "RouteController created a route"
+			} else {
+				condition.Status = corev1.ConditionTrue
+				condition.Reason = "NoRouteCreated"
+				condition.Message = "RouteController failed to create a route"
+			}
+			if !ok {
+				nins.Status.Conditions = append(nins.Status.Conditions, *condition)
+			}
+			return nins, nil
 		}
-		if !ok {
-			node.Status.Conditions = append(node.Status.Conditions, *condition)
-		}
-		err = r.client.Status().Patch(ctx, node, patch)
+		err = helper.PatchM(r.client, node, diff, helper.PatchStatus)
 		if err == nil {
 			return nil
 		}
