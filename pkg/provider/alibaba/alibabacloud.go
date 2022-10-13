@@ -2,7 +2,8 @@ package alibaba
 
 import (
 	"fmt"
-	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider"
+
+	prvd "k8s.io/cloud-provider-alibaba-cloud/pkg/provider"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/alb"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/base"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/cas"
@@ -31,7 +32,7 @@ func NewAlibabaCloud() prvd.Provider {
 
 	metric.RegisterPrometheus()
 
-	return &AlibabaCloud{
+	return AlibabaCloud{
 		IMetaData:    mgr.Meta,
 		ECSProvider:  ecs.NewECSProvider(mgr),
 		SLBProvider:  slb.NewLBProvider(mgr),
