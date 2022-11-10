@@ -2,7 +2,7 @@ package nlbv2
 
 import (
 	"context"
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/helper"
@@ -16,8 +16,8 @@ func RunLoadBalancerTestCases(f *framework.Framework) {
 
 	ginkgo.Describe("nlb service controller: loadbalancer", func() {
 
-		ginkgo.By("delete service")
 		ginkgo.AfterEach(func() {
+			ginkgo.By("delete service")
 			err := f.AfterEach()
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		})

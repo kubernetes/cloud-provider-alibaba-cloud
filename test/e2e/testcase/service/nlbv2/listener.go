@@ -1,7 +1,7 @@
 package nlbv2
 
 import (
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -15,8 +15,8 @@ import (
 func RunListenerTestCases(f *framework.Framework) {
 	ginkgo.Describe("nlb service controller: listener", func() {
 
-		ginkgo.By("delete service")
 		ginkgo.AfterEach(func() {
+			ginkgo.By("delete service")
 			err := f.AfterEach()
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		})
