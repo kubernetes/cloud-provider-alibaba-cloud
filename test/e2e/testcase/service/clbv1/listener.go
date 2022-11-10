@@ -4,7 +4,7 @@ import (
 	"context"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/service/reconcile/annotation"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -16,8 +16,8 @@ import (
 func RunListenerTestCases(f *framework.Framework) {
 	ginkgo.Describe("clb service controller: listener", func() {
 
-		ginkgo.By("delete service")
 		ginkgo.AfterEach(func() {
+			ginkgo.By("delete service")
 			err := f.AfterEach()
 			gomega.Expect(err).To(gomega.BeNil())
 		})
