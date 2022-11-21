@@ -96,6 +96,10 @@ func isNodeExcludeFromLoadBalancer(node *v1.Node) bool {
 		return true
 	}
 
+	if _, exclude := node.Labels[LabelNodeExcludeBalancerDeprecated]; exclude {
+		return true
+	}
+
 	if helper.HasExcludeLabel(node) {
 		return true
 	}

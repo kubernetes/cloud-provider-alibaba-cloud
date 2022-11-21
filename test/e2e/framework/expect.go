@@ -1184,6 +1184,10 @@ func isNodeExcludeFromLoadBalancer(node *v1.Node, anno *service.AnnotationReques
 		return true
 	}
 
+	if _, exclude := node.Labels[service.LabelNodeExcludeBalancerDeprecated]; exclude {
+		return true
+	}
+
 	return false
 }
 

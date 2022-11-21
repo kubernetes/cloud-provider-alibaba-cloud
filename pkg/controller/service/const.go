@@ -1,5 +1,7 @@
 package service
 
+import v1 "k8s.io/api/core/v1"
+
 // Service related
 const (
 	ServiceFinalizer    = "service.k8s.alibaba/resources"
@@ -14,7 +16,8 @@ const (
 	LabelNodeTypeVK     = "virtual-kubelet"
 	// LabelNodeExcludeBalancer specifies that the node should be
 	// exclude from loadbalancers created by a cloud provider.
-	LabelNodeExcludeBalancer = "alpha.service-controller.kubernetes.io/exclude-balancer"
+	LabelNodeExcludeBalancerDeprecated = "alpha.service-controller.kubernetes.io/exclude-balancer"
+	LabelNodeExcludeBalancer           = v1.LabelNodeExcludeBalancers
 	// ToBeDeletedTaint is a taint used by the CLuster Autoscaler before marking a node for deletion.
 	// Details in https://github.com/kubernetes/cloud-provider/blob/5bb9b27442bcb2613a9ca4046c89109de4435824/controllers/service/controller.go#L58
 	ToBeDeletedTaint = "ToBeDeletedByClusterAutoscaler"

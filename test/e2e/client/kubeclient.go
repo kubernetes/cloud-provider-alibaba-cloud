@@ -555,6 +555,9 @@ func (client *KubeClient) GetLatestNode() (*v1.Node, error) {
 		if _, exclude := node.Labels[service.LabelNodeExcludeBalancer]; exclude {
 			continue
 		}
+		if _, exclude := node.Labels[service.LabelNodeExcludeBalancerDeprecated]; exclude {
+			continue
+		}
 		if _, isVK := node.Labels[service.LabelNodeTypeVK]; isVK {
 			continue
 		}
