@@ -99,7 +99,8 @@ const (
 
 // network load balancer
 const (
-	ZoneMaps = AnnotationLoadBalancerPrefix + "zone-maps" // ZoneMaps zone maps
+	ZoneMaps         = AnnotationLoadBalancerPrefix + "zone-maps" // ZoneMaps zone maps
+	SecurityGroupIds = AnnotationLoadBalancerPrefix + "security-group-ids"
 
 	ProxyProtocol = AnnotationLoadBalancerPrefix + "proxy-protocol"
 	CaCertID      = AnnotationLoadBalancerPrefix + "cacert-id" // CertID cert id
@@ -145,6 +146,28 @@ func (n *AnnotationRequest) Get(k string) string {
 	}
 
 	return ""
+}
+
+func (n *AnnotationRequest) Has(k string) bool {
+	if n.Service == nil {
+		return false
+	}
+
+	if n.Service.Annotations == nil {
+		return false
+	}
+
+	key := composite(AnnotationPrefix, k)
+	if _, ok := n.Service.Annotations[key]; ok {
+		return true
+	}
+
+	key = composite(AnnotationLegacyPrefix, k)
+	if _, ok := n.Service.Annotations[key]; ok {
+		return true
+	}
+
+	return false
 }
 
 func (n *AnnotationRequest) GetDefaultValue(k string) string {

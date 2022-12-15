@@ -10,6 +10,7 @@ import (
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/model"
 	"k8s.io/cloud-provider-alibaba-cloud/test/e2e/framework"
 	"k8s.io/cloud-provider-alibaba-cloud/test/e2e/options"
+	"strings"
 )
 
 func RunLoadBalancerTestCases(f *framework.Framework) {
@@ -547,5 +548,118 @@ func RunLoadBalancerTestCases(f *framework.Framework) {
 				gomega.Expect(err).NotTo(gomega.BeNil())
 			})
 		})
+
+		if options.TestConfig.SecurityGroupIDs != "" {
+			securityGroupIDs := strings.Split(options.TestConfig.SecurityGroupIDs, ",")
+			ginkgo.Context("nlb security group ids", func() {
+				ginkgo.It("one security group", func() {
+					svc, err := f.Client.KubeClient.CreateNLBServiceByAnno(map[string]string{
+						annotation.Annotation(annotation.ZoneMaps):         options.TestConfig.NLBZoneMaps,
+						annotation.Annotation(annotation.SecurityGroupIds): securityGroupIDs[0],
+					})
+					gomega.Expect(err).To(gomega.BeNil())
+					err = f.ExpectNetworkLoadBalancerEqual(svc)
+					gomega.Expect(err).To(gomega.BeNil())
+				})
+
+				ginkgo.It("none to one security group", func() {
+					oldSvc, err := f.Client.KubeClient.CreateNLBServiceWithoutSelector(map[string]string{
+						annotation.Annotation(annotation.ZoneMaps): options.TestConfig.NLBZoneMaps,
+					})
+					gomega.Expect(err).To(gomega.BeNil())
+					err = f.ExpectNetworkLoadBalancerEqual(oldSvc)
+					gomega.Expect(err).To(gomega.BeNil())
+
+					newSvc := oldSvc.DeepCopy()
+					newSvc.Annotations[annotation.Annotation(annotation.SecurityGroupIds)] = securityGroupIDs[0]
+					newSvc, err = f.Client.KubeClient.PatchService(oldSvc, newSvc)
+					gomega.Expect(err).To(gomega.BeNil())
+					err = f.ExpectNetworkLoadBalancerEqual(newSvc)
+					gomega.Expect(err).To(gomega.BeNil())
+				})
+
+				ginkgo.It("set security group annotation to empty", func() {
+					oldSvc, err := f.Client.KubeClient.CreateNLBServiceWithoutSelector(map[string]string{
+						annotation.Annotation(annotation.ZoneMaps):         options.TestConfig.NLBZoneMaps,
+						annotation.Annotation(annotation.SecurityGroupIds): securityGroupIDs[0],
+					})
+					gomega.Expect(err).To(gomega.BeNil())
+					err = f.ExpectNetworkLoadBalancerEqual(oldSvc)
+					gomega.Expect(err).To(gomega.BeNil())
+
+					newSvc := oldSvc.DeepCopy()
+					newSvc.Annotations[annotation.Annotation(annotation.SecurityGroupIds)] = ""
+					newSvc, err = f.Client.KubeClient.PatchService(oldSvc, newSvc)
+					gomega.Expect(err).To(gomega.BeNil())
+					err = f.ExpectNetworkLoadBalancerEqual(newSvc)
+					gomega.Expect(err).To(gomega.BeNil())
+				})
+
+				ginkgo.It("delete security group annotation", func() {
+					oldSvc, err := f.Client.KubeClient.CreateNLBServiceWithoutSelector(map[string]string{
+						annotation.Annotation(annotation.ZoneMaps):         options.TestConfig.NLBZoneMaps,
+						annotation.Annotation(annotation.SecurityGroupIds): securityGroupIDs[0],
+					})
+					gomega.Expect(err).To(gomega.BeNil())
+					err = f.ExpectNetworkLoadBalancerEqual(oldSvc)
+					gomega.Expect(err).To(gomega.BeNil())
+
+					newSvc := oldSvc.DeepCopy()
+					delete(newSvc.Annotations, annotation.Annotation(annotation.SecurityGroupIds))
+					newSvc, err = f.Client.KubeClient.PatchService(oldSvc, newSvc)
+					gomega.Expect(err).To(gomega.BeNil())
+					err = f.ExpectNetworkLoadBalancerEqual(oldSvc)
+					gomega.Expect(err).To(gomega.BeNil())
+				})
+
+				if len(securityGroupIDs) >= 2 {
+					ids := strings.Join(securityGroupIDs[0:2], ",")
+					ginkgo.It("two security groups", func() {
+						svc, err := f.Client.KubeClient.CreateNLBServiceByAnno(map[string]string{
+							annotation.Annotation(annotation.ZoneMaps):         options.TestConfig.NLBZoneMaps,
+							annotation.Annotation(annotation.SecurityGroupIds): ids,
+						})
+						gomega.Expect(err).To(gomega.BeNil())
+						err = f.ExpectNetworkLoadBalancerEqual(svc)
+						gomega.Expect(err).To(gomega.BeNil())
+					})
+
+					ginkgo.It("security group a -> b", func() {
+						oldSvc, err := f.Client.KubeClient.CreateNLBServiceWithoutSelector(map[string]string{
+							annotation.Annotation(annotation.ZoneMaps):         options.TestConfig.NLBZoneMaps,
+							annotation.Annotation(annotation.SecurityGroupIds): securityGroupIDs[0],
+						})
+						gomega.Expect(err).To(gomega.BeNil())
+						err = f.ExpectNetworkLoadBalancerEqual(oldSvc)
+						gomega.Expect(err).To(gomega.BeNil())
+
+						newSvc := oldSvc.DeepCopy()
+						newSvc.Annotations[annotation.Annotation(annotation.SecurityGroupIds)] = securityGroupIDs[1]
+						newSvc, err = f.Client.KubeClient.PatchService(oldSvc, newSvc)
+						gomega.Expect(err).To(gomega.BeNil())
+						err = f.ExpectNetworkLoadBalancerEqual(newSvc)
+						gomega.Expect(err).To(gomega.BeNil())
+					})
+
+					ginkgo.It("security group a -> a&b", func() {
+						oldSvc, err := f.Client.KubeClient.CreateNLBServiceWithoutSelector(map[string]string{
+							annotation.Annotation(annotation.ZoneMaps):         options.TestConfig.NLBZoneMaps,
+							annotation.Annotation(annotation.SecurityGroupIds): securityGroupIDs[0],
+						})
+						gomega.Expect(err).To(gomega.BeNil())
+						err = f.ExpectNetworkLoadBalancerEqual(oldSvc)
+						gomega.Expect(err).To(gomega.BeNil())
+
+						newSvc := oldSvc.DeepCopy()
+						newSvc.Annotations[annotation.Annotation(annotation.SecurityGroupIds)] = ids
+						newSvc, err = f.Client.KubeClient.PatchService(oldSvc, newSvc)
+						gomega.Expect(err).To(gomega.BeNil())
+						err = f.ExpectNetworkLoadBalancerEqual(newSvc)
+						gomega.Expect(err).To(gomega.BeNil())
+					})
+
+				}
+			})
+		}
 	})
 }

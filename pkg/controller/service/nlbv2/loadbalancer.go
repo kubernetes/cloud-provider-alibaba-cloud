@@ -8,6 +8,7 @@ import (
 	nlbmodel "k8s.io/cloud-provider-alibaba-cloud/pkg/model/nlb"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/model/tag"
 	prvd "k8s.io/cloud-provider-alibaba-cloud/pkg/provider"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/util"
 	"strings"
 )
 
@@ -35,6 +36,14 @@ func (mgr *NLBManager) BuildLocalModel(reqCtx *svcCtx.RequestContext, mdl *nlbmo
 		mdl.LoadBalancerAttribute.ZoneMappings = zoneMappings
 	} else if !mdl.LoadBalancerAttribute.IsUserManaged {
 		return fmt.Errorf("ParameterMissing, zone mappings are required")
+	}
+
+	if reqCtx.Anno.Has(annotation.SecurityGroupIds) {
+		mdl.LoadBalancerAttribute.SecurityGroupIds = []string{}
+		anno := reqCtx.Anno.Get(annotation.SecurityGroupIds)
+		if anno != "" {
+			mdl.LoadBalancerAttribute.SecurityGroupIds = strings.Split(anno, ",")
+		}
 	}
 
 	mdl.LoadBalancerAttribute.AddressType = nlbmodel.GetAddressType(reqCtx.Anno.Get(annotation.AddressType))
@@ -146,6 +155,35 @@ func (mgr *NLBManager) Update(reqCtx *svcCtx.RequestContext, local, remote *nlbm
 			remote.LoadBalancerAttribute.ZoneMappings, local.LoadBalancerAttribute.ZoneMappings))
 		if err := mgr.cloud.UpdateNLBZones(reqCtx.Ctx, local); err != nil {
 			return fmt.Errorf("update zone mappings error: %s", err.Error())
+		}
+	}
+
+	if local.LoadBalancerAttribute.SecurityGroupIds != nil &&
+		!util.IsStringSliceEqual(local.LoadBalancerAttribute.SecurityGroupIds, remote.LoadBalancerAttribute.SecurityGroupIds) {
+		reqCtx.Log.Info(fmt.Sprintf("SecurityGroupIds changed from %v to %v",
+			remote.LoadBalancerAttribute.SecurityGroupIds, local.LoadBalancerAttribute.SecurityGroupIds))
+		// get difference
+		var added, removed []string
+		newMap := map[string]struct{}{}
+		oldMap := map[string]struct{}{}
+		for _, i := range local.LoadBalancerAttribute.SecurityGroupIds {
+			newMap[i] = struct{}{}
+		}
+		for _, i := range remote.LoadBalancerAttribute.SecurityGroupIds {
+			oldMap[i] = struct{}{}
+			if _, ok := newMap[i]; !ok {
+				removed = append(removed, i)
+			}
+		}
+		for _, i := range local.LoadBalancerAttribute.SecurityGroupIds {
+			if _, ok := oldMap[i]; !ok {
+				added = append(added, i)
+			}
+		}
+
+		reqCtx.Log.Info(fmt.Sprintf("security groups added %v, removed %v", added, removed))
+		if err := mgr.cloud.UpdateNLBSecurityGroupIds(reqCtx.Ctx, local, added, removed); err != nil {
+			return fmt.Errorf("update security group ids error: %s", err.Error())
 		}
 	}
 

@@ -196,6 +196,39 @@ func (p *NLBProvider) UpdateNLBZones(ctx context.Context, mdl *nlbmodel.NetworkL
 	return util.SDKError("UpdateLoadBalancerZones", err)
 }
 
+func (p *NLBProvider) UpdateNLBSecurityGroupIds(ctx context.Context, mdl *nlbmodel.NetworkLoadBalancer, added, removed []string) error {
+	// leave first, then join
+	if len(removed) != 0 {
+		req := &nlb.LoadBalancerLeaveSecurityGroupRequest{}
+		req.LoadBalancerId = tea.String(mdl.LoadBalancerAttribute.LoadBalancerId)
+		req.SecurityGroupIds = tea.StringSlice(removed)
+		resp, err := p.auth.NLB.LoadBalancerLeaveSecurityGroup(req)
+		if err != nil {
+			return util.SDKError("LoadBalancerLeaveSecurityGroup", err)
+		}
+		err = p.waitJobFinish("LoadBalancerLeaveSecurityGroup", tea.StringValue(resp.Body.JobId))
+		if err != nil {
+			return err
+		}
+	}
+
+	if len(added) != 0 {
+		req := &nlb.LoadBalancerJoinSecurityGroupRequest{}
+		req.LoadBalancerId = tea.String(mdl.LoadBalancerAttribute.LoadBalancerId)
+		req.SecurityGroupIds = tea.StringSlice(added)
+		resp, err := p.auth.NLB.LoadBalancerJoinSecurityGroup(req)
+		if err != nil {
+			return util.SDKError("LoadBalancerJoinSecurityGroup", err)
+		}
+		err = p.waitJobFinish("LoadBalancerJoinSecurityGroup", tea.StringValue(resp.Body.JobId))
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
 // tag
 func (p *NLBProvider) TagNLBResource(ctx context.Context, resourceId string, resourceType nlbmodel.TagResourceType, tags []tag.Tag,
 ) error {
@@ -326,6 +359,7 @@ func loadResponse(resp interface{}, lb *nlbmodel.NetworkLoadBalancer) error {
 		lb.LoadBalancerAttribute.LoadBalancerStatus = tea.StringValue(resp.LoadBalancerStatus)
 		lb.LoadBalancerAttribute.ResourceGroupId = tea.StringValue(resp.ResourceGroupId)
 		lb.LoadBalancerAttribute.DNSName = tea.StringValue(resp.DNSName)
+		lb.LoadBalancerAttribute.SecurityGroupIds = tea.StringSliceValue(resp.SecurityGroupIds)
 
 		for _, z := range resp.ZoneMappings {
 			lb.LoadBalancerAttribute.ZoneMappings = append(lb.LoadBalancerAttribute.ZoneMappings,
@@ -344,6 +378,7 @@ func loadResponse(resp interface{}, lb *nlbmodel.NetworkLoadBalancer) error {
 		lb.LoadBalancerAttribute.LoadBalancerStatus = tea.StringValue(resp.LoadBalancerStatus)
 		lb.LoadBalancerAttribute.ResourceGroupId = tea.StringValue(resp.ResourceGroupId)
 		lb.LoadBalancerAttribute.DNSName = tea.StringValue(resp.DNSName)
+		lb.LoadBalancerAttribute.SecurityGroupIds = tea.StringSliceValue(resp.SecurityGroupIds)
 
 		for _, z := range resp.ZoneMappings {
 			lb.LoadBalancerAttribute.ZoneMappings = append(lb.LoadBalancerAttribute.ZoneMappings,
