@@ -11,7 +11,6 @@ import (
 	nlbmodel "k8s.io/cloud-provider-alibaba-cloud/pkg/model/nlb"
 
 	"github.com/aliyun/alibaba-cloud-sdk-go/services/alb"
-	"github.com/aliyun/alibaba-cloud-sdk-go/services/cas"
 	"github.com/aliyun/alibaba-cloud-sdk-go/services/sls"
 	"github.com/aliyun/alibaba-cloud-sdk-go/services/vpc"
 	v1 "k8s.io/api/core/v1"
@@ -147,8 +146,8 @@ type ISLS interface {
 }
 
 type ICAS interface {
-	DescribeSSLCertificateList(ctx context.Context, request *cas.DescribeSSLCertificateListRequest) (*cas.DescribeSSLCertificateListResponse, error)
-	DescribeSSLCertificatePublicKeyDetail(ctx context.Context, request *cas.DescribeSSLCertificatePublicKeyDetailRequest) (*cas.DescribeSSLCertificatePublicKeyDetailResponse, error)
+	DescribeSSLCertificatePublicKeyDetail(ctx context.Context, certId string) (*model.CertificateInfo, error)
+	DescribeSSLCertificateList(ctx context.Context) ([]model.CertificateInfo, error)
 }
 
 type IALB interface {
