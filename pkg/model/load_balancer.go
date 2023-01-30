@@ -171,6 +171,8 @@ type ListenerAttribute struct {
 	// The following parameters can be set to the default value.
 	// Use the pointer type to distinguish. If the user does not set the param, the param is nil
 	PersistenceTimeout *int
+
+	HealthCheckSwitch FlagType // tcp & udp
 }
 
 type VServerGroup struct {
