@@ -299,3 +299,14 @@ func GetServiceTrafficPolicy(svc *v1.Service) (TrafficPolicy, error) {
 	}
 	return ClusterTrafficPolicy, nil
 }
+
+// GetNodeCondition will get pointer to Node's existing condition.
+// returns nil if no matching condition found.
+func GetNodeCondition(node *v1.Node, conditionType v1.NodeConditionType) *v1.NodeCondition {
+	for i := range node.Status.Conditions {
+		if node.Status.Conditions[i].Type == conditionType {
+			return &node.Status.Conditions[i]
+		}
+	}
+	return nil
+}
