@@ -18,8 +18,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
-	"sort"
-	"strings"
 )
 
 func NewEnqueueRequestForServiceEvent(eventRecorder record.EventRecorder) *enqueueRequestForServiceEvent {
@@ -439,37 +437,35 @@ func nodeSpecChanged(oldNode, newNode *v1.Node) bool {
 			"node", oldNode.Name)
 		return true
 	}
-	if nodeConditionChanged(oldNode.Name, oldNode.Status.Conditions, newNode.Status.Conditions) {
+
+	if nodeReadyChanged(oldNode, newNode) {
 		return true
 	}
+
 	return false
 }
 
-func nodeConditionChanged(name string, oldC, newC []v1.NodeCondition) bool {
-	if len(oldC) != len(newC) {
-		util.ServiceLog.Info(fmt.Sprintf("node changed:  condition length not equal, from=%v, to=%v", oldC, newC),
-			"node", name)
+func nodeReadyChanged(oldNode, newNode *v1.Node) bool {
+	oldNodeReadyCondition := v1.ConditionFalse
+	newNodeReadyCondition := v1.ConditionFalse
+	if oldNode != nil {
+		if readyCond := helper.GetNodeCondition(oldNode, v1.NodeReady); readyCond != nil {
+			oldNodeReadyCondition = readyCond.Status
+		}
+	}
+	if newNode != nil {
+		if readyCond := helper.GetNodeCondition(newNode, v1.NodeReady); readyCond != nil {
+			newNodeReadyCondition = readyCond.Status
+		}
+	}
+	if oldNodeReadyCondition != newNodeReadyCondition {
+		util.ServiceLog.Info(fmt.Sprintf(
+			"node changed: %s, ready condition from=%s, to=%s. old condition [%v], new condition[%v]",
+			oldNode.Name, oldNodeReadyCondition, newNodeReadyCondition, oldNode.Status.Conditions, newNode.Status.Conditions),
+			"node", oldNode.Name)
 		return true
 	}
 
-	sort.SliceStable(oldC, func(i, j int) bool {
-		return strings.Compare(string(oldC[i].Type), string(oldC[j].Type)) <= 0
-	})
-
-	sort.SliceStable(newC, func(i, j int) bool {
-		return strings.Compare(string(newC[i].Type), string(newC[j].Type)) <= 0
-	})
-
-	for i := range oldC {
-		if oldC[i].Type != newC[i].Type ||
-			oldC[i].Status != newC[i].Status {
-			util.ServiceLog.Info(
-				fmt.Sprintf("node changed: condition type(%s,%s) | status(%s,%s)",
-					oldC[i].Type, newC[i].Type, oldC[i].Status, newC[i].Status),
-				"node", name)
-			return true
-		}
-	}
 	return false
 }
 
