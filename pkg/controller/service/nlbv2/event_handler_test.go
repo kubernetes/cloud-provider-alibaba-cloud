@@ -266,7 +266,7 @@ func Test_nodeConditionChanged(t *testing.T) {
 			Type:   v1.NodePIDPressure,
 		},
 	}
-	assert.Equal(t, nodeSpecChanged(oldN, newN), true)
+	assert.Equal(t, nodeSpecChanged(oldN, newN), false)
 
 	newN = oldN.DeepCopy()
 	newN.Status.Conditions = []v1.NodeCondition{
@@ -276,7 +276,7 @@ func Test_nodeConditionChanged(t *testing.T) {
 			Type:   v1.NodeReady,
 		},
 	}
-	assert.Equal(t, nodeConditionChanged(NodeName, oldN.Status.Conditions, newN.Status.Conditions), true)
+	assert.Equal(t, nodeReadyChanged(oldN, newN), true)
 }
 
 func Test_nodeLabelsChanged(t *testing.T) {
