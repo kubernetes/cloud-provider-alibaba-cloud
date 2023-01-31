@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	v1 "k8s.io/api/core/v1"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	ctrlCfg "k8s.io/cloud-provider-alibaba-cloud/pkg/config"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/helper"
 	svcCtx "k8s.io/cloud-provider-alibaba-cloud/pkg/controller/service/reconcile/context"
@@ -12,6 +13,7 @@ import (
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/base"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/dryrun"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/util"
+	"k8s.io/klog/v2"
 )
 
 func NewModelApplier(nlbMgr *NLBManager, lisMgr *ListenerManager, sgMgr *ServerGroupManager) *ModelApplier {
@@ -38,43 +40,51 @@ func (m *ModelApplier) Apply(reqCtx *svcCtx.RequestContext, local *nlbmodel.Netw
 	if err != nil {
 		return remote, fmt.Errorf("get nlb attribute from cloud error: %s", err.Error())
 	}
-	reqCtx.Ctx = context.WithValue(reqCtx.Ctx, dryrun.ContextNLB, remote.LoadBalancerAttribute.LoadBalancerId)
+	reqCtx.Ctx = context.WithValue(reqCtx.Ctx, dryrun.ContextNLB, remote.GetLoadBalancerId())
+	klog.Infof("%s find nlb with result: \n%+v", util.Key(reqCtx.Service), util.PrettyJson(remote))
 
 	serviceHashChanged := helper.IsServiceHashChanged(reqCtx.Service)
+	errs := []error{}
 	if serviceHashChanged || ctrlCfg.ControllerCFG.DryRun {
 		if err := m.applyLoadBalancerAttribute(reqCtx, local, remote); err != nil {
-			return remote, fmt.Errorf("reconcile nlb attribute error: %s", err.Error())
+			errs = append(errs, fmt.Errorf("update nlb attribute error: %s", err.Error()))
 		}
 	}
 
 	if err := m.sgMgr.BuildRemoteModel(reqCtx, remote); err != nil {
-		return remote, fmt.Errorf("get server group from remote error: %s", err.Error())
+		errs = append(errs, fmt.Errorf("get server group from remote error: %s", err.Error()))
+		return remote, utilerrors.NewAggregate(errs)
 	}
 	if err := m.applyVGroups(reqCtx, local, remote); err != nil {
-		return remote, fmt.Errorf("reconcile backends error: %s", err.Error())
+		errs = append(errs, fmt.Errorf("reconcile backends error: %s", err.Error()))
+		return remote, utilerrors.NewAggregate(errs)
 	}
 
 	if serviceHashChanged || ctrlCfg.ControllerCFG.DryRun {
 		if remote.LoadBalancerAttribute.LoadBalancerId != "" {
 			if err := m.lisMgr.BuildRemoteModel(reqCtx, remote); err != nil {
-				return remote, fmt.Errorf("get lb listeners from cloud, error: %s", err.Error())
+				errs = append(errs, fmt.Errorf("get lb listeners from cloud, error: %s", err.Error()))
+				return remote, utilerrors.NewAggregate(errs)
 			}
 			if err := m.applyListeners(reqCtx, local, remote); err != nil {
-				return remote, fmt.Errorf("reconcile listeners error: %s", err.Error())
+				errs = append(errs, fmt.Errorf("reconcile listeners error: %s", err.Error()))
+				return remote, utilerrors.NewAggregate(errs)
 			}
 		} else {
 			if !helper.NeedDeleteLoadBalancer(reqCtx.Service) {
-				return remote, fmt.Errorf("alicloud: can not find loadbalancer by tag [%s:%s]",
-					helper.TAGKEY, reqCtx.Anno.GetDefaultLoadBalancerName())
+				errs = append(errs, fmt.Errorf("alicloud: can not find loadbalancer by tag [%s:%s]",
+					helper.TAGKEY, reqCtx.Anno.GetDefaultLoadBalancerName()))
+				return remote, utilerrors.NewAggregate(errs)
 			}
 		}
 	}
 
 	if err := m.cleanup(reqCtx, local, remote); err != nil {
-		return remote, fmt.Errorf("update lb listeners error: %s", err.Error())
+		errs = append(errs, fmt.Errorf("update lb listeners error: %s", err.Error()))
+		return remote, utilerrors.NewAggregate(errs)
 	}
 
-	return remote, nil
+	return remote, utilerrors.NewAggregate(errs)
 }
 
 func (m *ModelApplier) applyLoadBalancerAttribute(reqCtx *svcCtx.RequestContext, local, remote *nlbmodel.NetworkLoadBalancer) error {
