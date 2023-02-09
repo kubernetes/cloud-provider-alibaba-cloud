@@ -2,12 +2,12 @@ package clbv1
 
 import (
 	"context"
-	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/service/reconcile/annotation"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/service/reconcile/annotation"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/model"
 	"k8s.io/cloud-provider-alibaba-cloud/test/e2e/framework"
 	"k8s.io/cloud-provider-alibaba-cloud/test/e2e/options"
@@ -360,6 +360,42 @@ func RunListenerTestCases(f *framework.Framework) {
 				newsvc.Annotations[annotation.Annotation(annotation.HealthCheckURI)] = "/test/index1.html"
 				newsvc, err = f.Client.KubeClient.PatchService(oldsvc, newsvc)
 				gomega.Expect(err).To(gomega.BeNil())
+				err = f.ExpectLoadBalancerEqual(newsvc)
+				gomega.Expect(err).To(gomega.BeNil())
+			})
+			ginkgo.It("health-check-swith off", func() {
+				oldsvc, err := f.Client.KubeClient.CreateServiceByAnno(map[string]string{
+					annotation.Annotation(annotation.HealthCheckType):           model.TCP,
+					annotation.Annotation(annotation.HealthCheckConnectTimeout): "8",
+					annotation.Annotation(annotation.HealthyThreshold):          "5",
+					annotation.Annotation(annotation.UnhealthyThreshold):        "5",
+					annotation.Annotation(annotation.HealthCheckInterval):       "3",
+					annotation.Annotation(annotation.HealthCheckSwitch):         "off",
+					annotation.Annotation(annotation.ProtocolPort):              "tcp:80,udp:443",
+				})
+				gomega.Expect(err).To(gomega.BeNil())
+				err = f.ExpectLoadBalancerEqual(oldsvc)
+				gomega.Expect(err).To(gomega.BeNil())
+			})
+			ginkgo.It("health-check-swith: on -> off", func() {
+				oldsvc, err := f.Client.KubeClient.CreateServiceByAnno(map[string]string{
+					annotation.Annotation(annotation.HealthCheckType):           model.TCP,
+					annotation.Annotation(annotation.HealthCheckConnectTimeout): "8",
+					annotation.Annotation(annotation.HealthyThreshold):          "5",
+					annotation.Annotation(annotation.UnhealthyThreshold):        "5",
+					annotation.Annotation(annotation.HealthCheckInterval):       "3",
+					annotation.Annotation(annotation.HealthCheckSwitch):         "on",
+				})
+				gomega.Expect(err).To(gomega.BeNil())
+				err = f.ExpectLoadBalancerEqual(oldsvc)
+				gomega.Expect(err).To(gomega.BeNil())
+
+				// close health check for tcp & udp
+				newsvc := oldsvc.DeepCopy()
+				newsvc.Annotations[annotation.Annotation(annotation.HealthCheckSwitch)] = string(model.OffFlag)
+				newsvc, err = f.Client.KubeClient.PatchService(oldsvc, newsvc)
+				gomega.Expect(err).To(gomega.BeNil())
+
 				err = f.ExpectLoadBalancerEqual(newsvc)
 				gomega.Expect(err).To(gomega.BeNil())
 			})
@@ -1066,6 +1102,48 @@ func RunListenerTestCases(f *framework.Framework) {
 				err = f.ExpectLoadBalancerEqual(newsvc)
 				gomega.Expect(err).To(gomega.BeNil())
 			})
+			ginkgo.It("mixed port protocol", func() {
+				rawsvc := f.Client.KubeClient.DefaultService()
+				rawsvc.Spec.Ports = []v1.ServicePort{
+					{
+						Name:       "tcp",
+						Port:       80,
+						TargetPort: intstr.FromInt(80),
+						Protocol:   v1.ProtocolTCP,
+					},
+					{
+						Name:       "udp",
+						Port:       80,
+						TargetPort: intstr.FromInt(80),
+						Protocol:   v1.ProtocolUDP,
+					},
+				}
+				oldsvc, err := f.Client.KubeClient.CreateService(rawsvc)
+				gomega.Expect(err).To(gomega.BeNil())
+				err = f.ExpectLoadBalancerEqual(oldsvc)
+				gomega.Expect(err).To(gomega.BeNil())
+
+				//update listener port
+				newsvc := oldsvc.DeepCopy()
+				newsvc.Spec.Ports = []v1.ServicePort{
+					{
+						Name:       "tcp",
+						Port:       80,
+						TargetPort: intstr.FromInt(80),
+						Protocol:   v1.ProtocolTCP,
+					},
+					{
+						Name:       "udp",
+						Port:       53,
+						TargetPort: intstr.FromInt(53),
+						Protocol:   v1.ProtocolUDP,
+					},
+				}
+				newsvc, err = f.Client.KubeClient.PatchService(oldsvc, newsvc)
+				gomega.Expect(err).To(gomega.BeNil())
+				err = f.ExpectLoadBalancerEqual(newsvc)
+				gomega.Expect(err).To(gomega.BeNil())
+			})
 			if options.TestConfig.CertID != "" {
 				ginkgo.It("port: 443 -> 444; protocol: https", func() {
 					oldsvc, err := f.Client.KubeClient.CreateServiceByAnno(map[string]string{
@@ -1103,7 +1181,7 @@ func RunListenerTestCases(f *framework.Framework) {
 				gomega.Expect(err).To(gomega.BeNil())
 
 				err = f.Client.CloudClient.DeleteLoadBalancerListener(
-					context.TODO(), lb.LoadBalancerAttribute.LoadBalancerId, 80)
+					context.TODO(), lb.LoadBalancerAttribute.LoadBalancerId, 80, model.TCP)
 				gomega.Expect(err).To(gomega.BeNil())
 
 				newSvc := oldsvc.DeepCopy()
@@ -1126,7 +1204,7 @@ func RunListenerTestCases(f *framework.Framework) {
 					gomega.Expect(err).To(gomega.BeNil())
 
 					err = f.Client.CloudClient.SLBProvider.DeleteLoadBalancerListener(
-						context.TODO(), lb.LoadBalancerAttribute.LoadBalancerId, 80)
+						context.TODO(), lb.LoadBalancerAttribute.LoadBalancerId, 80, model.TCP)
 					gomega.Expect(err).To(gomega.BeNil())
 
 					newSvc := oldsvc.DeepCopy()

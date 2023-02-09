@@ -140,7 +140,7 @@ func (f *Framework) FindNetworkLoadBalancer() (*v1.Service, *nlbmodel.NetworkLoa
 		if err != nil {
 			return false, nil
 		}
-		klog.Infof("find nlb by service, %+v", svc.Status.LoadBalancer.Ingress)
+		klog.Infof("wait nlb service running, ingress: %+v", svc.Status.LoadBalancer.Ingress)
 		if len(svc.Status.LoadBalancer.Ingress) == 1 &&
 			(svc.Status.LoadBalancer.Ingress[0].IP != "" ||
 				svc.Status.LoadBalancer.Ingress[0].Hostname != "") {
@@ -301,6 +301,7 @@ func nlbVsgAttrEqual(f *Framework, reqCtx *svcCtx.RequestContext, remote *nlbmod
 			}
 			if found {
 				sg.ServicePort = &port
+				sg.ServicePort.Protocol = v1.Protocol(proto)
 				if isOverride(reqCtx.Anno) && !isNLBServerGroupUsedByPort(sg, remote.Listeners) {
 					return fmt.Errorf("port %d do not use vgroup id: %s", port.Port, sg.ServerGroupId)
 				}
@@ -399,7 +400,8 @@ func nlbListenerProtocol(annotation string, port v1.ServicePort) (string, error)
 
 func isNLBServerGroupUsedByPort(sg *nlbmodel.ServerGroup, listeners []*nlbmodel.ListenerAttribute) bool {
 	for _, l := range listeners {
-		if l.ListenerPort == sg.ServicePort.Port {
+		if l.ListenerPort == sg.ServicePort.Port &&
+			strings.EqualFold(l.ListenerProtocol, string(sg.ServicePort.Protocol)) {
 			return sg.ServerGroupId == l.ServerGroupId
 		}
 	}

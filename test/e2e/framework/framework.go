@@ -131,19 +131,40 @@ func (f *Framework) CreateCloudResource() error {
 		options.TestConfig.InternetLoadBalancerID = slbM.LoadBalancerAttribute.LoadBalancerId
 		f.CreatedResource[options.TestConfig.InternetLoadBalancerID] = SLBResource
 
-		vsg1 := &model.VServerGroup{VGroupName: "test1"}
-		err = f.Client.CloudClient.CreateVServerGroup(context.TODO(), vsg1, options.TestConfig.InternetLoadBalancerID)
-		if err != nil {
-			return fmt.Errorf("create vserver group error: %s", err.Error())
+		vsg := []model.VServerGroup{
+			{
+				VGroupName: "test1",
+			},
+			{
+				VGroupName: "test2",
+			},
 		}
-		options.TestConfig.VServerGroupID = vsg1.VGroupId
+		remotevsg, err := f.Client.CloudClient.DescribeVServerGroups(context.TODO(), slbM.LoadBalancerAttribute.LoadBalancerId)
+		if err != nil {
+			return err
+		}
+		for i, lvs := range vsg {
+			found := false
+			for _, rvs := range remotevsg {
+				if lvs.VGroupName == rvs.VGroupName {
+					found = true
+					vsg[i].VGroupId = rvs.VGroupId
+					break
+				}
+			}
+			if found {
+				continue
+			} else {
+				err = f.Client.CloudClient.CreateVServerGroup(context.TODO(), &vsg[i], options.TestConfig.InternetLoadBalancerID)
+				if err != nil {
+					return fmt.Errorf("create vserver group error: %s", err.Error())
+				}
+			}
 
-		vsg2 := &model.VServerGroup{VGroupName: "test2"}
-		err = f.Client.CloudClient.CreateVServerGroup(context.TODO(), vsg2, options.TestConfig.InternetLoadBalancerID)
-		if err != nil {
-			return fmt.Errorf("create vserver group error: %s", err.Error())
 		}
-		options.TestConfig.VServerGroupID2 = vsg2.VGroupId
+
+		options.TestConfig.VServerGroupID = vsg[0].VGroupId
+		options.TestConfig.VServerGroupID2 = vsg[1].VGroupId
 	}
 
 	if options.TestConfig.IntranetLoadBalancerID == "" {

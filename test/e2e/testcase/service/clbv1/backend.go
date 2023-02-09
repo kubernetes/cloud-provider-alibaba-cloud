@@ -561,5 +561,27 @@ func RunBackendTestCases(f *framework.Framework) {
 				gomega.Expect(err).To(gomega.BeNil())
 			})
 		})
+
+		ginkgo.Context("update-backend", func() {
+			ginkgo.It("scale deploy", func() {
+				rawsvc := f.Client.KubeClient.DefaultService()
+				rawsvc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyTypeLocal
+				oldSvc, err := f.Client.KubeClient.CreateService(rawsvc)
+				gomega.Expect(err).To(gomega.BeNil())
+				err = f.ExpectLoadBalancerEqual(oldSvc)
+				gomega.Expect(err).To(gomega.BeNil())
+
+				// scale deploy
+				err = f.Client.KubeClient.ScaleDeployment(1)
+				gomega.Expect(err).To(gomega.BeNil())
+				defer func() {
+					err = f.Client.KubeClient.ScaleDeployment(3)
+					gomega.Expect(err).To(gomega.BeNil())
+				}()
+
+				err = f.ExpectLoadBalancerEqual(oldSvc)
+				gomega.Expect(err).To(gomega.BeNil())
+			})
+		})
 	})
 }

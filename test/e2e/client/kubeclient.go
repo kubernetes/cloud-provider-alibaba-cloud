@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/alibabacloud-go/tea/tea"
 	"strings"
 	"time"
 
@@ -66,6 +67,35 @@ func (client *KubeClient) DefaultService() *v1.Service {
 	}
 }
 
+func (client *KubeClient) DefaultNLBService() *v1.Service {
+	return &v1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      Service,
+			Namespace: Namespace,
+		},
+		Spec: v1.ServiceSpec{
+			Ports: []v1.ServicePort{
+				{
+					Name:       "http",
+					Port:       80,
+					TargetPort: intstr.FromInt(80),
+					Protocol:   v1.ProtocolTCP,
+				},
+				{
+					Name:       "https",
+					Port:       443,
+					TargetPort: intstr.FromInt(443),
+					Protocol:   v1.ProtocolTCP,
+				},
+			},
+			Type:              v1.ServiceTypeLoadBalancer,
+			SessionAffinity:   v1.ServiceAffinityNone,
+			Selector:          map[string]string{"run": "nginx"},
+			LoadBalancerClass: tea.String(helper.NLBClass),
+		},
+	}
+}
+
 func (client *KubeClient) CreateServiceByAnno(anno map[string]string) (*v1.Service, error) {
 	svc := client.DefaultService()
 	svc.Annotations = anno
@@ -73,9 +103,7 @@ func (client *KubeClient) CreateServiceByAnno(anno map[string]string) (*v1.Servi
 }
 
 func (client *KubeClient) CreateNLBServiceByAnno(anno map[string]string) (*v1.Service, error) {
-	svc := client.DefaultService()
-	lbClass := helper.NLBClass
-	svc.Spec.LoadBalancerClass = &lbClass
+	svc := client.DefaultNLBService()
 	svc.Annotations = anno
 
 	return client.CoreV1().Services(Namespace).Create(context.TODO(), svc, metav1.CreateOptions{})
