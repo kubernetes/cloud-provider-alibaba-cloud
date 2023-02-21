@@ -3,7 +3,7 @@ package vmock
 import (
 	"context"
 
-	cassdk "github.com/aliyun/alibaba-cloud-sdk-go/services/cas"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/model"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/base"
 )
 
@@ -17,10 +17,12 @@ type MockCAS struct {
 	auth *base.ClientMgr
 }
 
-func (c MockCAS) DescribeSSLCertificateList(ctx context.Context, request *cassdk.DescribeSSLCertificateListRequest) (*cassdk.DescribeSSLCertificateListResponse, error) {
-	return nil, nil
+func (c MockCAS) DeleteSSLCertificate(ctx context.Context, certId string) error {
+	return nil
 }
-
-func (c MockCAS) DescribeSSLCertificatePublicKeyDetail(ctx context.Context, request *cassdk.DescribeSSLCertificatePublicKeyDetailRequest) (*cassdk.DescribeSSLCertificatePublicKeyDetailResponse, error) {
+func (c MockCAS) CreateSSLCertificateWithName(ctx context.Context, certName, certificate, privateKey string) (string, error) {
+	return "", nil
+}
+func (c MockCAS) DescribeSSLCertificateList(ctx context.Context) ([]model.CertificateInfo, error) {
 	return nil, nil
 }

@@ -31,6 +31,7 @@ func (b defaultServiceManagerBuilder) Build(ctx context.Context, svcStackCtx *al
 	serverStack.ClusterID = svcStackCtx.ClusterID
 	serverStack.Namespace = svcStackCtx.ServiceNamespace
 	serverStack.Name = svcStackCtx.ServiceName
+	serverStack.IngressAlbConfigMap = svcStackCtx.IngressAlbConfigMap
 	port2ServerGroup := make(map[int32]*alb.ServerGroupWithIngress)
 	port2Backends := make(map[int32][]alb.BackendItem)
 	containsPotentialReadyEndpoints := false

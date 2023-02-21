@@ -141,6 +141,7 @@ type ListenerAttribute struct {
 	TLSCipherPolicy           string
 	ForwardPort               int
 	EnableHttp2               FlagType
+	EnableProxyProtocolV2     *bool
 	StickySession             FlagType
 	StickySessionType         string
 	Cookie                    string

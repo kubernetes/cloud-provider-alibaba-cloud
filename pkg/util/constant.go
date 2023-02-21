@@ -30,8 +30,11 @@ const (
 	EnableALBDeletionProtection       = "EnableALBDeletionProtection"
 	DisableALBDeletionProtection      = "DisableALBDeletionProtection"
 
-	TagALBResource    = "TagALBResource"
-	AnalyzeProductLog = "AnalyzeProductLog"
+	TagALBResource             = "TagALBResource"
+	UnTagALBResource           = "UnTagALBResource"
+	AnalyzeProductLog          = "AnalyzeProductLog"
+	OpenProductDataCollection  = "OpenProductDataCollection"
+	CloseProductDataCollection = "CloseProductDataCollection"
 
 	CreateALBRule           = "CreateALBRule"
 	CreateALBRules          = "CreateALBRules"
@@ -52,14 +55,27 @@ const (
 	RemoveALBServersFromServerGroup             = "RemoveALBServersFromServerGroup"
 	ReplaceALBServersInServerGroupAsynchronous  = "ReplaceALBServersInServerGroupAsynchronous"
 	ReplaceALBServersInServerGroup              = "ReplaceALBServersInServerGroup"
+
+	ALBInnerServiceManagedControl = "InnerServiceManagedControl"
+
+	CreateAcl                  = "CreateAcl"
+	DeleteAcl                  = "DeleteAcl"
+	ListAcl                    = "ListAcl"
+	AddEntriesToAclALBAcl      = "AddEntriesToAclALBAcl"
+	AssociateAclsWithListener  = "AssociateAclsWithListener"
+	ListAclRelations           = "ListAclRelations"
+	ListAclEntries             = "ListAclEntries"
+	RemoveEntriesFromAcl       = "RemoveEntriesFromAcl"
+	DissociateAclsFromListener = "DissociateAclsFromListener"
 )
 const (
 	// IngressClass
-	IngressClass = "kubernetes.io/ingress.class"
+	IngressClass   = "kubernetes.io/ingress.class"
+	KnativeIngress = "knative.aliyun.com/ingress"
 
 	// Ingress annotation suffixes
 	IngressSuffixAlbConfigName  = "albconfig.name"
-	IngressSuffixAlbConfigOrder = "albconfig.order"
+	IngressSuffixAlbConfigOrder = "alb.ingress.kubernetes.io/albconfig.order"
 	IngressSuffixListenPorts    = "listen-ports"
 )
 
@@ -87,6 +103,8 @@ const (
 	ListenerStatusRunning      = "Running"
 	ListenerStatusConfiguring  = "Configuring"
 	ListenerStatusStopped      = "Stopped"
+
+	AclStatusAvailable = "Available"
 )
 
 const (
@@ -122,6 +140,13 @@ const (
 )
 
 const (
+	AclTypeBlack                  = "Black"
+	AclTypeWhite                  = "White"
+	BatchAddEntriesToAclMaxNum    = 20
+	BatchRemoveEntriesToAclMaxNum = 20
+)
+
+const (
 	ServerTypeEcs = "Ecs"
 	ServerTypeEni = "Eni"
 	ServerTypeEci = "Eci"
@@ -153,8 +178,9 @@ const (
 )
 
 const (
-	ServerGroupConcurrentNum = 5
-	ListenerConcurrentNum    = 5
+	ServerGroupConcurrentNum    = 5
+	ListenerConcurrentNum       = 5
+	SSLCertificateConcurrentNum = 5
 )
 
 const (
@@ -172,12 +198,14 @@ const IndexKeyServiceRefName = "spec.serviceRef.name"
 
 const (
 	ClusterTagKey          = "ack.aliyun.com"
+	ClusterNameTagKey      = ClusterTagKey
 	ServiceNamespaceTagKey = IngressTagKeyPrefix + "/service_ns"
 	ServiceNameTagKey      = IngressTagKeyPrefix + "/service_name"
 	ServicePortTagKey      = IngressTagKeyPrefix + "/service_port"
 	IngressNameTagKey      = IngressTagKeyPrefix + "/ingress_name"
 
-	AlbConfigTagKey = "albconfig"
+	AlbConfigTagKey     = "albconfig"
+	AlbConfigFullTagKey = IngressTagKeyPrefix + "/" + AlbConfigTagKey
 )
 
 const (
@@ -193,13 +221,29 @@ const (
 )
 
 const (
-	DefaultListenerFlag = "-listener-"
+	DefaultListenerFlag       = "-listener-"
+	ListenerDescriptionPrefix = "ingress-auto-listener"
 )
 
 const (
 	RuleActionTypeFixedResponse string = "FixedResponse"
 	RuleActionTypeRedirect      string = "Redirect"
 	RuleActionTypeForward       string = "ForwardGroup"
+	RuleActionTypeRewrite       string = "Rewrite"
+	RuleActionTypeInsertHeader  string = "InsertHeader"
+	RuleActionTypeRemoveHeader  string = "RemoveHeader"
+	RuleActionTypeTrafficLimit  string = "TrafficLimit"
+	RuleActionTypeTrafficMirror string = "TrafficMirror"
+	RuleActionTypeCors          string = "Cors"
+)
+
+const (
+	DefaultCorsAllowOrigin      string = "*"
+	DefaultCorsAllowMethods     string = "GET, PUT, POST, DELETE, PATCH, OPTIONS"
+	DefaultCorsAllowHeaders     string = "DNT,X-CustomHeader,Keep-Alive,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Authorization"
+	DefaultCorsExposeHeaders    string = ""
+	DefaultCorsAllowCredentials string = "on"
+	DefaultCorsMaxAge           string = "172800"
 )
 
 const (
@@ -209,6 +253,16 @@ const (
 	RuleConditionFieldQueryString string = "QueryString"
 	RuleConditionFieldMethod      string = "Method"
 	RuleConditionFieldCookie      string = "Cookie"
+	RuleConditionFieldSourceIp    string = "SourceIp"
+
+	// response rule condition
+	RuleConditionResponseStatusCode string = "ResponseStatusCode"
+	RuleConditionResponseHeader     string = "ResponseHeader"
+)
+
+const (
+	RuleRequestDirection  string = "Request"
+	RuleResponseDirection string = "Response"
 )
 
 const (
@@ -259,8 +313,11 @@ const (
 	DefaultListenerGzipEnabled      = true
 	DefaultListenerHttp2Enabled     = true
 	DefaultListenerSecurityPolicyId = "tls_cipher_policy_1_0"
-)
 
+	ActionTrafficLimitQpsMax = 100000
+	ActionTrafficLimitQpsMin = 1
+)
+const IsReuseLb string = "is_reuse_lb"
 const (
 	ServerGroupSchedulerWrr = "Wrr"
 	ServerGroupSchedulerWlc = "Wlc"
@@ -268,11 +325,13 @@ const (
 
 	ServerGroupProtocolHTTP  = "HTTP"
 	ServerGroupProtocolHTTPS = "HTTPS"
+	ServerGroupProtocolGRPC  = "GRPC"
 
 	ServerGroupHealthCheckMethodGET     = "GET"
 	ServerGroupHealthCheckMethodHEAD    = "HEAD"
 	ServerGroupHealthCheckProtocolHTTP  = "HTTP"
 	ServerGroupHealthCheckProtocolHTTPS = "HTTPS"
+	ServerGroupHealthCheckProtocolTCP   = "TCP"
 	ServerGroupHealthCheckCodes2xx      = "http_2xx"
 	ServerGroupHealthCheckCodes3xx      = "http_3xx"
 	ServerGroupHealthCheckCodes4xx      = "http_4xx"
@@ -287,6 +346,7 @@ const (
 const (
 	LoadBalancerEditionBasic    = "Basic"
 	LoadBalancerEditionStandard = "Standard"
+	LoadBalancerEditionWaf      = "StandardWithWaf"
 
 	LoadBalancerAddressTypeInternet = "Internet"
 	LoadBalancerAddressTypeIntranet = "Intranet"

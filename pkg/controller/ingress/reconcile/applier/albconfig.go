@@ -3,6 +3,9 @@ package applier
 import (
 	"context"
 	"fmt"
+	"strconv"
+
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/util"
 
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/ingress/reconcile/tracking"
 
@@ -57,25 +60,34 @@ func (m *defaultAlbConfigManagerApplier) Apply(ctx context.Context, stack core.M
 	_ = stack.ListResources(&resLBs)
 	if len(resLBs) > 1 {
 		return fmt.Errorf("invalid res loadBalancers, at most one loadBalancer for stack: %s", stack.StackID())
-	} else if len(resLBs) == 1 {
-		resLb := resLBs[0]
-		var isReuseLb bool
-		if len(resLb.Spec.LoadBalancerId) != 0 {
-			isReuseLb = true
-		}
-		if isReuseLb {
-			if resLb.Spec.ForceOverride != nil && !*resLb.Spec.ForceOverride {
-				applier := NewAlbLoadBalancerApplier(m.albProvider, m.trackingProvider, stack, m.logger)
-				return applier.Apply(ctx)
-			}
-		}
 	}
-
+	// Reuse LoadBalancer
+	var isReuseLb bool
+	if v, ok := ctx.Value(util.IsReuseLb).(bool); ok {
+		isReuseLb = v
+	}
+	commonReuse := false
+	// reuse=true, forceOverride=false => commonReuse=true
+	if isReuseLb && len(resLBs) == 1 && resLBs[0].Spec.ForceOverride != nil && !*resLBs[0].Spec.ForceOverride {
+		commonReuse = true
+	}
+	listenerCommonReuse := false
+	if isReuseLb && len(resLBs) == 1 && resLBs[0].Spec.ListenerForceOverride != nil && !*resLBs[0].Spec.ListenerForceOverride {
+		listenerCommonReuse = true
+	}
+	// only loadbalaner apply if delete albconfig
+	if len(resLBs) == 0 {
+		applier := NewAlbLoadBalancerApplier(m.albProvider, m.trackingProvider, stack, m.logger, commonReuse)
+		return applier.Apply(ctx)
+	}
+	errRes := core.NewDefaultErrResult()
 	appliers := []ResourceApply{
+		NewSecretApplier(m.albProvider, stack, m.logger),
 		NewServerGroupApplier(m.kubeClient, m.backendManager, m.albProvider, m.trackingProvider, stack, m.logger),
-		NewAlbLoadBalancerApplier(m.albProvider, m.trackingProvider, stack, m.logger),
-		NewListenerApplier(m.albProvider, stack, m.logger),
-		NewListenerRuleApplier(m.albProvider, stack, m.logger),
+		NewAlbLoadBalancerApplier(m.albProvider, m.trackingProvider, stack, m.logger, commonReuse),
+		NewListenerApplier(m.albProvider, stack, m.logger, commonReuse, errRes, listenerCommonReuse),
+		NewAclApplier(m.albProvider, m.trackingProvider, stack, m.logger),
+		NewListenerRuleApplier(m.albProvider, stack, m.logger, errRes),
 	}
 
 	for _, applier := range appliers {
@@ -90,5 +102,10 @@ func (m *defaultAlbConfigManagerApplier) Apply(ctx context.Context, stack core.M
 		}
 	}
 
+	for listenerPort, errInfo := range errRes.ErrResultMap {
+		for _, errMsg := range errInfo.ErrMsgs {
+			return fmt.Errorf("apply  failed %v %v %v %v", "listenerPort", strconv.Itoa(listenerPort), "errMsgs", errMsg.Error())
+		}
+	}
 	return nil
 }

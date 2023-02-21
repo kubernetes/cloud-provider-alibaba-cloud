@@ -8,7 +8,6 @@ import (
 
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
-	"k8s.io/client-go/rest"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/apis"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/context/shared"
 	prvd "k8s.io/cloud-provider-alibaba-cloud/pkg/provider"
@@ -52,9 +51,9 @@ func main() {
 	cfg := config.GetConfigOrDie()
 	cfg.QPS = ctrlCfg.ControllerCFG.RuntimeConfig.QPS
 	cfg.Burst = ctrlCfg.ControllerCFG.RuntimeConfig.Burst
-	cfg.ContentConfig = rest.ContentConfig{
-		ContentType: "application/vnd.kubernetes.protobuf",
-	}
+	//cfg.ContentConfig = rest.ContentConfig{
+	//	ContentType: "application/vnd.kubernetes.protobuf",
+	//}
 
 	// Create a new manager to provide shared dependencies and start components
 	mgr, err := manager.New(cfg, ctrlCfg.BuildRuntimeOptions(ctrlCfg.ControllerCFG.RuntimeConfig))

@@ -3,6 +3,7 @@ package clbv1
 import (
 	"context"
 	"fmt"
+	"github.com/alibabacloud-go/tea/tea"
 	"github.com/mohae/deepcopy"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/helper"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/service/reconcile/annotation"
@@ -176,6 +177,10 @@ func (mgr *ListenerManager) buildListenerFromServicePort(reqCtx *svcCtx.RequestC
 
 	if reqCtx.Anno.Get(annotation.EnableHttp2) != "" {
 		listener.EnableHttp2 = model.FlagType(reqCtx.Anno.Get(annotation.EnableHttp2))
+	}
+
+	if reqCtx.Anno.Get(annotation.ProxyProtocol) != "" {
+		listener.EnableProxyProtocolV2 = tea.Bool(reqCtx.Anno.Get(annotation.ProxyProtocol) == string(model.OnFlag))
 	}
 
 	if reqCtx.Anno.Get(annotation.ForwardPort) != "" && listener.Protocol == model.HTTP {
@@ -713,6 +718,14 @@ func isNeedUpdate(reqCtx *svcCtx.RequestContext, local model.ListenerAttribute, 
 		update.EstablishedTimeout = local.EstablishedTimeout
 		updateDetail += fmt.Sprintf("EstablishedTimeout changed: %v - %v ;",
 			remote.EstablishedTimeout, local.EstablishedTimeout)
+	}
+	if (local.Protocol == model.TCP || local.Protocol == model.UDP) &&
+		local.EnableProxyProtocolV2 != nil &&
+		tea.BoolValue(local.EnableProxyProtocolV2) != tea.BoolValue(remote.EnableProxyProtocolV2) {
+		needUpdate = true
+		update.EnableProxyProtocolV2 = tea.Bool(*local.EnableProxyProtocolV2)
+		updateDetail += fmt.Sprintf("lb EnableProxyProtocolV2 %v should be changed to %v",
+			tea.BoolValue(remote.EnableProxyProtocolV2), tea.BoolValue(local.EnableProxyProtocolV2))
 	}
 
 	// only for https

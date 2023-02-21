@@ -5,6 +5,8 @@ import (
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/base"
 	slsprvd "k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/sls"
 
+	"github.com/aliyun/alibaba-cloud-sdk-go/sdk/requests"
+	"github.com/aliyun/alibaba-cloud-sdk-go/sdk/responses"
 	"github.com/aliyun/alibaba-cloud-sdk-go/services/sls"
 )
 
@@ -21,6 +23,9 @@ type DryRunSLS struct {
 	sls  *slsprvd.SLSProvider
 }
 
+func (p DryRunSLS) SLSDoAction(request requests.AcsRequest, response responses.AcsResponse) (err error) {
+	return p.auth.ALB.Client.DoAction(request, response)
+}
 func (s DryRunSLS) AnalyzeProductLog(request *sls.AnalyzeProductLogRequest) (response *sls.AnalyzeProductLogResponse, err error) {
 	return s.auth.SLS.AnalyzeProductLog(request)
 }

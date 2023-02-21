@@ -17,6 +17,7 @@ limitations under the License.
 package store
 
 import (
+	"encoding/json"
 	"fmt"
 	"reflect"
 	"sort"
@@ -24,6 +25,7 @@ import (
 	"time"
 
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/helper"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/model/alb"
 
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/ingress/reconcile/annotations"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/util"
@@ -64,17 +66,22 @@ type Storer interface {
 	// ListIngresses returns a list of all Ingresses in the store.
 	ListIngresses() []*Ingress
 
+	// Delete Ingress
+	DeleteIngress(ing *Ingress) error
 	// Run initiates the synchronization of the controllers
 	Run(stopCh chan struct{})
 }
 
 // Informer defines the required SharedIndexInformers that interact with the API server.
 type Informer struct {
-	Ingress  cache.SharedIndexInformer
-	Endpoint cache.SharedIndexInformer
-	Service  cache.SharedIndexInformer
-	Node     cache.SharedIndexInformer
-	Pod      cache.SharedIndexInformer
+	Ingress      cache.SharedIndexInformer
+	Endpoint     cache.SharedIndexInformer
+	Service      cache.SharedIndexInformer
+	Node         cache.SharedIndexInformer
+	IngressClass cache.SharedIndexInformer
+	Pod          cache.SharedIndexInformer
+	Secret       cache.SharedIndexInformer
+	k8s118       bool
 }
 
 // Lister contains object listers (stores).
@@ -84,6 +91,8 @@ type Lister struct {
 	Endpoint              EndpointLister
 	Pod                   PodLister
 	Node                  NodeLister
+	Secret                SecretLister
+	IngressClass          IngressClassLister
 	IngressWithAnnotation IngressWithAnnotationsLister
 }
 
@@ -100,6 +109,7 @@ func (i *Informer) Run(stopCh chan struct{}) {
 	go i.Pod.Run(stopCh)
 	go i.Endpoint.Run(stopCh)
 	go i.Service.Run(stopCh)
+	go i.Secret.Run(stopCh)
 	go i.Node.Run(stopCh)
 	// wait for all involved caches to be synced before processing items
 	// from the queue
@@ -110,6 +120,14 @@ func (i *Informer) Run(stopCh chan struct{}) {
 		i.Node.HasSynced,
 	) {
 		runtime.HandleError(fmt.Errorf("timed out waiting for caches to sync"))
+	}
+	if i.k8s118 {
+		go i.IngressClass.Run(stopCh)
+		if !cache.WaitForCacheSync(stopCh,
+			i.IngressClass.HasSynced,
+		) {
+			runtime.HandleError(fmt.Errorf("timed out waiting for caches to sync"))
+		}
 	}
 
 	// in big clusters, deltas can keep arriving even after HasSynced
@@ -140,14 +158,19 @@ type k8sStore struct {
 	// secret in the annotations.
 	secretIngressMap ObjectRefMap
 
-	// updateCh
+	// updateCh for ingress
 	updateCh *channels.RingChannel
+
+	// updateServerCh for server
+	updateServerCh *channels.RingChannel
 
 	// syncSecretMu protects against simultaneous invocations of syncSecret
 	syncSecretMu *sync.Mutex
 
 	// backendConfigMu protects against simultaneous read/write of backendConfig
 	backendConfigMu *sync.RWMutex
+
+	k8s118 bool
 }
 
 // New creates a new object store to be used in the ingress controller
@@ -156,12 +179,14 @@ func New(
 	resyncPeriod time.Duration,
 	client clientset.Interface,
 	updateCh *channels.RingChannel,
+	updateServerCh *channels.RingChannel,
 	disableCatchAll bool) Storer {
 
 	store := &k8sStore{
 		informers:        &Informer{},
 		listers:          &Lister{},
 		updateCh:         updateCh,
+		updateServerCh:   updateServerCh,
 		syncSecretMu:     &sync.Mutex{},
 		backendConfigMu:  &sync.RWMutex{},
 		secretIngressMap: NewObjectRefMap(),
@@ -194,6 +219,17 @@ func New(
 	store.informers.Node = infFactory.Core().V1().Nodes().Informer()
 	store.listers.Node.Store = store.informers.Node.GetStore()
 
+	store.informers.Secret = infFactory.Core().V1().Secrets().Informer()
+	store.listers.Secret.Store = store.informers.Secret.GetStore()
+
+	_, k8s118, _ := NetworkingIngressAvailable(client)
+	if k8s118 {
+		store.informers.IngressClass = infFactory.Networking().V1().IngressClasses().Informer()
+		store.listers.IngressClass.Store = store.informers.IngressClass.GetStore()
+	}
+	store.informers.k8s118 = k8s118
+	store.k8s118 = k8s118
+
 	store.informers.Pod = infFactory.Core().V1().Pods().Informer()
 	store.listers.Pod.Store = store.informers.Pod.GetStore()
 
@@ -213,7 +249,7 @@ func New(
 			}
 		}
 
-		if !IsValid(ing) {
+		if !store.IsValid(ing) {
 			return
 		}
 
@@ -221,9 +257,8 @@ func New(
 			klog.InfoS("Ignoring delete for catch-all because of --disable-catch-all", "ingress", klog.KObj(ing))
 			return
 		}
-
-		//store.listers.IngressWithAnnotation.Delete(ing)
-
+		// ignore the normal delete
+		store.DeleteIngress(&Ingress{Ingress: *ing})
 		key := MetaNamespaceKey(ing)
 		store.secretIngressMap.Delete(key)
 
@@ -235,11 +270,8 @@ func New(
 
 	ingEventHandler := cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
-			ing, ok := toIngress(obj)
-			if !ok {
-				return
-			}
-			if !IsValid(ing) {
+			ing, _ := toIngress(obj)
+			if !store.IsValid(ing) {
 				ingressClass, _ := annotations.GetStringAnnotation(IngressKey, ing)
 				klog.InfoS("Ignoring ingress", "ingress", klog.KObj(ing), "kubernetes.io/ingress.class", ingressClass, "ingressClassName", pointer.StringPtrDerefOr(ing.Spec.IngressClassName, ""))
 				return
@@ -261,16 +293,11 @@ func New(
 		},
 		DeleteFunc: ingDeleteHandler,
 		UpdateFunc: func(old, cur interface{}) {
-			oldIng, ok := toIngress(old)
-			if !ok {
-				return
-			}
-			curIng, ok := toIngress(cur)
-			if !ok {
-				return
-			}
-			validOld := IsValid(oldIng)
-			validCur := IsValid(curIng)
+			oldIng, _ := toIngress(old)
+			curIng, _ := toIngress(cur)
+
+			validOld := store.IsValid(oldIng)
+			validCur := store.IsValid(curIng)
 			if !validOld && validCur {
 				if isCatchAllIngress(curIng.Spec) && disableCatchAll {
 					klog.InfoS("ignoring update for catch-all ingress because of --disable-catch-all", "ingress", klog.KObj(curIng))
@@ -297,7 +324,12 @@ func New(
 			}
 
 			store.syncIngress(curIng)
-
+			if store.IsIngressClassUpdate(oldIng, curIng) {
+				updateCh.In() <- helper.Event{
+					Type: helper.AlbConfigEvent,
+					Obj:  oldIng,
+				}
+			}
 			updateCh.In() <- helper.Event{
 				Type: helper.UpdateEvent,
 				Obj:  cur,
@@ -322,10 +354,7 @@ func New(
 
 			klog.Info("controller: endpoint add event",
 				util.NamespacedName(ep1).String())
-			updateCh.In() <- helper.Event{
-				Type: helper.EndPointEvent,
-				Obj:  s,
-			}
+			store.enqueueImpactedSvcIngresses(updateServerCh, helper.EndPointEvent, s)
 		},
 		DeleteFunc: func(obj interface{}) {
 			ep1 := obj.(*corev1.Endpoints)
@@ -344,15 +373,14 @@ func New(
 
 			klog.Info("controller: endpoint delete event",
 				util.NamespacedName(ep1).String())
-			updateCh.In() <- helper.Event{
-				Type: helper.EndPointEvent,
-				Obj:  s,
-			}
+			store.enqueueImpactedSvcIngresses(updateServerCh, helper.EndPointEvent, s)
 		},
 		UpdateFunc: func(old, cur interface{}) {
 			ep1 := old.(*corev1.Endpoints)
 			ep2 := cur.(*corev1.Endpoints)
 			if !reflect.DeepEqual(ep1.Subsets, ep2.Subsets) {
+				klog.Infof("controller: endpoint update event => old endpoint=(%v)", ep1)
+				klog.Infof("controller: endpoint update event => cur endpoint=(%v)", ep2)
 				key := MetaNamespaceKey(ep1)
 				svc, exist, err := store.listers.Service.GetByKey(key)
 				if err != nil {
@@ -367,10 +395,7 @@ func New(
 
 				klog.Info("controller: endpoint update event",
 					util.NamespacedName(ep1).String())
-				updateCh.In() <- helper.Event{
-					Type: helper.EndPointEvent,
-					Obj:  s,
-				}
+				store.enqueueImpactedSvcIngresses(updateServerCh, helper.EndPointEvent, s)
 			}
 		},
 	}
@@ -383,9 +408,27 @@ func New(
 			}
 		},
 		DeleteFunc: func(obj interface{}) {
-			_ = store.listers.Pod.Delete(obj)
+			store.listers.Pod.Delete(obj)
 		},
 		UpdateFunc: func(old, cur interface{}) {
+		},
+	}
+	ingressClassEventHandler := cache.ResourceEventHandlerFuncs{
+		AddFunc: func(obj interface{}) {
+			err := store.listers.IngressClass.Add(obj)
+			if err != nil {
+				klog.Error(err, "IngressClass Add failed")
+				return
+			}
+			ic := obj.(*networking.IngressClass)
+			store.enqueueImpactedIngressClassIngresses(updateCh, helper.CreateEvent, ic)
+		},
+		DeleteFunc: func(obj interface{}) {
+			store.listers.IngressClass.Delete(obj)
+		},
+		UpdateFunc: func(old, cur interface{}) {
+			ic := cur.(*networking.IngressClass)
+			store.enqueueImpactedIngressClassIngresses(updateCh, helper.UpdateEvent, ic)
 		},
 	}
 	nodeEventHandler := cache.ResourceEventHandlerFuncs{
@@ -393,10 +436,14 @@ func New(
 			serviceList := store.listers.Service.List()
 			for _, v := range serviceList {
 				svc := v.(*corev1.Service)
-				klog.Info("node change: enqueue service", util.Key(svc))
-				updateCh.In() <- helper.Event{
-					Type: helper.NodeEvent,
-					Obj:  svc,
+				policy, err := helper.GetServiceTrafficPolicy(svc)
+				if err != nil {
+					klog.Error(err, "ignore node add: service", util.Key(svc))
+					return
+				}
+				if policy == helper.ClusterTrafficPolicy {
+					klog.Info("node add: enqueue service", util.Key(svc))
+					store.enqueueImpactedSvcIngresses(updateServerCh, helper.NodeEvent, svc)
 				}
 			}
 		},
@@ -408,10 +455,14 @@ func New(
 				serviceList := store.listers.Service.List()
 				for _, v := range serviceList {
 					svc := v.(*corev1.Service)
-					klog.Info("node change: enqueue service", util.Key(svc))
-					updateCh.In() <- helper.Event{
-						Type: helper.NodeEvent,
-						Obj:  svc,
+					policy, err := helper.GetServiceTrafficPolicy(svc)
+					if err != nil {
+						klog.Error(err, "ignore node update change: service", util.Key(svc))
+						return
+					}
+					if policy == helper.ClusterTrafficPolicy {
+						klog.Info("node update: enqueue service", util.Key(svc))
+						store.enqueueImpactedSvcIngresses(updateServerCh, helper.NodeEvent, svc)
 					}
 				}
 			}
@@ -421,10 +472,14 @@ func New(
 			serviceList := store.listers.Service.List()
 			for _, v := range serviceList {
 				svc := v.(*corev1.Service)
-				klog.Info("node change: enqueue service", util.Key(svc))
-				updateCh.In() <- helper.Event{
-					Type: helper.NodeEvent,
-					Obj:  svc,
+				policy, err := helper.GetServiceTrafficPolicy(svc)
+				if err != nil {
+					klog.Error(err, "ignore node delete: service", util.Key(svc))
+					return
+				}
+				if policy == helper.ClusterTrafficPolicy {
+					klog.Info("node delete: enqueue service", util.Key(svc))
+					store.enqueueImpactedSvcIngresses(updateServerCh, helper.NodeEvent, svc)
 				}
 			}
 
@@ -434,26 +489,55 @@ func New(
 	serviceHandler := cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			curSvc := obj.(*corev1.Service)
-			store.enqueueImpactedIngresses(updateCh, curSvc)
+			store.enqueueImpactedSvcIngresses(updateServerCh, helper.ServiceEvent, curSvc)
 		},
 		UpdateFunc: func(old, cur interface{}) {
 			// update the server group
 			oldSvc := old.(*corev1.Service)
 			curSvc := cur.(*corev1.Service)
-
 			if reflect.DeepEqual(oldSvc, curSvc) {
 				return
 			}
+			store.enqueueImpactedSvcIngresses(updateServerCh, helper.ServiceEvent, curSvc)
 
-			updateCh.In() <- helper.Event{
-				Type: helper.ServiceEvent,
-				Obj:  cur,
-			}
 		},
 		DeleteFunc: func(obj interface{}) {
 			// ingress refer service to delete
 			curSvc := obj.(*corev1.Service)
-			store.enqueueImpactedIngresses(updateCh, curSvc)
+			store.enqueueImpactedSvcIngresses(updateServerCh, helper.ServiceEvent, curSvc)
+		},
+	}
+	secretHandler := cache.ResourceEventHandlerFuncs{
+		AddFunc: func(obj interface{}) {
+			curSecret := obj.(*corev1.Secret)
+			ings := store.getIngressBySecret(curSecret)
+			for _, ing := range ings {
+				store.syncIngress(ing)
+				updateCh.In() <- helper.Event{
+					Type: helper.UpdateEvent,
+					Obj:  ing,
+				}
+			}
+		},
+		UpdateFunc: func(old, cur interface{}) {
+			// update the server group
+			oldSecret := old.(*corev1.Secret)
+			curSecret := cur.(*corev1.Secret)
+			if reflect.DeepEqual(oldSecret, curSecret) {
+				return
+			}
+			ings := store.getIngressBySecret(curSecret)
+			for _, ing := range ings {
+				store.syncIngress(ing)
+				updateCh.In() <- helper.Event{
+					Type: helper.UpdateEvent,
+					Obj:  ing,
+				}
+			}
+		},
+		DeleteFunc: func(obj interface{}) {
+			// ingress refer service to delete
+			store.listers.Secret.Delete(obj)
 		},
 	}
 
@@ -462,6 +546,10 @@ func New(
 	store.informers.Node.AddEventHandler(podEventHandler)
 	store.informers.Service.AddEventHandler(serviceHandler)
 	store.informers.Node.AddEventHandler(nodeEventHandler)
+	store.informers.Secret.AddEventHandler(secretHandler)
+	if k8s118 {
+		store.informers.IngressClass.AddEventHandler(ingressClassEventHandler)
+	}
 	return store
 }
 
@@ -470,25 +558,110 @@ func (s *k8sStore) enqueueImpactedIngresses(updateCh *channels.RingChannel, svc 
 
 	for _, t := range ingList {
 		ing := t.(*networking.Ingress)
-
-		if !IsIngressAlbClass(*ing) {
+		if !s.IsValid(ing) {
 			continue
 		}
-
-		updateCh.In() <- helper.Event{
-			Type: helper.IngressEvent,
-			Obj:  ing,
+		isAlbSvc := false
+		for _, rule := range ing.Spec.Rules {
+			for _, path := range rule.HTTP.Paths {
+				if svc.Namespace == ing.Namespace && svc.Name == path.Backend.Service.Name {
+					isAlbSvc = true
+				}
+			}
+		}
+		if isAlbSvc {
+			updateCh.In() <- helper.Event{
+				Type: helper.IngressEvent,
+				Obj:  ing,
+			}
+			break
 		}
 	}
+
 }
 
-func IsIngressAlbClass(ing networking.Ingress) bool {
-	if ingClassAnnotation, exists := ing.Annotations[util.IngressClass]; exists {
-		if ingClassAnnotation == IngressClassName {
-			return true
+func (s *k8sStore) enqueueImpactedSvcIngresses(updateCh *channels.RingChannel, eventType helper.EventType, svc *corev1.Service) {
+	ingList := s.listers.Ingress.List()
+
+	for _, t := range ingList {
+		ing := t.(*networking.Ingress)
+		if !s.IsValid(ing) {
+			continue
+		}
+		isAlbSvc := false
+		for _, rule := range ing.Spec.Rules {
+			for _, path := range rule.HTTP.Paths {
+				if _, ok := ing.Labels[util.KnativeIngress]; ok {
+					actionStr := ing.Annotations[fmt.Sprintf(annotations.INGRESS_ALB_ACTIONS_ANNOTATIONS, path.Backend.Service.Name)]
+					if actionStr != "" {
+						var action alb.Action
+						err := json.Unmarshal([]byte(actionStr), &action)
+						if err != nil {
+							klog.Errorf("buildListenerRulesCommon: %s Unmarshal: %s", actionStr, err.Error())
+							continue
+						}
+						for _, sg := range action.ForwardConfig.ServerGroups {
+							if svc.Namespace == ing.Namespace && svc.Name == sg.ServiceName {
+								isAlbSvc = true
+								break
+							}
+						}
+					}
+				}
+				if svc.Namespace == ing.Namespace && svc.Name == path.Backend.Service.Name {
+					isAlbSvc = true
+				}
+			}
+		}
+		if isAlbSvc {
+			updateCh.In() <- helper.Event{
+				Type: eventType,
+				Obj:  svc,
+			}
+			break
 		}
 	}
-	return false
+
+}
+
+func (s *k8sStore) getIngressBySecret(secret *corev1.Secret) []*networking.Ingress {
+	ingList := s.listers.Ingress.List()
+
+	var sIng []*networking.Ingress
+	for _, t := range ingList {
+		ing := t.(*networking.Ingress)
+		if !s.IsValid(ing) {
+			continue
+		}
+		// non tls skip
+		if len(ing.Spec.TLS) == 0 {
+			continue
+		}
+		for _, tls := range ing.Spec.TLS {
+			if tls.SecretName == secret.Name {
+				sIng = append(sIng, ing)
+				break
+			}
+		}
+	}
+	return sIng
+}
+
+func (s *k8sStore) enqueueImpactedIngressClassIngresses(updateCh *channels.RingChannel, eventType helper.EventType, ic *networking.IngressClass) {
+	if ic.Spec.Controller != ALBIngressController {
+		return
+	}
+	ingList := s.listers.Ingress.List()
+	for _, t := range ingList {
+		ing := t.(*networking.Ingress)
+		if ing.Spec.IngressClassName != nil && *ing.Spec.IngressClassName == ic.Name {
+			s.syncIngress(ing)
+			updateCh.In() <- helper.Event{
+				Type: eventType,
+				Obj:  ing,
+			}
+		}
+	}
 }
 
 // isCatchAllIngress returns whether or not an ingress produces a
@@ -502,7 +675,7 @@ func isCatchAllIngress(spec networking.IngressSpec) bool {
 func (s *k8sStore) syncIngress(ing *networking.Ingress) {
 	key := MetaNamespaceKey(ing)
 	klog.V(3).Infof("updating annotations information for ingress %v", key)
-	if !IsValid(ing) {
+	if !s.IsValid(ing) {
 		return
 	}
 	copyIng := &networking.Ingress{}
@@ -537,6 +710,16 @@ func (s *k8sStore) GetService(key string) (*corev1.Service, error) {
 	return s.listers.Service.ByKey(key)
 }
 
+// getIngress returns the Ingress matching key.
+func (s *k8sStore) getIngress(key string) (*networking.Ingress, error) {
+	ing, err := s.listers.IngressWithAnnotation.ByKey(key)
+	if err != nil {
+		return nil, err
+	}
+
+	return &ing.Ingress, nil
+}
+
 func sortIngressSlice(ingresses []*Ingress) {
 	// sort Ingresses using the CreationTimestamp field
 	sort.SliceStable(ingresses, func(i, j int) bool {
@@ -558,7 +741,7 @@ func (s *k8sStore) ListIngresses() []*Ingress {
 	ingresses := make([]*Ingress, 0)
 	for _, item := range s.listers.IngressWithAnnotation.List() {
 		ing := item.(*Ingress)
-		if IsValid(&ing.Ingress) {
+		if s.IsValid(&ing.Ingress) {
 			ingresses = append(ingresses, ing)
 		}
 
@@ -567,6 +750,9 @@ func (s *k8sStore) ListIngresses() []*Ingress {
 	sortIngressSlice(ingresses)
 
 	return ingresses
+}
+func (s *k8sStore) DeleteIngress(ing *Ingress) error {
+	return s.listers.IngressWithAnnotation.Delete(ing)
 }
 
 // GetServiceEndpoints returns the Endpoints of a Service matching key.
@@ -598,4 +784,18 @@ func toIngress(obj interface{}) (*networking.Ingress, bool) {
 	}
 
 	return nil, false
+}
+
+func isLoadBalancerOrNodePortService(svc *corev1.Service) bool {
+	return isLoadBalancerService(svc) || isNodePortService(svc)
+}
+func isLoadBalancerService(svc *corev1.Service) bool {
+	return svc.Spec.Type == corev1.ServiceTypeLoadBalancer
+}
+
+func isNodePortService(svc *corev1.Service) bool {
+	return svc.Spec.Type == corev1.ServiceTypeNodePort
+}
+func isLocalModeService(svc *corev1.Service) bool {
+	return svc.Spec.ExternalTrafficPolicy == corev1.ServiceExternalTrafficPolicyTypeLocal
 }

@@ -3,6 +3,7 @@ package applier
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"sync"
 
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/util"
@@ -16,11 +17,12 @@ import (
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/model/alb/core"
 )
 
-func NewListenerRuleApplier(albProvider prvd.Provider, stack core.Manager, logger logr.Logger) *listenerRuleApplier {
+func NewListenerRuleApplier(albProvider prvd.Provider, stack core.Manager, logger logr.Logger, errRes core.ErrResult) *listenerRuleApplier {
 	return &listenerRuleApplier{
 		stack:       stack,
 		albProvider: albProvider,
 		logger:      logger,
+		errRes:      errRes,
 	}
 }
 
@@ -28,6 +30,7 @@ type listenerRuleApplier struct {
 	albProvider prvd.Provider
 	stack       core.Manager
 	logger      logr.Logger
+	errRes      core.ErrResult
 }
 
 func (s *listenerRuleApplier) Apply(ctx context.Context) error {
@@ -53,7 +56,12 @@ func (s *listenerRuleApplier) Apply(ctx context.Context) error {
 		chApply  = make(chan struct{}, util.ListenerConcurrentNum)
 	)
 
-	for lsID := range resLSsByLsID {
+	for lsID, resLSs := range resLSsByLsID {
+		err := s.errRes.CheckErrMsgsByListenerPort(resLSs.Spec.ListenerPort)
+		if err != nil {
+			s.logger.V(util.SynLogLevel).Error(err, "CheckErrMsgsByListenerPort succ")
+			continue
+		}
 		chApply <- struct{}{}
 		wgApply.Add(1)
 
@@ -114,14 +122,9 @@ func (s *listenerRuleApplier) applyListenerRulesOnListenerBatch(ctx context.Cont
 			"unmatchedSDKLBs", unmatchedSDKLRs,
 			"traceID", traceID)
 	}
-
-	unmatchedSDKLRIDs := make([]string, 0)
-	for _, sdkLR := range unmatchedSDKLRs {
-		unmatchedSDKLRIDs = append(unmatchedSDKLRIDs, sdkLR.RuleId)
-	}
-	if err := s.albProvider.DeleteALBListenerRules(ctx, unmatchedSDKLRIDs); err != nil {
-		return err
-	}
+	/** 1. 先新增、再修改、最后执行删除
+	 *  2. 修改操作从后往前批量处理
+	 */
 
 	lrStatus, err := s.albProvider.CreateALBListenerRules(ctx, unmatchedResLRs)
 	if err != nil {
@@ -152,6 +155,14 @@ func (s *listenerRuleApplier) applyListenerRulesOnListenerBatch(ctx context.Cont
 		})
 	}
 
+	unmatchedSDKLRIDs := make([]string, 0)
+	for _, sdkLR := range unmatchedSDKLRs {
+		unmatchedSDKLRIDs = append(unmatchedSDKLRIDs, sdkLR.RuleId)
+	}
+	if err := s.albProvider.DeleteALBListenerRules(ctx, unmatchedSDKLRIDs); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -168,43 +179,43 @@ func matchResAndSDKListenerRules(resLRs []*albmodel.ListenerRule, sdkLRs []albsd
 	var unmatchedResLRs []*albmodel.ListenerRule
 	var unmatchedSDKLRs []albsdk.Rule
 
-	resLRByPriority := mapResListenerRuleByPriority(resLRs)
-	sdkLRByPriority := mapSDKListenerRuleByPriority(sdkLRs)
-	resLRPriorities := sets.Int64KeySet(resLRByPriority)
-	sdkLRPriorities := sets.Int64KeySet(sdkLRByPriority)
-	for _, priority := range resLRPriorities.Intersection(sdkLRPriorities).List() {
-		resLR := resLRByPriority[priority]
-		sdkLR := sdkLRByPriority[priority]
+	resLRByPriorityDirection := mapResListenerRuleByPriority(resLRs)
+	sdkLRByPriorityDirection := mapSDKListenerRuleByPriority(sdkLRs)
+	resLRPriorityDirections := sets.StringKeySet(resLRByPriorityDirection)
+	sdkLRPriorityDirections := sets.StringKeySet(sdkLRByPriorityDirection)
+	for _, priorityDirection := range resLRPriorityDirections.Intersection(sdkLRPriorityDirections).List() {
+		resLR := resLRByPriorityDirection[priorityDirection]
+		sdkLR := sdkLRByPriorityDirection[priorityDirection]
 		matchedResAndSDKLRs = append(matchedResAndSDKLRs, albmodel.ResAndSDKListenerRulePair{
 			ResLR: resLR,
 			SdkLR: &sdkLR,
 		})
 	}
-	for _, priority := range resLRPriorities.Difference(sdkLRPriorities).List() {
-		unmatchedResLRs = append(unmatchedResLRs, resLRByPriority[priority])
+	for _, priorityDirection := range resLRPriorityDirections.Difference(sdkLRPriorityDirections).List() {
+		unmatchedResLRs = append(unmatchedResLRs, resLRByPriorityDirection[priorityDirection])
 	}
-	for _, priority := range sdkLRPriorities.Difference(resLRPriorities).List() {
-		unmatchedSDKLRs = append(unmatchedSDKLRs, sdkLRByPriority[priority])
+	for _, priorityDirection := range sdkLRPriorityDirections.Difference(resLRPriorityDirections).List() {
+		unmatchedSDKLRs = append(unmatchedSDKLRs, sdkLRByPriorityDirection[priorityDirection])
 	}
 
 	return matchedResAndSDKLRs, unmatchedResLRs, unmatchedSDKLRs
 }
 
-func mapResListenerRuleByPriority(resLRs []*albmodel.ListenerRule) map[int64]*albmodel.ListenerRule {
-	resLRByPriority := make(map[int64]*albmodel.ListenerRule)
+func mapResListenerRuleByPriority(resLRs []*albmodel.ListenerRule) map[string]*albmodel.ListenerRule {
+	resLRByPriorityDirection := make(map[string]*albmodel.ListenerRule)
 	for _, resLR := range resLRs {
-		resLRByPriority[int64(resLR.Spec.Priority)] = resLR
+		resLRByPriorityDirection[strconv.Itoa(resLR.Spec.Priority)+resLR.Spec.RuleDirection] = resLR
 	}
-	return resLRByPriority
+	return resLRByPriorityDirection
 }
 
-func mapSDKListenerRuleByPriority(sdkLRs []albsdk.Rule) map[int64]albsdk.Rule {
-	sdkLRByPriority := make(map[int64]albsdk.Rule)
+func mapSDKListenerRuleByPriority(sdkLRs []albsdk.Rule) map[string]albsdk.Rule {
+	sdkLRByPriorityDirection := make(map[string]albsdk.Rule)
 	for _, sdkLR := range sdkLRs {
-		priority := int64(sdkLR.Priority)
-		sdkLRByPriority[priority] = sdkLR
+		priority := strconv.Itoa(sdkLR.Priority) + sdkLR.Direction
+		sdkLRByPriorityDirection[priority] = sdkLR
 	}
-	return sdkLRByPriority
+	return sdkLRByPriorityDirection
 }
 
 func mapResListenerRuleByListenerID(ctx context.Context, resLRs []*albmodel.ListenerRule) (map[string][]*albmodel.ListenerRule, error) {

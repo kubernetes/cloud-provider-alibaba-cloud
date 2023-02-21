@@ -14,6 +14,7 @@ import (
 
 	"github.com/aliyun/alibaba-cloud-sdk-go/sdk/requests"
 	albsdk "github.com/aliyun/alibaba-cloud-sdk-go/services/alb"
+
 	"github.com/pkg/errors"
 )
 
@@ -359,6 +360,250 @@ func transSDKFixedResponseConfigToUpdateRule(fixedRespConf alb.FixedResponseConf
 		ContentType: fixedRespConf.ContentType,
 	}
 }
+func transSDKInsertHeaderConfigToCreateRules(insertHeaderConf alb.InsertHeaderConfig) albsdk.CreateRulesRulesRuleActionsItemInsertHeaderConfig {
+	return albsdk.CreateRulesRulesRuleActionsItemInsertHeaderConfig{
+		Key:       insertHeaderConf.Key,
+		Value:     insertHeaderConf.Value,
+		ValueType: insertHeaderConf.ValueType,
+	}
+}
+func transSDKInsertHeaderConfigToUpdateRules(insertHeaderConf alb.InsertHeaderConfig) albsdk.UpdateRulesAttributeRulesRuleActionsItemInsertHeaderConfig {
+	return albsdk.UpdateRulesAttributeRulesRuleActionsItemInsertHeaderConfig{
+		Key:       insertHeaderConf.Key,
+		Value:     insertHeaderConf.Value,
+		ValueType: insertHeaderConf.ValueType,
+	}
+}
+func transSDKRemoveHeaderConfigToCreateRules(removeHeaderConf alb.RemoveHeaderConfig) albsdk.CreateRulesRulesRuleActionsItemRemoveHeaderConfig {
+	return albsdk.CreateRulesRulesRuleActionsItemRemoveHeaderConfig{
+		Key: removeHeaderConf.Key,
+	}
+}
+func transSDKRemoveHeaderConfigToUpdateRules(removeHeaderConf alb.RemoveHeaderConfig) albsdk.UpdateRulesAttributeRulesRuleActionsItemRemoveHeaderConfig {
+	return albsdk.UpdateRulesAttributeRulesRuleActionsItemRemoveHeaderConfig{
+		Key: removeHeaderConf.Key,
+	}
+}
+func transSDKTrafficLimitConfigToCreateRules(trafficLimitConf alb.TrafficLimitConfig) albsdk.CreateRulesRulesRuleActionsItemTrafficLimitConfig {
+	return albsdk.CreateRulesRulesRuleActionsItemTrafficLimitConfig{
+		QPS: fmt.Sprintf("%d", trafficLimitConf.QPS),
+	}
+}
+func transSDKTrafficLimitConfigToUpdateRules(trafficLimitConf alb.TrafficLimitConfig) albsdk.UpdateRulesAttributeRulesRuleActionsItemTrafficLimitConfig {
+	return albsdk.UpdateRulesAttributeRulesRuleActionsItemTrafficLimitConfig{
+		QPS: fmt.Sprintf("%d", trafficLimitConf.QPS),
+	}
+}
+func transSDKTrafficMirrorConfigToCreateRules(trafficMirrorConf alb.TrafficMirrorConfig) (*albsdk.CreateRulesRulesRuleActionsItemTrafficMirrorConfig, error) {
+	mirrorGroup, err := transSDKTrafficMirrorConfigMirrorGroupConfigToCreateRules(trafficMirrorConf.MirrorGroupConfig)
+	if err != nil {
+		return nil, err
+	}
+	targetType := trafficMirrorConf.TargetType
+	r := &albsdk.CreateRulesRulesRuleActionsItemTrafficMirrorConfig{
+		MirrorGroupConfig: *mirrorGroup,
+		TargetType:        targetType,
+	}
+	return r, nil
+}
+func transSDKTrafficMirrorConfigMirrorGroupConfigToCreateRules(mirrorGroupConf alb.MirrorGroupConfig) (*albsdk.CreateRulesRulesRuleActionsItemTrafficMirrorConfigMirrorGroupConfig, error) {
+	sdkSGPs, err := transSDKTrafficMirrorConfigMirrorGroupConfigServerGroupTuplesItemToCreateRules(mirrorGroupConf.ServerGroupTuples)
+	if err != nil {
+		return nil, err
+	}
+	r := &albsdk.CreateRulesRulesRuleActionsItemTrafficMirrorConfigMirrorGroupConfig{
+		ServerGroupTuples: sdkSGPs,
+	}
+	return r, nil
+}
+func transSDKTrafficMirrorConfigMirrorGroupConfigServerGroupTuplesItemToCreateRules(sgpTuples []alb.TrafficMirrorServerGroupTuple) (*[]albsdk.CreateRulesRulesRuleActionsItemTrafficMirrorConfigMirrorGroupConfigServerGroupTuplesItem, error) {
+	var createRulesServerGroupTuples []albsdk.CreateRulesRulesRuleActionsItemTrafficMirrorConfigMirrorGroupConfigServerGroupTuplesItem
+	if len(sgpTuples) != 0 {
+		createRulesServerGroupTuples = make([]albsdk.CreateRulesRulesRuleActionsItemTrafficMirrorConfigMirrorGroupConfigServerGroupTuplesItem, 0)
+		for _, m := range sgpTuples {
+			serverGroupID := m.ServerGroupID
+			createRulesServerGroupTuples = append(createRulesServerGroupTuples, albsdk.CreateRulesRulesRuleActionsItemTrafficMirrorConfigMirrorGroupConfigServerGroupTuplesItem{
+				ServerGroupId: serverGroupID,
+			})
+		}
+	}
+	return &createRulesServerGroupTuples, nil
+}
+func transSDKTrafficMirrorConfigToUpdateRules(trafficMirrorConf alb.TrafficMirrorConfig) (*albsdk.UpdateRulesAttributeRulesRuleActionsItemTrafficMirrorConfig, error) {
+	mirrorGroup, err := transSDKTrafficMirrorConfigMirrorGroupConfigToUpdateRules(trafficMirrorConf.MirrorGroupConfig)
+	if err != nil {
+		return nil, err
+	}
+	targetType := trafficMirrorConf.TargetType
+	r := &albsdk.UpdateRulesAttributeRulesRuleActionsItemTrafficMirrorConfig{
+		MirrorGroupConfig: *mirrorGroup,
+		TargetType:        targetType,
+	}
+	return r, nil
+}
+func transSDKTrafficMirrorConfigMirrorGroupConfigToUpdateRules(mirrorGroupConf alb.MirrorGroupConfig) (*albsdk.UpdateRulesAttributeRulesRuleActionsItemTrafficMirrorConfigMirrorGroupConfig, error) {
+	sdkSGPs, err := transSDKTrafficMirrorConfigMirrorGroupConfigServerGroupTuplesItemToUpdateRules(mirrorGroupConf.ServerGroupTuples)
+	if err != nil {
+		return nil, err
+	}
+	r := &albsdk.UpdateRulesAttributeRulesRuleActionsItemTrafficMirrorConfigMirrorGroupConfig{
+		ServerGroupTuples: sdkSGPs,
+	}
+	return r, nil
+}
+func transSDKTrafficMirrorConfigMirrorGroupConfigServerGroupTuplesItemToUpdateRules(sgpTuples []alb.TrafficMirrorServerGroupTuple) (*[]albsdk.UpdateRulesAttributeRulesRuleActionsItemTrafficMirrorConfigMirrorGroupConfigServerGroupTuplesItem, error) {
+	var updateRulesServerGroupTuples []albsdk.UpdateRulesAttributeRulesRuleActionsItemTrafficMirrorConfigMirrorGroupConfigServerGroupTuplesItem
+	if len(sgpTuples) != 0 {
+		updateRulesServerGroupTuples = make([]albsdk.UpdateRulesAttributeRulesRuleActionsItemTrafficMirrorConfigMirrorGroupConfigServerGroupTuplesItem, 0)
+		for _, m := range sgpTuples {
+			serverGroupID := m.ServerGroupID
+			updateRulesServerGroupTuples = append(updateRulesServerGroupTuples, albsdk.UpdateRulesAttributeRulesRuleActionsItemTrafficMirrorConfigMirrorGroupConfigServerGroupTuplesItem{
+				ServerGroupId: serverGroupID,
+			})
+		}
+	}
+	return &updateRulesServerGroupTuples, nil
+}
+func transSDKTrafficMirrorConfigToCreateRule(trafficMirrorConf alb.TrafficMirrorConfig) (*albsdk.CreateRuleRuleActionsTrafficMirrorConfig, error) {
+	mirrorGroup, err := transSDKTrafficMirrorConfigMirrorGroupConfigToCreateRule(trafficMirrorConf.MirrorGroupConfig)
+	if err != nil {
+		return nil, err
+	}
+	targetType := trafficMirrorConf.TargetType
+	r := &albsdk.CreateRuleRuleActionsTrafficMirrorConfig{
+		MirrorGroupConfig: *mirrorGroup,
+		TargetType:        targetType,
+	}
+	return r, nil
+}
+func transSDKTrafficMirrorConfigMirrorGroupConfigToCreateRule(mirrorGroupConf alb.MirrorGroupConfig) (*albsdk.CreateRuleRuleActionsTrafficMirrorConfigMirrorGroupConfig, error) {
+	sdkSGPs, err := transSDKTrafficMirrorConfigMirrorGroupConfigServerGroupTuplesItemToCreateRule(mirrorGroupConf.ServerGroupTuples)
+	if err != nil {
+		return nil, err
+	}
+	r := &albsdk.CreateRuleRuleActionsTrafficMirrorConfigMirrorGroupConfig{
+		ServerGroupTuples: sdkSGPs,
+	}
+	return r, nil
+}
+func transSDKTrafficMirrorConfigMirrorGroupConfigServerGroupTuplesItemToCreateRule(sgpTuples []alb.TrafficMirrorServerGroupTuple) (*[]albsdk.CreateRuleRuleActionsTrafficMirrorConfigMirrorGroupConfigServerGroupTuplesItem, error) {
+	var createRuleServerGroupTuples []albsdk.CreateRuleRuleActionsTrafficMirrorConfigMirrorGroupConfigServerGroupTuplesItem
+	if len(sgpTuples) != 0 {
+		createRuleServerGroupTuples = make([]albsdk.CreateRuleRuleActionsTrafficMirrorConfigMirrorGroupConfigServerGroupTuplesItem, 0)
+		for _, m := range sgpTuples {
+			serverGroupID := m.ServerGroupID
+			createRuleServerGroupTuples = append(createRuleServerGroupTuples, albsdk.CreateRuleRuleActionsTrafficMirrorConfigMirrorGroupConfigServerGroupTuplesItem{
+				ServerGroupId: serverGroupID,
+			})
+		}
+	}
+	return &createRuleServerGroupTuples, nil
+}
+func transSDKTrafficMirrorConfigToUpdateRule(trafficMirrorConf alb.TrafficMirrorConfig) (*albsdk.UpdateRuleAttributeRuleActionsTrafficMirrorConfig, error) {
+	mirrorGroup, err := transSDKTrafficMirrorConfigMirrorGroupConfigToUpdateRule(trafficMirrorConf.MirrorGroupConfig)
+	if err != nil {
+		return nil, err
+	}
+	targetType := trafficMirrorConf.TargetType
+	r := &albsdk.UpdateRuleAttributeRuleActionsTrafficMirrorConfig{
+		MirrorGroupConfig: *mirrorGroup,
+		TargetType:        targetType,
+	}
+	return r, nil
+}
+func transSDKTrafficMirrorConfigMirrorGroupConfigToUpdateRule(mirrorGroupConf alb.MirrorGroupConfig) (*albsdk.UpdateRuleAttributeRuleActionsTrafficMirrorConfigMirrorGroupConfig, error) {
+	sdkSGPs, err := transSDKTrafficMirrorConfigMirrorGroupConfigServerGroupTuplesItemToUpdateRule(mirrorGroupConf.ServerGroupTuples)
+	if err != nil {
+		return nil, err
+	}
+	r := &albsdk.UpdateRuleAttributeRuleActionsTrafficMirrorConfigMirrorGroupConfig{
+		ServerGroupTuples: sdkSGPs,
+	}
+	return r, nil
+}
+func transSDKTrafficMirrorConfigMirrorGroupConfigServerGroupTuplesItemToUpdateRule(sgpTuples []alb.TrafficMirrorServerGroupTuple) (*[]albsdk.UpdateRuleAttributeRuleActionsTrafficMirrorConfigMirrorGroupConfigServerGroupTuplesItem, error) {
+	var updateRuleServerGroupTuples []albsdk.UpdateRuleAttributeRuleActionsTrafficMirrorConfigMirrorGroupConfigServerGroupTuplesItem
+	if len(sgpTuples) != 0 {
+		updateRuleServerGroupTuples = make([]albsdk.UpdateRuleAttributeRuleActionsTrafficMirrorConfigMirrorGroupConfigServerGroupTuplesItem, 0)
+		for _, m := range sgpTuples {
+			serverGroupID := m.ServerGroupID
+			updateRuleServerGroupTuples = append(updateRuleServerGroupTuples, albsdk.UpdateRuleAttributeRuleActionsTrafficMirrorConfigMirrorGroupConfigServerGroupTuplesItem{
+				ServerGroupId: serverGroupID,
+			})
+		}
+	}
+	return &updateRuleServerGroupTuples, nil
+}
+
+func transModelTrafficMirrorActionConfigToSDKRule(trafficMirrorConf alb.TrafficMirrorConfig) (*albsdk.TrafficMirrorConfig, error) {
+	mirrorGroup, err := transModelTrafficMirrorConfigMirrorGroupConfigToSDKRule(trafficMirrorConf.MirrorGroupConfig)
+	if err != nil {
+		return nil, err
+	}
+	targetType := trafficMirrorConf.TargetType
+	r := &albsdk.TrafficMirrorConfig{
+		MirrorGroupConfig: *mirrorGroup,
+		TargetType:        targetType,
+	}
+	return r, nil
+}
+func transModelTrafficMirrorConfigMirrorGroupConfigToSDKRule(mirrorGroupConf alb.MirrorGroupConfig) (*albsdk.MirrorGroupConfig, error) {
+	sdkSGPs, err := transModelTrafficMirrorConfigMirrorGroupConfigServerGroupTuplesToSDKRule(mirrorGroupConf.ServerGroupTuples)
+	if err != nil {
+		return nil, err
+	}
+	r := &albsdk.MirrorGroupConfig{
+		ServerGroupTuples: *sdkSGPs,
+	}
+	return r, nil
+}
+func transModelTrafficMirrorConfigMirrorGroupConfigServerGroupTuplesToSDKRule(sgpTuples []alb.TrafficMirrorServerGroupTuple) (*[]albsdk.ServerGroupTuple, error) {
+	var sdkServerGroupTuples []albsdk.ServerGroupTuple
+	if len(sgpTuples) != 0 {
+		sdkServerGroupTuples = make([]albsdk.ServerGroupTuple, 0)
+		for _, m := range sgpTuples {
+			serverGroupID := m.ServerGroupID
+			sdkServerGroupTuples = append(sdkServerGroupTuples, albsdk.ServerGroupTuple{
+				ServerGroupId: serverGroupID,
+			})
+		}
+	}
+	return &sdkServerGroupTuples, nil
+}
+func transSDKRerwriteConfigToCreateRules(rewriteConf alb.RewriteConfig) albsdk.CreateRulesRulesRuleActionsItemRewriteConfig {
+	return albsdk.CreateRulesRulesRuleActionsItemRewriteConfig{
+		Host:  rewriteConf.Host,
+		Path:  rewriteConf.Path,
+		Query: rewriteConf.Query,
+	}
+}
+func transSDKRerwriteConfigToUpdateRules(rewriteConf alb.RewriteConfig) albsdk.UpdateRulesAttributeRulesRuleActionsItemRewriteConfig {
+	return albsdk.UpdateRulesAttributeRulesRuleActionsItemRewriteConfig{
+		Host:  rewriteConf.Host,
+		Path:  rewriteConf.Path,
+		Query: rewriteConf.Query,
+	}
+}
+func transSDKCorsConfigToCreateRules(corsConfig alb.CorsConfig) albsdk.CreateRulesRulesRuleActionsItemCorsConfig {
+	return albsdk.CreateRulesRulesRuleActionsItemCorsConfig{
+		AllowCredentials: corsConfig.AllowCredentials,
+		MaxAge:           corsConfig.MaxAge,
+		AllowOrigin:      &corsConfig.AllowOrigin,
+		AllowMethods:     &corsConfig.AllowMethods,
+		AllowHeaders:     &corsConfig.AllowHeaders,
+		ExposeHeaders:    &corsConfig.ExposeHeaders,
+	}
+}
+func transSDKCorsConfigToUpdateRules(corsConfig alb.CorsConfig) albsdk.UpdateRulesAttributeRulesRuleActionsItemCorsConfig {
+	return albsdk.UpdateRulesAttributeRulesRuleActionsItemCorsConfig{
+		AllowCredentials: corsConfig.AllowCredentials,
+		MaxAge:           corsConfig.MaxAge,
+		AllowOrigin:      &corsConfig.AllowOrigin,
+		AllowMethods:     &corsConfig.AllowMethods,
+		AllowHeaders:     &corsConfig.AllowHeaders,
+		ExposeHeaders:    &corsConfig.ExposeHeaders,
+	}
+}
 func transSDKRedirectConfigToCreateRules(redirectConf alb.RedirectConfig) albsdk.CreateRulesRulesRuleActionsItemRedirectConfig {
 	return albsdk.CreateRulesRulesRuleActionsItemRedirectConfig{
 		Path:     redirectConf.Path,
@@ -495,6 +740,22 @@ func transModelActionToSDKCreateRules(action alb.Action) (*albsdk.CreateRulesRul
 			return nil, err
 		}
 		sdkObj.ForwardGroupConfig = *forwardActionConfig
+	case util.RuleActionTypeRewrite:
+		sdkObj.RewriteConfig = transSDKRerwriteConfigToCreateRules(*action.RewriteConfig)
+	case util.RuleActionTypeInsertHeader:
+		sdkObj.InsertHeaderConfig = transSDKInsertHeaderConfigToCreateRules(*action.InsertHeaderConfig)
+	case util.RuleActionTypeRemoveHeader:
+		sdkObj.RemoveHeaderConfig = transSDKRemoveHeaderConfigToCreateRules(*action.RemoveHeaderConfig)
+	case util.RuleActionTypeTrafficLimit:
+		sdkObj.TrafficLimitConfig = transSDKTrafficLimitConfigToCreateRules(*action.TrafficLimitConfig)
+	case util.RuleActionTypeTrafficMirror:
+		trafficMirrorConfig, err := transSDKTrafficMirrorConfigToCreateRules(*action.TrafficMirrorConfig)
+		if err != nil {
+			return nil, err
+		}
+		sdkObj.TrafficMirrorConfig = *trafficMirrorConfig
+	case util.RuleActionTypeCors:
+		sdkObj.CorsConfig = transSDKCorsConfigToCreateRules(*action.CorsConfig)
 	}
 	return sdkObj, nil
 }
@@ -513,6 +774,22 @@ func transModelActionToSDKUpdateRules(action alb.Action) (*albsdk.UpdateRulesAtt
 			return nil, err
 		}
 		sdkObj.ForwardGroupConfig = *forwardActionConfig
+	case util.RuleActionTypeRewrite:
+		sdkObj.RewriteConfig = transSDKRerwriteConfigToUpdateRules(*action.RewriteConfig)
+	case util.RuleActionTypeInsertHeader:
+		sdkObj.InsertHeaderConfig = transSDKInsertHeaderConfigToUpdateRules(*action.InsertHeaderConfig)
+	case util.RuleActionTypeRemoveHeader:
+		sdkObj.RemoveHeaderConfig = transSDKRemoveHeaderConfigToUpdateRules(*action.RemoveHeaderConfig)
+	case util.RuleActionTypeTrafficLimit:
+		sdkObj.TrafficLimitConfig = transSDKTrafficLimitConfigToUpdateRules(*action.TrafficLimitConfig)
+	case util.RuleActionTypeTrafficMirror:
+		trafficMirrorConfig, err := transSDKTrafficMirrorConfigToUpdateRules(*action.TrafficMirrorConfig)
+		if err != nil {
+			return nil, err
+		}
+		sdkObj.TrafficMirrorConfig = *trafficMirrorConfig
+	case util.RuleActionTypeCors:
+		sdkObj.CorsConfig = transSDKCorsConfigToUpdateRules(*action.CorsConfig)
 	}
 	return sdkObj, nil
 }
@@ -531,6 +808,12 @@ func transModelActionToSDKCreateRule(action alb.Action) (*albsdk.CreateRuleRuleA
 			return nil, err
 		}
 		sdkObj.ForwardGroupConfig = *forwardActionConfig
+	case util.RuleActionTypeTrafficMirror:
+		trafficMirrorConfig, err := transSDKTrafficMirrorConfigToCreateRule(*action.TrafficMirrorConfig)
+		if err != nil {
+			return nil, err
+		}
+		sdkObj.TrafficMirrorConfig = *trafficMirrorConfig
 	}
 	return sdkObj, nil
 }
@@ -549,6 +832,12 @@ func transModelActionToSDKUpdateRule(action alb.Action) (*albsdk.UpdateRuleAttri
 			return nil, err
 		}
 		sdkObj.ForwardGroupConfig = *forwardActionConfig
+	case util.RuleActionTypeTrafficMirror:
+		trafficMirrorConfig, err := transSDKTrafficMirrorConfigToUpdateRule(*action.TrafficMirrorConfig)
+		if err != nil {
+			return nil, err
+		}
+		sdkObj.TrafficMirrorConfig = *trafficMirrorConfig
 	}
 	return sdkObj, nil
 }
@@ -639,6 +928,46 @@ func transModelActionToSDK(action alb.Action) (*albsdk.Action, error) {
 			return nil, err
 		}
 		sdkObj.ForwardGroupConfig = *forwardActionConfig
+	case util.RuleActionTypeRewrite:
+		sdkObj.RewriteConfig = albsdk.RewriteConfig{
+			Host:  action.RewriteConfig.Host,
+			Path:  action.RewriteConfig.Path,
+			Query: action.RewriteConfig.Query,
+		}
+	case util.RuleActionTypeInsertHeader:
+		sdkObj.InsertHeaderConfig = albsdk.InsertHeaderConfig{
+			CoverEnabled: true,
+			Key:          action.InsertHeaderConfig.Key,
+			Value:        action.InsertHeaderConfig.Value,
+			ValueType:    action.InsertHeaderConfig.ValueType,
+		}
+	case util.RuleActionTypeRemoveHeader:
+		sdkObj.RemoveHeaderConfig = albsdk.RemoveHeaderConfig{
+			Key: action.RemoveHeaderConfig.Key,
+		}
+	case util.RuleActionTypeTrafficLimit:
+		sdkObj.TrafficLimitConfig = albsdk.TrafficLimitConfig{
+			QPS: action.TrafficLimitConfig.QPS,
+		}
+	case util.RuleActionTypeTrafficMirror:
+		trafficMirrorConfig, err := transModelTrafficMirrorActionConfigToSDKRule(*action.TrafficMirrorConfig)
+		if err != nil {
+			return nil, err
+		}
+		sdkObj.TrafficMirrorConfig = *trafficMirrorConfig
+	case util.RuleActionTypeCors:
+		maxAge, err := strconv.ParseInt(action.CorsConfig.MaxAge, 10, 64)
+		if err != nil {
+			return nil, err
+		}
+		sdkObj.CorsConfig = albsdk.CorsConfig{
+			AllowCredentials: action.CorsConfig.AllowCredentials,
+			MaxAge:           maxAge,
+			AllowOrigin:      action.CorsConfig.AllowOrigin,
+			AllowMethods:     action.CorsConfig.AllowMethods,
+			AllowHeaders:     action.CorsConfig.AllowHeaders,
+			ExposeHeaders:    action.CorsConfig.ExposeHeaders,
+		}
 	}
 	return sdkObj, nil
 }
@@ -658,7 +987,71 @@ func transModelActionsToSDK(actions []alb.Action) (*[]albsdk.Action, error) {
 
 	return &sdkActions, nil
 }
+func transModelValuesToSDK(values []alb.Value) *[]albsdk.Value {
+	var sdkValues []albsdk.Value
+	if len(values) != 0 {
+		sdkValues = make([]albsdk.Value, 0)
+		for _, m := range values {
+			value := albsdk.Value{
+				Key:   m.Key,
+				Value: m.Value,
+			}
+			sdkValues = append(sdkValues, value)
+		}
+	}
+	return &sdkValues
+}
+func transModelConditionToSDK(condition alb.Condition) (*albsdk.Condition, error) {
+	sdkObj := &albsdk.Condition{}
+	sdkObj.Type = condition.Type
+	switch sdkObj.Type {
+	case util.RuleConditionFieldPath:
+		sdkObj.PathConfig = albsdk.PathConfig{
+			Values: condition.PathConfig.Values,
+		}
+	case util.RuleConditionFieldHost:
+		sdkObj.HostConfig = albsdk.HostConfig{
+			Values: condition.HostConfig.Values,
+		}
+	case util.RuleConditionFieldHeader:
+		sdkObj.HeaderConfig = albsdk.HeaderConfig{
+			Key:    condition.HeaderConfig.Key,
+			Values: condition.HostConfig.Values,
+		}
+	case util.RuleConditionFieldQueryString:
+		sdkObj.QueryStringConfig = albsdk.QueryStringConfig{
+			Values: *transModelValuesToSDK(condition.QueryStringConfig.Values),
+		}
+	case util.RuleConditionFieldMethod:
+		sdkObj.MethodConfig = albsdk.MethodConfig{
+			Values: condition.MethodConfig.Values,
+		}
+	case util.RuleConditionFieldCookie:
+		sdkObj.CookieConfig = albsdk.CookieConfig{
+			Values: *transModelValuesToSDK(condition.CookieConfig.Values),
+		}
+	case util.RuleConditionFieldSourceIp:
+		sdkObj.SourceIpConfig = albsdk.SourceIpConfig{
+			Values: condition.SourceIpConfig.Values,
+		}
+	}
+	return sdkObj, nil
+}
+func transModelConditionsToSDk(conditions []alb.Condition) (*[]albsdk.Condition, error) {
+	var sdkConditions []albsdk.Condition
+	if len(conditions) != 0 {
+		sdkConditions = make([]albsdk.Condition, 0)
+		for _, m := range conditions {
+			ruleCondition, err := transModelConditionToSDK(m)
+			if err != nil {
+				return nil, err
+			}
+			sdkConditions = append(sdkConditions, *ruleCondition)
+		}
+	}
 
+	return &sdkConditions, nil
+}
 func transSDKQueryStringConfigValueToCreateRule(value alb.Value) *albsdk.CreateRuleRuleConditionsQueryStringConfigValuesItem {
 	return &albsdk.CreateRuleRuleConditionsQueryStringConfigValuesItem{
 		Value: value.Value,
@@ -810,6 +1203,45 @@ func transSDKHostConfigToCreateRules(hostConf alb.HostConfig) albsdk.CreateRules
 		Values: &hostConf.Values,
 	}
 }
+
+func transSDKSourceIpConfigToCreateRules(sourceIpConf alb.SourceIpConfig) albsdk.CreateRulesRulesRuleConditionsItemSourceIpConfig {
+	return albsdk.CreateRulesRulesRuleConditionsItemSourceIpConfig{
+		Values: &sourceIpConf.Values,
+	}
+}
+
+func transSDKSourceIpConfigToUpdateRules(sourceIpConf alb.SourceIpConfig) albsdk.UpdateRulesAttributeRulesRuleConditionsItemSourceIpConfig {
+	return albsdk.UpdateRulesAttributeRulesRuleConditionsItemSourceIpConfig{
+		Values: &(sourceIpConf.Values),
+	}
+}
+
+func transSDKResponseStatusCodeConfigToCreateRules(statusCodeConf alb.ResponseStatusCodeConfig) albsdk.CreateRulesRulesRuleConditionsItemResponseStatusCodeConfig {
+	return albsdk.CreateRulesRulesRuleConditionsItemResponseStatusCodeConfig{
+		Values: &statusCodeConf.Values,
+	}
+}
+
+func transSDKResponseStatusCodeConfigToUpdateRules(statusCodeConf alb.ResponseStatusCodeConfig) albsdk.UpdateRulesAttributeRulesRuleConditionsItemResponseStatusCodeConfig {
+	return albsdk.UpdateRulesAttributeRulesRuleConditionsItemResponseStatusCodeConfig{
+		Values: &statusCodeConf.Values,
+	}
+}
+
+func transSDKResponseHeaderConfigToCreateRules(responseHeaderConf alb.ResponseHeaderConfig) albsdk.CreateRulesRulesRuleConditionsItemResponseHeaderConfig {
+	return albsdk.CreateRulesRulesRuleConditionsItemResponseHeaderConfig{
+		Key:    responseHeaderConf.Key,
+		Values: &responseHeaderConf.Values,
+	}
+}
+
+func transSDKResponseHeaderConfigToUpdateRules(responseHeaderConf alb.ResponseHeaderConfig) albsdk.UpdateRulesAttributeRulesRuleConditionsItemResponseHeaderConfig {
+	return albsdk.UpdateRulesAttributeRulesRuleConditionsItemResponseHeaderConfig{
+		Key:    responseHeaderConf.Key,
+		Values: &responseHeaderConf.Values,
+	}
+}
+
 func transSDKHostConfigToUpdateRules(hostConf alb.HostConfig) albsdk.UpdateRulesAttributeRulesRuleConditionsItemHostConfig {
 	return albsdk.UpdateRulesAttributeRulesRuleConditionsItemHostConfig{
 		Values: &hostConf.Values,
@@ -909,6 +1341,12 @@ func transSDKConditionToCreateRules(condition alb.Condition) *albsdk.CreateRules
 		resCondition.QueryStringConfig = transSDKQueryStringConfigToCreateRules(condition.QueryStringConfig)
 	case util.RuleConditionFieldCookie:
 		resCondition.CookieConfig = transSDKCookieConfigToCreateRules(condition.CookieConfig)
+	case util.RuleConditionFieldSourceIp:
+		resCondition.SourceIpConfig = transSDKSourceIpConfigToCreateRules(condition.SourceIpConfig)
+	case util.RuleConditionResponseHeader:
+		resCondition.ResponseHeaderConfig = transSDKResponseHeaderConfigToCreateRules(condition.ResponseHeaderConfig)
+	case util.RuleConditionResponseStatusCode:
+		resCondition.ResponseStatusCodeConfig = transSDKResponseStatusCodeConfigToCreateRules(condition.ResponseStatusCodeConfig)
 	}
 
 	return resCondition
@@ -930,6 +1368,12 @@ func transSDKConditionToUpdateRules(condition alb.Condition) *albsdk.UpdateRules
 		resCondition.QueryStringConfig = transSDKQueryStringConfigToUpdateRules(condition.QueryStringConfig)
 	case util.RuleConditionFieldCookie:
 		resCondition.CookieConfig = transSDKCookieConfigToUpdateRules(condition.CookieConfig)
+	case util.RuleConditionFieldSourceIp:
+		resCondition.SourceIpConfig = transSDKSourceIpConfigToUpdateRules(condition.SourceIpConfig)
+	case util.RuleConditionResponseHeader:
+		resCondition.ResponseHeaderConfig = transSDKResponseHeaderConfigToUpdateRules(condition.ResponseHeaderConfig)
+	case util.RuleConditionResponseStatusCode:
+		resCondition.ResponseStatusCodeConfig = transSDKResponseStatusCodeConfigToUpdateRules(condition.ResponseStatusCodeConfig)
 	}
 
 	return resCondition
@@ -1094,7 +1538,11 @@ func (r *ListenerRuleUpdateAnalyzer) analysis(_ context.Context, resLR *alb.List
 		r.ruleActionsNeedUpdate = true
 	}
 
-	if !reflect.DeepEqual(resLR.Spec.RuleConditions, sdkLR.RuleConditions) {
+	resConditions, err := transModelConditionsToSDk(resLR.Spec.RuleConditions)
+	if err != nil {
+		return err
+	}
+	if !reflect.DeepEqual(*resConditions, sdkLR.RuleConditions) {
 		r.ruleConditionsNeedUpdate = true
 	}
 
@@ -1190,6 +1638,7 @@ func transModelRulesToSDKCreateRules(resLRs []*alb.ListenerRule) ([]albsdk.Creat
 			RuleName:       resLR.Spec.RuleName,
 			Priority:       strconv.Itoa(resLR.Spec.Priority),
 			RuleActions:    actions,
+			Direction:      resLR.Spec.RuleDirection,
 		})
 	}
 	return creatRules, nil
@@ -1269,14 +1718,16 @@ func BatchUpdateRules(ctx context.Context, ruleMgr *ALBProvider, rules []albsdk.
 	if cnt <= 0 || cnt >= util.BatchCreateDeleteUpdateRulesMaxNum {
 		cnt = util.BatchUpdateRulesDefaultNum
 	}
+	total := len(rules)
 
-	for len(rules) > cnt {
-		if err := batch(ctx, ruleMgr, rules[0:cnt]); err != nil {
+	for total > cnt {
+		if err := batch(ctx, ruleMgr, rules[total-cnt:total]); err != nil {
 			return err
 		}
-		rules = rules[cnt:]
+		rules = rules[0 : total-cnt]
+		total = len(rules)
 	}
-	if len(rules) <= 0 {
+	if total <= 0 {
 		return nil
 	}
 

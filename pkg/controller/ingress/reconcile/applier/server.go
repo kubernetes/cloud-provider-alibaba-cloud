@@ -177,7 +177,7 @@ func updateTargetHealthPodCondition(ctx context.Context, kubeClient client.Clien
 	endpoints []albmodel.BackendItem) error {
 	klog.Infof("start updateTargetHealthPodCondition")
 	for _, endpointAndTarget := range endpoints {
-		if len(endpointAndTarget.Pod.Spec.ReadinessGates) == 0 {
+		if endpointAndTarget.Pod == nil || endpointAndTarget.Pod.Spec.ReadinessGates == nil || len(endpointAndTarget.Pod.Spec.ReadinessGates) == 0 {
 			continue
 		}
 		epsKey := types.NamespacedName{

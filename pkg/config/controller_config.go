@@ -3,13 +3,14 @@ package config
 import (
 	"flag"
 	"fmt"
+	"os"
+	"time"
+
 	"github.com/spf13/pflag"
 	apiext "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/cloud-provider/config"
 	"k8s.io/klog/v2"
-	"os"
 	sigConfig "sigs.k8s.io/controller-runtime/pkg/client/config"
-	"time"
 )
 
 const (

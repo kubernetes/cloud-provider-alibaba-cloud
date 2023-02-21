@@ -15,6 +15,8 @@ type TrackingProvider interface {
 
 	ClusterNameTagKey() string
 
+	IsAlbIngressTagKey(key string) bool
+
 	StackTags(stack core.Manager) map[string]string
 
 	ResourceTags(stack core.Manager, res core.Resource, additionalTags map[string]string) map[string]string
@@ -43,9 +45,17 @@ func (p *defaultTrackingProvider) AlbConfigTagKey() string {
 }
 
 func (p *defaultTrackingProvider) ClusterNameTagKey() string {
-	return util.ClusterTagKey
+	return util.ClusterNameTagKey
 }
 
+func (p *defaultTrackingProvider) IsAlbIngressTagKey(key string) bool {
+	if key == p.AlbConfigTagKey() ||
+		key == p.ClusterNameTagKey() ||
+		key == p.ResourceIDTagKey() {
+		return true
+	}
+	return false
+}
 func (p *defaultTrackingProvider) StackTags(stack core.Manager) map[string]string {
 	stackID := stack.StackID()
 	return map[string]string{

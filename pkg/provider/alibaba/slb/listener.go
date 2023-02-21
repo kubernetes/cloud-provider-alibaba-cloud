@@ -3,6 +3,7 @@ package slb
 import (
 	"context"
 	"fmt"
+	"github.com/alibabacloud-go/tea/tea"
 	"k8s.io/klog/v2"
 	"reflect"
 	"strconv"
@@ -285,6 +286,10 @@ func setTCPListenerValue(req interface{}, listener *model.ListenerAttribute) {
 		connectionDrainTimeout := v.FieldByName("ConnectionDrainTimeout")
 		connectionDrainTimeout.SetString(strconv.Itoa(listener.ConnectionDrainTimeout))
 	}
+	if listener.EnableProxyProtocolV2 != nil {
+		enabled := v.FieldByName("ProxyProtocolV2Enabled")
+		enabled.SetString(string(requests.NewBoolean(*listener.EnableProxyProtocolV2)))
+	}
 }
 
 func setUDPListenerValue(req interface{}, listener *model.ListenerAttribute) {
@@ -301,6 +306,10 @@ func setUDPListenerValue(req interface{}, listener *model.ListenerAttribute) {
 	if listener.ConnectionDrainTimeout != 0 {
 		connectionDrainTimeout := v.FieldByName("ConnectionDrainTimeout")
 		connectionDrainTimeout.SetString(strconv.Itoa(listener.ConnectionDrainTimeout))
+	}
+	if listener.EnableProxyProtocolV2 != nil {
+		enabled := v.FieldByName("ProxyProtocolV2Enabled")
+		enabled.SetString(string(requests.NewBoolean(*listener.EnableProxyProtocolV2)))
 	}
 
 }
@@ -446,6 +455,9 @@ func loadTCPListener(config slb.TCPListenerConfig, listener *model.ListenerAttri
 	listener.HealthCheckDomain = config.HealthCheckDomain
 	listener.HealthCheckURI = config.HealthCheckURI
 	listener.HealthCheckType = config.HealthCheckType
+	if config.ProxyProtocolV2Enabled != "" {
+		listener.EnableProxyProtocolV2 = tea.Bool(config.ProxyProtocolV2Enabled == "true")
+	}
 }
 
 func loadUDPListener(config slb.UDPListenerConfig, listener *model.ListenerAttribute) {
@@ -456,6 +468,9 @@ func loadUDPListener(config slb.UDPListenerConfig, listener *model.ListenerAttri
 	listener.HealthCheckConnectTimeout = config.HealthCheckConnectTimeout
 	listener.HealthCheckConnectPort = config.HealthCheckConnectPort
 	listener.HealthCheckInterval = config.HealthCheckInterval
+	if config.ProxyProtocolV2Enabled != "" {
+		listener.EnableProxyProtocolV2 = tea.Bool(config.ProxyProtocolV2Enabled == "true")
+	}
 }
 
 func loadHTTPListener(config slb.HTTPListenerConfig, listener *model.ListenerAttribute) {

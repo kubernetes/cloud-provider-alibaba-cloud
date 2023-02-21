@@ -1139,5 +1139,50 @@ func RunListenerTestCases(f *framework.Framework) {
 			}
 		})
 
+		ginkgo.Context("proxy protocol", func() {
+			ginkgo.It("proxy-protocol on", func() {
+				svc, err := f.Client.KubeClient.CreateServiceByAnno(map[string]string{
+					annotation.Annotation(annotation.ProxyProtocol): string(model.OnFlag),
+					annotation.Annotation(annotation.ProtocolPort):  "tcp:80,udp:443",
+				})
+				gomega.Expect(err).To(gomega.BeNil())
+				err = f.ExpectLoadBalancerEqual(svc)
+				gomega.Expect(err).To(gomega.BeNil())
+			})
+
+			ginkgo.It("proxy-protocol on -> off", func() {
+				oldsvc, err := f.Client.KubeClient.CreateServiceByAnno(map[string]string{
+					annotation.Annotation(annotation.ProxyProtocol): string(model.OnFlag),
+					annotation.Annotation(annotation.ProtocolPort):  "tcp:80,udp:443",
+				})
+				gomega.Expect(err).To(gomega.BeNil())
+				err = f.ExpectLoadBalancerEqual(oldsvc)
+				gomega.Expect(err).To(gomega.BeNil())
+
+				newsvc := oldsvc.DeepCopy()
+				newsvc.Annotations[annotation.Annotation(annotation.ProxyProtocol)] = string(model.OffFlag)
+				newsvc, err = f.Client.KubeClient.PatchService(oldsvc, newsvc)
+				gomega.Expect(err).To(gomega.BeNil())
+				err = f.ExpectLoadBalancerEqual(newsvc)
+				gomega.Expect(err).To(gomega.BeNil())
+			})
+
+			ginkgo.It("proxy-protocol off -> on", func() {
+				oldsvc, err := f.Client.KubeClient.CreateServiceByAnno(map[string]string{
+					annotation.Annotation(annotation.ProxyProtocol): string(model.OffFlag),
+					annotation.Annotation(annotation.ProtocolPort):  "tcp:80,udp:443",
+				})
+				gomega.Expect(err).To(gomega.BeNil())
+				err = f.ExpectLoadBalancerEqual(oldsvc)
+				gomega.Expect(err).To(gomega.BeNil())
+
+				newsvc := oldsvc.DeepCopy()
+				newsvc.Annotations[annotation.Annotation(annotation.ProxyProtocol)] = string(model.OnFlag)
+				newsvc, err = f.Client.KubeClient.PatchService(oldsvc, newsvc)
+				gomega.Expect(err).To(gomega.BeNil())
+				err = f.ExpectLoadBalancerEqual(newsvc)
+				gomega.Expect(err).To(gomega.BeNil())
+			})
+		})
 	})
 }

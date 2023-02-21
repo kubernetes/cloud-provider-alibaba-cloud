@@ -3,14 +3,15 @@ package backend
 import (
 	"context"
 	"fmt"
+
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/helper"
+
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/ingress/reconcile/store"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/service/reconcile/annotation"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/service/reconcile/backend"
 	svcCtx "k8s.io/cloud-provider-alibaba-cloud/pkg/controller/service/reconcile/context"
-	"k8s.io/cloud-provider-alibaba-cloud/pkg/util"
-
-	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/helper"
-	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/ingress/reconcile/store"
 	pkgModel "k8s.io/cloud-provider-alibaba-cloud/pkg/model"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/util"
 
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -82,6 +83,7 @@ func (r *defaultEndpointResolver) resolvePodEndpoints(ctx context.Context, svc *
 	epsKey := util.NamespacedName(svc)
 	eps := &corev1.Endpoints{}
 	if err := r.k8sClient.Get(ctx, epsKey, eps); err != nil {
+		klog.Errorf("resolvePodEndpoints: %v", err)
 		if apierrors.IsNotFound(err) {
 			return nil, false, fmt.Errorf("%w: %v", ErrNotFound, err.Error())
 		}
@@ -89,6 +91,7 @@ func (r *defaultEndpointResolver) resolvePodEndpoints(ctx context.Context, svc *
 	}
 	var endpoints []PodEndpoint
 	containsPotentialReadyEndpoints := false
+	klog.Infof("resolvePodEndpoints = %v", eps)
 
 	for _, ep := range eps.Subsets {
 		var backendPort int
@@ -135,7 +138,7 @@ func (r *defaultEndpointResolver) resolvePodEndpoints(ctx context.Context, svc *
 	return endpoints, containsPotentialReadyEndpoints, nil
 }
 func (r *defaultEndpointResolver) findPodByReference(ctx context.Context, namespace string, podRef corev1.ObjectReference) (*corev1.Pod, error) {
-	podKey := fmt.Sprintf("%s/%s", namespace, podRef.Name)
+	podKey := fmt.Sprintf("%s/%s", podRef.Namespace, podRef.Name)
 	return r.store.GetPod(podKey)
 }
 func (r *defaultEndpointResolver) ResolveENIEndpoints(ctx context.Context, svcKey types.NamespacedName, port intstr.IntOrString) ([]NodePortEndpoint, bool, error) {
@@ -170,8 +173,10 @@ func (r *defaultEndpointResolver) ResolveLocalEndpoints(ctx context.Context, svc
 	svcNodePort := svcPort.NodePort
 
 	reqCtx := &svcCtx.RequestContext{
+		Ctx:     ctx,
 		Service: svc,
 		Anno:    &annotation.AnnotationRequest{Service: svc},
+		Log:     r.logger,
 	}
 	nodes, err := backend.GetNodes(reqCtx, r.k8sClient)
 	if err != nil {
@@ -233,8 +238,10 @@ func (r *defaultEndpointResolver) ResolveClusterEndpoints(ctx context.Context, s
 
 	svcNodePort := svcPort.NodePort
 	reqCtx := &svcCtx.RequestContext{
+		Ctx:     ctx,
 		Service: svc,
 		Anno:    &annotation.AnnotationRequest{Service: svc},
+		Log:     r.logger,
 	}
 	nodes, err := backend.GetNodes(reqCtx, r.k8sClient)
 	if err != nil {

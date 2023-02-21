@@ -3,7 +3,6 @@ package albconfigmanager
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"sort"
 	"strconv"
 
@@ -26,7 +25,7 @@ import (
 )
 
 type Builder interface {
-	Build(ctx context.Context, gateway *v1.AlbConfig, ingGroup *Group) (core.Manager, *alb.AlbLoadBalancer, error)
+	Build(ctx context.Context, gateway *v1.AlbConfig, ingGroup *Group) (core.Manager, *alb.AlbLoadBalancer, map[*networking.Ingress]error, error)
 }
 
 var _ Builder = &defaultAlbConfigManagerBuilder{}
@@ -45,23 +44,26 @@ func NewDefaultAlbConfigManagerBuilder(kubeClient client.Client, cloud prvd.Prov
 	}
 }
 
-func (b defaultAlbConfigManagerBuilder) Build(ctx context.Context, albconfig *v1.AlbConfig, ingGroup *Group) (core.Manager, *alb.AlbLoadBalancer, error) {
+func (b defaultAlbConfigManagerBuilder) Build(ctx context.Context, albconfig *v1.AlbConfig, ingGroup *Group) (core.Manager, *alb.AlbLoadBalancer, map[*networking.Ingress]error, error) {
 	stack := core.NewDefaultManager(core.StackID(ingGroup.ID))
-
+	errResultWithIngress := make(map[*networking.Ingress]error)
 	vpcID, err := b.cloud.VpcID()
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, errResultWithIngress, err
 	}
 
 	task := &defaultModelBuildTask{
-		stack:     stack,
-		albconfig: albconfig,
-		ingGroup:  ingGroup,
+		stack:                stack,
+		albconfig:            albconfig,
+		ingGroup:             ingGroup,
+		kubeClient:           b.kubeClient,
+		errResultWithIngress: errResultWithIngress,
 
 		clusterID: b.cloud.ClusterID(),
 		vpcID:     vpcID,
 
 		sgpByResID:      make(map[string]*alb.ServerGroup),
+		scByResID:       make(map[string]*alb.SecretCertificate),
 		backendServices: make(map[types.NamespacedName]*corev1.Service),
 
 		annotationParser: annotations.NewSuffixAnnotationParser(annotations.DefaultAnnotationsPrefix),
@@ -80,22 +82,25 @@ func (b defaultAlbConfigManagerBuilder) Build(ctx context.Context, albconfig *v1
 		defaultListenerSecurityPolicyId: util.DefaultListenerSecurityPolicyId,
 	}
 	if err := task.run(ctx); err != nil {
-		return nil, nil, err
+		return nil, nil, errResultWithIngress, err
 	}
 
-	return task.stack, task.loadBalancer, nil
+	return task.stack, task.loadBalancer, errResultWithIngress, nil
 }
 
 type defaultModelBuildTask struct {
-	stack        core.Manager
-	loadBalancer *alb.AlbLoadBalancer
-	albconfig    *v1.AlbConfig
-	ingGroup     *Group
+	stack                core.Manager
+	loadBalancer         *alb.AlbLoadBalancer
+	albconfig            *v1.AlbConfig
+	ingGroup             *Group
+	kubeClient           client.Client
+	errResultWithIngress map[*networking.Ingress]error
 
 	clusterID string
 	vpcID     string
 
 	sgpByResID map[string]*alb.ServerGroup
+	scByResID  map[string]*alb.SecretCertificate
 
 	annotationParser annotations.Parser
 	certDiscovery    CertDiscovery
@@ -129,10 +134,14 @@ func (t *defaultModelBuildTask) buildLsDefaultAction(ctx context.Context, lsPort
 	svcName := fakeDefaultServiceName
 	ing := new(networking.Ingress)
 	ing.Namespace = t.albconfig.Namespace
+	if ing.Namespace == "" {
+		ing.Namespace = ALBConfigNamespace
+	}
 	ing.Name = t.albconfig.Name + util.DefaultListenerFlag + strconv.Itoa(lsPort)
 	action := buildActionViaServiceAndServicePort(ctx, svcName, lsPort, 0)
 	actions, err := t.buildAction(ctx, *ing, action)
 	if err != nil {
+		t.errResultWithIngress[ing] = err
 		return alb.Action{}, err
 	}
 
@@ -145,6 +154,18 @@ func removeDuplicateElement(elements []string) []string {
 	for _, element := range elements {
 		if _, ok := temp[element]; !ok {
 			temp[element] = struct{}{}
+			result = append(result, element)
+		}
+	}
+	return result
+}
+
+func removeDuplicateSecretCertificate(elements []*alb.SecretCertificate) []*alb.SecretCertificate {
+	result := make([]*alb.SecretCertificate, 0, len(elements))
+	temp := map[string]struct{}{}
+	for _, element := range elements {
+		if _, ok := temp[element.Spec.CertName]; !ok {
+			temp[element.Spec.CertName] = struct{}{}
 			result = append(result, element)
 		}
 	}
@@ -168,6 +189,11 @@ func (t *defaultModelBuildTask) run(ctx context.Context) error {
 			return err
 		}
 		lss[int32(ls.Port.IntValue())] = modelLs
+		err = t.buildAcl(ctx, modelLs, ls, lb)
+		if err != nil {
+			return err
+		}
+
 	}
 
 	ingListByPort := make(map[portProtocol][]networking.Ingress)
@@ -190,71 +216,98 @@ func (t *defaultModelBuildTask) run(ctx context.Context) error {
 		if !ok {
 			continue
 		}
-		if pp.protocol == ProtocolHTTPS {
+		if pp.protocol == ProtocolHTTPS || pp.protocol == ProtocolQUIC {
 			if len(ls.Spec.Certificates) == 0 {
-				var certIDs []string
+				var certs []alb.Certificate
+				var certsAuto []alb.Certificate
+				var certsSecr []alb.Certificate
+				var certsSecCert []*alb.SecretCertificate
+				var certsID []string
 				for _, ing := range ingList {
-					cert, err := t.computeIngressInferredTLSCertIDs(ctx, &ing)
-					if err != nil {
-						klog.Errorf("computeIngressInferredTLSCertARNs error: %s", err.Error())
-						return err
+					var missHosts []string
+					var secretHosts []string
+					for _, tls := range ing.Spec.TLS {
+						if tls.SecretName != "" {
+							cert, err := t.buildSecretCertificate(ctx, ing, tls.SecretName, t.clusterID)
+							if err != nil {
+								t.errResultWithIngress[&ing] = err
+								klog.Errorf("build SecretCertificate by secret failed, error: %s", err.Error())
+								return err
+							}
+							certsSecCert = append(certsSecCert, cert)
+							secretHosts = append(secretHosts, tls.Hosts...)
+						} else {
+							missHosts = append(missHosts, tls.Hosts...)
+						}
 					}
-					certIDs = append(certIDs, cert...)
+					for _, rule := range ing.Spec.Rules {
+						// no discovery certificate for rule.Host if not config in tls.host
+						if rule.Host != "" && withTlsRule(pp.protocol, rule.Host, ing) {
+							missHosts = append(missHosts, rule.Host)
+						}
+					}
+					hosts := getStringsDiff(missHosts, secretHosts)
+					if len(hosts) > 0 {
+						certIds, err := t.computeHostsInferredTLSCertIDs(ctx, hosts)
+						if err != nil {
+							t.errResultWithIngress[&ing] = err
+							klog.Errorf("computeIngressInferredTLSCertARNs error: %s", err.Error())
+							return err
+						}
+						certsID = append(certsID, certIds...)
+					}
 				}
-				if len(certIDs) == 0 {
-					return fmt.Errorf("no cert was discovered: %v", certIDs)
-				}
-				certIDs = removeDuplicateElement(certIDs)
-				sort.Strings(certIDs)
-				cs := make([]alb.Certificate, 0)
-				for index, cid := range certIDs {
-					cert := alb.Certificate{
+				certsID = removeDuplicateElement(certsID)
+				sort.Strings(certsID)
+				for _, cid := range certsID {
+					cert := &alb.FixedCertificate{
 						IsDefault:     false,
 						CertificateId: cid,
 					}
-					if index == 0 {
-						cert.IsDefault = true
-					}
-					cs = append(cs, cert)
+					certsAuto = append(certsAuto, cert)
 				}
-				lss[pp.port].Spec.ListenerProtocol = string(ProtocolHTTPS)
-				lss[pp.port].Spec.Certificates = cs
+				certsSecCert = removeDuplicateSecretCertificate(certsSecCert)
+				for _, sc := range certsSecCert {
+					certsSecr = append(certsSecr, sc)
+				}
+				certs = append(certs, certsAuto...)
+				certs = append(certs, certsSecr...)
+				if len(certs) > 0 {
+					certs[0].SetDefault()
+				}
+				lss[pp.port].Spec.ListenerProtocol = string(pp.protocol)
+				lss[pp.port].Spec.Certificates = certs
 			}
 		}
-		if err := t.buildListenerRules(ctx, ls.ListenerID(), pp.port, ingList); err != nil {
+		if err := t.buildListenerRules(ctx, ls.ListenerID(), pp.port, pp.protocol, ingList); err != nil {
 			return err
 		}
 	}
 
-	for _, ls := range lss {
-		if ls.Spec.ListenerProtocol == string(ProtocolHTTPS) {
-			var isDefaultCertExist bool
-			for _, c := range ls.Spec.Certificates {
-				if c.IsDefault {
-					isDefaultCertExist = true
-					break
-				}
-			}
-			if !isDefaultCertExist {
-				return fmt.Errorf("https listener: %d must provider one default cert", ls.Spec.ListenerPort)
-			}
-		}
-	}
+	//for _, ls := range lss {
+	//	if ls.Spec.ListenerProtocol == string(ProtocolHTTPS) {
+	//		var isDefaultCertExist bool
+	//		for _, c := range ls.Spec.Certificates {
+	//			if c.GetIsDefault() {
+	//				isDefaultCertExist = true
+	//				break
+	//			}
+	//		}
+	//		if len(ls.Spec.Certificates) > 0 && !isDefaultCertExist {
+	//			return fmt.Errorf("https listener: %d must provider one default cert", ls.Spec.ListenerPort)
+	//		}
+	//	}
+	//}
 
 	return nil
 }
 
-func (t *defaultModelBuildTask) computeIngressInferredTLSCertIDs(ctx context.Context, ing *networking.Ingress) ([]string, error) {
-	hosts := sets.NewString()
-	for _, r := range ing.Spec.Rules {
-		if len(r.Host) != 0 {
-			hosts.Insert(r.Host)
-		}
+func (t *defaultModelBuildTask) computeHostsInferredTLSCertIDs(ctx context.Context, hosts []string) ([]string, error) {
+	dHosts := sets.NewString()
+	for _, h := range hosts {
+		dHosts.Insert(h)
 	}
-	for _, t := range ing.Spec.TLS {
-		hosts.Insert(t.Hosts...)
-	}
-	return t.certDiscovery.Discover(ctx, hosts.List())
+	return t.certDiscovery.Discover(ctx, dHosts.List())
 }
 
 func ComputeIngressListenPorts(ing *networking.Ingress) (map[int32]Protocol, error) {
@@ -266,15 +319,35 @@ func ComputeIngressListenPorts(ing *networking.Ingress) (map[int32]Protocol, err
 	}
 	rawListenPorts, err := annotations.GetStringAnnotation(annotations.ListenPorts, ing)
 	if err != nil {
+		ls443 := false
 		for _, tls := range ing.Spec.TLS {
 			for _, host := range tls.Hosts {
 				if host != "" {
-					portAndProtocols[443] = ProtocolHTTPS
-					return portAndProtocols, nil
+					ls443 = true
+					break
 				}
 			}
+			if ls443 {
+				break
+			}
 		}
-		return map[int32]Protocol{80: ProtocolHTTP}, nil
+		ls80 := false
+		for _, rule := range ing.Spec.Rules {
+			if rule.Host != "" && !withTlsRule(ProtocolHTTP, rule.Host, *ing) {
+				ls80 = true
+				break
+			}
+		}
+
+		if ls443 && ls80 {
+			portAndProtocols[80] = ProtocolHTTP
+			portAndProtocols[443] = ProtocolHTTPS
+		} else if ls443 {
+			portAndProtocols[443] = ProtocolHTTPS
+		} else {
+			portAndProtocols[80] = ProtocolHTTP
+		}
+		return portAndProtocols, nil
 	}
 
 	var entries []map[string]int32
@@ -295,6 +368,8 @@ func ComputeIngressListenPorts(ing *networking.Ingress) (map[int32]Protocol, err
 				portAndProtocols[port] = util.ListenerProtocolHTTP
 			case string(ProtocolHTTPS):
 				portAndProtocols[port] = util.ListenerProtocolHTTPS
+			case string(ProtocolQUIC):
+				portAndProtocols[port] = util.ListenerProtocolQUIC
 			default:
 				return nil, errors.Errorf("listen protocol must be within [%v, %v]: %v", ProtocolHTTP, ProtocolHTTPS, protocol)
 			}
@@ -308,4 +383,19 @@ type Protocol string
 const (
 	ProtocolHTTP  Protocol = util.ListenerProtocolHTTP
 	ProtocolHTTPS Protocol = util.ListenerProtocolHTTPS
+	ProtocolQUIC  Protocol = util.ListenerProtocolQUIC
 )
+
+func getStringsDiff(a, b []string) []string {
+	mapB := make(map[string]bool)
+	for _, s := range b {
+		mapB[s] = true
+	}
+	aDiffB := make([]string, 0)
+	for _, s := range a {
+		if !mapB[s] {
+			aDiffB = append(aDiffB, s)
+		}
+	}
+	return aDiffB
+}

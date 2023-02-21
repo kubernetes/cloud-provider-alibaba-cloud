@@ -1,6 +1,10 @@
 package alb
 
-import "k8s.io/cloud-provider-alibaba-cloud/pkg/model/alb/core"
+import (
+	"context"
+
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/model/alb/core"
+)
 
 type ALBLoadBalancerSpec struct {
 	AddressAllocatedMode         string                       `json:"AddressAllocatedMode" xml:"AddressAllocatedMode"`
@@ -20,6 +24,7 @@ type ALBLoadBalancerSpec struct {
 	LoadBalancerOperationLocks   []LoadBalancerOperationLock  `json:"LoadBalancerOperationLocks" xml:"LoadBalancerOperationLocks"`
 	Tags                         []ALBTag                     `json:"Tags" xml:"Tags"`
 	ZoneMapping                  []ZoneMapping                `json:"ZoneMapping" xml:"ZoneMapping"`
+	ListenerForceOverride        *bool                        `json:"ListenerForceOverride" xml:"ListenerForceOverride"`
 }
 
 type ALBListenerSpec struct {
@@ -48,6 +53,7 @@ type ALBListenerRuleSpec struct {
 	RuleStatus     string      `json:"RuleStatus" xml:"RuleStatus"`
 	RuleActions    []Action    `json:"RuleActions" xml:"RuleActions"`
 	RuleConditions []Condition `json:"RuleConditions" xml:"RuleConditions"`
+	RuleDirection  string      `json:"RuleDirection" xml:"RuleDirection"`
 }
 
 type ALBServerGroupSpec struct {
@@ -123,10 +129,10 @@ type StickySessionConfig struct {
 	StickySessionType    string `json:"StickySessionType" xml:"StickySessionType"`
 }
 
-type Certificate struct {
-	IsDefault     bool   `json:"IsDefault" xml:"IsDefault"`
-	CertificateId string `json:"CertificateId" xml:"CertificateId"`
-	Status        string `json:"Status" xml:"Status"`
+type Certificate interface {
+	SetDefault()
+	GetIsDefault() bool
+	GetCertificateId(ctx context.Context) (string, error)
 }
 type LogConfig struct {
 	AccessLogRecordCustomizedHeadersEnabled bool                   `json:"AccessLogRecordCustomizedHeadersEnabled" xml:"AccessLogRecordCustomizedHeadersEnabled"`
@@ -169,6 +175,7 @@ type Action struct {
 	RewriteConfig       *RewriteConfig       `json:"RewriteConfig" xml:"RewriteConfig"`
 	TrafficMirrorConfig *TrafficMirrorConfig `json:"TrafficMirrorConfig" xml:"TrafficMirrorConfig"`
 	TrafficLimitConfig  *TrafficLimitConfig  `json:"TrafficLimitConfig" xml:"TrafficLimitConfig"`
+	CorsConfig          *CorsConfig          `json:"CorsConfig" xml:"CorsConfig"`
 }
 
 type ServerGroupTuple struct {
@@ -216,8 +223,14 @@ type TrafficMirrorConfig struct {
 	TargetType        string            `json:"TargetType" xml:"TargetType"`
 	MirrorGroupConfig MirrorGroupConfig `json:"MirrorGroupConfig" xml:"MirrorGroupConfig"`
 }
+type TrafficMirrorServerGroupTuple struct {
+	ServerGroupID string `json:"serverGroupID"`
+	ServiceName   string `json:"serviceName"`
+	ServicePort   int    `json:"servicePort"`
+	Weight        int    `json:"weight,omitempty"`
+}
 type MirrorGroupConfig struct {
-	ServerGroupTuples []ServerGroupTuple `json:"ServerGroupTuples" xml:"ServerGroupTuples"`
+	ServerGroupTuples []TrafficMirrorServerGroupTuple `json:"ServerGroupTuples" xml:"ServerGroupTuples"`
 }
 type TrafficLimitConfig struct {
 	QPS int `json:"QPS" xml:"QPS"`
@@ -226,6 +239,14 @@ type FixedResponseConfig struct {
 	Content     string `json:"Content" xml:"Content"`
 	ContentType string `json:"ContentType" xml:"ContentType"`
 	HttpCode    string `json:"HttpCode" xml:"HttpCode"`
+}
+type CorsConfig struct {
+	AllowCredentials string   `json:"AllowCredentials" xml:"AllowCredentials"`
+	MaxAge           string   `json:"MaxAge" xml:"MaxAge"`
+	AllowOrigin      []string `json:"AllowOrigin" xml:"AllowOrigin"`
+	AllowMethods     []string `json:"AllowMethods" xml:"AllowMethods"`
+	AllowHeaders     []string `json:"AllowHeaders" xml:"AllowHeaders"`
+	ExposeHeaders    []string `json:"ExposeHeaders" xml:"ExposeHeaders"`
 }
 
 type Condition struct {

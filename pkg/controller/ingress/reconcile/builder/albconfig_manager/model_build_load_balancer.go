@@ -33,6 +33,15 @@ func (t *defaultModelBuildTask) buildAlbLoadBalancerSpec(ctx context.Context, al
 	lbModel := alb.ALBLoadBalancerSpec{}
 	lbModel.LoadBalancerId = albConfig.Spec.LoadBalancer.Id
 	lbModel.ForceOverride = albConfig.Spec.LoadBalancer.ForceOverride
+	forceOverride := false
+	if lbModel.ForceOverride == nil {
+		lbModel.ForceOverride = &forceOverride
+	}
+	lbModel.ListenerForceOverride = albConfig.Spec.LoadBalancer.ListenerForceOverride
+	listenerForceOverride := false
+	if lbModel.ListenerForceOverride == nil {
+		lbModel.ListenerForceOverride = &listenerForceOverride
+	}
 	if len(albConfig.Spec.LoadBalancer.Name) != 0 {
 		lbModel.LoadBalancerName = albConfig.Spec.LoadBalancer.Name
 	} else {
@@ -87,21 +96,47 @@ func (t *defaultModelBuildTask) buildAlbLoadBalancerSpec(ctx context.Context, al
 	lbModel.ZoneMapping = zoneMappings
 
 	lbModel.AddressAllocatedMode = albConfig.Spec.LoadBalancer.AddressAllocatedMode
+	if lbModel.AddressAllocatedMode == "" {
+		lbModel.AddressAllocatedMode = util.LoadBalancerAddressAllocatedModeDynamic
+	}
 	lbModel.AddressType = albConfig.Spec.LoadBalancer.AddressType
+	if lbModel.AddressType == "" {
+		lbModel.AddressType = util.LoadBalancerAddressTypeInternet
+	}
 	lbModel.DeletionProtectionConfig = alb.DeletionProtectionConfig{
-		Enabled:     *albConfig.Spec.LoadBalancer.DeletionProtectionEnabled,
+		Enabled:     true,
 		EnabledTime: "",
 	}
 	lbModel.ModificationProtectionConfig = alb.ModificationProtectionConfig{
 		Reason: "",
 		Status: util.LoadBalancerModificationProtectionStatusConsoleProtection,
 	}
+	payType := albConfig.Spec.LoadBalancer.BillingConfig.PayType
+	if payType == "" {
+		payType = util.LoadBalancerPayTypePostPay
+	}
 	lbModel.LoadBalancerBillingConfig = alb.LoadBalancerBillingConfig{
 		InternetBandwidth:  albConfig.Spec.LoadBalancer.BillingConfig.InternetBandwidth,
 		InternetChargeType: albConfig.Spec.LoadBalancer.BillingConfig.InternetChargeType,
-		PayType:            albConfig.Spec.LoadBalancer.BillingConfig.PayType,
+		PayType:            payType,
 	}
 	lbModel.LoadBalancerEdition = albConfig.Spec.LoadBalancer.Edition
+	if lbModel.LoadBalancerEdition == "" {
+		lbModel.LoadBalancerEdition = util.LoadBalancerEditionStandard
+	}
+
+	// build customer tags
+	if len(albConfig.Spec.LoadBalancer.Tags) != 0 {
+		tags := make([]alb.ALBTag, 0)
+		for _, tag := range albConfig.Spec.LoadBalancer.Tags {
+			tags = append(tags, alb.ALBTag{
+				Key:   tag.Key,
+				Value: tag.Value,
+			})
+		}
+		lbModel.Tags = tags
+	}
+
 	return lbModel, nil
 }
 

@@ -4,10 +4,19 @@ import (
 	"context"
 	"fmt"
 	"sort"
+	"strconv"
+
+	"sigs.k8s.io/controller-runtime/pkg/cache"
+
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	apiextcli "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/helper"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/ingress/reconcile/annotations"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/ingress/reconcile/store"
+
+	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 
 	networking "k8s.io/api/networking/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -21,8 +30,9 @@ import (
 )
 
 var (
-	DefaultGroupName   = "default"
-	ALBConfigNamespace = "kube-system"
+	errInvalidIngressGroup = errors.New("invalid ingress group")
+	DefaultGroupName       = "default"
+	ALBConfigNamespace     = "kube-system"
 )
 
 type GroupID types.NamespacedName
@@ -45,10 +55,12 @@ type GroupLoader interface {
 	LoadGroupID(ctx context.Context, ing *networking.Ingress) (*GroupID, error)
 }
 
-func NewDefaultGroupLoader(kubeClient client.Client, annotationParser annotations.Parser) *defaultGroupLoader {
+func NewDefaultGroupLoader(kubeClient client.Client, kubeClientCache cache.Cache, client apiextcli.Interface, annotationParser annotations.Parser) *defaultGroupLoader {
 	return &defaultGroupLoader{
 		annotationParser: annotationParser,
 		kubeClient:       kubeClient,
+		kubeClientCache:  kubeClientCache,
+		client:           client,
 	}
 }
 
@@ -57,6 +69,8 @@ var _ GroupLoader = (*defaultGroupLoader)(nil)
 type defaultGroupLoader struct {
 	annotationParser annotations.Parser
 	kubeClient       client.Client
+	kubeClientCache  cache.Cache
+	client           apiextcli.Interface
 }
 
 func (m *defaultGroupLoader) Load(ctx context.Context, groupID GroupID, ingress []*store.Ingress) (*Group, error) {
@@ -66,16 +80,27 @@ func (m *defaultGroupLoader) Load(ctx context.Context, groupID GroupID, ingress 
 	for _, ing := range ingress {
 		groupName := ""
 		if exists := m.annotationParser.ParseStringAnnotation(util.IngressSuffixAlbConfigName, &groupName, ing.Annotations); !exists {
-			// 设置默认为：default
+			// default config：default
 			groupName = DefaultGroupName
+			albconfigName := m.IngressClass(&ing.Ingress)
+			if albconfigName != "" {
+				groupName = albconfigName
+			}
 		}
 		if groupID.Namespace == ALBConfigNamespace {
 			if groupID.Name != groupName {
 				continue
 			}
 		} else {
-			if groupID.Name != groupName || groupID.Namespace != ing.Namespace {
-				continue
+			acrd, err := m.client.ApiextensionsV1().
+				CustomResourceDefinitions().Get(ctx, "albconfigs.alibabacloud.com", metav1.GetOptions{})
+			if err != nil {
+				return nil, err
+			}
+			if acrd.Spec.Scope == apiextv1.NamespaceScoped {
+				if groupID.Name != groupName {
+					continue
+				}
 			}
 		}
 
@@ -124,9 +149,30 @@ func (m *defaultGroupLoader) LoadGroupID(ctx context.Context, ing *networking.In
 	groupName := ""
 	if exists := m.annotationParser.ParseStringAnnotation(util.IngressSuffixAlbConfigName, &groupName, ing.Annotations); !exists {
 		groupName = DefaultGroupName
+		albconfigName := m.IngressClass(ing)
+		if albconfigName != "" {
+			groupName = albconfigName
+		}
+	}
+	acrd, err := m.client.ApiextensionsV1().
+		CustomResourceDefinitions().Get(ctx, "albconfigs.alibabacloud.com", metav1.GetOptions{})
+	if err != nil {
+		return nil, err
+	}
+	if acrd.Spec.Scope == apiextv1.ClusterScoped {
+		//if err := m.kubeClient.Get(ctx, types.NamespacedName{
+		//	Name: groupName,
+		//}, albconfig); err != nil {
+		//	return nil, err
+		//}
+		groupID := GroupID(types.NamespacedName{
+			Namespace: ALBConfigNamespace,
+			Name:      groupName,
+		})
+		return &groupID, nil
 	}
 	albconfig := &v1.AlbConfig{}
-	if err := m.kubeClient.Get(ctx, types.NamespacedName{
+	if err := m.kubeClientCache.Get(ctx, types.NamespacedName{
 		Namespace: ing.Namespace,
 		Name:      groupName,
 	}, albconfig); err == nil {
@@ -135,6 +181,30 @@ func (m *defaultGroupLoader) LoadGroupID(ctx context.Context, ing *networking.In
 			Name:      groupName,
 		})
 		return &groupID, nil
+	}
+	alist := &v1.AlbConfigList{}
+	err = m.kubeClientCache.List(ctx, alist)
+	if err == nil {
+		hasAlbConfig := ""
+		for _, item := range alist.Items {
+			if item.Name == groupName {
+				if item.Status.LoadBalancer.DNSName != "" {
+					groupID := GroupID(types.NamespacedName{
+						Namespace: item.Namespace,
+						Name:      groupName,
+					})
+					return &groupID, nil
+				}
+				hasAlbConfig = item.Namespace
+			}
+		}
+		if hasAlbConfig != "" {
+			groupID := GroupID(types.NamespacedName{
+				Namespace: hasAlbConfig,
+				Name:      groupName,
+			})
+			return &groupID, nil
+		}
 	}
 	groupID := GroupID(types.NamespacedName{
 		Namespace: ALBConfigNamespace,
@@ -167,9 +237,15 @@ func (m *defaultGroupLoader) sortGroupMembers(members []*networking.Ingress) ([]
 	explicitOrders := sets.NewInt64()
 	for _, member := range members {
 		var order = defaultGroupOrder
-		exists, err := m.annotationParser.ParseInt64Annotation(util.IngressSuffixAlbConfigOrder, &order, member.Annotations)
-		if err != nil {
-			return nil, errors.Wrapf(err, "failed to load Ingress group order for ingress: %v", util.NamespacedName(member))
+		exists := false
+		v := annotations.GetStringAnnotationMutil(util.IngressSuffixAlbConfigOrder, annotations.Order, member)
+		if v != "" {
+			exists = true
+			i, err := strconv.ParseInt(v, 10, 64)
+			if err != nil {
+				return nil, errors.Wrapf(err, "failed to load Ingress group order for ingress: %v", util.NamespacedName(member))
+			}
+			order = i
 		}
 		if exists {
 			if order < minGroupOrder || order > maxGroupOder {
@@ -202,4 +278,19 @@ func (m *defaultGroupLoader) sortGroupMembers(members []*networking.Ingress) ([]
 		sortedMembers = append(sortedMembers, item.member)
 	}
 	return sortedMembers, nil
+}
+
+func (m *defaultGroupLoader) IngressClass(ing *networking.Ingress) string {
+	alb := ing.Spec.IngressClassName
+	if alb == nil {
+		albStr := ing.GetAnnotations()[store.IngressKey]
+		alb = &albStr
+	}
+	ic := &networking.IngressClass{}
+	err := m.kubeClientCache.Get(context.TODO(), types.NamespacedName{Name: *alb}, ic)
+	if err != nil {
+		klog.Errorf("Get IngressClass %s:%s, error: %s", "class", alb, err.Error())
+		return ""
+	}
+	return ic.Spec.Parameters.Name
 }

@@ -36,8 +36,19 @@ type AlbConfig struct {
 
 // LoadBalancerStatus represents the status of a load-balancer.
 type LoadBalancerStatus struct {
-	DNSName string `json:"dnsname,omitempty" protobuf:"bytes,1,opt,name=dnsname"`
-	Id      string `json:"id,omitempty" protobuf:"bytes,2,opt,name=id"`
+	DNSName   string           `json:"dnsname,omitempty" protobuf:"bytes,1,opt,name=dnsname"`
+	Id        string           `json:"id,omitempty" protobuf:"bytes,2,opt,name=id"`
+	Listeners []ListenerStatus `json:"listeners,omitempty" protobuf:"bytes,3,opt,name=listeners"`
+}
+
+type ListenerStatus struct {
+	PortAndProtocol string               `json:"portAndProtocol,omitempty" protobuf:"bytes,1,opt,name=portAndProtocol"`
+	Certificates    []AppliedCertificate `json:"certificates,omitempty" protobuf:"bytes,2,opt,name=certificates"`
+}
+
+type AppliedCertificate struct {
+	CertificateId string `json:"certificateId,omitempty" protobuf:"bytes,1,opt,name=certificateId"`
+	IsDefault     bool   `json:"isDefault,omitempty" protobuf:"bytes,2,opt,name=isDefault"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -70,17 +81,24 @@ type IngressStatus struct {
 // LoadBalancer is a nested struct in alb response
 type LoadBalancerSpec struct {
 	Id                           string                       `json:"id" protobuf:"bytes,1,opt,name=id"`
-	Name                         string                       `json:"name" protobuf:"bytes,1,opt,name=name"`
-	AddressAllocatedMode         string                       `json:"addressAllocatedMode" protobuf:"bytes,2,opt,name=addressAllocatedMode"`
-	AddressType                  string                       `json:"addressType" protobuf:"bytes,3,opt,name=addressType"`
-	ResourceGroupId              string                       `json:"resourceGroupId" protobuf:"bytes,4,opt,name=resourceGroupId"`
-	Edition                      string                       `json:"edition" protobuf:"bytes,5,opt,name=edition"`
-	ZoneMappings                 []ZoneMapping                `json:"zoneMappings" protobuf:"bytes,6,rep,name=zoneMappings"`
-	AccessLogConfig              AccessLogConfig              `json:"accessLogConfig" protobuf:"bytes,7,opt,name=accessLogConfig"`
-	DeletionProtectionEnabled    *bool                        `json:"deletionProtectionEnabled" protobuf:"bytes,8,opt,name=deletionProtectionEnabled"`
-	BillingConfig                BillingConfig                `json:"billingConfig" protobuf:"bytes,9,opt,name=billingConfig"`
-	ForceOverride                *bool                        `json:"forceOverride" protobuf:"bytes,8,opt,name=forceOverride"`
-	ModificationProtectionConfig ModificationProtectionConfig `json:"modificationProtectionConfig" protobuf:"bytes,10,opt,name=modificationProtectionConfig"`
+	Name                         string                       `json:"name" protobuf:"bytes,2,opt,name=name"`
+	AddressAllocatedMode         string                       `json:"addressAllocatedMode" protobuf:"bytes,3,opt,name=addressAllocatedMode"`
+	AddressType                  string                       `json:"addressType" protobuf:"bytes,4,opt,name=addressType"`
+	ResourceGroupId              string                       `json:"resourceGroupId" protobuf:"bytes,5,opt,name=resourceGroupId"`
+	Edition                      string                       `json:"edition" protobuf:"bytes,6,opt,name=edition"`
+	ZoneMappings                 []ZoneMapping                `json:"zoneMappings" protobuf:"bytes,7,rep,name=zoneMappings"`
+	AccessLogConfig              AccessLogConfig              `json:"accessLogConfig" protobuf:"bytes,8,opt,name=accessLogConfig"`
+	DeletionProtectionEnabled    *bool                        `json:"deletionProtectionEnabled" protobuf:"bytes,9,opt,name=deletionProtectionEnabled"`
+	BillingConfig                BillingConfig                `json:"billingConfig" protobuf:"bytes,10,opt,name=billingConfig"`
+	ForceOverride                *bool                        `json:"forceOverride" protobuf:"bytes,11,opt,name=forceOverride"`
+	ModificationProtectionConfig ModificationProtectionConfig `json:"modificationProtectionConfig" protobuf:"bytes,12,opt,name=modificationProtectionConfig"`
+	Tags                         []Tag                        `json:"tags" protobuf:"bytes,13,opt,name=tags"`
+	ListenerForceOverride        *bool                        `json:"listenerForceOverride" protobuf:"bytes,14,opt,name=listenerForceOverride"`
+}
+
+type Tag struct {
+	Key   string `json:"key" protobuf:"bytes,1,opt,name=key"`
+	Value string `json:"value" protobuf:"bytes,2,opt,name=value"`
 }
 
 // ZoneMapping is a nested struct in alb response
@@ -161,6 +179,7 @@ type ListenerSpec struct {
 	CaEnabled           bool                `json:"caEnabled" protobuf:"bytes,14,opt,name=caEnabled"`
 	LogConfig           LogConfig           `json:"logConfig" protobuf:"bytes,15,opt,name=logConfig"`
 	RequestTimeout      int                 `json:"requestTimeout" protobuf:"bytes,16,opt,name=requestTimeout"`
+	AclConfig           AclConfig           `json:"aclConfig" protobuf:"bytes,17,opt,name=aclConfig"`
 }
 type Action struct {
 	Type string `json:"actionType" protobuf:"bytes,1,opt,name=actionType"`
@@ -205,4 +224,10 @@ type RedirectActionConfig struct {
 	Query string `json:"query,omitempty" protobuf:"bytes,5,opt,name=query"`
 
 	StatusCode string `json:"statusCode" protobuf:"bytes,6,opt,name=statusCode"`
+}
+
+type AclConfig struct {
+	AclName    string   `json:"aclName" protobuf:"bytes,1,opt,name=aclName"`
+	AclType    string   `json:"aclType" protobuf:"bytes,2,opt,name=aclType"`
+	AclEntries []string `json:"aclEntries" protobuf:"bytes,3,opt,name=aclEntries"`
 }

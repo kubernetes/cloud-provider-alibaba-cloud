@@ -4,9 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"runtime/debug"
 	"strings"
 	"sync"
 	"time"
+
+	"sigs.k8s.io/controller-runtime/pkg/cache"
 
 	"k8s.io/client-go/kubernetes"
 
@@ -19,6 +22,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	networking "k8s.io/api/networking/v1"
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
+	apiext "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -36,11 +40,9 @@ import (
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/util"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
-	"sigs.k8s.io/controller-runtime/pkg/source"
 )
 
 const (
@@ -61,15 +63,20 @@ func NewAlbConfigReconciler(mgr manager.Manager, ctx *shared.SharedContext) (*al
 	if err != nil {
 		return nil, err
 	}
+	extc, err := apiext.NewForConfig(mgr.GetConfig())
+	if err != nil {
+		logger.Error(err, "error create incluster client")
+	}
 	n := &albconfigReconciler{
 		cloud:            ctx.Provider(),
 		k8sClient:        mgr.GetClient(),
-		groupLoader:      albconfigmanager.NewDefaultGroupLoader(mgr.GetClient(), annotations.NewSuffixAnnotationParser(annotations.DefaultAnnotationsPrefix)),
+		groupLoader:      albconfigmanager.NewDefaultGroupLoader(mgr.GetClient(), mgr.GetCache(), extc, annotations.NewSuffixAnnotationParser(annotations.DefaultAnnotationsPrefix)),
 		referenceIndexer: helper.NewDefaultReferenceIndexer(),
 		eventRecorder:    mgr.GetEventRecorderFor("ingress"),
 		stackMarshaller:  NewDefaultStackMarshaller(),
 		logger:           logger,
 		updateCh:         channels.NewRingChannel(1024),
+		updateServerCh:   channels.NewRingChannel(1024),
 		albconfigBuilder: albconfigmanager.NewDefaultAlbConfigManagerBuilder(mgr.GetClient(), ctx.Provider(), logger),
 
 		serverApplier: applier.NewServiceManagerApplier(
@@ -87,6 +94,7 @@ func NewAlbConfigReconciler(mgr manager.Manager, ctx *shared.SharedContext) (*al
 		config.ResyncPeriod,
 		client,
 		n.updateCh,
+		n.updateServerCh,
 		config.DisableCatchAll)
 	n.serverBuilder = servicemanager.NewDefaultServiceStackBuilder(backend.NewBackendManager(n.store, mgr.GetClient(), ctx.Provider(), logger))
 	n.albconfigApplier = applier.NewAlbConfigManagerApplier(n.store, mgr.GetClient(), ctx.Provider(), util.IngressTagKeyPrefix, logger)
@@ -109,6 +117,7 @@ type Configuration struct {
 type albconfigReconciler struct {
 	cloud            prvd.Provider
 	k8sClient        client.Client
+	kubeClientCache  cache.Cache
 	groupLoader      albconfigmanager.GroupLoader
 	referenceIndexer helper.ReferenceIndexer
 	eventRecorder    record.EventRecorder
@@ -122,6 +131,7 @@ type albconfigReconciler struct {
 	isShuttingDown   bool
 	stopCh           chan struct{}
 	updateCh         *channels.RingChannel
+	updateServerCh   *channels.RingChannel
 	acEventChan      chan event.GenericEvent
 	// ngxErrCh is used to detect errors with the NGINX processes
 	ngxErrCh                chan error
@@ -131,36 +141,6 @@ type albconfigReconciler struct {
 	syncQueue               *helper.Queue
 	syncServersQueue        *helper.Queue
 	maxConcurrentReconciles int
-}
-
-func (g *albconfigReconciler) setupWatches(_ context.Context, c controller.Controller) error {
-	g.acEventChan = make(chan event.GenericEvent)
-	acEventHandler := NewEnqueueRequestsForAlbconfigEvent(g.k8sClient, g.eventRecorder, g.logger)
-	if err := c.Watch(&source.Channel{Source: g.acEventChan}, acEventHandler); err != nil {
-		return err
-	}
-
-	if err := c.Watch(&source.Kind{Type: &v1.AlbConfig{}}, acEventHandler); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (g *albconfigReconciler) SetupWithManager(ctx context.Context, mgr manager.Manager) error {
-	c, err := controller.New(albIngressControllerName, mgr, controller.Options{
-		MaxConcurrentReconciles: g.maxConcurrentReconciles,
-		Reconciler:              g,
-	})
-	if err != nil {
-		return err
-	}
-
-	if err := g.setupWatches(ctx, c); err != nil {
-		return err
-	}
-
-	return nil
 }
 
 func (g *albconfigReconciler) syncIngress(obj interface{}) error {
@@ -175,65 +155,97 @@ func (g *albconfigReconciler) syncIngress(obj interface{}) error {
 		g.logger.Info("ingress length: 0, skip")
 		return nil
 	}
-	if evt.Type == helper.EndPointEvent || evt.Type == helper.NodeEvent || evt.Type == helper.ServiceEvent {
-		g.syncServersQueue.EnqueueSkippableTask(evt)
-		return nil
+	ing := evt.Obj.(*networking.Ingress)
+	g.logger.Info("start ingress: %s", ing.Name)
+	var (
+		groupIDNew *albconfigmanager.GroupID
+	)
+	groupIDNew, err := g.groupLoader.LoadGroupID(ctx, ing)
+	if err != nil {
+		g.logger.Error(err, "LoadGroupID failed", "ingress", ing)
+		return err
 	}
-	for _, ing := range ings {
-		g.logger.Info("start ingress: %s", ing.Name)
-		var (
-			groupIDNew *albconfigmanager.GroupID
-		)
-		groupIDNew, _ = g.groupLoader.LoadGroupID(ctx, &ing.Ingress)
-		var groupInChan = func(groupID *albconfigmanager.GroupID) {
-			albconfig := &v1.AlbConfig{}
-			if err := g.k8sClient.Get(ctx, types.NamespacedName{
-				Namespace: groupID.Namespace,
-				Name:      groupID.Name,
-			}, albconfig); err != nil {
-				if errors.IsNotFound(err) {
-					err = g.k8sClient.Create(ctx, g.makeAlbConfig(ctx, groupID.Name, &ing.Ingress), &client.CreateOptions{})
-					if err != nil {
-						g.logger.Error(err, "Create albconfig failed", "albconfig", ing)
-						return
-					}
-					return
-				}
-				g.logger.Error(err, "get albconfig failed", "albconfig", ing)
-				return
+	var groupInChan = func(groupID *albconfigmanager.GroupID) {
+		albconfig := &v1.AlbConfig{}
+		if err := g.k8sClient.Get(ctx, types.NamespacedName{
+			Namespace: groupID.Namespace,
+			Name:      groupID.Name,
+		}, albconfig); err != nil {
+			g.logger.Error(err, "get albconfig failed", "albconfig", ing)
+			return
+		}
+
+		alb := ing.Spec.IngressClassName
+		if alb == nil {
+			albStr := ing.GetAnnotations()[store.IngressKey]
+			alb = &albStr
+		}
+		ic := &networking.IngressClass{}
+		err := g.k8sClient.Get(context.TODO(), types.NamespacedName{Name: *alb}, ic)
+		if err != nil {
+			if errors.IsNotFound(err) {
+				g.logger.Error(err, "Searching IngressClass", "class", alb)
+				g.MakeIngressClass(albconfig)
 			}
-			lss := make([]*v1.ListenerSpec, 0)
-			ingListByPort := make(map[int32]albconfigmanager.Protocol)
-			ingGroup, _ := g.groupLoader.Load(ctx, *groupID, ings)
-			if ingGroup.Members != nil && len(ingGroup.Members) > 0 {
-				for _, ingm := range ingGroup.Members {
-					portAndProtocol, _ := albconfigmanager.ComputeIngressListenPorts(ingm)
-					for port, pro := range portAndProtocol {
-						ingListByPort[port] = pro
-					}
+		}
+		ingGroup, err := g.groupLoader.Load(ctx, *groupID, ings)
+		if err != nil {
+			g.logger.Error(err, "groupLoader", "class")
+			return
+		}
+		ingListByPort := make(map[int32]albconfigmanager.Protocol, 0)
+		if ingGroup.Members != nil && len(ingGroup.Members) > 0 {
+			for _, ingm := range ingGroup.Members {
+				portAndProtocol, _ := albconfigmanager.ComputeIngressListenPorts(ingm)
+				for port, pro := range portAndProtocol {
+					ingListByPort[port] = pro
 				}
 			}
-			for k, v := range ingListByPort {
-				ls := &v1.ListenerSpec{
+		}
+		portProtocolListenerMap := make(map[string]*v1.ListenerSpec, 0)
+		existListeners := make([]*v1.ListenerSpec, 0)
+		conflictListeners := make(map[string]string, 0)
+		if albconfig.Spec.Listeners != nil && len(albconfig.Spec.Listeners) > 0 {
+			existListeners = albconfig.Spec.Listeners
+			for _, ls := range albconfig.Spec.Listeners {
+				if _, ok := ingListByPort[ls.Port.IntVal]; ok && ls.Protocol != string(ingListByPort[ls.Port.IntVal]) {
+					conflictListeners[ls.Port.String()] = ls.Protocol
+				}
+				portAndProtocol := fmt.Sprintf("%v/%v", ls.Port.String(), ls.Protocol)
+				portProtocolListenerMap[portAndProtocol] = ls
+			}
+		}
+		if len(conflictListeners) > 0 {
+			confStr, _ := json.Marshal(conflictListeners)
+			g.logger.Error(fmt.Errorf("conflict listener in albconfig, please remove it manual"), string(confStr))
+			return
+		}
+
+		lss := make([]*v1.ListenerSpec, 0)
+		// merge all listeners
+		lss = append(lss, existListeners...)
+		for k, v := range ingListByPort {
+			portProtocol := fmt.Sprintf("%d/%s", k, v)
+			if _, ok := portProtocolListenerMap[portProtocol]; !ok {
+				lss = append(lss, &v1.ListenerSpec{
 					Port:     intstr.FromInt(int(k)),
 					Protocol: string(v),
-				}
-				lss = append(lss, ls)
-			}
-			albconfig.Spec.Listeners = lss
-			err := g.k8sClient.Update(ctx, albconfig, &client.UpdateOptions{})
-			if err != nil {
-				g.logger.Error(err, "Update albconfig")
-				return
-			}
-			g.acEventChan <- event.GenericEvent{
-				Object: albconfig,
+				})
 			}
 		}
 
-		groupInChan(groupIDNew)
-
+		albconfig.Spec.Listeners = lss
+		err = g.k8sClient.Update(ctx, albconfig, &client.UpdateOptions{})
+		if err != nil {
+			g.logger.Error(err, "Update albconfig")
+			return
+		}
+		g.acEventChan <- event.GenericEvent{
+			Object: albconfig,
+		}
 	}
+
+	groupInChan(groupIDNew)
 
 	return nil
 }
@@ -267,9 +279,12 @@ func (g *albconfigReconciler) syncServers(obj interface{}) error {
 	request.Namespace = svc.Namespace
 	request.Name = svc.Name
 
-	servicePortToIngressNames := g.getServicePortToIngressNames(request, ings)
+	servicePortToIngressNames, ingressAlbConfigMap, err := g.getServicePortToIngressNames(ctx, request, ings)
+	if err != nil {
+		return err
+	}
 	if len(servicePortToIngressNames) > 0 {
-		svcStackContext, err := g.buildServiceStackContext(ctx, request, servicePortToIngressNames)
+		svcStackContext, err := g.buildServiceStackContext(ctx, request, servicePortToIngressNames, ingressAlbConfigMap)
 		if err != nil {
 			return err
 		}
@@ -282,19 +297,27 @@ func (g *albconfigReconciler) syncServers(obj interface{}) error {
 	return nil
 }
 
-func (g *albconfigReconciler) getServicePortToIngressNames(request reconcile.Request, ingList []*store.Ingress) map[int32][]string {
+func (g *albconfigReconciler) getServicePortToIngressNames(ctx context.Context, request reconcile.Request, ingList []*store.Ingress) (map[int32][]string, map[string]string, error) {
 
 	var servicePortToIngressNames = make(map[int32]map[string]struct{})
 
 	var processIngressBackend = func(b networking.IngressBackend, ingName string) {
 		servicePort := b.Service.Port.Number
 		if _, ok := servicePortToIngressNames[servicePort]; !ok {
-			servicePortToIngressNames[servicePort] = make(map[string]struct{})
+			servicePortToIngressNames[servicePort] = make(map[string]struct{}, 0)
 		}
 		servicePortToIngressNames[servicePort][ingName] = struct{}{}
 	}
 
+	var ingressAlbConfigMap = make(map[string]string, 0)
+
 	for _, ing := range ingList {
+		ingGroup, err := g.groupLoader.LoadGroupID(ctx, &ing.Ingress)
+		if err != nil {
+			return map[int32][]string{}, ingressAlbConfigMap, err
+		}
+		ingressAlbConfigMap[ing.Namespace+"/"+ing.Name] = ingGroup.String()
+
 		if ing.Spec.DefaultBackend != nil {
 			if ing.Spec.DefaultBackend.Service.Name == request.Name {
 				processIngressBackend(*ing.Spec.DefaultBackend, ing.Name)
@@ -306,6 +329,32 @@ func (g *albconfigReconciler) getServicePortToIngressNames(request reconcile.Req
 				continue
 			}
 			for _, path := range rule.HTTP.Paths {
+				if _, ok := ing.Labels[util.KnativeIngress]; ok {
+					actionStr := ing.Annotations[fmt.Sprintf(annotations.INGRESS_ALB_ACTIONS_ANNOTATIONS, path.Backend.Service.Name)]
+					if actionStr != "" {
+						var action albmodel.Action
+						err := json.Unmarshal([]byte(actionStr), &action)
+						if err != nil {
+							g.logger.Error(err, fmt.Sprintf("buildListenerRulesCommon: %s", actionStr))
+							continue
+						}
+						for _, sg := range action.ForwardConfig.ServerGroups {
+							if sg.ServiceName == request.Name {
+								g.logger.Info("processIngressBackend", "ServiceName", path.Backend.Service.Name, request.Name)
+								b := networking.IngressBackend{
+									Service: &networking.IngressServiceBackend{
+										Name: sg.ServiceName,
+										Port: networking.ServiceBackendPort{
+											Number: intstr.FromInt(sg.ServicePort).IntVal,
+										},
+									},
+								}
+								processIngressBackend(b, ing.Name)
+							}
+						}
+						continue
+					}
+				}
 				if path.Backend.Service.Name == request.Name {
 					g.logger.Info("processIngressBackend", "ServiceName", path.Backend.Service.Name, request.Name)
 					processIngressBackend(path.Backend, ing.Name)
@@ -321,15 +370,16 @@ func (g *albconfigReconciler) getServicePortToIngressNames(request reconcile.Req
 		}
 	}
 
-	return servicePortToIngressNameList
+	return servicePortToIngressNameList, ingressAlbConfigMap, nil
 }
 
-func (g *albconfigReconciler) buildServiceStackContext(ctx context.Context, request reconcile.Request, serverPortToIngressNames map[int32][]string) (*albmodel.ServiceStackContext, error) {
+func (g *albconfigReconciler) buildServiceStackContext(ctx context.Context, request reconcile.Request, serverPortToIngressNames map[int32][]string, ingressAlbConfigMap map[string]string) (*albmodel.ServiceStackContext, error) {
 	var svcStackContext = &albmodel.ServiceStackContext{
 		ClusterID:                 g.cloud.ClusterID(),
 		ServiceNamespace:          request.Namespace,
 		ServiceName:               request.Name,
 		ServicePortToIngressNames: serverPortToIngressNames,
+		IngressAlbConfigMap:       ingressAlbConfigMap,
 	}
 
 	svc := &corev1.Service{}
@@ -392,13 +442,12 @@ func (s *albconfigReconciler) buildAndApplyServers(ctx context.Context, svcStack
 
 func (g *albconfigReconciler) makeAlbConfig(ctx context.Context, groupName string, ing *networking.Ingress) *v1.AlbConfig {
 	id, _ := annotations.GetStringAnnotation(annotations.LoadBalancerId, ing)
-	overrideListener := false
+	albForceOverride := false
 	if override, err := annotations.GetStringAnnotation(annotations.OverrideListener, ing); err == nil {
 		if override == "true" {
-			overrideListener = true
+			albForceOverride = true
 		}
 	}
-
 	name, _ := annotations.GetStringAnnotation(annotations.LoadBalancerName, ing)
 	addressType, err := annotations.GetStringAnnotation(annotations.AddressType, ing)
 	if err != nil {
@@ -430,7 +479,7 @@ func (g *albconfigReconciler) makeAlbConfig(ctx context.Context, groupName strin
 	deletionProtectionEnabled := true
 	albconfig.Spec.LoadBalancer = &v1.LoadBalancerSpec{
 		Id:                        id,
-		ForceOverride:             &overrideListener,
+		ForceOverride:             &albForceOverride,
 		Name:                      name,
 		AddressAllocatedMode:      addressAllocatedMode,
 		AddressType:               addressType,
@@ -466,7 +515,9 @@ func (g *albconfigReconciler) makeAlbConfig(ctx context.Context, groupName strin
 	return albconfig
 }
 
-func (g *albconfigReconciler) Reconcile(ctx context.Context, req reconcile.Request) (reconcile.Result, error) {
+func (g *albconfigReconciler) Reconcile(_ context.Context, req reconcile.Request) (reconcile.Result, error) {
+	// new context for each request
+	ctx := context.Background()
 	traceID := sdkutils.GetUUID()
 	ctx = context.WithValue(ctx, util.TraceID, traceID)
 
@@ -477,6 +528,15 @@ func (g *albconfigReconciler) Reconcile(ctx context.Context, req reconcile.Reque
 		"traceID", traceID,
 		"startTime", startTime)
 	defer func() {
+		if rec := recover(); rec != nil {
+			perr := fmt.Errorf("panic recover: %v", rec)
+			g.logger.Error(perr, "finish reconcile",
+				"request", req.String(),
+				"traceID", traceID,
+				"elapsedTime", time.Since(startTime).Milliseconds(),
+				"panicStack", string(debug.Stack()))
+			return
+		}
 		if err != nil {
 			g.logger.Error(err, "finish reconcile",
 				"request", req.String(),
@@ -500,47 +560,64 @@ func (g *albconfigReconciler) reconcile(ctx context.Context, request reconcile.R
 		return client.IgnoreNotFound(err)
 	}
 	ings := g.store.ListIngresses()
+	if request.NamespacedName.Namespace == "" {
+		request.NamespacedName.Namespace = albconfigmanager.ALBConfigNamespace
+	}
 	ingGroup, err := g.groupLoader.Load(ctx, albconfigmanager.GroupID(request.NamespacedName), ings)
 	if err != nil {
 		return err
 	}
 
+	if albconfig.Spec.LoadBalancer == nil {
+		return fmt.Errorf("does not exist albconfig.spec.config")
+	}
+
+	// reuse loadBalancer
+	if len(albconfig.Spec.LoadBalancer.Id) != 0 {
+		ctx = context.WithValue(ctx, util.IsReuseLb, true)
+	}
 	if !albconfig.DeletionTimestamp.IsZero() {
 		if err := g.cleanupAlbLoadBalancerResources(ctx, albconfig, ingGroup); err != nil {
 			return err
 		}
 	} else {
 		if err := g.reconcileAlbLoadBalancerResources(ctx, albconfig, ingGroup); err != nil {
+			if len(ingGroup.InactiveMembers) != 0 {
+				if err := g.groupFinalizerManager.RemoveGroupFinalizer(ctx, ingGroup.InactiveMembers); err != nil {
+					g.recordIngressGroupEvent(ctx, albconfig, ingGroup, corev1.EventTypeWarning, helper.IngressEventReasonFailedRemoveFinalizer, helper.GetLogMessage(err))
+					return err
+				}
+			}
 			return err
 		}
 	}
 
 	if len(ingGroup.InactiveMembers) != 0 {
 		if err := g.groupFinalizerManager.RemoveGroupFinalizer(ctx, ingGroup.InactiveMembers); err != nil {
-			g.recordIngressGroupEvent(ctx, ingGroup, corev1.EventTypeWarning, helper.IngressEventReasonFailedRemoveFinalizer, helper.GetLogMessage(err))
+			g.recordIngressGroupEvent(ctx, albconfig, ingGroup, corev1.EventTypeWarning, helper.IngressEventReasonFailedRemoveFinalizer, helper.GetLogMessage(err))
 			return err
 		}
 	}
 
-	g.recordIngressGroupEvent(ctx, ingGroup, corev1.EventTypeNormal, helper.IngressEventReasonSuccessfullyReconciled, "Successfully reconciled")
+	g.recordIngressGroupEvent(ctx, albconfig, ingGroup, corev1.EventTypeNormal, helper.IngressEventReasonSuccessfullyReconciled, "Successfully reconciled")
 
 	return nil
 }
 
 func (g *albconfigReconciler) cleanupAlbLoadBalancerResources(ctx context.Context, albconfig *v1.AlbConfig, ingGroup *albconfigmanager.Group) error {
-	acFinalizer := albconfigmanager.GetIngressFinalizer()
-	if helper.HasFinalizer(albconfig, acFinalizer) {
+	gwFinalizer := albconfigmanager.GetIngressFinalizer()
+	if helper.HasFinalizer(albconfig, gwFinalizer) {
 		_, _, err := g.buildAndApply(ctx, albconfig, ingGroup)
 		if err != nil {
 			return err
 		}
-		if err := g.k8sFinalizerManager.RemoveFinalizers(ctx, albconfig, acFinalizer); err != nil {
+		if err := g.k8sFinalizerManager.RemoveFinalizers(ctx, albconfig, gwFinalizer); err != nil {
 			g.eventRecorder.Event(albconfig, corev1.EventTypeWarning, helper.IngressEventReasonFailedRemoveFinalizer, fmt.Sprintf("Failed remove finalizer due to %v", err))
 			return err
 		}
 		if len(ingGroup.Members) != 0 {
 			if err := g.groupFinalizerManager.RemoveGroupFinalizer(ctx, ingGroup.Members); err != nil {
-				g.recordIngressGroupEvent(ctx, ingGroup, corev1.EventTypeWarning, helper.IngressEventReasonFailedRemoveFinalizer, fmt.Sprintf("Failed remove finalizer due to %v", err))
+				g.recordIngressGroupEvent(ctx, albconfig, ingGroup, corev1.EventTypeWarning, helper.IngressEventReasonFailedRemoveFinalizer, fmt.Sprintf("Failed remove finalizer due to %v", err))
 				return err
 			}
 		}
@@ -549,20 +626,19 @@ func (g *albconfigReconciler) cleanupAlbLoadBalancerResources(ctx context.Contex
 }
 
 func (g *albconfigReconciler) reconcileAlbLoadBalancerResources(ctx context.Context, albconfig *v1.AlbConfig, ingGroup *albconfigmanager.Group) error {
-	acFinalizer := albconfigmanager.GetIngressFinalizer()
-	if err := g.k8sFinalizerManager.AddFinalizers(ctx, albconfig, acFinalizer); err != nil {
+	gwFinalizer := albconfigmanager.GetIngressFinalizer()
+	if err := g.k8sFinalizerManager.AddFinalizers(ctx, albconfig, gwFinalizer); err != nil {
 		g.eventRecorder.Event(albconfig, corev1.EventTypeWarning, helper.IngressEventReasonFailedRemoveFinalizer, helper.GetLogMessage(err))
 		return err
 	}
-	if err := g.groupFinalizerManager.AddGroupFinalizer(ctx, ingGroup.Members); err != nil {
-		g.recordIngressGroupEvent(ctx, ingGroup, corev1.EventTypeWarning, helper.IngressEventReasonFailedAddFinalizer, fmt.Sprintf("Failed add finalizer due to %v", err))
-		return err
-	}
-
-	_, lb, err := g.buildAndApply(ctx, albconfig, ingGroup)
+	stack, lb, err := g.buildAndApply(ctx, albconfig, ingGroup)
 	if err != nil {
 		return err
 	}
+	//if err := g.groupFinalizerManager.AddGroupFinalizer(ctx, ingGroup.Members); err != nil {
+	//	g.recordIngressGroupEvent(ctx, albconfig, ingGroup, corev1.EventTypeWarning, helper.IngressEventReasonFailedAddFinalizer, fmt.Sprintf("Failed add finalizer due to %v", err))
+	//	return err
+	//}
 	if lb.Status == nil || lb.Status.DNSName == "" {
 		return nil
 	}
@@ -580,12 +656,63 @@ func (g *albconfigReconciler) reconcileAlbLoadBalancerResources(ctx context.Cont
 			continue
 		}
 	}
-	if albconfig.Status.LoadBalancer.DNSName == lb.Status.DNSName {
-		return nil
+	// TODO: remove sync cloud acl config when deploy completed
+	needAcl := make(map[string]*v1.ListenerSpec, 0)
+	for i, ls := range albconfig.Spec.Listeners {
+		if len(ls.AclConfig.AclType) == 0 {
+			needAcl[ls.Port.String()] = albconfig.Spec.Listeners[i]
+		}
 	}
-	albconfig.Status.LoadBalancer.Id = lb.Status.LoadBalancerID
-	albconfig.Status.LoadBalancer.DNSName = lb.Status.DNSName
+	var resAcls []*albmodel.Acl
+	_ = stack.ListResources(&resAcls)
+	needUpdateAlbConfig := false
+	for _, acl := range resAcls {
+		if ls, ok := needAcl[acl.ID()]; ok {
+			aclEntries := make([]string, 0)
+			for _, entry := range acl.Spec.AclEntries {
+				aclEntries = append(aclEntries, entry.Entry)
+			}
+			ls.AclConfig.AclName = acl.Spec.AclName
+			ls.AclConfig.AclType = acl.Spec.AclType
+			ls.AclConfig.AclEntries = aclEntries
+			needUpdateAlbConfig = true
+		}
+	}
+	if needUpdateAlbConfig {
+		err = g.k8sClient.Update(ctx, albconfig, &client.UpdateOptions{})
+		if err != nil {
+			g.logger.Error(err, "LB Update %s failed, because acl need write back", albconfig.Name)
+			return err
+		}
+	}
 
+	// Update AlbConfig status
+	var resLSs []*albmodel.Listener
+	_ = stack.ListResources(&resLSs)
+	listenerStatus := make([]v1.ListenerStatus, 0)
+	for _, ls := range resLSs {
+		if util.ListenerProtocolHTTPS == ls.Spec.ListenerProtocol {
+			statusCerts := make([]v1.AppliedCertificate, 0)
+			for _, cert := range ls.Spec.Certificates {
+				certId, _ := cert.GetCertificateId(ctx)
+				isDefault := cert.GetIsDefault()
+				statusCerts = append(statusCerts, v1.AppliedCertificate{
+					CertificateId: certId,
+					IsDefault:     isDefault,
+				})
+			}
+			listenerStatus = append(listenerStatus, v1.ListenerStatus{
+				PortAndProtocol: fmt.Sprintf("%d/%s", ls.Spec.ListenerPort, ls.Spec.ListenerProtocol),
+				Certificates:    statusCerts,
+			})
+		}
+	}
+	status := v1.LoadBalancerStatus{
+		Id:        lb.Status.LoadBalancerID,
+		DNSName:   lb.Status.DNSName,
+		Listeners: listenerStatus,
+	}
+	albconfig.Status.LoadBalancer = status
 	err = g.k8sClient.Status().Update(ctx, albconfig, &client.UpdateOptions{})
 	if err != nil {
 		g.logger.Error(err, "LB Status Update %s, error: %s", albconfig.Name)
@@ -603,15 +730,19 @@ func (g *albconfigReconciler) buildAndApply(ctx context.Context, albconfig *v1.A
 		"traceID", traceID,
 		"startTime", buildStartTime)
 
-	stack, lb, err := g.albconfigBuilder.Build(ctx, albconfig, ingGroup)
+	stack, lb, errResWithIngress, err := g.albconfigBuilder.Build(ctx, albconfig, ingGroup)
 	if err != nil {
-		g.recordIngressGroupEvent(ctx, ingGroup, corev1.EventTypeWarning, helper.IngressEventReasonFailedBuildModel, helper.GetLogMessage(err))
+		for errIngress, err := range errResWithIngress {
+			g.recordIngressSingleEvent(ctx, albconfig, errIngress, corev1.EventTypeWarning, helper.IngressEventReasonFailedBuildModel, helper.GetLogMessage(err))
+		}
 		return nil, nil, err
 	}
 
 	stackJSON, err := g.stackMarshaller.Marshal(stack)
 	if err != nil {
-		g.recordIngressGroupEvent(ctx, ingGroup, corev1.EventTypeWarning, helper.IngressEventReasonFailedBuildModel, helper.GetLogMessage(err))
+		for errIngress, err := range errResWithIngress {
+			g.recordIngressSingleEvent(ctx, albconfig, errIngress, corev1.EventTypeWarning, helper.IngressEventReasonFailedBuildModel, helper.GetLogMessage(err))
+		}
 		return nil, nil, err
 	}
 
@@ -623,7 +754,7 @@ func (g *albconfigReconciler) buildAndApply(ctx context.Context, albconfig *v1.A
 
 	applyStartTime := time.Now()
 	if err := g.albconfigApplier.Apply(ctx, stack); err != nil {
-		g.recordIngressGroupEvent(ctx, ingGroup, corev1.EventTypeWarning, helper.IngressEventReasonFailedApplyModel, helper.GetLogMessage(err))
+		g.recordIngressGroupEvent(ctx, albconfig, ingGroup, corev1.EventTypeWarning, helper.IngressEventReasonFailedApplyModel, helper.GetLogMessage(err))
 		return nil, nil, err
 	}
 	g.logger.Info("successfully applied albconfig stack",
@@ -634,10 +765,16 @@ func (g *albconfigReconciler) buildAndApply(ctx context.Context, albconfig *v1.A
 	return stack, lb, nil
 }
 
-func (g *albconfigReconciler) recordIngressGroupEvent(_ context.Context, ingGroup *albconfigmanager.Group, eventType string, reason string, message string) {
+func (g *albconfigReconciler) recordIngressGroupEvent(_ context.Context, albConfig *v1.AlbConfig, ingGroup *albconfigmanager.Group, eventType string, reason string, message string) {
+	g.eventRecorder.Event(albConfig, eventType, reason, message)
 	for _, member := range ingGroup.Members {
 		g.eventRecorder.Event(member, eventType, reason, message)
 	}
+}
+
+func (g *albconfigReconciler) recordIngressSingleEvent(_ context.Context, albConfig *v1.AlbConfig, ing *networking.Ingress, eventType string, reason string, message string) {
+	g.eventRecorder.Event(albConfig, eventType, reason, message)
+	g.eventRecorder.Event(ing, eventType, reason, message)
 }
 
 // Start starts a new ALB master process running in the foreground.
@@ -666,6 +803,18 @@ func (n *albconfigReconciler) Start() {
 			} else {
 				n.logger.Info("Unexpected event type received %T", event)
 			}
+		case event := <-n.updateServerCh.Out():
+			if n.isShuttingDown {
+				break
+			}
+
+			if evt, ok := event.(helper.Event); ok {
+				n.logger.Info("Event server received", "type", evt.Type, "object", evt.Obj)
+
+				n.syncServersQueue.EnqueueSkippableTask(evt)
+			} else {
+				n.logger.Info("Unexpected event type received %T", event)
+			}
 		case <-n.stopCh:
 			return
 		}
@@ -682,11 +831,32 @@ func (n *albconfigReconciler) Stop() error {
 	if n.syncQueue.IsShuttingDown() {
 		return fmt.Errorf("shutdown already in progress")
 	}
+	if n.syncServersQueue.IsShuttingDown() {
+		return fmt.Errorf("shutdown already in progress")
+	}
 	n.logger.Info("Shutting down controller queues")
 	close(n.stopCh)
 	go n.syncQueue.Shutdown()
-
+	go n.syncServersQueue.Shutdown()
 	return nil
+}
+
+func (m *albconfigReconciler) MakeIngressClass(albConfig *v1.AlbConfig) string {
+	ic := &networking.IngressClass{}
+	group := "alibabacloud.com"
+	ic.Name = "alb"
+	ic.Spec.Controller = store.ALBIngressController
+	ic.Spec.Parameters = &networking.IngressClassParametersReference{
+		Kind:     albConfig.Kind,
+		APIGroup: &group,
+		Name:     albConfig.Name,
+	}
+	err := m.k8sClient.Create(context.TODO(), ic)
+	if err != nil {
+		m.logger.Error(err, "Searching IngressClass ")
+		return ""
+	}
+	return ic.Spec.Parameters.Name
 }
 
 type StackMarshaller interface {

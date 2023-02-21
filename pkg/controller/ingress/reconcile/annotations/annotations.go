@@ -20,27 +20,34 @@ const (
 const (
 	// AnnotationLoadBalancerPrefix loadbalancer prefix
 	AnnotationLoadBalancerPrefix = "alb.ingress.kubernetes.io/"
-
+	// config the rule conditions
+	INGRESS_ALB_CONDITIONS_ANNOTATIONS = "alb.ingress.kubernetes.io/conditions.%s"
+	// config the rule actions
+	INGRESS_ALB_ACTIONS_ANNOTATIONS = "alb.ingress.kubernetes.io/actions.%s"
+	// config the rule direction
+	INGRESS_ALB_RULE_DIRECTION = "alb.ingress.kubernetes.io/rule-direction.%s"
 	// Load Balancer Attribute
-	AddressType          = AnnotationLoadBalancerPrefix + "address-type"             // AddressType loadbalancer address type
-	VswitchIds           = AnnotationLoadBalancerPrefix + "vswitch-ids"              // VswitchId loadbalancer vswitch id
-	ChargeType           = AnnotationLoadBalancerPrefix + "charge-type"              // ChargeType lb charge type
-	LoadBalancerId       = AnnotationLoadBalancerPrefix + "id"                       // LoadBalancerId lb id
-	OverrideListener     = AnnotationLoadBalancerPrefix + "force-override-listeners" // OverrideListener force override listeners
-	LoadBalancerName     = AnnotationLoadBalancerPrefix + "name"                     // LoadBalancerName slb name
-	AddressAllocatedMode = AnnotationLoadBalancerPrefix + "address-allocated-mode"
-	LoadBalancerEdition  = AnnotationLoadBalancerPrefix + "edition"
-	ListenPorts          = AnnotationLoadBalancerPrefix + "listen-ports"
-	AccessLog            = AnnotationLoadBalancerPrefix + "access-log"
-	HealthCheckEnabled   = AnnotationLoadBalancerPrefix + "healthcheck-enabled"          // HealthCheckFlag health check flag
-	HealthCheckPath      = AnnotationLoadBalancerPrefix + "healthcheck-path"             // HealthCheckType health check type
-	HealthCheckProtocol  = AnnotationLoadBalancerPrefix + "healthcheck-protocol"         // HealthCheckConnectPort health check connect port
-	HealthCheckMethod    = AnnotationLoadBalancerPrefix + "healthcheck-method"           // HealthyThreshold health check healthy thresh hold
-	HealthCheckInterval  = AnnotationLoadBalancerPrefix + "healthcheck-interval-seconds" // HealthCheckInterval health check interval
-	HealthCheckTimeout   = AnnotationLoadBalancerPrefix + "healthcheck-timeout-seconds"  // HealthCheckTimeout health check timeout
-	HealthThreshold      = AnnotationLoadBalancerPrefix + "healthy-threshold-count"      // HealthCheckDomain health check domain
-	UnHealthThreshold    = AnnotationLoadBalancerPrefix + "unhealthy-threshold-count"    // HealthCheckHTTPCode health check http code
-	HealthCheckHTTPCode  = AnnotationLoadBalancerPrefix + "healthcheck-httpcode"
+	AddressType            = AnnotationLoadBalancerPrefix + "address-type"             // AddressType loadbalancer address type
+	VswitchIds             = AnnotationLoadBalancerPrefix + "vswitch-ids"              // VswitchId loadbalancer vswitch id
+	ChargeType             = AnnotationLoadBalancerPrefix + "charge-type"              // ChargeType lb charge type
+	LoadBalancerId         = AnnotationLoadBalancerPrefix + "id"                       // LoadBalancerId lb id
+	OverrideListener       = AnnotationLoadBalancerPrefix + "force-override-listeners" // OverrideListener force override listeners
+	LoadBalancerName       = AnnotationLoadBalancerPrefix + "name"                     // LoadBalancerName slb name
+	AddressAllocatedMode   = AnnotationLoadBalancerPrefix + "address-allocated-mode"
+	LoadBalancerEdition    = AnnotationLoadBalancerPrefix + "edition"
+	ListenPorts            = AnnotationLoadBalancerPrefix + "listen-ports"
+	AccessLog              = AnnotationLoadBalancerPrefix + "access-log"
+	HealthCheckEnabled     = AnnotationLoadBalancerPrefix + "healthcheck-enabled"          // HealthCheckFlag health check flag
+	HealthCheckPath        = AnnotationLoadBalancerPrefix + "healthcheck-path"             // HealthCheckType health check type
+	HealthCheckProtocol    = AnnotationLoadBalancerPrefix + "healthcheck-protocol"         // HealthCheckConnectPort health check connect port
+	HealthCheckConnectPort = AnnotationLoadBalancerPrefix + "healthcheck-connect-port"     // HealthCheckConnectPort health check connect port
+	HealthCheckMethod      = AnnotationLoadBalancerPrefix + "healthcheck-method"           // HealthyThreshold health check healthy thresh hold
+	HealthCheckInterval    = AnnotationLoadBalancerPrefix + "healthcheck-interval-seconds" // HealthCheckInterval health check interval
+	HealthCheckTimeout     = AnnotationLoadBalancerPrefix + "healthcheck-timeout-seconds"  // HealthCheckTimeout health check timeout
+	HealthThreshold        = AnnotationLoadBalancerPrefix + "healthy-threshold-count"      // HealthCheckDomain health check domain
+	UnHealthThreshold      = AnnotationLoadBalancerPrefix + "unhealthy-threshold-count"    // HealthCheckHTTPCode health check http code
+	HealthCheckHTTPCode    = AnnotationLoadBalancerPrefix + "healthcheck-httpcode"
+	Order                  = AnnotationLoadBalancerPrefix + "order"
 	// VServerBackend Attribute
 	BackendLabel      = AnnotationLoadBalancerPrefix + "backend-label"              // BackendLabel backend labels
 	BackendType       = "service.beta.kubernetes.io/backend-type"                   // BackendType backend type
@@ -56,13 +63,29 @@ const (
 	NginxCanaryWeight        = AnnotationNginxPrefix + "canary-weight"
 	NginxSslRedirect         = AnnotationNginxPrefix + "ssl-redirect"
 
-	AnnotationAlbPrefix    = "alb.ingress.kubernetes.io/"
-	AlbCanary              = AnnotationAlbPrefix + "canary"
-	AlbCanaryByHeader      = AnnotationAlbPrefix + "canary-by-header"
-	AlbCanaryByHeaderValue = AnnotationAlbPrefix + "canary-by-header-value"
-	AlbCanaryByCookie      = AnnotationAlbPrefix + "canary-by-cookie"
-	AlbCanaryWeight        = AnnotationAlbPrefix + "canary-weight"
-	AlbSslRedirect         = AnnotationAlbPrefix + "ssl-redirect"
+	AnnotationAlbPrefix = "alb.ingress.kubernetes.io/"
+	SessionStick        = AnnotationLoadBalancerPrefix + "sticky-session"      // SessionStick sticky session
+	SessionStickType    = AnnotationLoadBalancerPrefix + "sticky-session-type" // SessionStickType session sticky type
+	CookieTimeout       = AnnotationLoadBalancerPrefix + "cookie-timeout"      // CookieTimeout cookie timeout
+	Cookie              = AnnotationLoadBalancerPrefix + "cookie"              // Cookie lb cookie
+
+	AlbCanary               = AnnotationAlbPrefix + "canary"
+	AlbCanaryByHeader       = AnnotationAlbPrefix + "canary-by-header"
+	AlbCanaryByHeaderValue  = AnnotationAlbPrefix + "canary-by-header-value"
+	AlbCanaryByCookie       = AnnotationAlbPrefix + "canary-by-cookie"
+	AlbCanaryWeight         = AnnotationAlbPrefix + "canary-weight"
+	AlbSslRedirect          = AnnotationAlbPrefix + "ssl-redirect"
+	AlbRewriteTarget        = AnnotationAlbPrefix + "rewrite-target"
+	AlbBackendProtocol      = AnnotationAlbPrefix + "backend-protocol"
+	AlbBackendScheduler     = AnnotationAlbPrefix + "backend-scheduler"
+	AlbTrafficLimitQps      = AnnotationAlbPrefix + "traffic-limit-qps"
+	AlbEnableCors           = AnnotationAlbPrefix + "enable-cors"
+	AlbCorsAllowOrigin      = AnnotationAlbPrefix + "cors-allow-origin"
+	AlbCorsAllowMethods     = AnnotationAlbPrefix + "cors-allow-methods"
+	AlbCorsAllowHeaders     = AnnotationAlbPrefix + "cors-allow-headers"
+	AlbCorsExposeHeaders    = AnnotationAlbPrefix + "cors-expose-headers"
+	AlbCorsAllowCredentials = AnnotationAlbPrefix + "cors-allow-credentials"
+	AlbCorsMaxAge           = AnnotationAlbPrefix + "cors-max-age"
 )
 
 type ParseOptions struct {

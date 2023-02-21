@@ -7,7 +7,7 @@ import (
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/base"
 	casprvd "k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/cas"
 
-	cassdk "github.com/aliyun/alibaba-cloud-sdk-go/services/cas"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/model"
 )
 
 func NewDryRunCAS(
@@ -23,10 +23,13 @@ type DryRunCAS struct {
 	cas  *casprvd.CASProvider
 }
 
-func (c DryRunCAS) DescribeSSLCertificateList(ctx context.Context, request *cassdk.DescribeSSLCertificateListRequest) (*cassdk.DescribeSSLCertificateListResponse, error) {
-	return c.auth.CAS.DescribeSSLCertificateList(request)
+func (c DryRunCAS) DeleteSSLCertificate(ctx context.Context, certId string) error {
+	return nil
+}
+func (c DryRunCAS) CreateSSLCertificateWithName(ctx context.Context, certName, certificate, privateKey string) (string, error) {
+	return "", nil
 }
 
-func (c DryRunCAS) DescribeSSLCertificatePublicKeyDetail(ctx context.Context, request *cassdk.DescribeSSLCertificatePublicKeyDetailRequest) (*cassdk.DescribeSSLCertificatePublicKeyDetailResponse, error) {
-	return c.auth.CAS.DescribeSSLCertificatePublicKeyDetail(request)
+func (c DryRunCAS) DescribeSSLCertificateList(ctx context.Context) ([]model.CertificateInfo, error) {
+	return nil, nil
 }

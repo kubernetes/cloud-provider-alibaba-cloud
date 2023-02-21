@@ -2,6 +2,7 @@ package applier
 
 import (
 	"context"
+	"fmt"
 	"strconv"
 	"sync"
 
@@ -80,7 +81,7 @@ func (m *defaultServiceManagerApplier) Apply(ctx context.Context, albProvider pr
 
 func NewServiceStackApplier(albProvider prvd.Provider, serviceStack *albmodel.ServiceManager, logger logr.Logger) *serviceStackApplier {
 	tagFilters := make(map[string]string)
-	tagFilters[util.ClusterTagKey] = serviceStack.ClusterID
+	tagFilters[util.ClusterNameTagKey] = serviceStack.ClusterID
 	tagFilters[util.ServiceNamespaceTagKey] = serviceStack.Namespace
 	tagFilters[util.ServiceNameTagKey] = serviceStack.Name
 
@@ -151,10 +152,12 @@ func transServiceStackToServerGroupsWithNameKey(serviceStack *albmodel.ServiceMa
 				ServiceName: serviceStack.Name,
 				ServicePort: int(port),
 			}
+			albconfig := serviceStack.IngressAlbConfigMap[serviceStack.Namespace+"/"+ingressName]
 
 			serverGroups = append(serverGroups, albmodel.ServiceGroupWithNameKey{
-				NamedKey: serverGroupNamedKey,
-				Backends: serverGroup.Backends,
+				NamedKey:     serverGroupNamedKey,
+				AlbConfigKey: albconfig,
+				Backends:     serverGroup.Backends,
 			})
 		}
 	}
@@ -170,7 +173,8 @@ type resAndSDKServerGroupPair struct {
 func mapResServerGroupByResourceID(resSGPs []albmodel.ServiceGroupWithNameKey) map[string]albmodel.ServiceGroupWithNameKey {
 	resSGPsByID := make(map[string]albmodel.ServiceGroupWithNameKey)
 	for _, resSGP := range resSGPs {
-		resSGPsByID[resSGP.NamedKey.Key()] = resSGP
+		resID := fmt.Sprintf("%s_%s", resSGP.NamedKey.Key(), resSGP.AlbConfigKey)
+		resSGPsByID[resID] = resSGP
 	}
 	return resSGPsByID
 }
@@ -179,9 +183,15 @@ func mapSDKServerGroupByResourceID(sdkSGPs []albmodel.ServerGroupWithTags) map[s
 	resSGPsByID := make(map[string]albmodel.ServerGroupWithTags)
 	for _, sdkSGP := range sdkSGPs {
 		var svcNameKey albmodel.ServerGroupNamedKey
+		var svcAlbConfig string
 
 		tags := sdkSGP.Tags
-		if v, ok := tags[util.ClusterTagKey]; ok {
+		if v, ok := tags[util.AlbConfigFullTagKey]; ok {
+			svcAlbConfig = v
+		} else {
+			continue
+		}
+		if v, ok := tags[util.ClusterNameTagKey]; ok {
 			svcNameKey.ClusterID = v
 		} else {
 			continue
@@ -214,8 +224,8 @@ func mapSDKServerGroupByResourceID(sdkSGPs []albmodel.ServerGroupWithTags) map[s
 		} else {
 			continue
 		}
-
-		resSGPsByID[svcNameKey.Key()] = sdkSGP
+		sdkTagId := fmt.Sprintf("%s_%s", svcNameKey.Key(), svcAlbConfig)
+		resSGPsByID[sdkTagId] = sdkSGP
 	}
 	return resSGPsByID
 }

@@ -1,6 +1,8 @@
 package alb
 
-import albsdk "github.com/aliyun/alibaba-cloud-sdk-go/services/alb"
+import (
+	albsdk "github.com/aliyun/alibaba-cloud-sdk-go/services/alb"
+)
 
 type ServerGroupWithTags struct {
 	albsdk.ServerGroup

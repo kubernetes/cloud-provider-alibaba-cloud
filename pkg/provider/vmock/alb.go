@@ -2,8 +2,11 @@ package vmock
 
 import (
 	"context"
+
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/ingress/reconcile/tracking"
 
+	"github.com/aliyun/alibaba-cloud-sdk-go/sdk/requests"
+	"github.com/aliyun/alibaba-cloud-sdk-go/sdk/responses"
 	albsdk "github.com/aliyun/alibaba-cloud-sdk-go/services/alb"
 	albmodel "k8s.io/cloud-provider-alibaba-cloud/pkg/model/alb"
 
@@ -20,6 +23,13 @@ type MockALB struct {
 	auth *base.ClientMgr
 }
 
+func (p MockALB) DoAction(request requests.AcsRequest, response responses.AcsResponse) (err error) {
+	return nil
+}
+
+func (p MockALB) UnTagALBResources(request *albsdk.UnTagResourcesRequest) (response *albsdk.UnTagResourcesResponse, err error) {
+	return nil, nil
+}
 func (p MockALB) TagALBResources(request *albsdk.TagResourcesRequest) (response *albsdk.TagResourcesResponse, err error) {
 	return nil, nil
 }
@@ -33,8 +43,11 @@ func (p MockALB) CreateALB(ctx context.Context, resLB *albmodel.AlbLoadBalancer,
 func (p MockALB) ReuseALB(ctx context.Context, resLB *albmodel.AlbLoadBalancer, lbID string, trackingProvider tracking.TrackingProvider) (albmodel.LoadBalancerStatus, error) {
 	return albmodel.LoadBalancerStatus{}, nil
 }
+func (p MockALB) UnReuseALB(ctx context.Context, lbID string, trackingProvider tracking.TrackingProvider) error {
+	return nil
+}
 
-func (p MockALB) UpdateALB(ctx context.Context, resLB *albmodel.AlbLoadBalancer, sdkLB albsdk.LoadBalancer) (albmodel.LoadBalancerStatus, error) {
+func (p MockALB) UpdateALB(ctx context.Context, resLB *albmodel.AlbLoadBalancer, sdkLB albsdk.LoadBalancer, trackingProvider tracking.TrackingProvider) (albmodel.LoadBalancerStatus, error) {
 	return albmodel.LoadBalancerStatus{}, nil
 }
 func (p MockALB) DeleteALB(ctx context.Context, lbID string) error {
@@ -52,6 +65,9 @@ func (p MockALB) DeleteALBListener(ctx context.Context, lsID string) error {
 	return nil
 }
 func (p MockALB) ListALBListeners(ctx context.Context, lbID string) ([]albsdk.Listener, error) {
+	return nil, nil
+}
+func (p MockALB) GetALBListenerAttribute(ctx context.Context, lsID string) (*albsdk.GetListenerAttributeResponse, error) {
 	return nil, nil
 }
 
@@ -108,5 +124,22 @@ func (p MockALB) ListALBServerGroupsWithTags(ctx context.Context, tagFilters map
 	return nil, nil
 }
 func (p MockALB) ListALBsWithTags(ctx context.Context, tagFilters map[string]string) ([]albmodel.AlbLoadBalancerWithTags, error) {
+	return nil, nil
+}
+
+func (p MockALB) CreateAcl(ctx context.Context, resAcl *albmodel.Acl) (albmodel.AclStatus, error) {
+	return albmodel.AclStatus{}, nil
+}
+func (p MockALB) UpdateAcl(ctx context.Context, listenerID string, resAndSDKAclPair albmodel.ResAndSDKAclPair) (albmodel.AclStatus, error) {
+	return albmodel.AclStatus{}, nil
+}
+func (p MockALB) DeleteAcl(ctx context.Context, listenerID, sdkAclID string) error {
+	return nil
+}
+func (p MockALB) ListAcl(ctx context.Context, listener *albmodel.Listener, aclId string) ([]albsdk.Acl, error) {
+	return nil, nil
+}
+
+func (p MockALB) ListAclEntriesByID(traceID interface{}, sdkAclID string) ([]albsdk.AclEntry, error) {
 	return nil, nil
 }

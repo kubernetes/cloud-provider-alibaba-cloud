@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/alibabacloud-go/tea/tea"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -496,6 +497,13 @@ func tcpEqual(reqCtx *svcCtx.RequestContext, local v1.ServicePort, remote model.
 			return fmt.Errorf("expected slb connectionDrainTimeout %d, got %d", timeout, remote.ConnectionDrainTimeout)
 		}
 	}
+	if proxyProtocolV2 := reqCtx.Anno.Get(annotation.ProxyProtocol); proxyProtocolV2 != "" {
+		localEnabled := proxyProtocolV2 == string(model.OnFlag)
+		remoteEnabled := tea.BoolValue(remote.EnableProxyProtocolV2)
+		if localEnabled != remoteEnabled {
+			return fmt.Errorf("expected slb proxyprotocol v2 enabled %t, got %t", localEnabled, remoteEnabled)
+		}
+	}
 	return nil
 }
 
@@ -528,6 +536,13 @@ func udpEqual(reqCtx *svcCtx.RequestContext, local v1.ServicePort, remote model.
 		}
 		if remote.ConnectionDrainTimeout != timeout {
 			return fmt.Errorf("expected slb connectionDrainTimeout %d, got %d", timeout, remote.ConnectionDrainTimeout)
+		}
+	}
+	if proxyProtocolV2 := reqCtx.Anno.Get(annotation.ProxyProtocol); proxyProtocolV2 != "" {
+		localEnabled := proxyProtocolV2 == string(model.OnFlag)
+		remoteEnabled := tea.BoolValue(remote.EnableProxyProtocolV2)
+		if localEnabled != remoteEnabled {
+			return fmt.Errorf("expected slb proxyprotocol v2 enabled: %t, got %t", localEnabled, remoteEnabled)
 		}
 	}
 	return nil

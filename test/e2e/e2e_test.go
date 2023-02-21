@@ -1,6 +1,7 @@
 package e2e
 
 import (
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/apis"
 	"k8s.io/cloud-provider-alibaba-cloud/test/e2e/testcase/service/clbv1"
 	"k8s.io/cloud-provider-alibaba-cloud/test/e2e/testcase/service/nlbv2"
 	"strings"
@@ -11,6 +12,7 @@ import (
 	"k8s.io/cloud-provider-alibaba-cloud/test/e2e/client"
 	"k8s.io/cloud-provider-alibaba-cloud/test/e2e/framework"
 	"k8s.io/cloud-provider-alibaba-cloud/test/e2e/options"
+	"k8s.io/cloud-provider-alibaba-cloud/test/e2e/testcase/alb"
 	"k8s.io/cloud-provider-alibaba-cloud/test/e2e/testcase/node"
 	"k8s.io/cloud-provider-alibaba-cloud/test/e2e/testcase/route"
 	"k8s.io/klog/v2"
@@ -35,8 +37,11 @@ func TestE2E(t *testing.T) {
 		t.Fatalf("create client error: %s", err.Error())
 	}
 	f := framework.NewFrameWork(c)
-	if err := f.Client.InitOptions(); err != nil {
-		t.Fatalf("init option error: %s", err.Error())
+	if options.TestConfig.Controllers != "alb" {
+		// skip other testcase when only alb
+		if err := f.Client.InitOptions(); err != nil {
+			t.Fatalf("init option error: %s", err.Error())
+		}
 	}
 	if options.TestConfig.AllowCreateCloudResource {
 		if err := f.CreateCloudResource(); err != nil {
@@ -65,12 +70,30 @@ func TestE2E(t *testing.T) {
 
 func AddControllerTests(f *framework.Framework) {
 	controllers := strings.Split(options.TestConfig.Controllers, ",")
+
+	klog.Infof("test controllers: %s", options.TestConfig.Controllers)
 	if len(controllers) == 0 {
 		klog.Info("no controller tests need to run, finished")
 		return
 	}
 	for _, c := range controllers {
 		switch c {
+		case "alb":
+			var albFlags []string
+			if options.TestConfig.ALBFlags != "" {
+				albFlags = strings.Split(options.TestConfig.ALBFlags, ",")
+			}
+			if err := apis.AddToScheme(f.Client.RuntimeClient.Scheme()); err != nil {
+				klog.Errorf("AddToScheme failed %v", err)
+				return
+			}
+			ginkgo.Describe("alb ingress controller tests", func() {
+				alb.InitAlbConfigE2ECases()
+				alb.ExecuteAlbConfigE2ECases(f, albFlags)
+
+				alb.InitAlbIngressE2ECases()
+				alb.ExecuteIngressE2ECases(f, albFlags)
+			})
 		case "service":
 			ginkgo.Describe("clb service controller tests", func() {
 				clbv1.RunLoadBalancerTestCases(f)

@@ -10,6 +10,7 @@ import (
 
 	prvd "k8s.io/cloud-provider-alibaba-cloud/pkg/provider"
 
+	"github.com/aliyun/alibaba-cloud-sdk-go/services/alb"
 	"github.com/go-logr/logr"
 	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -17,12 +18,13 @@ import (
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/model/alb/core"
 )
 
-func NewAlbLoadBalancerApplier(albProvider prvd.Provider, trackingProvider tracking.TrackingProvider, stack core.Manager, logger logr.Logger) *albLoadBalancerApplier {
+func NewAlbLoadBalancerApplier(albProvider prvd.Provider, trackingProvider tracking.TrackingProvider, stack core.Manager, logger logr.Logger, commonReuse bool) *albLoadBalancerApplier {
 	return &albLoadBalancerApplier{
 		albProvider:      albProvider,
 		trackingProvider: trackingProvider,
 		stack:            stack,
 		logger:           logger,
+		commonReuse:      commonReuse,
 	}
 }
 
@@ -31,11 +33,11 @@ type albLoadBalancerApplier struct {
 	trackingProvider tracking.TrackingProvider
 	stack            core.Manager
 	logger           logr.Logger
+	commonReuse      bool
 }
 
 func (s *albLoadBalancerApplier) Apply(ctx context.Context) error {
 	traceID := ctx.Value(util.TraceID)
-
 	var resLBs []*albmodel.AlbLoadBalancer
 	_ = s.stack.ListResources(&resLBs)
 
@@ -74,52 +76,68 @@ func (s *albLoadBalancerApplier) Apply(ctx context.Context) error {
 	}
 
 	for _, sdkLB := range unmatchedSDKLBs {
-		if err := s.albProvider.DeleteALB(ctx, sdkLB.LoadBalancerId); err != nil {
+		if err := s.DeleteALB(ctx, sdkLB.LoadBalancerId); err != nil {
 			return err
 		}
 	}
 	for _, resLB := range unmatchedResLBs {
-		var isReuseLb bool
-		if len(resLB.Spec.LoadBalancerId) != 0 {
-			isReuseLb = true
-		}
-		if isReuseLb {
-			lbStatus, err := s.albProvider.ReuseALB(ctx, resLB, resLB.Spec.LoadBalancerId, s.trackingProvider)
-			if err != nil {
-				return err
-			}
-			resLB.SetStatus(lbStatus)
-			continue
-		}
-
-		lbStatus, err := s.albProvider.CreateALB(ctx, resLB, s.trackingProvider)
+		lbStatus, err := s.CreateALB(ctx, resLB, s.trackingProvider)
 		if err != nil {
 			return err
 		}
 		resLB.SetStatus(lbStatus)
 	}
 	for _, resAndSDKLB := range matchedResAndSDKLBs {
-		var isReuseLb bool
-		if len(resAndSDKLB.resLB.Spec.LoadBalancerId) != 0 {
-			isReuseLb = true
-		}
-		if isReuseLb {
-			if resAndSDKLB.resLB.Spec.ForceOverride != nil && !*resAndSDKLB.resLB.Spec.ForceOverride {
-				resAndSDKLB.resLB.SetStatus(albmodel.LoadBalancerStatus{
-					LoadBalancerID: resAndSDKLB.sdkLB.LoadBalancerId,
-					DNSName:        resAndSDKLB.sdkLB.DNSName,
-				})
-				continue
-			}
-		}
-
-		lbStatus, err := s.albProvider.UpdateALB(ctx, resAndSDKLB.resLB, resAndSDKLB.sdkLB.LoadBalancer)
+		lbStatus, err := s.UpdateALB(ctx, resAndSDKLB.resLB, resAndSDKLB.sdkLB.LoadBalancer)
 		if err != nil {
 			return err
 		}
 		resAndSDKLB.resLB.SetStatus(lbStatus)
 	}
 	return nil
+}
+
+func (s *albLoadBalancerApplier) UpdateALB(ctx context.Context, resLB *albmodel.AlbLoadBalancer, sdkLB alb.LoadBalancer) (albmodel.LoadBalancerStatus, error) {
+	var albStatus albmodel.LoadBalancerStatus
+	var err error
+	if s.commonReuse {
+		albStatus = albmodel.LoadBalancerStatus{
+			LoadBalancerID: sdkLB.LoadBalancerId,
+			DNSName:        sdkLB.DNSName,
+		}
+	} else {
+		albStatus, err = s.albProvider.UpdateALB(ctx, resLB, sdkLB, s.trackingProvider)
+	}
+	return albStatus, err
+}
+
+func (s *albLoadBalancerApplier) CreateALB(ctx context.Context, resLB *albmodel.AlbLoadBalancer, trackingProvider tracking.TrackingProvider) (albmodel.LoadBalancerStatus, error) {
+	var albStatus albmodel.LoadBalancerStatus
+	var err error
+	var isReuseLb bool
+	if v, ok := ctx.Value(util.IsReuseLb).(bool); ok {
+		isReuseLb = v
+	}
+	if isReuseLb {
+		albStatus, err = s.albProvider.ReuseALB(ctx, resLB, resLB.Spec.LoadBalancerId, s.trackingProvider)
+	} else {
+		albStatus, err = s.albProvider.CreateALB(ctx, resLB, s.trackingProvider)
+	}
+	return albStatus, err
+}
+
+func (s *albLoadBalancerApplier) DeleteALB(ctx context.Context, lbID string) error {
+	var err error
+	var isReuseLb bool
+	if v, ok := ctx.Value(util.IsReuseLb).(bool); ok {
+		isReuseLb = v
+	}
+	if isReuseLb {
+		err = s.albProvider.UnReuseALB(ctx, lbID, s.trackingProvider)
+	} else {
+		err = s.albProvider.DeleteALB(ctx, lbID)
+	}
+	return err
 }
 
 func (s *albLoadBalancerApplier) PostApply(ctx context.Context) error {

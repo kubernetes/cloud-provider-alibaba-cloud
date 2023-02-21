@@ -72,8 +72,8 @@ const (
 	UpdateEvent EventType = "UPDATE"
 	// DeleteEvent event associated when an object is removed from an informer
 	IngressDeleteEvent EventType = "DELETE"
-	// ConfigurationEvent event associated when a controller configuration object is created or updated
-	ConfigurationEvent EventType = "CONFIGURATION"
+	// AlbConfigEvent event associated when a controller ALB CONFIG object is created or updated
+	AlbConfigEvent EventType = "ALBCONFIG"
 
 	// NodeEvent event associated when a controller configuration object is created or updated
 	NodeEvent EventType = "NODE"
@@ -86,6 +86,9 @@ const (
 
 	// IngressEvent event associated when a controller configuration object is created or updated
 	IngressEvent EventType = "Ingress"
+
+	// SecretEvent event associated when a controller configuration object is created or updated
+	SecretEvent EventType = "SECRET"
 )
 
 // Event holds the context of an event.

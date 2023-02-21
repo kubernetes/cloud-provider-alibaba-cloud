@@ -21,7 +21,8 @@ const (
 	// IngressKey picks a specific "class" for the Ingress.
 	// The controller only processes Ingresses with this annotation either
 	// unset, or set to either the configured value or the empty string.
-	IngressKey = "kubernetes.io/ingress.class"
+	IngressKey           = "kubernetes.io/ingress.class"
+	ALBIngressController = "ingress.k8s.alibabacloud/alb"
 )
 
 var (
@@ -41,22 +42,60 @@ type Ingress struct {
 
 // IsValid returns true if the given Ingress specify the ingress.class
 // annotation or IngressClassName resource for Kubernetes >= v1.18
-func IsValid(ing *networking.Ingress) bool {
+func (s *k8sStore) IsValid(ing *networking.Ingress) bool {
 	// 1. with annotation or IngressClass
 	ingress, ok := ing.GetAnnotations()[IngressKey]
 	if !ok && ing.Spec.IngressClassName != nil {
 		ingress = *ing.Spec.IngressClassName
+		ingressClass, exist, err := s.listers.IngressClass.GetByKey(ingress)
+		if err != nil {
+			klog.Errorf("IngressClass: %s GetByKey by endpoint failed: %s", ingress, err.Error())
+			return false
+		}
+		if !exist {
+			klog.Warningf("IngressClass: %s GetByKey by endpoint failed: %v", ingress, exist)
+			return false
+		}
+		ic := ingressClass.(*networking.IngressClass)
+		if ic.Spec.Controller == ALBIngressController {
+			return true
+		}
 	}
-
-	// k8s > v1.18.
-	// Processing may be redundant because k8s.IngressClass is obtained by IngressClass
-	// 2. without annotation and IngressClass. Check IngressClass
-	if IngressClass != nil {
-		return ingress == IngressClass.Name
+	if ingress == IngressClassName {
+		return true
 	}
+	if s.k8s118 {
+		ingressClass, exist, err := s.listers.IngressClass.GetByKey(ingress)
+		if err != nil {
+			klog.Errorf("IngressClass: %s GetByKey by endpoint failed: %s", ingress, err.Error())
+			return false
+		}
+		if !exist {
+			return false
+		}
+		ic := ingressClass.(*networking.IngressClass)
+		if ic.Spec.Controller == ALBIngressController {
+			return true
+		}
+	}
+	return false
+}
 
-	// 3. with IngressClass
-	return ingress == IngressClassName
+func (s *k8sStore) IsIngressClassUpdate(oldIng *networking.Ingress, curIng *networking.Ingress) bool {
+	// 1. old ingress with annotation or IngressClass
+	oldIc, ok := oldIng.GetAnnotations()[IngressKey]
+	if !ok && oldIng.Spec.IngressClassName != nil {
+		oldIc = *oldIng.Spec.IngressClassName
+	}
+	// 2. new ingress with annotation or IngressClass
+	newIc, ok := curIng.GetAnnotations()[IngressKey]
+	if !ok && curIng.Spec.IngressClassName != nil {
+		newIc = *curIng.Spec.IngressClassName
+	}
+	if oldIc != newIc {
+		return true
+	}
+	return false
 }
 
 // ConfigMapLister makes a Store that lists Configmaps.
@@ -246,6 +285,23 @@ func MetaNamespaceKey(obj interface{}) string {
 	return key
 }
 
+// IngressClassLister makes a Store that lists IngressClass
+type IngressClassLister struct {
+	cache.Store
+}
+
+// ByKey returns the Node matching key in the local Node Store.
+func (sl *IngressClassLister) ByKey(key string) (*networking.IngressClass, error) {
+	s, exists, err := sl.GetByKey(key)
+	if err != nil {
+		return nil, err
+	}
+	if !exists {
+		return nil, NotExistsError(key)
+	}
+	return s.(*networking.IngressClass), nil
+}
+
 // IsIngressV1Beta1Ready indicates if the running Kubernetes version is at least v1.18.0
 var IsIngressV1Beta1Ready bool
 
@@ -297,9 +353,9 @@ func SetDefaultALBPathType(ing *networking.Ingress) {
 				p.PathType = &defaultPathType
 			}
 
-			if *p.PathType == networking.PathTypeImplementationSpecific {
-				p.PathType = &defaultPathType
-			}
+			//if *p.PathType == networking.PathTypeImplementationSpecific {
+			//	p.PathType = &defaultPathType
+			//}
 		}
 	}
 }

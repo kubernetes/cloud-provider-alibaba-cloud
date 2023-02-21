@@ -5,7 +5,7 @@ import (
 )
 
 // Prefix for TargetHealth pod condition type.
-const TargetHealthPodConditionTypePrefix = "target-health.alb.k8s.alicloud"
+const TargetHealthPodConditionTypePrefix = "target-health.alb.k8s.alibabacloud"
 
 // BuildTargetHealthPodConditionType constructs the condition type for TargetHealth pod condition.
 func BuildReadinessGatePodConditionType() corev1.PodConditionType {

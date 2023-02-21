@@ -10,6 +10,9 @@ import (
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/alb"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/base"
 
+	"github.com/aliyun/alibaba-cloud-sdk-go/sdk/requests"
+	"github.com/aliyun/alibaba-cloud-sdk-go/sdk/responses"
+
 	albsdk "github.com/aliyun/alibaba-cloud-sdk-go/services/alb"
 )
 
@@ -26,6 +29,14 @@ type DryRunALB struct {
 	alb  *alb.ALBProvider
 }
 
+func (p DryRunALB) DoAction(request requests.AcsRequest, response responses.AcsResponse) (err error) {
+	return p.auth.ALB.Client.DoAction(request, response)
+}
+
+func (p DryRunALB) UnTagALBResources(request *albsdk.UnTagResourcesRequest) (response *albsdk.UnTagResourcesResponse, err error) {
+	return p.auth.ALB.UnTagResources(request)
+}
+
 func (p DryRunALB) TagALBResources(request *albsdk.TagResourcesRequest) (response *albsdk.TagResourcesResponse, err error) {
 	return p.auth.ALB.TagResources(request)
 }
@@ -39,8 +50,10 @@ func (p DryRunALB) CreateALB(ctx context.Context, resLB *albmodel.AlbLoadBalance
 func (p DryRunALB) ReuseALB(ctx context.Context, resLB *albmodel.AlbLoadBalancer, lbID string, trackingProvider tracking.TrackingProvider) (albmodel.LoadBalancerStatus, error) {
 	return albmodel.LoadBalancerStatus{}, nil
 }
-
-func (p DryRunALB) UpdateALB(ctx context.Context, resLB *albmodel.AlbLoadBalancer, sdkLB albsdk.LoadBalancer) (albmodel.LoadBalancerStatus, error) {
+func (p DryRunALB) UnReuseALB(ctx context.Context, lbID string, trackingProvider tracking.TrackingProvider) error {
+	return nil
+}
+func (p DryRunALB) UpdateALB(ctx context.Context, resLB *albmodel.AlbLoadBalancer, sdkLB albsdk.LoadBalancer, trackingProvider tracking.TrackingProvider) (albmodel.LoadBalancerStatus, error) {
 	return albmodel.LoadBalancerStatus{}, nil
 }
 func (p DryRunALB) DeleteALB(ctx context.Context, lbID string) error {
@@ -83,6 +96,9 @@ func (p DryRunALB) DeleteALBListenerRules(ctx context.Context, sdkLRIds []string
 func (p DryRunALB) ListALBListenerRules(ctx context.Context, lsID string) ([]albsdk.Rule, error) {
 	return nil, nil
 }
+func (p DryRunALB) GetALBListenerAttribute(ctx context.Context, lsID string) (*albsdk.GetListenerAttributeResponse, error) {
+	return nil, nil
+}
 
 // ALB Server
 func (p DryRunALB) RegisterALBServers(ctx context.Context, serverGroupID string, resServers []albmodel.BackendItem) error {
@@ -114,5 +130,22 @@ func (p DryRunALB) ListALBServerGroupsWithTags(ctx context.Context, tagFilters m
 	return nil, nil
 }
 func (p DryRunALB) ListALBsWithTags(ctx context.Context, tagFilters map[string]string) ([]albmodel.AlbLoadBalancerWithTags, error) {
+	return nil, nil
+}
+
+func (p DryRunALB) CreateAcl(ctx context.Context, resAcl *albmodel.Acl) (albmodel.AclStatus, error) {
+	return albmodel.AclStatus{}, nil
+}
+func (p DryRunALB) UpdateAcl(ctx context.Context, listenerID string, resAndSDKAclPair albmodel.ResAndSDKAclPair) (albmodel.AclStatus, error) {
+	return albmodel.AclStatus{}, nil
+}
+func (p DryRunALB) DeleteAcl(ctx context.Context, listenerID, sdkAclID string) error {
+	return nil
+}
+func (p DryRunALB) ListAcl(ctx context.Context, listener *albmodel.Listener, aclId string) ([]albsdk.Acl, error) {
+	return nil, nil
+}
+
+func (p DryRunALB) ListAclEntriesByID(traceID interface{}, sdkAclID string) ([]albsdk.AclEntry, error) {
 	return nil, nil
 }

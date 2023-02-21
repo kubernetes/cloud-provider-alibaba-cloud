@@ -7,6 +7,7 @@ import (
 	"k8s.io/cloud-provider-alibaba-cloud/cmd/health"
 	v1 "k8s.io/cloud-provider-alibaba-cloud/pkg/apis/alibabacloud/v1"
 
+	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apiext "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/rest"
@@ -82,7 +83,7 @@ func (p *AlbConfigCRD) Initialize() error {
 		NamePlural:              "albconfigs",
 		Group:                   "alibabacloud.com",
 		Version:                 "v1",
-		Scope:                   crd.NamespaceScoped,
+		Scope:                   apiextv1.ClusterScoped,
 		EnableStatusSubresource: true,
 	}
 

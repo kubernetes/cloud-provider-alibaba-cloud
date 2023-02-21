@@ -3,6 +3,7 @@ package applier
 import (
 	"context"
 	"fmt"
+	"strings"
 	"sync"
 
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/util"
@@ -16,18 +17,24 @@ import (
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/model/alb/core"
 )
 
-func NewListenerApplier(albProvider prvd.Provider, stack core.Manager, logger logr.Logger) *listenerApplier {
+func NewListenerApplier(albProvider prvd.Provider, stack core.Manager, logger logr.Logger, commonReuse bool, errRes core.ErrResult, listenerCommonReuse bool) *listenerApplier {
 	return &listenerApplier{
-		albProvider: albProvider,
-		stack:       stack,
-		logger:      logger,
+		albProvider:         albProvider,
+		stack:               stack,
+		logger:              logger,
+		commonReuse:         commonReuse,
+		errRes:              errRes,
+		listenerCommonReuse: listenerCommonReuse,
 	}
 }
 
 type listenerApplier struct {
-	albProvider prvd.Provider
-	stack       core.Manager
-	logger      logr.Logger
+	albProvider         prvd.Provider
+	stack               core.Manager
+	logger              logr.Logger
+	commonReuse         bool
+	errRes              core.ErrResult
+	listenerCommonReuse bool
 }
 
 func (s *listenerApplier) Apply(ctx context.Context) error {
@@ -96,26 +103,6 @@ func (s *listenerApplier) applyListenersOnLB(ctx context.Context, lbID string, r
 	}
 
 	var (
-		errDelete error
-		wgDelete  sync.WaitGroup
-	)
-	for _, sdkLS := range unmatchedSDKLSs {
-		wgDelete.Add(1)
-		go func(sdkLS albsdk.Listener) {
-			util.RandomSleepFunc(util.ConcurrentMaxSleepMillisecondTime)
-
-			defer wgDelete.Done()
-			if err := s.albProvider.DeleteALB(ctx, sdkLS.ListenerId); errDelete == nil && err != nil {
-				errDelete = err
-			}
-		}(sdkLS)
-	}
-	wgDelete.Wait()
-	if errDelete != nil {
-		return errDelete
-	}
-
-	var (
 		errCreate error
 		wgCreate  sync.WaitGroup
 	)
@@ -128,13 +115,18 @@ func (s *listenerApplier) applyListenersOnLB(ctx context.Context, lbID string, r
 			lsStatus, err := s.albProvider.CreateALBListener(ctx, resLS)
 			if errCreate == nil && err != nil {
 				errCreate = err
+				s.errRes.AddErrMsgsWithListenerPort(resLS.Spec.ListenerPort, errCreate)
+				s.logger.V(util.SynLogLevel).Error(errCreate, "CreateALBListener AddErrMsg")
 			}
 			resLS.SetStatus(lsStatus)
 		}(resLS)
 	}
 	wgCreate.Wait()
 	if errCreate != nil {
-		return errCreate
+		if strings.Contains(errCreate.Error(), "ResourceAlreadyExist.Listener") {
+			return fmt.Errorf("listener already in use, please set forceOverride=true and reconcile")
+		}
+		//return errCreate
 	}
 
 	var (
@@ -150,15 +142,34 @@ func (s *listenerApplier) applyListenersOnLB(ctx context.Context, lbID string, r
 			lsStatus, err := s.albProvider.UpdateALBListener(ctx, resLs, sdkLs)
 			if errUpdate == nil && err != nil {
 				errUpdate = err
+				s.errRes.AddErrMsgsWithListenerPort(resAndSDKLS.resLS.Spec.ListenerPort, errUpdate)
+				s.logger.V(util.SynLogLevel).Error(errUpdate, "UpdateALBListener AddErrMsg")
 			}
 			resLs.SetStatus(lsStatus)
 		}(resAndSDKLS.resLS, resAndSDKLS.sdkLS)
 	}
 	wgUpdate.Wait()
 	if errUpdate != nil {
-		return errUpdate
+		//return errUpdate
 	}
-
+	var (
+		errDelete error
+		wgDelete  sync.WaitGroup
+	)
+	for _, sdkLS := range unmatchedSDKLSs {
+		wgDelete.Add(1)
+		go func(sdkLS albsdk.Listener) {
+			util.RandomSleepFunc(util.ConcurrentMaxSleepMillisecondTime)
+			defer wgDelete.Done()
+			if err := s.albProvider.DeleteALBListener(ctx, sdkLS.ListenerId); errDelete == nil && err != nil {
+				errDelete = err
+			}
+		}(sdkLS)
+	}
+	wgDelete.Wait()
+	if errDelete != nil {
+		return errDelete
+	}
 	return nil
 }
 
@@ -167,7 +178,19 @@ func (s *listenerApplier) findSDKListenersOnLB(ctx context.Context, lbID string)
 	if err != nil {
 		return nil, err
 	}
-	return listeners, nil
+	if !s.commonReuse {
+		return listeners, nil
+	}
+	if !s.listenerCommonReuse {
+		return listeners, nil
+	}
+	filteredListeners := make([]albsdk.Listener, 0)
+	for _, ls := range listeners {
+		if strings.HasPrefix(ls.ListenerDescription, util.ListenerDescriptionPrefix) {
+			filteredListeners = append(filteredListeners, ls)
+		}
+	}
+	return filteredListeners, nil
 }
 
 type resAndSDKListenerPair struct {
@@ -180,40 +203,42 @@ func matchResAndSDKListeners(resLSs []*albmodel.Listener, sdkLSs []albsdk.Listen
 	var unmatchedResLSs []*albmodel.Listener
 	var unmatchedSDKLSs []albsdk.Listener
 
-	resLSByPort := mapResListenerByPort(resLSs)
-	sdkLSByPort := mapSDKListenerByPort(sdkLSs)
-	resLSPorts := sets.Int64KeySet(resLSByPort)
-	sdkLSPorts := sets.Int64KeySet(sdkLSByPort)
-	for _, port := range resLSPorts.Intersection(sdkLSPorts).List() {
-		resLS := resLSByPort[port]
-		sdkLS := sdkLSByPort[port]
+	resLSByPP := mapResListenerByPortProtocol(resLSs)
+	sdkLSByPP := mapSDKListenerByPortProtocol(sdkLSs)
+	resLSPP := sets.StringKeySet(resLSByPP)
+	sdkLSPP := sets.StringKeySet(sdkLSByPP)
+	for _, pp := range resLSPP.Intersection(sdkLSPP).List() {
+		resLS := resLSByPP[pp]
+		sdkLS := sdkLSByPP[pp]
 		matchedResAndSDKLSs = append(matchedResAndSDKLSs, resAndSDKListenerPair{
 			resLS: resLS,
 			sdkLS: &sdkLS,
 		})
 	}
-	for _, port := range resLSPorts.Difference(sdkLSPorts).List() {
-		unmatchedResLSs = append(unmatchedResLSs, resLSByPort[port])
+	for _, port := range resLSPP.Difference(sdkLSPP).List() {
+		unmatchedResLSs = append(unmatchedResLSs, resLSByPP[port])
 	}
-	for _, port := range sdkLSPorts.Difference(resLSPorts).List() {
-		unmatchedSDKLSs = append(unmatchedSDKLSs, sdkLSByPort[port])
+	for _, port := range sdkLSPP.Difference(resLSPP).List() {
+		unmatchedSDKLSs = append(unmatchedSDKLSs, sdkLSByPP[port])
 	}
 
 	return matchedResAndSDKLSs, unmatchedResLSs, unmatchedSDKLSs
 }
 
-func mapResListenerByPort(resLSs []*albmodel.Listener) map[int64]*albmodel.Listener {
-	resLSByPort := make(map[int64]*albmodel.Listener, len(resLSs))
+func mapResListenerByPortProtocol(resLSs []*albmodel.Listener) map[string]*albmodel.Listener {
+	resLSByPort := make(map[string]*albmodel.Listener, len(resLSs))
 	for _, ls := range resLSs {
-		resLSByPort[int64(ls.Spec.ListenerPort)] = ls
+		pp := fmt.Sprintf("%s+%d", ls.Spec.ListenerProtocol, ls.Spec.ListenerPort)
+		resLSByPort[pp] = ls
 	}
 	return resLSByPort
 }
 
-func mapSDKListenerByPort(sdkLSs []albsdk.Listener) map[int64]albsdk.Listener {
-	sdkLSByPort := make(map[int64]albsdk.Listener, len(sdkLSs))
+func mapSDKListenerByPortProtocol(sdkLSs []albsdk.Listener) map[string]albsdk.Listener {
+	sdkLSByPort := make(map[string]albsdk.Listener, len(sdkLSs))
 	for _, ls := range sdkLSs {
-		sdkLSByPort[int64(ls.ListenerPort)] = ls
+		pp := fmt.Sprintf("%s+%d", ls.ListenerProtocol, ls.ListenerPort)
+		sdkLSByPort[pp] = ls
 	}
 	return sdkLSByPort
 }

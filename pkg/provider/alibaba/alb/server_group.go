@@ -136,6 +136,7 @@ func (m *ALBProvider) updateServerGroupAttribute(ctx context.Context, resSGP *al
 		isHealthCheckConfigNeedUpdate,
 		isStickySessionConfigNeedUpdate,
 		isServerGroupNameNeedUpdate,
+		isServiceNameNeedUpdate,
 		isSchedulerNeedUpdate bool
 	)
 	if resSGP.Spec.ServerGroupName != sdkSGP.ServerGroupName {
@@ -145,6 +146,14 @@ func (m *ALBProvider) updateServerGroupAttribute(ctx context.Context, resSGP *al
 			"serverGroupID", sdkSGP.ServerGroupId,
 			"traceID", traceID)
 		isServerGroupNameNeedUpdate = true
+	}
+	if resSGP.Spec.ServerGroupName != sdkSGP.ServiceName {
+		m.logger.V(util.MgrLogLevel).Info("Sdk ServiceName update:",
+			"res", resSGP.Spec.ServerGroupName,
+			"sdk", sdkSGP.ServiceName,
+			"serverGroupID", sdkSGP.ServerGroupId,
+			"traceID", traceID)
+		isServiceNameNeedUpdate = true
 	}
 	if !isServerGroupSchedulerValid(resSGP.Spec.Scheduler) {
 		return nil, fmt.Errorf("invalid server group scheduler: %s", resSGP.Spec.Scheduler)
@@ -201,7 +210,8 @@ func (m *ALBProvider) updateServerGroupAttribute(ctx context.Context, resSGP *al
 	}
 
 	if !isServerGroupNameNeedUpdate && !isSchedulerNeedUpdate &&
-		!isHealthCheckConfigNeedUpdate && !isStickySessionConfigNeedUpdate {
+		!isHealthCheckConfigNeedUpdate && !isStickySessionConfigNeedUpdate &&
+		!isServiceNameNeedUpdate {
 		return nil, nil
 	}
 
@@ -210,6 +220,9 @@ func (m *ALBProvider) updateServerGroupAttribute(ctx context.Context, resSGP *al
 
 	if isServerGroupNameNeedUpdate {
 		updateSgpReq.ServerGroupName = resSGP.Spec.ServerGroupName
+	}
+	if isServiceNameNeedUpdate {
+		updateSgpReq.ServiceName = resSGP.Spec.ServerGroupName
 	}
 	if isSchedulerNeedUpdate {
 		updateSgpReq.Scheduler = resSGP.Spec.Scheduler
@@ -249,6 +262,7 @@ func buildSDKServerGroupCreateRequest(sgpSpec alb.ServerGroupSpec) (*albsdk.Crea
 	sgpReq := albsdk.CreateCreateServerGroupRequest()
 
 	sgpReq.ServerGroupName = sgpSpec.ServerGroupName
+	sgpReq.ServiceName = sgpSpec.ServerGroupName
 
 	if len(sgpSpec.VpcId) == 0 {
 		return nil, fmt.Errorf("invalid server group vpc id: %s", sgpSpec.VpcId)
@@ -299,7 +313,8 @@ func checkHealthCheckConfigValid(conf alb.HealthCheckConfig) error {
 		return fmt.Errorf("invalid server group HealthCheckMethod: %v", conf.HealthCheckMethod)
 	}
 	if !strings.EqualFold(conf.HealthCheckProtocol, util.ServerGroupHealthCheckProtocolHTTP) &&
-		!strings.EqualFold(conf.HealthCheckProtocol, util.ServerGroupHealthCheckProtocolHTTPS) {
+		!strings.EqualFold(conf.HealthCheckProtocol, util.ServerGroupHealthCheckProtocolHTTPS) &&
+		!strings.EqualFold(conf.HealthCheckProtocol, util.ServerGroupHealthCheckProtocolTCP) {
 		return fmt.Errorf("invalid server group HealthCheckProtocol: %v", conf.HealthCheckProtocol)
 	}
 	if conf.HealthCheckTimeout < 1 || conf.HealthCheckTimeout > 300 {
@@ -358,7 +373,8 @@ func isServerGroupSchedulerValid(scheduler string) bool {
 }
 func isServerGroupProtocolValid(protocol string) bool {
 	if strings.EqualFold(protocol, util.ServerGroupProtocolHTTP) ||
-		strings.EqualFold(protocol, util.ServerGroupProtocolHTTPS) {
+		strings.EqualFold(protocol, util.ServerGroupProtocolHTTPS) ||
+		strings.EqualFold(protocol, util.ServerGroupProtocolGRPC) {
 		return true
 	}
 	return false

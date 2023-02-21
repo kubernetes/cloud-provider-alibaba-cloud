@@ -74,16 +74,9 @@ func (m *ALBProvider) CreateALBListener(ctx context.Context, resLS *albmodel.Lis
 		"startTime", asynchronousStartTime,
 		util.Action, util.CreateALBListenerAsynchronous)
 	var getLsResp *albsdk.GetListenerAttributeResponse
-	for i := 0; i < util.CreateListenerWaitRunningMaxRetryTimes; i++ {
-		time.Sleep(util.CreateListenerWaitRunningRetryInterval)
-
-		getLsResp, err = getALBListenerAttributeFunc(ctx, createLsResp.ListenerId, m.auth, m.logger)
-		if err != nil {
-			return albmodel.ListenerStatus{}, err
-		}
-		if isListenerListenerStatusRunning(getLsResp.ListenerStatus) {
-			break
-		}
+	getLsResp, err = m.waitListenerStatus(ctx, createLsResp.ListenerId)
+	if err != nil {
+		return albmodel.ListenerStatus{}, err
 	}
 	m.logger.V(util.MgrLogLevel).Info("created listener asynchronous",
 		"stackID", resLS.Stack().StackID(),
@@ -95,7 +88,7 @@ func (m *ALBProvider) CreateALBListener(ctx context.Context, resLS *albmodel.Lis
 		"elapsedTime", time.Since(asynchronousStartTime).Milliseconds(),
 		util.Action, util.CreateALBListenerAsynchronous)
 
-	if isHTTPSListenerProtocol(resLS.Spec.ListenerProtocol) {
+	if isHTTPSListenerProtocol(resLS.Spec.ListenerProtocol) || isQUICListenerProtocol(resLS.Spec.ListenerProtocol) {
 		if err := util.RetryImmediateOnError(m.waitLSExistencePollInterval, m.waitLSExistenceTimeout, isIncorrectStatusListenerError, func() error {
 			if err := m.updateListenerExtraCertificates(ctx, createLsResp.ListenerId, resLS); err != nil {
 				return err
@@ -106,6 +99,10 @@ func (m *ALBProvider) CreateALBListener(ctx context.Context, resLS *albmodel.Lis
 		}
 	}
 	return buildResListenerStatus(createLsResp.ListenerId), nil
+}
+
+func (m *ALBProvider) GetALBListenerAttribute(ctx context.Context, lsID string) (*albsdk.GetListenerAttributeResponse, error) {
+	return getALBListenerAttributeFunc(ctx, lsID, m.auth, m.logger)
 }
 
 func isListenerListenerStatusRunning(status string) bool {
@@ -180,7 +177,7 @@ func (m *ALBProvider) listListenerCerts(ctx context.Context, lsID string) ([]alb
 }
 
 func (m *ALBProvider) UpdateALBListener(ctx context.Context, resLS *albmodel.Listener, sdkLS *albsdk.Listener) (albmodel.ListenerStatus, error) {
-	if isHTTPSListenerProtocol(sdkLS.ListenerProtocol) {
+	if isHTTPSListenerProtocol(sdkLS.ListenerProtocol) || isQUICListenerProtocol(sdkLS.ListenerProtocol) {
 		certs, err := m.listListenerCerts(ctx, sdkLS.ListenerId)
 		if err != nil {
 			return albmodel.ListenerStatus{}, err
@@ -188,14 +185,17 @@ func (m *ALBProvider) UpdateALBListener(ctx context.Context, resLS *albmodel.Lis
 		m.sdkCerts = certs
 	}
 
-	if err := m.updateListenerAttribute(ctx, resLS, sdkLS); err != nil {
-		return albmodel.ListenerStatus{}, err
-	}
-
-	if isHTTPSListenerProtocol(sdkLS.ListenerProtocol) {
+	if isHTTPSListenerProtocol(sdkLS.ListenerProtocol) || isQUICListenerProtocol(sdkLS.ListenerProtocol) {
 		if err := m.updateListenerExtraCertificates(ctx, sdkLS.ListenerId, resLS); err != nil {
 			return albmodel.ListenerStatus{}, err
 		}
+		if _, err := m.waitListenerStatus(ctx, sdkLS.ListenerId); err != nil {
+			return albmodel.ListenerStatus{}, err
+		}
+	}
+
+	if err := m.updateListenerAttribute(ctx, resLS, sdkLS); err != nil {
+		return albmodel.ListenerStatus{}, err
 	}
 
 	return buildResListenerStatus(sdkLS.ListenerId), nil
@@ -366,26 +366,27 @@ func buildSDKCreateListenerRequest(lsSpec albmodel.ListenerSpec) (*albsdk.Create
 
 	createLsReq.XForwardedForConfig = transSDKXForwardedForConfigToCreateLs(lsSpec.XForwardedForConfig)
 
-	if isHTTPSListenerProtocol(lsSpec.ListenerProtocol) {
-		if len(lsSpec.SecurityPolicyId) == 0 {
-			return nil, fmt.Errorf("invalid https listener SecurityPolicyId: %s", lsSpec.SecurityPolicyId)
+	if isHTTPSListenerProtocol(lsSpec.ListenerProtocol) || isQUICListenerProtocol(lsSpec.ListenerProtocol) {
+		if isHTTPSListenerProtocol(lsSpec.ListenerProtocol) {
+			if len(lsSpec.SecurityPolicyId) == 0 {
+				return nil, fmt.Errorf("invalid https listener SecurityPolicyId: %s", lsSpec.SecurityPolicyId)
+			}
+			createLsReq.SecurityPolicyId = lsSpec.SecurityPolicyId
 		}
-		createLsReq.SecurityPolicyId = lsSpec.SecurityPolicyId
-
-		createLsReq.CaCertificates = transSDKCaCertificatesToCreateLs(lsSpec.CaCertificates)
+		createLsReq.CaCertificates = transSDKCaCertificatesToCreateLs(ctx, lsSpec.CaCertificates)
 
 		if len(lsSpec.Certificates) == 0 {
 			return nil, fmt.Errorf("empty https listener default certs ")
 		}
-		defaultCerts, _ := buildSDKCertificates(lsSpec.Certificates)
+		defaultCerts, _ := buildSDKCertificates(ctx, lsSpec.Certificates)
 		if len(defaultCerts) != 1 {
 			return nil, fmt.Errorf("empty https listener default certs")
 		}
 		createLsReq.Certificates = transSDKCertificatesToCreateLs(defaultCerts)
-
-		createLsReq.Http2Enabled = requests.NewBoolean(lsSpec.Http2Enabled)
+		if isHTTPSListenerProtocol(lsSpec.ListenerProtocol) {
+			createLsReq.Http2Enabled = requests.NewBoolean(lsSpec.Http2Enabled)
+		}
 	}
-
 	return createLsReq, nil
 }
 
@@ -393,15 +394,36 @@ func (m *ALBProvider) updateListenerExtraCertificates(ctx context.Context, lsID 
 	traceID := ctx.Value(util.TraceID)
 
 	desiredExtraCertIDs := sets.NewString()
-	_, desiredExtraCerts := buildSDKCertificates(resLs.Spec.Certificates)
+	desiredDefaultCertIDs := sets.NewString()
+	desiredDefaultCerts, desiredExtraCerts := buildSDKCertificates(ctx, resLs.Spec.Certificates)
 	for _, cert := range desiredExtraCerts {
 		desiredExtraCertIDs.Insert(cert.CertificateId)
 	}
+	for _, cert := range desiredDefaultCerts {
+		desiredDefaultCertIDs.Insert(cert.CertificateId)
+	}
 
 	currentExtraCertIDs := sets.NewString()
-	_, currentExtraCerts := buildSDKCertificatesModel(m.sdkCerts)
+	currentDefaultCerts, currentExtraCerts := buildSDKCertificatesModel(m.sdkCerts)
 	for _, cert := range currentExtraCerts {
 		currentExtraCertIDs.Insert(cert.CertificateId)
+	}
+
+	if len(currentDefaultCerts) != 0 {
+		isDefaultCertUpdate := false
+		if len(desiredDefaultCerts) > 0 && desiredDefaultCerts[0].CertificateId != currentDefaultCerts[0].CertificateId {
+			if _, ok := desiredExtraCertIDs[currentDefaultCerts[0].CertificateId]; !ok {
+				isDefaultCertUpdate = true
+			}
+			// 目标默认证书与当前默认证书不同，需要将目标默认证书修改为扩展证书
+			// 如果目标默认证书已经更新过了，就不需要把目标默认证书修改为扩展证书了
+			if !isDefaultCertUpdate {
+				desiredExtraCertIDs.Insert(desiredDefaultCerts[0].CertificateId)
+			}
+		}
+		if _, ok := desiredExtraCertIDs[currentDefaultCerts[0].CertificateId]; ok {
+			desiredExtraCertIDs.Delete(currentDefaultCerts[0].CertificateId)
+		}
 	}
 
 	unmatchedResCerts := desiredExtraCertIDs.Difference(currentExtraCertIDs).List()
@@ -570,46 +592,61 @@ func (m *ALBProvider) updateListenerAttribute(ctx context.Context, resLS *albmod
 		isListenerDescriptionNeedUpdate = true
 	}
 
-	if isHTTPSListenerProtocol(sdkLs.ListenerProtocol) {
-		if len(resLS.Spec.SecurityPolicyId) == 0 {
-			return fmt.Errorf("invalid https listener SecurityPolicyId: %s", resLS.Spec.SecurityPolicyId)
-		}
-		if resLS.Spec.SecurityPolicyId != sdkLs.SecurityPolicyId {
-			m.logger.V(util.MgrLogLevel).Info("SecurityPolicyId update",
-				"res", resLS.Spec.SecurityPolicyId,
-				"sdk", sdkLs.SecurityPolicyId,
-				"listenerID", sdkLs.ListenerId,
-				"traceID", traceID)
-			isSecurityPolicyIdNeedUpdate = true
+	var desiredDefaultCerts = make([]albsdk.Certificate, 0)
+	var desiredExtraCerts = make([]albsdk.Certificate, 0)
+	if isHTTPSListenerProtocol(sdkLs.ListenerProtocol) || isQUICListenerProtocol(sdkLs.ListenerProtocol) {
+		if isHTTPSListenerProtocol(sdkLs.ListenerProtocol) {
+			if len(resLS.Spec.SecurityPolicyId) == 0 {
+				return fmt.Errorf("invalid https listener SecurityPolicyId: %s", resLS.Spec.SecurityPolicyId)
+			}
+			if resLS.Spec.SecurityPolicyId != sdkLs.SecurityPolicyId {
+				m.logger.V(util.MgrLogLevel).Info("SecurityPolicyId update",
+					"res", resLS.Spec.SecurityPolicyId,
+					"sdk", sdkLs.SecurityPolicyId,
+					"listenerID", sdkLs.ListenerId,
+					"traceID", traceID)
+				isSecurityPolicyIdNeedUpdate = true
+			}
 		}
 
-		desiredDefaultCerts, _ := buildSDKCertificates(resLS.Spec.Certificates)
-		if len(desiredDefaultCerts) != 1 {
-			return fmt.Errorf("invalid res https listener default certs len: %d", len(desiredDefaultCerts))
-		}
-		currentDefaultCerts, _ := buildSDKCertificatesModel(m.sdkCerts)
+		desiredDefaultCerts, desiredExtraCerts = buildSDKCertificates(ctx, resLS.Spec.Certificates)
+		// if len(desiredDefaultCerts) != 1 {
+		// 	return fmt.Errorf("invalid res https listener default certs len: %d", len(desiredDefaultCerts))
+		// }
+		currentDefaultCerts, currentExtraCerts := buildSDKCertificatesModel(m.sdkCerts)
 		if len(currentDefaultCerts) != 1 {
 			return fmt.Errorf("invalid sdk https listener default certs len: %d", len(currentDefaultCerts))
 		}
-		if desiredDefaultCerts[0].CertificateId != currentDefaultCerts[0].CertificateId {
-			m.logger.V(util.MgrLogLevel).Info("DefaultCerts update",
-				"res", desiredDefaultCerts[0],
-				"sdk", currentDefaultCerts[0],
-				"listenerID", sdkLs.ListenerId,
-				"traceID", traceID)
-			isCertificatesNeedUpdate = true
+		currentExtraCertIDs := sets.NewString()
+		for _, cert := range currentExtraCerts {
+			currentExtraCertIDs.Insert(cert.CertificateId)
 		}
-
-		if resLS.Spec.Http2Enabled != sdkLs.Http2Enabled {
-			m.logger.V(util.MgrLogLevel).Info("Http2Enabled update",
-				"res", resLS.Spec.Http2Enabled,
-				"sdk", sdkLs.Http2Enabled,
-				"listenerID", sdkLs.ListenerId,
-				"traceID", traceID)
-			isHttp2EnabledNeedUpdate = true
+		desiredExtraCertIDs := sets.NewString()
+		for _, cert := range desiredExtraCerts {
+			desiredExtraCertIDs.Insert(cert.CertificateId)
+		}
+		if len(desiredDefaultCerts) > 0 && desiredDefaultCerts[0].CertificateId != currentDefaultCerts[0].CertificateId {
+			// 目标扩展证书中不包含当前默认证书，需要更新默认证书
+			if _, ok := desiredExtraCertIDs[currentDefaultCerts[0].CertificateId]; !ok {
+				m.logger.V(util.MgrLogLevel).Info("DefaultCerts update",
+					"res", desiredDefaultCerts[0],
+					"sdk", currentDefaultCerts[0],
+					"listenerID", sdkLs.ListenerId,
+					"traceID", traceID)
+				isCertificatesNeedUpdate = true
+			}
+		}
+		if isHTTPSListenerProtocol(sdkLs.ListenerProtocol) {
+			if resLS.Spec.Http2Enabled != sdkLs.Http2Enabled {
+				m.logger.V(util.MgrLogLevel).Info("Http2Enabled update",
+					"res", resLS.Spec.Http2Enabled,
+					"sdk", sdkLs.Http2Enabled,
+					"listenerID", sdkLs.ListenerId,
+					"traceID", traceID)
+				isHttp2EnabledNeedUpdate = true
+			}
 		}
 	}
-
 	if !isGzipEnabledNeedUpdate && !isQuicConfigUpdate && !isHttp2EnabledNeedUpdate &&
 		!isDefaultActionsNeedUpdate && !isRequestTimeoutNeedUpdate && !isXForwardedForConfigNeedUpdate &&
 		!isSecurityPolicyIdNeedUpdate && !isIdleTimeoutNeedUpdate && !isListenerDescriptionNeedUpdate &&
@@ -651,8 +688,11 @@ func (m *ALBProvider) updateListenerAttribute(ctx context.Context, resLS *albmod
 	if isListenerDescriptionNeedUpdate {
 		updateLsReq.ListenerDescription = resLS.Spec.ListenerDescription
 	}
-	if isCertificatesNeedUpdate {
-		updateLsReq.Certificates = transSDKCertificatesToUpdateLs(resLS.Spec.Certificates)
+	if isHTTPSListenerProtocol(sdkLs.ListenerProtocol) && isCertificatesNeedUpdate {
+		updateLsReq.Certificates = transSDKCertificatesToUpdateLs(desiredDefaultCerts)
+	}
+	if isQUICListenerProtocol(sdkLs.ListenerProtocol) && isCertificatesNeedUpdate {
+		updateLsReq.Certificates = transSDKCertificatesToUpdateLs(desiredDefaultCerts)
 	}
 
 	startTime := time.Now()
@@ -661,6 +701,7 @@ func (m *ALBProvider) updateListenerAttribute(ctx context.Context, resLS *albmod
 		"resourceID", resLS.ID(),
 		"traceID", traceID,
 		"listenerID", sdkLs.ListenerId,
+		"updateLsReq", updateLsReq,
 		"startTime", startTime,
 		util.Action, util.UpdateALBListenerAttribute)
 	updateLsResp, err := m.auth.ALB.UpdateListenerAttribute(updateLsReq)
@@ -803,11 +844,12 @@ func transSDKQuicConfigToUpdateLs(c albmodel.QuicConfig) albsdk.UpdateListenerAt
 	}
 }
 
-func transSDKCaCertificatesToCreateLs(certificates []albmodel.Certificate) *[]albsdk.CreateListenerCaCertificates {
+func transSDKCaCertificatesToCreateLs(ctx context.Context, certificates []albmodel.Certificate) *[]albsdk.CreateListenerCaCertificates {
 	createListenerAttributeCaCertificates := make([]albsdk.CreateListenerCaCertificates, 0)
 	for _, certificate := range certificates {
+		certId, _ := certificate.GetCertificateId(ctx)
 		createListenerAttributeCaCertificates = append(createListenerAttributeCaCertificates, albsdk.CreateListenerCaCertificates{
-			CertificateId: certificate.CertificateId,
+			CertificateId: certId,
 		})
 	}
 	return &createListenerAttributeCaCertificates
@@ -823,7 +865,7 @@ func transSDKCertificatesToCreateLs(certificates []albsdk.Certificate) *[]albsdk
 	return &createListenerAttributeCertificates
 }
 
-func transSDKCertificatesToUpdateLs(certificates []albmodel.Certificate) *[]albsdk.UpdateListenerAttributeCertificates {
+func transSDKCertificatesToUpdateLs(certificates []albsdk.Certificate) *[]albsdk.UpdateListenerAttributeCertificates {
 	updateListenerAttributeCertificates := make([]albsdk.UpdateListenerAttributeCertificates, 0)
 	for _, certificate := range certificates {
 		updateListenerAttributeCertificates = append(updateListenerAttributeCertificates, albsdk.UpdateListenerAttributeCertificates{
@@ -904,7 +946,7 @@ func buildSDKCertificatesModel(modelCerts []albsdk.CertificateModel) ([]albsdk.C
 	return defaultSDKCerts, extraSDKCerts
 }
 
-func buildSDKCertificates(modelCerts []albmodel.Certificate) ([]albsdk.Certificate, []albsdk.Certificate) {
+func buildSDKCertificates(ctx context.Context, modelCerts []albmodel.Certificate) ([]albsdk.Certificate, []albsdk.Certificate) {
 	if len(modelCerts) == 0 {
 		return nil, nil
 	}
@@ -912,17 +954,16 @@ func buildSDKCertificates(modelCerts []albmodel.Certificate) ([]albsdk.Certifica
 	var defaultSDKCerts []albsdk.Certificate
 	var extraSDKCerts []albsdk.Certificate
 	for _, cert := range modelCerts {
-		if cert.IsDefault {
+		certId, _ := cert.GetCertificateId(ctx)
+		if cert.GetIsDefault() {
 			defaultSDKCerts = append(defaultSDKCerts, albsdk.Certificate{
-				IsDefault:     cert.IsDefault,
-				CertificateId: cert.CertificateId,
-				Status:        cert.Status,
+				IsDefault:     cert.GetIsDefault(),
+				CertificateId: certId,
 			})
 		} else {
 			extraSDKCerts = append(extraSDKCerts, albsdk.Certificate{
-				IsDefault:     cert.IsDefault,
-				CertificateId: cert.CertificateId,
-				Status:        cert.Status,
+				IsDefault:     cert.GetIsDefault(),
+				CertificateId: certId,
 			})
 		}
 	}
@@ -930,15 +971,25 @@ func buildSDKCertificates(modelCerts []albmodel.Certificate) ([]albsdk.Certifica
 }
 
 func isIncorrectStatusLoadBalancerError(err error) bool {
-	return strings.Contains(err.Error(), "IncorrectStatus.LoadBalancer")
+	if strings.Contains(err.Error(), "IncorrectStatus.LoadBalancer") {
+		return true
+	}
+	return false
 }
 
 func isIncorrectStatusListenerError(err error) bool {
-	return strings.Contains(err.Error(), "IncorrectStatus.Listener")
+	if strings.Contains(err.Error(), "IncorrectStatus.Listener") {
+		return true
+	}
+	return false
 }
 
 func isHTTPSListenerProtocol(protocol string) bool {
 	return strings.EqualFold(protocol, util.ListenerProtocolHTTPS)
+}
+
+func isQUICListenerProtocol(protocol string) bool {
+	return strings.EqualFold(protocol, util.ListenerProtocolQUIC)
 }
 
 func isListenerProtocolValid(protocol string) bool {
@@ -975,4 +1026,21 @@ func buildResListenerStatus(lsID string) albmodel.ListenerStatus {
 	return albmodel.ListenerStatus{
 		ListenerID: lsID,
 	}
+}
+
+func (m *ALBProvider) waitListenerStatus(ctx context.Context, listenerId string) (*albsdk.GetListenerAttributeResponse, error) {
+	var getLsResp *albsdk.GetListenerAttributeResponse
+	var err error
+	for i := 0; i < util.CreateListenerWaitRunningMaxRetryTimes; i++ {
+		time.Sleep(util.CreateListenerWaitRunningRetryInterval)
+
+		getLsResp, err = getALBListenerAttributeFunc(ctx, listenerId, m.auth, m.logger)
+		if err != nil {
+			return getLsResp, err
+		}
+		if isListenerListenerStatusRunning(getLsResp.ListenerStatus) {
+			break
+		}
+	}
+	return getLsResp, nil
 }

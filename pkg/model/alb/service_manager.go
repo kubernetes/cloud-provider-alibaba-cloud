@@ -12,7 +12,8 @@ type ServiceManager struct {
 	Namespace string
 	Name      string
 
-	PortToServerGroup map[int32]*ServerGroupWithIngress
+	PortToServerGroup   map[int32]*ServerGroupWithIngress
+	IngressAlbConfigMap map[string]string
 
 	TrafficPolicy                   string
 	ContainsPotentialReadyEndpoints bool
@@ -38,8 +39,9 @@ type BackendItem struct {
 }
 
 type ServiceGroupWithNameKey struct {
-	NamedKey *ServerGroupNamedKey
-	Backends []BackendItem
+	NamedKey     *ServerGroupNamedKey
+	AlbConfigKey string
+	Backends     []BackendItem
 }
 
 type ServerGroupWithIngress struct {
@@ -84,6 +86,7 @@ type ServiceStackContext struct {
 	Service *v1.Service
 
 	ServicePortToIngressNames map[int32][]string
+	IngressAlbConfigMap       map[string]string
 
 	IsServiceNotFound bool
 }

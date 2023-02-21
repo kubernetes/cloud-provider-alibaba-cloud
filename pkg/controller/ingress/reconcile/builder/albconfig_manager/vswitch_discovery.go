@@ -44,7 +44,8 @@ const (
 )
 
 const (
-	albLeastZoneCount = 2
+	albLeastZoneCount   = 2
+	vSwitchLeastIPCount = 5
 )
 
 func (v *defaultVSwitchesResolver) discoveryALBZones(ctx context.Context) ([]albsdk.Zone, error) {
@@ -117,7 +118,7 @@ func (v *defaultVSwitchesResolver) ResolveViaDiscovery(ctx context.Context) ([]v
 		return nil, fmt.Errorf("unable to discover at least two vSwitches from alb zones: %v", albZones)
 	}
 
-	return chosenVSwitches[:albLeastZoneCount], nil
+	return chosenVSwitches, nil
 }
 
 func mapSDKVSwitchesByZone(vSwitches []vpc.VSwitch) map[string][]vpc.VSwitch {
@@ -164,5 +165,5 @@ func (v *defaultVSwitchesResolver) ResolveViaIDSlice(ctx context.Context, vSwitc
 		return nil, fmt.Errorf("unable to discover at least two vSwitches: %v", vSwitchIDs)
 	}
 
-	return chosenVSwitches[:albLeastZoneCount], nil
+	return chosenVSwitches, nil
 }

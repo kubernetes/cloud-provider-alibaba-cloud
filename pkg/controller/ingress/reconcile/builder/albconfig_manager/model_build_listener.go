@@ -7,6 +7,7 @@ import (
 	v1 "k8s.io/cloud-provider-alibaba-cloud/pkg/apis/alibabacloud/v1"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/model/alb"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/model/alb/core"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/util"
 )
 
 func (t *defaultModelBuildTask) buildListener(ctx context.Context, lbID core.StringToken, lsSpec *v1.ListenerSpec) (*alb.Listener, error) {
@@ -18,10 +19,6 @@ func (t *defaultModelBuildTask) buildListener(ctx context.Context, lbID core.Str
 	ls := alb.NewListener(t.stack, lsResID, lsSpecDst)
 	return ls, nil
 }
-
-const (
-	ListenerDescriptionPrefix = "ls"
-)
 
 func (t *defaultModelBuildTask) buildListenerSpec(ctx context.Context, lbID core.StringToken, apiLs *v1.ListenerSpec) (alb.ListenerSpec, error) {
 	defaultAction, err := t.buildLsDefaultAction(ctx, apiLs.Port.IntValue())
@@ -79,7 +76,7 @@ func (t *defaultModelBuildTask) buildListenerSpec(ctx context.Context, lbID core
 		modelLs.RequestTimeout = t.defaultListenerRequestTimeout
 	}
 	if len(modelLs.ListenerDescription) == 0 {
-		modelLs.ListenerDescription = fmt.Sprintf("%v-%v", ListenerDescriptionPrefix, modelLs.ListenerPort)
+		modelLs.ListenerDescription = fmt.Sprintf("%v-%v", util.ListenerDescriptionPrefix, modelLs.ListenerPort)
 	}
 	if apiLs.GzipEnabled == nil {
 		modelLs.GzipEnabled = t.defaultListenerGzipEnabled
@@ -97,6 +94,12 @@ func (t *defaultModelBuildTask) buildListenerSpec(ctx context.Context, lbID core
 			modelLs.Http2Enabled = t.defaultListenerHttp2Enabled
 		}
 	}
+	if apiLs.Protocol == string(ProtocolQUIC) {
+		modelLs.Certificates = transCertificatesFromAPIToSDK(apiLs.Certificates)
+		if len(apiLs.CaCertificates) != 0 {
+			modelLs.CaCertificates = transCertificatesFromAPIToSDK(apiLs.CaCertificates)
+		}
+	}
 
 	return modelLs, nil
 }
@@ -105,7 +108,7 @@ func transCertificatesFromAPIToSDK(apiCerts []v1.Certificate) []alb.Certificate 
 	sdkCerts := make([]alb.Certificate, 0)
 
 	for _, apiCert := range apiCerts {
-		sdkCerts = append(sdkCerts, alb.Certificate{
+		sdkCerts = append(sdkCerts, &alb.FixedCertificate{
 			IsDefault:     apiCert.IsDefault,
 			CertificateId: apiCert.CertificateId,
 		})

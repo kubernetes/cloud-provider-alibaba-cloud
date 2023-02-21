@@ -1,9 +1,10 @@
 package config
 
 import (
+	"time"
+
 	"github.com/spf13/pflag"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
-	"time"
 )
 
 const (

@@ -82,6 +82,9 @@ func RetryImmediateOnError(interval time.Duration, timeout time.Duration, retrya
 	})
 }
 
+func WaitUntilStop(interval time.Duration, condition func() (done bool, err error), stopCh <-chan struct{}) error {
+	return wait.PollUntil(interval, condition, stopCh)
+}
 func IsStringSliceEqual(s1, s2 []string) bool {
 	if len(s1) != len(s2) {
 		return false

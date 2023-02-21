@@ -9,6 +9,7 @@ import (
 
 	appv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
+	networkingv1 "k8s.io/api/networking/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -23,6 +24,7 @@ import (
 const (
 	Namespace        = "e2e-test"
 	Service          = "basic-service"
+	Secret           = "basic-secret"
 	Deployment       = "nginx"
 	VKDeployment     = "nginx-vk"
 	NodeLabel        = "e2etest"
@@ -66,6 +68,106 @@ func (client *KubeClient) DefaultService() *v1.Service {
 	}
 }
 
+// service
+func (client *KubeClient) DefaultSecret() *v1.Secret {
+	return &v1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      Secret,
+			Namespace: Namespace,
+		},
+		Data: map[string][]byte{
+			"tls.crt": []byte("-----BEGIN CERTIFICATE-----\nMIIBazCCARKgAwIBAgIJAK1KWGXr2wjmMAkGByqGSM49BAEwJjEkMCIGA1UEAwwb\nYWxiLXRvcC5pbmdyZXNzLmFsaWJhYmEuY29tMB4XDTIyMDMyMzA3MTQxNFoXDTMy\nMDMyMDA3MTQxNFowJjEkMCIGA1UEAwwbYWxiLXRvcC5pbmdyZXNzLmFsaWJhYmEu\nY29tMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEZsHzfNnxRDhm0ZG+C8OlmlJU\nXyf3PTNrZrRx4wKIKHPuhZxxmAM/58Gf+ZlYVEZiymbok38MTIgdEfvYCYUpXaMq\nMCgwJgYDVR0RBB8wHYIbYWxiLXRvcC5pbmdyZXNzLmFsaWJhYmEuY29tMAkGByqG\nSM49BAEDSAAwRQIge+GbbNeEm0UhFobZPjr8sSDNMWwrqF/RszBPTQMzv7cCIQDH\n9I7i2WLBsW8wHIFy51oHNbbbMTL0PWD/QZ2LrFOhjQ==\n-----END CERTIFICATE-----\n"),
+			"tls.key": []byte("-----BEGIN EC PARAMETERS-----\nBggqhkjOPQMBBw==\n-----END EC PARAMETERS-----\n-----BEGIN EC PRIVATE KEY-----\nMHcCAQEEIBzf5LCBwZAgJqFxacK9vA7OoFaKIxikk8xq5jgfpx3moAoGCCqGSM49\nAwEHoUQDQgAEZsHzfNnxRDhm0ZG+C8OlmlJUXyf3PTNrZrRx4wKIKHPuhZxxmAM/\n58Gf+ZlYVEZiymbok38MTIgdEfvYCYUpXQ==\n-----END EC PRIVATE KEY-----\n"),
+		},
+	}
+}
+func (client *KubeClient) IngressWithTLS(ing *networkingv1.Ingress, tlsNames []string) *networkingv1.Ingress {
+	tls := []networkingv1.IngressTLS{
+		{
+			Hosts: tlsNames,
+		},
+	}
+	ing.Spec.TLS = tls
+	return ing
+}
+
+// service
+func (client *KubeClient) DefaultIngress() *networkingv1.Ingress {
+	ingressClassName := "alb"
+	pathTypePrefix := networkingv1.PathTypePrefix
+	return &networkingv1.Ingress{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      Service + "-ingress",
+			Namespace: Namespace,
+		},
+		Spec: networkingv1.IngressSpec{
+			IngressClassName: &ingressClassName,
+			Rules: []networkingv1.IngressRule{
+				{
+					Host: "alb.ingress.alibaba.com",
+					IngressRuleValue: networkingv1.IngressRuleValue{
+						HTTP: &networkingv1.HTTPIngressRuleValue{
+							Paths: []networkingv1.HTTPIngressPath{
+								{
+									Path:     "/",
+									PathType: &pathTypePrefix,
+									Backend: networkingv1.IngressBackend{
+										Service: &networkingv1.IngressServiceBackend{
+
+											Name: Service,
+											Port: networkingv1.ServiceBackendPort{
+												Number: 80,
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
+func (client *KubeClient) DefaultIngressWithSvcName(svcName string) *networkingv1.Ingress {
+	ingressClassName := "alb"
+	pathTypePrefix := networkingv1.PathTypePrefix
+	return &networkingv1.Ingress{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      svcName + "-ingress",
+			Namespace: Namespace,
+		},
+		Spec: networkingv1.IngressSpec{
+			IngressClassName: &ingressClassName,
+			Rules: []networkingv1.IngressRule{
+				{
+					Host: "alb.ingress.alibaba.com",
+					IngressRuleValue: networkingv1.IngressRuleValue{
+						HTTP: &networkingv1.HTTPIngressRuleValue{
+							Paths: []networkingv1.HTTPIngressPath{
+								{
+									Path:     "/",
+									PathType: &pathTypePrefix,
+									Backend: networkingv1.IngressBackend{
+										Service: &networkingv1.IngressServiceBackend{
+
+											Name: svcName,
+											Port: networkingv1.ServiceBackendPort{
+												Number: 80,
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
 func (client *KubeClient) CreateServiceByAnno(anno map[string]string) (*v1.Service, error) {
 	svc := client.DefaultService()
 	svc.Annotations = anno
@@ -99,6 +201,13 @@ func (client *KubeClient) CreateServiceWithStringTargetPort(anno map[string]stri
 		},
 	}
 	return client.CoreV1().Services(Namespace).Create(context.TODO(), svc, metav1.CreateOptions{})
+}
+
+func (client *KubeClient) CreateIngress(ing *networkingv1.Ingress) (*networkingv1.Ingress, error) {
+	if ing == nil {
+		return nil, fmt.Errorf("ingress is nil")
+	}
+	return client.NetworkingV1().Ingresses(Namespace).Create(context.TODO(), ing, metav1.CreateOptions{})
 }
 
 func (client *KubeClient) CreateNLBServiceWithStringTargetPort(anno map[string]string) (*v1.Service, error) {

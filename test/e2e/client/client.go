@@ -3,27 +3,25 @@ package client
 import (
 	"context"
 	"fmt"
+	"os"
+	"strings"
+
 	vpcsdk "github.com/aliyun/alibaba-cloud-sdk-go/services/vpc"
+
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	ctrlCfg "k8s.io/cloud-provider-alibaba-cloud/pkg/config"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba"
-	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/base"
-	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/ecs"
-	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/nlb"
-	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/pvtz"
-	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/slb"
-	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/vpc"
 	"k8s.io/cloud-provider-alibaba-cloud/test/e2e/options"
 	"k8s.io/klog/v2"
-	"os"
 	runtime "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
-	"strings"
 )
 
 type E2EClient struct {
-	CloudClient   *alibaba.AlibabaCloud
+	CloudClient   alibaba.AlibabaCloud
 	KubeClient    *KubeClient
+	DynamicClient dynamic.Interface
 	RuntimeClient runtime.Client
 	ACKClient     *ACKClient
 }
@@ -31,45 +29,43 @@ type E2EClient struct {
 func NewClient() (*E2EClient, error) {
 	ctrlCfg.ControllerCFG.CloudConfigPath = options.TestConfig.CloudConfig
 
-	ackClient, err := NewACKClient()
-	if err != nil {
-		panic(fmt.Sprintf("initialize alibaba client: %s", err.Error()))
+	onlyAlb := options.TestConfig.Controllers == "alb"
+
+	ackClient := &ACKClient{}
+
+	fmt.Println("%#v", options.TestConfig)
+	// alb测试账号没有ack资源权限，跳过ackClient
+	if !onlyAlb {
+		ackClient, err := NewACKClient()
+		if err != nil && !onlyAlb {
+			panic(fmt.Sprintf("initialize alibaba client: %s", err.Error()))
+		}
+
+		if err := InitCloudConfig(ackClient); err != nil {
+			panic(fmt.Sprintf("init cloud config error: %s", err.Error()))
+		}
 	}
 
-	if err := InitCloudConfig(ackClient); err != nil {
-		panic(fmt.Sprintf("init cloud config error: %s", err.Error()))
-	}
-	mgr, err := base.NewClientMgr()
-	if err != nil || mgr == nil {
-		return nil, fmt.Errorf("initialize alibaba cloud client auth error: %v", err)
-	}
-	err = mgr.Start(base.RefreshToken)
-	if err != nil {
-		return nil, fmt.Errorf("refresh token: %s", err.Error())
-	}
-	cc := &alibaba.AlibabaCloud{
-		IMetaData:    mgr.Meta,
-		ECSProvider:  ecs.NewECSProvider(mgr),
-		SLBProvider:  slb.NewLBProvider(mgr),
-		PVTZProvider: pvtz.NewPVTZProvider(mgr),
-		VPCProvider:  vpc.NewVPCProvider(mgr),
-		NLBProvider:  nlb.NewNLBProvider(mgr),
-	}
+	newCC := alibaba.NewAlibabaCloud().(alibaba.AlibabaCloud)
 
 	cfg := config.GetConfigOrDie()
 	kubeClient, err := kubernetes.NewForConfig(cfg)
 	if err != nil {
 		panic(fmt.Sprintf("new client : %s", err.Error()))
 	}
-
+	dynamicClient, err := dynamic.NewForConfig(cfg)
+	if err != nil {
+		panic(fmt.Sprintf("new dynamic client : %s", err.Error()))
+	}
 	runtimeClient, err := runtime.New(cfg, runtime.Options{})
 	if err != nil {
 		panic(fmt.Sprintf("new runtime client error: %s", err.Error()))
 	}
 
 	return &E2EClient{
-		CloudClient:   cc,
+		CloudClient:   newCC,
 		KubeClient:    NewKubeClient(kubeClient),
+		DynamicClient: dynamicClient,
 		RuntimeClient: runtimeClient,
 		ACKClient:     ackClient,
 	}, nil

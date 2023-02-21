@@ -2,8 +2,9 @@ package alb
 
 import (
 	"context"
-	"errors"
+	"encoding/json"
 	"fmt"
+	"reflect"
 	"strings"
 	"time"
 
@@ -14,8 +15,10 @@ import (
 	prvd "k8s.io/cloud-provider-alibaba-cloud/pkg/provider"
 
 	"github.com/aliyun/alibaba-cloud-sdk-go/sdk/requests"
+	"github.com/aliyun/alibaba-cloud-sdk-go/sdk/responses"
+
 	albsdk "github.com/aliyun/alibaba-cloud-sdk-go/services/alb"
-	"github.com/aliyun/alibaba-cloud-sdk-go/services/sls"
+
 	"github.com/go-logr/logr"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/model/alb"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/base"
@@ -23,10 +26,12 @@ import (
 )
 
 const (
-	DefaultWaitSGPDeletionPollInterval = 2 * time.Second
-	DefaultWaitSGPDeletionTimeout      = 50 * time.Second
-	DefaultWaitLSExistencePollInterval = 2 * time.Second
-	DefaultWaitLSExistenceTimeout      = 20 * time.Second
+	DefaultWaitSGPDeletionPollInterval  = 2 * time.Second
+	DefaultWaitSGPDeletionTimeout       = 50 * time.Second
+	DefaultWaitLSExistencePollInterval  = 2 * time.Second
+	DefaultWaitLSExistenceTimeout       = 20 * time.Second
+	DefaultWaitAclExistencePollInterval = 2 * time.Second
+	DefaultWaitAclExistenceTimeout      = 20 * time.Second
 )
 
 func NewALBProvider(
@@ -34,12 +39,14 @@ func NewALBProvider(
 ) *ALBProvider {
 	logger := ctrl.Log.WithName("controllers").WithName("ALBProvider")
 	return &ALBProvider{
-		logger:                      logger,
-		auth:                        auth,
-		waitSGPDeletionPollInterval: DefaultWaitSGPDeletionPollInterval,
-		waitSGPDeletionTimeout:      DefaultWaitSGPDeletionTimeout,
-		waitLSExistenceTimeout:      DefaultWaitLSExistenceTimeout,
-		waitLSExistencePollInterval: DefaultWaitLSExistencePollInterval,
+		logger:                       logger,
+		auth:                         auth,
+		waitSGPDeletionPollInterval:  DefaultWaitSGPDeletionPollInterval,
+		waitSGPDeletionTimeout:       DefaultWaitSGPDeletionTimeout,
+		waitLSExistenceTimeout:       DefaultWaitLSExistenceTimeout,
+		waitLSExistencePollInterval:  DefaultWaitLSExistencePollInterval,
+		waitAclExistencePollInterval: DefaultWaitAclExistencePollInterval,
+		waitAclExistenceTimeout:      DefaultWaitAclExistenceTimeout,
 	}
 }
 
@@ -50,10 +57,16 @@ type ALBProvider struct {
 	logger   logr.Logger
 	sdkCerts []albsdk.CertificateModel
 
-	waitLSExistencePollInterval time.Duration
-	waitLSExistenceTimeout      time.Duration
-	waitSGPDeletionPollInterval time.Duration
-	waitSGPDeletionTimeout      time.Duration
+	waitLSExistencePollInterval  time.Duration
+	waitLSExistenceTimeout       time.Duration
+	waitSGPDeletionPollInterval  time.Duration
+	waitSGPDeletionTimeout       time.Duration
+	waitAclExistencePollInterval time.Duration
+	waitAclExistenceTimeout      time.Duration
+}
+
+func (m *ALBProvider) DoAction(request requests.AcsRequest, response responses.AcsResponse) (err error) {
+	return m.auth.ALB.Client.DoAction(request, response)
 }
 
 func (m *ALBProvider) CreateALB(ctx context.Context, resLB *alb.AlbLoadBalancer, trackingProvider tracking.TrackingProvider) (alb.LoadBalancerStatus, error) {
@@ -124,6 +137,24 @@ func (m *ALBProvider) CreateALB(ctx context.Context, resLB *alb.AlbLoadBalancer,
 		}
 		return alb.LoadBalancerStatus{}, err
 	}
+	// if err := m.ServiceManagedControl(ctx, resLB, createLbResp.LoadBalancerId); err != nil {
+	// 	m.logger.V(util.MgrLogLevel).Error(err, "service managed control resource failed",
+	// 		"stackID", resLB.Stack().StackID(),
+	// 		"resourceID", resLB.ID(),
+	// 		"traceID", traceID,
+	// 		"loadBalancerID", createLbResp.LoadBalancerId,
+	// 		"elapsedTime", time.Since(asynchronousStartTime).Milliseconds(),
+	// 		util.Action, util.ALBInnerServiceManagedControl)
+	// 	if errTmp := m.DeleteALB(ctx, createLbResp.LoadBalancerId); errTmp != nil {
+	// 		m.logger.V(util.MgrLogLevel).Error(errTmp, "roll back load balancer failed",
+	// 			"stackID", resLB.Stack().StackID(),
+	// 			"resourceID", resLB.ID(),
+	// 			"traceID", traceID,
+	// 			"loadBalancerID", createLbResp.LoadBalancerId,
+	// 			util.Action, util.ALBInnerServiceManagedControl)
+	// 	}
+	// 	return alb.LoadBalancerStatus{}, err
+	// }
 
 	if len(resLB.Spec.AccessLogConfig.LogProject) != 0 && len(resLB.Spec.AccessLogConfig.LogStore) != 0 {
 		if err := m.AnalyzeAndAssociateAccessLogToALB(ctx, createLbResp.LoadBalancerId, resLB); err != nil {
@@ -138,7 +169,94 @@ func isAlbLoadBalancerActive(status string) bool {
 	return strings.EqualFold(status, util.LoadBalancerStatusActive)
 }
 
-func (m *ALBProvider) UpdateALB(ctx context.Context, resLB *alb.AlbLoadBalancer, sdkLB albsdk.LoadBalancer) (alb.LoadBalancerStatus, error) {
+func filterAlbLoadBalancerResourceTags(tags map[string]string, trackingProvider tracking.TrackingProvider) map[string]string {
+	ret := make(map[string]string)
+	for k, v := range tags {
+		if !trackingProvider.IsAlbIngressTagKey(k) {
+			ret[k] = v
+		}
+	}
+	return ret
+}
+
+func (m *ALBProvider) updateAlbLoadBalancerTag(ctx context.Context, resLB *alb.AlbLoadBalancer, sdkLB *albsdk.LoadBalancer, trackingProvider tracking.TrackingProvider) error {
+	traceID := ctx.Value(util.TraceID)
+
+	if len(resLB.Spec.Tags) == 0 {
+		m.logger.V(util.MgrLogLevel).Info("AlbLoadBalancerTag no need update, res tags is nil",
+			"sdk", sdkLB.Tags,
+			"loadBalancerID", sdkLB.LoadBalancerId,
+			"traceID", traceID)
+		return nil
+	}
+	var (
+		isAlbLoadBalancerTagNeedUpdate = false
+	)
+
+	sdkCustomerTagMap := filterAlbLoadBalancerResourceTags(transSDKTagListToMap(sdkLB.Tags), trackingProvider)
+	resCustomerTagMap := transTagListToMap(resLB.Spec.Tags)
+
+	if !reflect.DeepEqual(resCustomerTagMap, sdkCustomerTagMap) {
+		m.logger.V(util.MgrLogLevel).Info("AlbLoadBalancerTag update",
+			"res", resLB.Spec.Tags,
+			"sdk", sdkLB.Tags,
+			"loadBalancerID", sdkLB.LoadBalancerId,
+			"traceID", traceID)
+		isAlbLoadBalancerTagNeedUpdate = true
+	}
+	if !isAlbLoadBalancerTagNeedUpdate {
+		return nil
+	}
+
+	needUnTagMaps := make(map[string]string)
+	needTagMaps := make(map[string]string)
+	// find needTags map
+	for key, resValue := range resCustomerTagMap {
+		if sdkValue, exist := sdkCustomerTagMap[key]; exist {
+			if sdkValue != resValue {
+				needTagMaps[key] = resValue
+			}
+		} else {
+			needTagMaps[key] = resValue
+		}
+	}
+
+	// find needUnTags map
+	for key, sdkValue := range sdkCustomerTagMap {
+		if _, exist := resCustomerTagMap[key]; !exist {
+			needUnTagMaps[key] = sdkValue
+		}
+	}
+	if len(needUnTagMaps) != 0 {
+		if err := m.UnTag(ctx, needUnTagMaps, sdkLB.LoadBalancerId); err != nil {
+			m.logger.V(util.MgrLogLevel).Error(err, "unTag load balancer failed",
+				"stackID", resLB.Stack().StackID(),
+				"resourceID", resLB.ID(),
+				"traceID", traceID,
+				"loadBalancerID", sdkLB.LoadBalancerId,
+				"unTags", needUnTagMaps,
+				util.Action, util.UnTagALBResource)
+			return err
+		}
+	}
+
+	if len(needTagMaps) != 0 {
+		if err := m.TagWithoutResourceTags(ctx, needTagMaps, sdkLB.LoadBalancerId); err != nil {
+			m.logger.V(util.MgrLogLevel).Error(err, "tag load balancer failed",
+				"stackID", resLB.Stack().StackID(),
+				"resourceID", resLB.ID(),
+				"traceID", traceID,
+				"loadBalancerID", sdkLB.LoadBalancerId,
+				"tags", needTagMaps,
+				util.Action, util.TagALBResource)
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (m *ALBProvider) UpdateALB(ctx context.Context, resLB *alb.AlbLoadBalancer, sdkLB albsdk.LoadBalancer, trackingProvider tracking.TrackingProvider) (alb.LoadBalancerStatus, error) {
 	if err := m.updateAlbLoadBalancerAttribute(ctx, resLB, &sdkLB); err != nil {
 		return alb.LoadBalancerStatus{}, err
 	}
@@ -151,8 +269,93 @@ func (m *ALBProvider) UpdateALB(ctx context.Context, resLB *alb.AlbLoadBalancer,
 	if err := m.updateAlbLoadBalancerEdition(ctx, resLB, &sdkLB); err != nil {
 		return alb.LoadBalancerStatus{}, err
 	}
+	if err := m.updateAlbLoadBalancerTag(ctx, resLB, &sdkLB, trackingProvider); err != nil {
+		return alb.LoadBalancerStatus{}, err
+	}
 
 	return buildResAlbLoadBalancerStatus(sdkLB.LoadBalancerId, sdkLB.DNSName), nil
+}
+
+func (m *ALBProvider) ServiceManagedControl(ctx context.Context, resLB *alb.AlbLoadBalancer, lbID string) error {
+	traceID := ctx.Value(util.TraceID)
+
+	startTime := time.Now()
+	rpcRequest := &requests.RpcRequest{}
+	rpcRequest.InitWithApiInfo("Alb", "2020-06-16", "ServiceManagedControl", "alb", "innerAPI")
+	region, err := m.auth.Meta.Region()
+	if err != nil {
+		return err
+	}
+	resourceUid, err := m.auth.Meta.OwnerAccountID()
+	if err != nil {
+		return err
+	}
+	region = reCorrectRegion(region)
+	rpcRequest.RegionId = region
+	rpcRequest.QueryParams = map[string]string{
+		"ServiceManagedMode": "Managed",
+		"ResourceType":       "LoadBalancer",
+		"ResourceUid":        resourceUid,
+		"ResourceIds.1":      lbID,
+	}
+
+	m.logger.V(util.MgrLogLevel).Info("service managed control resource",
+		"stackID", resLB.Stack().StackID(),
+		"resourceID", resLB.ID(),
+		"traceID", traceID,
+		"loadBalancerID", lbID,
+		"startTime", startTime,
+		"request", rpcRequest,
+		util.Action, util.ALBInnerServiceManagedControl)
+	response := responses.NewCommonResponse()
+	if err := m.DoAction(rpcRequest, response); err != nil {
+		return err
+	}
+	resp := make(map[string]string)
+	if err := json.Unmarshal(response.GetHttpContentBytes(), &resp); err != nil {
+		return err
+	}
+	m.logger.V(util.MgrLogLevel).Info("",
+		"stackID", resLB.Stack().StackID(),
+		"resourceID", resLB.ID(),
+		"traceID", traceID,
+		"loadBalancerID", lbID,
+		"requestID", resp["RequestId"],
+		"elapsedTime", time.Since(startTime).Milliseconds(),
+		util.Action, util.ALBInnerServiceManagedControl)
+
+	return nil
+}
+
+func (m *ALBProvider) TagWithoutResourceTags(ctx context.Context, withoutResourceTags map[string]string, lbID string) error {
+	traceID := ctx.Value(util.TraceID)
+
+	lbIDs := make([]string, 0)
+	lbIDs = append(lbIDs, lbID)
+	tags := transTagMapToSDKTagResourcesTagList(withoutResourceTags)
+	tagReq := albsdk.CreateTagResourcesRequest()
+	tagReq.Tag = &tags
+	tagReq.ResourceId = &lbIDs
+	tagReq.ResourceType = util.LoadBalancerResourceType
+	startTime := time.Now()
+
+	m.logger.V(util.MgrLogLevel).Info("tagging resource without resourceTags",
+		"traceID", traceID,
+		"loadBalancerID", lbID,
+		"startTime", startTime,
+		util.Action, util.TagALBResource)
+	tagResp, err := m.auth.ALB.TagResources(tagReq)
+	if err != nil {
+		return err
+	}
+	m.logger.V(util.MgrLogLevel).Info("tagged resource without resourceTags",
+		"traceID", traceID,
+		"loadBalancerID", lbID,
+		"requestID", tagResp.RequestId,
+		"elapsedTime", time.Since(startTime).Milliseconds(),
+		util.Action, util.TagALBResource)
+
+	return nil
 }
 
 func (m *ALBProvider) Tag(ctx context.Context, resLB *alb.AlbLoadBalancer, lbID string, trackingProvider tracking.TrackingProvider) error {
@@ -189,7 +392,35 @@ func (m *ALBProvider) Tag(ctx context.Context, resLB *alb.AlbLoadBalancer, lbID 
 
 	return nil
 }
+func (m *ALBProvider) UnTag(ctx context.Context, tags map[string]string, lbID string) error {
+	traceID := ctx.Value(util.TraceID)
 
+	lbIds := make([]string, 0)
+	lbIds = append(lbIds, lbID)
+	sdkTags := transTagMapToSDKUnTagResourcesTagList(tags)
+	untagReq := albsdk.CreateUnTagResourcesRequest()
+	untagReq.Tag = &sdkTags
+	untagReq.ResourceId = &lbIds
+	untagReq.ResourceType = util.LoadBalancerResourceType
+	startTime := time.Now()
+	m.logger.V(util.MgrLogLevel).Info("untagging resource",
+		"traceID", traceID,
+		"loadBalancerID", lbID,
+		"startTime", startTime,
+		util.Action, util.UnTagALBResource)
+	untagResp, err := m.auth.ALB.UnTagResources(untagReq)
+	if err != nil {
+		return err
+	}
+	m.logger.V(util.MgrLogLevel).Info("untagged resource",
+		"traceID", traceID,
+		"loadBalancerID", lbID,
+		"requestID", untagResp.RequestId,
+		"elapsedTime", time.Since(startTime).Milliseconds(),
+		util.Action, util.UnTagALBResource)
+
+	return nil
+}
 func (m *ALBProvider) preCheckTagConflictForReuse(ctx context.Context, sdkLB *albsdk.GetLoadBalancerAttributeResponse, resLB *alb.AlbLoadBalancer, trackingProvider tracking.TrackingProvider) error {
 	if sdkLB.VpcId != resLB.Spec.VpcId {
 		return fmt.Errorf("the vpc %s of reused alb %s is not same with cluster vpc %s", sdkLB.VpcId, sdkLB.LoadBalancerId, resLB.Spec.VpcId)
@@ -228,6 +459,10 @@ func (m *ALBProvider) ReuseALB(ctx context.Context, resLB *alb.AlbLoadBalancer, 
 		return alb.LoadBalancerStatus{}, err
 	}
 
+	if getLbResp.LoadBalancerEdition == util.LoadBalancerEditionBasic {
+		return alb.LoadBalancerStatus{}, fmt.Errorf("LoadBalancer Edition: %s can't use for ingress controller", getLbResp.LoadBalancerEdition)
+	}
+
 	if err := m.preCheckTagConflictForReuse(ctx, getLbResp, resLB, trackingProvider); err != nil {
 		return alb.LoadBalancerStatus{}, err
 	}
@@ -238,12 +473,31 @@ func (m *ALBProvider) ReuseALB(ctx context.Context, resLB *alb.AlbLoadBalancer, 
 
 	if resLB.Spec.ForceOverride != nil && *resLB.Spec.ForceOverride {
 		loadBalancer := transSDKGetLoadBalancerAttributeResponseToLoadBalancer(*getLbResp)
-		return m.UpdateALB(ctx, resLB, loadBalancer)
+		return m.UpdateALB(ctx, resLB, loadBalancer, trackingProvider)
 	}
 
 	return buildResAlbLoadBalancerStatus(lbID, getLbResp.DNSName), nil
 }
 
+func (m *ALBProvider) UnReuseALB(ctx context.Context, lbID string, trackingProvider tracking.TrackingProvider) error {
+	getLbResp, err := getALBLoadBalancerAttributeFunc(ctx, lbID, m.auth, m.logger)
+	if err != nil {
+		return err
+	}
+
+	tagsToClean := make(map[string]string, 0)
+	for _, tag := range getLbResp.Tags {
+		if trackingProvider.IsAlbIngressTagKey(tag.Key) {
+			tagsToClean[tag.Key] = tag.Value
+		}
+	}
+
+	if err = m.UnTag(ctx, tagsToClean, lbID); err != nil {
+		return err
+	}
+
+	return nil
+}
 func transSDKGetLoadBalancerAttributeResponseToLoadBalancer(albAttr albsdk.GetLoadBalancerAttributeResponse) albsdk.LoadBalancer {
 	return albsdk.LoadBalancer{
 		AddressAllocatedMode:         albAttr.AddressAllocatedMode,
@@ -582,28 +836,51 @@ func reCorrectRegion(region string) string {
 func (m *ALBProvider) DissociateAccessLogFromALB(ctx context.Context, lbID string, resLB *alb.AlbLoadBalancer) error {
 	traceID := ctx.Value(util.TraceID)
 
-	updateLbReq := albsdk.CreateDisableLoadBalancerAccessLogRequest()
-	updateLbReq.LoadBalancerId = lbID
-	startTime := time.Now()
-	m.logger.V(util.MgrLogLevel).Info("disabling loadBalancer access log",
-		"stackID", resLB.Stack().StackID(),
-		"resourceID", resLB.ID(),
-		"traceID", traceID,
-		"loadBalancerID", lbID,
-		"startTime", startTime,
-		util.Action, util.DisableALBLoadBalancerAccessLog)
-	updateLbResp, err := m.auth.ALB.DisableLoadBalancerAccessLog(updateLbReq)
+	rpcRequest := &requests.RpcRequest{}
+	rpcRequest.InitWithApiInfo("Sls", "2019-10-23", "CloseProductDataCollection", "sls", "innerAPI")
+	region, err := m.auth.Meta.Region()
 	if err != nil {
 		return err
 	}
-	m.logger.V(util.MgrLogLevel).Info("disabled loadBalancer access log",
+	region = reCorrectRegion(region)
+	rpcRequest.Domain = fmt.Sprintf("%s%s", region, util.DefaultLogDomainSuffix)
+	rpcRequest.QueryParams = map[string]string{
+		"DataType":       "alb.access_log",
+		"InstanceRegion": region,
+		"InstanceId":     lbID,
+	}
+	startTime := time.Now()
+	m.logger.V(util.MgrLogLevel).Info("close product data collection",
 		"stackID", resLB.Stack().StackID(),
 		"resourceID", resLB.ID(),
 		"traceID", traceID,
+		"request", rpcRequest,
 		"loadBalancerID", lbID,
-		"requestID", updateLbResp.RequestId,
+		"startTime", startTime,
+		util.Action, util.CloseProductDataCollection)
+	response := responses.NewCommonResponse()
+	err = m.auth.SLS.DoAction(rpcRequest, response)
+	if err != nil {
+		return err
+	}
+	if !response.IsSuccess() {
+		err := fmt.Errorf("failed close SLS product data, reponse: %v", response.GetHttpContentString())
+		m.logger.V(util.MgrLogLevel).Info("close product data collection",
+			"stackID", resLB.Stack().StackID(),
+			"resourceID", resLB.ID(),
+			"loadBalancerID", lbID,
+			"traceID", traceID,
+			"error", err.Error(),
+			util.Action, util.CloseProductDataCollection)
+		return err
+	}
+	m.logger.V(util.MgrLogLevel).Info("close product data collection",
+		"stackID", resLB.Stack().StackID(),
+		"resourceID", resLB.ID(),
+		"loadBalancerID", lbID,
+		"traceID", traceID,
 		"elapsedTime", time.Since(startTime).Milliseconds(),
-		util.Action, util.DisableALBLoadBalancerAccessLog)
+		util.Action, util.CloseProductDataCollection)
 	return nil
 }
 
@@ -617,72 +894,54 @@ func (m *ALBProvider) AnalyzeAndAssociateAccessLogToALB(ctx context.Context, lbI
 		return fmt.Errorf("invalid name of logProject: %s or logStore: %s", logProject, logStore)
 	}
 
-	logReq := sls.CreateAnalyzeProductLogRequest()
+	rpcRequest := &requests.RpcRequest{}
+	rpcRequest.InitWithApiInfo("Sls", "2019-10-23", "OpenProductDataCollection", "sls", "innerAPI")
 	region, err := m.auth.Meta.Region()
 	if err != nil {
 		return err
 	}
-	logReq.Region = reCorrectRegion(region)
-	logReq.Logstore = logStore
-	logReq.Project = logProject
-	logReq.AcceptFormat = util.DefaultLogAcceptFormat
-	logReq.CloudProduct = util.DefaultLogCloudProduct
-	logReq.Lang = util.DefaultLogLang
-	logReq.Domain = fmt.Sprintf("%s%s", logReq.Region, util.DefaultLogDomainSuffix)
+	region = reCorrectRegion(region)
+	rpcRequest.Domain = fmt.Sprintf("%s%s", region, util.DefaultLogDomainSuffix)
+	rpcRequest.QueryParams = map[string]string{
+		"DataType":        "alb.access_log",
+		"InstanceRegion":  region,
+		"InstanceId":      lbID,
+		"TargetSLSRegion": region,
+		"TargetProject":   logProject,
+		"TargetStore":     logStore,
+	}
 	startTime := time.Now()
-	m.logger.V(util.MgrLogLevel).Info("analyzing product log",
+	m.logger.V(util.MgrLogLevel).Info("open product data collection",
 		"stackID", resLB.Stack().StackID(),
 		"resourceID", resLB.ID(),
 		"traceID", traceID,
-		"request", logReq,
+		"request", rpcRequest,
 		"loadBalancerID", lbID,
 		"startTime", startTime,
-		util.Action, util.AnalyzeProductLog)
-	logResp, err := m.auth.SLS.AnalyzeProductLog(logReq)
+		util.Action, util.OpenProductDataCollection)
+	response := responses.NewCommonResponse()
+	err = m.auth.SLS.DoAction(rpcRequest, response)
 	if err != nil {
-		m.logger.V(util.MgrLogLevel).Info("analyzing product log",
+		return err
+	}
+	if !response.IsSuccess() {
+		err := fmt.Errorf("failed open SLS product data, reponse: %v", response.GetHttpContentString())
+		m.logger.V(util.MgrLogLevel).Info("open product data collection",
 			"stackID", resLB.Stack().StackID(),
 			"resourceID", resLB.ID(),
 			"loadBalancerID", lbID,
 			"traceID", traceID,
-			"requestID", logResp.RequestId,
 			"error", err.Error(),
-			util.Action, util.AnalyzeProductLog)
+			util.Action, util.OpenProductDataCollection)
 		return err
 	}
-	m.logger.V(util.MgrLogLevel).Info("analyzed product log",
+	m.logger.V(util.MgrLogLevel).Info("open product data collection",
 		"stackID", resLB.Stack().StackID(),
 		"resourceID", resLB.ID(),
 		"loadBalancerID", lbID,
 		"traceID", traceID,
-		"requestID", logResp.RequestId,
 		"elapsedTime", time.Since(startTime).Milliseconds(),
-		util.Action, util.AnalyzeProductLog)
-
-	lbReq := albsdk.CreateEnableLoadBalancerAccessLogRequest()
-	lbReq.LoadBalancerId = lbID
-	lbReq.LogProject = logProject
-	lbReq.LogStore = logStore
-	startTime = time.Now()
-	m.logger.V(util.MgrLogLevel).Info("enabling loadBalancer access log",
-		"stackID", resLB.Stack().StackID(),
-		"resourceID", resLB.ID(),
-		"traceID", traceID,
-		"loadBalancerID", lbID,
-		"startTime", startTime,
-		util.Action, util.EnableALBLoadBalancerAccessLog)
-	lbResp, err := m.auth.ALB.EnableLoadBalancerAccessLog(lbReq)
-	if err != nil {
-		return err
-	}
-	m.logger.V(util.MgrLogLevel).Info("enabled loadBalancer access log",
-		"stackID", resLB.Stack().StackID(),
-		"resourceID", resLB.ID(),
-		"loadBalancerID", lbID,
-		"traceID", traceID,
-		"requestID", lbResp.RequestId,
-		"elapsedTime", time.Since(startTime).Milliseconds(),
-		util.Action, util.EnableALBLoadBalancerAccessLog)
+		util.Action, util.OpenProductDataCollection)
 	return nil
 }
 
@@ -720,7 +979,10 @@ func (m *ALBProvider) updateAlbLoadBalancerAccessLogConfig(ctx context.Context, 
 
 func (m *ALBProvider) updateAlbLoadBalancerEdition(ctx context.Context, resLB *alb.AlbLoadBalancer, sdkLB *albsdk.LoadBalancer) error {
 	traceID := ctx.Value(util.TraceID)
-
+	// do not update edition when reusing alb
+	if len(resLB.Spec.LoadBalancerId) != 0 {
+		return nil
+	}
 	var (
 		isLoadBalancerEditionNeedUpdate = false
 	)
@@ -728,9 +990,10 @@ func (m *ALBProvider) updateAlbLoadBalancerEdition(ctx context.Context, resLB *a
 	if !isAlbLoadBalancerEditionValid(resLB.Spec.LoadBalancerEdition) {
 		return fmt.Errorf("invalid load balancer edition: %s", resLB.Spec.LoadBalancerEdition)
 	}
-	if strings.EqualFold(resLB.Spec.LoadBalancerEdition, util.LoadBalancerEditionBasic) &&
-		strings.EqualFold(sdkLB.LoadBalancerEdition, util.LoadBalancerEditionStandard) {
-		return errors.New("downgrade not allowed for alb from standard to basic")
+
+	if sdkLB.LoadBalancerEdition != util.LoadBalancerEditionBasic &&
+		resLB.Spec.LoadBalancerEdition == util.LoadBalancerEditionBasic {
+		return fmt.Errorf("downgrade not allowed for alb from %s to %s", sdkLB.LoadBalancerEdition, resLB.Spec.LoadBalancerEdition)
 	}
 	if !strings.EqualFold(resLB.Spec.LoadBalancerEdition, sdkLB.LoadBalancerEdition) {
 		m.logger.V(util.MgrLogLevel).Info("LoadBalancer Edition update",
@@ -781,7 +1044,16 @@ func transTagMapToSDKTagResourcesTagList(tagMap map[string]string) []albsdk.TagR
 	}
 	return tagList
 }
-
+func transTagMapToSDKUnTagResourcesTagList(tagMap map[string]string) []albsdk.UnTagResourcesTag {
+	tagList := make([]albsdk.UnTagResourcesTag, 0)
+	for k, v := range tagMap {
+		tagList = append(tagList, albsdk.UnTagResourcesTag{
+			Key:   k,
+			Value: v,
+		})
+	}
+	return tagList
+}
 func transTagListToMap(tagList []alb.ALBTag) map[string]string {
 	tagMap := make(map[string]string)
 	for _, tag := range tagList {
@@ -831,13 +1103,17 @@ func isLoadBalancerAddressAllocatedModeValid(addressAllocatedMode string) bool {
 func (p ALBProvider) TagALBResources(request *albsdk.TagResourcesRequest) (response *albsdk.TagResourcesResponse, err error) {
 	return p.auth.ALB.TagResources(request)
 }
+func (p ALBProvider) UnTagALBResources(request *albsdk.UnTagResourcesRequest) (response *albsdk.UnTagResourcesResponse, err error) {
+	return p.auth.ALB.UnTagResources(request)
+}
 func (p ALBProvider) DescribeALBZones(request *albsdk.DescribeZonesRequest) (response *albsdk.DescribeZonesResponse, err error) {
 	return p.auth.ALB.DescribeZones(request)
 }
 
 func isAlbLoadBalancerEditionValid(edition string) bool {
 	if strings.EqualFold(edition, util.LoadBalancerEditionBasic) ||
-		strings.EqualFold(edition, util.LoadBalancerEditionStandard) {
+		strings.EqualFold(edition, util.LoadBalancerEditionStandard) ||
+		strings.EqualFold(edition, util.LoadBalancerEditionWaf) {
 		return true
 	}
 	return false

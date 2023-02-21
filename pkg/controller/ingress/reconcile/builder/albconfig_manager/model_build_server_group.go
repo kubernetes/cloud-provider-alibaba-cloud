@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"strconv"
 
@@ -56,6 +57,13 @@ func (t *defaultModelBuildTask) buildServerGroupSpec(_ context.Context,
 		len(svc.Name) == 0 {
 		return alb.ServerGroupSpec{}, fmt.Errorf("ingress namespace, ingress name and service name cant be empty")
 	}
+	if err := checkIngressProtocolAnnotations(ing); err != nil {
+		return alb.ServerGroupSpec{}, err
+	}
+	if err := checkBackendSchedulerAnnotations(ing); err != nil {
+		return alb.ServerGroupSpec{}, err
+	}
+
 	tags := make([]alb.ALBTag, 0)
 	tags = append(tags, []alb.ALBTag{
 		{
@@ -89,12 +97,97 @@ func (t *defaultModelBuildTask) buildServerGroupSpec(_ context.Context,
 	sgpSpec.Tags = tags
 	sgpSpec.HealthCheckConfig = buildServerGroupHealthCheckConfig(ing)
 	sgpSpec.ServerGroupName = t.buildServerGroupName(ing, svc, port)
-	sgpSpec.Scheduler = t.defaultServerGroupScheduler
-	sgpSpec.Protocol = t.defaultServerGroupProtocol
+	sgpSpec.Scheduler = t.buildServerGroupScheduler(ing)
+	sgpSpec.Protocol = t.buildServerGroupProtocol(ing)
 	sgpSpec.StickySessionConfig = buildServerGroupStickySessionConfig(ing)
 	sgpSpec.ServerGroupType = t.defaultServerGroupType
 	sgpSpec.VpcId = t.vpcID
 	return sgpSpec, nil
+}
+
+func checkBackendSchedulerAnnotations(ing *networking.Ingress) error {
+	if v, ok := ing.Annotations[annotations.AlbBackendScheduler]; ok {
+		switch v {
+		case "wrr":
+			return nil
+		case "wlc":
+			return nil
+		case "sch":
+			return nil
+		default:
+			return fmt.Errorf("unkown backend scheduler [%s]", v)
+		}
+	}
+	return nil
+}
+
+func checkIngressProtocolAnnotations(ing *networking.Ingress) error {
+	if v, ok := ing.Annotations[annotations.AlbBackendProtocol]; ok && v == "grpc" {
+		if len(ing.Spec.TLS) == 0 {
+			return fmt.Errorf("'grpc' backend protocol must be use with TLS listener(Ingress.Spec.TLS)")
+		}
+		if rawListenPorts, err := annotations.GetStringAnnotation(annotations.ListenPorts, ing); err == nil {
+			var entries []map[string]int32
+			if err := json.Unmarshal([]byte(rawListenPorts), &entries); err != nil {
+				return fmt.Errorf("failed to parse listen-ports configuration: `%s` [%v]", rawListenPorts, err)
+			}
+			if len(entries) == 0 {
+				return fmt.Errorf("empty listen-ports configuration: `%s`", rawListenPorts)
+			}
+
+			for _, entry := range entries {
+				for protocol, port := range entry {
+					if port < 1 || port > 65535 {
+						return fmt.Errorf("listen port must be within [1, 65535]: %v", port)
+					}
+					switch protocol {
+					case string(ProtocolHTTP):
+						if v := annotations.GetStringAnnotationMutil(annotations.NginxSslRedirect, annotations.AlbSslRedirect, ing); v == "true" && port == 80 {
+							break
+						}
+						return fmt.Errorf("'grpc' backend protocol must be use TLS listener only or redirect to")
+					case string(ProtocolHTTPS):
+						continue
+					default:
+						return fmt.Errorf("listen protocol must be within [%v, %v]: %v", ProtocolHTTP, ProtocolHTTPS, protocol)
+					}
+				}
+			}
+		}
+	}
+	return nil
+}
+
+func (t *defaultModelBuildTask) buildServerGroupScheduler(ing *networking.Ingress) string {
+	backendScheduler := t.defaultServerGroupScheduler
+	if v, ok := ing.Annotations[annotations.AlbBackendScheduler]; ok {
+		switch v {
+		case "wrr":
+			backendScheduler = util.ServerGroupSchedulerWrr
+		case "wlc":
+			backendScheduler = util.ServerGroupSchedulerWlc
+		case "sch":
+			backendScheduler = util.ServerGroupSchedulerSch
+		default:
+			backendScheduler = util.ServerGroupSchedulerWrr
+		}
+	}
+	return backendScheduler
+}
+
+func (t *defaultModelBuildTask) buildServerGroupProtocol(ing *networking.Ingress) string {
+	backendProtocol := t.defaultServerGroupProtocol
+	if v, ok := ing.Annotations[annotations.AlbBackendProtocol]; ok {
+		switch v {
+		case "grpc":
+			backendProtocol = util.ServerGroupProtocolGRPC
+		case "https":
+			backendProtocol = util.ServerGroupProtocolHTTPS
+		default:
+			backendProtocol = util.ServerGroupProtocolHTTP
+		}
+	}
+	return backendProtocol
 }
 
 func buildServerGroupHealthCheckConfig(ing *networking.Ingress) alb.HealthCheckConfig {
@@ -151,8 +244,16 @@ func buildServerGroupHealthCheckConfig(ing *networking.Ingress) alb.HealthCheckC
 			unhealthyThreshold = val
 		}
 	}
+	healthyCheckConnectPort := util.DefaultServerGroupHealthCheckConnectPort
+	if v, ok := ing.Annotations[annotations.HealthCheckConnectPort]; ok {
+		if val, err := strconv.Atoi(v); err != nil {
+			klog.Error(err.Error())
+		} else {
+			healthyCheckConnectPort = val
+		}
+	}
 	return alb.HealthCheckConfig{
-		HealthCheckConnectPort:         util.DefaultServerGroupHealthCheckConnectPort,
+		HealthCheckConnectPort:         healthyCheckConnectPort,
 		HealthCheckEnabled:             healthCheckEnabled,
 		HealthCheckHost:                util.DefaultServerGroupHealthCheckHost,
 		HealthCheckHttpVersion:         util.DefaultServerGroupHealthCheckHttpVersion,
@@ -174,10 +275,26 @@ func buildServerGroupHealthCheckConfig(ing *networking.Ingress) alb.HealthCheckC
 }
 
 func buildServerGroupStickySessionConfig(ing *networking.Ingress) alb.StickySessionConfig {
+	sessionStickEnabled := util.DefaultServerGroupStickySessionEnabled
+	if v, ok := ing.Annotations[annotations.SessionStick]; ok && v == "true" {
+		sessionStickEnabled = true
+	}
+	sessionStickType := util.DefaultServerGroupStickySessionType
+	if v, ok := ing.Annotations[annotations.SessionStickType]; ok {
+		sessionStickType = v
+	}
+	cookieTimeout := util.DefaultServerGroupStickySessionCookieTimeout
+	if v, ok := ing.Annotations[annotations.CookieTimeout]; ok {
+		if val, err := strconv.Atoi(v); err != nil {
+			klog.Error(err.Error())
+		} else {
+			cookieTimeout = val
+		}
+	}
 	return alb.StickySessionConfig{
 		Cookie:               "",
-		CookieTimeout:        util.DefaultServerGroupStickySessionCookieTimeout,
-		StickySessionEnabled: util.DefaultServerGroupStickySessionEnabled,
-		StickySessionType:    util.DefaultServerGroupStickySessionType,
+		CookieTimeout:        cookieTimeout,
+		StickySessionEnabled: sessionStickEnabled,
+		StickySessionType:    sessionStickType,
 	}
 }

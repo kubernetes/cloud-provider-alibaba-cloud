@@ -1,7 +1,7 @@
 package vmock
 
 import (
-	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider"
+	prvd "k8s.io/cloud-provider-alibaba-cloud/pkg/provider"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/base"
 )

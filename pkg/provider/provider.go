@@ -2,16 +2,19 @@ package prvd
 
 import (
 	"context"
-	"k8s.io/cloud-provider-alibaba-cloud/pkg/model/tag"
 	"time"
+
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/model/tag"
 
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/ingress/reconcile/tracking"
 
 	albmodel "k8s.io/cloud-provider-alibaba-cloud/pkg/model/alb"
 	nlbmodel "k8s.io/cloud-provider-alibaba-cloud/pkg/model/nlb"
 
+	"github.com/aliyun/alibaba-cloud-sdk-go/sdk/requests"
+	"github.com/aliyun/alibaba-cloud-sdk-go/sdk/responses"
+
 	"github.com/aliyun/alibaba-cloud-sdk-go/services/alb"
-	"github.com/aliyun/alibaba-cloud-sdk-go/services/cas"
 	"github.com/aliyun/alibaba-cloud-sdk-go/services/sls"
 	"github.com/aliyun/alibaba-cloud-sdk-go/services/vpc"
 	v1 "k8s.io/api/core/v1"
@@ -141,20 +144,24 @@ type IPrivateZone interface {
 
 type ISLS interface {
 	AnalyzeProductLog(request *sls.AnalyzeProductLogRequest) (response *sls.AnalyzeProductLogResponse, err error)
+	SLSDoAction(request requests.AcsRequest, response responses.AcsResponse) (err error)
 }
 
 type ICAS interface {
-	DescribeSSLCertificateList(ctx context.Context, request *cas.DescribeSSLCertificateListRequest) (*cas.DescribeSSLCertificateListResponse, error)
-	DescribeSSLCertificatePublicKeyDetail(ctx context.Context, request *cas.DescribeSSLCertificatePublicKeyDetailRequest) (*cas.DescribeSSLCertificatePublicKeyDetailResponse, error)
+	DescribeSSLCertificateList(ctx context.Context) ([]model.CertificateInfo, error)
+	CreateSSLCertificateWithName(ctx context.Context, certName, certificate, privateKey string) (string, error)
+	DeleteSSLCertificate(ctx context.Context, certId string) error
 }
 
 type IALB interface {
 	DescribeALBZones(request *alb.DescribeZonesRequest) (response *alb.DescribeZonesResponse, err error)
 	TagALBResources(request *alb.TagResourcesRequest) (response *alb.TagResourcesResponse, err error)
+	UnTagALBResources(request *alb.UnTagResourcesRequest) (response *alb.UnTagResourcesResponse, err error)
 	// ApplicationLoadBalancer
 	CreateALB(ctx context.Context, resLB *albmodel.AlbLoadBalancer, trackingProvider tracking.TrackingProvider) (albmodel.LoadBalancerStatus, error)
 	ReuseALB(ctx context.Context, resLB *albmodel.AlbLoadBalancer, lbID string, trackingProvider tracking.TrackingProvider) (albmodel.LoadBalancerStatus, error)
-	UpdateALB(ctx context.Context, resLB *albmodel.AlbLoadBalancer, sdkLB alb.LoadBalancer) (albmodel.LoadBalancerStatus, error)
+	UnReuseALB(ctx context.Context, lbID string, trackingProvider tracking.TrackingProvider) error
+	UpdateALB(ctx context.Context, resLB *albmodel.AlbLoadBalancer, sdkLB alb.LoadBalancer, trackingProvider tracking.TrackingProvider) (albmodel.LoadBalancerStatus, error)
 	DeleteALB(ctx context.Context, lbID string) error
 	// ALB Listener
 	CreateALBListener(ctx context.Context, resLS *albmodel.Listener) (albmodel.ListenerStatus, error)
@@ -170,6 +177,7 @@ type IALB interface {
 	DeleteALBListenerRule(ctx context.Context, sdkLRId string) error
 	DeleteALBListenerRules(ctx context.Context, sdkLRIds []string) error
 	ListALBListenerRules(ctx context.Context, lsID string) ([]alb.Rule, error)
+	GetALBListenerAttribute(ctx context.Context, lsID string) (*alb.GetListenerAttributeResponse, error)
 
 	// ALB Server
 	RegisterALBServers(ctx context.Context, serverGroupID string, resServers []albmodel.BackendItem) error
@@ -185,6 +193,16 @@ type IALB interface {
 	// ALB Tags
 	ListALBServerGroupsWithTags(ctx context.Context, tagFilters map[string]string) ([]albmodel.ServerGroupWithTags, error)
 	ListALBsWithTags(ctx context.Context, tagFilters map[string]string) ([]albmodel.AlbLoadBalancerWithTags, error)
+
+	DoAction(request requests.AcsRequest, response responses.AcsResponse) (err error)
+
+	// ACL support
+
+	CreateAcl(ctx context.Context, resAcl *albmodel.Acl) (albmodel.AclStatus, error)
+	UpdateAcl(ctx context.Context, listenerID string, resAndSDKAclPair albmodel.ResAndSDKAclPair) (albmodel.AclStatus, error)
+	DeleteAcl(ctx context.Context, listenerID, sdkAclID string) error
+	ListAcl(ctx context.Context, listener *albmodel.Listener, aclId string) ([]alb.Acl, error)
+	ListAclEntriesByID(traceID interface{}, sdkAclID string) ([]alb.AclEntry, error)
 }
 
 type INLB interface {

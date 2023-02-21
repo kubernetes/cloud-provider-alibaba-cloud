@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/util"
+	"k8s.io/klog/v2"
 
 	"github.com/go-logr/logr"
 	v1 "k8s.io/api/core/v1"
@@ -82,6 +83,7 @@ func (mgr *Manager) BuildServicePortsToSDKBackends(ctx context.Context, svc *v1.
 	for _, port := range svc.Spec.Ports {
 		backends, _containsPotentialReadyEndpoints, err := mgr.BuildServicePortSDKBackends(ctx, util.NamespacedName(svc), intstr.FromInt(int(port.Port)))
 		if err != nil {
+			klog.Errorf("BuildServicePortsToSDKBackends: %v", err)
 			if apierrors.IsNotFound(err) {
 				continue
 			}
