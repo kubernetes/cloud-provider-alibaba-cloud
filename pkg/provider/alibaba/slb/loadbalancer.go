@@ -323,34 +323,6 @@ func (p SLBProvider) DeleteAccessControlList(ctx context.Context, aclId string) 
 	return err
 }
 
-// DescribeServerCertificates used for e2etest
-func (p SLBProvider) DescribeServerCertificates(ctx context.Context) ([]string, error) {
-	req := slb.CreateDescribeServerCertificatesRequest()
-	resp, err := p.auth.SLB.DescribeServerCertificates(req)
-	if err != nil {
-		return nil, err
-	}
-	var certs []string
-	for _, cert := range resp.ServerCertificates.ServerCertificate {
-		certs = append(certs, cert.ServerCertificateId)
-	}
-	return certs, nil
-}
-
-// DescribeCACertificates used for e2etest
-func (p SLBProvider) DescribeCACertificates(ctx context.Context) ([]string, error) {
-	req := slb.CreateDescribeCACertificatesRequest()
-	resp, err := p.auth.SLB.DescribeCACertificates(req)
-	if err != nil {
-		return nil, err
-	}
-	var certIds []string
-	for _, cert := range resp.CACertificates.CACertificate {
-		certIds = append(certIds, cert.CACertificateId)
-	}
-	return certIds, nil
-}
-
 func setRequest(request *slb.CreateLoadBalancerRequest, mdl *model.LoadBalancer) {
 	if mdl.LoadBalancerAttribute.AddressType != "" {
 		request.AddressType = string(mdl.LoadBalancerAttribute.AddressType)

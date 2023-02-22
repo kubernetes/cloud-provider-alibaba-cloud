@@ -269,6 +269,10 @@ func (m *DryRunSLB) ModifyVServerGroupBackendServers(ctx context.Context, vGroup
 	return hintError(mtype, fmt.Sprintf("loadbalancer %s vgroup %s backends should be %s", lbId, vGroupId, new))
 }
 
+func (m *DryRunSLB) DescribeServerCertificateById(ctx context.Context, serverCertificateId string) (*model.CertAttribute, error) {
+	return m.slb.DescribeServerCertificateById(ctx, serverCertificateId)
+}
+
 func getService(ctx context.Context) *v1.Service {
 	isvc := ctx.Value(ContextService)
 	if isvc == nil {

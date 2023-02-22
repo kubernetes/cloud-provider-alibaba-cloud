@@ -7,6 +7,7 @@ import (
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/helper"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/service/reconcile/annotation"
 	svcCtx "k8s.io/cloud-provider-alibaba-cloud/pkg/controller/service/reconcile/context"
+	"time"
 
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/dryrun"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/util"
@@ -476,6 +477,14 @@ func (t *https) Update(reqCtx *svcCtx.RequestContext, action UpdateAction) error
 		reqCtx.Log.Info(fmt.Sprintf("update listener: https [%d] did not change, skip", action.local.ListenerPort))
 		return nil
 	}
+
+	if action.local.CertId != action.remote.CertId {
+		err := checkCertValidity(t.mgr.cloud, action.remote.CertId, action.local.CertId)
+		if err != nil {
+			return err
+		}
+	}
+
 	return t.mgr.cloud.SetLoadBalancerHTTPSListenerAttribute(reqCtx.Ctx, action.lbId, update)
 }
 
@@ -967,4 +976,30 @@ func isPortManagedByMyService(local *model.LoadBalancer, n model.ListenerAttribu
 	return n.NamedKey.ServiceName == local.NamespacedName.Name &&
 		n.NamedKey.Namespace == local.NamespacedName.Namespace &&
 		n.NamedKey.CID == base.CLUSTER_ID
+}
+
+func checkCertValidity(cloudClient prvd.Provider, oldCertId, newCertId string) error {
+	oldCert, err := cloudClient.DescribeServerCertificateById(context.TODO(), oldCertId)
+	if err != nil {
+		return fmt.Errorf("describe old cert %s error: %s", oldCertId, err.Error())
+	}
+
+	newCert, err := cloudClient.DescribeServerCertificateById(context.TODO(), newCertId)
+	if err != nil {
+		return fmt.Errorf("describe new cert %s error: %s", newCertId, err.Error())
+	}
+
+	if oldCert == nil {
+		return nil
+	}
+
+	if newCert == nil {
+		return fmt.Errorf("can not found cert by id %s", newCertId)
+	}
+
+	if newCert.ExpireTimeStamp < time.Now().UnixMilli() {
+		return fmt.Errorf("can not update cert %s because it is expired", newCertId)
+	}
+
+	return nil
 }
