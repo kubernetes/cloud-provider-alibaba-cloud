@@ -106,7 +106,7 @@ func (m *DryRunSLB) DescribeLoadBalancerListeners(ctx context.Context, lbId stri
 	return m.slb.DescribeLoadBalancerListeners(ctx, lbId)
 }
 
-func (m *DryRunSLB) StartLoadBalancerListener(ctx context.Context, lbId string, port int) error {
+func (m *DryRunSLB) StartLoadBalancerListener(ctx context.Context, lbId string, port int, proto string) error {
 	mtype := "StartLoadBalancerListener"
 	svc := getService(ctx)
 	AddEvent(SLB, fmt.Sprintf("%s/%d", util.Key(svc), port), lbId, "StartListener",
@@ -114,7 +114,7 @@ func (m *DryRunSLB) StartLoadBalancerListener(ctx context.Context, lbId string, 
 	return hintError(mtype, fmt.Sprintf("loadbalancer %s listener %d should be running", lbId, port))
 }
 
-func (m *DryRunSLB) StopLoadBalancerListener(ctx context.Context, lbId string, port int) error {
+func (m *DryRunSLB) StopLoadBalancerListener(ctx context.Context, lbId string, port int, proto string) error {
 	mtype := "StopLoadBalancerListener"
 	svc := getService(ctx)
 	AddEvent(SLB, fmt.Sprintf("%s/%d", util.Key(svc), port), lbId, "StopListener",
@@ -122,7 +122,7 @@ func (m *DryRunSLB) StopLoadBalancerListener(ctx context.Context, lbId string, p
 	return hintError(mtype, fmt.Sprintf("loadbalancer %s listener %d should be stopped", lbId, port))
 }
 
-func (m *DryRunSLB) DeleteLoadBalancerListener(ctx context.Context, lbId string, port int) error {
+func (m *DryRunSLB) DeleteLoadBalancerListener(ctx context.Context, lbId string, port int, proto string) error {
 	mtype := "DeleteLoadBalancerListener"
 	svc := getService(ctx)
 	AddEvent(SLB, fmt.Sprintf("%s/%d", util.Key(svc), port), lbId, "DeleteListener", ERROR, "")

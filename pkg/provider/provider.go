@@ -105,9 +105,9 @@ type ILoadBalancer interface {
 
 	// Listener
 	DescribeLoadBalancerListeners(ctx context.Context, lbId string) ([]model.ListenerAttribute, error)
-	StartLoadBalancerListener(ctx context.Context, lbId string, port int) error
-	StopLoadBalancerListener(ctx context.Context, lbId string, port int) error
-	DeleteLoadBalancerListener(ctx context.Context, lbId string, port int) error
+	StartLoadBalancerListener(ctx context.Context, lbId string, port int, proto string) error
+	StopLoadBalancerListener(ctx context.Context, lbId string, port int, proto string) error
+	DeleteLoadBalancerListener(ctx context.Context, lbId string, port int, proto string) error
 	CreateLoadBalancerTCPListener(ctx context.Context, lbId string, listener model.ListenerAttribute) error
 	SetLoadBalancerTCPListenerAttribute(ctx context.Context, lbId string, listener model.ListenerAttribute) error
 	CreateLoadBalancerUDPListener(ctx context.Context, lbId string, listener model.ListenerAttribute) error

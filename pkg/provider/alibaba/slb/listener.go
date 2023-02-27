@@ -72,26 +72,29 @@ func (p SLBProvider) DescribeLoadBalancerListeners(ctx context.Context, lbId str
 	return listeners, nil
 }
 
-func (p SLBProvider) StartLoadBalancerListener(ctx context.Context, lbId string, port int) error {
+func (p SLBProvider) StartLoadBalancerListener(ctx context.Context, lbId string, port int, proto string) error {
 	req := slb.CreateStartLoadBalancerListenerRequest()
 	req.LoadBalancerId = lbId
 	req.ListenerPort = requests.NewInteger(port)
+	req.ListenerProtocol = proto
 	_, err := p.auth.SLB.StartLoadBalancerListener(req)
 	return util.SDKError("StartLoadBalancerListener", err)
 }
 
-func (p SLBProvider) StopLoadBalancerListener(ctx context.Context, lbId string, port int) error {
+func (p SLBProvider) StopLoadBalancerListener(ctx context.Context, lbId string, port int, proto string) error {
 	req := slb.CreateStopLoadBalancerListenerRequest()
 	req.LoadBalancerId = lbId
 	req.ListenerPort = requests.NewInteger(port)
+	req.ListenerProtocol = proto
 	_, err := p.auth.SLB.StopLoadBalancerListener(req)
 	return util.SDKError("StopLoadBalancerListener", err)
 }
 
-func (p SLBProvider) DeleteLoadBalancerListener(ctx context.Context, lbId string, port int) error {
+func (p SLBProvider) DeleteLoadBalancerListener(ctx context.Context, lbId string, port int, proto string) error {
 	req := slb.CreateDeleteLoadBalancerListenerRequest()
 	req.LoadBalancerId = lbId
 	req.ListenerPort = requests.NewInteger(port)
+	req.ListenerProtocol = proto
 
 	_, err := p.auth.SLB.DeleteLoadBalancerListener(req)
 	return util.SDKError("DeleteLoadBalancerListener", err)
