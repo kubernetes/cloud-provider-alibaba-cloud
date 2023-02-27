@@ -10,6 +10,7 @@ import (
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/base"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/util"
 	"k8s.io/klog/v2"
+	"os"
 	"reflect"
 	"strings"
 
@@ -142,6 +143,9 @@ func (p SLBProvider) CreateLoadBalancer(ctx context.Context, mdl *model.LoadBala
 	req := slb.CreateCreateLoadBalancerRequest()
 	setRequest(req, mdl)
 	req.ClientToken = utils.GetUUID()
+	if ascmContext := os.Getenv("X-ACSPROXY-ASCM-CONTEXT"); ascmContext != "" {
+		req.GetHeaders()["x-acsproxy-ascm-context"] = ascmContext
+	}
 	resp, err := p.auth.SLB.CreateLoadBalancer(req)
 	if err != nil {
 		return util.SDKError("CreateLoadBalancer", err)
