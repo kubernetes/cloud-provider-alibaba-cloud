@@ -23,6 +23,9 @@ var defaultUserAgent = fmt.Sprintf("AlibabaCloud (%s; %s) Golang/%s Core/%s TeaD
 type RuntimeOptions struct {
 	Autoretry      *bool   `json:"autoretry" xml:"autoretry"`
 	IgnoreSSL      *bool   `json:"ignoreSSL" xml:"ignoreSSL"`
+	Key            *string `json:"key,omitempty" xml:"key,omitempty"`
+	Cert           *string `json:"cert,omitempty" xml:"cert,omitempty"`
+	Ca             *string `json:"ca,omitempty" xml:"ca,omitempty"`
 	MaxAttempts    *int    `json:"maxAttempts" xml:"maxAttempts"`
 	BackoffPolicy  *string `json:"backoffPolicy" xml:"backoffPolicy"`
 	BackoffPeriod  *int    `json:"backoffPeriod" xml:"backoffPeriod"`
@@ -53,6 +56,21 @@ func (s *RuntimeOptions) SetAutoretry(v bool) *RuntimeOptions {
 
 func (s *RuntimeOptions) SetIgnoreSSL(v bool) *RuntimeOptions {
 	s.IgnoreSSL = &v
+	return s
+}
+
+func (s *RuntimeOptions) SetKey(v string) *RuntimeOptions {
+	s.Key = &v
+	return s
+}
+
+func (s *RuntimeOptions) SetCert(v string) *RuntimeOptions {
+	s.Cert = &v
+	return s
+}
+
+func (s *RuntimeOptions) SetCa(v string) *RuntimeOptions {
+	s.Ca = &v
 	return s
 }
 

@@ -202,6 +202,7 @@ type INLB interface {
 	UpdateNLB(ctx context.Context, mdl *nlbmodel.NetworkLoadBalancer) error
 	UpdateNLBAddressType(ctx context.Context, mdl *nlbmodel.NetworkLoadBalancer) error
 	UpdateNLBZones(ctx context.Context, mdl *nlbmodel.NetworkLoadBalancer) error
+	UpdateNLBSecurityGroupIds(ctx context.Context, mdl *nlbmodel.NetworkLoadBalancer, added, removed []string) error
 
 	// ServerGroup
 	ListNLBServerGroups(ctx context.Context, tags []tag.Tag) ([]*nlbmodel.ServerGroup, error)

@@ -25,6 +25,7 @@ type E2EConfig struct {
 	EipLoadBalancerID string `json:"EipLoadBalancerID"` // intranet slb with eip
 	ResourceGroupID   string `json:"ResourceGroupID"`
 	NLBZoneMaps       string `json:"NLBZoneMaps"`
+	SecurityGroupIDs  string `json:"SecurityGroupIDs"`
 
 	// described by cluster info
 	Network      string `json:"network"`
@@ -82,6 +83,7 @@ func (e *E2EConfig) BindFlags() {
 	flag.StringVar(&e.VServerGroupID, "vserver-group-id", "", "vserver group id")
 	flag.StringVar(&e.VServerGroupID2, "vserver-group-id-2", "", "vserver group id")
 	flag.StringVar(&e.NLBZoneMaps, "nlb-zone-maps", "", "nlb zone maps")
+	flag.StringVar(&e.SecurityGroupIDs, "security-group-ids", "", "security group ids used by nlb tests")
 }
 
 func (e *E2EConfig) Validate() error {

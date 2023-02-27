@@ -224,6 +224,17 @@ func networkLoadBalancerAttrEqual(f *Framework, anno *annotation.AnnotationReque
 			return fmt.Errorf("expected nlb additional tags %s, got %v", additionalTags, nlb.Tags)
 		}
 	}
+
+	if anno.Has(annotation.SecurityGroupIds) {
+		id := anno.Get(annotation.SecurityGroupIds)
+		var ids []string
+		if id != "" {
+			ids = strings.Split(id, ",")
+		}
+		if !util.IsStringSliceEqual(ids, nlb.SecurityGroupIds) {
+			return fmt.Errorf("expected nlb security group ids %v, got %v", ids, nlb.SecurityGroupIds)
+		}
+	}
 	return nil
 }
 

@@ -113,6 +113,7 @@ type LoadBalancerAttribute struct {
 	ZoneMappings     []ZoneMapping
 	ResourceGroupId  string
 	Tags             []tag.Tag
+	SecurityGroupIds []string
 
 	// auto-generated parameters
 	LoadBalancerId             string

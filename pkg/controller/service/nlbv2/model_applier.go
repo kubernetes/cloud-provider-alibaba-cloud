@@ -121,6 +121,11 @@ func (m *ModelApplier) applyLoadBalancerAttribute(reqCtx *svcCtx.RequestContext,
 			return fmt.Errorf("update remote model for lbId %s, error: %s",
 				remote.LoadBalancerAttribute.LoadBalancerId, err.Error())
 		}
+		// need update nlb security groups
+		if len(local.LoadBalancerAttribute.SecurityGroupIds) != 0 {
+			return m.nlbMgr.Update(reqCtx, local, remote)
+		}
+
 		return nil
 	}
 

@@ -22,6 +22,11 @@ type DryRunNLB struct {
 	nlb  *nlb.NLBProvider
 }
 
+func (d DryRunNLB) UpdateNLBSecurityGroupIds(ctx context.Context, mdl *nlbmodel.NetworkLoadBalancer, added, removed []string) error {
+	//TODO implement me
+	panic("implement me")
+}
+
 func (d DryRunNLB) TagNLBResource(ctx context.Context, resourceId string, resourceType nlbmodel.TagResourceType, tags []tag.Tag) error {
 	//TODO implement me
 	panic("implement me")

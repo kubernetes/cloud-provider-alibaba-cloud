@@ -380,7 +380,7 @@ func NewClient(config *Config) (*Client, error) {
 }
 
 func (client *Client) Init(config *Config) (_err error) {
-	if tea.BoolValue(util.IsUnset(tea.ToMap(config))) {
+	if tea.BoolValue(util.IsUnset(config)) {
 		_err = tea.NewSDKError(map[string]interface{}{
 			"code":    "ParameterMissing",
 			"message": "'config' can not be unset",
@@ -399,8 +399,8 @@ func (client *Client) Init(config *Config) (_err error) {
 			AccessKeyId:     config.AccessKeyId,
 			Type:            config.Type,
 			AccessKeySecret: config.AccessKeySecret,
-			SecurityToken:   config.SecurityToken,
 		}
+		credentialConfig.SecurityToken = config.SecurityToken
 		client.Credential, _err = credential.NewCredential(credentialConfig)
 		if _err != nil {
 			return _err
@@ -488,13 +488,28 @@ func (client *Client) DoRPCRequest(action *string, version *string, protocol *st
 			request_.Protocol = util.DefaultString(client.Protocol, protocol)
 			request_.Method = method
 			request_.Pathname = tea.String("/")
+			globalQueries := make(map[string]*string)
+			globalHeaders := make(map[string]*string)
+			if !tea.BoolValue(util.IsUnset(client.GlobalParameters)) {
+				globalParams := client.GlobalParameters
+				if !tea.BoolValue(util.IsUnset(globalParams.Queries)) {
+					globalQueries = globalParams.Queries
+				}
+
+				if !tea.BoolValue(util.IsUnset(globalParams.Headers)) {
+					globalHeaders = globalParams.Headers
+				}
+
+			}
+
 			request_.Query = tea.Merge(map[string]*string{
 				"Action":         action,
 				"Format":         tea.String("json"),
 				"Version":        version,
 				"Timestamp":      openapiutil.GetTimestamp(),
 				"SignatureNonce": util.GetNonce(),
-			}, request.Query)
+			}, globalQueries,
+				request.Query)
 			headers, _err := client.GetRpcHeaders()
 			if _err != nil {
 				return _result, _err
@@ -502,19 +517,20 @@ func (client *Client) DoRPCRequest(action *string, version *string, protocol *st
 
 			if tea.BoolValue(util.IsUnset(headers)) {
 				// endpoint is setted in product client
-				request_.Headers = map[string]*string{
+				request_.Headers = tea.Merge(map[string]*string{
 					"host":          client.Endpoint,
 					"x-acs-version": version,
 					"x-acs-action":  action,
 					"user-agent":    client.GetUserAgent(),
-				}
+				}, globalHeaders)
 			} else {
 				request_.Headers = tea.Merge(map[string]*string{
 					"host":          client.Endpoint,
 					"x-acs-version": version,
 					"x-acs-action":  action,
 					"user-agent":    client.GetUserAgent(),
-				}, headers)
+				}, globalHeaders,
+					headers)
 			}
 
 			if !tea.BoolValue(util.IsUnset(request.Body)) {
@@ -581,18 +597,22 @@ func (client *Client) DoRPCRequest(action *string, version *string, protocol *st
 				}
 
 				requestId := DefaultAny(err["RequestId"], err["requestId"])
+				err["statusCode"] = response_.StatusCode
 				_err = tea.NewSDKError(map[string]interface{}{
-					"code":    tea.ToString(DefaultAny(err["Code"], err["code"])),
-					"message": "code: " + tea.ToString(tea.IntValue(response_.StatusCode)) + ", " + tea.ToString(DefaultAny(err["Message"], err["message"])) + " request id: " + tea.ToString(requestId),
-					"data":    err,
+					"code":               tea.ToString(DefaultAny(err["Code"], err["code"])),
+					"message":            "code: " + tea.ToString(tea.IntValue(response_.StatusCode)) + ", " + tea.ToString(DefaultAny(err["Message"], err["message"])) + " request id: " + tea.ToString(requestId),
+					"data":               err,
+					"description":        tea.ToString(DefaultAny(err["Description"], err["description"])),
+					"accessDeniedDetail": err["AccessDeniedDetail"],
 				})
 				return _result, _err
 			}
 
 			if tea.BoolValue(util.EqualString(bodyType, tea.String("binary"))) {
 				resp := map[string]interface{}{
-					"body":    response_.Body,
-					"headers": response_.Headers,
+					"body":       response_.Body,
+					"headers":    response_.Headers,
+					"statusCode": tea.IntValue(response_.StatusCode),
 				}
 				_result = resp
 				return _result, _err
@@ -604,8 +624,9 @@ func (client *Client) DoRPCRequest(action *string, version *string, protocol *st
 
 				_result = make(map[string]interface{})
 				_err = tea.Convert(map[string]interface{}{
-					"body":    byt,
-					"headers": response_.Headers,
+					"body":       byt,
+					"headers":    response_.Headers,
+					"statusCode": tea.IntValue(response_.StatusCode),
 				}, &_result)
 				return _result, _err
 			} else if tea.BoolValue(util.EqualString(bodyType, tea.String("string"))) {
@@ -616,8 +637,9 @@ func (client *Client) DoRPCRequest(action *string, version *string, protocol *st
 
 				_result = make(map[string]interface{})
 				_err = tea.Convert(map[string]interface{}{
-					"body":    tea.StringValue(str),
-					"headers": response_.Headers,
+					"body":       tea.StringValue(str),
+					"headers":    response_.Headers,
+					"statusCode": tea.IntValue(response_.StatusCode),
 				}, &_result)
 				return _result, _err
 			} else if tea.BoolValue(util.EqualString(bodyType, tea.String("json"))) {
@@ -633,8 +655,9 @@ func (client *Client) DoRPCRequest(action *string, version *string, protocol *st
 
 				_result = make(map[string]interface{})
 				_err = tea.Convert(map[string]interface{}{
-					"body":    res,
-					"headers": response_.Headers,
+					"body":       res,
+					"headers":    response_.Headers,
+					"statusCode": tea.IntValue(response_.StatusCode),
 				}, &_result)
 				return _result, _err
 			} else if tea.BoolValue(util.EqualString(bodyType, tea.String("array"))) {
@@ -645,14 +668,16 @@ func (client *Client) DoRPCRequest(action *string, version *string, protocol *st
 
 				_result = make(map[string]interface{})
 				_err = tea.Convert(map[string]interface{}{
-					"body":    arr,
-					"headers": response_.Headers,
+					"body":       arr,
+					"headers":    response_.Headers,
+					"statusCode": tea.IntValue(response_.StatusCode),
 				}, &_result)
 				return _result, _err
 			} else {
 				_result = make(map[string]interface{})
-				_err = tea.Convert(map[string]map[string]*string{
-					"headers": response_.Headers,
+				_err = tea.Convert(map[string]interface{}{
+					"headers":    response_.Headers,
+					"statusCode": tea.IntValue(response_.StatusCode),
 				}, &_result)
 				return _result, _err
 			}
@@ -723,6 +748,20 @@ func (client *Client) DoROARequest(action *string, version *string, protocol *st
 			request_.Protocol = util.DefaultString(client.Protocol, protocol)
 			request_.Method = method
 			request_.Pathname = pathname
+			globalQueries := make(map[string]*string)
+			globalHeaders := make(map[string]*string)
+			if !tea.BoolValue(util.IsUnset(client.GlobalParameters)) {
+				globalParams := client.GlobalParameters
+				if !tea.BoolValue(util.IsUnset(globalParams.Queries)) {
+					globalQueries = globalParams.Queries
+				}
+
+				if !tea.BoolValue(util.IsUnset(globalParams.Headers)) {
+					globalHeaders = globalParams.Headers
+				}
+
+			}
+
 			request_.Headers = tea.Merge(map[string]*string{
 				"date":                    util.GetDateUTCString(),
 				"host":                    client.Endpoint,
@@ -733,14 +772,17 @@ func (client *Client) DoROARequest(action *string, version *string, protocol *st
 				"x-acs-version":           version,
 				"x-acs-action":            action,
 				"user-agent":              util.GetUserAgent(client.UserAgent),
-			}, request.Headers)
+			}, globalHeaders,
+				request.Headers)
 			if !tea.BoolValue(util.IsUnset(request.Body)) {
 				request_.Body = tea.ToReader(util.ToJSONString(request.Body))
 				request_.Headers["content-type"] = tea.String("application/json; charset=utf-8")
 			}
 
+			request_.Query = globalQueries
 			if !tea.BoolValue(util.IsUnset(request.Query)) {
-				request_.Query = request.Query
+				request_.Query = tea.Merge(request_.Query,
+					request.Query)
 			}
 
 			if !tea.BoolValue(util.EqualString(authType, tea.String("Anonymous"))) {
@@ -793,18 +835,22 @@ func (client *Client) DoROARequest(action *string, version *string, protocol *st
 
 				requestId := DefaultAny(err["RequestId"], err["requestId"])
 				requestId = DefaultAny(requestId, err["requestid"])
+				err["statusCode"] = response_.StatusCode
 				_err = tea.NewSDKError(map[string]interface{}{
-					"code":    tea.ToString(DefaultAny(err["Code"], err["code"])),
-					"message": "code: " + tea.ToString(tea.IntValue(response_.StatusCode)) + ", " + tea.ToString(DefaultAny(err["Message"], err["message"])) + " request id: " + tea.ToString(requestId),
-					"data":    err,
+					"code":               tea.ToString(DefaultAny(err["Code"], err["code"])),
+					"message":            "code: " + tea.ToString(tea.IntValue(response_.StatusCode)) + ", " + tea.ToString(DefaultAny(err["Message"], err["message"])) + " request id: " + tea.ToString(requestId),
+					"data":               err,
+					"description":        tea.ToString(DefaultAny(err["Description"], err["description"])),
+					"accessDeniedDetail": err["AccessDeniedDetail"],
 				})
 				return _result, _err
 			}
 
 			if tea.BoolValue(util.EqualString(bodyType, tea.String("binary"))) {
 				resp := map[string]interface{}{
-					"body":    response_.Body,
-					"headers": response_.Headers,
+					"body":       response_.Body,
+					"headers":    response_.Headers,
+					"statusCode": tea.IntValue(response_.StatusCode),
 				}
 				_result = resp
 				return _result, _err
@@ -816,8 +862,9 @@ func (client *Client) DoROARequest(action *string, version *string, protocol *st
 
 				_result = make(map[string]interface{})
 				_err = tea.Convert(map[string]interface{}{
-					"body":    byt,
-					"headers": response_.Headers,
+					"body":       byt,
+					"headers":    response_.Headers,
+					"statusCode": tea.IntValue(response_.StatusCode),
 				}, &_result)
 				return _result, _err
 			} else if tea.BoolValue(util.EqualString(bodyType, tea.String("string"))) {
@@ -828,8 +875,9 @@ func (client *Client) DoROARequest(action *string, version *string, protocol *st
 
 				_result = make(map[string]interface{})
 				_err = tea.Convert(map[string]interface{}{
-					"body":    tea.StringValue(str),
-					"headers": response_.Headers,
+					"body":       tea.StringValue(str),
+					"headers":    response_.Headers,
+					"statusCode": tea.IntValue(response_.StatusCode),
 				}, &_result)
 				return _result, _err
 			} else if tea.BoolValue(util.EqualString(bodyType, tea.String("json"))) {
@@ -845,8 +893,9 @@ func (client *Client) DoROARequest(action *string, version *string, protocol *st
 
 				_result = make(map[string]interface{})
 				_err = tea.Convert(map[string]interface{}{
-					"body":    res,
-					"headers": response_.Headers,
+					"body":       res,
+					"headers":    response_.Headers,
+					"statusCode": tea.IntValue(response_.StatusCode),
 				}, &_result)
 				return _result, _err
 			} else if tea.BoolValue(util.EqualString(bodyType, tea.String("array"))) {
@@ -857,14 +906,16 @@ func (client *Client) DoROARequest(action *string, version *string, protocol *st
 
 				_result = make(map[string]interface{})
 				_err = tea.Convert(map[string]interface{}{
-					"body":    arr,
-					"headers": response_.Headers,
+					"body":       arr,
+					"headers":    response_.Headers,
+					"statusCode": tea.IntValue(response_.StatusCode),
 				}, &_result)
 				return _result, _err
 			} else {
 				_result = make(map[string]interface{})
-				_err = tea.Convert(map[string]map[string]*string{
-					"headers": response_.Headers,
+				_err = tea.Convert(map[string]interface{}{
+					"headers":    response_.Headers,
+					"statusCode": tea.IntValue(response_.StatusCode),
 				}, &_result)
 				return _result, _err
 			}
@@ -935,6 +986,20 @@ func (client *Client) DoROARequestWithForm(action *string, version *string, prot
 			request_.Protocol = util.DefaultString(client.Protocol, protocol)
 			request_.Method = method
 			request_.Pathname = pathname
+			globalQueries := make(map[string]*string)
+			globalHeaders := make(map[string]*string)
+			if !tea.BoolValue(util.IsUnset(client.GlobalParameters)) {
+				globalParams := client.GlobalParameters
+				if !tea.BoolValue(util.IsUnset(globalParams.Queries)) {
+					globalQueries = globalParams.Queries
+				}
+
+				if !tea.BoolValue(util.IsUnset(globalParams.Headers)) {
+					globalHeaders = globalParams.Headers
+				}
+
+			}
+
 			request_.Headers = tea.Merge(map[string]*string{
 				"date":                    util.GetDateUTCString(),
 				"host":                    client.Endpoint,
@@ -945,7 +1010,8 @@ func (client *Client) DoROARequestWithForm(action *string, version *string, prot
 				"x-acs-version":           version,
 				"x-acs-action":            action,
 				"user-agent":              util.GetUserAgent(client.UserAgent),
-			}, request.Headers)
+			}, globalHeaders,
+				request.Headers)
 			if !tea.BoolValue(util.IsUnset(request.Body)) {
 				m, _err := util.AssertAsMap(request.Body)
 				if _err != nil {
@@ -956,8 +1022,10 @@ func (client *Client) DoROARequestWithForm(action *string, version *string, prot
 				request_.Headers["content-type"] = tea.String("application/x-www-form-urlencoded")
 			}
 
+			request_.Query = globalQueries
 			if !tea.BoolValue(util.IsUnset(request.Query)) {
-				request_.Query = request.Query
+				request_.Query = tea.Merge(request_.Query,
+					request.Query)
 			}
 
 			if !tea.BoolValue(util.EqualString(authType, tea.String("Anonymous"))) {
@@ -1008,18 +1076,22 @@ func (client *Client) DoROARequestWithForm(action *string, version *string, prot
 					return _result, _err
 				}
 
+				err["statusCode"] = response_.StatusCode
 				_err = tea.NewSDKError(map[string]interface{}{
-					"code":    tea.ToString(DefaultAny(err["Code"], err["code"])),
-					"message": "code: " + tea.ToString(tea.IntValue(response_.StatusCode)) + ", " + tea.ToString(DefaultAny(err["Message"], err["message"])) + " request id: " + tea.ToString(DefaultAny(err["RequestId"], err["requestId"])),
-					"data":    err,
+					"code":               tea.ToString(DefaultAny(err["Code"], err["code"])),
+					"message":            "code: " + tea.ToString(tea.IntValue(response_.StatusCode)) + ", " + tea.ToString(DefaultAny(err["Message"], err["message"])) + " request id: " + tea.ToString(DefaultAny(err["RequestId"], err["requestId"])),
+					"data":               err,
+					"description":        tea.ToString(DefaultAny(err["Description"], err["description"])),
+					"accessDeniedDetail": err["AccessDeniedDetail"],
 				})
 				return _result, _err
 			}
 
 			if tea.BoolValue(util.EqualString(bodyType, tea.String("binary"))) {
 				resp := map[string]interface{}{
-					"body":    response_.Body,
-					"headers": response_.Headers,
+					"body":       response_.Body,
+					"headers":    response_.Headers,
+					"statusCode": tea.IntValue(response_.StatusCode),
 				}
 				_result = resp
 				return _result, _err
@@ -1031,8 +1103,9 @@ func (client *Client) DoROARequestWithForm(action *string, version *string, prot
 
 				_result = make(map[string]interface{})
 				_err = tea.Convert(map[string]interface{}{
-					"body":    byt,
-					"headers": response_.Headers,
+					"body":       byt,
+					"headers":    response_.Headers,
+					"statusCode": tea.IntValue(response_.StatusCode),
 				}, &_result)
 				return _result, _err
 			} else if tea.BoolValue(util.EqualString(bodyType, tea.String("string"))) {
@@ -1043,8 +1116,9 @@ func (client *Client) DoROARequestWithForm(action *string, version *string, prot
 
 				_result = make(map[string]interface{})
 				_err = tea.Convert(map[string]interface{}{
-					"body":    tea.StringValue(str),
-					"headers": response_.Headers,
+					"body":       tea.StringValue(str),
+					"headers":    response_.Headers,
+					"statusCode": tea.IntValue(response_.StatusCode),
 				}, &_result)
 				return _result, _err
 			} else if tea.BoolValue(util.EqualString(bodyType, tea.String("json"))) {
@@ -1060,8 +1134,9 @@ func (client *Client) DoROARequestWithForm(action *string, version *string, prot
 
 				_result = make(map[string]interface{})
 				_err = tea.Convert(map[string]interface{}{
-					"body":    res,
-					"headers": response_.Headers,
+					"body":       res,
+					"headers":    response_.Headers,
+					"statusCode": tea.IntValue(response_.StatusCode),
 				}, &_result)
 				return _result, _err
 			} else if tea.BoolValue(util.EqualString(bodyType, tea.String("array"))) {
@@ -1072,14 +1147,16 @@ func (client *Client) DoROARequestWithForm(action *string, version *string, prot
 
 				_result = make(map[string]interface{})
 				_err = tea.Convert(map[string]interface{}{
-					"body":    arr,
-					"headers": response_.Headers,
+					"body":       arr,
+					"headers":    response_.Headers,
+					"statusCode": tea.IntValue(response_.StatusCode),
 				}, &_result)
 				return _result, _err
 			} else {
 				_result = make(map[string]interface{})
-				_err = tea.Convert(map[string]map[string]*string{
-					"headers": response_.Headers,
+				_err = tea.Convert(map[string]interface{}{
+					"headers":    response_.Headers,
+					"statusCode": tea.IntValue(response_.StatusCode),
 				}, &_result)
 				return _result, _err
 			}
@@ -1155,7 +1232,7 @@ func (client *Client) DoRequest(params *Params, request *OpenApiRequest, runtime
 			request_.Pathname = params.Pathname
 			globalQueries := make(map[string]*string)
 			globalHeaders := make(map[string]*string)
-			if !tea.BoolValue(util.IsUnset(tea.ToMap(client.GlobalParameters))) {
+			if !tea.BoolValue(util.IsUnset(client.GlobalParameters)) {
 				globalParams := client.GlobalParameters
 				if !tea.BoolValue(util.IsUnset(globalParams.Queries)) {
 					globalQueries = globalParams.Queries
@@ -1300,9 +1377,11 @@ func (client *Client) DoRequest(params *Params, request *OpenApiRequest, runtime
 
 				err["statusCode"] = response_.StatusCode
 				_err = tea.NewSDKError(map[string]interface{}{
-					"code":    tea.ToString(DefaultAny(err["Code"], err["code"])),
-					"message": "code: " + tea.ToString(tea.IntValue(response_.StatusCode)) + ", " + tea.ToString(DefaultAny(err["Message"], err["message"])) + " request id: " + tea.ToString(DefaultAny(err["RequestId"], err["requestId"])),
-					"data":    err,
+					"code":               tea.ToString(DefaultAny(err["Code"], err["code"])),
+					"message":            "code: " + tea.ToString(tea.IntValue(response_.StatusCode)) + ", " + tea.ToString(DefaultAny(err["Message"], err["message"])) + " request id: " + tea.ToString(DefaultAny(err["RequestId"], err["requestId"])),
+					"data":               err,
+					"description":        tea.ToString(DefaultAny(err["Description"], err["description"])),
+					"accessDeniedDetail": err["AccessDeniedDetail"],
 				})
 				return _result, _err
 			}
@@ -1455,7 +1534,7 @@ func (client *Client) Execute(params *Params, request *OpenApiRequest, runtime *
 
 			globalQueries := make(map[string]*string)
 			globalHeaders := make(map[string]*string)
-			if !tea.BoolValue(util.IsUnset(tea.ToMap(client.GlobalParameters))) {
+			if !tea.BoolValue(util.IsUnset(client.GlobalParameters)) {
 				globalParams := client.GlobalParameters
 				if !tea.BoolValue(util.IsUnset(globalParams.Queries)) {
 					globalQueries = globalParams.Queries
@@ -1553,7 +1632,7 @@ func (client *Client) Execute(params *Params, request *OpenApiRequest, runtime *
 }
 
 func (client *Client) CallApi(params *Params, request *OpenApiRequest, runtime *util.RuntimeOptions) (_result map[string]interface{}, _err error) {
-	if tea.BoolValue(util.IsUnset(tea.ToMap(params))) {
+	if tea.BoolValue(util.IsUnset(params)) {
 		_err = tea.NewSDKError(map[string]interface{}{
 			"code":    "ParameterMissing",
 			"message": "'params' can not be unset",
@@ -1723,6 +1802,15 @@ func (client *Client) CheckConfig(config *Config) (_err error) {
 		return _err
 	}
 
+	return _err
+}
+
+/**
+ * set gateway client
+ * @param spi.
+ */
+func (client *Client) SetGatewayClient(spi spi.ClientInterface) (_err error) {
+	client.Spi = spi
 	return _err
 }
 

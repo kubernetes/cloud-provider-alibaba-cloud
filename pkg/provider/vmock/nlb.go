@@ -311,3 +311,7 @@ func (m MockNLB) DeleteNLBListener(ctx context.Context, listenerId string) error
 func (m MockNLB) StartNLBListener(ctx context.Context, listenerId string) error {
 	return nil
 }
+
+func (m MockNLB) UpdateNLBSecurityGroupIds(ctx context.Context, mdl *nlbmodel.NetworkLoadBalancer, added, removed []string) error {
+	return nil
+}
