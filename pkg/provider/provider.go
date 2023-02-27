@@ -130,6 +130,9 @@ type ILoadBalancer interface {
 	// Tag
 	TagCLBResource(ctx context.Context, resourceId string, tags []tag.Tag) error
 	ListCLBTagResources(ctx context.Context, lbId string) ([]tag.Tag, error)
+
+	// Cert
+	DescribeServerCertificateById(ctx context.Context, serverCertificateId string) (*model.CertAttribute, error)
 }
 
 type IPrivateZone interface {

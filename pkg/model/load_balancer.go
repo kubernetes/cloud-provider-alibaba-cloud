@@ -204,6 +204,13 @@ type BackendAttribute struct {
 	Type        string `json:"type"`
 }
 
+type CertAttribute struct {
+	CreateTimeStamp     int64
+	ExpireTimeStamp     int64
+	ServerCertificateId string
+	CommonName          string // The domain name of the certificate.
+}
+
 // DEFAULT_PREFIX default prefix for listener
 var DEFAULT_PREFIX = "k8s"
 
