@@ -1187,6 +1187,10 @@ func isNodeExcludeFromLoadBalancer(node *v1.Node, anno *annotation.AnnotationReq
 		return true
 	}
 
+	if _, exclude := node.Labels[helper.LabelNodeExcludeBalancerDeprecated]; exclude {
+		return true
+	}
+
 	return false
 }
 
