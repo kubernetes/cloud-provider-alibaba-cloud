@@ -247,6 +247,9 @@ func (mgr *ServerGroupManager) updateServerGroupServers(reqCtx *svcCtx.RequestCo
 		return nil
 	}
 
+	reqCtx.Log.Info(fmt.Sprintf("reconcile sg: [%s] changed, local: [%s], remote: [%s]",
+		remote.ResourceGroupId, local.BackendInfo(), remote.BackendInfo()), "sgName", remote.ServerGroupName)
+
 	if len(add) > 0 {
 		if err := mgr.BatchAddServers(reqCtx, local, add); err != nil {
 			return err
@@ -514,6 +517,7 @@ func (mgr *ServerGroupManager) buildLocalBackends(reqCtx *svcCtx.RequestContext,
 				"expected: ${regionid}.${nodeid}, %s", node.Spec.ProviderID, err.Error())
 		}
 		backend.ServerId = id
+		backend.ServerIp = ""
 		backend.ServerType = nlbmodel.EcsServerType
 		// for ECS backend type, port should be set to NodePort
 		backend.Port = sg.ServicePort.NodePort

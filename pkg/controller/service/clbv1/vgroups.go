@@ -529,6 +529,7 @@ func (mgr *VGroupManager) buildLocalBackends(reqCtx *svcCtx.RequestContext, cand
 				"expected: ${regionid}.${nodeid}, %s", node.Spec.ProviderID, err.Error())
 		}
 		backend.ServerId = id
+		backend.ServerIp = ""
 		backend.Type = model.ECSBackendType
 		// for ECS backend type, port should be set to NodePort
 		backend.Port = int(vgroup.ServicePort.NodePort)
