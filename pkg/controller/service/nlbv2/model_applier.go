@@ -47,7 +47,13 @@ func (m *ModelApplier) Apply(reqCtx *svcCtx.RequestContext, local *nlbmodel.Netw
 	errs := []error{}
 	if serviceHashChanged || ctrlCfg.ControllerCFG.DryRun {
 		if err := m.applyLoadBalancerAttribute(reqCtx, local, remote); err != nil {
-			errs = append(errs, fmt.Errorf("update nlb attribute error: %s", err.Error()))
+			_, ok := err.(utilerrors.Aggregate)
+			if ok {
+				// if lb attr update failed, continue to sync vgroup & listener
+				errs = append(errs, fmt.Errorf("update nlb attribute error: %s", err.Error()))
+			} else {
+				return nil, err
+			}
 		}
 	}
 
