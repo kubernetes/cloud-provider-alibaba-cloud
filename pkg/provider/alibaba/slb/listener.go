@@ -276,6 +276,10 @@ func setTCPListenerValue(req interface{}, listener *model.ListenerAttribute) {
 		healthCheckDomain := v.FieldByName("HealthCheckDomain")
 		healthCheckDomain.SetString(listener.HealthCheckDomain)
 	}
+	if listener.HealthCheckSwitch != "" {
+		healthCheckSwitch := v.FieldByName("HealthCheckSwitch")
+		healthCheckSwitch.SetString(string(listener.HealthCheckSwitch))
+	}
 
 	if listener.ConnectionDrain != "" {
 		connectionDrain := v.FieldByName("ConnectionDrain")
@@ -301,6 +305,10 @@ func setUDPListenerValue(req interface{}, listener *model.ListenerAttribute) {
 	if listener.ConnectionDrainTimeout != 0 {
 		connectionDrainTimeout := v.FieldByName("ConnectionDrainTimeout")
 		connectionDrainTimeout.SetString(strconv.Itoa(listener.ConnectionDrainTimeout))
+	}
+	if listener.HealthCheckSwitch != "" {
+		healthCheckSwitch := v.FieldByName("HealthCheckSwitch")
+		healthCheckSwitch.SetString(string(listener.HealthCheckSwitch))
 	}
 
 }
@@ -446,6 +454,7 @@ func loadTCPListener(config slb.TCPListenerConfig, listener *model.ListenerAttri
 	listener.HealthCheckDomain = config.HealthCheckDomain
 	listener.HealthCheckURI = config.HealthCheckURI
 	listener.HealthCheckType = config.HealthCheckType
+	listener.HealthCheckSwitch = model.FlagType(config.HealthCheckSwitch)
 }
 
 func loadUDPListener(config slb.UDPListenerConfig, listener *model.ListenerAttribute) {
@@ -456,6 +465,7 @@ func loadUDPListener(config slb.UDPListenerConfig, listener *model.ListenerAttri
 	listener.HealthCheckConnectTimeout = config.HealthCheckConnectTimeout
 	listener.HealthCheckConnectPort = config.HealthCheckConnectPort
 	listener.HealthCheckInterval = config.HealthCheckInterval
+	listener.HealthCheckSwitch = model.FlagType(config.HealthCheckSwitch)
 }
 
 func loadHTTPListener(config slb.HTTPListenerConfig, listener *model.ListenerAttribute) {

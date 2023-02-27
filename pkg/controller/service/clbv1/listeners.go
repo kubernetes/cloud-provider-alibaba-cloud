@@ -322,6 +322,10 @@ func (mgr *ListenerManager) buildListenerFromServicePort(reqCtx *svcCtx.RequestC
 		listener.HealthCheckMethod = reqCtx.Anno.Get(annotation.HealthCheckMethod)
 	}
 
+	if reqCtx.Anno.Get(annotation.HealthCheckSwitch) != "" {
+		listener.HealthCheckSwitch = model.FlagType(reqCtx.Anno.Get(annotation.HealthCheckSwitch))
+	}
+
 	return listener, nil
 }
 
@@ -845,7 +849,7 @@ func isNeedUpdate(reqCtx *svcCtx.RequestContext, local model.ListenerAttribute, 
 			remote.ConnectionDrainTimeout, local.ConnectionDrainTimeout)
 	}
 
-	//x-forwarded-for
+	// x-forwarded-for
 	if helper.Is7LayerProtocol(local.Protocol) &&
 		local.XForwardedForProto != "" &&
 		remote.XForwardedForProto != local.XForwardedForProto {
@@ -923,6 +927,14 @@ func isNeedUpdate(reqCtx *svcCtx.RequestContext, local model.ListenerAttribute, 
 		update.HealthCheckConnectTimeout = local.HealthCheckConnectTimeout
 		updateDetail += fmt.Sprintf("lb HealthCheckConnectTimeout %v should be changed to %v;",
 			remote.HealthCheckConnectTimeout, local.HealthCheckConnectTimeout)
+	}
+	if helper.Is4LayerProtocol(local.Protocol) &&
+		local.HealthCheckSwitch != "" &&
+		remote.HealthCheckSwitch != local.HealthCheckSwitch {
+		needUpdate = true
+		update.HealthCheckSwitch = local.HealthCheckSwitch
+		updateDetail += fmt.Sprintf("lb HealthCheckSwitch %v should be changed to %v;",
+			remote.HealthCheckSwitch, local.HealthCheckSwitch)
 	}
 	if helper.Is7LayerProtocol(local.Protocol) &&
 		local.HealthCheck != "" &&

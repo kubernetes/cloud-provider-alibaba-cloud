@@ -66,8 +66,9 @@ const (
 	AclID                     = AnnotationLoadBalancerPrefix + "acl-id"                       // AclID acl id
 	AclType                   = AnnotationLoadBalancerPrefix + "acl-type"                     // AclType acl type, black or white
 	ForwardPort               = AnnotationLoadBalancerPrefix + "forward-port"                 // ForwardPort loadbalancer forward port
-	EnableHttp2               = AnnotationLoadBalancerPrefix + "http2-enabled"                //EnableHttp2 enable http2 on https port
-	HealthCheckFlag           = AnnotationLoadBalancerPrefix + "health-check-flag"            // HealthCheckFlag health check flag
+	EnableHttp2               = AnnotationLoadBalancerPrefix + "http2-enabled"                // EnableHttp2 enable http2 on https port
+	HealthCheckSwitch         = AnnotationLoadBalancerPrefix + "health-check-switch"          // HealthCheckSwitch health check switch flag, only for tcp & udp
+	HealthCheckFlag           = AnnotationLoadBalancerPrefix + "health-check-flag"            // HealthCheckFlag health check flag, only for http & https
 	HealthCheckType           = AnnotationLoadBalancerPrefix + "health-check-type"            // HealthCheckType health check type
 	HealthCheckURI            = AnnotationLoadBalancerPrefix + "health-check-uri"             // HealthCheckURI health check uri
 	HealthCheckConnectPort    = AnnotationLoadBalancerPrefix + "health-check-connect-port"    // HealthCheckConnectPort health check connect port
