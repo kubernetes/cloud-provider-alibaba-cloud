@@ -115,6 +115,8 @@ func RunRouteControllerTestCases(f *framework.Framework) {
 					if cond.Type == v1.NodeNetworkUnavailable {
 						gomega.Expect(cond.Status).To(gomega.Equal(v1.ConditionFalse))
 						cond.Status = v1.ConditionTrue
+						cond.Reason = "NoRouteCreated"
+						cond.Message = "route controller e2e test: no route created"
 						conditions = append(conditions, cond)
 						continue
 					}
