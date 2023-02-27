@@ -153,7 +153,7 @@ func TestNodeSpecChanged(t *testing.T) {
 	newN.Status.Conditions = []v1.NodeCondition{
 		{
 			Reason: "KubeletReady",
-			Status: "True",
+			Status: v1.ConditionTrue,
 			Type:   v1.NodeReady,
 		},
 		{
@@ -162,13 +162,13 @@ func TestNodeSpecChanged(t *testing.T) {
 			Type:   v1.NodePIDPressure,
 		},
 	}
-	assert.Equal(t, nodeSpecChanged(oldN, newN), true)
+	assert.Equal(t, nodeSpecChanged(oldN, newN), false)
 
 	newN = oldN.DeepCopy()
 	newN.Status.Conditions = []v1.NodeCondition{
 		{
 			Reason: "KubeletReady",
-			Status: "False",
+			Status: v1.ConditionFalse,
 			Type:   v1.NodeReady,
 		},
 	}

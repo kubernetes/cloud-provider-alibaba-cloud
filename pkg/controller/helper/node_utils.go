@@ -106,6 +106,17 @@ func FindCondition(conds []v1.NodeCondition, conditionType v1.NodeConditionType)
 	}
 }
 
+// GetNodeCondition will get pointer to Node's existing condition.
+// returns nil if no matching condition found.
+func GetNodeCondition(node *v1.Node, conditionType v1.NodeConditionType) *v1.NodeCondition {
+	for i := range node.Status.Conditions {
+		if node.Status.Conditions[i].Type == conditionType {
+			return &node.Status.Conditions[i]
+		}
+	}
+	return nil
+}
+
 func HasExcludeLabel(node *v1.Node) bool {
 	if _, exclude := node.Labels[LabelNodeExcludeNodeDeprecated]; exclude {
 		return true

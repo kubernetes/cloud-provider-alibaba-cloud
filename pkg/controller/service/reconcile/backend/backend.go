@@ -1,6 +1,7 @@
 package backend
 
 import (
+	"context"
 	"fmt"
 	v1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1beta1"
@@ -97,9 +98,9 @@ func (e *EndpointWithENI) setAddressIpVersion(reqCtx *svcCtx.RequestContext) {
 	e.AddressIPVersion = model.IPv4
 }
 
-func GetNodes(reqCtx *svcCtx.RequestContext, client client.Client) ([]v1.Node, error) {
+func GetNodes(reqCtx *svcCtx.RequestContext, kubeClient client.Client) ([]v1.Node, error) {
 	nodeList := v1.NodeList{}
-	err := client.List(reqCtx.Ctx, &nodeList)
+	err := kubeClient.List(reqCtx.Ctx, &nodeList)
 	if err != nil {
 		return nil, fmt.Errorf("get nodes error: %s", err.Error())
 	}
@@ -194,7 +195,8 @@ func needExcludeFromLB(reqCtx *svcCtx.RequestContext, node *v1.Node) bool {
 		// condition status is ConditionTrue
 		if cond.Type == v1.NodeReady &&
 			cond.Status != v1.ConditionTrue {
-			reqCtx.Log.Info(fmt.Sprintf("node not ready with %v condition, status %v", cond.Type, cond.Status),
+			reqCtx.Log.Info(fmt.Sprintf("node not ready with %v condition, status %v. raw conditions [%v]",
+				cond.Type, cond.Status, node.Status.Conditions),
 				"node", node.Name)
 			return true
 		}
@@ -203,9 +205,9 @@ func needExcludeFromLB(reqCtx *svcCtx.RequestContext, node *v1.Node) bool {
 	return false
 }
 
-func getEndpoints(reqCtx *svcCtx.RequestContext, client client.Client) (*v1.Endpoints, error) {
+func getEndpoints(reqCtx *svcCtx.RequestContext, kubeClient client.Client) (*v1.Endpoints, error) {
 	eps := &v1.Endpoints{}
-	err := client.Get(reqCtx.Ctx, util.NamespacedName(reqCtx.Service), eps)
+	err := kubeClient.Get(context.Background(), util.NamespacedName(reqCtx.Service), eps)
 	if err != nil && apierrors.IsNotFound(err) {
 		reqCtx.Log.Info("warning: endpoint not found")
 		return eps, nil
@@ -215,7 +217,7 @@ func getEndpoints(reqCtx *svcCtx.RequestContext, client client.Client) (*v1.Endp
 
 func getEndpointByEndpointSlice(reqCtx *svcCtx.RequestContext, kubeClient client.Client, ipVersion model.AddressIPVersionType) ([]discovery.EndpointSlice, error) {
 	epsList := &discovery.EndpointSliceList{}
-	err := kubeClient.List(reqCtx.Ctx, epsList, client.MatchingLabels{
+	err := kubeClient.List(context.Background(), epsList, client.MatchingLabels{
 		discovery.LabelServiceName: reqCtx.Service.Name,
 	}, client.InNamespace(reqCtx.Service.Namespace))
 	if err != nil {
