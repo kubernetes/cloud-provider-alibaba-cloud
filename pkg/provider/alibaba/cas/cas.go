@@ -104,23 +104,15 @@ func (c CASProvider) DescribeSSLCertificatePublicKeyDetail(ctx context.Context, 
 		return nil, errors.Wrap(retErr, "failed to describeSSLCertificatePublicKeyDetail")
 	}
 
-	resp := map[string]interface{}{}
+	resp := struct {
+		CertificateInfo *model.CertificateInfo `json:"CertificateInfo"`
+	}{}
 	err := json.Unmarshal(response.GetHttpContentBytes(), &resp)
 	if err != nil {
 		return nil, err
 	}
-	if _, ok := resp["CertificateInfo"]; !ok {
-		return nil, nil
-	}
 
-	certBytes, _ := json.Marshal(resp["CertificateInfo"])
-	certInfo := &model.CertificateInfo{}
-	err = json.Unmarshal(certBytes, certInfo)
-	if err != nil {
-		return nil, err
-	}
-
-	return certInfo, nil
+	return resp.CertificateInfo, nil
 }
 
 func (c CASProvider) DescribeSSLCertificateList(ctx context.Context) ([]model.CertificateInfo, error) {
