@@ -89,6 +89,7 @@ const (
 	XForwardedForProto        = AnnotationLoadBalancerPrefix + "xforwardedfor-proto"          // XForwardedForProto whether to use the X-Forwarded-Proto header to retrieve the listener protocol
 	RequestTimeout            = AnnotationLoadBalancerPrefix + "request-timeout"              // RequestTimeout request timeout for L7
 	EstablishedTimeout        = AnnotationLoadBalancerPrefix + "established-timeout"          // EstablishedTimeout connection established time out for TCP
+	ProxyProtocol             = AnnotationLoadBalancerPrefix + "proxy-protocol"
 
 	// VServerBackend Attribute
 	BackendLabel      = AnnotationLoadBalancerPrefix + "backend-label"              // BackendLabel backend labels
@@ -103,10 +104,9 @@ const (
 	ZoneMaps         = AnnotationLoadBalancerPrefix + "zone-maps" // ZoneMaps zone maps
 	SecurityGroupIds = AnnotationLoadBalancerPrefix + "security-group-ids"
 
-	ProxyProtocol = AnnotationLoadBalancerPrefix + "proxy-protocol"
-	CaCertID      = AnnotationLoadBalancerPrefix + "cacert-id" // CertID cert id
-	CaCert        = AnnotationLoadBalancerPrefix + "cacert"    // CaCert enable ca
-	Cps           = AnnotationLoadBalancerPrefix + "cps"
+	CaCertID = AnnotationLoadBalancerPrefix + "cacert-id" // CertID cert id
+	CaCert   = AnnotationLoadBalancerPrefix + "cacert"    // CaCert enable ca
+	Cps      = AnnotationLoadBalancerPrefix + "cps"
 
 	PreserveClientIp = AnnotationLoadBalancerPrefix + "preserve-client-ip"
 )
