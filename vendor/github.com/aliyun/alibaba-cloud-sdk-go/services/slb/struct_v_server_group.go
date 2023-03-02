@@ -21,5 +21,6 @@ type VServerGroup struct {
 	ServiceManagedMode string            `json:"ServiceManagedMode" xml:"ServiceManagedMode"`
 	VServerGroupName   string            `json:"VServerGroupName" xml:"VServerGroupName"`
 	ServerCount        int64             `json:"ServerCount" xml:"ServerCount"`
+	CreateTime         string            `json:"CreateTime" xml:"CreateTime"`
 	AssociatedObjects  AssociatedObjects `json:"AssociatedObjects" xml:"AssociatedObjects"`
 }
