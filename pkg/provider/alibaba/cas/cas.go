@@ -74,7 +74,7 @@ func (c CASProvider) DescribeSSLCertificatePublicKeyDetail(ctx context.Context, 
 	}
 
 	response := responses.NewCommonResponse()
-	var apiErr error
+	var retErr error
 
 	if err := util.RetryImmediateOnError(DefaultSSLCertificatePollInterval, DefaultSSLCertificateTimeout, func(err error) bool {
 		return false
@@ -84,13 +84,13 @@ func (c CASProvider) DescribeSSLCertificatePublicKeyDetail(ctx context.Context, 
 			"traceID", traceID,
 			"startTime", startTime,
 			"action", DescribeSSLCertificatePublicKeyDetail)
-		apiErr = c.casDoAction(rpcRequest, response)
-		if apiErr != nil {
-			return apiErr
+		retErr = c.casDoAction(rpcRequest, response)
+		if retErr != nil {
+			return retErr
 		}
 		if !response.IsSuccess() {
-			c.logger.Error(apiErr, "DescribeSSLCertificatePublicKeyDetail error")
-			return apiErr
+			c.logger.Error(retErr, "DescribeSSLCertificatePublicKeyDetail error")
+			return retErr
 		}
 
 		c.logger.Info("got ssl certificate",
@@ -101,11 +101,21 @@ func (c CASProvider) DescribeSSLCertificatePublicKeyDetail(ctx context.Context, 
 			"action", DescribeSSLCertificatePublicKeyDetail)
 		return nil
 	}); err != nil {
-		return nil, errors.Wrap(err, "failed to describeSSLCertificatePublicKeyDetail")
+		return nil, errors.Wrap(retErr, "failed to describeSSLCertificatePublicKeyDetail")
 	}
 
+	resp := map[string]interface{}{}
+	err := json.Unmarshal(response.GetHttpContentBytes(), &resp)
+	if err != nil {
+		return nil, err
+	}
+	if _, ok := resp["CertificateInfo"]; !ok {
+		return nil, nil
+	}
+
+	certBytes, _ := json.Marshal(resp["CertificateInfo"])
 	certInfo := &model.CertificateInfo{}
-	err := json.Unmarshal(response.GetHttpContentBytes(), certInfo)
+	err = json.Unmarshal(certBytes, certInfo)
 	if err != nil {
 		return nil, err
 	}
