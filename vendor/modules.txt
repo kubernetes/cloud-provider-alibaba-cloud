@@ -60,7 +60,7 @@ github.com/alibabacloud-go/tea-utils/v2/service
 # github.com/alibabacloud-go/tea-xml v1.1.2
 ## explicit; go 1.14
 github.com/alibabacloud-go/tea-xml/service
-# github.com/aliyun/alibaba-cloud-sdk-go v1.61.1727
+# github.com/aliyun/alibaba-cloud-sdk-go v1.62.88
 ## explicit; go 1.13
 github.com/aliyun/alibaba-cloud-sdk-go/sdk
 github.com/aliyun/alibaba-cloud-sdk-go/sdk/auth
@@ -229,6 +229,11 @@ github.com/onsi/gomega/matchers/support/goraph/edge
 github.com/onsi/gomega/matchers/support/goraph/node
 github.com/onsi/gomega/matchers/support/goraph/util
 github.com/onsi/gomega/types
+# github.com/opentracing/opentracing-go v1.2.1-0.20220228012449-10b1cf09e00b
+## explicit; go 1.14
+github.com/opentracing/opentracing-go
+github.com/opentracing/opentracing-go/ext
+github.com/opentracing/opentracing-go/log
 # github.com/orcaman/concurrent-map v0.0.0-20210501183033-44dafcb38ecc
 ## explicit
 github.com/orcaman/concurrent-map

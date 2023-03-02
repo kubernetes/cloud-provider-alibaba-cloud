@@ -7,7 +7,7 @@ require (
 	github.com/alibabacloud-go/darabonba-openapi/v2 v2.0.2
 	github.com/alibabacloud-go/nlb-20220430 v1.0.9
 	github.com/alibabacloud-go/tea v1.1.19
-	github.com/aliyun/alibaba-cloud-sdk-go v1.61.1727
+	github.com/aliyun/alibaba-cloud-sdk-go v1.62.88
 	github.com/eapache/channels v1.1.0
 	github.com/ghodss/yaml v1.0.0
 	github.com/go-cmd/cmd v1.2.1
@@ -81,6 +81,7 @@ require (
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
+	github.com/opentracing/opentracing-go v1.2.1-0.20220228012449-10b1cf09e00b // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/prometheus/client_model v0.2.0 // indirect
 	github.com/prometheus/common v0.32.1 // indirect
