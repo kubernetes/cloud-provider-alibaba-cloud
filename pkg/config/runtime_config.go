@@ -26,7 +26,7 @@ const (
 	defaultLeaderElectLeaseDuration     = 15 * time.Second
 	defaultElectRenewDeadline           = 10 * time.Second
 	defaultLeaderElectRetryPeriod       = 2 * time.Second
-	defaultLeaderElectResourceLock      = "endpointsleases"
+	defaultLeaderElectResourceLock      = "leases"
 	defaultLeaderElectResourceName      = "ccm"
 	defaultLeaderElectResourceNamespace = "kube-system"
 	defaultSyncPeriod                   = 60 * time.Minute
