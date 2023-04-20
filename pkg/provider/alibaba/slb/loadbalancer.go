@@ -371,6 +371,9 @@ func setRequest(request *slb.CreateLoadBalancerRequest, mdl *model.LoadBalancer)
 		request.ModificationProtectionStatus = string(mdl.LoadBalancerAttribute.ModificationProtectionStatus)
 		request.ModificationProtectionReason = mdl.LoadBalancerAttribute.ModificationProtectionReason
 	}
+	if mdl.LoadBalancerAttribute.Address != "" {
+		request.Address = mdl.LoadBalancerAttribute.Address
+	}
 }
 
 func loadResponse(resp interface{}, lb *model.LoadBalancer) {

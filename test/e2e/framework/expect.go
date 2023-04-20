@@ -182,6 +182,11 @@ func loadBalancerAttrEqual(f *Framework, anno *annotation.AnnotationRequest, svc
 			return fmt.Errorf("expected slb MasterZoneId %s, got %s", MasterZoneId, lb.MasterZoneId)
 		}
 	}
+	if Address := anno.Get(annotation.IP); Address != "" {
+		if lb.Address != Address {
+			return fmt.Errorf("expected slb Address %s, got %s", Address, lb.Address)
+		}
+	}
 	if SlaveZoneId := anno.Get(annotation.SlaveZoneID); SlaveZoneId != "" {
 		if lb.SlaveZoneId != SlaveZoneId {
 			return fmt.Errorf("expected slb SlaveZoneId %s, got%s ", SlaveZoneId, lb.SlaveZoneId)

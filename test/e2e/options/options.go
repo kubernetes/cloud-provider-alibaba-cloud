@@ -32,6 +32,7 @@ type E2EConfig struct {
 	EnableVK     bool   `json:"enableVK"`
 	VPCID        string `json:"VPCID"`
 	VSwitchID    string `json:"VSwitchID"`
+	Address      string `json:"address"`
 	VSwitchID2   string `json:"VSwitchID2"`
 	MasterZoneID string `json:"MasterZoneID"`
 	SlaveZoneID  string `json:"SlaveZoneID"`
@@ -84,6 +85,7 @@ func (e *E2EConfig) BindFlags() {
 	flag.StringVar(&e.VServerGroupID2, "vserver-group-id-2", "", "vserver group id")
 	flag.StringVar(&e.NLBZoneMaps, "nlb-zone-maps", "", "nlb zone maps")
 	flag.StringVar(&e.SecurityGroupIDs, "security-group-ids", "", "security group ids used by nlb tests")
+	flag.StringVar(&e.Address, "address", "", "loadbalancer address")
 }
 
 func (e *E2EConfig) Validate() error {

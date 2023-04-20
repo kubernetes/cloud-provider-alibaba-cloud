@@ -108,12 +108,12 @@ type LoadBalancerAttribute struct {
 	SlaveZoneId                  string
 	AddressIPVersion             AddressIPVersionType
 	Tags                         []tag.Tag
+	Address                      string
 
 	// parameters are immutable
 	RegionId                     string
 	LoadBalancerId               string
 	LoadBalancerStatus           string
-	Address                      string
 	VpcId                        string
 	CreateTime                   string
 	ModificationProtectionReason string

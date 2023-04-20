@@ -888,6 +888,21 @@ func RunLoadBalancerTestCases(f *framework.Framework) {
 				gomega.Expect(err).NotTo(gomega.BeNil())
 			})
 		})
+
+		if options.TestConfig.Address != "" {
+			ginkgo.Context("loadbalancer address", func() {
+				ginkgo.It("loadbalancer address", func() {
+					svc, err := f.Client.KubeClient.CreateServiceByAnno(map[string]string{
+						annotation.Annotation(annotation.AddressType): string(model.IntranetAddressType),
+						annotation.Annotation(annotation.VswitchId):   options.TestConfig.VSwitchID,
+						annotation.Annotation(annotation.IP):          options.TestConfig.Address,
+					})
+					gomega.Expect(err).To(gomega.BeNil())
+					err = f.ExpectLoadBalancerEqual(svc)
+					gomega.Expect(err).To(gomega.BeNil())
+				})
+			})
+		}
 	})
 
 }

@@ -60,6 +60,7 @@ const (
 	ModificationProtection = AnnotationLoadBalancerPrefix + "modification-protection"  // ModificationProtection modification type
 	ExternalIPType         = AnnotationLoadBalancerPrefix + "external-ip-type"         // ExternalIPType external ip type
 	HostName               = AnnotationLoadBalancerPrefix + "hostname"                 // HostName hostname for service.status.ingress.hostname
+	IP                     = AnnotationLoadBalancerPrefix + "ip"                       // Ip Address
 
 	// Listener Attribute
 	AclStatus                 = AnnotationLoadBalancerPrefix + "acl-status"                   // AclStatus enable or disable acl on all listener
