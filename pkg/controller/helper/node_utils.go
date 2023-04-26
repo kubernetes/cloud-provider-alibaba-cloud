@@ -178,3 +178,14 @@ func IsNodeExcludeFromLoadBalancer(node *v1.Node) bool {
 	}
 	return false
 }
+
+func IsNodeExcludeFromEdgeLoadBalancer(node *v1.Node) bool {
+	if _, exclude := node.Labels[LabelNodeExcludeBalancer]; exclude {
+		return true
+	}
+
+	if _, exclude := node.Labels[LabelNodeExcludeBalancerDeprecated]; exclude {
+		return true
+	}
+	return false
+}

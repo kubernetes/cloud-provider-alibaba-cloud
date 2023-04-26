@@ -18,6 +18,7 @@ func NewMockCloud(auth *base.ClientMgr) prvd.Provider {
 		MockSLS:   NewMockSLS(auth),
 		MockCAS:   NewMockCAS(auth),
 		MockNLB:   NewMockNLB(auth),
+		MockELB:   NewMockELB(auth),
 	}
 }
 
@@ -33,5 +34,6 @@ type MockCloud struct {
 	*MockCAS
 	*MockSLS
 	*MockNLB
+	*MockELB
 	prvd.IMetaData
 }
