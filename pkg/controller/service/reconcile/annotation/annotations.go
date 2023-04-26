@@ -111,6 +111,20 @@ const (
 	PreserveClientIp = AnnotationLoadBalancerPrefix + "preserve-client-ip"
 )
 
+// edge load balancer
+const (
+	EdgeLoadBalancerReUse = AnnotationLoadBalancerPrefix + "reuse"
+	EdgeNetWorkId         = AnnotationLoadBalancerPrefix + "network-id"
+	EdgeServerWeight      = AnnotationLoadBalancerPrefix + "backend-weight"
+	EdgePayType           = AnnotationLegacyPrefix + "pay-type"
+
+	EdgeEipAssociate          = AnnotationLoadBalancerPrefix + "associate-eip"
+	EdgeEipId                 = AnnotationLoadBalancerPrefix + "eip-id"
+	EdgeEipBandwidth          = AnnotationLoadBalancerPrefix + "eip-bandwidth"
+	EdgeEipInternetChargeType = AnnotationLoadBalancerPrefix + "eip-internet-chargetype"
+	EdgeEipInstanceChargeType = AnnotationLoadBalancerPrefix + "eip-instance-chargetype"
+)
+
 var DefaultValue = map[string]string{
 	composite(AnnotationPrefix, AddressType):            string(model.InternetAddressType),
 	composite(AnnotationPrefix, Spec):                   model.S1Small,
