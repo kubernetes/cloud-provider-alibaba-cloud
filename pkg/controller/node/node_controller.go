@@ -57,13 +57,14 @@ func (controller nodeController) Start(ctx context.Context) error {
 
 // add a new Controller to mgr with r as the reconcile.Reconciler
 func add(mgr manager.Manager, r *ReconcileNode) error {
+	recoverPanic := true
 	// Create a new controller
 	c, err := controller.NewUnmanaged(
 		"node-controller", mgr,
 		controller.Options{
 			Reconciler:              r,
 			MaxConcurrentReconciles: 1,
-			RecoverPanic:            true,
+			RecoverPanic:            &recoverPanic,
 		},
 	)
 	if err != nil {

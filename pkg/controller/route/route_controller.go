@@ -63,13 +63,14 @@ func (controller routeController) Start(ctx context.Context) error {
 
 // add adds a new Controller to mgr with r as the reconcile.Reconciler
 func add(mgr manager.Manager, r *ReconcileRoute) error {
+	recoverPanic := true
 	// Create a new controller
 	c, err := controller.NewUnmanaged(
 		"route-controller", mgr,
 		controller.Options{
 			Reconciler:              r,
 			MaxConcurrentReconciles: 1,
-			RecoverPanic:            true,
+			RecoverPanic:            &recoverPanic,
 		},
 	)
 	if err != nil {
