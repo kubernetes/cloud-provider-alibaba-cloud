@@ -15,7 +15,7 @@ type ServicePredicate struct {
 
 func (sp *ServicePredicate) filterLeaseEvents(obj client.Object) bool {
 	empty := sets.Empty{}
-	avoid := sets.String{
+	avoid := sets.Set[string]{
 		"kube-system/kube-scheduler":          empty,
 		"kube-system/ccm":                     empty,
 		"kube-system/kube-controller-manager": empty,

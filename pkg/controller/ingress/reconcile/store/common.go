@@ -319,13 +319,13 @@ type ObjectRefMap interface {
 
 type objectRefMap struct {
 	sync.Mutex
-	v map[string]sets.String
+	v map[string]sets.Set[string]
 }
 
 // NewObjectRefMap returns a new ObjectRefMap.
 func NewObjectRefMap() ObjectRefMap {
 	return &objectRefMap{
-		v: make(map[string]sets.String),
+		v: make(map[string]sets.Set[string]),
 	}
 }
 
@@ -336,7 +336,7 @@ func (o *objectRefMap) Insert(consumer string, ref ...string) {
 
 	for _, r := range ref {
 		if _, ok := o.v[r]; !ok {
-			o.v[r] = sets.NewString(consumer)
+			o.v[r] = sets.New(consumer)
 			continue
 		}
 		o.v[r].Insert(consumer)
@@ -394,7 +394,7 @@ func (o *objectRefMap) Reference(ref string) []string {
 	if !ok {
 		return make([]string, 0)
 	}
-	return consumers.List()
+	return consumers.UnsortedList()
 }
 
 // ReferencedBy returns all objects referenced by the given object.

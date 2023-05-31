@@ -4,32 +4,27 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"strings"
-	"sync"
-	"time"
-
-	"k8s.io/client-go/kubernetes"
-
-	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/ingress/reconcile/annotations"
-	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/ingress/reconcile/store"
-
 	sdkutils "github.com/aliyun/alibaba-cloud-sdk-go/sdk/utils"
 	"github.com/eapache/channels"
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
+	netv1 "k8s.io/api/networking/v1"
 	networking "k8s.io/api/networking/v1"
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/record"
 	v1 "k8s.io/cloud-provider-alibaba-cloud/pkg/apis/alibabacloud/v1"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/context/shared"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/helper"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/ingress/reconcile/annotations"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/ingress/reconcile/applier"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/ingress/reconcile/backend"
 	albconfigmanager "k8s.io/cloud-provider-alibaba-cloud/pkg/controller/ingress/reconcile/builder/albconfig_manager"
 	servicemanager "k8s.io/cloud-provider-alibaba-cloud/pkg/controller/ingress/reconcile/builder/service_manager"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/ingress/reconcile/store"
 	albmodel "k8s.io/cloud-provider-alibaba-cloud/pkg/model/alb"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/model/alb/core"
 	prvd "k8s.io/cloud-provider-alibaba-cloud/pkg/provider"
@@ -41,6 +36,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
+	"strings"
+	"sync"
+	"time"
 )
 
 const (
@@ -570,11 +568,11 @@ func (g *albconfigReconciler) reconcileAlbLoadBalancerResources(ctx context.Cont
 		if ing.Status.LoadBalancer.Ingress != nil && len(ing.Status.LoadBalancer.Ingress) > 0 && ing.Status.LoadBalancer.Ingress[0].Hostname == lb.Status.DNSName {
 			continue
 		}
-		lbi := corev1.LoadBalancerIngress{
+		lbi := netv1.IngressLoadBalancerIngress{
 			Hostname: lb.Status.DNSName,
 		}
-		ing.Status.LoadBalancer.Ingress = []corev1.LoadBalancerIngress{lbi}
-		err = g.k8sClient.Status().Update(ctx, ing, &client.UpdateOptions{})
+		ing.Status.LoadBalancer.Ingress = []netv1.IngressLoadBalancerIngress{lbi}
+		err = g.k8sClient.Status().Update(ctx, ing, &client.SubResourceUpdateOptions{})
 		if err != nil {
 			g.logger.Error(err, "Ingress Status Update %s, error: %s", ing.Name)
 			continue
@@ -586,7 +584,7 @@ func (g *albconfigReconciler) reconcileAlbLoadBalancerResources(ctx context.Cont
 	albconfig.Status.LoadBalancer.Id = lb.Status.LoadBalancerID
 	albconfig.Status.LoadBalancer.DNSName = lb.Status.DNSName
 
-	err = g.k8sClient.Status().Update(ctx, albconfig, &client.UpdateOptions{})
+	err = g.k8sClient.Status().Update(ctx, albconfig, &client.SubResourceUpdateOptions{})
 	if err != nil {
 		g.logger.Error(err, "LB Status Update %s, error: %s", albconfig.Name)
 		return err

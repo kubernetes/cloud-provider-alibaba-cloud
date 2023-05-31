@@ -82,6 +82,7 @@ func add(mgr manager.Manager, r *ReconcileService) error {
 		&workqueue.BucketRateLimiter{Limiter: rate.NewLimiter(rate.Limit(10), 100)},
 	)
 
+	recoverPanic := true
 	// Create a new controller
 	c, err := controller.NewUnmanaged(
 		"service-controller", mgr,
@@ -89,7 +90,7 @@ func add(mgr manager.Manager, r *ReconcileService) error {
 			Reconciler:              r,
 			MaxConcurrentReconciles: 2,
 			RateLimiter:             rateLimit,
-			RecoverPanic:            true,
+			RecoverPanic:            &recoverPanic,
 		},
 	)
 	if err != nil {

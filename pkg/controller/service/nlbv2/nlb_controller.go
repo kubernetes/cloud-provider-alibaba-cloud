@@ -77,7 +77,7 @@ func add(mgr manager.Manager, r *ReconcileNLB) error {
 		// 10 qps, 100 bucket size.  This is only for retry speed and its only the overall factor (not per item)
 		&workqueue.BucketRateLimiter{Limiter: rate.NewLimiter(rate.Limit(10), 100)},
 	)
-
+	recoverPanic := true
 	// Create a new controller
 	c, err := controller.NewUnmanaged(
 		"nlb-controller", mgr,
@@ -85,7 +85,7 @@ func add(mgr manager.Manager, r *ReconcileNLB) error {
 			Reconciler:              r,
 			MaxConcurrentReconciles: 2,
 			RateLimiter:             rateLimit,
-			RecoverPanic:            true,
+			RecoverPanic:            &recoverPanic,
 		},
 	)
 	if err != nil {

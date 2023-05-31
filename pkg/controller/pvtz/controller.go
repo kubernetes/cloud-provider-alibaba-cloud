@@ -39,12 +39,14 @@ func addServiceReconciler(mgr manager.Manager, ctx *shared.SharedContext) error 
 		actuator: NewActuator(mgr.GetClient(), ctx.Provider()),
 		record:   mgr.GetEventRecorderFor("Pvtz"),
 	}
+
+	recoverPanic := true
 	c, err := controller.New(
 		"pvtz-controller", mgr,
 		controller.Options{
 			Reconciler:              r,
 			MaxConcurrentReconciles: 1,
-			RecoverPanic:            true,
+			RecoverPanic:            &recoverPanic,
 		},
 	)
 	if err != nil {
