@@ -95,7 +95,7 @@ const (
 	DescribeSSLCertificatePublicKeyDetail = "DescribeSSLCertificatePublicKeyDetail"
 )
 
-func (d *casCertDiscovery) loadDomainsForAllCertificates(ctx context.Context) (map[string]sets.String, error) {
+func (d *casCertDiscovery) loadDomainsForAllCertificates(ctx context.Context) (map[string]sets.Set[string], error) {
 	d.loadDomainsByCertIDMutex.Lock()
 	defer d.loadDomainsByCertIDMutex.Unlock()
 
@@ -104,7 +104,7 @@ func (d *casCertDiscovery) loadDomainsForAllCertificates(ctx context.Context) (m
 		klog.Errorf("loadAllCertificateIDs error: %v", err)
 		return nil, err
 	}
-	domainsByCertID := make(map[string]sets.String, len(certIDs))
+	domainsByCertID := make(map[string]sets.Set[string], len(certIDs))
 	for _, certID := range certIDs {
 		certDomains, err := d.loadDomainsForCertificate(ctx, certID)
 		if err != nil {
@@ -138,10 +138,10 @@ func (d *casCertDiscovery) loadAllCertificateIDs(ctx context.Context) ([]string,
 	return certIDs, nil
 }
 
-func (d *casCertDiscovery) loadDomainsForCertificate(ctx context.Context, certID string) (sets.String, error) {
+func (d *casCertDiscovery) loadDomainsForCertificate(ctx context.Context, certID string) (sets.Set[string], error) {
 
 	if rawCacheItem, ok := d.certDomainsCache.Get(certID); ok {
-		return rawCacheItem.(sets.String), nil
+		return rawCacheItem.(sets.Set[string]), nil
 	}
 
 	resp, err := d.cloud.DescribeSSLCertificatePublicKeyDetail(ctx, certID)
@@ -150,7 +150,7 @@ func (d *casCertDiscovery) loadDomainsForCertificate(ctx context.Context, certID
 		return nil, err
 	}
 
-	domains := sets.NewString(resp.CommonName, resp.Sans)
+	domains := sets.New(resp.CommonName, resp.Sans)
 	d.certDomainsCache.Set(certID, domains, d.importedCertDomainsCacheTTL)
 
 	return domains, nil

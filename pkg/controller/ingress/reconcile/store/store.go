@@ -241,7 +241,7 @@ func New(
 			}
 			if !IsValid(ing) {
 				ingressClass, _ := annotations.GetStringAnnotation(IngressKey, ing)
-				klog.InfoS("Ignoring ingress", "ingress", klog.KObj(ing), "kubernetes.io/ingress.class", ingressClass, "ingressClassName", pointer.StringPtrDerefOr(ing.Spec.IngressClassName, ""))
+				klog.InfoS("Ignoring ingress", "ingress", klog.KObj(ing), "kubernetes.io/ingress.class", ingressClass, "ingressClassName", pointer.StringDeref(ing.Spec.IngressClassName, ""))
 				return
 			}
 
@@ -457,11 +457,11 @@ func New(
 		},
 	}
 
-	store.informers.Ingress.AddEventHandler(ingEventHandler)
-	store.informers.Endpoint.AddEventHandler(epEventHandler)
-	store.informers.Node.AddEventHandler(podEventHandler)
-	store.informers.Service.AddEventHandler(serviceHandler)
-	store.informers.Node.AddEventHandler(nodeEventHandler)
+	_, _ = store.informers.Ingress.AddEventHandler(ingEventHandler)
+	_, _ = store.informers.Endpoint.AddEventHandler(epEventHandler)
+	_, _ = store.informers.Node.AddEventHandler(podEventHandler)
+	_, _ = store.informers.Service.AddEventHandler(serviceHandler)
+	_, _ = store.informers.Node.AddEventHandler(nodeEventHandler)
 	return store
 }
 

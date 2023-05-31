@@ -109,7 +109,7 @@ gofmt:
 
 .PHONY: golint
 golint:
-	which golangci-lint 2>&1 >/dev/null || go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.51.2
+	which golangci-lint 2>&1 >/dev/null || go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.52.2
 	golangci-lint run pkg/... --timeout=300s
 
 unit-test:
