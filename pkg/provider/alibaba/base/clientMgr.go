@@ -160,7 +160,7 @@ func NewClientMgr() (*ClientMgr, error) {
 	esscli.AppendUserAgent(AgentClusterId, CLUSTER_ID)
 
 	// new sdk
-	nlbcli, err := nlb.NewClient(openapiCfg(region, credential))
+	nlbcli, err := nlb.NewClient(openapiCfg(region, credential, ctrlCfg.ControllerCFG.NetWork))
 	if err != nil {
 		return nil, fmt.Errorf("initialize alibaba nlb client: %s", err.Error())
 	}
@@ -311,7 +311,7 @@ func RefreshToken(mgr *ClientMgr, token *Token) error {
 		return fmt.Errorf("init elb sts token config: %s", err.Error())
 	}
 
-	err = mgr.NLB.Init(openapiCfg(token.Region, credential))
+	err = mgr.NLB.Init(openapiCfg(token.Region, credential, ctrlCfg.ControllerCFG.NetWork))
 
 	if err != nil {
 		return fmt.Errorf("init nlb sts token config: %s", err.Error())
@@ -334,7 +334,6 @@ func setVPCEndpoint(mgr *ClientMgr) {
 	mgr.ALB.Network = "vpc"
 	mgr.SLS.Network = "vpc"
 	mgr.CAS.Network = "vpc"
-	mgr.NLB.Network = tea.String("vpc")
 }
 
 func setCustomizedEndpoint(mgr *ClientMgr) {
@@ -376,7 +375,7 @@ func clientCfg() *sdk.Config {
 	}
 }
 
-func openapiCfg(region string, credential *credentials.StsTokenCredential) *openapi.Config {
+func openapiCfg(region string, credential *credentials.StsTokenCredential, network string) *openapi.Config {
 	scheme := "HTTPS"
 	if os.Getenv("ALICLOUD_CLIENT_SCHEME") == "HTTP" {
 		scheme = "HTTP"
@@ -385,6 +384,9 @@ func openapiCfg(region string, credential *credentials.StsTokenCredential) *open
 		UserAgent:       tea.String(getUserAgent()),
 		Protocol:        tea.String(scheme),
 		RegionId:        tea.String(region),
+		Network:         &network,
+		ConnectTimeout:  tea.Int(20000),
+		ReadTimeout:     tea.Int(20000),
 		AccessKeyId:     tea.String(credential.AccessKeyId),
 		AccessKeySecret: tea.String(credential.AccessKeySecret),
 		SecurityToken:   tea.String(credential.AccessKeyStsToken),
@@ -464,6 +466,7 @@ func (f *ServiceToken) NextToken() (*Token, error) {
 		fmt.Sprintf("--uid=%s", ctrlCfg.CloudCFG.Global.UID),
 		fmt.Sprintf("--key=%s", key),
 		fmt.Sprintf("--secret=%s", secret),
+		fmt.Sprintf("--region=%s", f.svcak.Region),
 	).Start()
 	if status.Error != nil {
 		return nil, fmt.Errorf("invoke servicetoken: %s", status.Error.Error())
