@@ -988,6 +988,16 @@ func RunListenerTestCases(f *framework.Framework) {
 					err = f.ExpectLoadBalancerEqual(newsvc)
 					gomega.Expect(err).To(gomega.BeNil())
 				})
+				ginkgo.It("http:80,https:443,http:8080 and forward port: 80:443", func() {
+					svc, err := f.Client.KubeClient.CreateServiceByAnno(map[string]string{
+						annotation.Annotation(annotation.ProtocolPort): "https:443,http:80,http:8080",
+						annotation.Annotation(annotation.CertID):       options.TestConfig.CertID,
+						annotation.Annotation(annotation.ForwardPort):  "80:443",
+					})
+					gomega.Expect(err).To(gomega.BeNil())
+					err = f.ExpectLoadBalancerEqual(svc)
+					gomega.Expect(err).To(gomega.BeNil())
+				})
 			})
 
 			ginkgo.Context("tls-cipher-policy", func() {
