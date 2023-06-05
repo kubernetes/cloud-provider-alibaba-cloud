@@ -104,7 +104,9 @@ func NeedNLB(service *v1.Service) bool {
 
 func GetServiceHash(svc *v1.Service) string {
 	var op []interface{}
-	op = append(op, svc.Spec, svc.Annotations, svc.DeletionTimestamp)
+	// ServiceSpec
+	op = append(op, svc.Spec.Ports, svc.Spec.Type, svc.Spec.ExternalTrafficPolicy, svc.Spec.LoadBalancerClass)
+	op = append(op, svc.Annotations, svc.DeletionTimestamp)
 	return hash.HashObject(op)
 }
 

@@ -27,6 +27,11 @@ func TestIsServiceHashChanged(t *testing.T) {
 	svcSpecChanged.Spec.ExternalTrafficPolicy = "Cluster"
 	hash = GetServiceHash(svcSpecChanged)
 	assert.NotEqual(t, baseHash, hash)
+
+	svcNewAttrChanged := base.DeepCopy()
+	svcNewAttrChanged.Spec.PublishNotReadyAddresses = true
+	hash = GetServiceHash(svcNewAttrChanged)
+	assert.Equal(t, baseHash, hash)
 }
 
 func getDefaultService() *v1.Service {
@@ -46,7 +51,8 @@ func getDefaultService() *v1.Service {
 					Protocol:   v1.ProtocolTCP,
 				},
 			},
-			Type: v1.ServiceTypeLoadBalancer,
+			Type:                  v1.ServiceTypeLoadBalancer,
+			ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeLocal,
 		},
 	}
 }
