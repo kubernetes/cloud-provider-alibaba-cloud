@@ -9,6 +9,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/record"
+	ctrlCfg "k8s.io/cloud-provider-alibaba-cloud/pkg/config"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/context/shared"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/helper"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider"
@@ -33,7 +34,7 @@ func Add(mgr manager.Manager, ctx *shared.SharedContext) error {
 // newReconciler returns a new reconcile.Reconciler
 func newReconciler(mgr manager.Manager, ctx *shared.SharedContext) *ReconcileNode {
 	recon := &ReconcileNode{
-		monitorPeriod:   5 * time.Minute,
+		monitorPeriod:   ctrlCfg.ControllerCFG.NodeMonitorPeriod.Duration,
 		statusFrequency: 5 * time.Minute,
 		// provider
 		cloud:  ctx.Provider(),

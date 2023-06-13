@@ -88,7 +88,7 @@ func add(mgr manager.Manager, r *ReconcileService) error {
 		"service-controller", mgr,
 		controller.Options{
 			Reconciler:              r,
-			MaxConcurrentReconciles: 2,
+			MaxConcurrentReconciles: ctrlCfg.ControllerCFG.ServiceMaxConcurrentReconciles,
 			RateLimiter:             rateLimit,
 			RecoverPanic:            &recoverPanic,
 		},
