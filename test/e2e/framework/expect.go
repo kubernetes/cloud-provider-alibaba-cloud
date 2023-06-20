@@ -1115,6 +1115,10 @@ func podNumberAlgorithm(mode helper.TrafficPolicy, backends []model.BackendAttri
 }
 
 func podPercentAlgorithm(mode helper.TrafficPolicy, backends []model.BackendAttribute, weight int) []model.BackendAttribute {
+	if len(backends) == 0 {
+		return backends
+	}
+
 	if weight == 0 {
 		for i := range backends {
 			backends[i].Weight = 0

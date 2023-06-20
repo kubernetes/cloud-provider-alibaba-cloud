@@ -711,6 +711,10 @@ func nlbPodNumberAlgorithm(mode helper.TrafficPolicy, backends []nlbmodel.Server
 }
 
 func nlbPodPercentAlgorithm(mode helper.TrafficPolicy, backends []nlbmodel.ServerGroupServer, weight int) []nlbmodel.ServerGroupServer {
+	if len(backends) == 0 {
+		return backends
+	}
+
 	if weight == 0 {
 		for i := range backends {
 			backends[i].Weight = 0
