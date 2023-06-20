@@ -185,12 +185,14 @@ func (mgr *ListenerManager) buildListenerFromServicePort(reqCtx *svcCtx.RequestC
 	}
 
 	if reqCtx.Anno.Get(annotation.ForwardPort) != "" && listener.Protocol == model.HTTP {
-		forwardPort, err := forwardPort(reqCtx.Anno.Get(annotation.ForwardPort), int(port.Port))
+		fp, err := forwardPort(reqCtx.Anno.Get(annotation.ForwardPort), int(port.Port))
 		if err != nil {
 			return listener, fmt.Errorf("Annotation ForwardPort error: %s ", err.Error())
 		}
-		listener.ForwardPort = forwardPort
-		listener.ListenerForward = model.OnFlag
+		if fp != 0 {
+			listener.ForwardPort = fp
+			listener.ListenerForward = model.OnFlag
+		}
 	}
 
 	if reqCtx.Anno.Get(annotation.IdleTimeout) != "" {
@@ -508,7 +510,7 @@ func forwardPort(port string, target int) (int, error) {
 		if len(ports) != 2 {
 			return 0, fmt.Errorf("forward port format error: %s, expect 80:443,88:6443", port)
 		}
-		if ports[0] == strconv.Itoa(int(target)) {
+		if ports[0] == strconv.Itoa(target) {
 			forwarded = ports[1]
 			break
 		}
@@ -521,7 +523,7 @@ func forwardPort(port string, target int) (int, error) {
 		klog.Infof("forward http port %d to %d", target, forward)
 		return forward, nil
 	}
-	return 0, fmt.Errorf("forward port format error: %s, expect 80:443,88:6443", port)
+	return 0, nil
 }
 
 func buildActionsForListeners(reqCtx *svcCtx.RequestContext, local *model.LoadBalancer, remote *model.LoadBalancer) ([]CreateAction, []UpdateAction, []DeleteAction, error) {
