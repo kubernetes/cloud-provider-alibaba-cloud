@@ -114,6 +114,10 @@ func (mgr *LoadBalancerManager) Update(reqCtx *svcCtx.RequestContext, local, rem
 		local.LoadBalancerAttribute.ResourceGroupId != remote.LoadBalancerAttribute.ResourceGroupId {
 		errs = append(errs, fmt.Errorf("alicloud: can not change ResourceGroupId once created"))
 	}
+	if local.LoadBalancerAttribute.Address != "" &&
+		local.LoadBalancerAttribute.Address != remote.LoadBalancerAttribute.Address {
+		errs = append(errs, fmt.Errorf("alicloud: can not change LoadBalancer address once created"))
+	}
 
 	// need to change instance chargeType first
 	if local.LoadBalancerAttribute.InstanceChargeType != "" &&
@@ -251,6 +255,7 @@ func (mgr *LoadBalancerManager) BuildLocalModel(reqCtx *svcCtx.RequestContext, m
 	mdl.LoadBalancerAttribute.ModificationProtectionStatus =
 		model.ModificationProtectionType(reqCtx.Anno.Get(annotation.ModificationProtection))
 	mdl.LoadBalancerAttribute.Tags = reqCtx.Anno.GetLoadBalancerAdditionalTags()
+	mdl.LoadBalancerAttribute.Address = reqCtx.Anno.Get(annotation.IP)
 	return nil
 }
 
