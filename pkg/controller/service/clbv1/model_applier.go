@@ -3,10 +3,10 @@ package clbv1
 import (
 	"context"
 	"fmt"
-	v1 "k8s.io/api/core/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	ctrlCfg "k8s.io/cloud-provider-alibaba-cloud/pkg/config"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/helper"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/service/reconcile/annotation"
 	svcCtx "k8s.io/cloud-provider-alibaba-cloud/pkg/controller/service/reconcile/context"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/model"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/model/tag"
@@ -153,7 +153,7 @@ func (m *ModelApplier) applyLoadBalancerAttribute(reqCtx *svcCtx.RequestContext,
 
 	// check whether slb can be reused
 	if !helper.NeedDeleteLoadBalancer(reqCtx.Service) && local.LoadBalancerAttribute.IsUserManaged {
-		if ok, reason := isLoadBalancerReusable(reqCtx.Service, tags, remote.LoadBalancerAttribute.Address); !ok {
+		if ok, reason := isLoadBalancerReusable(reqCtx, tags, remote.LoadBalancerAttribute.Address); !ok {
 			return fmt.Errorf("alicloud: the loadbalancer %s can not be reused, %s",
 				remote.LoadBalancerAttribute.LoadBalancerId, reason)
 		}
@@ -308,7 +308,7 @@ func (m *ModelApplier) cleanup(reqCtx *svcCtx.RequestContext, local *model.LoadB
 	return nil
 }
 
-func isLoadBalancerReusable(service *v1.Service, tags []tag.Tag, lbIp string) (bool, string) {
+func isLoadBalancerReusable(reqCtx *svcCtx.RequestContext, tags []tag.Tag, lbIp string) (bool, string) {
 	for _, tag := range tags {
 		// the tag of the apiserver slb is "ack.aliyun.com": "${clusterid}",
 		// so can not reuse slbs which have ack.aliyun.com tag key.
@@ -317,6 +317,12 @@ func isLoadBalancerReusable(service *v1.Service, tags []tag.Tag, lbIp string) (b
 		}
 	}
 
+	// if use eip as externalIPType, ingress IP is eip, skip to check
+	if reqCtx.Anno.Get(annotation.ExternalIPType) == "eip" {
+		return true, ""
+	}
+
+	service := reqCtx.Service
 	if len(service.Status.LoadBalancer.Ingress) > 0 {
 		found := false
 		for _, ingress := range service.Status.LoadBalancer.Ingress {
