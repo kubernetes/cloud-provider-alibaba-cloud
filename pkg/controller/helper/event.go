@@ -1,6 +1,9 @@
 package helper
 
-import "regexp"
+import (
+	"regexp"
+	"strings"
+)
 
 // ServiceEventReason
 const (
@@ -42,14 +45,18 @@ func GetLogMessage(err error) string {
 	if err == nil {
 		return ""
 	}
-	var message string
-	sub := re.FindStringSubmatch(err.Error())
-	if len(sub) > 1 {
-		message = sub[1]
-	} else {
-		message = err.Error()
+
+	attr := strings.Split(err.Error(), "[SDKError]")
+	if len(attr) < 2 {
+		return err.Error()
 	}
-	return message
+
+	sub := re.FindStringSubmatch(attr[1])
+	if len(sub) > 1 {
+		return sub[1]
+	}
+
+	return err.Error()
 }
 
 const (

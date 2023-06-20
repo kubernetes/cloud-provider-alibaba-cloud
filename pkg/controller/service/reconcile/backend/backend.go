@@ -6,6 +6,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	ctrlCfg "k8s.io/cloud-provider-alibaba-cloud/pkg/config"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/helper"
@@ -248,9 +249,9 @@ type Func func([]interface{}) error
 
 // Batch batch process `object` m with func `func`
 // for general purpose
-func Batch(m interface{}, cnt int, batch Func) error {
-	if cnt <= 0 {
-		cnt = MaxBackendNum
+func Batch(m interface{}, batchSize int, f Func) error {
+	if batchSize <= 0 {
+		batchSize = MaxBackendNum
 	}
 	v := reflect.ValueOf(m)
 	if v.Kind() != reflect.Slice {
@@ -263,18 +264,26 @@ func Batch(m interface{}, cnt int, batch Func) error {
 	for i := 0; i < v.Len(); i++ {
 		target[i] = v.Index(i).Interface()
 	}
-	klog.Infof("batch process ,total length %d", len(target))
-	for len(target) > cnt {
-		if err := batch(target[0:cnt]); err != nil {
+	total := len(target)
+	klog.Infof("batch process ,total length %d", total)
 
-			return err
+	var errs []error
+	beginIdx := 0
+	for {
+		if beginIdx >= len(target) {
+			break
 		}
-		target = target[cnt:]
-	}
-	if len(target) <= 0 {
-		return nil
+
+		endIdx := beginIdx + batchSize
+		if endIdx > len(target) {
+			endIdx = len(target)
+		}
+
+		if err := f(target[beginIdx:endIdx]); err != nil {
+			errs = append(errs, err)
+		}
+		beginIdx = endIdx
 	}
 
-	klog.Infof("batch process ,total length %d last section", len(target))
-	return batch(target)
+	return utilerrors.NewAggregate(errs)
 }

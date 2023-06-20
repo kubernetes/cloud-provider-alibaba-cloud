@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	ctrlCfg "k8s.io/cloud-provider-alibaba-cloud/pkg/config"
@@ -80,25 +81,44 @@ func (mgr *VGroupManager) UpdateVServerGroup(reqCtx *svcCtx.RequestContext, loca
 	if len(add) == 0 && len(del) == 0 && len(update) == 0 {
 		reqCtx.Log.Info(fmt.Sprintf("reconcile vgroup: [%s] not change, skip reconcile", remote.VGroupId),
 			"vgroupName", remote.VGroupName)
-	} else {
-		reqCtx.Log.Info(fmt.Sprintf("reconcile vgroup: [%s] changed, local: [%s], remote: [%s]",
-			remote.VGroupId, local.BackendInfo(), remote.BackendInfo()),
-			"vgroupName", remote.VGroupName)
+		return nil
 	}
+
+	reqCtx.Log.Info(fmt.Sprintf("reconcile vgroup: [%s] changed, local: [%s], remote: [%s]",
+		remote.VGroupId, local.BackendInfo(), remote.BackendInfo()), "vgroupName", remote.VGroupName)
+
+	var errs []error
+	retryAdd := false
+
 	if len(add) > 0 {
 		if err := mgr.BatchAddVServerGroupBackendServers(reqCtx, local, add); err != nil {
-			return err
+			if strings.Contains(err.Error(), "InstanceBackendServerNumberOverLimit") {
+				retryAdd = true
+			} else {
+				errs = append(errs, err)
+			}
 		}
 	}
+
 	if len(del) > 0 {
 		if err := mgr.BatchRemoveVServerGroupBackendServers(reqCtx, remote, del); err != nil {
-			return err
+			errs = append(errs, err)
 		}
 	}
+
 	if len(update) > 0 {
-		return mgr.BatchUpdateVServerGroupBackendServers(reqCtx, remote, update)
+		if err := mgr.BatchUpdateVServerGroupBackendServers(reqCtx, remote, update); err != nil {
+			errs = append(errs, err)
+		}
 	}
-	return nil
+
+	if retryAdd {
+		if err := mgr.BatchAddVServerGroupBackendServers(reqCtx, local, add); err != nil {
+			errs = append(errs, err)
+		}
+	}
+
+	return utilerrors.NewAggregate(errs)
 }
 
 func (mgr *VGroupManager) DescribeVServerGroups(reqCtx *svcCtx.RequestContext, lbId string) ([]model.VServerGroup, error) {
@@ -134,37 +154,43 @@ func (mgr *VGroupManager) DescribeVServerGroups(reqCtx *svcCtx.RequestContext, l
 }
 
 func (mgr *VGroupManager) BatchAddVServerGroupBackendServers(reqCtx *svcCtx.RequestContext, vGroup model.VServerGroup, add interface{}) error {
+	batch := 0
 	return backend.Batch(add, backend.MaxBackendNum,
 		func(list []interface{}) error {
+			batch += 1
 			additions, err := json.Marshal(list)
 			if err != nil {
 				return fmt.Errorf("error marshal backends: %s, %v", err.Error(), list)
 			}
-			reqCtx.Log.Info(fmt.Sprintf("reconcile vgroup: [%s] backend add [%s]", vGroup.VGroupId, string(additions)))
+			reqCtx.Log.Info(fmt.Sprintf("reconcile vgroup: [%s] backend add [%s]", vGroup.VGroupId, string(additions)), "batch", batch)
 			return mgr.cloud.AddVServerGroupBackendServers(reqCtx.Ctx, vGroup.VGroupId, string(additions))
 		})
 }
 
 func (mgr *VGroupManager) BatchRemoveVServerGroupBackendServers(reqCtx *svcCtx.RequestContext, vGroup model.VServerGroup, del interface{}) error {
+	batch := 0
 	return backend.Batch(del, backend.MaxBackendNum,
 		func(list []interface{}) error {
+			batch += 1
 			deletions, err := json.Marshal(list)
 			if err != nil {
 				return fmt.Errorf("error marshal backends: %s, %v", err.Error(), list)
 			}
-			reqCtx.Log.Info(fmt.Sprintf("reconcile vgroup: [%s] backend del [%s]", vGroup.VGroupId, string(deletions)))
+			reqCtx.Log.Info(fmt.Sprintf("reconcile vgroup: [%s] backend del [%s]", vGroup.VGroupId, string(deletions)), "batch", batch)
 			return mgr.cloud.RemoveVServerGroupBackendServers(reqCtx.Ctx, vGroup.VGroupId, string(deletions))
 		})
 }
 
 func (mgr *VGroupManager) BatchUpdateVServerGroupBackendServers(reqCtx *svcCtx.RequestContext, vGroup model.VServerGroup, update interface{}) error {
+	batch := 0
 	return backend.Batch(update, backend.MaxBackendNum,
 		func(list []interface{}) error {
+			batch += 1
 			updateJson, err := json.Marshal(list)
 			if err != nil {
 				return fmt.Errorf("error marshal backends: %s, %v", err.Error(), list)
 			}
-			reqCtx.Log.Info(fmt.Sprintf("reconcile vgroup: [%s] backend update [%s]", vGroup.VGroupId, string(updateJson)))
+			reqCtx.Log.Info(fmt.Sprintf("reconcile vgroup: [%s] backend update [%s]", vGroup.VGroupId, string(updateJson)), "batch", batch)
 			return mgr.cloud.SetVServerGroupAttribute(reqCtx.Ctx, vGroup.VGroupId, string(updateJson))
 		})
 }
