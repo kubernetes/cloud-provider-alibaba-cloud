@@ -8,7 +8,6 @@ import (
 	"github.com/eapache/channels"
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
-	netv1 "k8s.io/api/networking/v1"
 	networking "k8s.io/api/networking/v1"
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -568,10 +567,10 @@ func (g *albconfigReconciler) reconcileAlbLoadBalancerResources(ctx context.Cont
 		if ing.Status.LoadBalancer.Ingress != nil && len(ing.Status.LoadBalancer.Ingress) > 0 && ing.Status.LoadBalancer.Ingress[0].Hostname == lb.Status.DNSName {
 			continue
 		}
-		lbi := netv1.IngressLoadBalancerIngress{
+		lbi := networking.IngressLoadBalancerIngress{
 			Hostname: lb.Status.DNSName,
 		}
-		ing.Status.LoadBalancer.Ingress = []netv1.IngressLoadBalancerIngress{lbi}
+		ing.Status.LoadBalancer.Ingress = []networking.IngressLoadBalancerIngress{lbi}
 		err = g.k8sClient.Status().Update(ctx, ing, &client.SubResourceUpdateOptions{})
 		if err != nil {
 			g.logger.Error(err, "Ingress Status Update %s, error: %s", ing.Name)
