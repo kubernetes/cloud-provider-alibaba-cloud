@@ -35,7 +35,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	networking "k8s.io/api/networking/v1"
 	k8sruntime "k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
@@ -109,7 +108,7 @@ func (i *Informer) Run(stopCh chan struct{}) {
 		i.Service.HasSynced,
 		i.Node.HasSynced,
 	) {
-		runtime.HandleError(fmt.Errorf("timed out waiting for caches to sync"))
+		utilruntime.HandleError(fmt.Errorf("timed out waiting for caches to sync"))
 	}
 
 	// in big clusters, deltas can keep arriving even after HasSynced
@@ -123,7 +122,7 @@ func (i *Informer) Run(stopCh chan struct{}) {
 	if !cache.WaitForCacheSync(stopCh,
 		i.Ingress.HasSynced,
 	) {
-		runtime.HandleError(fmt.Errorf("timed out waiting for caches to sync"))
+		utilruntime.HandleError(fmt.Errorf("timed out waiting for caches to sync"))
 	}
 }
 
