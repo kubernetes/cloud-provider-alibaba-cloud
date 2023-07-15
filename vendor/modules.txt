@@ -93,9 +93,6 @@ github.com/evanphx/json-patch/v5
 # github.com/fsnotify/fsnotify v1.6.0
 ## explicit; go 1.16
 github.com/fsnotify/fsnotify
-# github.com/ghodss/yaml v1.0.0
-## explicit
-github.com/ghodss/yaml
 # github.com/go-cmd/cmd v1.2.1
 ## explicit; go 1.13
 github.com/go-cmd/cmd
