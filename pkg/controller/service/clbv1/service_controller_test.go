@@ -255,10 +255,11 @@ func getDefaultService() *v1.Service {
 
 func getReqCtx(svc *v1.Service) *svcCtx.RequestContext {
 	return &svcCtx.RequestContext{
-		Ctx:     context.TODO(),
-		Service: svc,
-		Anno:    annotation.NewAnnotationRequest(svc),
-		Log:     util.ServiceLog.WithValues("service", util.Key(svc)),
+		Ctx:      context.TODO(),
+		Service:  svc,
+		Anno:     annotation.NewAnnotationRequest(svc),
+		Log:      util.ServiceLog.WithValues("service", util.Key(svc)),
+		Recorder: record.NewFakeRecorder(100),
 	}
 }
 

@@ -6,6 +6,7 @@ import (
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/model"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/base"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/vpc"
+	"net"
 
 	servicesvpc "github.com/aliyun/alibaba-cloud-sdk-go/services/vpc"
 )
@@ -52,4 +53,8 @@ func (m *DryRunVPC) DescribeEipAddresses(ctx context.Context, instanceType strin
 
 func (m *DryRunVPC) DescribeVSwitches(ctx context.Context, vpcID string) ([]servicesvpc.VSwitch, error) {
 	return m.vpc.DescribeVSwitches(ctx, vpcID)
+}
+
+func (m *DryRunVPC) DescribeVpcCIDRBlock(ctx context.Context, vpcId string, ipVersion model.AddressIPVersionType) (*net.IPNet, error) {
+	return m.vpc.DescribeVpcCIDRBlock(ctx, vpcId, ipVersion)
 }

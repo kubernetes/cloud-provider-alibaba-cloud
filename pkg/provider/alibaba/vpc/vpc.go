@@ -10,6 +10,7 @@ import (
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/base"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/util"
 	"k8s.io/klog/v2"
+	"net"
 	"strings"
 )
 
@@ -227,6 +228,25 @@ func (r *VPCProvider) DescribeEipAddresses(ctx context.Context, instanceType str
 		}
 	}
 	return ips, nil
+}
+
+func (r *VPCProvider) DescribeVpcCIDRBlock(ctx context.Context, vpcId string, ipVersion model.AddressIPVersionType) (*net.IPNet, error) {
+	req := vpc.CreateDescribeVpcAttributeRequest()
+	req.VpcId = vpcId
+	resp, err := r.auth.VPC.DescribeVpcAttribute(req)
+	if err != nil {
+		return nil, err
+	}
+	if resp == nil {
+		return nil, fmt.Errorf("DescribeVpcAttribute resp is nil")
+	}
+	if ipVersion == model.IPv6 {
+		_, ipv6CIDR, err := net.ParseCIDR(resp.Ipv6CidrBlock)
+		return ipv6CIDR, err
+	}
+
+	_, ipv4CIDR, err := net.ParseCIDR(resp.CidrBlock)
+	return ipv4CIDR, err
 }
 
 // DescribeVSwitches used for e2etest
