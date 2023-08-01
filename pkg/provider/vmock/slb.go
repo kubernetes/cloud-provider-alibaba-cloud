@@ -407,3 +407,6 @@ func (m *MockCLB) SetVServerGroupAttribute(ctx context.Context, vGroupId string,
 func (m *MockCLB) ModifyVServerGroupBackendServers(ctx context.Context, vGroupId string, old string, new string) error {
 	return nil
 }
+func (m *MockCLB) DescribeServerCertificateById(ctx context.Context, serverCertificateId string) (*model.CertAttribute, error) {
+	return nil, nil
+}

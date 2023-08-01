@@ -22,7 +22,7 @@ func (p SLBProvider) DescribeLoadBalancerListeners(ctx context.Context, lbId str
 	for {
 		resp, err := p.auth.SLB.DescribeLoadBalancerListeners(req)
 		if err != nil {
-			return nil, util.FormatErrorMessage(err)
+			return nil, util.SDKError("DescribeLoadBalancerListeners", err)
 		}
 		klog.V(5).Infof("RequestId: %s, API: %s, lbId: %s", resp.RequestId, "DescribeLoadBalancerListeners", lbId)
 		respListeners = append(respListeners, resp.Listeners...)
@@ -77,7 +77,7 @@ func (p SLBProvider) StartLoadBalancerListener(ctx context.Context, lbId string,
 	req.LoadBalancerId = lbId
 	req.ListenerPort = requests.NewInteger(port)
 	_, err := p.auth.SLB.StartLoadBalancerListener(req)
-	return util.FormatErrorMessage(err)
+	return util.SDKError("StartLoadBalancerListener", err)
 }
 
 func (p SLBProvider) StopLoadBalancerListener(ctx context.Context, lbId string, port int) error {
@@ -85,7 +85,7 @@ func (p SLBProvider) StopLoadBalancerListener(ctx context.Context, lbId string, 
 	req.LoadBalancerId = lbId
 	req.ListenerPort = requests.NewInteger(port)
 	_, err := p.auth.SLB.StopLoadBalancerListener(req)
-	return util.FormatErrorMessage(err)
+	return util.SDKError("StopLoadBalancerListener", err)
 }
 
 func (p SLBProvider) DeleteLoadBalancerListener(ctx context.Context, lbId string, port int) error {
@@ -94,7 +94,7 @@ func (p SLBProvider) DeleteLoadBalancerListener(ctx context.Context, lbId string
 	req.ListenerPort = requests.NewInteger(port)
 
 	_, err := p.auth.SLB.DeleteLoadBalancerListener(req)
-	return util.FormatErrorMessage(err)
+	return util.SDKError("DeleteLoadBalancerListener", err)
 
 }
 
@@ -105,7 +105,7 @@ func (p SLBProvider) CreateLoadBalancerTCPListener(
 	setGenericListenerValue(req, &listener)
 	setTCPListenerValue(req, &listener)
 	_, err := p.auth.SLB.CreateLoadBalancerTCPListener(req)
-	return util.FormatErrorMessage(err)
+	return util.SDKError("CreateLoadBalancerTCPListener", err)
 }
 
 func (p SLBProvider) SetLoadBalancerTCPListenerAttribute(
@@ -116,7 +116,8 @@ func (p SLBProvider) SetLoadBalancerTCPListenerAttribute(
 	setGenericListenerValue(req, &listener)
 	setTCPListenerValue(req, &listener)
 	_, err := p.auth.SLB.SetLoadBalancerTCPListenerAttribute(req)
-	return util.FormatErrorMessage(err)
+	return util.SDKError("SetLoadBalancerTCPListenerAttribute", err)
+
 }
 
 func (p SLBProvider) CreateLoadBalancerUDPListener(
@@ -126,7 +127,7 @@ func (p SLBProvider) CreateLoadBalancerUDPListener(
 	setGenericListenerValue(req, &listener)
 	setUDPListenerValue(req, &listener)
 	_, err := p.auth.SLB.CreateLoadBalancerUDPListener(req)
-	return util.FormatErrorMessage(err)
+	return util.SDKError("CreateLoadBalancerUDPListener", err)
 }
 
 func (p SLBProvider) SetLoadBalancerUDPListenerAttribute(
@@ -137,7 +138,7 @@ func (p SLBProvider) SetLoadBalancerUDPListenerAttribute(
 	setGenericListenerValue(req, &listener)
 	setUDPListenerValue(req, &listener)
 	_, err := p.auth.SLB.SetLoadBalancerUDPListenerAttribute(req)
-	return util.FormatErrorMessage(err)
+	return util.SDKError("SetLoadBalancerUDPListenerAttribute", err)
 }
 
 func (p SLBProvider) CreateLoadBalancerHTTPListener(
@@ -154,7 +155,7 @@ func (p SLBProvider) CreateLoadBalancerHTTPListener(
 		req.ForwardPort = requests.NewInteger(listener.ForwardPort)
 	}
 	_, err := p.auth.SLB.CreateLoadBalancerHTTPListener(req)
-	return util.FormatErrorMessage(err)
+	return util.SDKError("CreateLoadBalancerHTTPListener", err)
 }
 
 func (p SLBProvider) SetLoadBalancerHTTPListenerAttribute(
@@ -165,7 +166,7 @@ func (p SLBProvider) SetLoadBalancerHTTPListenerAttribute(
 	setGenericListenerValue(req, &listener)
 	setHTTPListenerValue(req, &listener)
 	_, err := p.auth.SLB.SetLoadBalancerHTTPListenerAttribute(req)
-	return util.FormatErrorMessage(err)
+	return util.SDKError("SetLoadBalancerHTTPListenerAttribute", err)
 }
 
 func (p SLBProvider) CreateLoadBalancerHTTPSListener(
@@ -175,7 +176,7 @@ func (p SLBProvider) CreateLoadBalancerHTTPSListener(
 	setGenericListenerValue(req, &listener)
 	setHTTPSListenerValue(req, &listener)
 	_, err := p.auth.SLB.CreateLoadBalancerHTTPSListener(req)
-	return util.FormatErrorMessage(err)
+	return util.SDKError("CreateLoadBalancerHTTPSListener", err)
 }
 
 func (p SLBProvider) SetLoadBalancerHTTPSListenerAttribute(
@@ -186,7 +187,7 @@ func (p SLBProvider) SetLoadBalancerHTTPSListenerAttribute(
 	setGenericListenerValue(req, &listener)
 	setHTTPSListenerValue(req, &listener)
 	_, err := p.auth.SLB.SetLoadBalancerHTTPSListenerAttribute(req)
-	return util.FormatErrorMessage(err)
+	return util.SDKError("SetLoadBalancerHTTPSListenerAttribute", err)
 }
 
 func setGenericListenerValue(req interface{}, listener *model.ListenerAttribute) {

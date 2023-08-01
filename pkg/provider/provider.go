@@ -126,6 +126,8 @@ type ILoadBalancer interface {
 	RemoveVServerGroupBackendServers(ctx context.Context, vGroupId string, backends string) error
 	SetVServerGroupAttribute(ctx context.Context, vGroupId string, backends string) error
 	ModifyVServerGroupBackendServers(ctx context.Context, vGroupId string, old string, new string) error
+	// Cert
+	DescribeServerCertificateById(ctx context.Context, serverCertificateId string) (*model.CertAttribute, error)
 }
 
 type IPrivateZone interface {

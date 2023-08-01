@@ -75,7 +75,8 @@ func (p SLBProvider) findLoadBalancerByTag(mdl *model.LoadBalancer) error {
 	req.Tags = string(items)
 	resp, err := p.auth.SLB.DescribeLoadBalancers(req)
 	if err != nil {
-		return fmt.Errorf("[%s] find loadbalancer by tag error: %s", mdl.NamespacedName, util.FormatErrorMessage(err))
+		return fmt.Errorf("[%s] find loadbalancer by tag error: %s", mdl.NamespacedName,
+			util.SDKError("DescribeLoadBalancers", err).Error())
 	}
 	klog.V(5).Infof("RequestId: %s, API: %s", resp.RequestId, "DescribeLoadBalancers")
 
@@ -109,7 +110,7 @@ func (p SLBProvider) FindLoadBalancerByName(mdl *model.LoadBalancer) error {
 	resp, err := p.auth.SLB.DescribeLoadBalancers(req)
 	if err != nil {
 		return fmt.Errorf("[%s] find loadbalancer by name %s error: %s", mdl.NamespacedName,
-			req.LoadBalancerName, util.FormatErrorMessage(err))
+			req.LoadBalancerName, util.SDKError("DescribeLoadBalancers", err).Error())
 	}
 	num := len(resp.LoadBalancers.LoadBalancer)
 	if num == 0 {
@@ -135,7 +136,7 @@ func (p SLBProvider) CreateLoadBalancer(ctx context.Context, mdl *model.LoadBala
 	req.ClientToken = utils.GetUUID()
 	resp, err := p.auth.SLB.CreateLoadBalancer(req)
 	if err != nil {
-		return util.FormatErrorMessage(err)
+		return util.SDKError("CreateLoadBalancer", err)
 	}
 	mdl.LoadBalancerAttribute.LoadBalancerId = resp.LoadBalancerId
 	mdl.LoadBalancerAttribute.Address = resp.Address
@@ -148,7 +149,7 @@ func (p SLBProvider) DescribeLoadBalancer(ctx context.Context, mdl *model.LoadBa
 	req.LoadBalancerId = mdl.LoadBalancerAttribute.LoadBalancerId
 	resp, err := p.auth.SLB.DescribeLoadBalancerAttribute(req)
 	if err != nil {
-		return util.FormatErrorMessage(err)
+		return util.SDKError("DescribeLoadBalancerAttribute", err)
 	}
 	if resp == nil {
 		klog.Errorf("RequestId: %s, lbId %s DescribeLoadBalancerAttribute response is nil",
@@ -164,7 +165,7 @@ func (p SLBProvider) DeleteLoadBalancer(ctx context.Context, mdl *model.LoadBala
 	req := slb.CreateDeleteLoadBalancerRequest()
 	req.LoadBalancerId = mdl.LoadBalancerAttribute.LoadBalancerId
 	_, err := p.auth.SLB.DeleteLoadBalancer(req)
-	return util.FormatErrorMessage(err)
+	return util.SDKError("DeleteLoadBalancer", err)
 }
 
 func (p SLBProvider) SetLoadBalancerDeleteProtection(ctx context.Context, lbId string, flag string) error {
@@ -172,7 +173,7 @@ func (p SLBProvider) SetLoadBalancerDeleteProtection(ctx context.Context, lbId s
 	req.LoadBalancerId = lbId
 	req.DeleteProtection = flag
 	_, err := p.auth.SLB.SetLoadBalancerDeleteProtection(req)
-	return util.FormatErrorMessage(err)
+	return util.SDKError("SetLoadBalancerDeleteProtection", err)
 }
 
 func (p SLBProvider) ModifyLoadBalancerInstanceSpec(ctx context.Context, lbId string, spec string) error {
@@ -180,7 +181,7 @@ func (p SLBProvider) ModifyLoadBalancerInstanceSpec(ctx context.Context, lbId st
 	req.LoadBalancerId = lbId
 	req.LoadBalancerSpec = spec
 	_, err := p.auth.SLB.ModifyLoadBalancerInstanceSpec(req)
-	return util.FormatErrorMessage(err)
+	return util.SDKError("ModifyLoadBalancerInstanceSpec", err)
 }
 
 func (p SLBProvider) SetLoadBalancerName(ctx context.Context, lbId string, name string) error {
@@ -188,7 +189,7 @@ func (p SLBProvider) SetLoadBalancerName(ctx context.Context, lbId string, name 
 	req.LoadBalancerId = lbId
 	req.LoadBalancerName = name
 	_, err := p.auth.SLB.SetLoadBalancerName(req)
-	return util.FormatErrorMessage(err)
+	return util.SDKError("SetLoadBalancerName", err)
 }
 
 func (p SLBProvider) ModifyLoadBalancerInternetSpec(ctx context.Context, lbId string, chargeType string, bandwidth int) error {
@@ -197,7 +198,7 @@ func (p SLBProvider) ModifyLoadBalancerInternetSpec(ctx context.Context, lbId st
 	req.InternetChargeType = chargeType
 	req.Bandwidth = requests.NewInteger(bandwidth)
 	_, err := p.auth.SLB.ModifyLoadBalancerInternetSpec(req)
-	return util.FormatErrorMessage(err)
+	return util.SDKError("ModifyLoadBalancerInternetSpec", err)
 }
 
 func (p SLBProvider) SetLoadBalancerModificationProtection(ctx context.Context, lbId string, flag string) error {
@@ -208,7 +209,7 @@ func (p SLBProvider) SetLoadBalancerModificationProtection(ctx context.Context, 
 		req.ModificationProtectionReason = model.ModificationProtectionReason
 	}
 	_, err := p.auth.SLB.SetLoadBalancerModificationProtection(req)
-	return util.FormatErrorMessage(err)
+	return util.SDKError("SetLoadBalancerModificationProtection", err)
 }
 
 func (p SLBProvider) ModifyLoadBalancerInstanceChargeType(ctx context.Context, lbId string, instanceChargeType string, spec string) error {
@@ -217,7 +218,7 @@ func (p SLBProvider) ModifyLoadBalancerInstanceChargeType(ctx context.Context, l
 	req.InstanceChargeType = instanceChargeType
 	req.LoadBalancerSpec = spec
 	_, err := p.auth.SLB.ModifyLoadBalancerInstanceChargeType(req)
-	return util.FormatErrorMessage(err)
+	return util.SDKError("ModifyLoadBalancerInstanceChargeType", err)
 }
 
 func (p SLBProvider) AddTags(ctx context.Context, lbId string, tags string) error {
@@ -225,7 +226,7 @@ func (p SLBProvider) AddTags(ctx context.Context, lbId string, tags string) erro
 	req.LoadBalancerId = lbId
 	req.Tags = tags
 	_, err := p.auth.SLB.AddTags(req)
-	return util.FormatErrorMessage(err)
+	return util.SDKError("AddTags", err)
 }
 
 func (p SLBProvider) DescribeTags(ctx context.Context, lbId string) ([]model.Tag, error) {
@@ -233,7 +234,7 @@ func (p SLBProvider) DescribeTags(ctx context.Context, lbId string) ([]model.Tag
 	req.LoadBalancerId = lbId
 	resp, err := p.auth.SLB.DescribeTags(req)
 	if err != nil {
-		return nil, util.FormatErrorMessage(err)
+		return nil, util.SDKError("DescribeTags", err)
 	}
 	var tags []model.Tag
 	for _, tag := range resp.TagSets.TagSet {
@@ -252,7 +253,7 @@ func (p SLBProvider) UntagResources(ctx context.Context, lbId string, tagKey *[]
 	req.ResourceType = "instance"
 	req.TagKey = tagKey
 	_, err := p.auth.SLB.UntagResources(req)
-	return err
+	return util.SDKError("UntagResources", err)
 }
 
 // DescribeAvailableResource used for e2etest
@@ -262,7 +263,7 @@ func (p SLBProvider) DescribeAvailableResource(ctx context.Context, addressType,
 	req.AddressIPVersion = AddressIPVersion
 	resp, err := p.auth.SLB.DescribeAvailableResource(req)
 	if err != nil {
-		return nil, err
+		return nil, util.SDKError("DescribeAvailableResource", err)
 	}
 	return resp.AvailableResources.AvailableResource, nil
 }
@@ -273,7 +274,7 @@ func (p SLBProvider) CreateAccessControlList(ctx context.Context, aclName string
 	req.AclName = aclName
 	resp, err := p.auth.SLB.CreateAccessControlList(req)
 	if err != nil {
-		return "", err
+		return "", util.SDKError("CreateAccessControlList", err)
 	}
 	return resp.AclId, nil
 }
@@ -287,7 +288,7 @@ func (p SLBProvider) DescribeAccessControlList(ctx context.Context, aclName stri
 		if strings.Contains(err.Error(), "NotFound") {
 			return "", nil
 		}
-		return "", err
+		return "", util.SDKError("DescribeAccessControlList", err)
 	}
 	if len(resp.Acls.Acl) == 0 {
 		return "", nil
@@ -300,35 +301,7 @@ func (p SLBProvider) DeleteAccessControlList(ctx context.Context, aclId string) 
 	req := slb.CreateDeleteAccessControlListRequest()
 	req.AclId = aclId
 	_, err := p.auth.SLB.DeleteAccessControlList(req)
-	return err
-}
-
-// DescribeServerCertificates used for e2etest
-func (p SLBProvider) DescribeServerCertificates(ctx context.Context) ([]string, error) {
-	req := slb.CreateDescribeServerCertificatesRequest()
-	resp, err := p.auth.SLB.DescribeServerCertificates(req)
-	if err != nil {
-		return nil, err
-	}
-	var certs []string
-	for _, cert := range resp.ServerCertificates.ServerCertificate {
-		certs = append(certs, cert.ServerCertificateId)
-	}
-	return certs, nil
-}
-
-// DescribeCACertificates used for e2etest
-func (p SLBProvider) DescribeCACertificates(ctx context.Context) ([]string, error) {
-	req := slb.CreateDescribeCACertificatesRequest()
-	resp, err := p.auth.SLB.DescribeCACertificates(req)
-	if err != nil {
-		return nil, err
-	}
-	var certIds []string
-	for _, cert := range resp.CACertificates.CACertificate {
-		certIds = append(certIds, cert.CACertificateId)
-	}
-	return certIds, nil
+	return util.SDKError("DeleteAccessControlList", err)
 }
 
 func setRequest(request *slb.CreateLoadBalancerRequest, mdl *model.LoadBalancer) {
