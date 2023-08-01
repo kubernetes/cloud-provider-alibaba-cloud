@@ -183,7 +183,11 @@ type VServerGroup struct {
 }
 
 func (v *VServerGroup) BackendInfo() string {
-	backendJson, err := json.Marshal(v.Backends)
+	endIdx := len(v.Backends)
+	if endIdx >= 100 {
+		endIdx = 100
+	}
+	backendJson, err := json.Marshal(v.Backends[:endIdx])
 	if err != nil {
 		return fmt.Sprintf("%v", v.Backends)
 	}

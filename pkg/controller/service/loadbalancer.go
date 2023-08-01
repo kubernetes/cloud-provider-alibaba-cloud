@@ -3,6 +3,7 @@ package service
 import (
 	"encoding/json"
 	"fmt"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/model"
 	prvd "k8s.io/cloud-provider-alibaba-cloud/pkg/provider"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/util"
@@ -80,6 +81,7 @@ func (mgr *LoadBalancerManager) Delete(reqCtx *RequestContext, remote *model.Loa
 func (mgr *LoadBalancerManager) Update(reqCtx *RequestContext, local, remote *model.LoadBalancer) error {
 	lbId := remote.LoadBalancerAttribute.LoadBalancerId
 	reqCtx.Log.Info(fmt.Sprintf("found load balancer [%s], try to update load balancer attribute", lbId))
+	errs := []error{}
 
 	// update tag
 	var tag model.Tag
@@ -89,27 +91,27 @@ func (mgr *LoadBalancerManager) Update(reqCtx *RequestContext, local, remote *mo
 		tag = model.Tag{TagKey: TAGKEY, TagValue: reqCtx.Anno.GetDefaultLoadBalancerName()}
 	}
 	if err := mgr.addTagIfNotExist(reqCtx, *remote, tag); err != nil {
-		return fmt.Errorf("AddTags: %s", err.Error())
+		errs = append(errs, fmt.Errorf("AddTags: %s", err.Error()))
 	}
 
 	if local.LoadBalancerAttribute.MasterZoneId != "" &&
 		local.LoadBalancerAttribute.MasterZoneId != remote.LoadBalancerAttribute.MasterZoneId {
-		return fmt.Errorf("alicloud: can not change LoadBalancer master zone id once created")
+		errs = append(errs, fmt.Errorf("alicloud: can not change LoadBalancer master zone id once created"))
 	}
 	if local.LoadBalancerAttribute.SlaveZoneId != "" &&
 		local.LoadBalancerAttribute.SlaveZoneId != remote.LoadBalancerAttribute.SlaveZoneId {
-		return fmt.Errorf("alicloud: can not change LoadBalancer slave zone id once created")
+		errs = append(errs, fmt.Errorf("alicloud: can not change LoadBalancer slave zone id once created"))
 	}
 	if local.LoadBalancerAttribute.AddressType != "" &&
 		local.LoadBalancerAttribute.AddressType != remote.LoadBalancerAttribute.AddressType {
-		return fmt.Errorf("alicloud: can not change LoadBalancer AddressType once created. delete and retry")
+		errs = append(errs, fmt.Errorf("alicloud: can not change LoadBalancer AddressType once created. delete and retry"))
 	}
 	if !equalsAddressIPVersion(local.LoadBalancerAttribute.AddressIPVersion, remote.LoadBalancerAttribute.AddressIPVersion) {
-		return fmt.Errorf("alicloud: can not change LoadBalancer AddressIPVersion once created")
+		errs = append(errs, fmt.Errorf("alicloud: can not change LoadBalancer AddressIPVersion once created"))
 	}
 	if local.LoadBalancerAttribute.ResourceGroupId != "" &&
 		local.LoadBalancerAttribute.ResourceGroupId != remote.LoadBalancerAttribute.ResourceGroupId {
-		return fmt.Errorf("alicloud: can not change ResourceGroupId once created")
+		errs = append(errs, fmt.Errorf("alicloud: can not change ResourceGroupId once created"))
 	}
 
 	// need to change instance chargeType first
@@ -129,7 +131,7 @@ func (mgr *LoadBalancerManager) Update(reqCtx *RequestContext, local, remote *mo
 
 		if err := mgr.cloud.ModifyLoadBalancerInstanceChargeType(reqCtx.Ctx, lbId,
 			string(local.LoadBalancerAttribute.InstanceChargeType), spec); err != nil {
-			return fmt.Errorf("ModifyLoadBalancerInstanceChargeType: %s", err.Error())
+			errs = append(errs, fmt.Errorf("ModifyLoadBalancerInstanceChargeType: %s", err.Error()))
 		}
 	}
 
@@ -158,7 +160,7 @@ func (mgr *LoadBalancerManager) Update(reqCtx *RequestContext, local, remote *mo
 			reqCtx.Log.Info(fmt.Sprintf("update lb: modify loadbalancer: chargeType=%s, bandwidth=%d", charge, bandwidth),
 				"lbId", lbId)
 			if err := mgr.cloud.ModifyLoadBalancerInternetSpec(reqCtx.Ctx, lbId, string(charge), bandwidth); err != nil {
-				return fmt.Errorf("ModifyLoadBalancerInternetSpec: %s", err.Error())
+				errs = append(errs, fmt.Errorf("ModifyLoadBalancerInternetSpec: %s", err.Error()))
 			}
 		} else {
 			reqCtx.Log.Info("update lb: only internet loadbalancer is allowed to modify bandwidth and pay type",
@@ -174,7 +176,7 @@ func (mgr *LoadBalancerManager) Update(reqCtx *RequestContext, local, remote *mo
 			"lbId", lbId)
 		if err := mgr.cloud.ModifyLoadBalancerInstanceSpec(reqCtx.Ctx, lbId,
 			string(local.LoadBalancerAttribute.LoadBalancerSpec)); err != nil {
-			return fmt.Errorf("ModifyLoadBalancerInstanceSpec: %s", err.Error())
+			errs = append(errs, fmt.Errorf("ModifyLoadBalancerInstanceSpec: %s", err.Error()))
 		}
 	}
 
@@ -186,7 +188,7 @@ func (mgr *LoadBalancerManager) Update(reqCtx *RequestContext, local, remote *mo
 			"lbId", lbId)
 		if err := mgr.cloud.SetLoadBalancerDeleteProtection(reqCtx.Ctx, lbId,
 			string(local.LoadBalancerAttribute.DeleteProtection)); err != nil {
-			return fmt.Errorf("SetLoadBalancerDeleteProtection: %s", err.Error())
+			errs = append(errs, fmt.Errorf("SetLoadBalancerDeleteProtection: %s", err.Error()))
 		}
 	}
 
@@ -199,7 +201,7 @@ func (mgr *LoadBalancerManager) Update(reqCtx *RequestContext, local, remote *mo
 			"lbId", lbId)
 		if err := mgr.cloud.SetLoadBalancerModificationProtection(reqCtx.Ctx, lbId,
 			string(local.LoadBalancerAttribute.ModificationProtectionStatus)); err != nil {
-			return fmt.Errorf("SetLoadBalancerModificationProtection: %s", err.Error())
+			errs = append(errs, fmt.Errorf("SetLoadBalancerModificationProtection: %s", err.Error()))
 		}
 	}
 
@@ -212,10 +214,10 @@ func (mgr *LoadBalancerManager) Update(reqCtx *RequestContext, local, remote *mo
 			"lbId", lbId)
 		if err := mgr.cloud.SetLoadBalancerName(reqCtx.Ctx, lbId,
 			local.LoadBalancerAttribute.LoadBalancerName); err != nil {
-			return fmt.Errorf("SetLoadBalancerName: %s", err.Error())
+			errs = append(errs, fmt.Errorf("SetLoadBalancerName: %s", err.Error()))
 		}
 	}
-	return nil
+	return utilerrors.NewAggregate(errs)
 }
 
 // Build build load balancer attribute for local model
