@@ -2,10 +2,14 @@ package vmock
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/model"
+	prvd "k8s.io/cloud-provider-alibaba-cloud/pkg/provider"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/base"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/dryrun"
 	"k8s.io/klog/v2"
 )
 
@@ -14,6 +18,8 @@ func NewMockCLB(
 ) *MockCLB {
 	return &MockCLB{auth: auth}
 }
+
+var _ prvd.ILoadBalancer = &MockCLB{}
 
 type MockCLB struct {
 	auth *base.ClientMgr
@@ -396,9 +402,41 @@ func (m *MockCLB) DeleteVServerGroup(ctx context.Context, vGroupId string) error
 	return nil
 }
 func (m *MockCLB) AddVServerGroupBackendServers(ctx context.Context, vGroupId string, backends string) error {
+	vgroup, ok := ctx.Value(dryrun.ContextKey("vgroup")).(*model.VServerGroup)
+	if !ok {
+		return nil
+	}
+	var adds []model.BackendAttribute
+	_ = json.Unmarshal([]byte(backends), &adds)
+	if len(vgroup.Backends)+len(adds) > 200 {
+		return fmt.Errorf("Status Code: 400 Code: InstanceBackendServerNumberOverLimit Message: The backend server number has reached to the quota limit of this load balancer.. %s ", vgroup.VGroupName)
+	}
+
+	vgroup.Backends = append(vgroup.Backends, adds...)
 	return nil
 }
 func (m *MockCLB) RemoveVServerGroupBackendServers(ctx context.Context, vGroupId string, backends string) error {
+	vgroup, ok := ctx.Value(dryrun.ContextKey("vgroup")).(*model.VServerGroup)
+	if !ok {
+		return nil
+	}
+	var removes []model.BackendAttribute
+	_ = json.Unmarshal([]byte(backends), &removes)
+
+	var ret []model.BackendAttribute
+	for _, backend := range vgroup.Backends {
+		find := false
+		for _, del := range removes {
+			if backend.ServerId == del.ServerId && backend.ServerIp == del.ServerIp {
+				find = true
+				break
+			}
+		}
+		if !find {
+			ret = append(ret, backend)
+		}
+	}
+	vgroup.Backends = ret
 	return nil
 }
 func (m *MockCLB) SetVServerGroupAttribute(ctx context.Context, vGroupId string, backends string) error {
@@ -407,6 +445,7 @@ func (m *MockCLB) SetVServerGroupAttribute(ctx context.Context, vGroupId string,
 func (m *MockCLB) ModifyVServerGroupBackendServers(ctx context.Context, vGroupId string, old string, new string) error {
 	return nil
 }
+
 func (m *MockCLB) DescribeServerCertificateById(ctx context.Context, serverCertificateId string) (*model.CertAttribute, error) {
 	return nil, nil
 }

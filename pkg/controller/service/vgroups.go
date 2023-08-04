@@ -199,6 +199,7 @@ func (mgr *VGroupManager) UpdateVServerGroup(reqCtx *RequestContext, local, remo
 	}
 
 	if retryAdd {
+		reqCtx.Log.Info("InstanceBackendServerNumberOverLimit, retry add", "vgroupName", remote.VGroupName)
 		if err := mgr.BatchAddVServerGroupBackendServers(reqCtx, local, add); err != nil {
 			errs = append(errs, err)
 		}
