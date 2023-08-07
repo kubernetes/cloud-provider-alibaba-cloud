@@ -59,9 +59,14 @@ const (
 type AuthMode string
 
 const (
-	AKMode      = AuthMode("ak")      //get token by accessKeyId and accessKeySecretId
-	SAMode      = AuthMode("service") //get token by assuming role
-	RamRoleMode = AuthMode("ramrole") //get token by ecs ram role
+	AKMode         = AuthMode("ak")         //get token by accessKeyId and accessKeySecretId
+	SAMode         = AuthMode("service")    //get token by assuming role
+	RamRoleMode    = AuthMode("ramrole")    //get token by ecs ram role
+	AddonTokenMode = AuthMode("addontoken") //get token from token-controller
+
+	AddonTokenFilePath = "/etc/addon-token"
+	AccessKeyID        = "ACCESS_KEY_ID"
+	AccessKeySecret    = "ACCESS_KEY_SECRET"
 )
 
 var log = klogr.New().WithName("clientMgr")
@@ -243,6 +248,11 @@ func (mgr *ClientMgr) Start(
 }
 
 func (mgr *ClientMgr) GetAuthMode() AuthMode {
+	_, err := os.Stat(AddonTokenFilePath)
+	if err == nil {
+		return AddonTokenMode
+	}
+
 	if ctrlCfg.CloudCFG.Global.AccessKeyID != "" &&
 		ctrlCfg.CloudCFG.Global.AccessKeySecret != "" {
 		if ctrlCfg.CloudCFG.Global.UID != "" {
@@ -254,8 +264,8 @@ func (mgr *ClientMgr) GetAuthMode() AuthMode {
 		}
 	}
 
-	if os.Getenv("ACCESS_KEY_ID") != "" &&
-		os.Getenv("ACCESS_KEY_SECRET") != "" {
+	if os.Getenv(AccessKeyID) != "" &&
+		os.Getenv(AccessKeySecret) != "" {
 		log.Info("use ak mode to get token")
 		return AKMode
 	}
@@ -450,7 +460,7 @@ func (f *RamRoleToken) NextToken() (*Token, error) {
 	}, nil
 }
 
-// ServiceToken is an implemention of service account auth
+// ServiceToken is an implementation of service account auth
 type ServiceToken struct {
 	svcak    *Token
 	execpath string
@@ -479,6 +489,19 @@ func (f *ServiceToken) NextToken() (*Token, error) {
 	return token, nil
 }
 
+type AddonToken struct {
+	t *Token
+}
+
+func (f *AddonToken) NextToken() (*Token, error) {
+	token := &Token{Region: f.t.Region}
+	fileBytes, err := os.ReadFile(AddonTokenFilePath)
+	if err = json.Unmarshal(fileBytes, token); err != nil {
+		return nil, fmt.Errorf("unmarshal AddonToken error: %s", err.Error())
+	}
+	return token, nil
+}
+
 func LoadAK() (string, string, error) {
 	var keyId, keySecret string
 	log.V(5).Info(fmt.Sprintf("load cfg from file: %s", ctrlCfg.ControllerCFG.CloudConfigPath))
@@ -503,8 +526,8 @@ func LoadAK() (string, string, error) {
 	if keyId == "" || keySecret == "" {
 		log.V(5).Info("LoadAK: cloud config does not have keyId or keySecret. " +
 			"try environment ACCESS_KEY_ID ACCESS_KEY_SECRET")
-		keyId = os.Getenv("ACCESS_KEY_ID")
-		keySecret = os.Getenv("ACCESS_KEY_SECRET")
+		keyId = os.Getenv(AccessKeyID)
+		keySecret = os.Getenv(AccessKeySecret)
 		if keyId == "" || keySecret == "" {
 			return "", "", fmt.Errorf("cloud config and env do not have keyId or keySecret, load AK failed")
 		}
