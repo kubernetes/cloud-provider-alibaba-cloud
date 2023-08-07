@@ -216,7 +216,9 @@ func (p SLBProvider) ModifyLoadBalancerInstanceChargeType(ctx context.Context, l
 	req := slb.CreateModifyLoadBalancerInstanceChargeTypeRequest()
 	req.LoadBalancerId = lbId
 	req.InstanceChargeType = instanceChargeType
-	req.LoadBalancerSpec = spec
+	if spec != "" {
+		req.LoadBalancerSpec = spec
+	}
 	_, err := p.auth.SLB.ModifyLoadBalancerInstanceChargeType(req)
 	return util.SDKError("ModifyLoadBalancerInstanceChargeType", err)
 }
