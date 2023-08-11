@@ -109,8 +109,11 @@ func (p *NLBProvider) CreateNLBServerGroup(ctx context.Context, sg *nlbmodel.Ser
 		})
 	}
 
+	if sg.ServerGroupType != "" {
+		req.ServerGroupType = tea.String(string(sg.ServerGroupType))
+	}
 	if sg.AddressIPVersion != "" {
-		req.AddressIPVersion = tea.String(string(sg.AddressIPVersion))
+		req.AddressIPVersion = tea.String(sg.AddressIPVersion)
 	}
 	if sg.ConnectionDrainEnabled != nil {
 		req.ConnectionDrainEnabled = sg.ConnectionDrainEnabled
