@@ -198,11 +198,13 @@ func (m *ModelApplier) applyVGroups(reqCtx *svcCtx.RequestContext, local, remote
 			// to avoid add too many backends in one action, create server group with empty backends,
 			// then use AddNLBServers to add backends
 			if err := m.sgMgr.CreateServerGroup(reqCtx, local.ServerGroups[i]); err != nil {
-				return fmt.Errorf("EnsureServerGroupCreated error: %s", err.Error())
+				errs = append(errs, fmt.Errorf("EnsureServerGroupCreated error: %s", err.Error()))
+				continue
 			}
 			if err := m.sgMgr.BatchAddServers(reqCtx, local.ServerGroups[i],
 				local.ServerGroups[i].Servers); err != nil {
-				return err
+				errs = append(errs, fmt.Errorf("BatchAddServers error: %s", err.Error()))
+				continue
 			}
 			remote.ServerGroups = append(remote.ServerGroups, local.ServerGroups[i])
 		}

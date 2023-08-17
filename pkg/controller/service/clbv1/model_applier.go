@@ -164,6 +164,7 @@ func (m *ModelApplier) applyLoadBalancerAttribute(reqCtx *svcCtx.RequestContext,
 }
 
 func (m *ModelApplier) applyVGroups(reqCtx *svcCtx.RequestContext, local *model.LoadBalancer, remote *model.LoadBalancer) error {
+	var errs []error
 	for i := range local.VServerGroups {
 		found := false
 		var old model.VServerGroup
@@ -188,7 +189,8 @@ func (m *ModelApplier) applyVGroups(reqCtx *svcCtx.RequestContext, local *model.
 		// update
 		if found {
 			if err := m.vGroupMgr.UpdateVServerGroup(reqCtx, local.VServerGroups[i], old); err != nil {
-				return fmt.Errorf("EnsureVGroupUpdated error: %s", err.Error())
+				errs = append(errs, fmt.Errorf("EnsureVGroupUpdated error: %s", err.Error()))
+				continue
 			}
 		}
 
@@ -199,17 +201,19 @@ func (m *ModelApplier) applyVGroups(reqCtx *svcCtx.RequestContext, local *model.
 			// then use AddVServerGroupBackendServers to add backends
 			err := m.vGroupMgr.CreateVServerGroup(reqCtx, &local.VServerGroups[i], remote.LoadBalancerAttribute.LoadBalancerId)
 			if err != nil {
-				return fmt.Errorf("EnsureVGroupCreated error: %s", err.Error())
+				errs = append(errs, fmt.Errorf("CreateVServerGroup error: %s", err.Error()))
+				continue
 			}
 			if err := m.vGroupMgr.BatchAddVServerGroupBackendServers(reqCtx, local.VServerGroups[i],
 				local.VServerGroups[i].Backends); err != nil {
-				return err
+				errs = append(errs, fmt.Errorf("BatchAddVServerGroupBackendServers error: %s", err.Error()))
+				continue
 			}
 			remote.VServerGroups = append(remote.VServerGroups, local.VServerGroups[i])
 		}
 	}
 
-	return nil
+	return utilerrors.NewAggregate(errs)
 }
 
 func (m *ModelApplier) applyListeners(reqCtx *svcCtx.RequestContext, local *model.LoadBalancer, remote *model.LoadBalancer) error {
