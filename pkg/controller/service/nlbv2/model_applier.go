@@ -186,9 +186,18 @@ func (m *ModelApplier) applyVGroups(reqCtx *svcCtx.RequestContext, local, remote
 
 		// update
 		if found {
-			if err := m.sgMgr.UpdateServerGroup(reqCtx, local.ServerGroups[i], &old); err != nil {
-				errs = append(errs, fmt.Errorf("EnsureServerGroupUpdated error: %s", err.Error()))
-				continue
+			// if server group type changed, need to recreate
+			if local.ServerGroups[i].ServerGroupType != "" &&
+				local.ServerGroups[i].ServerGroupType != old.ServerGroupType {
+				reqCtx.Log.Info(fmt.Sprintf("ServerGroupType changed [%s] - [%s], need to recreate server group",
+					old.ServerGroupType, local.ServerGroups[i].ServerGroupType),
+					"sgId", old.ServerGroupId, "sgName", old.ServerGroupName)
+				found = false
+			} else {
+				if err := m.sgMgr.UpdateServerGroup(reqCtx, local.ServerGroups[i], &old); err != nil {
+					errs = append(errs, fmt.Errorf("EnsureServerGroupUpdated error: %s", err.Error()))
+					continue
+				}
 			}
 		}
 

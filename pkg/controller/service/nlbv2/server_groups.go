@@ -99,12 +99,6 @@ func (mgr *ServerGroupManager) UpdateServerGroup(reqCtx *svcCtx.RequestContext, 
 	needUpdate := false
 	updateDetail := ""
 
-	if local.ServerGroupType != "" && local.ServerGroupType != remote.ServerGroupType {
-		// do not continue to updateServerGroupServers, because can not addServerGroupServers with wrong server type
-		return fmt.Errorf(" %s [%s] can not change ServerGroupType [%s] - [%s] once created",
-			local.ServerGroupId, local.ServerGroupName, remote.ServerGroupType, local.ServerGroupType)
-	}
-
 	if local.ServerGroupName != remote.ServerGroupName {
 		needUpdate = true
 		update.ServerGroupName = local.ServerGroupName
