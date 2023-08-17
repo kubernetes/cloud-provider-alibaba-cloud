@@ -98,13 +98,11 @@ func (mgr *ServerGroupManager) UpdateServerGroup(reqCtx *svcCtx.RequestContext, 
 	update := deepcopy.Copy(remote).(*nlbmodel.ServerGroup)
 	needUpdate := false
 	updateDetail := ""
-	var errs []error
 
 	if local.ServerGroupType != "" && local.ServerGroupType != remote.ServerGroupType {
-		err := fmt.Errorf("can not change ServerGroupType once created")
-		reqCtx.Log.Error(err, fmt.Sprintf(" %s [%s] can not change ServerGroupType [%s] - [%s] once created",
-			local.ServerGroupId, local.ServerGroupName, remote.ServerGroupType, local.ServerGroupType))
-		errs = append(errs, err)
+		// do not continue to updateServerGroupServers, because can not addServerGroupServers with wrong server type
+		return fmt.Errorf(" %s [%s] can not change ServerGroupType [%s] - [%s] once created",
+			local.ServerGroupId, local.ServerGroupName, remote.ServerGroupType, local.ServerGroupType)
 	}
 
 	if local.ServerGroupName != remote.ServerGroupName {
@@ -232,6 +230,7 @@ func (mgr *ServerGroupManager) UpdateServerGroup(reqCtx *svcCtx.RequestContext, 
 
 	}
 update:
+	var errs []error
 	if needUpdate {
 		reqCtx.Log.Info(fmt.Sprintf("update server group: %s [%s] changed, detail %s",
 			local.ServerGroupId, local.ServerGroupName, updateDetail))
@@ -808,7 +807,13 @@ func getServerGroupTag(reqCtx *svcCtx.RequestContext) []tag.Tag {
 
 func setServerGroupAttributeFromAnno(sg *nlbmodel.ServerGroup, anno *annotation.AnnotationRequest) error {
 	if anno.Get(annotation.ServerGroupType) != "" {
-		sg.ServerGroupType = nlbmodel.ServerGroupType(anno.Get(annotation.ServerGroupType))
+		if strings.EqualFold(anno.Get(annotation.ServerGroupType), string(nlbmodel.IpServerGroupType)) {
+			sg.ServerGroupType = nlbmodel.IpServerGroupType
+		} else if strings.EqualFold(anno.Get(annotation.ServerGroupType), string(nlbmodel.InstanceServerGroupType)) {
+			sg.ServerGroupType = nlbmodel.InstanceServerGroupType
+		} else {
+			return fmt.Errorf("unsupport server ServerGroupType [%s]", sg.ServerGroupType)
+		}
 	}
 
 	if anno.Get(annotation.ConnectionDrain) != "" {
@@ -949,7 +954,7 @@ func isServerEqual(a, b nlbmodel.ServerGroupServer) bool {
 	case nlbmodel.EcsServerType:
 		return a.ServerId == b.ServerId
 	case nlbmodel.IpServerType:
-		return a.ServerIp == b.ServerIp
+		return a.ServerId == b.ServerId && a.ServerIp == b.ServerIp
 	default:
 		klog.Errorf("%s is not supported, skip", a.ServerType)
 		return false

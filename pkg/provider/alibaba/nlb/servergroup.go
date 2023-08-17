@@ -34,6 +34,8 @@ func (p *NLBProvider) ListNLBServerGroups(ctx context.Context, tags []tag.Tag) (
 		if resp == nil || resp.Body == nil {
 			return nil, fmt.Errorf("OpenAPI ListServerGroups resp is nil")
 		}
+		klog.V(5).Infof("RequestId: %s, API: %s", tea.StringValue(resp.Body.RequestId), "ListServerGroups")
+
 		remoteServerGroups = append(remoteServerGroups, resp.Body.ServerGroups...)
 
 		nextToken = tea.StringValue(resp.Body.NextToken)
@@ -175,6 +177,7 @@ func (p *NLBProvider) CreateNLBServerGroup(ctx context.Context, sg *nlbmodel.Ser
 	if resp == nil || resp.Body == nil {
 		return fmt.Errorf("OpenAPI CreateServerGroup resp is nil")
 	}
+	klog.V(5).Infof("RequestId: %s, API: %s", tea.StringValue(resp.Body.RequestId), "CreateServerGroup")
 
 	sg.ServerGroupId = tea.StringValue(resp.Body.ServerGroupId)
 
@@ -209,8 +212,15 @@ func (p *NLBProvider) CreateNLBServerGroup(ctx context.Context, sg *nlbmodel.Ser
 func (p *NLBProvider) DeleteNLBServerGroup(ctx context.Context, sgId string) error {
 	req := &nlb.DeleteServerGroupRequest{}
 	req.ServerGroupId = tea.String(sgId)
-	_, err := p.auth.NLB.DeleteServerGroup(req)
-	return util.SDKError("DeleteServerGroup", err)
+	resp, err := p.auth.NLB.DeleteServerGroup(req)
+	if err != nil {
+		return util.SDKError("DeleteServerGroup", err)
+	}
+	if resp == nil || resp.Body == nil {
+		return fmt.Errorf("OpenAPI DeleteServerGroup resp is nil")
+	}
+	klog.V(5).Infof("RequestId: %s, API: %s", tea.StringValue(resp.Body.RequestId), "DeleteServerGroup")
+	return nil
 
 }
 
@@ -269,8 +279,15 @@ func (p *NLBProvider) UpdateNLBServerGroup(ctx context.Context, sg *nlbmodel.Ser
 		}
 	}
 
-	_, err := p.auth.NLB.UpdateServerGroupAttribute(req)
-	return util.SDKError("UpdateServerGroupAttribute", err)
+	resp, err := p.auth.NLB.UpdateServerGroupAttribute(req)
+	if err != nil {
+		return util.SDKError("UpdateServerGroupAttribute", err)
+	}
+	if resp == nil || resp.Body == nil {
+		return fmt.Errorf("OpenAPI UpdateServerGroupAttribute resp is nil")
+	}
+	klog.V(5).Infof("RequestId: %s, API: %s", tea.StringValue(resp.Body.RequestId), "UpdateServerGroupAttribute")
+	return nil
 }
 
 // ServerGroupServer
@@ -299,6 +316,7 @@ func (p *NLBProvider) AddNLBServers(ctx context.Context, sgId string, backends [
 	if resp == nil || resp.Body == nil {
 		return fmt.Errorf("OpenAPI AddServersToServerGroup resp is nil")
 	}
+	klog.V(5).Infof("RequestId: %s, API: %s", tea.StringValue(resp.Body.RequestId), "AddServersToServerGroup")
 	return p.waitJobFinish("AddServersToServerGroup", tea.StringValue(resp.Body.JobId))
 }
 
@@ -327,6 +345,7 @@ func (p *NLBProvider) RemoveNLBServers(ctx context.Context, sgId string, backend
 	if resp == nil || resp.Body == nil {
 		return fmt.Errorf("OpenAPI RemoveServersFromServerGroup resp is nil")
 	}
+	klog.V(5).Infof("RequestId: %s, API: %s", tea.StringValue(resp.Body.RequestId), "RemoveServersFromServerGroup")
 	return p.waitJobFinish("RemoveServersFromServerGroup", tea.StringValue(resp.Body.JobId))
 }
 
@@ -357,6 +376,7 @@ func (p *NLBProvider) UpdateNLBServers(ctx context.Context, sgId string, backend
 	if resp == nil || resp.Body == nil {
 		return fmt.Errorf("OpenAPI UpdateServerGroupServersAttribute resp is nil")
 	}
+	klog.V(5).Infof("RequestId: %s, API: %s", tea.StringValue(resp.Body.RequestId), "UpdateServerGroupServersAttribute")
 	return p.waitJobFinish("UpdateServerGroupServersAttribute", tea.StringValue(resp.Body.JobId))
 }
 
@@ -373,6 +393,11 @@ func (p *NLBProvider) ListNLBServers(ctx context.Context, sgId string) ([]nlbmod
 		if err != nil {
 			return nil, util.SDKError("ListServerGroupServers", err)
 		}
+		if resp == nil || resp.Body == nil {
+			return nil, fmt.Errorf("OpenAPI ListServerGroupServers resp is nil")
+		}
+		klog.V(5).Infof("RequestId: %s, API: %s, ServerGroupId: %s",
+			tea.StringValue(resp.Body.RequestId), "ListServerGroupServers", tea.StringValue(req.ServerGroupId))
 
 		for _, s := range resp.Body.Servers {
 			ret = append(ret, nlbmodel.ServerGroupServer{
