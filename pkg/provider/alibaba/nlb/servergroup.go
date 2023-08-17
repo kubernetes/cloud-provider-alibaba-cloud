@@ -102,6 +102,13 @@ func (p *NLBProvider) CreateNLBServerGroup(ctx context.Context, sg *nlbmodel.Ser
 	req.ServerGroupName = tea.String(sg.ServerGroupName)
 	req.VpcId = tea.String(sg.VPCId)
 	req.Protocol = tea.String(sg.Protocol)
+	for _, t := range sg.Tags {
+		req.Tag = append(req.Tag, &nlb.CreateServerGroupRequestTag{
+			Key:   tea.String(t.Key),
+			Value: tea.String(t.Value),
+		})
+	}
+
 	if sg.AddressIPVersion != "" {
 		req.AddressIPVersion = tea.String(string(sg.AddressIPVersion))
 	}
