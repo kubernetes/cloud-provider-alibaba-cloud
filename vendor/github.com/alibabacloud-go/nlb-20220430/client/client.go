@@ -13,9 +13,22 @@ import (
 )
 
 type AddServersToServerGroupRequest struct {
-	ClientToken   *string                                  `json:"ClientToken,omitempty" xml:"ClientToken,omitempty"`
-	DryRun        *bool                                    `json:"DryRun,omitempty" xml:"DryRun,omitempty"`
-	RegionId      *string                                  `json:"RegionId,omitempty" xml:"RegionId,omitempty"`
+	// The client token that is used to ensure the idempotence of the request.
+	//
+	// You can use the client to generate the value, but you must ensure that it is unique among all requests. ClientToken can contain only ASCII characters.
+	//
+	// >  If you do not set this parameter, **ClientToken** is set to the value of **RequestId**. The value of **RequestId** of each API request may be different.
+	ClientToken *string `json:"ClientToken,omitempty" xml:"ClientToken,omitempty"`
+	// Specifies whether only to precheck the request. Valid values:
+	//
+	// *   **true**: prechecks the request but does not add the servers to the server group. The system prechecks the required parameters, request syntax, and limits. If the request fails the precheck, an error message is returned. If the request passes the precheck, the `DryRunOperation` error code is returned.
+	// *   **false** (default): sends the request. If the request passes the precheck, an HTTP 2xx status code is returned and the operation is performed.
+	DryRun *bool `json:"DryRun,omitempty" xml:"DryRun,omitempty"`
+	// The ID of the region where the NLB instance is deployed.
+	//
+	// You can call the [DescribeRegions](~~443657~~) operation to query the most recent region list.
+	RegionId *string `json:"RegionId,omitempty" xml:"RegionId,omitempty"`
+	// The ID of the server group.
 	ServerGroupId *string                                  `json:"ServerGroupId,omitempty" xml:"ServerGroupId,omitempty"`
 	Servers       []*AddServersToServerGroupRequestServers `json:"Servers,omitempty" xml:"Servers,omitempty" type:"Repeated"`
 }
@@ -54,12 +67,38 @@ func (s *AddServersToServerGroupRequest) SetServers(v []*AddServersToServerGroup
 }
 
 type AddServersToServerGroupRequestServers struct {
+	// The description of the servers.
+	//
+	// The description must be 2 to 256 characters in length, and can contain letters, digits, commas (,), periods (.), semicolons (;), forward slashes (/), at signs (@), underscores (\_), and hyphens (-).
+	//
+	// >  You can specify at most 40 servers in each call.
 	Description *string `json:"Description,omitempty" xml:"Description,omitempty"`
-	Port        *int32  `json:"Port,omitempty" xml:"Port,omitempty"`
-	ServerId    *string `json:"ServerId,omitempty" xml:"ServerId,omitempty"`
-	ServerIp    *string `json:"ServerIp,omitempty" xml:"ServerIp,omitempty"`
-	ServerType  *string `json:"ServerType,omitempty" xml:"ServerType,omitempty"`
-	Weight      *int32  `json:"Weight,omitempty" xml:"Weight,omitempty"`
+	// The port used by the backend server. Valid values: **1** to **65535**.
+	//
+	// >  You can specify at most 40 servers in each call.
+	Port *int32 `json:"Port,omitempty" xml:"Port,omitempty"`
+	// The ID of the server. You can specify at most 40 server IDs in each call.
+	//
+	// *   If the server group type is **Instance**, set the ServerId parameter to the ID of an Elastic Compute Service (ECS) instance, an elastic network interface (ENI), or an elastic container instance. These backend servers are specified by **Ecs**, **Eni**, or **Eci**.
+	// *   If the server group type is **Ip**, set the ServerId parameter to an IP address.
+	ServerId *string `json:"ServerId,omitempty" xml:"ServerId,omitempty"`
+	// The IP address of the server. If the server group type is **Ip**, set the ServerId parameter to an IP address.
+	//
+	// >  You can specify at most 40 server IP addresses in each call.
+	ServerIp *string `json:"ServerIp,omitempty" xml:"ServerIp,omitempty"`
+	// The type of the backend server. Valid values:
+	//
+	// *   **Ecs**: an ECS instance
+	// *   **Eni**: an ENI
+	// *   **Eci**: an elastic container instance
+	// *   **Ip**: an IP address
+	//
+	// >  You can specify at most 40 servers in each call.
+	ServerType *string `json:"ServerType,omitempty" xml:"ServerType,omitempty"`
+	// The weight of the backend server. Valid values: **0** to **100**. Default value: **100**. If the weight of a backend server is set to **0**, no requests are forwarded to the backend server.
+	//
+	// >  You can specify at most 40 servers in each call.
+	Weight *int32 `json:"Weight,omitempty" xml:"Weight,omitempty"`
 }
 
 func (s AddServersToServerGroupRequestServers) String() string {
@@ -101,8 +140,11 @@ func (s *AddServersToServerGroupRequestServers) SetWeight(v int32) *AddServersTo
 }
 
 type AddServersToServerGroupResponseBody struct {
-	JobId         *string `json:"JobId,omitempty" xml:"JobId,omitempty"`
-	RequestId     *string `json:"RequestId,omitempty" xml:"RequestId,omitempty"`
+	// The ID of the asynchronous task.
+	JobId *string `json:"JobId,omitempty" xml:"JobId,omitempty"`
+	// The ID of the request.
+	RequestId *string `json:"RequestId,omitempty" xml:"RequestId,omitempty"`
+	// The ID of the server group.
 	ServerGroupId *string `json:"ServerGroupId,omitempty" xml:"ServerGroupId,omitempty"`
 }
 
@@ -158,12 +200,119 @@ func (s *AddServersToServerGroupResponse) SetBody(v *AddServersToServerGroupResp
 	return s
 }
 
+type AssociateAdditionalCertificatesWithListenerRequest struct {
+	AdditionalCertificateIds []*string `json:"AdditionalCertificateIds,omitempty" xml:"AdditionalCertificateIds,omitempty" type:"Repeated"`
+	ClientToken              *string   `json:"ClientToken,omitempty" xml:"ClientToken,omitempty"`
+	DryRun                   *bool     `json:"DryRun,omitempty" xml:"DryRun,omitempty"`
+	ListenerId               *string   `json:"ListenerId,omitempty" xml:"ListenerId,omitempty"`
+	RegionId                 *string   `json:"RegionId,omitempty" xml:"RegionId,omitempty"`
+}
+
+func (s AssociateAdditionalCertificatesWithListenerRequest) String() string {
+	return tea.Prettify(s)
+}
+
+func (s AssociateAdditionalCertificatesWithListenerRequest) GoString() string {
+	return s.String()
+}
+
+func (s *AssociateAdditionalCertificatesWithListenerRequest) SetAdditionalCertificateIds(v []*string) *AssociateAdditionalCertificatesWithListenerRequest {
+	s.AdditionalCertificateIds = v
+	return s
+}
+
+func (s *AssociateAdditionalCertificatesWithListenerRequest) SetClientToken(v string) *AssociateAdditionalCertificatesWithListenerRequest {
+	s.ClientToken = &v
+	return s
+}
+
+func (s *AssociateAdditionalCertificatesWithListenerRequest) SetDryRun(v bool) *AssociateAdditionalCertificatesWithListenerRequest {
+	s.DryRun = &v
+	return s
+}
+
+func (s *AssociateAdditionalCertificatesWithListenerRequest) SetListenerId(v string) *AssociateAdditionalCertificatesWithListenerRequest {
+	s.ListenerId = &v
+	return s
+}
+
+func (s *AssociateAdditionalCertificatesWithListenerRequest) SetRegionId(v string) *AssociateAdditionalCertificatesWithListenerRequest {
+	s.RegionId = &v
+	return s
+}
+
+type AssociateAdditionalCertificatesWithListenerResponseBody struct {
+	JobId     *string `json:"JobId,omitempty" xml:"JobId,omitempty"`
+	RequestId *string `json:"RequestId,omitempty" xml:"RequestId,omitempty"`
+}
+
+func (s AssociateAdditionalCertificatesWithListenerResponseBody) String() string {
+	return tea.Prettify(s)
+}
+
+func (s AssociateAdditionalCertificatesWithListenerResponseBody) GoString() string {
+	return s.String()
+}
+
+func (s *AssociateAdditionalCertificatesWithListenerResponseBody) SetJobId(v string) *AssociateAdditionalCertificatesWithListenerResponseBody {
+	s.JobId = &v
+	return s
+}
+
+func (s *AssociateAdditionalCertificatesWithListenerResponseBody) SetRequestId(v string) *AssociateAdditionalCertificatesWithListenerResponseBody {
+	s.RequestId = &v
+	return s
+}
+
+type AssociateAdditionalCertificatesWithListenerResponse struct {
+	Headers    map[string]*string                                       `json:"headers,omitempty" xml:"headers,omitempty" require:"true"`
+	StatusCode *int32                                                   `json:"statusCode,omitempty" xml:"statusCode,omitempty" require:"true"`
+	Body       *AssociateAdditionalCertificatesWithListenerResponseBody `json:"body,omitempty" xml:"body,omitempty" require:"true"`
+}
+
+func (s AssociateAdditionalCertificatesWithListenerResponse) String() string {
+	return tea.Prettify(s)
+}
+
+func (s AssociateAdditionalCertificatesWithListenerResponse) GoString() string {
+	return s.String()
+}
+
+func (s *AssociateAdditionalCertificatesWithListenerResponse) SetHeaders(v map[string]*string) *AssociateAdditionalCertificatesWithListenerResponse {
+	s.Headers = v
+	return s
+}
+
+func (s *AssociateAdditionalCertificatesWithListenerResponse) SetStatusCode(v int32) *AssociateAdditionalCertificatesWithListenerResponse {
+	s.StatusCode = &v
+	return s
+}
+
+func (s *AssociateAdditionalCertificatesWithListenerResponse) SetBody(v *AssociateAdditionalCertificatesWithListenerResponseBody) *AssociateAdditionalCertificatesWithListenerResponse {
+	s.Body = v
+	return s
+}
+
 type AttachCommonBandwidthPackageToLoadBalancerRequest struct {
+	// The ID of the EIP bandwidth plan.
 	BandwidthPackageId *string `json:"BandwidthPackageId,omitempty" xml:"BandwidthPackageId,omitempty"`
-	ClientToken        *string `json:"ClientToken,omitempty" xml:"ClientToken,omitempty"`
-	DryRun             *bool   `json:"DryRun,omitempty" xml:"DryRun,omitempty"`
-	LoadBalancerId     *string `json:"LoadBalancerId,omitempty" xml:"LoadBalancerId,omitempty"`
-	RegionId           *string `json:"RegionId,omitempty" xml:"RegionId,omitempty"`
+	// The client token that is used to ensure the idempotence of the request.
+	//
+	// You can use the client to generate the value, but you must ensure that it is unique among all requests. ClientToken can contain only ASCII characters.
+	//
+	// >  If you do not set this parameter, **ClientToken** is set to the value of **RequestId**. The value of **RequestId** of each API request may be different.
+	ClientToken *string `json:"ClientToken,omitempty" xml:"ClientToken,omitempty"`
+	// Specifies whether only to precheck the request. Valid values:
+	//
+	// *   **true**: prechecks the request but does not associate the EIP bandwidth plan with the NLB instance. The system prechecks the required parameters, request syntax, and limits. If the request fails the precheck, an error message is returned. If the request passes the precheck, the `DryRunOperation` error code is returned.
+	// *   **false** (default): sends the request. If the request passes the precheck, an HTTP 2xx status code is returned and the operation is performed.
+	DryRun *bool `json:"DryRun,omitempty" xml:"DryRun,omitempty"`
+	// The ID of the NLB instance.
+	LoadBalancerId *string `json:"LoadBalancerId,omitempty" xml:"LoadBalancerId,omitempty"`
+	// The ID of the region where the NLB instance is deployed.
+	//
+	// You can call the [DescribeRegions](~~443657~~) operation to query the most recent region list.
+	RegionId *string `json:"RegionId,omitempty" xml:"RegionId,omitempty"`
 }
 
 func (s AttachCommonBandwidthPackageToLoadBalancerRequest) String() string {
@@ -200,7 +349,9 @@ func (s *AttachCommonBandwidthPackageToLoadBalancerRequest) SetRegionId(v string
 }
 
 type AttachCommonBandwidthPackageToLoadBalancerResponseBody struct {
-	JobId     *string `json:"JobId,omitempty" xml:"JobId,omitempty"`
+	// The ID of the asynchronous task.
+	JobId *string `json:"JobId,omitempty" xml:"JobId,omitempty"`
+	// The ID of the request.
 	RequestId *string `json:"RequestId,omitempty" xml:"RequestId,omitempty"`
 }
 
@@ -252,27 +403,84 @@ func (s *AttachCommonBandwidthPackageToLoadBalancerResponse) SetBody(v *AttachCo
 }
 
 type CreateListenerRequest struct {
-	AlpnEnabled          *bool     `json:"AlpnEnabled,omitempty" xml:"AlpnEnabled,omitempty"`
-	AlpnPolicy           *string   `json:"AlpnPolicy,omitempty" xml:"AlpnPolicy,omitempty"`
-	CaCertificateIds     []*string `json:"CaCertificateIds,omitempty" xml:"CaCertificateIds,omitempty" type:"Repeated"`
-	CaEnabled            *bool     `json:"CaEnabled,omitempty" xml:"CaEnabled,omitempty"`
-	CertificateIds       []*string `json:"CertificateIds,omitempty" xml:"CertificateIds,omitempty" type:"Repeated"`
-	ClientToken          *string   `json:"ClientToken,omitempty" xml:"ClientToken,omitempty"`
-	Cps                  *int32    `json:"Cps,omitempty" xml:"Cps,omitempty"`
-	DryRun               *bool     `json:"DryRun,omitempty" xml:"DryRun,omitempty"`
-	EndPort              *int32    `json:"EndPort,omitempty" xml:"EndPort,omitempty"`
-	IdleTimeout          *int32    `json:"IdleTimeout,omitempty" xml:"IdleTimeout,omitempty"`
-	ListenerDescription  *string   `json:"ListenerDescription,omitempty" xml:"ListenerDescription,omitempty"`
-	ListenerPort         *int32    `json:"ListenerPort,omitempty" xml:"ListenerPort,omitempty"`
-	ListenerProtocol     *string   `json:"ListenerProtocol,omitempty" xml:"ListenerProtocol,omitempty"`
-	LoadBalancerId       *string   `json:"LoadBalancerId,omitempty" xml:"LoadBalancerId,omitempty"`
-	Mss                  *int32    `json:"Mss,omitempty" xml:"Mss,omitempty"`
-	ProxyProtocolEnabled *bool     `json:"ProxyProtocolEnabled,omitempty" xml:"ProxyProtocolEnabled,omitempty"`
-	RegionId             *string   `json:"RegionId,omitempty" xml:"RegionId,omitempty"`
-	SecSensorEnabled     *bool     `json:"SecSensorEnabled,omitempty" xml:"SecSensorEnabled,omitempty"`
-	SecurityPolicyId     *string   `json:"SecurityPolicyId,omitempty" xml:"SecurityPolicyId,omitempty"`
-	ServerGroupId        *string   `json:"ServerGroupId,omitempty" xml:"ServerGroupId,omitempty"`
-	StartPort            *int32    `json:"StartPort,omitempty" xml:"StartPort,omitempty"`
+	// Specifies whether to enable Application-Layer Protocol Negotiation (ALPN). Valid values:
+	//
+	// *   **true**: yes
+	// *   **false** (default): no
+	AlpnEnabled *bool `json:"AlpnEnabled,omitempty" xml:"AlpnEnabled,omitempty"`
+	// The ALPN policy.
+	AlpnPolicy       *string   `json:"AlpnPolicy,omitempty" xml:"AlpnPolicy,omitempty"`
+	CaCertificateIds []*string `json:"CaCertificateIds,omitempty" xml:"CaCertificateIds,omitempty" type:"Repeated"`
+	// Specifies whether to enable mutual authentication. Valid values:
+	//
+	// *   **true**: yes
+	// *   **false** (default): no
+	CaEnabled      *bool     `json:"CaEnabled,omitempty" xml:"CaEnabled,omitempty"`
+	CertificateIds []*string `json:"CertificateIds,omitempty" xml:"CertificateIds,omitempty" type:"Repeated"`
+	// The client token that is used to ensure the idempotence of the request.
+	//
+	// You can use the client to generate the value, but you must ensure that it is unique among all requests. ClientToken can contain only ASCII characters.
+	//
+	// >  If you do not set this parameter, the system uses **RequestId** as **ClientToken**. **RequestId** may be different for each API request.
+	ClientToken *string `json:"ClientToken,omitempty" xml:"ClientToken,omitempty"`
+	// The maximum number of connections that can be created per second on the NLB instance. Valid values: **0** to **1000000**. **0** specifies that the number of connections is unlimited.
+	Cps *int32 `json:"Cps,omitempty" xml:"Cps,omitempty"`
+	// Specifies whether to only precheck this request. Valid values:
+	//
+	// *   **true**: prechecks the request without creating the resource. The system prechecks the required parameters, request syntax, and limits. If the request fails the precheck, an error message is returned. If the request passes the precheck, the `DryRunOperation` error code is returned.
+	// *   **false** (default): sends the request. If the request passes the precheck, a 2xx HTTP status code is returned and the operation is performed.
+	DryRun *bool `json:"DryRun,omitempty" xml:"DryRun,omitempty"`
+	// The last port in the listening port range. Valid values: **0** to **65535**.
+	//
+	// The number of the last port must be larger than that of the first port.
+	EndPort *int32 `json:"EndPort,omitempty" xml:"EndPort,omitempty"`
+	// The timeout period of an idle connection. Unit: seconds.
+	//
+	// Valid values: **1** to **900**. Default value: **900**.
+	IdleTimeout *int32 `json:"IdleTimeout,omitempty" xml:"IdleTimeout,omitempty"`
+	// The name of the listener.
+	//
+	// The name must be 2 to 256 characters in length, and can contain letters, digits, commas (,), periods (.), semicolons (;), forward slashes (/), at signs (@), underscores (\_), and hyphens (-).
+	ListenerDescription *string `json:"ListenerDescription,omitempty" xml:"ListenerDescription,omitempty"`
+	// The listening port. Valid values: **0** to **65535**.
+	//
+	// If you set the value to **0**, the listener listens by port range. If you set the value to **0**, you must also set the **StartPort** and **EndPort** parameters.
+	ListenerPort *int32 `json:"ListenerPort,omitempty" xml:"ListenerPort,omitempty"`
+	// The listening protocol. Valid values: **TCP**, **UDP**, and **TCPSSL**.
+	ListenerProtocol *string `json:"ListenerProtocol,omitempty" xml:"ListenerProtocol,omitempty"`
+	// The ID of the NLB instance.
+	LoadBalancerId *string `json:"LoadBalancerId,omitempty" xml:"LoadBalancerId,omitempty"`
+	// The maximum size of a TCP segment. Unit: bytes. Valid values: **0** to **1500**.
+	//
+	// **0** specifies that the maximum segment size remains unchanged.
+	//
+	// >  This parameter is supported only by listeners that use SSL over TCP.
+	Mss *int32 `json:"Mss,omitempty" xml:"Mss,omitempty"`
+	// Specifies whether to use the Proxy protocol to pass client IP addresses to backend servers. Valid values:
+	//
+	// *   **true**: yes
+	// *   **false** (default): no
+	ProxyProtocolEnabled *bool `json:"ProxyProtocolEnabled,omitempty" xml:"ProxyProtocolEnabled,omitempty"`
+	// The ID of the region where the NLB instance is deployed.
+	//
+	// You can call the [DescribeRegions](~~443657~~) operation to query the most recent region list.
+	RegionId *string `json:"RegionId,omitempty" xml:"RegionId,omitempty"`
+	// Specifies whether to enable fine-grained monitoring. Valid values:
+	//
+	// *   **true**: yes
+	// *   **false** (default): no
+	SecSensorEnabled *bool `json:"SecSensorEnabled,omitempty" xml:"SecSensorEnabled,omitempty"`
+	// The ID of the security policy. System security policies and custom security policies are supported.
+	//
+	// Valid values: **tls_cipher_policy\_1\_0** (default), **tls_cipher_policy\_1\_1**, **tls_cipher_policy\_1\_2**, **tls_cipher_policy\_1\_2\_strict**, and **tls_cipher_policy\_1\_2\_strict_with\_1\_3**.
+	//
+	// >  This parameter takes effect only for listeners that use SSL over TCP.
+	SecurityPolicyId *string `json:"SecurityPolicyId,omitempty" xml:"SecurityPolicyId,omitempty"`
+	// The ID of the server group.
+	ServerGroupId *string `json:"ServerGroupId,omitempty" xml:"ServerGroupId,omitempty"`
+	// The first port in the listening port range. Valid values: **0** to **65535**.
+	StartPort *int32                      `json:"StartPort,omitempty" xml:"StartPort,omitempty"`
+	Tag       []*CreateListenerRequestTag `json:"Tag,omitempty" xml:"Tag,omitempty" type:"Repeated"`
 }
 
 func (s CreateListenerRequest) String() string {
@@ -388,10 +596,41 @@ func (s *CreateListenerRequest) SetStartPort(v int32) *CreateListenerRequest {
 	return s
 }
 
+func (s *CreateListenerRequest) SetTag(v []*CreateListenerRequestTag) *CreateListenerRequest {
+	s.Tag = v
+	return s
+}
+
+type CreateListenerRequestTag struct {
+	Key   *string `json:"Key,omitempty" xml:"Key,omitempty"`
+	Value *string `json:"Value,omitempty" xml:"Value,omitempty"`
+}
+
+func (s CreateListenerRequestTag) String() string {
+	return tea.Prettify(s)
+}
+
+func (s CreateListenerRequestTag) GoString() string {
+	return s.String()
+}
+
+func (s *CreateListenerRequestTag) SetKey(v string) *CreateListenerRequestTag {
+	s.Key = &v
+	return s
+}
+
+func (s *CreateListenerRequestTag) SetValue(v string) *CreateListenerRequestTag {
+	s.Value = &v
+	return s
+}
+
 type CreateListenerResponseBody struct {
-	JobId      *string `json:"JobId,omitempty" xml:"JobId,omitempty"`
+	// The ID of the asynchronous task.
+	JobId *string `json:"JobId,omitempty" xml:"JobId,omitempty"`
+	// The ID of the listener.
 	ListenerId *string `json:"ListenerId,omitempty" xml:"ListenerId,omitempty"`
-	RequestId  *string `json:"RequestId,omitempty" xml:"RequestId,omitempty"`
+	// The ID of the request.
+	RequestId *string `json:"RequestId,omitempty" xml:"RequestId,omitempty"`
 }
 
 func (s CreateListenerResponseBody) String() string {
@@ -447,20 +686,54 @@ func (s *CreateListenerResponse) SetBody(v *CreateListenerResponseBody) *CreateL
 }
 
 type CreateLoadBalancerRequest struct {
-	AddressIpVersion             *string                                                `json:"AddressIpVersion,omitempty" xml:"AddressIpVersion,omitempty"`
-	AddressType                  *string                                                `json:"AddressType,omitempty" xml:"AddressType,omitempty"`
-	BandwidthPackageId           *string                                                `json:"BandwidthPackageId,omitempty" xml:"BandwidthPackageId,omitempty"`
-	ClientToken                  *string                                                `json:"ClientToken,omitempty" xml:"ClientToken,omitempty"`
-	DeletionProtectionConfig     *CreateLoadBalancerRequestDeletionProtectionConfig     `json:"DeletionProtectionConfig,omitempty" xml:"DeletionProtectionConfig,omitempty" type:"Struct"`
-	DryRun                       *bool                                                  `json:"DryRun,omitempty" xml:"DryRun,omitempty"`
-	LoadBalancerBillingConfig    *CreateLoadBalancerRequestLoadBalancerBillingConfig    `json:"LoadBalancerBillingConfig,omitempty" xml:"LoadBalancerBillingConfig,omitempty" type:"Struct"`
-	LoadBalancerName             *string                                                `json:"LoadBalancerName,omitempty" xml:"LoadBalancerName,omitempty"`
-	LoadBalancerType             *string                                                `json:"LoadBalancerType,omitempty" xml:"LoadBalancerType,omitempty"`
+	// The protocol version. Valid values:
+	//
+	// *   **ipv4:** IPv4. This is the default value.
+	// *   **DualStack:** dual stack.
+	AddressIpVersion *string `json:"AddressIpVersion,omitempty" xml:"AddressIpVersion,omitempty"`
+	// The type of IPv4 address used by the NLB instance. Valid values:
+	//
+	// *   **Internet**: The NLB instance uses a public IP address. The domain name of the NLB instance is resolved to the public IP address. Therefore, the NLB instance can be accessed over the Internet.
+	// *   **Intranet**: The NLB instance uses a private IP address. The domain name of the NLB instance is resolved to the private IP address. Therefore, the NLB instance can be accessed over the virtual private cloud (VPC) where the NLB instance is deployed.
+	//
+	// >  To enable a public IPv6 address for an NLB instance, call the [EnableLoadBalancerIpv6Internet](~~445878~~) operation.
+	AddressType *string `json:"AddressType,omitempty" xml:"AddressType,omitempty"`
+	// The ID of the EIP bandwidth plan that is associated with the Internet-facing NLB instance.
+	BandwidthPackageId *string `json:"BandwidthPackageId,omitempty" xml:"BandwidthPackageId,omitempty"`
+	// The client token that is used to ensure the idempotence of the request.
+	//
+	// You can use the client to generate the value, but you must make sure that it is unique among different requests. The client token can contain only ASCII characters.
+	//
+	// >  If you do not set this parameter, **ClientToken** is set to the value of **RequestId**. The value of **RequestId** for each API request is different.
+	ClientToken *string `json:"ClientToken,omitempty" xml:"ClientToken,omitempty"`
+	// The configuration of the deletion protection feature.
+	DeletionProtectionConfig *CreateLoadBalancerRequestDeletionProtectionConfig `json:"DeletionProtectionConfig,omitempty" xml:"DeletionProtectionConfig,omitempty" type:"Struct"`
+	// Specifies whether to perform a dry run. Valid values:
+	//
+	// *   **true**: performs a dry run. The system checks the required parameters, request syntax, and limits. If the request fails the dry run, an error message is returned. If the request passes the dry run, the `DryRunOperation` error code is returned.
+	// *   **false**: performs a dry run and sends the request. This is the default value. If the request passes the dry run, a 2xx HTTP status code is returned and the operation is performed.
+	DryRun *bool `json:"DryRun,omitempty" xml:"DryRun,omitempty"`
+	// The billing settings of the NLB instance.
+	LoadBalancerBillingConfig *CreateLoadBalancerRequestLoadBalancerBillingConfig `json:"LoadBalancerBillingConfig,omitempty" xml:"LoadBalancerBillingConfig,omitempty" type:"Struct"`
+	// The name of the NLB instance.
+	//
+	// The value must be 2 to 128 characters in length, and can contain letters, digits, periods (.), underscores (\_), and hyphens (-). The value must start with a letter.
+	LoadBalancerName *string `json:"LoadBalancerName,omitempty" xml:"LoadBalancerName,omitempty"`
+	// The type of the instance. Set the value to **network**, which specifies an NLB instance.
+	LoadBalancerType *string `json:"LoadBalancerType,omitempty" xml:"LoadBalancerType,omitempty"`
+	// The configuration of the configuration read-only mode.
 	ModificationProtectionConfig *CreateLoadBalancerRequestModificationProtectionConfig `json:"ModificationProtectionConfig,omitempty" xml:"ModificationProtectionConfig,omitempty" type:"Struct"`
-	RegionId                     *string                                                `json:"RegionId,omitempty" xml:"RegionId,omitempty"`
-	ResourceGroupId              *string                                                `json:"ResourceGroupId,omitempty" xml:"ResourceGroupId,omitempty"`
-	VpcId                        *string                                                `json:"VpcId,omitempty" xml:"VpcId,omitempty"`
-	ZoneMappings                 []*CreateLoadBalancerRequestZoneMappings               `json:"ZoneMappings,omitempty" xml:"ZoneMappings,omitempty" type:"Repeated"`
+	// The ID of the region where the NLB instance is deployed.
+	//
+	// You can call the [DescribeRegions](~~443657~~) operation to query the most recent region list.
+	RegionId *string `json:"RegionId,omitempty" xml:"RegionId,omitempty"`
+	// The ID of the resource group.
+	ResourceGroupId *string                         `json:"ResourceGroupId,omitempty" xml:"ResourceGroupId,omitempty"`
+	Tag             []*CreateLoadBalancerRequestTag `json:"Tag,omitempty" xml:"Tag,omitempty" type:"Repeated"`
+	// The ID of the VPC where the NLB instance is deployed.
+	VpcId *string `json:"VpcId,omitempty" xml:"VpcId,omitempty"`
+	// The mappings between zones and vSwitches. You must add at least two zones. You can add a maximum of 10 zones.
+	ZoneMappings []*CreateLoadBalancerRequestZoneMappings `json:"ZoneMappings,omitempty" xml:"ZoneMappings,omitempty" type:"Repeated"`
 }
 
 func (s CreateLoadBalancerRequest) String() string {
@@ -531,6 +804,11 @@ func (s *CreateLoadBalancerRequest) SetResourceGroupId(v string) *CreateLoadBala
 	return s
 }
 
+func (s *CreateLoadBalancerRequest) SetTag(v []*CreateLoadBalancerRequestTag) *CreateLoadBalancerRequest {
+	s.Tag = v
+	return s
+}
+
 func (s *CreateLoadBalancerRequest) SetVpcId(v string) *CreateLoadBalancerRequest {
 	s.VpcId = &v
 	return s
@@ -542,8 +820,13 @@ func (s *CreateLoadBalancerRequest) SetZoneMappings(v []*CreateLoadBalancerReque
 }
 
 type CreateLoadBalancerRequestDeletionProtectionConfig struct {
-	Enabled *bool   `json:"Enabled,omitempty" xml:"Enabled,omitempty"`
-	Reason  *string `json:"Reason,omitempty" xml:"Reason,omitempty"`
+	// Specifies whether to enable deletion protection. Valid values:
+	//
+	// *   **true**: yes
+	// *   **false** (default): no
+	Enabled *bool `json:"Enabled,omitempty" xml:"Enabled,omitempty"`
+	// The reason why the deletion protection feature is enabled or disabled. The value must be 2 to 128 characters in length, and can contain letters, digits, periods (.), underscores (\_), and hyphens (-). The value must start with a letter.
+	Reason *string `json:"Reason,omitempty" xml:"Reason,omitempty"`
 }
 
 func (s CreateLoadBalancerRequestDeletionProtectionConfig) String() string {
@@ -565,6 +848,9 @@ func (s *CreateLoadBalancerRequestDeletionProtectionConfig) SetReason(v string) 
 }
 
 type CreateLoadBalancerRequestLoadBalancerBillingConfig struct {
+	// The billing method of the NLB instance.
+	//
+	// Set the value to **PostPay**, which specifies the pay-as-you-go billing method.
 	PayType *string `json:"PayType,omitempty" xml:"PayType,omitempty"`
 }
 
@@ -582,7 +868,16 @@ func (s *CreateLoadBalancerRequestLoadBalancerBillingConfig) SetPayType(v string
 }
 
 type CreateLoadBalancerRequestModificationProtectionConfig struct {
+	// The reason why the configuration read-only mode is enabled. The value must be 2 to 128 characters in length, and can contain letters, digits, periods (.), underscores (\_), and hyphens (-). The value must start with a letter.
+	//
+	// >  This parameter takes effect only if the **Status** parameter is set to **ConsoleProtection**.
 	Reason *string `json:"Reason,omitempty" xml:"Reason,omitempty"`
+	// Specifies whether to enable the configuration read-only mode. Valid values:
+	//
+	// *   **NonProtection**: does not enable the configuration read-only mode. You cannot set the **Reason** parameter. If the **Reason** parameter is set, the value is cleared.
+	// *   **ConsoleProtection**: enables the configuration read-only mode. You can set the **Reason** parameter.
+	//
+	// >  If you set this parameter to **ConsoleProtection**, you cannot use the NLB console to modify instance configurations. However, you can call API operations to modify instance configurations.
 	Status *string `json:"Status,omitempty" xml:"Status,omitempty"`
 }
 
@@ -604,11 +899,40 @@ func (s *CreateLoadBalancerRequestModificationProtectionConfig) SetStatus(v stri
 	return s
 }
 
+type CreateLoadBalancerRequestTag struct {
+	Key   *string `json:"Key,omitempty" xml:"Key,omitempty"`
+	Value *string `json:"Value,omitempty" xml:"Value,omitempty"`
+}
+
+func (s CreateLoadBalancerRequestTag) String() string {
+	return tea.Prettify(s)
+}
+
+func (s CreateLoadBalancerRequestTag) GoString() string {
+	return s.String()
+}
+
+func (s *CreateLoadBalancerRequestTag) SetKey(v string) *CreateLoadBalancerRequestTag {
+	s.Key = &v
+	return s
+}
+
+func (s *CreateLoadBalancerRequestTag) SetValue(v string) *CreateLoadBalancerRequestTag {
+	s.Value = &v
+	return s
+}
+
 type CreateLoadBalancerRequestZoneMappings struct {
-	AllocationId       *string `json:"AllocationId,omitempty" xml:"AllocationId,omitempty"`
+	// The ID of the elastic IP address (EIP) that is associated with the Internet-facing NLB instance. You can specify one EIP for each zone. You must add at least two zones. You can add a maximum of 10 zones.
+	AllocationId *string `json:"AllocationId,omitempty" xml:"AllocationId,omitempty"`
+	// The private IP address. You must add at least two zones. You can add a maximum of 10 zones.
 	PrivateIPv4Address *string `json:"PrivateIPv4Address,omitempty" xml:"PrivateIPv4Address,omitempty"`
-	VSwitchId          *string `json:"VSwitchId,omitempty" xml:"VSwitchId,omitempty"`
-	ZoneId             *string `json:"ZoneId,omitempty" xml:"ZoneId,omitempty"`
+	// The vSwitch in the zone. You can specify only one vSwitch (subnet) in each zone of an NLB instance. You must add at least two zones. You can add a maximum of 10 zones.
+	VSwitchId *string `json:"VSwitchId,omitempty" xml:"VSwitchId,omitempty"`
+	// The ID of the zone of the NLB instance. You must add at least two zones. You can add a maximum of 10 zones.
+	//
+	// You can call the [DescribeZones](~~443890~~) operation to query the most recent zone list.
+	ZoneId *string `json:"ZoneId,omitempty" xml:"ZoneId,omitempty"`
 }
 
 func (s CreateLoadBalancerRequestZoneMappings) String() string {
@@ -640,9 +964,12 @@ func (s *CreateLoadBalancerRequestZoneMappings) SetZoneId(v string) *CreateLoadB
 }
 
 type CreateLoadBalancerResponseBody struct {
+	// The ID of the NLB instance.
 	LoadbalancerId *string `json:"LoadbalancerId,omitempty" xml:"LoadbalancerId,omitempty"`
-	OrderId        *int64  `json:"OrderId,omitempty" xml:"OrderId,omitempty"`
-	RequestId      *string `json:"RequestId,omitempty" xml:"RequestId,omitempty"`
+	// The ID of the order for the NLB instance.
+	OrderId *int64 `json:"OrderId,omitempty" xml:"OrderId,omitempty"`
+	// The ID of the request.
+	RequestId *string `json:"RequestId,omitempty" xml:"RequestId,omitempty"`
 }
 
 func (s CreateLoadBalancerResponseBody) String() string {
@@ -698,13 +1025,30 @@ func (s *CreateLoadBalancerResponse) SetBody(v *CreateLoadBalancerResponseBody) 
 }
 
 type CreateSecurityPolicyRequest struct {
-	Ciphers            []*string `json:"Ciphers,omitempty" xml:"Ciphers,omitempty" type:"Repeated"`
-	ClientToken        *string   `json:"ClientToken,omitempty" xml:"ClientToken,omitempty"`
-	DryRun             *bool     `json:"DryRun,omitempty" xml:"DryRun,omitempty"`
-	RegionId           *string   `json:"RegionId,omitempty" xml:"RegionId,omitempty"`
-	ResourceGroupId    *string   `json:"ResourceGroupId,omitempty" xml:"ResourceGroupId,omitempty"`
-	SecurityPolicyName *string   `json:"SecurityPolicyName,omitempty" xml:"SecurityPolicyName,omitempty"`
-	TlsVersions        []*string `json:"TlsVersions,omitempty" xml:"TlsVersions,omitempty" type:"Repeated"`
+	Ciphers []*string `json:"Ciphers,omitempty" xml:"Ciphers,omitempty" type:"Repeated"`
+	// The client token that is used to ensure the idempotence of the request.
+	//
+	// You can use the client to generate the value, but you must ensure that it is unique among all requests. ClientToken can contain only ASCII characters.
+	//
+	// >  If you do not set this parameter, **ClientToken** is set to the value of **RequestId**. The value of **RequestId** for each API request may be different.
+	ClientToken *string `json:"ClientToken,omitempty" xml:"ClientToken,omitempty"`
+	// Specifies whether only to precheck the request. Valid values:
+	//
+	// *   **true**: checks the request but does not create the security policy. The system prechecks the required parameters, request syntax, and limits. If the request fails the precheck, an error message is returned. If the request passes the precheck, the `DryRunOperation` error code is returned.
+	// *   **false** (default): sends the request. If the request passes the precheck, an HTTP 2xx status code is returned and the operation is performed.
+	DryRun *bool `json:"DryRun,omitempty" xml:"DryRun,omitempty"`
+	// The ID of the region where the NLB instance is deployed.
+	//
+	// You can call the [DescribeRegions](~~443657~~) operation to query the most recent region list.
+	RegionId *string `json:"RegionId,omitempty" xml:"RegionId,omitempty"`
+	// The ID of the resource group.
+	ResourceGroupId *string `json:"ResourceGroupId,omitempty" xml:"ResourceGroupId,omitempty"`
+	// The name of the security policy.
+	//
+	// The name must be 1 to 200 characters in length, and can contain letters, digits, periods (.), underscores (\_), and hyphens (-).
+	SecurityPolicyName *string                           `json:"SecurityPolicyName,omitempty" xml:"SecurityPolicyName,omitempty"`
+	Tag                []*CreateSecurityPolicyRequestTag `json:"Tag,omitempty" xml:"Tag,omitempty" type:"Repeated"`
+	TlsVersions        []*string                         `json:"TlsVersions,omitempty" xml:"TlsVersions,omitempty" type:"Repeated"`
 }
 
 func (s CreateSecurityPolicyRequest) String() string {
@@ -745,14 +1089,45 @@ func (s *CreateSecurityPolicyRequest) SetSecurityPolicyName(v string) *CreateSec
 	return s
 }
 
+func (s *CreateSecurityPolicyRequest) SetTag(v []*CreateSecurityPolicyRequestTag) *CreateSecurityPolicyRequest {
+	s.Tag = v
+	return s
+}
+
 func (s *CreateSecurityPolicyRequest) SetTlsVersions(v []*string) *CreateSecurityPolicyRequest {
 	s.TlsVersions = v
 	return s
 }
 
+type CreateSecurityPolicyRequestTag struct {
+	Key   *string `json:"Key,omitempty" xml:"Key,omitempty"`
+	Value *string `json:"Value,omitempty" xml:"Value,omitempty"`
+}
+
+func (s CreateSecurityPolicyRequestTag) String() string {
+	return tea.Prettify(s)
+}
+
+func (s CreateSecurityPolicyRequestTag) GoString() string {
+	return s.String()
+}
+
+func (s *CreateSecurityPolicyRequestTag) SetKey(v string) *CreateSecurityPolicyRequestTag {
+	s.Key = &v
+	return s
+}
+
+func (s *CreateSecurityPolicyRequestTag) SetValue(v string) *CreateSecurityPolicyRequestTag {
+	s.Value = &v
+	return s
+}
+
 type CreateSecurityPolicyResponseBody struct {
-	JobId            *string `json:"JobId,omitempty" xml:"JobId,omitempty"`
-	RequestId        *string `json:"RequestId,omitempty" xml:"RequestId,omitempty"`
+	// The ID of the asynchronous task.
+	JobId *string `json:"JobId,omitempty" xml:"JobId,omitempty"`
+	// The ID of the request.
+	RequestId *string `json:"RequestId,omitempty" xml:"RequestId,omitempty"`
+	// The ID of the TLS security policy.
 	SecurityPolicyId *string `json:"SecurityPolicyId,omitempty" xml:"SecurityPolicyId,omitempty"`
 }
 
@@ -809,21 +1184,76 @@ func (s *CreateSecurityPolicyResponse) SetBody(v *CreateSecurityPolicyResponseBo
 }
 
 type CreateServerGroupRequest struct {
-	AddressIPVersion        *string                                    `json:"AddressIPVersion,omitempty" xml:"AddressIPVersion,omitempty"`
-	AnyPortEnabled          *bool                                      `json:"AnyPortEnabled,omitempty" xml:"AnyPortEnabled,omitempty"`
-	ClientToken             *string                                    `json:"ClientToken,omitempty" xml:"ClientToken,omitempty"`
-	ConnectionDrainEnabled  *bool                                      `json:"ConnectionDrainEnabled,omitempty" xml:"ConnectionDrainEnabled,omitempty"`
-	ConnectionDrainTimeout  *int32                                     `json:"ConnectionDrainTimeout,omitempty" xml:"ConnectionDrainTimeout,omitempty"`
-	DryRun                  *bool                                      `json:"DryRun,omitempty" xml:"DryRun,omitempty"`
-	HealthCheckConfig       *CreateServerGroupRequestHealthCheckConfig `json:"HealthCheckConfig,omitempty" xml:"HealthCheckConfig,omitempty" type:"Struct"`
-	PreserveClientIpEnabled *bool                                      `json:"PreserveClientIpEnabled,omitempty" xml:"PreserveClientIpEnabled,omitempty"`
-	Protocol                *string                                    `json:"Protocol,omitempty" xml:"Protocol,omitempty"`
-	RegionId                *string                                    `json:"RegionId,omitempty" xml:"RegionId,omitempty"`
-	ResourceGroupId         *string                                    `json:"ResourceGroupId,omitempty" xml:"ResourceGroupId,omitempty"`
-	Scheduler               *string                                    `json:"Scheduler,omitempty" xml:"Scheduler,omitempty"`
-	ServerGroupName         *string                                    `json:"ServerGroupName,omitempty" xml:"ServerGroupName,omitempty"`
-	ServerGroupType         *string                                    `json:"ServerGroupType,omitempty" xml:"ServerGroupType,omitempty"`
-	VpcId                   *string                                    `json:"VpcId,omitempty" xml:"VpcId,omitempty"`
+	// The protocol version. Valid values:
+	//
+	// *   **ipv4:** IPv4. This is the default value.
+	// *   **DualStack:** dual stack.
+	AddressIPVersion *string `json:"AddressIPVersion,omitempty" xml:"AddressIPVersion,omitempty"`
+	// Specifies whether to enable all-port forwarding. Valid values:
+	//
+	// *   **true:** yes.
+	// *   **false:** no. This is the default value.
+	AnyPortEnabled *bool `json:"AnyPortEnabled,omitempty" xml:"AnyPortEnabled,omitempty"`
+	// The client token that is used to ensure the idempotence of the request.
+	//
+	// You can use the client to generate the value, but you must make sure that the value is unique among different requests. The token can contain only ASCII characters.
+	//
+	// >  If you do not set this parameter, the system automatically uses the value of **RequestId** as the value of **ClientToken**. The value of **RequestId** may be different for each API request.
+	ClientToken *string `json:"ClientToken,omitempty" xml:"ClientToken,omitempty"`
+	// Specifies whether to enable connection draining. Valid values:
+	//
+	// *   **true:** yes.
+	// *   **false:** no. This is the default value.
+	ConnectionDrainEnabled *bool `json:"ConnectionDrainEnabled,omitempty" xml:"ConnectionDrainEnabled,omitempty"`
+	// The timeout period of connection draining. Unit: seconds.
+	//
+	// Valid values: **10** to **900**.
+	ConnectionDrainTimeout *int32 `json:"ConnectionDrainTimeout,omitempty" xml:"ConnectionDrainTimeout,omitempty"`
+	// Specifies whether to perform a dry run. Valid values:
+	//
+	// *   **true:** performs a dry run. The system checks the required parameters, request syntax, and limits. If the request fails the dry run, an error message is returned. If the request passes the dry run, the `DryRunOperation` error code is returned.
+	// *   **false:** performs a dry run and sends the request. If the request passes the dry run, a 2xx HTTP status code is returned and the operation is performed.
+	DryRun            *bool                                      `json:"DryRun,omitempty" xml:"DryRun,omitempty"`
+	HealthCheckConfig *CreateServerGroupRequestHealthCheckConfig `json:"HealthCheckConfig,omitempty" xml:"HealthCheckConfig,omitempty" type:"Struct"`
+	// Specifies whether to enable client IP preservation. Valid values:
+	//
+	// *   **true:** yes.
+	// *   **false:** no. This is the default value.
+	PreserveClientIpEnabled *bool `json:"PreserveClientIpEnabled,omitempty" xml:"PreserveClientIpEnabled,omitempty"`
+	// The protocol used to forward requests to the backend servers. Valid values:
+	//
+	// *   **TCP:** This is the default value.
+	// *   **UDP**
+	// *   **TCPSSL**
+	Protocol *string `json:"Protocol,omitempty" xml:"Protocol,omitempty"`
+	// The ID of the region where the NLB instance is deployed.
+	//
+	// You can call the [DescribeRegions](~~443657~~) operation to query the most recent region list.
+	RegionId *string `json:"RegionId,omitempty" xml:"RegionId,omitempty"`
+	// The ID of the resource group to which the server group belongs.
+	ResourceGroupId *string `json:"ResourceGroupId,omitempty" xml:"ResourceGroupId,omitempty"`
+	// The scheduling algorithm. Valid values:
+	//
+	// *   **Wrr:** The weighted round-robin algorithm is used. Backend servers with higher weights receive more requests than backend servers with lower weights. This is the default value.
+	// *   **rr:** The round-robin algorithm is used. Requests are forwarded to backend servers in sequence.
+	// *   **sch:** Source IP hashing is used. Requests from the same source IP address are forwarded to the same backend server.
+	// *   **tch:** Four-element hashing is used. It specifies consistent hashing that is based on four factors: source IP address, destination IP address, source port, and destination port. Requests that contain the same information based on the four factors are forwarded to the same backend server.
+	// *   **qch:** QUIC ID hashing is used. Requests that contain the same QUIC ID are forwarded to the same backend server.
+	Scheduler *string `json:"Scheduler,omitempty" xml:"Scheduler,omitempty"`
+	// The name of the server group.
+	//
+	// The name must be 2 to 128 characters in length and can contain letters, digits, periods (.), underscores (\_), and hyphens (-). The name must start with a letter.
+	ServerGroupName *string `json:"ServerGroupName,omitempty" xml:"ServerGroupName,omitempty"`
+	// The type of the server group. Valid values:
+	//
+	// *   **Instance:** allows you to add servers of the **Ecs**, **Ens**, or **Eci** type. This is the default value.
+	// *   **Ip:** allows you to add servers by specifying IP addresses.
+	ServerGroupType *string                        `json:"ServerGroupType,omitempty" xml:"ServerGroupType,omitempty"`
+	Tag             []*CreateServerGroupRequestTag `json:"Tag,omitempty" xml:"Tag,omitempty" type:"Repeated"`
+	// The ID of the VPC to which the server group belongs.
+	//
+	// >  If **ServerGroupType** is set to **Instance**, only servers in the specified VPC can be added to the server group.
+	VpcId *string `json:"VpcId,omitempty" xml:"VpcId,omitempty"`
 }
 
 func (s CreateServerGroupRequest) String() string {
@@ -904,23 +1334,72 @@ func (s *CreateServerGroupRequest) SetServerGroupType(v string) *CreateServerGro
 	return s
 }
 
+func (s *CreateServerGroupRequest) SetTag(v []*CreateServerGroupRequestTag) *CreateServerGroupRequest {
+	s.Tag = v
+	return s
+}
+
 func (s *CreateServerGroupRequest) SetVpcId(v string) *CreateServerGroupRequest {
 	s.VpcId = &v
 	return s
 }
 
 type CreateServerGroupRequestHealthCheckConfig struct {
-	HealthCheckConnectPort    *int32    `json:"HealthCheckConnectPort,omitempty" xml:"HealthCheckConnectPort,omitempty"`
-	HealthCheckConnectTimeout *int32    `json:"HealthCheckConnectTimeout,omitempty" xml:"HealthCheckConnectTimeout,omitempty"`
-	HealthCheckDomain         *string   `json:"HealthCheckDomain,omitempty" xml:"HealthCheckDomain,omitempty"`
-	HealthCheckEnabled        *bool     `json:"HealthCheckEnabled,omitempty" xml:"HealthCheckEnabled,omitempty"`
-	HealthCheckHttpCode       []*string `json:"HealthCheckHttpCode,omitempty" xml:"HealthCheckHttpCode,omitempty" type:"Repeated"`
-	HealthCheckInterval       *int32    `json:"HealthCheckInterval,omitempty" xml:"HealthCheckInterval,omitempty"`
-	HealthCheckType           *string   `json:"HealthCheckType,omitempty" xml:"HealthCheckType,omitempty"`
-	HealthCheckUrl            *string   `json:"HealthCheckUrl,omitempty" xml:"HealthCheckUrl,omitempty"`
-	HealthyThreshold          *int32    `json:"HealthyThreshold,omitempty" xml:"HealthyThreshold,omitempty"`
-	HttpCheckMethod           *string   `json:"HttpCheckMethod,omitempty" xml:"HttpCheckMethod,omitempty"`
-	UnhealthyThreshold        *int32    `json:"UnhealthyThreshold,omitempty" xml:"UnhealthyThreshold,omitempty"`
+	// The backend port that is used for health checks.
+	//
+	// Valid values: **0** to **65535**.
+	//
+	// Default value: **0**. If you set the value to 0, the port of a backend server is used for health checks.
+	HealthCheckConnectPort *int32 `json:"HealthCheckConnectPort,omitempty" xml:"HealthCheckConnectPort,omitempty"`
+	// The maximum timeout period of a health check response. Unit: seconds.
+	//
+	// Valid values: **1** to **300**.
+	//
+	// Default value: **5**.
+	HealthCheckConnectTimeout *int32 `json:"HealthCheckConnectTimeout,omitempty" xml:"HealthCheckConnectTimeout,omitempty"`
+	// The domain name that is used for health checks. Valid values:
+	//
+	// *   **$SERVER_IP:** the private IP address of a backend server.
+	// *   **domain:** the domain name you want to use for health checks. The domain name must be 1 to 80 characters in length and can contain lowercase letters, digits, hyphens (-), and periods (.).
+	//
+	// >  This parameter takes effect only when you set **HealthCheckType** to **HTTP**.
+	HealthCheckDomain *string `json:"HealthCheckDomain,omitempty" xml:"HealthCheckDomain,omitempty"`
+	// Specifies whether to enable the health check feature. Valid values:
+	//
+	// *   **true:** yes. This is the default value.
+	// *   **false:** no.
+	HealthCheckEnabled  *bool     `json:"HealthCheckEnabled,omitempty" xml:"HealthCheckEnabled,omitempty"`
+	HealthCheckHttpCode []*string `json:"HealthCheckHttpCode,omitempty" xml:"HealthCheckHttpCode,omitempty" type:"Repeated"`
+	// The interval between two consecutive health checks. Unit: seconds.
+	//
+	// Valid values: **5** to **5000**.
+	//
+	// Default value: **10**.
+	HealthCheckInterval *int32 `json:"HealthCheckInterval,omitempty" xml:"HealthCheckInterval,omitempty"`
+	// The protocol that is used for health checks. Valid values: **TCP** (default) and **HTTP**.
+	HealthCheckType *string `json:"HealthCheckType,omitempty" xml:"HealthCheckType,omitempty"`
+	// The path to which health check requests are sent.
+	//
+	// The path must be 1 to 80 characters in length, and can contain only letters, digits, and the following special characters: `- / . % ? # & =`. It can also contain the following extended characters: `_ ; ~ ! ( ) * [ ] @ $ ^ : \" , +`. The path must start with a forward slash (/).
+	//
+	// >  This parameter takes effect only when you set **HealthCheckType** to **HTTP**.
+	HealthCheckUrl *string `json:"HealthCheckUrl,omitempty" xml:"HealthCheckUrl,omitempty"`
+	// The number of times that an unhealthy backend server must consecutively pass health checks before it is declared healthy. In this case, the health status is changed from **fail** to **success**.
+	//
+	// Valid values: **2** to **10**.
+	//
+	// Default value: **2**.
+	HealthyThreshold *int32 `json:"HealthyThreshold,omitempty" xml:"HealthyThreshold,omitempty"`
+	// The HTTP method that is used for health checks. Valid values: **GET** (default) and **HEAD**.
+	//
+	// >  This parameter takes effect only when you set **HealthCheckType** to **HTTP**.
+	HttpCheckMethod *string `json:"HttpCheckMethod,omitempty" xml:"HttpCheckMethod,omitempty"`
+	// The number of times that a healthy backend server must consecutively fail health checks before it is declared unhealthy. In this case, the health status is changed from **success** to **fail**.
+	//
+	// Valid values: **2** to **10**.
+	//
+	// Default value: **2**.
+	UnhealthyThreshold *int32 `json:"UnhealthyThreshold,omitempty" xml:"UnhealthyThreshold,omitempty"`
 }
 
 func (s CreateServerGroupRequestHealthCheckConfig) String() string {
@@ -986,9 +1465,35 @@ func (s *CreateServerGroupRequestHealthCheckConfig) SetUnhealthyThreshold(v int3
 	return s
 }
 
+type CreateServerGroupRequestTag struct {
+	Key   *string `json:"Key,omitempty" xml:"Key,omitempty"`
+	Value *string `json:"Value,omitempty" xml:"Value,omitempty"`
+}
+
+func (s CreateServerGroupRequestTag) String() string {
+	return tea.Prettify(s)
+}
+
+func (s CreateServerGroupRequestTag) GoString() string {
+	return s.String()
+}
+
+func (s *CreateServerGroupRequestTag) SetKey(v string) *CreateServerGroupRequestTag {
+	s.Key = &v
+	return s
+}
+
+func (s *CreateServerGroupRequestTag) SetValue(v string) *CreateServerGroupRequestTag {
+	s.Value = &v
+	return s
+}
+
 type CreateServerGroupResponseBody struct {
-	JobId         *string `json:"JobId,omitempty" xml:"JobId,omitempty"`
-	RequestId     *string `json:"RequestId,omitempty" xml:"RequestId,omitempty"`
+	// The ID of the asynchronous task.
+	JobId *string `json:"JobId,omitempty" xml:"JobId,omitempty"`
+	// The ID of the request.
+	RequestId *string `json:"RequestId,omitempty" xml:"RequestId,omitempty"`
+	// The ID of the server group.
 	ServerGroupId *string `json:"ServerGroupId,omitempty" xml:"ServerGroupId,omitempty"`
 }
 
@@ -1045,10 +1550,23 @@ func (s *CreateServerGroupResponse) SetBody(v *CreateServerGroupResponseBody) *C
 }
 
 type DeleteListenerRequest struct {
+	// The client token that is used to ensure the idempotence of the request.
+	//
+	// You can use the client to generate the value, but you must ensure that it is unique among all requests. ClientToken can contain only ASCII characters.
+	//
+	// >  If you do not set this parameter, **ClientToken** is set to the value of **RequestId**. The value of **RequestId** of each API request may be different.
 	ClientToken *string `json:"ClientToken,omitempty" xml:"ClientToken,omitempty"`
-	DryRun      *bool   `json:"DryRun,omitempty" xml:"DryRun,omitempty"`
-	ListenerId  *string `json:"ListenerId,omitempty" xml:"ListenerId,omitempty"`
-	RegionId    *string `json:"RegionId,omitempty" xml:"RegionId,omitempty"`
+	// Specifies whether only to precheck the request. Valid values:
+	//
+	// *   **true**: prechecks the request but does not delete the listener. The system prechecks the required parameters, request syntax, and limits. If the request fails the precheck, an error message is returned. If the request passes the precheck, the `DryRunOperation` error code is returned.
+	// *   **false** (default): sends the request. If the request passes the precheck, an HTTP 2xx status code is returned and the operation is performed.
+	DryRun *bool `json:"DryRun,omitempty" xml:"DryRun,omitempty"`
+	// The ID of the listener.
+	ListenerId *string `json:"ListenerId,omitempty" xml:"ListenerId,omitempty"`
+	// The ID of the region where the NLB instance is deployed.
+	//
+	// You can call the [DescribeRegions](~~443657~~) operation to query the most recent region list.
+	RegionId *string `json:"RegionId,omitempty" xml:"RegionId,omitempty"`
 }
 
 func (s DeleteListenerRequest) String() string {
@@ -1080,7 +1598,9 @@ func (s *DeleteListenerRequest) SetRegionId(v string) *DeleteListenerRequest {
 }
 
 type DeleteListenerResponseBody struct {
-	JobId     *string `json:"JobId,omitempty" xml:"JobId,omitempty"`
+	// The ID of the asynchronous task.
+	JobId *string `json:"JobId,omitempty" xml:"JobId,omitempty"`
+	// The ID of the request.
 	RequestId *string `json:"RequestId,omitempty" xml:"RequestId,omitempty"`
 }
 
@@ -1132,10 +1652,23 @@ func (s *DeleteListenerResponse) SetBody(v *DeleteListenerResponseBody) *DeleteL
 }
 
 type DeleteLoadBalancerRequest struct {
-	ClientToken    *string `json:"ClientToken,omitempty" xml:"ClientToken,omitempty"`
-	DryRun         *bool   `json:"DryRun,omitempty" xml:"DryRun,omitempty"`
+	// The client token that is used to ensure the idempotence of the request.
+	//
+	// You can use the client to generate the value, but you must ensure that it is unique among all requests. ClientToken can contain only ASCII characters.
+	//
+	// >  If you do not set this parameter, the system uses **RequestId** as **ClientToken**. **RequestId** may be different for each API request.
+	ClientToken *string `json:"ClientToken,omitempty" xml:"ClientToken,omitempty"`
+	// Specifies whether to only precheck this request. Valid values:
+	//
+	// *   **true**: prechecks the request without deleting the NLB instance. The system prechecks the required parameters, request syntax, and limits. If the request fails the precheck, an error message is returned. If the request passes the precheck, the `DryRunOperation` error code is returned.
+	// *   **false** (default): sends the request. If the request passes the precheck, an HTTP 2xx status code is returned and the operation is performed.
+	DryRun *bool `json:"DryRun,omitempty" xml:"DryRun,omitempty"`
+	// The ID of the NLB instance.
 	LoadBalancerId *string `json:"LoadBalancerId,omitempty" xml:"LoadBalancerId,omitempty"`
-	RegionId       *string `json:"RegionId,omitempty" xml:"RegionId,omitempty"`
+	// The ID of the region where the NLB instance is deployed.
+	//
+	// You can call the [DescribeRegions](~~443657~~) operation to query the most recent region list.
+	RegionId *string `json:"RegionId,omitempty" xml:"RegionId,omitempty"`
 }
 
 func (s DeleteLoadBalancerRequest) String() string {
@@ -1167,7 +1700,9 @@ func (s *DeleteLoadBalancerRequest) SetRegionId(v string) *DeleteLoadBalancerReq
 }
 
 type DeleteLoadBalancerResponseBody struct {
-	JobId     *string `json:"JobId,omitempty" xml:"JobId,omitempty"`
+	// The ID of the asynchronous task.
+	JobId *string `json:"JobId,omitempty" xml:"JobId,omitempty"`
+	// The ID of the request.
 	RequestId *string `json:"RequestId,omitempty" xml:"RequestId,omitempty"`
 }
 
@@ -1219,9 +1754,22 @@ func (s *DeleteLoadBalancerResponse) SetBody(v *DeleteLoadBalancerResponseBody) 
 }
 
 type DeleteSecurityPolicyRequest struct {
-	ClientToken      *string `json:"ClientToken,omitempty" xml:"ClientToken,omitempty"`
-	DryRun           *bool   `json:"DryRun,omitempty" xml:"DryRun,omitempty"`
-	RegionId         *string `json:"RegionId,omitempty" xml:"RegionId,omitempty"`
+	// The client token that is used to ensure the idempotence of the request.
+	//
+	// You can use the client to generate the value, but you must make sure that it is unique among different requests. The token can only contain ASCII characters.
+	//
+	// >  If you do not set this parameter, the system automatically uses the value of **RequestId** as the value of **ClientToken**. **RequestId** of each API request may be different.
+	ClientToken *string `json:"ClientToken,omitempty" xml:"ClientToken,omitempty"`
+	// Specifies whether to perform a dry run. Valid values:
+	//
+	// *   **true**: performs a dry run. The system checks the required parameters, request syntax, and limits. If the request fails the dry run, an error message is returned. If the request passes the dry run, the `DryRunOperation` error code is returned.
+	// *   **false** (default): performs a dry run and sends the request. If the request passes the dry run, a 2xx HTTP status code is returned and the operation is performed.
+	DryRun *bool `json:"DryRun,omitempty" xml:"DryRun,omitempty"`
+	// The ID of the region where the NLB instance is deployed.
+	//
+	// You can call the [DescribeRegions](~~443657~~) operation to query the available regions.
+	RegionId *string `json:"RegionId,omitempty" xml:"RegionId,omitempty"`
+	// The ID of the TLS security policy.
 	SecurityPolicyId *string `json:"SecurityPolicyId,omitempty" xml:"SecurityPolicyId,omitempty"`
 }
 
@@ -1254,6 +1802,7 @@ func (s *DeleteSecurityPolicyRequest) SetSecurityPolicyId(v string) *DeleteSecur
 }
 
 type DeleteSecurityPolicyResponseBody struct {
+	// The ID of the request.
 	RequestId *string `json:"RequestId,omitempty" xml:"RequestId,omitempty"`
 }
 
@@ -1300,9 +1849,22 @@ func (s *DeleteSecurityPolicyResponse) SetBody(v *DeleteSecurityPolicyResponseBo
 }
 
 type DeleteServerGroupRequest struct {
-	ClientToken   *string `json:"ClientToken,omitempty" xml:"ClientToken,omitempty"`
-	DryRun        *bool   `json:"DryRun,omitempty" xml:"DryRun,omitempty"`
-	RegionId      *string `json:"RegionId,omitempty" xml:"RegionId,omitempty"`
+	// The client token that is used to ensure the idempotence of the request.
+	//
+	// You can use the client to generate the value, but you must make sure that it is unique among different requests. The token can only contain ASCII characters.
+	//
+	// >  If you do not set this parameter, the system automatically uses the value of **RequestId** as the value of **ClientToken**. **RequestId** of each API request may be different.
+	ClientToken *string `json:"ClientToken,omitempty" xml:"ClientToken,omitempty"`
+	// Specifies whether to perform a dry run. Valid values:
+	//
+	// *   **true**: performs a dry run. The system checks the required parameters, request syntax, and limits. If the request fails the dry run, an error message is returned. If the request passes the dry run, the `DryRunOperation` error code is returned.
+	// *   **false** (default): performs a dry run and sends the request. If the request passes the dry run, a 2xx HTTP status code is returned and the operation is performed.
+	DryRun *bool `json:"DryRun,omitempty" xml:"DryRun,omitempty"`
+	// The ID of the region where the NLB instance is deployed.
+	//
+	// You can call the [DescribeRegions](~~443657~~) operation to query the most recent region list.
+	RegionId *string `json:"RegionId,omitempty" xml:"RegionId,omitempty"`
+	// The ID of the server group.
 	ServerGroupId *string `json:"ServerGroupId,omitempty" xml:"ServerGroupId,omitempty"`
 }
 
@@ -1335,7 +1897,9 @@ func (s *DeleteServerGroupRequest) SetServerGroupId(v string) *DeleteServerGroup
 }
 
 type DeleteServerGroupResponseBody struct {
-	JobId     *string `json:"JobId,omitempty" xml:"JobId,omitempty"`
+	// The ID of the asynchronous task.
+	JobId *string `json:"JobId,omitempty" xml:"JobId,omitempty"`
+	// The ID of the request.
 	RequestId *string `json:"RequestId,omitempty" xml:"RequestId,omitempty"`
 }
 
@@ -1387,9 +1951,20 @@ func (s *DeleteServerGroupResponse) SetBody(v *DeleteServerGroupResponseBody) *D
 }
 
 type DescribeRegionsRequest struct {
+	// The supported natural language. Valid values:
+	//
+	// *   **zh-CN**: Chinese
+	// *   **en-US** (default): English
+	// *   **ja**: Japanese
 	AcceptLanguage *string `json:"AcceptLanguage,omitempty" xml:"AcceptLanguage,omitempty"`
-	ClientToken    *string `json:"ClientToken,omitempty" xml:"ClientToken,omitempty"`
-	ServiceCode    *string `json:"ServiceCode,omitempty" xml:"ServiceCode,omitempty"`
+	// The client token that is used to ensure the idempotence of the request.
+	//
+	// You can use the client to generate the value, but you must ensure that it is unique among all requests. ClientToken can contain only ASCII characters.
+	//
+	// >  If you do not set this parameter, **ClientToken** is set to the value of **RequestId**. The value of **RequestId** for each API request may be different.
+	ClientToken *string `json:"ClientToken,omitempty" xml:"ClientToken,omitempty"`
+	// The service code. Set the value to **nlb**.
+	ServiceCode *string `json:"ServiceCode,omitempty" xml:"ServiceCode,omitempty"`
 }
 
 func (s DescribeRegionsRequest) String() string {
@@ -1416,8 +1991,10 @@ func (s *DescribeRegionsRequest) SetServiceCode(v string) *DescribeRegionsReques
 }
 
 type DescribeRegionsResponseBody struct {
-	Regions   []*DescribeRegionsResponseBodyRegions `json:"Regions,omitempty" xml:"Regions,omitempty" type:"Repeated"`
-	RequestId *string                               `json:"RequestId,omitempty" xml:"RequestId,omitempty"`
+	// A list of regions.
+	Regions []*DescribeRegionsResponseBodyRegions `json:"Regions,omitempty" xml:"Regions,omitempty" type:"Repeated"`
+	// The ID of the request.
+	RequestId *string `json:"RequestId,omitempty" xml:"RequestId,omitempty"`
 }
 
 func (s DescribeRegionsResponseBody) String() string {
@@ -1439,9 +2016,12 @@ func (s *DescribeRegionsResponseBody) SetRequestId(v string) *DescribeRegionsRes
 }
 
 type DescribeRegionsResponseBodyRegions struct {
-	LocalName      *string `json:"LocalName,omitempty" xml:"LocalName,omitempty"`
+	// The name of the region.
+	LocalName *string `json:"LocalName,omitempty" xml:"LocalName,omitempty"`
+	// The endpoint of the region service.
 	RegionEndpoint *string `json:"RegionEndpoint,omitempty" xml:"RegionEndpoint,omitempty"`
-	RegionId       *string `json:"RegionId,omitempty" xml:"RegionId,omitempty"`
+	// The ID of the region.
+	RegionId *string `json:"RegionId,omitempty" xml:"RegionId,omitempty"`
 }
 
 func (s DescribeRegionsResponseBodyRegions) String() string {
@@ -1497,10 +2077,22 @@ func (s *DescribeRegionsResponse) SetBody(v *DescribeRegionsResponseBody) *Descr
 }
 
 type DescribeZonesRequest struct {
+	// The supported natural language. Valid values:
+	//
+	// *   **zh-CN**: Chinese
+	// *   **en-US** (default): English
+	// *   **ja**: Japanese
 	AcceptLanguage *string `json:"AcceptLanguage,omitempty" xml:"AcceptLanguage,omitempty"`
-	ClientToken    *string `json:"ClientToken,omitempty" xml:"ClientToken,omitempty"`
-	RegionId       *string `json:"RegionId,omitempty" xml:"RegionId,omitempty"`
-	ServiceCode    *string `json:"ServiceCode,omitempty" xml:"ServiceCode,omitempty"`
+	// The client token that is used to ensure the idempotence of the request.
+	//
+	// You can use the client to generate the value, but you must ensure that it is unique among all requests. ClientToken can contain only ASCII characters.
+	//
+	// >  If you do not set this parameter, the system uses **RequestId** as **ClientToken**. **RequestId** may be different for each API request.
+	ClientToken *string `json:"ClientToken,omitempty" xml:"ClientToken,omitempty"`
+	// The ID of the region to which the zone belongs. You can call the [DescribeRegions](~~443657~~) operation to query the most recent region list.
+	RegionId *string `json:"RegionId,omitempty" xml:"RegionId,omitempty"`
+	// The service code. Set the value to **nlb**.
+	ServiceCode *string `json:"ServiceCode,omitempty" xml:"ServiceCode,omitempty"`
 }
 
 func (s DescribeZonesRequest) String() string {
@@ -1532,8 +2124,10 @@ func (s *DescribeZonesRequest) SetServiceCode(v string) *DescribeZonesRequest {
 }
 
 type DescribeZonesResponseBody struct {
-	RequestId *string                           `json:"RequestId,omitempty" xml:"RequestId,omitempty"`
-	Zones     []*DescribeZonesResponseBodyZones `json:"Zones,omitempty" xml:"Zones,omitempty" type:"Repeated"`
+	// The ID of the request.
+	RequestId *string `json:"RequestId,omitempty" xml:"RequestId,omitempty"`
+	// The list of zones.
+	Zones []*DescribeZonesResponseBodyZones `json:"Zones,omitempty" xml:"Zones,omitempty" type:"Repeated"`
 }
 
 func (s DescribeZonesResponseBody) String() string {
@@ -1555,8 +2149,10 @@ func (s *DescribeZonesResponseBody) SetZones(v []*DescribeZonesResponseBodyZones
 }
 
 type DescribeZonesResponseBodyZones struct {
+	// The name of the zone.
 	LocalName *string `json:"LocalName,omitempty" xml:"LocalName,omitempty"`
-	ZoneId    *string `json:"ZoneId,omitempty" xml:"ZoneId,omitempty"`
+	// The ID of the zone.
+	ZoneId *string `json:"ZoneId,omitempty" xml:"ZoneId,omitempty"`
 }
 
 func (s DescribeZonesResponseBodyZones) String() string {
@@ -1607,11 +2203,25 @@ func (s *DescribeZonesResponse) SetBody(v *DescribeZonesResponseBody) *DescribeZ
 }
 
 type DetachCommonBandwidthPackageFromLoadBalancerRequest struct {
+	// The ID of the EIP bandwidth plan.
 	BandwidthPackageId *string `json:"BandwidthPackageId,omitempty" xml:"BandwidthPackageId,omitempty"`
-	ClientToken        *string `json:"ClientToken,omitempty" xml:"ClientToken,omitempty"`
-	DryRun             *bool   `json:"DryRun,omitempty" xml:"DryRun,omitempty"`
-	LoadBalancerId     *string `json:"LoadBalancerId,omitempty" xml:"LoadBalancerId,omitempty"`
-	RegionId           *string `json:"RegionId,omitempty" xml:"RegionId,omitempty"`
+	// The client token that is used to ensure the idempotence of the request.
+	//
+	// You can use the client to generate the value, but you must ensure that it is unique among all requests. ClientToken can contain only ASCII characters.
+	//
+	// >  If you do not set this parameter, **ClientToken** is set to the value of **RequestId**. The value of **RequestId** of each API request may be different.
+	ClientToken *string `json:"ClientToken,omitempty" xml:"ClientToken,omitempty"`
+	// Specifies whether only to precheck the request. Valid values:
+	//
+	// *   **true**: prechecks the request but does not disassociate the NLB instance from the EIP bandwidth plan. The system prechecks the required parameters, request syntax, and limits. If the request fails the precheck, an error message is returned. If the request passes the precheck, the `DryRunOperation` error code is returned.
+	// *   **false** (default): sends the request. If the request passes the precheck, an HTTP 2xx status code is returned and the operation is performed.
+	DryRun *bool `json:"DryRun,omitempty" xml:"DryRun,omitempty"`
+	// The ID of the NLB instance.
+	LoadBalancerId *string `json:"LoadBalancerId,omitempty" xml:"LoadBalancerId,omitempty"`
+	// The ID of the region where the NLB instance is deployed.
+	//
+	// You can call the [DescribeRegions](~~443657~~) operation to query the most recent region list.
+	RegionId *string `json:"RegionId,omitempty" xml:"RegionId,omitempty"`
 }
 
 func (s DetachCommonBandwidthPackageFromLoadBalancerRequest) String() string {
@@ -1648,7 +2258,9 @@ func (s *DetachCommonBandwidthPackageFromLoadBalancerRequest) SetRegionId(v stri
 }
 
 type DetachCommonBandwidthPackageFromLoadBalancerResponseBody struct {
-	JobId     *string `json:"JobId,omitempty" xml:"JobId,omitempty"`
+	// The ID of the asynchronous task.
+	JobId *string `json:"JobId,omitempty" xml:"JobId,omitempty"`
+	// The ID of the request.
 	RequestId *string `json:"RequestId,omitempty" xml:"RequestId,omitempty"`
 }
 
@@ -1700,10 +2312,23 @@ func (s *DetachCommonBandwidthPackageFromLoadBalancerResponse) SetBody(v *Detach
 }
 
 type DisableLoadBalancerIpv6InternetRequest struct {
-	ClientToken    *string `json:"ClientToken,omitempty" xml:"ClientToken,omitempty"`
-	DryRun         *bool   `json:"DryRun,omitempty" xml:"DryRun,omitempty"`
+	// The client token that is used to ensure the idempotence of the request.
+	//
+	// You can use the client to generate the value, but you must ensure that it is unique among all requests. ClientToken can contain only ASCII characters.
+	//
+	// >  If you do not set this parameter, **ClientToken** is set to the value of **RequestId**. The value of **RequestId** of each API request may be different.
+	ClientToken *string `json:"ClientToken,omitempty" xml:"ClientToken,omitempty"`
+	// Specifies whether only to precheck the request. Valid values:
+	//
+	// *   **true**: prechecks the request but does not change the network type of the NLB instance. The system prechecks the required parameters, request syntax, and limits. If the request fails the precheck, an error message is returned. If the request passes the precheck, the `DryRunOperation` error code is returned.
+	// *   **false** (default): sends the request. If the request passes the precheck, an HTTP 2xx status code is returned and the operation is performed.
+	DryRun *bool `json:"DryRun,omitempty" xml:"DryRun,omitempty"`
+	// The ID of the NLB instance.
 	LoadBalancerId *string `json:"LoadBalancerId,omitempty" xml:"LoadBalancerId,omitempty"`
-	RegionId       *string `json:"RegionId,omitempty" xml:"RegionId,omitempty"`
+	// The ID of the region where the NLB instance is deployed.
+	//
+	// You can call the [DescribeRegions](~~443657~~) operation to query the most recent region list.
+	RegionId *string `json:"RegionId,omitempty" xml:"RegionId,omitempty"`
 }
 
 func (s DisableLoadBalancerIpv6InternetRequest) String() string {
@@ -1735,7 +2360,7 @@ func (s *DisableLoadBalancerIpv6InternetRequest) SetRegionId(v string) *DisableL
 }
 
 type DisableLoadBalancerIpv6InternetResponseBody struct {
-	JobId     *string `json:"JobId,omitempty" xml:"JobId,omitempty"`
+	// The ID of the request.
 	RequestId *string `json:"RequestId,omitempty" xml:"RequestId,omitempty"`
 }
 
@@ -1745,11 +2370,6 @@ func (s DisableLoadBalancerIpv6InternetResponseBody) String() string {
 
 func (s DisableLoadBalancerIpv6InternetResponseBody) GoString() string {
 	return s.String()
-}
-
-func (s *DisableLoadBalancerIpv6InternetResponseBody) SetJobId(v string) *DisableLoadBalancerIpv6InternetResponseBody {
-	s.JobId = &v
-	return s
 }
 
 func (s *DisableLoadBalancerIpv6InternetResponseBody) SetRequestId(v string) *DisableLoadBalancerIpv6InternetResponseBody {
@@ -1786,11 +2406,117 @@ func (s *DisableLoadBalancerIpv6InternetResponse) SetBody(v *DisableLoadBalancer
 	return s
 }
 
+type DisassociateAdditionalCertificatesWithListenerRequest struct {
+	AdditionalCertificateIds []*string `json:"AdditionalCertificateIds,omitempty" xml:"AdditionalCertificateIds,omitempty" type:"Repeated"`
+	ClientToken              *string   `json:"ClientToken,omitempty" xml:"ClientToken,omitempty"`
+	DryRun                   *bool     `json:"DryRun,omitempty" xml:"DryRun,omitempty"`
+	ListenerId               *string   `json:"ListenerId,omitempty" xml:"ListenerId,omitempty"`
+	RegionId                 *string   `json:"RegionId,omitempty" xml:"RegionId,omitempty"`
+}
+
+func (s DisassociateAdditionalCertificatesWithListenerRequest) String() string {
+	return tea.Prettify(s)
+}
+
+func (s DisassociateAdditionalCertificatesWithListenerRequest) GoString() string {
+	return s.String()
+}
+
+func (s *DisassociateAdditionalCertificatesWithListenerRequest) SetAdditionalCertificateIds(v []*string) *DisassociateAdditionalCertificatesWithListenerRequest {
+	s.AdditionalCertificateIds = v
+	return s
+}
+
+func (s *DisassociateAdditionalCertificatesWithListenerRequest) SetClientToken(v string) *DisassociateAdditionalCertificatesWithListenerRequest {
+	s.ClientToken = &v
+	return s
+}
+
+func (s *DisassociateAdditionalCertificatesWithListenerRequest) SetDryRun(v bool) *DisassociateAdditionalCertificatesWithListenerRequest {
+	s.DryRun = &v
+	return s
+}
+
+func (s *DisassociateAdditionalCertificatesWithListenerRequest) SetListenerId(v string) *DisassociateAdditionalCertificatesWithListenerRequest {
+	s.ListenerId = &v
+	return s
+}
+
+func (s *DisassociateAdditionalCertificatesWithListenerRequest) SetRegionId(v string) *DisassociateAdditionalCertificatesWithListenerRequest {
+	s.RegionId = &v
+	return s
+}
+
+type DisassociateAdditionalCertificatesWithListenerResponseBody struct {
+	JobId     *string `json:"JobId,omitempty" xml:"JobId,omitempty"`
+	RequestId *string `json:"RequestId,omitempty" xml:"RequestId,omitempty"`
+}
+
+func (s DisassociateAdditionalCertificatesWithListenerResponseBody) String() string {
+	return tea.Prettify(s)
+}
+
+func (s DisassociateAdditionalCertificatesWithListenerResponseBody) GoString() string {
+	return s.String()
+}
+
+func (s *DisassociateAdditionalCertificatesWithListenerResponseBody) SetJobId(v string) *DisassociateAdditionalCertificatesWithListenerResponseBody {
+	s.JobId = &v
+	return s
+}
+
+func (s *DisassociateAdditionalCertificatesWithListenerResponseBody) SetRequestId(v string) *DisassociateAdditionalCertificatesWithListenerResponseBody {
+	s.RequestId = &v
+	return s
+}
+
+type DisassociateAdditionalCertificatesWithListenerResponse struct {
+	Headers    map[string]*string                                          `json:"headers,omitempty" xml:"headers,omitempty" require:"true"`
+	StatusCode *int32                                                      `json:"statusCode,omitempty" xml:"statusCode,omitempty" require:"true"`
+	Body       *DisassociateAdditionalCertificatesWithListenerResponseBody `json:"body,omitempty" xml:"body,omitempty" require:"true"`
+}
+
+func (s DisassociateAdditionalCertificatesWithListenerResponse) String() string {
+	return tea.Prettify(s)
+}
+
+func (s DisassociateAdditionalCertificatesWithListenerResponse) GoString() string {
+	return s.String()
+}
+
+func (s *DisassociateAdditionalCertificatesWithListenerResponse) SetHeaders(v map[string]*string) *DisassociateAdditionalCertificatesWithListenerResponse {
+	s.Headers = v
+	return s
+}
+
+func (s *DisassociateAdditionalCertificatesWithListenerResponse) SetStatusCode(v int32) *DisassociateAdditionalCertificatesWithListenerResponse {
+	s.StatusCode = &v
+	return s
+}
+
+func (s *DisassociateAdditionalCertificatesWithListenerResponse) SetBody(v *DisassociateAdditionalCertificatesWithListenerResponseBody) *DisassociateAdditionalCertificatesWithListenerResponse {
+	s.Body = v
+	return s
+}
+
 type EnableLoadBalancerIpv6InternetRequest struct {
-	ClientToken    *string `json:"ClientToken,omitempty" xml:"ClientToken,omitempty"`
-	DryRun         *bool   `json:"DryRun,omitempty" xml:"DryRun,omitempty"`
+	// The client token that is used to ensure the idempotence of the request.
+	//
+	// You can use the client to generate the value, but you must ensure that it is unique among all requests. ClientToken can contain only ASCII characters.
+	//
+	// >  If you do not set this parameter, **ClientToken** is set to the value of **RequestId**. The value of **RequestId** for each API request may be different.
+	ClientToken *string `json:"ClientToken,omitempty" xml:"ClientToken,omitempty"`
+	// Specifies whether only to precheck the request. Valid values:
+	//
+	// *   **true**: prechecks the request but does not change the network type of the NLB instance. The system prechecks the required parameters, request syntax, and limits. If the request fails the precheck, an error message is returned. If the request passes the precheck, the `DryRunOperation` error code is returned.
+	// *   **false** (default): sends the request. If the request passes the precheck, an HTTP 2xx status code is returned and the operation is performed.
+	DryRun *bool `json:"DryRun,omitempty" xml:"DryRun,omitempty"`
+	// The ID of the NLB instance.
 	LoadBalancerId *string `json:"LoadBalancerId,omitempty" xml:"LoadBalancerId,omitempty"`
-	RegionId       *string `json:"RegionId,omitempty" xml:"RegionId,omitempty"`
+	// The ID of the region where the NLB instance is deployed.
+	//
+	// You can call the [DescribeRegions](~~443657~~) operation to query the most recent region list.
+	RegionId *string `json:"RegionId,omitempty" xml:"RegionId,omitempty"`
 }
 
 func (s EnableLoadBalancerIpv6InternetRequest) String() string {
@@ -1822,7 +2548,7 @@ func (s *EnableLoadBalancerIpv6InternetRequest) SetRegionId(v string) *EnableLoa
 }
 
 type EnableLoadBalancerIpv6InternetResponseBody struct {
-	JobId     *string `json:"JobId,omitempty" xml:"JobId,omitempty"`
+	// The ID of the request.
 	RequestId *string `json:"RequestId,omitempty" xml:"RequestId,omitempty"`
 }
 
@@ -1832,11 +2558,6 @@ func (s EnableLoadBalancerIpv6InternetResponseBody) String() string {
 
 func (s EnableLoadBalancerIpv6InternetResponseBody) GoString() string {
 	return s.String()
-}
-
-func (s *EnableLoadBalancerIpv6InternetResponseBody) SetJobId(v string) *EnableLoadBalancerIpv6InternetResponseBody {
-	s.JobId = &v
-	return s
 }
 
 func (s *EnableLoadBalancerIpv6InternetResponseBody) SetRequestId(v string) *EnableLoadBalancerIpv6InternetResponseBody {
@@ -1874,8 +2595,14 @@ func (s *EnableLoadBalancerIpv6InternetResponse) SetBody(v *EnableLoadBalancerIp
 }
 
 type GetJobStatusRequest struct {
+	// The client token that is used to ensure the idempotence of the request.
+	//
+	// You can use the client to generate the value, but you must ensure that it is unique among all requests. ClientToken can contain only ASCII characters.
+	//
+	// >  If you do not set this parameter, **ClientToken** is set to the value of **RequestId**. The value of **RequestId** of each API request may be different.
 	ClientToken *string `json:"ClientToken,omitempty" xml:"ClientToken,omitempty"`
-	JobId       *string `json:"JobId,omitempty" xml:"JobId,omitempty"`
+	// The ID of the asynchronous task.
+	JobId *string `json:"JobId,omitempty" xml:"JobId,omitempty"`
 }
 
 func (s GetJobStatusRequest) String() string {
@@ -1897,8 +2624,13 @@ func (s *GetJobStatusRequest) SetJobId(v string) *GetJobStatusRequest {
 }
 
 type GetJobStatusResponseBody struct {
+	// The ID of the request.
 	RequestId *string `json:"RequestId,omitempty" xml:"RequestId,omitempty"`
-	Status    *string `json:"Status,omitempty" xml:"Status,omitempty"`
+	// The state of the task. Valid values:
+	//
+	// *   **Succeeded**: The task is successful.
+	// *   **processing**: The ticket is being executed.
+	Status *string `json:"Status,omitempty" xml:"Status,omitempty"`
 }
 
 func (s GetJobStatusResponseBody) String() string {
@@ -1949,10 +2681,23 @@ func (s *GetJobStatusResponse) SetBody(v *GetJobStatusResponseBody) *GetJobStatu
 }
 
 type GetListenerAttributeRequest struct {
+	// The client token that is used to ensure the idempotence of the request.
+	//
+	// You can use the client to generate the value, but you must ensure that it is unique among all requests. ClientToken can contain only ASCII characters.
+	//
+	// >  If you do not set this parameter, **ClientToken** is set to the value of **RequestId**. The value of **RequestId** of each API request may be different.
 	ClientToken *string `json:"ClientToken,omitempty" xml:"ClientToken,omitempty"`
-	DryRun      *bool   `json:"DryRun,omitempty" xml:"DryRun,omitempty"`
-	ListenerId  *string `json:"ListenerId,omitempty" xml:"ListenerId,omitempty"`
-	RegionId    *string `json:"RegionId,omitempty" xml:"RegionId,omitempty"`
+	// Specifies whether only to precheck the request. Valid values:
+	//
+	// *   **true**: checks the request but does not query the listener details. The system prechecks the required parameters, request syntax, and limits. If the request fails the precheck, an error message is returned. If the request passes the precheck, the `DryRunOperation` error code is returned.
+	// *   **false** (default): sends the request. If the request passes the precheck, an HTTP 2xx status code is returned and the operation is performed.
+	DryRun *bool `json:"DryRun,omitempty" xml:"DryRun,omitempty"`
+	// The ID of the listener.
+	ListenerId *string `json:"ListenerId,omitempty" xml:"ListenerId,omitempty"`
+	// The ID of the region where the Network Load Balancer (NLB) instance is deployed.
+	//
+	// You can call the [DescribeRegions](~~443657~~) operation to query the most recent region list.
+	RegionId *string `json:"RegionId,omitempty" xml:"RegionId,omitempty"`
 }
 
 func (s GetListenerAttributeRequest) String() string {
@@ -1984,28 +2729,89 @@ func (s *GetListenerAttributeRequest) SetRegionId(v string) *GetListenerAttribut
 }
 
 type GetListenerAttributeResponseBody struct {
-	AlpnEnabled          *bool     `json:"AlpnEnabled,omitempty" xml:"AlpnEnabled,omitempty"`
-	AlpnPolicy           *string   `json:"AlpnPolicy,omitempty" xml:"AlpnPolicy,omitempty"`
-	CaCertificateIds     []*string `json:"CaCertificateIds,omitempty" xml:"CaCertificateIds,omitempty" type:"Repeated"`
-	CaEnabled            *bool     `json:"CaEnabled,omitempty" xml:"CaEnabled,omitempty"`
-	CertificateIds       []*string `json:"CertificateIds,omitempty" xml:"CertificateIds,omitempty" type:"Repeated"`
-	Cps                  *int32    `json:"Cps,omitempty" xml:"Cps,omitempty"`
-	EndPort              *string   `json:"EndPort,omitempty" xml:"EndPort,omitempty"`
-	IdleTimeout          *int32    `json:"IdleTimeout,omitempty" xml:"IdleTimeout,omitempty"`
-	ListenerDescription  *string   `json:"ListenerDescription,omitempty" xml:"ListenerDescription,omitempty"`
-	ListenerId           *string   `json:"ListenerId,omitempty" xml:"ListenerId,omitempty"`
-	ListenerPort         *int32    `json:"ListenerPort,omitempty" xml:"ListenerPort,omitempty"`
-	ListenerProtocol     *string   `json:"ListenerProtocol,omitempty" xml:"ListenerProtocol,omitempty"`
-	ListenerStatus       *string   `json:"ListenerStatus,omitempty" xml:"ListenerStatus,omitempty"`
-	LoadBalancerId       *string   `json:"LoadBalancerId,omitempty" xml:"LoadBalancerId,omitempty"`
-	Mss                  *int32    `json:"Mss,omitempty" xml:"Mss,omitempty"`
-	ProxyProtocolEnabled *bool     `json:"ProxyProtocolEnabled,omitempty" xml:"ProxyProtocolEnabled,omitempty"`
-	RegionId             *string   `json:"RegionId,omitempty" xml:"RegionId,omitempty"`
-	RequestId            *string   `json:"RequestId,omitempty" xml:"RequestId,omitempty"`
-	SecSensorEnabled     *bool     `json:"SecSensorEnabled,omitempty" xml:"SecSensorEnabled,omitempty"`
-	SecurityPolicyId     *string   `json:"SecurityPolicyId,omitempty" xml:"SecurityPolicyId,omitempty"`
-	ServerGroupId        *string   `json:"ServerGroupId,omitempty" xml:"ServerGroupId,omitempty"`
-	StartPort            *string   `json:"StartPort,omitempty" xml:"StartPort,omitempty"`
+	// Indicates whether Application-Layer Protocol Negotiation (ALPN) is enabled. Valid values:
+	//
+	// *   **true**: yes
+	// *   **false**: no
+	AlpnEnabled *bool `json:"AlpnEnabled,omitempty" xml:"AlpnEnabled,omitempty"`
+	// The ALPN policy. Valid values:
+	//
+	// *   **HTTP1Only**
+	// *   **HTTP2Only**
+	// *   **HTTP2Preferred**
+	// *   **HTTP2Optional**
+	AlpnPolicy *string `json:"AlpnPolicy,omitempty" xml:"AlpnPolicy,omitempty"`
+	// The CA certificates. Only one CA certificate is supported.
+	//
+	// >  This parameter takes effect only for listeners that use SSL over TCP.
+	CaCertificateIds []*string `json:"CaCertificateIds,omitempty" xml:"CaCertificateIds,omitempty" type:"Repeated"`
+	// Indicates whether mutual authentication is enabled. Valid values:
+	//
+	// *   **true**: yes
+	// *   **false**: no
+	CaEnabled *bool `json:"CaEnabled,omitempty" xml:"CaEnabled,omitempty"`
+	// The server certificates. Only one server certificate is supported.
+	//
+	// >  This parameter takes effect only for listeners that use SSL over TCP.
+	CertificateIds []*string `json:"CertificateIds,omitempty" xml:"CertificateIds,omitempty" type:"Repeated"`
+	// The maximum number of connections that can be created per second on the NLB instance. Valid values: **0** to **1000000**. **0** specifies that the number of connections is unlimited.
+	Cps *int32 `json:"Cps,omitempty" xml:"Cps,omitempty"`
+	// The last port in the listening port range. Valid values: **0** to **65535**. The number of the last port must be smaller than that of the first port.
+	EndPort *string `json:"EndPort,omitempty" xml:"EndPort,omitempty"`
+	// The timeout period of an idle connection. Unit: seconds. Valid values: **1** to **900**.
+	IdleTimeout *int32 `json:"IdleTimeout,omitempty" xml:"IdleTimeout,omitempty"`
+	// The name of the listener.
+	//
+	// The name must be 2 to 256 characters in length, and can contain letters, digits, commas (,), periods (.), semicolons (;), forward slashes (/), at signs (@), underscores (\_), and hyphens (-).
+	ListenerDescription *string `json:"ListenerDescription,omitempty" xml:"ListenerDescription,omitempty"`
+	// The ID of the listener.
+	ListenerId *string `json:"ListenerId,omitempty" xml:"ListenerId,omitempty"`
+	// The listening port. Valid values: **0** to **65535**. A value of **0** specifies all ports. If you set the value to **0**, you must also set the **StartPort** and **EndPort** parameters.
+	ListenerPort *int32 `json:"ListenerPort,omitempty" xml:"ListenerPort,omitempty"`
+	// The listening protocol. Valid values: **TCP**, **UDP**, and **TCPSSL**.
+	ListenerProtocol *string `json:"ListenerProtocol,omitempty" xml:"ListenerProtocol,omitempty"`
+	// The status of the listener. Valid values:
+	//
+	// *   **Provisioning**: The listener is being created.
+	// *   **Running**: The listener is running.
+	// *   **Configuring**: The listener is being configured.
+	// *   **Stopping**: The listener is being stopped.
+	// *   **Stopped**: The listener is stopped.
+	// *   **Starting**: The listener is being started.
+	// *   **Deleting**: The listener is being deleted.
+	// *   **Deleted**: The listener is deleted.
+	ListenerStatus *string `json:"ListenerStatus,omitempty" xml:"ListenerStatus,omitempty"`
+	// The ID of the NLB instance.
+	LoadBalancerId *string `json:"LoadBalancerId,omitempty" xml:"LoadBalancerId,omitempty"`
+	// The size of the largest TCP segment. Unit: bytes. Valid values: **0** to **1500**. **0** specifies that the maximum segment size remains unchanged.
+	//
+	// >  This parameter is supported only by listeners that use SSL over TCP.
+	Mss *int32 `json:"Mss,omitempty" xml:"Mss,omitempty"`
+	// Indicates whether the Proxy protocol is used to pass client IP addresses to backend servers. Valid values:
+	//
+	// *   **true**: yes
+	// *   **false**: no
+	ProxyProtocolEnabled *bool `json:"ProxyProtocolEnabled,omitempty" xml:"ProxyProtocolEnabled,omitempty"`
+	// The ID of the region where the NLB instance is deployed.
+	RegionId *string `json:"RegionId,omitempty" xml:"RegionId,omitempty"`
+	// The ID of the request.
+	RequestId *string `json:"RequestId,omitempty" xml:"RequestId,omitempty"`
+	// Indicates whether fine-grained monitoring is enabled. Valid values:
+	//
+	// *   **true**: yes
+	// *   **false**: no
+	SecSensorEnabled *bool `json:"SecSensorEnabled,omitempty" xml:"SecSensorEnabled,omitempty"`
+	// The ID of the security policy. System security policies and custom security policies are supported.
+	//
+	// Valid values: **tls_cipher_policy\_1\_0**, **tls_cipher_policy\_1\_1**, **tls_cipher_policy\_1\_2**, **tls_cipher_policy\_1\_2\_strict**, and **tls_cipher_policy\_1\_2\_strict_with\_1\_3**.
+	//
+	// >  This parameter takes effect only for listeners that use SSL over TCP.
+	SecurityPolicyId *string `json:"SecurityPolicyId,omitempty" xml:"SecurityPolicyId,omitempty"`
+	// The ID of the server group.
+	ServerGroupId *string `json:"ServerGroupId,omitempty" xml:"ServerGroupId,omitempty"`
+	// The first port in the listening port range. Valid values: **0** to **65535**.
+	StartPort *string                                 `json:"StartPort,omitempty" xml:"StartPort,omitempty"`
+	Tags      []*GetListenerAttributeResponseBodyTags `json:"Tags,omitempty" xml:"Tags,omitempty" type:"Repeated"`
 }
 
 func (s GetListenerAttributeResponseBody) String() string {
@@ -2126,6 +2932,34 @@ func (s *GetListenerAttributeResponseBody) SetStartPort(v string) *GetListenerAt
 	return s
 }
 
+func (s *GetListenerAttributeResponseBody) SetTags(v []*GetListenerAttributeResponseBodyTags) *GetListenerAttributeResponseBody {
+	s.Tags = v
+	return s
+}
+
+type GetListenerAttributeResponseBodyTags struct {
+	TagKey   *string `json:"TagKey,omitempty" xml:"TagKey,omitempty"`
+	TagValue *string `json:"TagValue,omitempty" xml:"TagValue,omitempty"`
+}
+
+func (s GetListenerAttributeResponseBodyTags) String() string {
+	return tea.Prettify(s)
+}
+
+func (s GetListenerAttributeResponseBodyTags) GoString() string {
+	return s.String()
+}
+
+func (s *GetListenerAttributeResponseBodyTags) SetTagKey(v string) *GetListenerAttributeResponseBodyTags {
+	s.TagKey = &v
+	return s
+}
+
+func (s *GetListenerAttributeResponseBodyTags) SetTagValue(v string) *GetListenerAttributeResponseBodyTags {
+	s.TagValue = &v
+	return s
+}
+
 type GetListenerAttributeResponse struct {
 	Headers    map[string]*string                `json:"headers,omitempty" xml:"headers,omitempty" require:"true"`
 	StatusCode *int32                            `json:"statusCode,omitempty" xml:"statusCode,omitempty" require:"true"`
@@ -2156,10 +2990,19 @@ func (s *GetListenerAttributeResponse) SetBody(v *GetListenerAttributeResponseBo
 }
 
 type GetListenerHealthStatusRequest struct {
+	// The ID of the listener of the NLB instance.
 	ListenerId *string `json:"ListenerId,omitempty" xml:"ListenerId,omitempty"`
-	MaxResults *int32  `json:"MaxResults,omitempty" xml:"MaxResults,omitempty"`
-	NextToken  *string `json:"NextToken,omitempty" xml:"NextToken,omitempty"`
-	RegionId   *string `json:"RegionId,omitempty" xml:"RegionId,omitempty"`
+	// The number of entries to return on each page. Valid values: **1** to **100**. Default value: **20**.
+	MaxResults *int32 `json:"MaxResults,omitempty" xml:"MaxResults,omitempty"`
+	// The token that is used for the next query. Valid values:
+	//
+	// *   If this is your first query or no next query is to be sent, ignore this parameter.
+	// *   If a next query is to be sent, set the parameter to the value of NextToken that is returned from the last call.
+	NextToken *string `json:"NextToken,omitempty" xml:"NextToken,omitempty"`
+	// The ID of the region where the NLB instance is deployed.
+	//
+	// You can call the [DescribeRegions](~~443657~~) operation to query the most recent region list.
+	RegionId *string `json:"RegionId,omitempty" xml:"RegionId,omitempty"`
 }
 
 func (s GetListenerHealthStatusRequest) String() string {
@@ -2191,11 +3034,19 @@ func (s *GetListenerHealthStatusRequest) SetRegionId(v string) *GetListenerHealt
 }
 
 type GetListenerHealthStatusResponseBody struct {
+	// The health check status of the server groups that are associated with the listener.
 	ListenerHealthStatus []*GetListenerHealthStatusResponseBodyListenerHealthStatus `json:"ListenerHealthStatus,omitempty" xml:"ListenerHealthStatus,omitempty" type:"Repeated"`
-	MaxResults           *int32                                                     `json:"MaxResults,omitempty" xml:"MaxResults,omitempty"`
-	NextToken            *string                                                    `json:"NextToken,omitempty" xml:"NextToken,omitempty"`
-	RequestId            *string                                                    `json:"RequestId,omitempty" xml:"RequestId,omitempty"`
-	TotalCount           *int32                                                     `json:"TotalCount,omitempty" xml:"TotalCount,omitempty"`
+	// The number of entries returned per page.
+	MaxResults *int32 `json:"MaxResults,omitempty" xml:"MaxResults,omitempty"`
+	// The token that is used for the next query. Valid values:
+	//
+	// - If **NextToken** is empty, it indicates that no next query is to be sent.
+	// - If a value of **NextToken** is returned, the value is the token used for the next query.
+	NextToken *string `json:"NextToken,omitempty" xml:"NextToken,omitempty"`
+	// The ID of the request.
+	RequestId *string `json:"RequestId,omitempty" xml:"RequestId,omitempty"`
+	// The number of entries returned.
+	TotalCount *int32 `json:"TotalCount,omitempty" xml:"TotalCount,omitempty"`
 }
 
 func (s GetListenerHealthStatusResponseBody) String() string {
@@ -2232,9 +3083,13 @@ func (s *GetListenerHealthStatusResponseBody) SetTotalCount(v int32) *GetListene
 }
 
 type GetListenerHealthStatusResponseBodyListenerHealthStatus struct {
-	ListenerId       *string                                                                    `json:"ListenerId,omitempty" xml:"ListenerId,omitempty"`
-	ListenerPort     *int32                                                                     `json:"ListenerPort,omitempty" xml:"ListenerPort,omitempty"`
-	ListenerProtocol *string                                                                    `json:"ListenerProtocol,omitempty" xml:"ListenerProtocol,omitempty"`
+	// The ID of the listener of the NLB instance.
+	ListenerId *string `json:"ListenerId,omitempty" xml:"ListenerId,omitempty"`
+	// The listening port.
+	ListenerPort *int32 `json:"ListenerPort,omitempty" xml:"ListenerPort,omitempty"`
+	// The listening protocol. Valid values: **TCP**, **UDP**, and **TCPSSL**.
+	ListenerProtocol *string `json:"ListenerProtocol,omitempty" xml:"ListenerProtocol,omitempty"`
+	// The information about the server groups.
 	ServerGroupInfos []*GetListenerHealthStatusResponseBodyListenerHealthStatusServerGroupInfos `json:"ServerGroupInfos,omitempty" xml:"ServerGroupInfos,omitempty" type:"Repeated"`
 }
 
@@ -2267,9 +3122,15 @@ func (s *GetListenerHealthStatusResponseBodyListenerHealthStatus) SetServerGroup
 }
 
 type GetListenerHealthStatusResponseBodyListenerHealthStatusServerGroupInfos struct {
-	HeathCheckEnabled *bool                                                                                      `json:"HeathCheckEnabled,omitempty" xml:"HeathCheckEnabled,omitempty"`
-	NonNormalServers  []*GetListenerHealthStatusResponseBodyListenerHealthStatusServerGroupInfosNonNormalServers `json:"NonNormalServers,omitempty" xml:"NonNormalServers,omitempty" type:"Repeated"`
-	ServerGroupId     *string                                                                                    `json:"ServerGroupId,omitempty" xml:"ServerGroupId,omitempty"`
+	// Indicates whether the health check feature is enabled. Valid values:
+	//
+	// *   **true**: enabled
+	// *   **false**: disabled
+	HeathCheckEnabled *bool `json:"HeathCheckEnabled,omitempty" xml:"HeathCheckEnabled,omitempty"`
+	// A list of unhealthy backend servers.
+	NonNormalServers []*GetListenerHealthStatusResponseBodyListenerHealthStatusServerGroupInfosNonNormalServers `json:"NonNormalServers,omitempty" xml:"NonNormalServers,omitempty" type:"Repeated"`
+	// The ID of the server group.
+	ServerGroupId *string `json:"ServerGroupId,omitempty" xml:"ServerGroupId,omitempty"`
 }
 
 func (s GetListenerHealthStatusResponseBodyListenerHealthStatusServerGroupInfos) String() string {
@@ -2296,11 +3157,21 @@ func (s *GetListenerHealthStatusResponseBodyListenerHealthStatusServerGroupInfos
 }
 
 type GetListenerHealthStatusResponseBodyListenerHealthStatusServerGroupInfosNonNormalServers struct {
-	Port     *int32                                                                                         `json:"Port,omitempty" xml:"Port,omitempty"`
-	Reason   *GetListenerHealthStatusResponseBodyListenerHealthStatusServerGroupInfosNonNormalServersReason `json:"Reason,omitempty" xml:"Reason,omitempty" type:"Struct"`
-	ServerId *string                                                                                        `json:"ServerId,omitempty" xml:"ServerId,omitempty"`
-	ServerIp *string                                                                                        `json:"ServerIp,omitempty" xml:"ServerIp,omitempty"`
-	Status   *string                                                                                        `json:"Status,omitempty" xml:"Status,omitempty"`
+	// The backend port.
+	Port *int32 `json:"Port,omitempty" xml:"Port,omitempty"`
+	// The cause of the health check failure.
+	Reason *GetListenerHealthStatusResponseBodyListenerHealthStatusServerGroupInfosNonNormalServersReason `json:"Reason,omitempty" xml:"Reason,omitempty" type:"Struct"`
+	// The ID of the backend server.
+	ServerId *string `json:"ServerId,omitempty" xml:"ServerId,omitempty"`
+	// The IP address of the backend server.
+	ServerIp *string `json:"ServerIp,omitempty" xml:"ServerIp,omitempty"`
+	// The health check status. Valid values:
+	//
+	// *   **Initial**: indicates that health checks are configured for the NLB instance, but no data was found.
+	// *   **Unhealthy**: indicates that the backend server consecutively fails health checks.
+	// *   **Unused**: indicates that the weight of the backend server is 0.
+	// *   **Unavailable**: indicates that health checks are disabled.
+	Status *string `json:"Status,omitempty" xml:"Status,omitempty"`
 }
 
 func (s GetListenerHealthStatusResponseBodyListenerHealthStatusServerGroupInfosNonNormalServers) String() string {
@@ -2337,6 +3208,14 @@ func (s *GetListenerHealthStatusResponseBodyListenerHealthStatusServerGroupInfos
 }
 
 type GetListenerHealthStatusResponseBodyListenerHealthStatusServerGroupInfosNonNormalServersReason struct {
+	// The reason why the **status** is abnormal. Valid values:
+	//
+	// *   **CONNECT_TIMEOUT**: The NLB instance failed to connect to the backend server within the specified period of time.
+	// *   **CONNECT_FAILED**: The NLB instance failed to connect to the backend server.
+	// *   **RECV_RESPONSE_TIMEOUT**: The NLB instance failed to receive a response from the backend server within the specified period of time.
+	// *   **CONNECT_INTERRUPT**: The connection between the health check and the backend servers was interrupted.
+	// *   **HTTP_CODE_NOT_MATCH**: The HTTP status code from the backend servers was not the expected one.
+	// *   **HTTP_INVALID_HEADER**: The format of the response from the backend servers is invalid.
 	ReasonCode *string `json:"ReasonCode,omitempty" xml:"ReasonCode,omitempty"`
 }
 
@@ -2439,6 +3318,7 @@ type GetLoadBalancerAttributeResponseBody struct {
 	RequestId                    *string                                                           `json:"RequestId,omitempty" xml:"RequestId,omitempty"`
 	ResourceGroupId              *string                                                           `json:"ResourceGroupId,omitempty" xml:"ResourceGroupId,omitempty"`
 	SecurityGroupIds             []*string                                                         `json:"SecurityGroupIds,omitempty" xml:"SecurityGroupIds,omitempty" type:"Repeated"`
+	Tags                         []*GetLoadBalancerAttributeResponseBodyTags                       `json:"Tags,omitempty" xml:"Tags,omitempty" type:"Repeated"`
 	VpcId                        *string                                                           `json:"VpcId,omitempty" xml:"VpcId,omitempty"`
 	ZoneMappings                 []*GetLoadBalancerAttributeResponseBodyZoneMappings               `json:"ZoneMappings,omitempty" xml:"ZoneMappings,omitempty" type:"Repeated"`
 }
@@ -2556,6 +3436,11 @@ func (s *GetLoadBalancerAttributeResponseBody) SetSecurityGroupIds(v []*string) 
 	return s
 }
 
+func (s *GetLoadBalancerAttributeResponseBody) SetTags(v []*GetLoadBalancerAttributeResponseBodyTags) *GetLoadBalancerAttributeResponseBody {
+	s.Tags = v
+	return s
+}
+
 func (s *GetLoadBalancerAttributeResponseBody) SetVpcId(v string) *GetLoadBalancerAttributeResponseBody {
 	s.VpcId = &v
 	return s
@@ -2664,8 +3549,32 @@ func (s *GetLoadBalancerAttributeResponseBodyOperationLocks) SetLockType(v strin
 	return s
 }
 
+type GetLoadBalancerAttributeResponseBodyTags struct {
+	TagKey   *string `json:"TagKey,omitempty" xml:"TagKey,omitempty"`
+	TagValue *string `json:"TagValue,omitempty" xml:"TagValue,omitempty"`
+}
+
+func (s GetLoadBalancerAttributeResponseBodyTags) String() string {
+	return tea.Prettify(s)
+}
+
+func (s GetLoadBalancerAttributeResponseBodyTags) GoString() string {
+	return s.String()
+}
+
+func (s *GetLoadBalancerAttributeResponseBodyTags) SetTagKey(v string) *GetLoadBalancerAttributeResponseBodyTags {
+	s.TagKey = &v
+	return s
+}
+
+func (s *GetLoadBalancerAttributeResponseBodyTags) SetTagValue(v string) *GetLoadBalancerAttributeResponseBodyTags {
+	s.TagValue = &v
+	return s
+}
+
 type GetLoadBalancerAttributeResponseBodyZoneMappings struct {
 	LoadBalancerAddresses []*GetLoadBalancerAttributeResponseBodyZoneMappingsLoadBalancerAddresses `json:"LoadBalancerAddresses,omitempty" xml:"LoadBalancerAddresses,omitempty" type:"Repeated"`
+	Status                *string                                                                  `json:"Status,omitempty" xml:"Status,omitempty"`
 	VSwitchId             *string                                                                  `json:"VSwitchId,omitempty" xml:"VSwitchId,omitempty"`
 	ZoneId                *string                                                                  `json:"ZoneId,omitempty" xml:"ZoneId,omitempty"`
 }
@@ -2683,6 +3592,11 @@ func (s *GetLoadBalancerAttributeResponseBodyZoneMappings) SetLoadBalancerAddres
 	return s
 }
 
+func (s *GetLoadBalancerAttributeResponseBodyZoneMappings) SetStatus(v string) *GetLoadBalancerAttributeResponseBodyZoneMappings {
+	s.Status = &v
+	return s
+}
+
 func (s *GetLoadBalancerAttributeResponseBodyZoneMappings) SetVSwitchId(v string) *GetLoadBalancerAttributeResponseBodyZoneMappings {
 	s.VSwitchId = &v
 	return s
@@ -2694,11 +3608,13 @@ func (s *GetLoadBalancerAttributeResponseBodyZoneMappings) SetZoneId(v string) *
 }
 
 type GetLoadBalancerAttributeResponseBodyZoneMappingsLoadBalancerAddresses struct {
-	AllocationId       *string `json:"AllocationId,omitempty" xml:"AllocationId,omitempty"`
-	EniId              *string `json:"EniId,omitempty" xml:"EniId,omitempty"`
-	Ipv6Address        *string `json:"Ipv6Address,omitempty" xml:"Ipv6Address,omitempty"`
-	PrivateIPv4Address *string `json:"PrivateIPv4Address,omitempty" xml:"PrivateIPv4Address,omitempty"`
-	PublicIPv4Address  *string `json:"PublicIPv4Address,omitempty" xml:"PublicIPv4Address,omitempty"`
+	AllocationId        *string `json:"AllocationId,omitempty" xml:"AllocationId,omitempty"`
+	EniId               *string `json:"EniId,omitempty" xml:"EniId,omitempty"`
+	Ipv6Address         *string `json:"Ipv6Address,omitempty" xml:"Ipv6Address,omitempty"`
+	PrivateIPv4Address  *string `json:"PrivateIPv4Address,omitempty" xml:"PrivateIPv4Address,omitempty"`
+	PrivateIPv4HcStatus *string `json:"PrivateIPv4HcStatus,omitempty" xml:"PrivateIPv4HcStatus,omitempty"`
+	PrivateIPv6HcStatus *string `json:"PrivateIPv6HcStatus,omitempty" xml:"PrivateIPv6HcStatus,omitempty"`
+	PublicIPv4Address   *string `json:"PublicIPv4Address,omitempty" xml:"PublicIPv4Address,omitempty"`
 }
 
 func (s GetLoadBalancerAttributeResponseBodyZoneMappingsLoadBalancerAddresses) String() string {
@@ -2726,6 +3642,16 @@ func (s *GetLoadBalancerAttributeResponseBodyZoneMappingsLoadBalancerAddresses) 
 
 func (s *GetLoadBalancerAttributeResponseBodyZoneMappingsLoadBalancerAddresses) SetPrivateIPv4Address(v string) *GetLoadBalancerAttributeResponseBodyZoneMappingsLoadBalancerAddresses {
 	s.PrivateIPv4Address = &v
+	return s
+}
+
+func (s *GetLoadBalancerAttributeResponseBodyZoneMappingsLoadBalancerAddresses) SetPrivateIPv4HcStatus(v string) *GetLoadBalancerAttributeResponseBodyZoneMappingsLoadBalancerAddresses {
+	s.PrivateIPv4HcStatus = &v
+	return s
+}
+
+func (s *GetLoadBalancerAttributeResponseBodyZoneMappingsLoadBalancerAddresses) SetPrivateIPv6HcStatus(v string) *GetLoadBalancerAttributeResponseBodyZoneMappingsLoadBalancerAddresses {
+	s.PrivateIPv6HcStatus = &v
 	return s
 }
 
@@ -2764,12 +3690,20 @@ func (s *GetLoadBalancerAttributeResponse) SetBody(v *GetLoadBalancerAttributeRe
 }
 
 type ListListenerCertificatesRequest struct {
+	CertType *string `json:"CertType,omitempty" xml:"CertType,omitempty"`
+	// The ID of the listener. Specify the ID of a listener that uses SSL over TCP.
 	ListenerId *string `json:"ListenerId,omitempty" xml:"ListenerId,omitempty"`
-	MaxResults *int32  `json:"MaxResults,omitempty" xml:"MaxResults,omitempty"`
-	NextToken  *string `json:"NextToken,omitempty" xml:"NextToken,omitempty"`
-	Page       *int32  `json:"Page,omitempty" xml:"Page,omitempty"`
-	PageSize   *int32  `json:"PageSize,omitempty" xml:"PageSize,omitempty"`
-	RegionId   *string `json:"RegionId,omitempty" xml:"RegionId,omitempty"`
+	// The number of entries to return on each page. Valid values: **1** to **100**. Default value: **20**.
+	MaxResults *int32 `json:"MaxResults,omitempty" xml:"MaxResults,omitempty"`
+	// The pagination token that is used in the next request to retrieve a new page of results. Valid values:
+	//
+	// *   You do not need to specify this parameter for the first request.
+	// *   You must specify the token that is obtained from the previous query as the value of NextToken.
+	NextToken *string `json:"NextToken,omitempty" xml:"NextToken,omitempty"`
+	// The ID of the region where the Network Load Balancer (NLB) instance is deployed.
+	//
+	// You can call the [DescribeRegions](~~443657~~) operation to query the most recent region list.
+	RegionId *string `json:"RegionId,omitempty" xml:"RegionId,omitempty"`
 }
 
 func (s ListListenerCertificatesRequest) String() string {
@@ -2778,6 +3712,11 @@ func (s ListListenerCertificatesRequest) String() string {
 
 func (s ListListenerCertificatesRequest) GoString() string {
 	return s.String()
+}
+
+func (s *ListListenerCertificatesRequest) SetCertType(v string) *ListListenerCertificatesRequest {
+	s.CertType = &v
+	return s
 }
 
 func (s *ListListenerCertificatesRequest) SetListenerId(v string) *ListListenerCertificatesRequest {
@@ -2795,27 +3734,26 @@ func (s *ListListenerCertificatesRequest) SetNextToken(v string) *ListListenerCe
 	return s
 }
 
-func (s *ListListenerCertificatesRequest) SetPage(v int32) *ListListenerCertificatesRequest {
-	s.Page = &v
-	return s
-}
-
-func (s *ListListenerCertificatesRequest) SetPageSize(v int32) *ListListenerCertificatesRequest {
-	s.PageSize = &v
-	return s
-}
-
 func (s *ListListenerCertificatesRequest) SetRegionId(v string) *ListListenerCertificatesRequest {
 	s.RegionId = &v
 	return s
 }
 
 type ListListenerCertificatesResponseBody struct {
-	CertificateIds []*string `json:"CertificateIds,omitempty" xml:"CertificateIds,omitempty" type:"Repeated"`
-	MaxResults     *int32    `json:"MaxResults,omitempty" xml:"MaxResults,omitempty"`
-	NextToken      *string   `json:"NextToken,omitempty" xml:"NextToken,omitempty"`
-	RequestId      *string   `json:"RequestId,omitempty" xml:"RequestId,omitempty"`
-	TotalCount     *int32    `json:"TotalCount,omitempty" xml:"TotalCount,omitempty"`
+	// The server certificates.
+	CertificateIds []*string                                           `json:"CertificateIds,omitempty" xml:"CertificateIds,omitempty" type:"Repeated"`
+	Certificates   []*ListListenerCertificatesResponseBodyCertificates `json:"Certificates,omitempty" xml:"Certificates,omitempty" type:"Repeated"`
+	// The number of entries returned per page. Valid values: **1** to **100**. Default value: **20**.
+	MaxResults *int32 `json:"MaxResults,omitempty" xml:"MaxResults,omitempty"`
+	// The returned value of NextToken is a pagination token, which can be used in the next request to retrieve a new page of results. Valid values:
+	//
+	// *   You do not need to specify this parameter for the first request.
+	// *   You must specify the token that is obtained from the previous query as the value of NextToken.
+	NextToken *string `json:"NextToken,omitempty" xml:"NextToken,omitempty"`
+	// The request ID.
+	RequestId *string `json:"RequestId,omitempty" xml:"RequestId,omitempty"`
+	// The total number of entries returned.
+	TotalCount *int32 `json:"TotalCount,omitempty" xml:"TotalCount,omitempty"`
 }
 
 func (s ListListenerCertificatesResponseBody) String() string {
@@ -2828,6 +3766,11 @@ func (s ListListenerCertificatesResponseBody) GoString() string {
 
 func (s *ListListenerCertificatesResponseBody) SetCertificateIds(v []*string) *ListListenerCertificatesResponseBody {
 	s.CertificateIds = v
+	return s
+}
+
+func (s *ListListenerCertificatesResponseBody) SetCertificates(v []*ListListenerCertificatesResponseBodyCertificates) *ListListenerCertificatesResponseBody {
+	s.Certificates = v
 	return s
 }
 
@@ -2848,6 +3791,41 @@ func (s *ListListenerCertificatesResponseBody) SetRequestId(v string) *ListListe
 
 func (s *ListListenerCertificatesResponseBody) SetTotalCount(v int32) *ListListenerCertificatesResponseBody {
 	s.TotalCount = &v
+	return s
+}
+
+type ListListenerCertificatesResponseBodyCertificates struct {
+	CertificateId   *string `json:"CertificateId,omitempty" xml:"CertificateId,omitempty"`
+	CertificateType *string `json:"CertificateType,omitempty" xml:"CertificateType,omitempty"`
+	IsDefault       *bool   `json:"IsDefault,omitempty" xml:"IsDefault,omitempty"`
+	Status          *string `json:"Status,omitempty" xml:"Status,omitempty"`
+}
+
+func (s ListListenerCertificatesResponseBodyCertificates) String() string {
+	return tea.Prettify(s)
+}
+
+func (s ListListenerCertificatesResponseBodyCertificates) GoString() string {
+	return s.String()
+}
+
+func (s *ListListenerCertificatesResponseBodyCertificates) SetCertificateId(v string) *ListListenerCertificatesResponseBodyCertificates {
+	s.CertificateId = &v
+	return s
+}
+
+func (s *ListListenerCertificatesResponseBodyCertificates) SetCertificateType(v string) *ListListenerCertificatesResponseBodyCertificates {
+	s.CertificateType = &v
+	return s
+}
+
+func (s *ListListenerCertificatesResponseBodyCertificates) SetIsDefault(v bool) *ListListenerCertificatesResponseBodyCertificates {
+	s.IsDefault = &v
+	return s
+}
+
+func (s *ListListenerCertificatesResponseBodyCertificates) SetStatus(v string) *ListListenerCertificatesResponseBodyCertificates {
+	s.Status = &v
 	return s
 }
 
@@ -2881,12 +3859,22 @@ func (s *ListListenerCertificatesResponse) SetBody(v *ListListenerCertificatesRe
 }
 
 type ListListenersRequest struct {
-	ListenerIds      []*string `json:"ListenerIds,omitempty" xml:"ListenerIds,omitempty" type:"Repeated"`
+	ListenerIds []*string `json:"ListenerIds,omitempty" xml:"ListenerIds,omitempty" type:"Repeated"`
+	// The listening protocol. Valid values: **TCP**, **UDP**, and **TCPSSL**.
 	ListenerProtocol *string   `json:"ListenerProtocol,omitempty" xml:"ListenerProtocol,omitempty"`
 	LoadBalancerIds  []*string `json:"LoadBalancerIds,omitempty" xml:"LoadBalancerIds,omitempty" type:"Repeated"`
-	MaxResults       *int32    `json:"MaxResults,omitempty" xml:"MaxResults,omitempty"`
-	NextToken        *string   `json:"NextToken,omitempty" xml:"NextToken,omitempty"`
-	RegionId         *string   `json:"RegionId,omitempty" xml:"RegionId,omitempty"`
+	// The number of entries to return on each page. Valid values: **1** to **100**. Default value: **20**.
+	MaxResults *int32 `json:"MaxResults,omitempty" xml:"MaxResults,omitempty"`
+	// The token that is used for the next query. Valid values:
+	//
+	// *   If this is your first query or no next query is to be sent, ignore this parameter.
+	// *   If a next query is to be sent, set the parameter to the value of NextToken that is returned from the last call.
+	NextToken *string `json:"NextToken,omitempty" xml:"NextToken,omitempty"`
+	// The ID of the region where the NLB instance is deployed.
+	//
+	// You can call the [DescribeRegions](~~443657~~) operation to query the most recent region list.
+	RegionId *string                    `json:"RegionId,omitempty" xml:"RegionId,omitempty"`
+	Tag      []*ListListenersRequestTag `json:"Tag,omitempty" xml:"Tag,omitempty" type:"Repeated"`
 }
 
 func (s ListListenersRequest) String() string {
@@ -2927,12 +3915,48 @@ func (s *ListListenersRequest) SetRegionId(v string) *ListListenersRequest {
 	return s
 }
 
+func (s *ListListenersRequest) SetTag(v []*ListListenersRequestTag) *ListListenersRequest {
+	s.Tag = v
+	return s
+}
+
+type ListListenersRequestTag struct {
+	Key   *string `json:"Key,omitempty" xml:"Key,omitempty"`
+	Value *string `json:"Value,omitempty" xml:"Value,omitempty"`
+}
+
+func (s ListListenersRequestTag) String() string {
+	return tea.Prettify(s)
+}
+
+func (s ListListenersRequestTag) GoString() string {
+	return s.String()
+}
+
+func (s *ListListenersRequestTag) SetKey(v string) *ListListenersRequestTag {
+	s.Key = &v
+	return s
+}
+
+func (s *ListListenersRequestTag) SetValue(v string) *ListListenersRequestTag {
+	s.Value = &v
+	return s
+}
+
 type ListListenersResponseBody struct {
-	Listeners  []*ListListenersResponseBodyListeners `json:"Listeners,omitempty" xml:"Listeners,omitempty" type:"Repeated"`
-	MaxResults *int32                                `json:"MaxResults,omitempty" xml:"MaxResults,omitempty"`
-	NextToken  *string                               `json:"NextToken,omitempty" xml:"NextToken,omitempty"`
-	RequestId  *string                               `json:"RequestId,omitempty" xml:"RequestId,omitempty"`
-	TotalCount *int32                                `json:"TotalCount,omitempty" xml:"TotalCount,omitempty"`
+	// The list of listeners.
+	Listeners []*ListListenersResponseBodyListeners `json:"Listeners,omitempty" xml:"Listeners,omitempty" type:"Repeated"`
+	// The number of entries returned per page.
+	MaxResults *int32 `json:"MaxResults,omitempty" xml:"MaxResults,omitempty"`
+	// The token that is used for the next query. Valid values:
+	//
+	// *   If **NextToken** is empty, it indicates that no next query is to be sent.
+	// *   If a value of **NextToken** is returned, the value is the token used for the next query.
+	NextToken *string `json:"NextToken,omitempty" xml:"NextToken,omitempty"`
+	// The ID of the request.
+	RequestId *string `json:"RequestId,omitempty" xml:"RequestId,omitempty"`
+	// The number of entries returned.
+	TotalCount *int32 `json:"TotalCount,omitempty" xml:"TotalCount,omitempty"`
 }
 
 func (s ListListenersResponseBody) String() string {
@@ -2969,27 +3993,85 @@ func (s *ListListenersResponseBody) SetTotalCount(v int32) *ListListenersRespons
 }
 
 type ListListenersResponseBodyListeners struct {
-	AlpnEnabled          *bool     `json:"AlpnEnabled,omitempty" xml:"AlpnEnabled,omitempty"`
-	AlpnPolicy           *string   `json:"AlpnPolicy,omitempty" xml:"AlpnPolicy,omitempty"`
-	CaCertificateIds     []*string `json:"CaCertificateIds,omitempty" xml:"CaCertificateIds,omitempty" type:"Repeated"`
-	CaEnabled            *bool     `json:"CaEnabled,omitempty" xml:"CaEnabled,omitempty"`
-	CertificateIds       []*string `json:"CertificateIds,omitempty" xml:"CertificateIds,omitempty" type:"Repeated"`
-	Cps                  *int32    `json:"Cps,omitempty" xml:"Cps,omitempty"`
-	EndPort              *string   `json:"EndPort,omitempty" xml:"EndPort,omitempty"`
-	IdleTimeout          *int32    `json:"IdleTimeout,omitempty" xml:"IdleTimeout,omitempty"`
-	ListenerDescription  *string   `json:"ListenerDescription,omitempty" xml:"ListenerDescription,omitempty"`
-	ListenerId           *string   `json:"ListenerId,omitempty" xml:"ListenerId,omitempty"`
-	ListenerPort         *int32    `json:"ListenerPort,omitempty" xml:"ListenerPort,omitempty"`
-	ListenerProtocol     *string   `json:"ListenerProtocol,omitempty" xml:"ListenerProtocol,omitempty"`
-	ListenerStatus       *string   `json:"ListenerStatus,omitempty" xml:"ListenerStatus,omitempty"`
-	LoadBalancerId       *string   `json:"LoadBalancerId,omitempty" xml:"LoadBalancerId,omitempty"`
-	Mss                  *int32    `json:"Mss,omitempty" xml:"Mss,omitempty"`
-	ProxyProtocolEnabled *bool     `json:"ProxyProtocolEnabled,omitempty" xml:"ProxyProtocolEnabled,omitempty"`
-	RegionId             *string   `json:"RegionId,omitempty" xml:"RegionId,omitempty"`
-	SecSensorEnabled     *bool     `json:"SecSensorEnabled,omitempty" xml:"SecSensorEnabled,omitempty"`
-	SecurityPolicyId     *string   `json:"SecurityPolicyId,omitempty" xml:"SecurityPolicyId,omitempty"`
-	ServerGroupId        *string   `json:"ServerGroupId,omitempty" xml:"ServerGroupId,omitempty"`
-	StartPort            *string   `json:"StartPort,omitempty" xml:"StartPort,omitempty"`
+	// Indicates whether Application-Layer Protocol Negotiation (ALPN) is enabled. Valid values:
+	//
+	// *   **true**: enabled
+	// *   **false**: disabled
+	AlpnEnabled *bool `json:"AlpnEnabled,omitempty" xml:"AlpnEnabled,omitempty"`
+	// The ALPN policy. Valid values:
+	//
+	// *   **HTTP1Only**
+	// *   **HTTP2Only**
+	// *   **HTTP2Preferred**
+	// *   **HTTP2Optional**
+	AlpnPolicy *string `json:"AlpnPolicy,omitempty" xml:"AlpnPolicy,omitempty"`
+	// The list of CA certificates.
+	//
+	// >  This parameter takes effect only for listeners that use SSL over TCP.
+	CaCertificateIds []*string `json:"CaCertificateIds,omitempty" xml:"CaCertificateIds,omitempty" type:"Repeated"`
+	// Indicates whether mutual authentication is enabled. Valid values:
+	//
+	// *   **true**: yes
+	// *   **false**: no
+	CaEnabled *bool `json:"CaEnabled,omitempty" xml:"CaEnabled,omitempty"`
+	// The list of server certificates.
+	//
+	// >  This parameter takes effect only for listeners that use SSL over TCP.
+	CertificateIds []*string `json:"CertificateIds,omitempty" xml:"CertificateIds,omitempty" type:"Repeated"`
+	// The maximum number of connections that can be created per second on the NLB instance. Valid values: **0** to **1000000**. **0** indicates that the number of connections is unlimited.
+	Cps *int32 `json:"Cps,omitempty" xml:"Cps,omitempty"`
+	// The last port in the listening port range.
+	EndPort *string `json:"EndPort,omitempty" xml:"EndPort,omitempty"`
+	// The timeout period of an idle connection. Unit: seconds. Valid values: **1** to **900**. Default value: **900**.
+	IdleTimeout *int32 `json:"IdleTimeout,omitempty" xml:"IdleTimeout,omitempty"`
+	// The name of the listener.
+	//
+	// The name must be 2 to 256 characters in length, and can contain letters, digits, commas (,), periods (.), semicolons (;), forward slashes (/), at signs (@), underscores (\_), and hyphens (-).
+	ListenerDescription *string `json:"ListenerDescription,omitempty" xml:"ListenerDescription,omitempty"`
+	// The ID of the listener.
+	ListenerId *string `json:"ListenerId,omitempty" xml:"ListenerId,omitempty"`
+	// The listening port.
+	ListenerPort *int32 `json:"ListenerPort,omitempty" xml:"ListenerPort,omitempty"`
+	// The listening protocol. Valid values: **TCP**, **UDP**, and **TCPSSL**.
+	ListenerProtocol *string `json:"ListenerProtocol,omitempty" xml:"ListenerProtocol,omitempty"`
+	// The status of the listener. Valid values:
+	//
+	// *   **Provisioning**
+	// *   **Running**
+	// *   **Configuring**
+	// *   **Stopping**
+	// *   **Stopped**
+	// *   **Starting**
+	// *   **Deleting**
+	// *   **Deleted**
+	ListenerStatus *string `json:"ListenerStatus,omitempty" xml:"ListenerStatus,omitempty"`
+	// The ID of the NLB instance.
+	LoadBalancerId *string `json:"LoadBalancerId,omitempty" xml:"LoadBalancerId,omitempty"`
+	// The maximum size of a TCP segment. Unit: bytes. Valid values: **0** to **1500**. **0** indicates that the maximum segment size remains unchanged.
+	//
+	// >  This parameter is supported only by listeners that use SSL over TCP.
+	Mss *int32 `json:"Mss,omitempty" xml:"Mss,omitempty"`
+	// Indicates whether the Proxy protocol is used to pass client IP addresses to backend servers. Valid values:
+	//
+	// *   **true**: enabled
+	// *   **false**: disabled
+	ProxyProtocolEnabled *bool `json:"ProxyProtocolEnabled,omitempty" xml:"ProxyProtocolEnabled,omitempty"`
+	// The ID of the region where the NLB instance is deployed.
+	RegionId *string `json:"RegionId,omitempty" xml:"RegionId,omitempty"`
+	// Indicates whether fine-grained monitoring is enabled. Valid values:
+	//
+	// *   **true**: enabled
+	// *   **false**: disabled
+	SecSensorEnabled *bool `json:"SecSensorEnabled,omitempty" xml:"SecSensorEnabled,omitempty"`
+	// The ID of the security policy.
+	//
+	// >  This parameter takes effect only for listeners that use SSL over TCP.
+	SecurityPolicyId *string `json:"SecurityPolicyId,omitempty" xml:"SecurityPolicyId,omitempty"`
+	// The ID of the server group.
+	ServerGroupId *string `json:"ServerGroupId,omitempty" xml:"ServerGroupId,omitempty"`
+	// The first port in the listening port range.
+	StartPort *string                                   `json:"StartPort,omitempty" xml:"StartPort,omitempty"`
+	Tags      []*ListListenersResponseBodyListenersTags `json:"Tags,omitempty" xml:"Tags,omitempty" type:"Repeated"`
 }
 
 func (s ListListenersResponseBodyListeners) String() string {
@@ -3102,6 +4184,34 @@ func (s *ListListenersResponseBodyListeners) SetServerGroupId(v string) *ListLis
 
 func (s *ListListenersResponseBodyListeners) SetStartPort(v string) *ListListenersResponseBodyListeners {
 	s.StartPort = &v
+	return s
+}
+
+func (s *ListListenersResponseBodyListeners) SetTags(v []*ListListenersResponseBodyListenersTags) *ListListenersResponseBodyListeners {
+	s.Tags = v
+	return s
+}
+
+type ListListenersResponseBodyListenersTags struct {
+	Key   *string `json:"Key,omitempty" xml:"Key,omitempty"`
+	Value *string `json:"Value,omitempty" xml:"Value,omitempty"`
+}
+
+func (s ListListenersResponseBodyListenersTags) String() string {
+	return tea.Prettify(s)
+}
+
+func (s ListListenersResponseBodyListenersTags) GoString() string {
+	return s.String()
+}
+
+func (s *ListListenersResponseBodyListenersTags) SetKey(v string) *ListListenersResponseBodyListenersTags {
+	s.Key = &v
+	return s
+}
+
+func (s *ListListenersResponseBodyListenersTags) SetValue(v string) *ListListenersResponseBodyListenersTags {
+	s.Value = &v
 	return s
 }
 
@@ -3571,6 +4681,7 @@ func (s *ListLoadBalancersResponseBodyLoadBalancersTags) SetValue(v string) *Lis
 
 type ListLoadBalancersResponseBodyLoadBalancersZoneMappings struct {
 	LoadBalancerAddresses []*ListLoadBalancersResponseBodyLoadBalancersZoneMappingsLoadBalancerAddresses `json:"LoadBalancerAddresses,omitempty" xml:"LoadBalancerAddresses,omitempty" type:"Repeated"`
+	Status                *string                                                                        `json:"Status,omitempty" xml:"Status,omitempty"`
 	VSwitchId             *string                                                                        `json:"VSwitchId,omitempty" xml:"VSwitchId,omitempty"`
 	ZoneId                *string                                                                        `json:"ZoneId,omitempty" xml:"ZoneId,omitempty"`
 }
@@ -3588,6 +4699,11 @@ func (s *ListLoadBalancersResponseBodyLoadBalancersZoneMappings) SetLoadBalancer
 	return s
 }
 
+func (s *ListLoadBalancersResponseBodyLoadBalancersZoneMappings) SetStatus(v string) *ListLoadBalancersResponseBodyLoadBalancersZoneMappings {
+	s.Status = &v
+	return s
+}
+
 func (s *ListLoadBalancersResponseBodyLoadBalancersZoneMappings) SetVSwitchId(v string) *ListLoadBalancersResponseBodyLoadBalancersZoneMappings {
 	s.VSwitchId = &v
 	return s
@@ -3599,11 +4715,13 @@ func (s *ListLoadBalancersResponseBodyLoadBalancersZoneMappings) SetZoneId(v str
 }
 
 type ListLoadBalancersResponseBodyLoadBalancersZoneMappingsLoadBalancerAddresses struct {
-	AllocationId       *string `json:"AllocationId,omitempty" xml:"AllocationId,omitempty"`
-	EniId              *string `json:"EniId,omitempty" xml:"EniId,omitempty"`
-	Ipv6Address        *string `json:"Ipv6Address,omitempty" xml:"Ipv6Address,omitempty"`
-	PrivateIPv4Address *string `json:"PrivateIPv4Address,omitempty" xml:"PrivateIPv4Address,omitempty"`
-	PublicIPv4Address  *string `json:"PublicIPv4Address,omitempty" xml:"PublicIPv4Address,omitempty"`
+	AllocationId        *string `json:"AllocationId,omitempty" xml:"AllocationId,omitempty"`
+	EniId               *string `json:"EniId,omitempty" xml:"EniId,omitempty"`
+	Ipv6Address         *string `json:"Ipv6Address,omitempty" xml:"Ipv6Address,omitempty"`
+	PrivateIPv4Address  *string `json:"PrivateIPv4Address,omitempty" xml:"PrivateIPv4Address,omitempty"`
+	PrivateIPv4HcStatus *string `json:"PrivateIPv4HcStatus,omitempty" xml:"PrivateIPv4HcStatus,omitempty"`
+	PrivateIPv6HcStatus *string `json:"PrivateIPv6HcStatus,omitempty" xml:"PrivateIPv6HcStatus,omitempty"`
+	PublicIPv4Address   *string `json:"PublicIPv4Address,omitempty" xml:"PublicIPv4Address,omitempty"`
 }
 
 func (s ListLoadBalancersResponseBodyLoadBalancersZoneMappingsLoadBalancerAddresses) String() string {
@@ -3631,6 +4749,16 @@ func (s *ListLoadBalancersResponseBodyLoadBalancersZoneMappingsLoadBalancerAddre
 
 func (s *ListLoadBalancersResponseBodyLoadBalancersZoneMappingsLoadBalancerAddresses) SetPrivateIPv4Address(v string) *ListLoadBalancersResponseBodyLoadBalancersZoneMappingsLoadBalancerAddresses {
 	s.PrivateIPv4Address = &v
+	return s
+}
+
+func (s *ListLoadBalancersResponseBodyLoadBalancersZoneMappingsLoadBalancerAddresses) SetPrivateIPv4HcStatus(v string) *ListLoadBalancersResponseBodyLoadBalancersZoneMappingsLoadBalancerAddresses {
+	s.PrivateIPv4HcStatus = &v
+	return s
+}
+
+func (s *ListLoadBalancersResponseBodyLoadBalancersZoneMappingsLoadBalancerAddresses) SetPrivateIPv6HcStatus(v string) *ListLoadBalancersResponseBodyLoadBalancersZoneMappingsLoadBalancerAddresses {
+	s.PrivateIPv6HcStatus = &v
 	return s
 }
 
@@ -3669,9 +4797,18 @@ func (s *ListLoadBalancersResponse) SetBody(v *ListLoadBalancersResponseBody) *L
 }
 
 type ListSecurityPolicyRequest struct {
-	MaxResults          *int32                          `json:"MaxResults,omitempty" xml:"MaxResults,omitempty"`
-	NextToken           *string                         `json:"NextToken,omitempty" xml:"NextToken,omitempty"`
-	RegionId            *string                         `json:"RegionId,omitempty" xml:"RegionId,omitempty"`
+	// The number of entries to return on each page. Valid values: **1** to **100**. Default value: **20**.
+	MaxResults *int32 `json:"MaxResults,omitempty" xml:"MaxResults,omitempty"`
+	// The token that is used for the next query. Valid values:
+	//
+	// *   If this is your first query or no next query is to be sent, ignore this parameter.
+	// *   If a next query is to be sent, set the parameter to the value of NextToken that is returned from the last call.
+	NextToken *string `json:"NextToken,omitempty" xml:"NextToken,omitempty"`
+	// The ID of the region where the NLB instance is deployed.
+	//
+	// You can call the [DescribeRegions](~~443657~~) operation to query the most recent region list.
+	RegionId *string `json:"RegionId,omitempty" xml:"RegionId,omitempty"`
+	// The ID of the resource group.
 	ResourceGroupId     *string                         `json:"ResourceGroupId,omitempty" xml:"ResourceGroupId,omitempty"`
 	SecurityPolicyIds   []*string                       `json:"SecurityPolicyIds,omitempty" xml:"SecurityPolicyIds,omitempty" type:"Repeated"`
 	SecurityPolicyNames []*string                       `json:"SecurityPolicyNames,omitempty" xml:"SecurityPolicyNames,omitempty" type:"Repeated"`
@@ -3722,7 +4859,13 @@ func (s *ListSecurityPolicyRequest) SetTag(v []*ListSecurityPolicyRequestTag) *L
 }
 
 type ListSecurityPolicyRequestTag struct {
-	Key   *string `json:"Key,omitempty" xml:"Key,omitempty"`
+	// The tag keys. You can specify up to 10 tag keys.
+	//
+	// It can be at most 64 characters in length, and cannot contain `http://` or `https://`. It must not start with `aliyun` or `acs:`.
+	Key *string `json:"Key,omitempty" xml:"Key,omitempty"`
+	// The tag values. You can specify up to 10 tag values.
+	//
+	// It can be at most 128 characters in length, and cannot contain `http://` or `https://`. It must not start with `aliyun` or `acs:`.
 	Value *string `json:"Value,omitempty" xml:"Value,omitempty"`
 }
 
@@ -3745,11 +4888,19 @@ func (s *ListSecurityPolicyRequestTag) SetValue(v string) *ListSecurityPolicyReq
 }
 
 type ListSecurityPolicyResponseBody struct {
-	MaxResults       *int32                                            `json:"MaxResults,omitempty" xml:"MaxResults,omitempty"`
-	NextToken        *string                                           `json:"NextToken,omitempty" xml:"NextToken,omitempty"`
-	RequestId        *string                                           `json:"RequestId,omitempty" xml:"RequestId,omitempty"`
+	// The number of entries returned per page.
+	MaxResults *int32 `json:"MaxResults,omitempty" xml:"MaxResults,omitempty"`
+	// The token that is used for the next query. Valid values:
+	//
+	// *   If this is your first query or no next query is to be sent, ignore this parameter.
+	// *   If a next query is to be sent, set the parameter to the value of NextToken that is returned from the last call.
+	NextToken *string `json:"NextToken,omitempty" xml:"NextToken,omitempty"`
+	// The ID of the request.
+	RequestId *string `json:"RequestId,omitempty" xml:"RequestId,omitempty"`
+	// A list of TLS security policies.
 	SecurityPolicies []*ListSecurityPolicyResponseBodySecurityPolicies `json:"SecurityPolicies,omitempty" xml:"SecurityPolicies,omitempty" type:"Repeated"`
-	TotalCount       *int32                                            `json:"TotalCount,omitempty" xml:"TotalCount,omitempty"`
+	// The number of entries returned.
+	TotalCount *int32 `json:"TotalCount,omitempty" xml:"TotalCount,omitempty"`
 }
 
 func (s ListSecurityPolicyResponseBody) String() string {
@@ -3786,15 +4937,67 @@ func (s *ListSecurityPolicyResponseBody) SetTotalCount(v int32) *ListSecurityPol
 }
 
 type ListSecurityPolicyResponseBodySecurityPolicies struct {
-	Ciphers              *string                                                           `json:"Ciphers,omitempty" xml:"Ciphers,omitempty"`
-	RegionId             *string                                                           `json:"RegionId,omitempty" xml:"RegionId,omitempty"`
-	RelatedListeners     []*ListSecurityPolicyResponseBodySecurityPoliciesRelatedListeners `json:"RelatedListeners,omitempty" xml:"RelatedListeners,omitempty" type:"Repeated"`
-	ResourceGroupId      *string                                                           `json:"ResourceGroupId,omitempty" xml:"ResourceGroupId,omitempty"`
-	SecurityPolicyId     *string                                                           `json:"SecurityPolicyId,omitempty" xml:"SecurityPolicyId,omitempty"`
-	SecurityPolicyName   *string                                                           `json:"SecurityPolicyName,omitempty" xml:"SecurityPolicyName,omitempty"`
-	SecurityPolicyStatus *string                                                           `json:"SecurityPolicyStatus,omitempty" xml:"SecurityPolicyStatus,omitempty"`
-	Tags                 []*ListSecurityPolicyResponseBodySecurityPoliciesTags             `json:"Tags,omitempty" xml:"Tags,omitempty" type:"Repeated"`
-	TlsVersion           *string                                                           `json:"TlsVersion,omitempty" xml:"TlsVersion,omitempty"`
+	// The supported cipher suites, which are determined by the TLS protocol version. You can specify at most 32 cipher suites.
+	//
+	// TLS 1.0 and TLS 1.1 support the following cipher suites:
+	//
+	// *   **ECDHE-ECDSA-AES128-SHA**
+	// *   **ECDHE-ECDSA-AES256-SHA**
+	// *   **ECDHE-RSA-AES128-SHA**
+	// *   **ECDHE-RSA-AES256-SHA**
+	// *   **AES128-SHA**
+	// *   **AES256-SHA**
+	// *   **DES-CBC3-SHA**
+	//
+	// TLS 1.2 supports the following cipher suites:
+	//
+	// *   **ECDHE-ECDSA-AES128-SHA**
+	// *   **ECDHE-ECDSA-AES256-SHA**
+	// *   **ECDHE-RSA-AES128-SHA**
+	// *   **ECDHE-RSA-AES256-SHA**
+	// *   **AES128-SHA**
+	// *   **AES256-SHA**
+	// *   **DES-CBC3-SHA**
+	// *   **ECDHE-ECDSA-AES128-GCM-SHA256**
+	// *   **ECDHE-ECDSA-AES256-GCM-SHA384**
+	// *   **ECDHE-ECDSA-AES128-SHA256**
+	// *   **ECDHE-ECDSA-AES256-SHA384**
+	// *   **ECDHE-RSA-AES128-GCM-SHA256**
+	// *   **ECDHE-RSA-AES256-GCM-SHA384**
+	// *   **ECDHE-RSA-AES128-SHA256**
+	// *   **ECDHE-RSA-AES256-SHA384**
+	// *   **AES128-GCM-SHA256**
+	// *   **AES256-GCM-SHA384**
+	// *   **AES128-SHA256**
+	// *   **AES256-SHA256**
+	//
+	// TLS 1.3 supports the following cipher suites:
+	//
+	// *   **TLS_AES\_128\_GCM_SHA256**
+	// *   **TLS_AES\_256\_GCM_SHA384**
+	// *   **TLS_CHACHA20\_POLY1305\_SHA256**
+	// *   **TLS_AES\_128\_CCM_SHA256**
+	// *   **TLS_AES\_128\_CCM\_8\_SHA256**
+	Ciphers *string `json:"Ciphers,omitempty" xml:"Ciphers,omitempty"`
+	// The ID of the region where the NLB instance is deployed.
+	RegionId *string `json:"RegionId,omitempty" xml:"RegionId,omitempty"`
+	// The listeners that are associated with the NLB instance.
+	RelatedListeners []*ListSecurityPolicyResponseBodySecurityPoliciesRelatedListeners `json:"RelatedListeners,omitempty" xml:"RelatedListeners,omitempty" type:"Repeated"`
+	// The ID of the resource group.
+	ResourceGroupId *string `json:"ResourceGroupId,omitempty" xml:"ResourceGroupId,omitempty"`
+	// The ID of the TLS security policy.
+	SecurityPolicyId *string `json:"SecurityPolicyId,omitempty" xml:"SecurityPolicyId,omitempty"`
+	// The name of the TLS security policy.
+	SecurityPolicyName *string `json:"SecurityPolicyName,omitempty" xml:"SecurityPolicyName,omitempty"`
+	// The status of the TLS security policy. Valid values:
+	//
+	// *   **Configuring**: The security policy is being configured.
+	// *   **Available**: The security policy is available.
+	SecurityPolicyStatus *string `json:"SecurityPolicyStatus,omitempty" xml:"SecurityPolicyStatus,omitempty"`
+	// The tags that are added to the NLB instance.
+	Tags []*ListSecurityPolicyResponseBodySecurityPoliciesTags `json:"Tags,omitempty" xml:"Tags,omitempty" type:"Repeated"`
+	// The supported versions of the TLS protocol. Valid values: **TLSv1.0**, **TLSv1.1**, **TLSv1.2**, and **TLSv1.3**.
+	TlsVersion *string `json:"TlsVersion,omitempty" xml:"TlsVersion,omitempty"`
 }
 
 func (s ListSecurityPolicyResponseBodySecurityPolicies) String() string {
@@ -3851,10 +5054,14 @@ func (s *ListSecurityPolicyResponseBodySecurityPolicies) SetTlsVersion(v string)
 }
 
 type ListSecurityPolicyResponseBodySecurityPoliciesRelatedListeners struct {
-	ListenerId       *string `json:"ListenerId,omitempty" xml:"ListenerId,omitempty"`
-	ListenerPort     *int64  `json:"ListenerPort,omitempty" xml:"ListenerPort,omitempty"`
+	// The ID of the listener.
+	ListenerId *string `json:"ListenerId,omitempty" xml:"ListenerId,omitempty"`
+	// The listening port.
+	ListenerPort *int64 `json:"ListenerPort,omitempty" xml:"ListenerPort,omitempty"`
+	// The listening protocol. Valid value: **TCPSSL**.
 	ListenerProtocol *string `json:"ListenerProtocol,omitempty" xml:"ListenerProtocol,omitempty"`
-	LoadBalancerId   *string `json:"LoadBalancerId,omitempty" xml:"LoadBalancerId,omitempty"`
+	// The ID of the NLB instance.
+	LoadBalancerId *string `json:"LoadBalancerId,omitempty" xml:"LoadBalancerId,omitempty"`
 }
 
 func (s ListSecurityPolicyResponseBodySecurityPoliciesRelatedListeners) String() string {
@@ -3886,7 +5093,13 @@ func (s *ListSecurityPolicyResponseBodySecurityPoliciesRelatedListeners) SetLoad
 }
 
 type ListSecurityPolicyResponseBodySecurityPoliciesTags struct {
-	Key   *string `json:"Key,omitempty" xml:"Key,omitempty"`
+	// The tag keys. You can specify up to 10 tag keys.
+	//
+	// The tag key can be at most 64 characters in length, and cannot contain `http://` or `https://`. The tag key cannot start with `aliyun` or `acs:`.
+	Key *string `json:"Key,omitempty" xml:"Key,omitempty"`
+	// The tag values. You can specify up to 10 tag values.
+	//
+	// It can be at most 128 characters in length, and cannot contain `http://` or `https://`. It must not start with `aliyun` or `acs:`.
 	Value *string `json:"Value,omitempty" xml:"Value,omitempty"`
 }
 
@@ -3938,8 +5151,14 @@ func (s *ListSecurityPolicyResponse) SetBody(v *ListSecurityPolicyResponseBody) 
 }
 
 type ListServerGroupServersRequest struct {
-	MaxResults    *int32    `json:"MaxResults,omitempty" xml:"MaxResults,omitempty"`
-	NextToken     *string   `json:"NextToken,omitempty" xml:"NextToken,omitempty"`
+	// The number of entries to return on each page. Valid values: **1** to **100**. Default value: **20**.
+	MaxResults *int32 `json:"MaxResults,omitempty" xml:"MaxResults,omitempty"`
+	// The token that is used for the next query. Valid values:
+	//
+	// *   If this is your first query or no next query is to be sent, ignore this parameter.
+	// *   If a next query is to be sent, set the parameter to the value of NextToken that is returned from the last call.
+	NextToken *string `json:"NextToken,omitempty" xml:"NextToken,omitempty"`
+	// The ID of the server group.
 	ServerGroupId *string   `json:"ServerGroupId,omitempty" xml:"ServerGroupId,omitempty"`
 	ServerIds     []*string `json:"ServerIds,omitempty" xml:"ServerIds,omitempty" type:"Repeated"`
 	ServerIps     []*string `json:"ServerIps,omitempty" xml:"ServerIps,omitempty" type:"Repeated"`
@@ -3979,11 +5198,19 @@ func (s *ListServerGroupServersRequest) SetServerIps(v []*string) *ListServerGro
 }
 
 type ListServerGroupServersResponseBody struct {
-	MaxResults *int32                                       `json:"MaxResults,omitempty" xml:"MaxResults,omitempty"`
-	NextToken  *string                                      `json:"NextToken,omitempty" xml:"NextToken,omitempty"`
-	RequestId  *string                                      `json:"RequestId,omitempty" xml:"RequestId,omitempty"`
-	Servers    []*ListServerGroupServersResponseBodyServers `json:"Servers,omitempty" xml:"Servers,omitempty" type:"Repeated"`
-	TotalCount *int32                                       `json:"TotalCount,omitempty" xml:"TotalCount,omitempty"`
+	// The number of entries returned per page.
+	MaxResults *int32 `json:"MaxResults,omitempty" xml:"MaxResults,omitempty"`
+	// The token that is used for the next query. Valid values:
+	//
+	// *   If this is your first query or no next query is to be sent, ignore this parameter.
+	// *   If a next query is to be sent, set the parameter to the value of NextToken that is returned from the last call.
+	NextToken *string `json:"NextToken,omitempty" xml:"NextToken,omitempty"`
+	// The ID of the request.
+	RequestId *string `json:"RequestId,omitempty" xml:"RequestId,omitempty"`
+	// A list of backend servers.
+	Servers []*ListServerGroupServersResponseBodyServers `json:"Servers,omitempty" xml:"Servers,omitempty" type:"Repeated"`
+	// The number of entries returned.
+	TotalCount *int32 `json:"TotalCount,omitempty" xml:"TotalCount,omitempty"`
 }
 
 func (s ListServerGroupServersResponseBody) String() string {
@@ -4020,15 +5247,34 @@ func (s *ListServerGroupServersResponseBody) SetTotalCount(v int32) *ListServerG
 }
 
 type ListServerGroupServersResponseBodyServers struct {
-	Description   *string `json:"Description,omitempty" xml:"Description,omitempty"`
-	Port          *int32  `json:"Port,omitempty" xml:"Port,omitempty"`
+	// The description of the backend server.
+	Description *string `json:"Description,omitempty" xml:"Description,omitempty"`
+	// The port used by the backend server. Valid values: **1** to **65535**.
+	Port *int32 `json:"Port,omitempty" xml:"Port,omitempty"`
+	// The ID of the server group.
 	ServerGroupId *string `json:"ServerGroupId,omitempty" xml:"ServerGroupId,omitempty"`
-	ServerId      *string `json:"ServerId,omitempty" xml:"ServerId,omitempty"`
-	ServerIp      *string `json:"ServerIp,omitempty" xml:"ServerIp,omitempty"`
-	ServerType    *string `json:"ServerType,omitempty" xml:"ServerType,omitempty"`
-	Status        *string `json:"Status,omitempty" xml:"Status,omitempty"`
-	Weight        *int32  `json:"Weight,omitempty" xml:"Weight,omitempty"`
-	ZoneId        *string `json:"ZoneId,omitempty" xml:"ZoneId,omitempty"`
+	// The ID of the server.
+	ServerId *string `json:"ServerId,omitempty" xml:"ServerId,omitempty"`
+	// The IP address of the backend server.
+	ServerIp *string `json:"ServerIp,omitempty" xml:"ServerIp,omitempty"`
+	// The type of the backend server. Valid values:
+	//
+	// *   **Ecs**: an Elastic Compute Service (ECS) instance
+	// *   **Eni**: an elastic network interface (ENI)
+	// *   **Eci**: an elastic container instance
+	// *   **Ip**: an IP address
+	ServerType *string `json:"ServerType,omitempty" xml:"ServerType,omitempty"`
+	// Indicates the status of the backend server. Valid values:
+	//
+	// *   **Adding**: The backend server is being added.
+	// *   **Available**: The backend server is added.
+	// *   **Configuring**: The backend server is being configured.
+	// *   **Removing**: The backend server is being removed.
+	Status *string `json:"Status,omitempty" xml:"Status,omitempty"`
+	// The weight of the backend server.
+	Weight *int32 `json:"Weight,omitempty" xml:"Weight,omitempty"`
+	// The zone ID of the server.
+	ZoneId *string `json:"ZoneId,omitempty" xml:"ZoneId,omitempty"`
 }
 
 func (s ListServerGroupServersResponseBodyServers) String() string {
@@ -4114,15 +5360,29 @@ func (s *ListServerGroupServersResponse) SetBody(v *ListServerGroupServersRespon
 }
 
 type ListServerGroupsRequest struct {
-	MaxResults       *int32                        `json:"MaxResults,omitempty" xml:"MaxResults,omitempty"`
-	NextToken        *string                       `json:"NextToken,omitempty" xml:"NextToken,omitempty"`
-	RegionId         *string                       `json:"RegionId,omitempty" xml:"RegionId,omitempty"`
-	ResourceGroupId  *string                       `json:"ResourceGroupId,omitempty" xml:"ResourceGroupId,omitempty"`
-	ServerGroupIds   []*string                     `json:"ServerGroupIds,omitempty" xml:"ServerGroupIds,omitempty" type:"Repeated"`
-	ServerGroupNames []*string                     `json:"ServerGroupNames,omitempty" xml:"ServerGroupNames,omitempty" type:"Repeated"`
-	ServerGroupType  *string                       `json:"ServerGroupType,omitempty" xml:"ServerGroupType,omitempty"`
-	Tag              []*ListServerGroupsRequestTag `json:"Tag,omitempty" xml:"Tag,omitempty" type:"Repeated"`
-	VpcId            *string                       `json:"VpcId,omitempty" xml:"VpcId,omitempty"`
+	// The number of entries to return on each page. Valid values: **1** to **100**. Default value: **20**.
+	MaxResults *int32 `json:"MaxResults,omitempty" xml:"MaxResults,omitempty"`
+	// The token that determines the start point of the query. Valid values:
+	//
+	// *   If this is your first query and no next queries are to be sent, ignore this parameter.
+	// *   If a next query is to be sent, set the value to the value of NextToken that is returned from the last call.
+	NextToken *string `json:"NextToken,omitempty" xml:"NextToken,omitempty"`
+	// The ID of the region where the NLB instance is deployed.
+	//
+	// You can call the [DescribeRegions](~~443657~~) operation to query the most recent region list.
+	RegionId *string `json:"RegionId,omitempty" xml:"RegionId,omitempty"`
+	// The ID of the resource group to which the server group belongs.
+	ResourceGroupId  *string   `json:"ResourceGroupId,omitempty" xml:"ResourceGroupId,omitempty"`
+	ServerGroupIds   []*string `json:"ServerGroupIds,omitempty" xml:"ServerGroupIds,omitempty" type:"Repeated"`
+	ServerGroupNames []*string `json:"ServerGroupNames,omitempty" xml:"ServerGroupNames,omitempty" type:"Repeated"`
+	// The type of server group. Valid values:
+	//
+	// *   **Instance** : allows you to add servers of the **Ecs**, **Ens**, and **Eci** types.
+	// *   **Ip**: allows you to add servers by specifying IP addresses.
+	ServerGroupType *string                       `json:"ServerGroupType,omitempty" xml:"ServerGroupType,omitempty"`
+	Tag             []*ListServerGroupsRequestTag `json:"Tag,omitempty" xml:"Tag,omitempty" type:"Repeated"`
+	// The ID of the virtual private cloud (VPC) to which the server group belongs.
+	VpcId *string `json:"VpcId,omitempty" xml:"VpcId,omitempty"`
 }
 
 func (s ListServerGroupsRequest) String() string {
@@ -4179,7 +5439,13 @@ func (s *ListServerGroupsRequest) SetVpcId(v string) *ListServerGroupsRequest {
 }
 
 type ListServerGroupsRequestTag struct {
-	Key   *string `json:"Key,omitempty" xml:"Key,omitempty"`
+	// The tag key. You can specify up to 10 tag keys.
+	//
+	// The tag key can be up to 64 characters in length, and cannot contain `http://` or `https://`. It cannot start with `aliyun` or `acs:`.
+	Key *string `json:"Key,omitempty" xml:"Key,omitempty"`
+	// The tag value. You can specify up to 10 tag values.
+	//
+	// The tag value can be up to 128 characters in length, and cannot contain `http://` or `https://`. It cannot start with `aliyun` or `acs:`.
 	Value *string `json:"Value,omitempty" xml:"Value,omitempty"`
 }
 
@@ -4202,11 +5468,19 @@ func (s *ListServerGroupsRequestTag) SetValue(v string) *ListServerGroupsRequest
 }
 
 type ListServerGroupsResponseBody struct {
-	MaxResults   *int32                                      `json:"MaxResults,omitempty" xml:"MaxResults,omitempty"`
-	NextToken    *string                                     `json:"NextToken,omitempty" xml:"NextToken,omitempty"`
-	RequestId    *string                                     `json:"RequestId,omitempty" xml:"RequestId,omitempty"`
+	// The number of entries returned per page. Valid values: **1** to **100**.
+	MaxResults *int32 `json:"MaxResults,omitempty" xml:"MaxResults,omitempty"`
+	// The token that determines the start point of the query. Valid values:
+	//
+	// *   If **NextToken** is empty, it indicates that no subsequent query is to be sent.
+	// *   If a value of **NextToken** is returned, the value is the token used for the next query.
+	NextToken *string `json:"NextToken,omitempty" xml:"NextToken,omitempty"`
+	// The ID of the request.
+	RequestId *string `json:"RequestId,omitempty" xml:"RequestId,omitempty"`
+	// The server groups.
 	ServerGroups []*ListServerGroupsResponseBodyServerGroups `json:"ServerGroups,omitempty" xml:"ServerGroups,omitempty" type:"Repeated"`
-	TotalCount   *int32                                      `json:"TotalCount,omitempty" xml:"TotalCount,omitempty"`
+	// The number of entries returned.
+	TotalCount *int32 `json:"TotalCount,omitempty" xml:"TotalCount,omitempty"`
 }
 
 func (s ListServerGroupsResponseBody) String() string {
@@ -4243,25 +5517,73 @@ func (s *ListServerGroupsResponseBody) SetTotalCount(v int32) *ListServerGroupsR
 }
 
 type ListServerGroupsResponseBodyServerGroups struct {
-	AddressIPVersion        *string                                              `json:"AddressIPVersion,omitempty" xml:"AddressIPVersion,omitempty"`
-	AliUid                  *int64                                               `json:"AliUid,omitempty" xml:"AliUid,omitempty"`
-	AnyPortEnabled          *bool                                                `json:"AnyPortEnabled,omitempty" xml:"AnyPortEnabled,omitempty"`
-	ConnectionDrainEnabled  *bool                                                `json:"ConnectionDrainEnabled,omitempty" xml:"ConnectionDrainEnabled,omitempty"`
-	ConnectionDrainTimeout  *int32                                               `json:"ConnectionDrainTimeout,omitempty" xml:"ConnectionDrainTimeout,omitempty"`
-	HealthCheck             *ListServerGroupsResponseBodyServerGroupsHealthCheck `json:"HealthCheck,omitempty" xml:"HealthCheck,omitempty" type:"Struct"`
-	PreserveClientIpEnabled *bool                                                `json:"PreserveClientIpEnabled,omitempty" xml:"PreserveClientIpEnabled,omitempty"`
-	Protocol                *string                                              `json:"Protocol,omitempty" xml:"Protocol,omitempty"`
-	RegionId                *string                                              `json:"RegionId,omitempty" xml:"RegionId,omitempty"`
-	RelatedLoadBalancerIds  []*string                                            `json:"RelatedLoadBalancerIds,omitempty" xml:"RelatedLoadBalancerIds,omitempty" type:"Repeated"`
-	ResourceGroupId         *string                                              `json:"ResourceGroupId,omitempty" xml:"ResourceGroupId,omitempty"`
-	Scheduler               *string                                              `json:"Scheduler,omitempty" xml:"Scheduler,omitempty"`
-	ServerCount             *int32                                               `json:"ServerCount,omitempty" xml:"ServerCount,omitempty"`
-	ServerGroupId           *string                                              `json:"ServerGroupId,omitempty" xml:"ServerGroupId,omitempty"`
-	ServerGroupName         *string                                              `json:"ServerGroupName,omitempty" xml:"ServerGroupName,omitempty"`
-	ServerGroupStatus       *string                                              `json:"ServerGroupStatus,omitempty" xml:"ServerGroupStatus,omitempty"`
-	ServerGroupType         *string                                              `json:"ServerGroupType,omitempty" xml:"ServerGroupType,omitempty"`
-	Tags                    []*ListServerGroupsResponseBodyServerGroupsTags      `json:"Tags,omitempty" xml:"Tags,omitempty" type:"Repeated"`
-	VpcId                   *string                                              `json:"VpcId,omitempty" xml:"VpcId,omitempty"`
+	// The protocol version. Valid values:
+	//
+	// *   **ipv4**: IPv4
+	// *   **DualStack**: dual stack
+	AddressIPVersion *string `json:"AddressIPVersion,omitempty" xml:"AddressIPVersion,omitempty"`
+	// The UID of the Alibaba Cloud account.
+	AliUid *int64 `json:"AliUid,omitempty" xml:"AliUid,omitempty"`
+	// Indicates whether the feature of forwarding requests to all ports is enabled. Valid values:
+	//
+	// *   **true**: enabled
+	// *   **false**: disabled
+	AnyPortEnabled *bool `json:"AnyPortEnabled,omitempty" xml:"AnyPortEnabled,omitempty"`
+	// Indicates whether connection draining is enabled. Valid values:
+	//
+	// *   **true**: enabled
+	// *   **false**: disabled
+	ConnectionDrainEnabled *bool `json:"ConnectionDrainEnabled,omitempty" xml:"ConnectionDrainEnabled,omitempty"`
+	// The timeout period of connection draining. Unit: seconds.
+	//
+	// Valid values: **10** to **900**.
+	ConnectionDrainTimeout *int32 `json:"ConnectionDrainTimeout,omitempty" xml:"ConnectionDrainTimeout,omitempty"`
+	// The configurations of health checks.
+	HealthCheck *ListServerGroupsResponseBodyServerGroupsHealthCheck `json:"HealthCheck,omitempty" xml:"HealthCheck,omitempty" type:"Struct"`
+	// Indicates whether client IP preservation is enabled. Valid values:
+	//
+	// *   **true**: enabled
+	// *   **false**: disabled
+	//
+	// >  Note: If **AddressIPVersion** is set to **ipv4**, the default value is **true**. If **AddressIPVersion** is set to **ipv6**, the only valid value is **false**. **true** will be supported in later version.
+	PreserveClientIpEnabled *bool `json:"PreserveClientIpEnabled,omitempty" xml:"PreserveClientIpEnabled,omitempty"`
+	// The protocol used to forward requests to the backend servers. Valid values: **TCP**, **UDP**, and **TCPSSL**.
+	Protocol *string `json:"Protocol,omitempty" xml:"Protocol,omitempty"`
+	// The ID of the region where the NLB instance is deployed.
+	RegionId *string `json:"RegionId,omitempty" xml:"RegionId,omitempty"`
+	// The NLB instances.
+	RelatedLoadBalancerIds []*string `json:"RelatedLoadBalancerIds,omitempty" xml:"RelatedLoadBalancerIds,omitempty" type:"Repeated"`
+	// The ID of the resource group to which the server group belongs.
+	ResourceGroupId *string `json:"ResourceGroupId,omitempty" xml:"ResourceGroupId,omitempty"`
+	// The scheduling algorithm. Valid values:
+	//
+	// *   **Wrr**: Backend servers with higher weights receive more requests than backend servers with lower weights.
+	// *   **rr**: Requests are forwarded to the backend servers in sequence. sch: Requests are forwarded to the backend servers based on source IP address hashing.
+	// *   **sch**: Requests from the same source IP address are forwarded to the same backend server.
+	// *   **tch**: Four-element hashing, which specifies consistent hashing that is based on four factors: source IP address, destination IP address, source port, and destination port. Requests that contain the same information based on the four factors are forwarded to the same backend server.
+	// *   **qch**: QUIC ID hashing. Requests that contain the same QUIC ID are forwarded to the same backend server.
+	Scheduler *string `json:"Scheduler,omitempty" xml:"Scheduler,omitempty"`
+	// The number of server groups associated with the NLB instances.
+	ServerCount *int32 `json:"ServerCount,omitempty" xml:"ServerCount,omitempty"`
+	// The ID of the server group.
+	ServerGroupId *string `json:"ServerGroupId,omitempty" xml:"ServerGroupId,omitempty"`
+	// The name of the server group.
+	ServerGroupName *string `json:"ServerGroupName,omitempty" xml:"ServerGroupName,omitempty"`
+	// The status of the server group. Valid values:
+	//
+	// *   **Creating**: The server group is being created.
+	// *   **Available**: The server group is available.
+	// *   **Configuring**: The server group is being configured.
+	ServerGroupStatus *string `json:"ServerGroupStatus,omitempty" xml:"ServerGroupStatus,omitempty"`
+	// The type of server group. Valid values:
+	//
+	// *   **Instance** : allows you to add servers of the **Ecs**, **Ens**, and **Eci** types.
+	// *   **Ip**: allows you to add servers by specifying IP addresses.
+	ServerGroupType *string `json:"ServerGroupType,omitempty" xml:"ServerGroupType,omitempty"`
+	// The tags that are added to the NLB instance.
+	Tags []*ListServerGroupsResponseBodyServerGroupsTags `json:"Tags,omitempty" xml:"Tags,omitempty" type:"Repeated"`
+	// The ID of the VPC to which the server group belongs.
+	VpcId *string `json:"VpcId,omitempty" xml:"VpcId,omitempty"`
 }
 
 func (s ListServerGroupsResponseBodyServerGroups) String() string {
@@ -4368,17 +5690,56 @@ func (s *ListServerGroupsResponseBodyServerGroups) SetVpcId(v string) *ListServe
 }
 
 type ListServerGroupsResponseBodyServerGroupsHealthCheck struct {
-	HealthCheckConnectPort    *int32    `json:"HealthCheckConnectPort,omitempty" xml:"HealthCheckConnectPort,omitempty"`
-	HealthCheckConnectTimeout *int32    `json:"HealthCheckConnectTimeout,omitempty" xml:"HealthCheckConnectTimeout,omitempty"`
-	HealthCheckDomain         *string   `json:"HealthCheckDomain,omitempty" xml:"HealthCheckDomain,omitempty"`
-	HealthCheckEnabled        *bool     `json:"HealthCheckEnabled,omitempty" xml:"HealthCheckEnabled,omitempty"`
-	HealthCheckHttpCode       []*string `json:"HealthCheckHttpCode,omitempty" xml:"HealthCheckHttpCode,omitempty" type:"Repeated"`
-	HealthCheckInterval       *int32    `json:"HealthCheckInterval,omitempty" xml:"HealthCheckInterval,omitempty"`
-	HealthCheckType           *string   `json:"HealthCheckType,omitempty" xml:"HealthCheckType,omitempty"`
-	HealthCheckUrl            *string   `json:"HealthCheckUrl,omitempty" xml:"HealthCheckUrl,omitempty"`
-	HealthyThreshold          *int32    `json:"HealthyThreshold,omitempty" xml:"HealthyThreshold,omitempty"`
-	HttpCheckMethod           *string   `json:"HttpCheckMethod,omitempty" xml:"HttpCheckMethod,omitempty"`
-	UnhealthyThreshold        *int32    `json:"UnhealthyThreshold,omitempty" xml:"UnhealthyThreshold,omitempty"`
+	// The backend port that is used for health checks.
+	//
+	// Valid values: **0** to **65535**.
+	//
+	// A value of **0** indicates that the port on a backend server is used for health checks.
+	HealthCheckConnectPort *int32 `json:"HealthCheckConnectPort,omitempty" xml:"HealthCheckConnectPort,omitempty"`
+	// The maximum timeout period of a health check. Unit: seconds.
+	//
+	// Valid values: **1** to **300**.
+	HealthCheckConnectTimeout *int32 `json:"HealthCheckConnectTimeout,omitempty" xml:"HealthCheckConnectTimeout,omitempty"`
+	// The domain name that is used for health checks. Valid values:
+	//
+	// *   **$SERVER_IP**: the private IP address of a backend server.
+	// *   **domain**: a specified domain name. The domain name must be 1 to 80 characters in length, and can contain lowercase letters, digits, hyphens (-), and periods (.).
+	//
+	// >  This parameter takes effect only if **HealthCheckType** is set to **HTTP**.
+	HealthCheckDomain *string `json:"HealthCheckDomain,omitempty" xml:"HealthCheckDomain,omitempty"`
+	// Indicates whether the health check feature is enabled. Valid values:
+	//
+	// *   **true**: enabled
+	// *   **false**: disabled
+	HealthCheckEnabled *bool `json:"HealthCheckEnabled,omitempty" xml:"HealthCheckEnabled,omitempty"`
+	// The HTTP status codes returned for health checks. Multiple HTTP status codes are separated by commas (,).
+	//
+	// Valid values: **http\_2xx**, **http\_3xx**, **http\_4xx**, and **http\_5xx**.
+	//
+	// >  This parameter takes effect only if **HealthCheckType** is set to **HTTP**.
+	HealthCheckHttpCode []*string `json:"HealthCheckHttpCode,omitempty" xml:"HealthCheckHttpCode,omitempty" type:"Repeated"`
+	// The interval between two consecutive health checks. Unit: seconds.
+	//
+	// Valid values: **5** to **50**.
+	HealthCheckInterval *int32 `json:"HealthCheckInterval,omitempty" xml:"HealthCheckInterval,omitempty"`
+	// The protocol that is used for health checks. Valid values: **TCP** and **HTTP**.
+	HealthCheckType *string `json:"HealthCheckType,omitempty" xml:"HealthCheckType,omitempty"`
+	// The path to which health check requests are sent.
+	//
+	// >  This parameter takes effect only if **HealthCheckType** is set to **HTTP**.
+	HealthCheckUrl *string `json:"HealthCheckUrl,omitempty" xml:"HealthCheckUrl,omitempty"`
+	// The number of times that an unhealthy backend server must consecutively pass health checks before it is declared healthy. In this case, the health status is changed from **fail** to **success**.
+	//
+	// Valid values: **2** to **10**.
+	HealthyThreshold *int32 `json:"HealthyThreshold,omitempty" xml:"HealthyThreshold,omitempty"`
+	// The HTTP method that is used for health checks. Valid values: **GET** and **HEAD**.
+	//
+	// >  This parameter takes effect only if **HealthCheckType** is set to **HTTP**.
+	HttpCheckMethod *string `json:"HttpCheckMethod,omitempty" xml:"HttpCheckMethod,omitempty"`
+	// The number of times that a healthy backend server must consecutively fail health checks before it is declared unhealthy. In this case, the health status is changed from **success** to **fail**.
+	//
+	// Valid values: **2** to **10**.
+	UnhealthyThreshold *int32 `json:"UnhealthyThreshold,omitempty" xml:"UnhealthyThreshold,omitempty"`
 }
 
 func (s ListServerGroupsResponseBodyServerGroupsHealthCheck) String() string {
@@ -4445,7 +5806,13 @@ func (s *ListServerGroupsResponseBodyServerGroupsHealthCheck) SetUnhealthyThresh
 }
 
 type ListServerGroupsResponseBodyServerGroupsTags struct {
-	Key   *string `json:"Key,omitempty" xml:"Key,omitempty"`
+	// The tag key. At most 10 tag keys are returned.
+	//
+	// The tag key can be up to 64 characters in length, and cannot contain `http://` or `https://`. It cannot start with `aliyun` or `acs:`.
+	Key *string `json:"Key,omitempty" xml:"Key,omitempty"`
+	// The tag value. At most 10 tag values are returned.
+	//
+	// The tag value can be up to 128 characters in length, and cannot contain `http://` or `https://`. It cannot start with `aliyun` or `acs:`.
 	Value *string `json:"Value,omitempty" xml:"Value,omitempty"`
 }
 
@@ -4497,14 +5864,7 @@ func (s *ListServerGroupsResponse) SetBody(v *ListServerGroupsResponseBody) *Lis
 }
 
 type ListSystemSecurityPolicyRequest struct {
-	CallerBidLoginEmail  *string `json:"CallerBidLoginEmail,omitempty" xml:"CallerBidLoginEmail,omitempty"`
-	CallerUidLoginEmail  *string `json:"CallerUidLoginEmail,omitempty" xml:"CallerUidLoginEmail,omitempty"`
-	Channel              *string `json:"Channel,omitempty" xml:"Channel,omitempty"`
-	OwnerAccount         *string `json:"OwnerAccount,omitempty" xml:"OwnerAccount,omitempty"`
-	OwnerIdLoginEmail    *string `json:"OwnerIdLoginEmail,omitempty" xml:"OwnerIdLoginEmail,omitempty"`
-	RegionId             *string `json:"RegionId,omitempty" xml:"RegionId,omitempty"`
-	RequestContent       *string `json:"RequestContent,omitempty" xml:"RequestContent,omitempty"`
-	ResourceOwnerAccount *string `json:"ResourceOwnerAccount,omitempty" xml:"ResourceOwnerAccount,omitempty"`
+	RegionId *string `json:"RegionId,omitempty" xml:"RegionId,omitempty"`
 }
 
 func (s ListSystemSecurityPolicyRequest) String() string {
@@ -4515,43 +5875,8 @@ func (s ListSystemSecurityPolicyRequest) GoString() string {
 	return s.String()
 }
 
-func (s *ListSystemSecurityPolicyRequest) SetCallerBidLoginEmail(v string) *ListSystemSecurityPolicyRequest {
-	s.CallerBidLoginEmail = &v
-	return s
-}
-
-func (s *ListSystemSecurityPolicyRequest) SetCallerUidLoginEmail(v string) *ListSystemSecurityPolicyRequest {
-	s.CallerUidLoginEmail = &v
-	return s
-}
-
-func (s *ListSystemSecurityPolicyRequest) SetChannel(v string) *ListSystemSecurityPolicyRequest {
-	s.Channel = &v
-	return s
-}
-
-func (s *ListSystemSecurityPolicyRequest) SetOwnerAccount(v string) *ListSystemSecurityPolicyRequest {
-	s.OwnerAccount = &v
-	return s
-}
-
-func (s *ListSystemSecurityPolicyRequest) SetOwnerIdLoginEmail(v string) *ListSystemSecurityPolicyRequest {
-	s.OwnerIdLoginEmail = &v
-	return s
-}
-
 func (s *ListSystemSecurityPolicyRequest) SetRegionId(v string) *ListSystemSecurityPolicyRequest {
 	s.RegionId = &v
-	return s
-}
-
-func (s *ListSystemSecurityPolicyRequest) SetRequestContent(v string) *ListSystemSecurityPolicyRequest {
-	s.RequestContent = &v
-	return s
-}
-
-func (s *ListSystemSecurityPolicyRequest) SetResourceOwnerAccount(v string) *ListSystemSecurityPolicyRequest {
-	s.ResourceOwnerAccount = &v
 	return s
 }
 
@@ -4645,8 +5970,6 @@ func (s *ListSystemSecurityPolicyResponse) SetBody(v *ListSystemSecurityPolicyRe
 type ListTagResourcesRequest struct {
 	MaxResults   *int32                        `json:"MaxResults,omitempty" xml:"MaxResults,omitempty"`
 	NextToken    *string                       `json:"NextToken,omitempty" xml:"NextToken,omitempty"`
-	Page         *int32                        `json:"Page,omitempty" xml:"Page,omitempty"`
-	PageSize     *int32                        `json:"PageSize,omitempty" xml:"PageSize,omitempty"`
 	RegionId     *string                       `json:"RegionId,omitempty" xml:"RegionId,omitempty"`
 	ResourceId   []*string                     `json:"ResourceId,omitempty" xml:"ResourceId,omitempty" type:"Repeated"`
 	ResourceType *string                       `json:"ResourceType,omitempty" xml:"ResourceType,omitempty"`
@@ -4668,16 +5991,6 @@ func (s *ListTagResourcesRequest) SetMaxResults(v int32) *ListTagResourcesReques
 
 func (s *ListTagResourcesRequest) SetNextToken(v string) *ListTagResourcesRequest {
 	s.NextToken = &v
-	return s
-}
-
-func (s *ListTagResourcesRequest) SetPage(v int32) *ListTagResourcesRequest {
-	s.Page = &v
-	return s
-}
-
-func (s *ListTagResourcesRequest) SetPageSize(v int32) *ListTagResourcesRequest {
-	s.PageSize = &v
 	return s
 }
 
@@ -4854,9 +6167,22 @@ func (s *ListTagResourcesResponse) SetBody(v *ListTagResourcesResponseBody) *Lis
 }
 
 type LoadBalancerJoinSecurityGroupRequest struct {
-	ClientToken      *string   `json:"ClientToken,omitempty" xml:"ClientToken,omitempty"`
-	DryRun           *bool     `json:"DryRun,omitempty" xml:"DryRun,omitempty"`
-	LoadBalancerId   *string   `json:"LoadBalancerId,omitempty" xml:"LoadBalancerId,omitempty"`
+	// The client token that is used to ensure the idempotence of the request.
+	//
+	// You can use the client to generate the value, but you must make sure that the value is unique among different requests. The client token can contain only ASCII characters.
+	//
+	// >  If you do not set this parameter, the system automatically uses the value of **RequestId** as the value of **ClientToken**. The value of **RequestId** may be different for each API request.
+	ClientToken *string `json:"ClientToken,omitempty" xml:"ClientToken,omitempty"`
+	// Specifies whether to check the request without performing the operation. Valid values:
+	//
+	// *   **true**: checks the request without performing the operation. The system checks the required parameters, request syntax, and limits. If the request fails the check, an error code is returned based on the cause of the failure. If the request passes the check, the `DryRunOperation` error code is returned.
+	// *   **false** (default): sends the request. If the request passes the check, an HTTP 2xx status code is returned and the operation is performed.
+	DryRun *bool `json:"DryRun,omitempty" xml:"DryRun,omitempty"`
+	// The ID of the NLB instance to be associated with the security group.
+	LoadBalancerId *string `json:"LoadBalancerId,omitempty" xml:"LoadBalancerId,omitempty"`
+	// The ID of the region where the NLB instance is deployed.
+	//
+	// You can call the [DescribeRegions](~~443657~~) operation to query the most recent region list.
 	RegionId         *string   `json:"RegionId,omitempty" xml:"RegionId,omitempty"`
 	SecurityGroupIds []*string `json:"SecurityGroupIds,omitempty" xml:"SecurityGroupIds,omitempty" type:"Repeated"`
 }
@@ -4895,7 +6221,9 @@ func (s *LoadBalancerJoinSecurityGroupRequest) SetSecurityGroupIds(v []*string) 
 }
 
 type LoadBalancerJoinSecurityGroupResponseBody struct {
-	JobId     *string `json:"JobId,omitempty" xml:"JobId,omitempty"`
+	// The ID of the asynchronous task.
+	JobId *string `json:"JobId,omitempty" xml:"JobId,omitempty"`
+	// The ID of the request.
 	RequestId *string `json:"RequestId,omitempty" xml:"RequestId,omitempty"`
 }
 
@@ -4947,9 +6275,22 @@ func (s *LoadBalancerJoinSecurityGroupResponse) SetBody(v *LoadBalancerJoinSecur
 }
 
 type LoadBalancerLeaveSecurityGroupRequest struct {
-	ClientToken      *string   `json:"ClientToken,omitempty" xml:"ClientToken,omitempty"`
-	DryRun           *bool     `json:"DryRun,omitempty" xml:"DryRun,omitempty"`
-	LoadBalancerId   *string   `json:"LoadBalancerId,omitempty" xml:"LoadBalancerId,omitempty"`
+	// The client token that is used to ensure the idempotence of the request.
+	//
+	// You can use the client to generate the value, but you must make sure that the value is unique among different requests. The client token can contain only ASCII characters.
+	//
+	// >  If you do not set this parameter, the system automatically uses the value of **RequestId** as the value of **ClientToken**. The value of **RequestId** may be different for each API request.
+	ClientToken *string `json:"ClientToken,omitempty" xml:"ClientToken,omitempty"`
+	// Specifies whether to check the request without performing the operation. Valid values:
+	//
+	// *   **true**: checks the request without performing the operation. The system checks the required parameters, request syntax, and limits. If the request fails the check, an error code is returned based on the cause of the failure. If the request passes the check, the `DryRunOperation` error code is returned.
+	// *   **false** (default): sends the request. If the request passes the check, an HTTP 2xx status code is returned and the operation is performed.
+	DryRun *bool `json:"DryRun,omitempty" xml:"DryRun,omitempty"`
+	// The ID of the NLB instance.
+	LoadBalancerId *string `json:"LoadBalancerId,omitempty" xml:"LoadBalancerId,omitempty"`
+	// The ID of the region where the NLB instance is deployed.
+	//
+	// You can call the [DescribeRegions](~~443657~~) operation to query the most recent region list.
 	RegionId         *string   `json:"RegionId,omitempty" xml:"RegionId,omitempty"`
 	SecurityGroupIds []*string `json:"SecurityGroupIds,omitempty" xml:"SecurityGroupIds,omitempty" type:"Repeated"`
 }
@@ -4988,7 +6329,9 @@ func (s *LoadBalancerLeaveSecurityGroupRequest) SetSecurityGroupIds(v []*string)
 }
 
 type LoadBalancerLeaveSecurityGroupResponseBody struct {
-	JobId     *string `json:"JobId,omitempty" xml:"JobId,omitempty"`
+	// The ID of the asynchronous task.
+	JobId *string `json:"JobId,omitempty" xml:"JobId,omitempty"`
+	// The ID of the request.
 	RequestId *string `json:"RequestId,omitempty" xml:"RequestId,omitempty"`
 }
 
@@ -5039,10 +6382,139 @@ func (s *LoadBalancerLeaveSecurityGroupResponse) SetBody(v *LoadBalancerLeaveSec
 	return s
 }
 
+type MoveResourceGroupRequest struct {
+	NewResourceGroupId *string `json:"NewResourceGroupId,omitempty" xml:"NewResourceGroupId,omitempty"`
+	RegionId           *string `json:"RegionId,omitempty" xml:"RegionId,omitempty"`
+	ResourceId         *string `json:"ResourceId,omitempty" xml:"ResourceId,omitempty"`
+	ResourceType       *string `json:"ResourceType,omitempty" xml:"ResourceType,omitempty"`
+}
+
+func (s MoveResourceGroupRequest) String() string {
+	return tea.Prettify(s)
+}
+
+func (s MoveResourceGroupRequest) GoString() string {
+	return s.String()
+}
+
+func (s *MoveResourceGroupRequest) SetNewResourceGroupId(v string) *MoveResourceGroupRequest {
+	s.NewResourceGroupId = &v
+	return s
+}
+
+func (s *MoveResourceGroupRequest) SetRegionId(v string) *MoveResourceGroupRequest {
+	s.RegionId = &v
+	return s
+}
+
+func (s *MoveResourceGroupRequest) SetResourceId(v string) *MoveResourceGroupRequest {
+	s.ResourceId = &v
+	return s
+}
+
+func (s *MoveResourceGroupRequest) SetResourceType(v string) *MoveResourceGroupRequest {
+	s.ResourceType = &v
+	return s
+}
+
+type MoveResourceGroupResponseBody struct {
+	Data           *MoveResourceGroupResponseBodyData `json:"Data,omitempty" xml:"Data,omitempty" type:"Struct"`
+	HttpStatusCode *int32                             `json:"HttpStatusCode,omitempty" xml:"HttpStatusCode,omitempty"`
+	RequestId      *string                            `json:"RequestId,omitempty" xml:"RequestId,omitempty"`
+	Success        *bool                              `json:"Success,omitempty" xml:"Success,omitempty"`
+}
+
+func (s MoveResourceGroupResponseBody) String() string {
+	return tea.Prettify(s)
+}
+
+func (s MoveResourceGroupResponseBody) GoString() string {
+	return s.String()
+}
+
+func (s *MoveResourceGroupResponseBody) SetData(v *MoveResourceGroupResponseBodyData) *MoveResourceGroupResponseBody {
+	s.Data = v
+	return s
+}
+
+func (s *MoveResourceGroupResponseBody) SetHttpStatusCode(v int32) *MoveResourceGroupResponseBody {
+	s.HttpStatusCode = &v
+	return s
+}
+
+func (s *MoveResourceGroupResponseBody) SetRequestId(v string) *MoveResourceGroupResponseBody {
+	s.RequestId = &v
+	return s
+}
+
+func (s *MoveResourceGroupResponseBody) SetSuccess(v bool) *MoveResourceGroupResponseBody {
+	s.Success = &v
+	return s
+}
+
+type MoveResourceGroupResponseBodyData struct {
+	ResourceId *string `json:"ResourceId,omitempty" xml:"ResourceId,omitempty"`
+}
+
+func (s MoveResourceGroupResponseBodyData) String() string {
+	return tea.Prettify(s)
+}
+
+func (s MoveResourceGroupResponseBodyData) GoString() string {
+	return s.String()
+}
+
+func (s *MoveResourceGroupResponseBodyData) SetResourceId(v string) *MoveResourceGroupResponseBodyData {
+	s.ResourceId = &v
+	return s
+}
+
+type MoveResourceGroupResponse struct {
+	Headers    map[string]*string             `json:"headers,omitempty" xml:"headers,omitempty" require:"true"`
+	StatusCode *int32                         `json:"statusCode,omitempty" xml:"statusCode,omitempty" require:"true"`
+	Body       *MoveResourceGroupResponseBody `json:"body,omitempty" xml:"body,omitempty" require:"true"`
+}
+
+func (s MoveResourceGroupResponse) String() string {
+	return tea.Prettify(s)
+}
+
+func (s MoveResourceGroupResponse) GoString() string {
+	return s.String()
+}
+
+func (s *MoveResourceGroupResponse) SetHeaders(v map[string]*string) *MoveResourceGroupResponse {
+	s.Headers = v
+	return s
+}
+
+func (s *MoveResourceGroupResponse) SetStatusCode(v int32) *MoveResourceGroupResponse {
+	s.StatusCode = &v
+	return s
+}
+
+func (s *MoveResourceGroupResponse) SetBody(v *MoveResourceGroupResponseBody) *MoveResourceGroupResponse {
+	s.Body = v
+	return s
+}
+
 type RemoveServersFromServerGroupRequest struct {
-	ClientToken   *string                                       `json:"ClientToken,omitempty" xml:"ClientToken,omitempty"`
-	DryRun        *bool                                         `json:"DryRun,omitempty" xml:"DryRun,omitempty"`
-	RegionId      *string                                       `json:"RegionId,omitempty" xml:"RegionId,omitempty"`
+	// The client token that is used to ensure the idempotence of the request.
+	//
+	// You can use the client to generate the value, but you must ensure that it is unique among all requests. ClientToken can contain only ASCII characters.
+	//
+	// >  If you do not set this parameter, **ClientToken** is set to the value of **RequestId**. The value of **RequestId** of each API request may be different.
+	ClientToken *string `json:"ClientToken,omitempty" xml:"ClientToken,omitempty"`
+	// Specifies whether only to precheck the request. Valid values:
+	//
+	// *   **true**: prechecks the request but does not remove the backend servers. The system prechecks the required parameters, request syntax, and limits. If the request fails the precheck, an error message is returned. If the request passes the precheck, the `DryRunOperation` error code is returned.
+	// *   **false** (default): sends the request. If the request passes the precheck, an HTTP 2xx status code is returned and the operation is performed.
+	DryRun *bool `json:"DryRun,omitempty" xml:"DryRun,omitempty"`
+	// The ID of the region where the NLB instance is deployed.
+	//
+	// You can call the [DescribeRegions](~~443657~~) operation to query the most recent region list.
+	RegionId *string `json:"RegionId,omitempty" xml:"RegionId,omitempty"`
+	// The ID of the server group.
 	ServerGroupId *string                                       `json:"ServerGroupId,omitempty" xml:"ServerGroupId,omitempty"`
 	Servers       []*RemoveServersFromServerGroupRequestServers `json:"Servers,omitempty" xml:"Servers,omitempty" type:"Repeated"`
 }
@@ -5081,9 +6553,21 @@ func (s *RemoveServersFromServerGroupRequest) SetServers(v []*RemoveServersFromS
 }
 
 type RemoveServersFromServerGroupRequestServers struct {
-	Port       *int32  `json:"Port,omitempty" xml:"Port,omitempty"`
-	ServerId   *string `json:"ServerId,omitempty" xml:"ServerId,omitempty"`
-	ServerIp   *string `json:"ServerIp,omitempty" xml:"ServerIp,omitempty"`
+	// The port used by the backend server. Valid values: **1** to **65535**.
+	Port *int32 `json:"Port,omitempty" xml:"Port,omitempty"`
+	// The ID of the server.
+	//
+	// *   If the server group type is **Instance**, set the ServerId parameter to the ID of an Elastic Compute Service (ECS) instance, an elastic network interface (ENI), or an elastic container instance. These backend servers are specified by **Ecs**, **Eni**, or **Eci**.
+	// *   If the server group type is **Ip**, set the ServerId parameter to an IP address.
+	ServerId *string `json:"ServerId,omitempty" xml:"ServerId,omitempty"`
+	// The IP address of the server. If the server group type is **Ip**, set the ServerId parameter to an IP address.
+	ServerIp *string `json:"ServerIp,omitempty" xml:"ServerIp,omitempty"`
+	// The type of the backend server. Valid values:
+	//
+	// *   **Ecs**: an ECS instance
+	// *   **Eni**: an ENI
+	// *   **Eci**: an elastic container instance
+	// *   **Ip**: an IP address
 	ServerType *string `json:"ServerType,omitempty" xml:"ServerType,omitempty"`
 }
 
@@ -5116,8 +6600,11 @@ func (s *RemoveServersFromServerGroupRequestServers) SetServerType(v string) *Re
 }
 
 type RemoveServersFromServerGroupResponseBody struct {
-	JobId         *string `json:"JobId,omitempty" xml:"JobId,omitempty"`
-	RequestId     *string `json:"RequestId,omitempty" xml:"RequestId,omitempty"`
+	// The ID of the asynchronous task.
+	JobId *string `json:"JobId,omitempty" xml:"JobId,omitempty"`
+	// The ID of the request.
+	RequestId *string `json:"RequestId,omitempty" xml:"RequestId,omitempty"`
+	// The ID of the server group.
 	ServerGroupId *string `json:"ServerGroupId,omitempty" xml:"ServerGroupId,omitempty"`
 }
 
@@ -5174,10 +6661,23 @@ func (s *RemoveServersFromServerGroupResponse) SetBody(v *RemoveServersFromServe
 }
 
 type StartListenerRequest struct {
+	// The client token that is used to ensure the idempotence of the request.
+	//
+	// You can use the client to generate the value, but you must ensure that it is unique among all requests. ClientToken can contain only ASCII characters.
+	//
+	// >  If you do not set this parameter, **ClientToken** is set to the value of **RequestId**. The value of **RequestId** for each API request may be different.
 	ClientToken *string `json:"ClientToken,omitempty" xml:"ClientToken,omitempty"`
-	DryRun      *bool   `json:"DryRun,omitempty" xml:"DryRun,omitempty"`
-	ListenerId  *string `json:"ListenerId,omitempty" xml:"ListenerId,omitempty"`
-	RegionId    *string `json:"RegionId,omitempty" xml:"RegionId,omitempty"`
+	// Specifies whether only to precheck the request. Valid values:
+	//
+	// *   **true**: prechecks the request but does not enable the listener. The system prechecks the required parameters, request syntax, and limits. If the request fails the precheck, an error message is returned. If the request passes the precheck, the `DryRunOperation` error code is returned.
+	// *   **false** (default): sends the request. If the request passes the precheck, an HTTP 2xx status code is returned and the operation is performed.
+	DryRun *bool `json:"DryRun,omitempty" xml:"DryRun,omitempty"`
+	// The ID of the listener.
+	ListenerId *string `json:"ListenerId,omitempty" xml:"ListenerId,omitempty"`
+	// The ID of the region where the NLB instance is deployed.
+	//
+	// You can call the [DescribeRegions](~~443657~~) operation to query the most recent region list.
+	RegionId *string `json:"RegionId,omitempty" xml:"RegionId,omitempty"`
 }
 
 func (s StartListenerRequest) String() string {
@@ -5209,7 +6709,9 @@ func (s *StartListenerRequest) SetRegionId(v string) *StartListenerRequest {
 }
 
 type StartListenerResponseBody struct {
-	JobId     *string `json:"JobId,omitempty" xml:"JobId,omitempty"`
+	// The ID of the asynchronous task.
+	JobId *string `json:"JobId,omitempty" xml:"JobId,omitempty"`
+	// The ID of the request.
 	RequestId *string `json:"RequestId,omitempty" xml:"RequestId,omitempty"`
 }
 
@@ -5261,10 +6763,23 @@ func (s *StartListenerResponse) SetBody(v *StartListenerResponseBody) *StartList
 }
 
 type StopListenerRequest struct {
+	// The client token that is used to ensure the idempotence of the request.
+	//
+	// You can use the client to generate the value, but you must make sure that it is unique among different requests. The token can only contain ASCII characters.
+	//
+	// >  If you do not set this parameter, the system automatically uses the value of **RequestId** as the value of **ClientToken**. **RequestId** of each API request may be different.
 	ClientToken *string `json:"ClientToken,omitempty" xml:"ClientToken,omitempty"`
-	DryRun      *bool   `json:"DryRun,omitempty" xml:"DryRun,omitempty"`
-	ListenerId  *string `json:"ListenerId,omitempty" xml:"ListenerId,omitempty"`
-	RegionId    *string `json:"RegionId,omitempty" xml:"RegionId,omitempty"`
+	// Specifies whether to perform a dry run. Valid values:
+	//
+	// *   **true**: performs a dry run. The system checks the required parameters, request syntax, and limits. If the request fails the dry run, an error message is returned. If the request passes the dry run, the `DryRunOperation` error code is returned.
+	// *   **false** (default): performs a dry run and sends the request. If the request passes the dry run, a 2xx HTTP status code is returned and the operation is performed.
+	DryRun *bool `json:"DryRun,omitempty" xml:"DryRun,omitempty"`
+	// The ID of the listener.
+	ListenerId *string `json:"ListenerId,omitempty" xml:"ListenerId,omitempty"`
+	// The ID of the region where the NLB instance is deployed.
+	//
+	// You can call the [DescribeRegions](~~443657~~) operation to query the most recent region list.
+	RegionId *string `json:"RegionId,omitempty" xml:"RegionId,omitempty"`
 }
 
 func (s StopListenerRequest) String() string {
@@ -5296,7 +6811,9 @@ func (s *StopListenerRequest) SetRegionId(v string) *StopListenerRequest {
 }
 
 type StopListenerResponseBody struct {
-	JobId     *string `json:"JobId,omitempty" xml:"JobId,omitempty"`
+	// The ID of the asynchronous task.
+	JobId *string `json:"JobId,omitempty" xml:"JobId,omitempty"`
+	// The ID of the request.
 	RequestId *string `json:"RequestId,omitempty" xml:"RequestId,omitempty"`
 }
 
@@ -5348,12 +6865,31 @@ func (s *StopListenerResponse) SetBody(v *StopListenerResponseBody) *StopListene
 }
 
 type TagResourcesRequest struct {
-	ClientToken  *string                   `json:"ClientToken,omitempty" xml:"ClientToken,omitempty"`
-	DryRun       *bool                     `json:"DryRun,omitempty" xml:"DryRun,omitempty"`
-	RegionId     *string                   `json:"RegionId,omitempty" xml:"RegionId,omitempty"`
-	ResourceId   []*string                 `json:"ResourceId,omitempty" xml:"ResourceId,omitempty" type:"Repeated"`
-	ResourceType *string                   `json:"ResourceType,omitempty" xml:"ResourceType,omitempty"`
-	Tag          []*TagResourcesRequestTag `json:"Tag,omitempty" xml:"Tag,omitempty" type:"Repeated"`
+	// The client token that is used to ensure the idempotence of the request.
+	//
+	// You can use the client to generate the value, but you must make sure that it is unique among different requests. The client token can contain only ASCII characters.
+	//
+	// >  If you do not set this parameter, the system automatically uses the value of **RequestId** as the value of **ClientToken**. The value of **RequestId** is different for each API request.
+	ClientToken *string `json:"ClientToken,omitempty" xml:"ClientToken,omitempty"`
+	// Specifies whether to perform a dry run. Valid values:
+	//
+	// *   **true**: performs a dry run. The system checks the required parameters, request syntax, and limits. If the request fails the dry run, an error message is returned. If the request passes the dry run, the `DryRunOperation` error code is returned.
+	// *   **false**: performs a dry run and sends the request. If the request passes the dry run, a 2xx HTTP status code is returned and the operation is performed. This is the default value.
+	DryRun *bool `json:"DryRun,omitempty" xml:"DryRun,omitempty"`
+	// The region ID of the resource.
+	//
+	// You can call the [DescribeRegions](~~443657~~) operation to query the most recent region list.
+	RegionId *string `json:"RegionId,omitempty" xml:"RegionId,omitempty"`
+	// The ID of the resource. You can specify up to 50 resource IDs in each call.
+	ResourceId []*string `json:"ResourceId,omitempty" xml:"ResourceId,omitempty" type:"Repeated"`
+	// The type of the resource. Valid values:
+	//
+	// *   **loadbalancer**: a Network Load Balancer (NLB) instance
+	// *   **securitypolicy**: a security policy
+	// *   **servergroup**: a server group
+	ResourceType *string `json:"ResourceType,omitempty" xml:"ResourceType,omitempty"`
+	// The tags.
+	Tag []*TagResourcesRequestTag `json:"Tag,omitempty" xml:"Tag,omitempty" type:"Repeated"`
 }
 
 func (s TagResourcesRequest) String() string {
@@ -5395,7 +6931,13 @@ func (s *TagResourcesRequest) SetTag(v []*TagResourcesRequestTag) *TagResourcesR
 }
 
 type TagResourcesRequestTag struct {
-	Key   *string `json:"Key,omitempty" xml:"Key,omitempty"`
+	// The tag key. The tag key can be up to 128 characters in length and cannot start with `acs:` or `aliyun`. It cannot contain `http://` or `https://`.
+	//
+	// You can add up to 20 tags in each call.
+	Key *string `json:"Key,omitempty" xml:"Key,omitempty"`
+	// The tag value. The tag value can be up to 128 characters in length and cannot start with `acs:` or `aliyun`. It cannot contain `http://` or `https://`.
+	//
+	// You can add up to 20 tags in each call.
 	Value *string `json:"Value,omitempty" xml:"Value,omitempty"`
 }
 
@@ -5418,14 +6960,10 @@ func (s *TagResourcesRequestTag) SetValue(v string) *TagResourcesRequestTag {
 }
 
 type TagResourcesResponseBody struct {
-	Code           *string `json:"Code,omitempty" xml:"Code,omitempty"`
-	DynamicCode    *string `json:"DynamicCode,omitempty" xml:"DynamicCode,omitempty"`
-	DynamicMessage *string `json:"DynamicMessage,omitempty" xml:"DynamicMessage,omitempty"`
-	HttpStatusCode *int32  `json:"HttpStatusCode,omitempty" xml:"HttpStatusCode,omitempty"`
-	JobId          *string `json:"JobId,omitempty" xml:"JobId,omitempty"`
-	Message        *string `json:"Message,omitempty" xml:"Message,omitempty"`
-	RequestId      *string `json:"RequestId,omitempty" xml:"RequestId,omitempty"`
-	Success        *bool   `json:"Success,omitempty" xml:"Success,omitempty"`
+	// The ID of the asynchronous task.
+	JobId *string `json:"JobId,omitempty" xml:"JobId,omitempty"`
+	// The ID of the request.
+	RequestId *string `json:"RequestId,omitempty" xml:"RequestId,omitempty"`
 }
 
 func (s TagResourcesResponseBody) String() string {
@@ -5436,43 +6974,13 @@ func (s TagResourcesResponseBody) GoString() string {
 	return s.String()
 }
 
-func (s *TagResourcesResponseBody) SetCode(v string) *TagResourcesResponseBody {
-	s.Code = &v
-	return s
-}
-
-func (s *TagResourcesResponseBody) SetDynamicCode(v string) *TagResourcesResponseBody {
-	s.DynamicCode = &v
-	return s
-}
-
-func (s *TagResourcesResponseBody) SetDynamicMessage(v string) *TagResourcesResponseBody {
-	s.DynamicMessage = &v
-	return s
-}
-
-func (s *TagResourcesResponseBody) SetHttpStatusCode(v int32) *TagResourcesResponseBody {
-	s.HttpStatusCode = &v
-	return s
-}
-
 func (s *TagResourcesResponseBody) SetJobId(v string) *TagResourcesResponseBody {
 	s.JobId = &v
 	return s
 }
 
-func (s *TagResourcesResponseBody) SetMessage(v string) *TagResourcesResponseBody {
-	s.Message = &v
-	return s
-}
-
 func (s *TagResourcesResponseBody) SetRequestId(v string) *TagResourcesResponseBody {
 	s.RequestId = &v
-	return s
-}
-
-func (s *TagResourcesResponseBody) SetSuccess(v bool) *TagResourcesResponseBody {
-	s.Success = &v
 	return s
 }
 
@@ -5506,13 +7014,36 @@ func (s *TagResourcesResponse) SetBody(v *TagResourcesResponseBody) *TagResource
 }
 
 type UntagResourcesRequest struct {
-	All          *bool     `json:"All,omitempty" xml:"All,omitempty"`
-	ClientToken  *string   `json:"ClientToken,omitempty" xml:"ClientToken,omitempty"`
-	DryRun       *bool     `json:"DryRun,omitempty" xml:"DryRun,omitempty"`
-	RegionId     *string   `json:"RegionId,omitempty" xml:"RegionId,omitempty"`
-	ResourceId   []*string `json:"ResourceId,omitempty" xml:"ResourceId,omitempty" type:"Repeated"`
-	ResourceType *string   `json:"ResourceType,omitempty" xml:"ResourceType,omitempty"`
-	TagKey       []*string `json:"TagKey,omitempty" xml:"TagKey,omitempty" type:"Repeated"`
+	// Specifies whether to remove all tags from the specified resource. Valid values:
+	//
+	// *   **true**: removes all tags from the specified resource.
+	// *   **false**: does not remove all tags from the specified resource. This is the default value.
+	All *bool `json:"All,omitempty" xml:"All,omitempty"`
+	// The client token that is used to ensure the idempotence of the request.
+	//
+	// You can use the client to generate the value, but you must make sure that it is unique among different requests. The client token can contain only ASCII characters.
+	//
+	// >  If you do not set this parameter, the system automatically uses the value of **RequestId** as the value of **ClientToken**. The value of **RequestId** is different for each API request.
+	ClientToken *string `json:"ClientToken,omitempty" xml:"ClientToken,omitempty"`
+	// Specifies whether to perform a dry run. Valid values:
+	//
+	// *   **true**: performs a dry run. The system checks the required parameters, request syntax, and limits. If the request fails the dry run, an error message is returned. If the request passes the dry run, the `DryRunOperation` error code is returned.
+	// *   **false**: performs a dry run and sends the request. If the request passes the dry run, a 2xx HTTP status code is returned and the operation is performed. This is the default value.
+	DryRun *bool `json:"DryRun,omitempty" xml:"DryRun,omitempty"`
+	// The region ID of the resource.
+	//
+	// You can call the [DescribeRegions](~~443657~~) operation to query the most recent region list.
+	RegionId *string `json:"RegionId,omitempty" xml:"RegionId,omitempty"`
+	// The ID of the resource. You can specify up to 50 resource IDs in each call.
+	ResourceId []*string `json:"ResourceId,omitempty" xml:"ResourceId,omitempty" type:"Repeated"`
+	// The type of the resource from which you want to remove tags. Valid values:
+	//
+	// *   **loadbalancer**: a Network Load Balancer (NLB) instance
+	// *   **securitypolicy**: a security policy
+	// *   **servergroup**: a server group
+	ResourceType *string `json:"ResourceType,omitempty" xml:"ResourceType,omitempty"`
+	// The key of the tag that you want to remove. You can remove up to 20 tags in each call.
+	TagKey []*string `json:"TagKey,omitempty" xml:"TagKey,omitempty" type:"Repeated"`
 }
 
 func (s UntagResourcesRequest) String() string {
@@ -5559,14 +7090,10 @@ func (s *UntagResourcesRequest) SetTagKey(v []*string) *UntagResourcesRequest {
 }
 
 type UntagResourcesResponseBody struct {
-	Code           *string `json:"Code,omitempty" xml:"Code,omitempty"`
-	DynamicCode    *string `json:"DynamicCode,omitempty" xml:"DynamicCode,omitempty"`
-	DynamicMessage *string `json:"DynamicMessage,omitempty" xml:"DynamicMessage,omitempty"`
-	HttpStatusCode *int32  `json:"HttpStatusCode,omitempty" xml:"HttpStatusCode,omitempty"`
-	JobId          *string `json:"JobId,omitempty" xml:"JobId,omitempty"`
-	Message        *string `json:"Message,omitempty" xml:"Message,omitempty"`
-	RequestId      *string `json:"RequestId,omitempty" xml:"RequestId,omitempty"`
-	Success        *bool   `json:"Success,omitempty" xml:"Success,omitempty"`
+	// The ID of the asynchronous task.
+	JobId *string `json:"JobId,omitempty" xml:"JobId,omitempty"`
+	// The ID of the request.
+	RequestId *string `json:"RequestId,omitempty" xml:"RequestId,omitempty"`
 }
 
 func (s UntagResourcesResponseBody) String() string {
@@ -5577,43 +7104,13 @@ func (s UntagResourcesResponseBody) GoString() string {
 	return s.String()
 }
 
-func (s *UntagResourcesResponseBody) SetCode(v string) *UntagResourcesResponseBody {
-	s.Code = &v
-	return s
-}
-
-func (s *UntagResourcesResponseBody) SetDynamicCode(v string) *UntagResourcesResponseBody {
-	s.DynamicCode = &v
-	return s
-}
-
-func (s *UntagResourcesResponseBody) SetDynamicMessage(v string) *UntagResourcesResponseBody {
-	s.DynamicMessage = &v
-	return s
-}
-
-func (s *UntagResourcesResponseBody) SetHttpStatusCode(v int32) *UntagResourcesResponseBody {
-	s.HttpStatusCode = &v
-	return s
-}
-
 func (s *UntagResourcesResponseBody) SetJobId(v string) *UntagResourcesResponseBody {
 	s.JobId = &v
 	return s
 }
 
-func (s *UntagResourcesResponseBody) SetMessage(v string) *UntagResourcesResponseBody {
-	s.Message = &v
-	return s
-}
-
 func (s *UntagResourcesResponseBody) SetRequestId(v string) *UntagResourcesResponseBody {
 	s.RequestId = &v
-	return s
-}
-
-func (s *UntagResourcesResponseBody) SetSuccess(v bool) *UntagResourcesResponseBody {
-	s.Success = &v
 	return s
 }
 
@@ -5647,23 +7144,63 @@ func (s *UntagResourcesResponse) SetBody(v *UntagResourcesResponseBody) *UntagRe
 }
 
 type UpdateListenerAttributeRequest struct {
-	AlpnEnabled          *bool     `json:"AlpnEnabled,omitempty" xml:"AlpnEnabled,omitempty"`
-	AlpnPolicy           *string   `json:"AlpnPolicy,omitempty" xml:"AlpnPolicy,omitempty"`
-	CaCertificateIds     []*string `json:"CaCertificateIds,omitempty" xml:"CaCertificateIds,omitempty" type:"Repeated"`
-	CaEnabled            *bool     `json:"CaEnabled,omitempty" xml:"CaEnabled,omitempty"`
-	CertificateIds       []*string `json:"CertificateIds,omitempty" xml:"CertificateIds,omitempty" type:"Repeated"`
-	ClientToken          *string   `json:"ClientToken,omitempty" xml:"ClientToken,omitempty"`
-	Cps                  *int32    `json:"Cps,omitempty" xml:"Cps,omitempty"`
-	DryRun               *bool     `json:"DryRun,omitempty" xml:"DryRun,omitempty"`
-	IdleTimeout          *int32    `json:"IdleTimeout,omitempty" xml:"IdleTimeout,omitempty"`
-	ListenerDescription  *string   `json:"ListenerDescription,omitempty" xml:"ListenerDescription,omitempty"`
-	ListenerId           *string   `json:"ListenerId,omitempty" xml:"ListenerId,omitempty"`
-	Mss                  *int32    `json:"Mss,omitempty" xml:"Mss,omitempty"`
-	ProxyProtocolEnabled *bool     `json:"ProxyProtocolEnabled,omitempty" xml:"ProxyProtocolEnabled,omitempty"`
-	RegionId             *string   `json:"RegionId,omitempty" xml:"RegionId,omitempty"`
-	SecSensorEnabled     *bool     `json:"SecSensorEnabled,omitempty" xml:"SecSensorEnabled,omitempty"`
-	SecurityPolicyId     *string   `json:"SecurityPolicyId,omitempty" xml:"SecurityPolicyId,omitempty"`
-	ServerGroupId        *string   `json:"ServerGroupId,omitempty" xml:"ServerGroupId,omitempty"`
+	// Specifies whether to enable Application-Layer Protocol Negotiation (ALPN). Valid values:
+	//
+	// *   **true**: yes
+	// *   **false**: no
+	AlpnEnabled *bool `json:"AlpnEnabled,omitempty" xml:"AlpnEnabled,omitempty"`
+	// The ALPN policy.
+	AlpnPolicy       *string   `json:"AlpnPolicy,omitempty" xml:"AlpnPolicy,omitempty"`
+	CaCertificateIds []*string `json:"CaCertificateIds,omitempty" xml:"CaCertificateIds,omitempty" type:"Repeated"`
+	// Specifies whether to enable mutual authentication. Valid values:
+	//
+	// *   **true**: yes
+	// *   **false** (default): no
+	CaEnabled      *bool     `json:"CaEnabled,omitempty" xml:"CaEnabled,omitempty"`
+	CertificateIds []*string `json:"CertificateIds,omitempty" xml:"CertificateIds,omitempty" type:"Repeated"`
+	// The client token that is used to ensure the idempotence of the request.
+	//
+	// You can use the client to generate the value, but you must ensure that it is unique among all requests. ClientToken can contain only ASCII characters.
+	//
+	// >  If you do not set this parameter, **ClientToken** is set to the value of **RequestId**. The value of **RequestId** of each API request may be different.
+	ClientToken *string `json:"ClientToken,omitempty" xml:"ClientToken,omitempty"`
+	// The maximum number of connections that can be created per second on the NLB instance. Valid values: **0** to **1000000**. **0** specifies that the number of connections is unlimited.
+	Cps *int32 `json:"Cps,omitempty" xml:"Cps,omitempty"`
+	// Specifies whether only to precheck the request. Valid values:
+	//
+	// *   **true**: prechecks the request but does not update the configurations of the listener. The system prechecks the required parameters, request syntax, and limits. If the request fails the precheck, an error message is returned. If the request passes the precheck, the `DryRunOperation` error code is returned.
+	// *   **false** (default): sends the request. If the request passes the precheck, an HTTP 2xx status code is returned and the operation is performed.
+	DryRun *bool `json:"DryRun,omitempty" xml:"DryRun,omitempty"`
+	// The timeout period of an idle connection. Unit: seconds. Valid values: **1** to **900**.
+	IdleTimeout *int32 `json:"IdleTimeout,omitempty" xml:"IdleTimeout,omitempty"`
+	// Enter a name for the listener.
+	//
+	// The description must be 2 to 256 characters in length, and can contain letters, digits, commas (,), periods (.), semicolons (;), forward slashes (/), at signs (@), underscores (\_), and hyphens (-).
+	ListenerDescription *string `json:"ListenerDescription,omitempty" xml:"ListenerDescription,omitempty"`
+	// The ID of the listener.
+	ListenerId *string `json:"ListenerId,omitempty" xml:"ListenerId,omitempty"`
+	// The size of the largest TCP segment. Unit: bytes. Valid values: **0** to **1500**. **0** specifies that the maximum segment size remains unchanged. This parameter is supported only by listeners that use SSL over TCP.
+	Mss *int32 `json:"Mss,omitempty" xml:"Mss,omitempty"`
+	// Specifies whether to use the Proxy protocol to pass client IP addresses to backend servers. Valid values:
+	//
+	// *   **true**: yes
+	// *   **false**: no
+	ProxyProtocolEnabled *bool `json:"ProxyProtocolEnabled,omitempty" xml:"ProxyProtocolEnabled,omitempty"`
+	// The ID of the region where the NLB instance is deployed.
+	//
+	// You can call the [DescribeRegions](~~443657~~) operation to query the most recent region list.
+	RegionId *string `json:"RegionId,omitempty" xml:"RegionId,omitempty"`
+	// Specifies whether to enable fine-grained monitoring. Valid values:
+	//
+	// *   **true**: yes
+	// *   **false**: no
+	SecSensorEnabled *bool `json:"SecSensorEnabled,omitempty" xml:"SecSensorEnabled,omitempty"`
+	// The ID of the security policy.
+	//
+	// >  This parameter takes effect only for listeners that use SSL over TCP.
+	SecurityPolicyId *string `json:"SecurityPolicyId,omitempty" xml:"SecurityPolicyId,omitempty"`
+	// The ID of the server group.
+	ServerGroupId *string `json:"ServerGroupId,omitempty" xml:"ServerGroupId,omitempty"`
 }
 
 func (s UpdateListenerAttributeRequest) String() string {
@@ -5760,7 +7297,9 @@ func (s *UpdateListenerAttributeRequest) SetServerGroupId(v string) *UpdateListe
 }
 
 type UpdateListenerAttributeResponseBody struct {
-	JobId     *string `json:"JobId,omitempty" xml:"JobId,omitempty"`
+	// The ID of the asynchronous task.
+	JobId *string `json:"JobId,omitempty" xml:"JobId,omitempty"`
+	// The ID of the request.
 	RequestId *string `json:"RequestId,omitempty" xml:"RequestId,omitempty"`
 }
 
@@ -5812,12 +7351,29 @@ func (s *UpdateListenerAttributeResponse) SetBody(v *UpdateListenerAttributeResp
 }
 
 type UpdateLoadBalancerAddressTypeConfigRequest struct {
-	AddressType    *string                                                   `json:"AddressType,omitempty" xml:"AddressType,omitempty"`
-	ClientToken    *string                                                   `json:"ClientToken,omitempty" xml:"ClientToken,omitempty"`
-	DryRun         *bool                                                     `json:"DryRun,omitempty" xml:"DryRun,omitempty"`
-	LoadBalancerId *string                                                   `json:"LoadBalancerId,omitempty" xml:"LoadBalancerId,omitempty"`
-	RegionId       *string                                                   `json:"RegionId,omitempty" xml:"RegionId,omitempty"`
-	ZoneMappings   []*UpdateLoadBalancerAddressTypeConfigRequestZoneMappings `json:"ZoneMappings,omitempty" xml:"ZoneMappings,omitempty" type:"Repeated"`
+	// The new network type. Valid values:
+	//
+	// *   **Internet**: The NLB instance uses a public IP address. The domain name of the NLB instance is resolved to the public IP address. Therefore, the NLB instance can be accessed over the Internet.
+	// *   **Intranet**: The NLB instance uses a private IP address. The domain name of the NLB instance is resolved to the private IP address. Therefore, the NLB instance can be accessed over the virtual private cloud (VPC) where the NLB instance is deployed.
+	AddressType *string `json:"AddressType,omitempty" xml:"AddressType,omitempty"`
+	// The client token that is used to ensure the idempotence of the request.
+	//
+	// You can use the client to generate the value, but you must make sure that it is unique among all requests. The token can only contain ASCII characters.
+	//
+	// >  If you do not specify this parameter, the system automatically sets **ClientToken** to the value of **RequestId**. **RequestId** of each API request may be different.
+	ClientToken *string `json:"ClientToken,omitempty" xml:"ClientToken,omitempty"`
+	// Specifies whether to check the request without performing the operation. Valid values:
+	//
+	// *   **true**: checks the request without performing the operation. The system checks the required parameters, request syntax, and limits. If the request fails the check, an error message is returned. If the request passes the check, the `DryRunOperation` error code is returned.
+	// *   **false** (default): sends the request. If the request passes the check, an HTTP 2xx status code is returned and the operation is performed.
+	DryRun *bool `json:"DryRun,omitempty" xml:"DryRun,omitempty"`
+	// The ID of the NLB instance.
+	LoadBalancerId *string `json:"LoadBalancerId,omitempty" xml:"LoadBalancerId,omitempty"`
+	// The ID of the region where the NLB instance is deployed.
+	//
+	// You can call the [DescribeRegions](~~443657~~) operation to query the most recent region list.
+	RegionId     *string                                                   `json:"RegionId,omitempty" xml:"RegionId,omitempty"`
+	ZoneMappings []*UpdateLoadBalancerAddressTypeConfigRequestZoneMappings `json:"ZoneMappings,omitempty" xml:"ZoneMappings,omitempty" type:"Repeated"`
 }
 
 func (s UpdateLoadBalancerAddressTypeConfigRequest) String() string {
@@ -5859,9 +7415,21 @@ func (s *UpdateLoadBalancerAddressTypeConfigRequest) SetZoneMappings(v []*Update
 }
 
 type UpdateLoadBalancerAddressTypeConfigRequestZoneMappings struct {
+	// The ID of the elastic IP address (EIP).
 	AllocationId *string `json:"AllocationId,omitempty" xml:"AllocationId,omitempty"`
-	VSwitchId    *string `json:"VSwitchId,omitempty" xml:"VSwitchId,omitempty"`
-	ZoneId       *string `json:"ZoneId,omitempty" xml:"ZoneId,omitempty"`
+	// The type of the EIP. Valid values:
+	//
+	// *   **Common**: EIP
+	// *   **Anycast**: Anycast EIP
+	//
+	// >  Only NLB instances in the China (Hong Kong) region can be associated with Anycast EIPs. This parameter is required if you set the **AddressType** parameter to **Internet**.
+	EipType *string `json:"EipType,omitempty" xml:"EipType,omitempty"`
+	// The ID of the vSwitch in the zone. You can specify only one vSwitch (subnet) in each zone of an NLB instance.
+	VSwitchId *string `json:"VSwitchId,omitempty" xml:"VSwitchId,omitempty"`
+	// The ID of the zone of the NLB instance.
+	//
+	// You can call the [DescribeZones](~~443890~~) operation to query the most recent zone list.
+	ZoneId *string `json:"ZoneId,omitempty" xml:"ZoneId,omitempty"`
 }
 
 func (s UpdateLoadBalancerAddressTypeConfigRequestZoneMappings) String() string {
@@ -5877,6 +7445,11 @@ func (s *UpdateLoadBalancerAddressTypeConfigRequestZoneMappings) SetAllocationId
 	return s
 }
 
+func (s *UpdateLoadBalancerAddressTypeConfigRequestZoneMappings) SetEipType(v string) *UpdateLoadBalancerAddressTypeConfigRequestZoneMappings {
+	s.EipType = &v
+	return s
+}
+
 func (s *UpdateLoadBalancerAddressTypeConfigRequestZoneMappings) SetVSwitchId(v string) *UpdateLoadBalancerAddressTypeConfigRequestZoneMappings {
 	s.VSwitchId = &v
 	return s
@@ -5888,7 +7461,9 @@ func (s *UpdateLoadBalancerAddressTypeConfigRequestZoneMappings) SetZoneId(v str
 }
 
 type UpdateLoadBalancerAddressTypeConfigResponseBody struct {
-	JobId     *string `json:"JobId,omitempty" xml:"JobId,omitempty"`
+	// The ID of the asynchronous task.
+	JobId *string `json:"JobId,omitempty" xml:"JobId,omitempty"`
+	// The ID of the request.
 	RequestId *string `json:"RequestId,omitempty" xml:"RequestId,omitempty"`
 }
 
@@ -5940,13 +7515,34 @@ func (s *UpdateLoadBalancerAddressTypeConfigResponse) SetBody(v *UpdateLoadBalan
 }
 
 type UpdateLoadBalancerAttributeRequest struct {
-	ClientToken      *string `json:"ClientToken,omitempty" xml:"ClientToken,omitempty"`
-	Cps              *int32  `json:"Cps,omitempty" xml:"Cps,omitempty"`
-	CrossZoneEnabled *bool   `json:"CrossZoneEnabled,omitempty" xml:"CrossZoneEnabled,omitempty"`
-	DryRun           *bool   `json:"DryRun,omitempty" xml:"DryRun,omitempty"`
-	LoadBalancerId   *string `json:"LoadBalancerId,omitempty" xml:"LoadBalancerId,omitempty"`
+	// The client token that is used to ensure the idempotence of the request.
+	//
+	// You can use the client to generate the value, but you must ensure that it is unique among all requests. ClientToken can contain only ASCII characters.
+	//
+	// >  If you do not set this parameter, **ClientToken** is set to the value of **RequestId**. The value of **RequestId** of each API request may be different.
+	ClientToken *string `json:"ClientToken,omitempty" xml:"ClientToken,omitempty"`
+	// The maximum number of connections that can be created per second on the NLB instance. Valid values: **1** to **1000000**.
+	Cps *int32 `json:"Cps,omitempty" xml:"Cps,omitempty"`
+	// Specifies whether to enable cross-zone load balancing for the NLB instance. Valid values:
+	//
+	// *   **true**: yes
+	// *   **false**: no
+	CrossZoneEnabled *bool `json:"CrossZoneEnabled,omitempty" xml:"CrossZoneEnabled,omitempty"`
+	// Specifies whether only to precheck this request. Valid values:
+	//
+	// *   **true**: prechecks the request but does not modify the name or status of the NLB instance. The system prechecks the required parameters, request syntax, and limits. If the request fails the precheck, an error message is returned. If the request passes the precheck, the `DryRunOperation` error code is returned.
+	// *   **false** (default): sends the request. If the request passes the precheck, an HTTP 2xx status code is returned and the operation is performed.
+	DryRun *bool `json:"DryRun,omitempty" xml:"DryRun,omitempty"`
+	// The ID of the NLB instance.
+	LoadBalancerId *string `json:"LoadBalancerId,omitempty" xml:"LoadBalancerId,omitempty"`
+	// The name of the NLB instance.
+	//
+	// The name must be 2 to 128 characters in length, and can contain letters, digits, periods (.), underscores (\_), and hyphens (-). The name must start with a letter.
 	LoadBalancerName *string `json:"LoadBalancerName,omitempty" xml:"LoadBalancerName,omitempty"`
-	RegionId         *string `json:"RegionId,omitempty" xml:"RegionId,omitempty"`
+	// The ID of the region where the NLB instance is deployed.
+	//
+	// You can call the [DescribeRegions](~~443657~~) operation to query the most recent region list.
+	RegionId *string `json:"RegionId,omitempty" xml:"RegionId,omitempty"`
 }
 
 func (s UpdateLoadBalancerAttributeRequest) String() string {
@@ -5993,7 +7589,9 @@ func (s *UpdateLoadBalancerAttributeRequest) SetRegionId(v string) *UpdateLoadBa
 }
 
 type UpdateLoadBalancerAttributeResponseBody struct {
-	JobId     *string `json:"JobId,omitempty" xml:"JobId,omitempty"`
+	// The ID of the asynchronous task.
+	JobId *string `json:"JobId,omitempty" xml:"JobId,omitempty"`
+	// The ID of the request.
 	RequestId *string `json:"RequestId,omitempty" xml:"RequestId,omitempty"`
 }
 
@@ -6045,14 +7643,43 @@ func (s *UpdateLoadBalancerAttributeResponse) SetBody(v *UpdateLoadBalancerAttri
 }
 
 type UpdateLoadBalancerProtectionRequest struct {
-	ClientToken                  *string `json:"ClientToken,omitempty" xml:"ClientToken,omitempty"`
-	DeletionProtectionEnabled    *bool   `json:"DeletionProtectionEnabled,omitempty" xml:"DeletionProtectionEnabled,omitempty"`
-	DeletionProtectionReason     *string `json:"DeletionProtectionReason,omitempty" xml:"DeletionProtectionReason,omitempty"`
-	DryRun                       *bool   `json:"DryRun,omitempty" xml:"DryRun,omitempty"`
-	LoadBalancerId               *string `json:"LoadBalancerId,omitempty" xml:"LoadBalancerId,omitempty"`
+	// The client token that is used to ensure the idempotence of the request.
+	//
+	// You can use the client to generate the token, but you must make sure that the token is unique among different requests. The client token can contain only ASCII characters.
+	//
+	// >  If you do not specify this parameter, the system automatically uses the **request ID** as the **client token**. The **request ID** may be different for each request.
+	ClientToken *string `json:"ClientToken,omitempty" xml:"ClientToken,omitempty"`
+	// Specifies whether to enable deletion protection. Valid values:
+	//
+	// *   **true**
+	// *   **false**
+	DeletionProtectionEnabled *bool `json:"DeletionProtectionEnabled,omitempty" xml:"DeletionProtectionEnabled,omitempty"`
+	// The reason for enabling deletion protection. The reason must be 2 to 128 characters in length, and can contain letters, digits, periods (.), underscores (\_), and hyphens (-). The reason must start with a letter.
+	//
+	// >  This parameter is valid only if you set **DeletionProtectionEnabled** to **true**.
+	DeletionProtectionReason *string `json:"DeletionProtectionReason,omitempty" xml:"DeletionProtectionReason,omitempty"`
+	// Specifies whether to perform only a dry run without performing the actual request. Valid values:
+	//
+	// *   **true**: performs only a dry run. The system checks the request for potential issues, including missing parameter values, incorrect request syntax, and service limits. If the request fails the dry run, an error message is returned. If the request passes the dry run, the `DryRunOperation` error code is returned.
+	// *   **false** (default): performs a dry run and performs the actual request. If the request passes the dry run, a 2xx HTTP status code is returned and the operation is performed.
+	DryRun *bool `json:"DryRun,omitempty" xml:"DryRun,omitempty"`
+	// The ID of the NLB instance.
+	LoadBalancerId *string `json:"LoadBalancerId,omitempty" xml:"LoadBalancerId,omitempty"`
+	// The reason for enabling the configuration read-only mode. The reason must be 2 to 128 characters in length, and can contain letters, digits, periods (.), underscores (\_), and hyphens (-). The reason must start with a letter.
+	//
+	// >  This parameter takes effect only if you set **Status** to **ConsoleProtection**.
 	ModificationProtectionReason *string `json:"ModificationProtectionReason,omitempty" xml:"ModificationProtectionReason,omitempty"`
+	// Specifies whether to enable the configuration read-only mode. Valid values:
+	//
+	// *   **NonProtection**: disables the configuration read-only mode. In this case, you cannot specify **ModificationProtectionReason**. If you specify **ModificationProtectionReason**, the value is cleared.
+	// *   **ConsoleProtection**: enables the configuration read-only mode. In this case, you can specify **ModificationProtectionReason**.
+	//
+	// >  If you set this parameter to **ConsoleProtection**, you cannot modify instance configurations in the NLB console. However, you can modify instance configurations by calling API operations.
 	ModificationProtectionStatus *string `json:"ModificationProtectionStatus,omitempty" xml:"ModificationProtectionStatus,omitempty"`
-	RegionId                     *string `json:"RegionId,omitempty" xml:"RegionId,omitempty"`
+	// The region ID of the NLB instance.
+	//
+	// You can call the [DescribeRegions](~~443657~~) operation to query the most recent region list.
+	RegionId *string `json:"RegionId,omitempty" xml:"RegionId,omitempty"`
 }
 
 func (s UpdateLoadBalancerProtectionRequest) String() string {
@@ -6104,6 +7731,7 @@ func (s *UpdateLoadBalancerProtectionRequest) SetRegionId(v string) *UpdateLoadB
 }
 
 type UpdateLoadBalancerProtectionResponseBody struct {
+	// The request ID.
 	RequestId *string `json:"RequestId,omitempty" xml:"RequestId,omitempty"`
 }
 
@@ -6150,11 +7778,24 @@ func (s *UpdateLoadBalancerProtectionResponse) SetBody(v *UpdateLoadBalancerProt
 }
 
 type UpdateLoadBalancerZonesRequest struct {
-	ClientToken    *string                                       `json:"ClientToken,omitempty" xml:"ClientToken,omitempty"`
-	DryRun         *bool                                         `json:"DryRun,omitempty" xml:"DryRun,omitempty"`
-	LoadBalancerId *string                                       `json:"LoadBalancerId,omitempty" xml:"LoadBalancerId,omitempty"`
-	RegionId       *string                                       `json:"RegionId,omitempty" xml:"RegionId,omitempty"`
-	ZoneMappings   []*UpdateLoadBalancerZonesRequestZoneMappings `json:"ZoneMappings,omitempty" xml:"ZoneMappings,omitempty" type:"Repeated"`
+	// The client token that is used to ensure the idempotence of the request.
+	//
+	// You can use the client to generate the value, but you must make sure that it is unique among all requests. The token can only contain ASCII characters.
+	//
+	// >  If you do not specify this parameter, the system automatically sets **ClientToken** to the value of **RequestId**. **RequestId** of each API request may be different.
+	ClientToken *string `json:"ClientToken,omitempty" xml:"ClientToken,omitempty"`
+	// Specifies whether to check the request without performing the operation. Valid values:
+	//
+	// *   **true**: checks the request without performing the operation. The system checks the required parameters, request syntax, and limits. If the request fails the check, an error message is returned. If the request passes the check, the `DryRunOperation` error code is returned.
+	// *   **false**: sends the request. If the request passes the check, an HTTP 2xx status code is returned and the operation is performed. This is the default value.
+	DryRun *bool `json:"DryRun,omitempty" xml:"DryRun,omitempty"`
+	// The ID of the NLB instance.
+	LoadBalancerId *string `json:"LoadBalancerId,omitempty" xml:"LoadBalancerId,omitempty"`
+	// The ID of the region where the NLB instance is deployed.
+	//
+	// You can call the [DescribeRegions](~~443657~~) operation to query the most recent region list.
+	RegionId     *string                                       `json:"RegionId,omitempty" xml:"RegionId,omitempty"`
+	ZoneMappings []*UpdateLoadBalancerZonesRequestZoneMappings `json:"ZoneMappings,omitempty" xml:"ZoneMappings,omitempty" type:"Repeated"`
 }
 
 func (s UpdateLoadBalancerZonesRequest) String() string {
@@ -6191,10 +7832,21 @@ func (s *UpdateLoadBalancerZonesRequest) SetZoneMappings(v []*UpdateLoadBalancer
 }
 
 type UpdateLoadBalancerZonesRequestZoneMappings struct {
-	AllocationId       *string `json:"AllocationId,omitempty" xml:"AllocationId,omitempty"`
+	// The ID of the elastic IP address (EIP) or Anycast EIP.
+	AllocationId *string `json:"AllocationId,omitempty" xml:"AllocationId,omitempty"`
+	// The type of the EIP. Valid values:
+	//
+	// *   **Common**: EIP
+	// *   **Anycast**: Anycast EIP
+	//
+	// >  Only NLB instances in the China (Hong Kong) region can be associated with Anycast EIPs. This parameter is required if you set the **AddressType** parameter to **Internet**.
+	EipType *string `json:"EipType,omitempty" xml:"EipType,omitempty"`
+	// The private IP addresses.
 	PrivateIPv4Address *string `json:"PrivateIPv4Address,omitempty" xml:"PrivateIPv4Address,omitempty"`
-	VSwitchId          *string `json:"VSwitchId,omitempty" xml:"VSwitchId,omitempty"`
-	ZoneId             *string `json:"ZoneId,omitempty" xml:"ZoneId,omitempty"`
+	// The ID of the vSwitch in the zone. By default, each zone contains one vSwitch and one subnet.
+	VSwitchId *string `json:"VSwitchId,omitempty" xml:"VSwitchId,omitempty"`
+	// The ID of the zone. You can call the [DescribeZones](~~443890~~) operation to query the zones.
+	ZoneId *string `json:"ZoneId,omitempty" xml:"ZoneId,omitempty"`
 }
 
 func (s UpdateLoadBalancerZonesRequestZoneMappings) String() string {
@@ -6207,6 +7859,11 @@ func (s UpdateLoadBalancerZonesRequestZoneMappings) GoString() string {
 
 func (s *UpdateLoadBalancerZonesRequestZoneMappings) SetAllocationId(v string) *UpdateLoadBalancerZonesRequestZoneMappings {
 	s.AllocationId = &v
+	return s
+}
+
+func (s *UpdateLoadBalancerZonesRequestZoneMappings) SetEipType(v string) *UpdateLoadBalancerZonesRequestZoneMappings {
+	s.EipType = &v
 	return s
 }
 
@@ -6226,7 +7883,9 @@ func (s *UpdateLoadBalancerZonesRequestZoneMappings) SetZoneId(v string) *Update
 }
 
 type UpdateLoadBalancerZonesResponseBody struct {
-	JobId     *string `json:"JobId,omitempty" xml:"JobId,omitempty"`
+	// The ID of the asynchronous task.
+	JobId *string `json:"JobId,omitempty" xml:"JobId,omitempty"`
+	// The ID of the request.
 	RequestId *string `json:"RequestId,omitempty" xml:"RequestId,omitempty"`
 }
 
@@ -6278,11 +7937,27 @@ func (s *UpdateLoadBalancerZonesResponse) SetBody(v *UpdateLoadBalancerZonesResp
 }
 
 type UpdateSecurityPolicyAttributeRequest struct {
-	Ciphers            []*string `json:"Ciphers,omitempty" xml:"Ciphers,omitempty" type:"Repeated"`
-	ClientToken        *string   `json:"ClientToken,omitempty" xml:"ClientToken,omitempty"`
-	DryRun             *bool     `json:"DryRun,omitempty" xml:"DryRun,omitempty"`
-	RegionId           *string   `json:"RegionId,omitempty" xml:"RegionId,omitempty"`
-	SecurityPolicyId   *string   `json:"SecurityPolicyId,omitempty" xml:"SecurityPolicyId,omitempty"`
+	Ciphers []*string `json:"Ciphers,omitempty" xml:"Ciphers,omitempty" type:"Repeated"`
+	// The client token that is used to ensure the idempotence of the request.
+	//
+	// You can use the client to generate the value, but you must ensure that it is unique among all requests. ClientToken can contain only ASCII characters.
+	//
+	// >  If you do not set this parameter, **ClientToken** is set to the value of **RequestId**. The value of **RequestId** for each API request may be different.
+	ClientToken *string `json:"ClientToken,omitempty" xml:"ClientToken,omitempty"`
+	// Specifies whether only to precheck the request. Valid values:
+	//
+	// *   **true**: prechecks the request but does not modify the configurations of the security policy. The system prechecks the required parameters, request syntax, and limits. If the request fails the precheck, an error message is returned. If the request passes the precheck, the `DryRunOperation` error code is returned.
+	// *   **false** (default): sends the request. If the request passes the precheck, an HTTP 2xx status code is returned and the operation is performed.
+	DryRun *bool `json:"DryRun,omitempty" xml:"DryRun,omitempty"`
+	// The ID of the region where the NLB instance is deployed.
+	//
+	// You can call the [DescribeRegions](~~443657~~) operation to query the most recent region list.
+	RegionId *string `json:"RegionId,omitempty" xml:"RegionId,omitempty"`
+	// The ID of the TLS security policy.
+	SecurityPolicyId *string `json:"SecurityPolicyId,omitempty" xml:"SecurityPolicyId,omitempty"`
+	// The name of the security policy.
+	//
+	// The name must be 1 to 200 characters in length, and can contain letters, digits, periods (.), underscores (\_), and hyphens (-).
 	SecurityPolicyName *string   `json:"SecurityPolicyName,omitempty" xml:"SecurityPolicyName,omitempty"`
 	TlsVersions        []*string `json:"TlsVersions,omitempty" xml:"TlsVersions,omitempty" type:"Repeated"`
 }
@@ -6331,8 +8006,11 @@ func (s *UpdateSecurityPolicyAttributeRequest) SetTlsVersions(v []*string) *Upda
 }
 
 type UpdateSecurityPolicyAttributeResponseBody struct {
-	JobId            *string `json:"JobId,omitempty" xml:"JobId,omitempty"`
-	RequestId        *string `json:"RequestId,omitempty" xml:"RequestId,omitempty"`
+	// The ID of the asynchronous task.
+	JobId *string `json:"JobId,omitempty" xml:"JobId,omitempty"`
+	// The ID of the request.
+	RequestId *string `json:"RequestId,omitempty" xml:"RequestId,omitempty"`
+	// The ID of the TLS security policy.
 	SecurityPolicyId *string `json:"SecurityPolicyId,omitempty" xml:"SecurityPolicyId,omitempty"`
 }
 
@@ -6389,16 +8067,48 @@ func (s *UpdateSecurityPolicyAttributeResponse) SetBody(v *UpdateSecurityPolicyA
 }
 
 type UpdateServerGroupAttributeRequest struct {
-	ClientToken             *string                                             `json:"ClientToken,omitempty" xml:"ClientToken,omitempty"`
-	ConnectionDrainEnabled  *bool                                               `json:"ConnectionDrainEnabled,omitempty" xml:"ConnectionDrainEnabled,omitempty"`
-	ConnectionDrainTimeout  *int32                                              `json:"ConnectionDrainTimeout,omitempty" xml:"ConnectionDrainTimeout,omitempty"`
-	DryRun                  *bool                                               `json:"DryRun,omitempty" xml:"DryRun,omitempty"`
-	HealthCheckConfig       *UpdateServerGroupAttributeRequestHealthCheckConfig `json:"HealthCheckConfig,omitempty" xml:"HealthCheckConfig,omitempty" type:"Struct"`
-	PreserveClientIpEnabled *bool                                               `json:"PreserveClientIpEnabled,omitempty" xml:"PreserveClientIpEnabled,omitempty"`
-	RegionId                *string                                             `json:"RegionId,omitempty" xml:"RegionId,omitempty"`
-	Scheduler               *string                                             `json:"Scheduler,omitempty" xml:"Scheduler,omitempty"`
-	ServerGroupId           *string                                             `json:"ServerGroupId,omitempty" xml:"ServerGroupId,omitempty"`
-	ServerGroupName         *string                                             `json:"ServerGroupName,omitempty" xml:"ServerGroupName,omitempty"`
+	// The client token that is used to ensure the idempotence of the request.
+	//
+	// You can use the client to generate the value, but you must ensure that it is unique among different requests. The token can contain only ASCII characters.
+	//
+	// >  If you do not specify this parameter, the system automatically sets **ClientToken** to the value of **RequestId**. **RequestId** may be different for each API request.
+	ClientToken *string `json:"ClientToken,omitempty" xml:"ClientToken,omitempty"`
+	// Specifies whether to enable connection draining. Valid values:
+	//
+	// *   **true**: enables connection draining.
+	// *   **false**: disables connection draining.
+	ConnectionDrainEnabled *bool `json:"ConnectionDrainEnabled,omitempty" xml:"ConnectionDrainEnabled,omitempty"`
+	// The timeout period of connection draining. Unit: seconds. Valid values: **10** to **900**.
+	ConnectionDrainTimeout *int32 `json:"ConnectionDrainTimeout,omitempty" xml:"ConnectionDrainTimeout,omitempty"`
+	// Specifies whether to only precheck the request. Valid values:
+	//
+	// *   **true**: checks the request without performing the UpdateServerGroupAttribute operation. The system checks the required parameters, request syntax, and limits. If the request fails the check, an error message is returned. If the request passes the check, the `DryRunOperation` error code is returned.
+	// *   **false** (default): sends the request. If the request passes the check, a 2xx HTTP status code is returned and the UpdateServerGroupAttribute operation is performed.
+	DryRun            *bool                                               `json:"DryRun,omitempty" xml:"DryRun,omitempty"`
+	HealthCheckConfig *UpdateServerGroupAttributeRequestHealthCheckConfig `json:"HealthCheckConfig,omitempty" xml:"HealthCheckConfig,omitempty" type:"Struct"`
+	// Specifies whether to enable client IP preservation. Valid values:
+	//
+	// *   **true**: enables client IP preservation.
+	// *   **false**: disables client IP preservation.
+	PreserveClientIpEnabled *bool `json:"PreserveClientIpEnabled,omitempty" xml:"PreserveClientIpEnabled,omitempty"`
+	// The ID of the region where the NLB instance is deployed.
+	//
+	// You can call the [DescribeRegions](~~443657~~) operation to query the available regions.
+	RegionId *string `json:"RegionId,omitempty" xml:"RegionId,omitempty"`
+	// The scheduling algorithm. Valid values:
+	//
+	// *   **Wrr**: Backend servers with higher weights receive more requests than backend servers with lower weights.
+	// *   **rr**: Requests are forwarded to backend servers in sequence.
+	// *   **sch**: Requests from the same source IP address are forwarded to the same backend server.
+	// *   **tch**: Four-element hashing is used. This value specifies consistent hashing that is based on four factors: source IP address, destination IP address, source port, and destination port. Requests that contain the same information based on the four factors are forwarded to the same backend server.
+	// *   **qch**: Requests that contain the same QUIC ID are forwarded to the same backend server.
+	Scheduler *string `json:"Scheduler,omitempty" xml:"Scheduler,omitempty"`
+	// The ID of the server group.
+	ServerGroupId *string `json:"ServerGroupId,omitempty" xml:"ServerGroupId,omitempty"`
+	// The new name of the server group.
+	//
+	// The name must be 2 to 128 characters in length and can contain letters, digits, periods (.), underscores (\_), and hyphens (-). The name must start with a letter.
+	ServerGroupName *string `json:"ServerGroupName,omitempty" xml:"ServerGroupName,omitempty"`
 }
 
 func (s UpdateServerGroupAttributeRequest) String() string {
@@ -6460,17 +8170,43 @@ func (s *UpdateServerGroupAttributeRequest) SetServerGroupName(v string) *Update
 }
 
 type UpdateServerGroupAttributeRequestHealthCheckConfig struct {
-	HealthCheckConnectPort    *int32    `json:"HealthCheckConnectPort,omitempty" xml:"HealthCheckConnectPort,omitempty"`
-	HealthCheckConnectTimeout *int32    `json:"HealthCheckConnectTimeout,omitempty" xml:"HealthCheckConnectTimeout,omitempty"`
-	HealthCheckDomain         *string   `json:"HealthCheckDomain,omitempty" xml:"HealthCheckDomain,omitempty"`
-	HealthCheckEnabled        *bool     `json:"HealthCheckEnabled,omitempty" xml:"HealthCheckEnabled,omitempty"`
-	HealthCheckHttpCode       []*string `json:"HealthCheckHttpCode,omitempty" xml:"HealthCheckHttpCode,omitempty" type:"Repeated"`
-	HealthCheckInterval       *int32    `json:"HealthCheckInterval,omitempty" xml:"HealthCheckInterval,omitempty"`
-	HealthCheckType           *string   `json:"HealthCheckType,omitempty" xml:"HealthCheckType,omitempty"`
-	HealthCheckUrl            *string   `json:"HealthCheckUrl,omitempty" xml:"HealthCheckUrl,omitempty"`
-	HealthyThreshold          *int32    `json:"HealthyThreshold,omitempty" xml:"HealthyThreshold,omitempty"`
-	HttpCheckMethod           *string   `json:"HttpCheckMethod,omitempty" xml:"HttpCheckMethod,omitempty"`
-	UnhealthyThreshold        *int32    `json:"UnhealthyThreshold,omitempty" xml:"UnhealthyThreshold,omitempty"`
+	// The backend port that is used for health checks. Valid values: **0** to **65535**. If you set the value to **0**, the ports of backend servers are used for health checks.
+	HealthCheckConnectPort *int32 `json:"HealthCheckConnectPort,omitempty" xml:"HealthCheckConnectPort,omitempty"`
+	// The maximum timeout period of a health check response. Unit: seconds. Valid values: **1** to **300**.
+	HealthCheckConnectTimeout *int32 `json:"HealthCheckConnectTimeout,omitempty" xml:"HealthCheckConnectTimeout,omitempty"`
+	// The domain name that is used for health checks. Valid values:
+	//
+	// *   **$SERVER_IP**: the private IP address of a backend server.
+	// *   **domain**: a specific domain name. The domain name must be 1 to 80 characters in length and can contain lowercase letters, digits, hyphens (-), and periods (.).
+	//
+	// >  This parameter takes effect only when you set **HealthCheckType** to **HTTP**.
+	HealthCheckDomain *string `json:"HealthCheckDomain,omitempty" xml:"HealthCheckDomain,omitempty"`
+	// Specifies whether to enable the health check feature. Valid values:
+	//
+	// *   **true**: enables the health check feature.
+	// *   **false**: disables the health check feature.
+	HealthCheckEnabled  *bool     `json:"HealthCheckEnabled,omitempty" xml:"HealthCheckEnabled,omitempty"`
+	HealthCheckHttpCode []*string `json:"HealthCheckHttpCode,omitempty" xml:"HealthCheckHttpCode,omitempty" type:"Repeated"`
+	// The interval between two consecutive health checks. Unit: seconds.
+	//
+	// Valid values: **5** to **50**.
+	HealthCheckInterval *int32 `json:"HealthCheckInterval,omitempty" xml:"HealthCheckInterval,omitempty"`
+	// The protocol that is used for health checks. Valid values: **TCP** and **HTTP**.
+	HealthCheckType *string `json:"HealthCheckType,omitempty" xml:"HealthCheckType,omitempty"`
+	// The path to which health check requests are sent.
+	//
+	// The path must be 1 to 80 characters in length, and can contain only letters, digits, and the following special characters: `- / . % ? # & =`. The path can also contain the following extended characters: `_ ; ~ ! ( ) * [ ] @ $ ^ : \" , +`. The path must start with a forward slash (/).
+	//
+	// >  This parameter takes effect only when you set **HealthCheckType** to **HTTP**.
+	HealthCheckUrl *string `json:"HealthCheckUrl,omitempty" xml:"HealthCheckUrl,omitempty"`
+	// The number of times that an unhealthy backend server must consecutively pass health checks before it is declared healthy. In this case, the health status is changed from **fail** to **success**. Valid values: **2** to **10**.
+	HealthyThreshold *int32 `json:"HealthyThreshold,omitempty" xml:"HealthyThreshold,omitempty"`
+	// The HTTP method that is used for health checks. Valid values: **GET** and **HEAD**.
+	//
+	// >  This parameter takes effect only when you set **HealthCheckType** to **HTTP**.
+	HttpCheckMethod *string `json:"HttpCheckMethod,omitempty" xml:"HttpCheckMethod,omitempty"`
+	// The number of times that a healthy backend server must consecutively fail health checks before it is declared unhealthy. In this case, the health status is changed from **success** to **fail**. Valid values: **2** to **10**.
+	UnhealthyThreshold *int32 `json:"UnhealthyThreshold,omitempty" xml:"UnhealthyThreshold,omitempty"`
 }
 
 func (s UpdateServerGroupAttributeRequestHealthCheckConfig) String() string {
@@ -6537,8 +8273,11 @@ func (s *UpdateServerGroupAttributeRequestHealthCheckConfig) SetUnhealthyThresho
 }
 
 type UpdateServerGroupAttributeResponseBody struct {
-	JobId         *string `json:"JobId,omitempty" xml:"JobId,omitempty"`
-	RequestId     *string `json:"RequestId,omitempty" xml:"RequestId,omitempty"`
+	// The ID of the asynchronous task.
+	JobId *string `json:"JobId,omitempty" xml:"JobId,omitempty"`
+	// The ID of the request.
+	RequestId *string `json:"RequestId,omitempty" xml:"RequestId,omitempty"`
+	// The ID of the server group.
 	ServerGroupId *string `json:"ServerGroupId,omitempty" xml:"ServerGroupId,omitempty"`
 }
 
@@ -6595,9 +8334,22 @@ func (s *UpdateServerGroupAttributeResponse) SetBody(v *UpdateServerGroupAttribu
 }
 
 type UpdateServerGroupServersAttributeRequest struct {
-	ClientToken   *string                                            `json:"ClientToken,omitempty" xml:"ClientToken,omitempty"`
-	DryRun        *bool                                              `json:"DryRun,omitempty" xml:"DryRun,omitempty"`
-	RegionId      *string                                            `json:"RegionId,omitempty" xml:"RegionId,omitempty"`
+	// The client token that is used to ensure the idempotence of the request.
+	//
+	// You can use the client to generate the value, but you must make sure that the value is unique among different requests. The token can only contain ASCII characters.
+	//
+	// >  If you do not specify this parameter, the system automatically sets **ClientToken** to the value of **RequestId**. **RequestId** of each API request may be different.
+	ClientToken *string `json:"ClientToken,omitempty" xml:"ClientToken,omitempty"`
+	// Specifies whether to perform a dry run. Valid values:
+	//
+	// *   **true**: performs a dry run. The system checks the required parameters, request syntax, and limits. If the request fails the dry run, an error message is returned. If the request passes the dry run, the `DryRunOperation` error code is returned.
+	// *   **false** (default): performs a dry run and sends the request. If the request passes the dry run, a 2xx HTTP status code is returned and the operation is performed.
+	DryRun *bool `json:"DryRun,omitempty" xml:"DryRun,omitempty"`
+	// The ID of the region where the Network Load Balancer (NLB) instance is deployed.
+	//
+	// You can call the [DescribeRegions](~~443657~~) operation to query the most recent region list.
+	RegionId *string `json:"RegionId,omitempty" xml:"RegionId,omitempty"`
+	// The ID of the server group.
 	ServerGroupId *string                                            `json:"ServerGroupId,omitempty" xml:"ServerGroupId,omitempty"`
 	Servers       []*UpdateServerGroupServersAttributeRequestServers `json:"Servers,omitempty" xml:"Servers,omitempty" type:"Repeated"`
 }
@@ -6636,12 +8388,36 @@ func (s *UpdateServerGroupServersAttributeRequest) SetServers(v []*UpdateServerG
 }
 
 type UpdateServerGroupServersAttributeRequestServers struct {
+	// The description of the backend server.
+	//
+	// The description must be 2 to 256 characters in length, and can contain letters, digits, commas (,), periods (.), semicolons (;), forward slashes (/), at signs (@), underscores (\_), and hyphens (-).
 	Description *string `json:"Description,omitempty" xml:"Description,omitempty"`
-	Port        *int32  `json:"Port,omitempty" xml:"Port,omitempty"`
-	ServerId    *string `json:"ServerId,omitempty" xml:"ServerId,omitempty"`
-	ServerIp    *string `json:"ServerIp,omitempty" xml:"ServerIp,omitempty"`
-	ServerType  *string `json:"ServerType,omitempty" xml:"ServerType,omitempty"`
-	Weight      *int32  `json:"Weight,omitempty" xml:"Weight,omitempty"`
+	// The port used by the backend server. Valid values: **1** to **65535**. You can specify at most 40 backend servers in each call.
+	//
+	// >  The value of this parameter cannot be modified.
+	Port *int32 `json:"Port,omitempty" xml:"Port,omitempty"`
+	// The ID of the backend server. You can specify at most 40 backend servers in each call.
+	//
+	// *   If the server group type is **Instance**, set the ServerId parameter to the ID of an Elastic Compute Service (ECS) instance, an elastic network interface (ENI), or an elastic container instance. These backend servers are specified by **Ecs**, **Eni**, or **Eci**.
+	// *   If the server group type is **Ip**, set the ServerId parameter to an IP address.
+	ServerId *string `json:"ServerId,omitempty" xml:"ServerId,omitempty"`
+	// The IP address of the server. If the server group type is **Ip**, you must specify an IP address.
+	//
+	// >  You can specify at most 40 backend servers in each call.
+	ServerIp *string `json:"ServerIp,omitempty" xml:"ServerIp,omitempty"`
+	// The type of the backend server. Valid values:
+	//
+	// *   **Ecs**: an ECS instance
+	// *   **Eni**: an ENI
+	// *   **Eci**: an elastic container instance
+	// *   **Ip**: an IP address
+	//
+	// >  You can specify at most 40 backend servers in each call.
+	ServerType *string `json:"ServerType,omitempty" xml:"ServerType,omitempty"`
+	// The weight of the backend server. Valid values: **0** to **100**. Default value: **100**. If the weight of a backend server is set to **0**, no requests are forwarded to the backend server.
+	//
+	// >  You can specify at most 40 backend servers in each call.
+	Weight *int32 `json:"Weight,omitempty" xml:"Weight,omitempty"`
 }
 
 func (s UpdateServerGroupServersAttributeRequestServers) String() string {
@@ -6683,8 +8459,11 @@ func (s *UpdateServerGroupServersAttributeRequestServers) SetWeight(v int32) *Up
 }
 
 type UpdateServerGroupServersAttributeResponseBody struct {
-	JobId         *string `json:"JobId,omitempty" xml:"JobId,omitempty"`
-	RequestId     *string `json:"RequestId,omitempty" xml:"RequestId,omitempty"`
+	// The ID of the asynchronous task.
+	JobId *string `json:"JobId,omitempty" xml:"JobId,omitempty"`
+	// The ID of the request.
+	RequestId *string `json:"RequestId,omitempty" xml:"RequestId,omitempty"`
+	// The ID of the server group.
 	ServerGroupId *string `json:"ServerGroupId,omitempty" xml:"ServerGroupId,omitempty"`
 }
 
@@ -6850,6 +8629,66 @@ func (client *Client) AddServersToServerGroup(request *AddServersToServerGroupRe
 	return _result, _err
 }
 
+func (client *Client) AssociateAdditionalCertificatesWithListenerWithOptions(request *AssociateAdditionalCertificatesWithListenerRequest, runtime *util.RuntimeOptions) (_result *AssociateAdditionalCertificatesWithListenerResponse, _err error) {
+	_err = util.ValidateModel(request)
+	if _err != nil {
+		return _result, _err
+	}
+	body := map[string]interface{}{}
+	if !tea.BoolValue(util.IsUnset(request.AdditionalCertificateIds)) {
+		body["AdditionalCertificateIds"] = request.AdditionalCertificateIds
+	}
+
+	if !tea.BoolValue(util.IsUnset(request.ClientToken)) {
+		body["ClientToken"] = request.ClientToken
+	}
+
+	if !tea.BoolValue(util.IsUnset(request.DryRun)) {
+		body["DryRun"] = request.DryRun
+	}
+
+	if !tea.BoolValue(util.IsUnset(request.ListenerId)) {
+		body["ListenerId"] = request.ListenerId
+	}
+
+	if !tea.BoolValue(util.IsUnset(request.RegionId)) {
+		body["RegionId"] = request.RegionId
+	}
+
+	req := &openapi.OpenApiRequest{
+		Body: openapiutil.ParseToMap(body),
+	}
+	params := &openapi.Params{
+		Action:      tea.String("AssociateAdditionalCertificatesWithListener"),
+		Version:     tea.String("2022-04-30"),
+		Protocol:    tea.String("HTTPS"),
+		Pathname:    tea.String("/"),
+		Method:      tea.String("POST"),
+		AuthType:    tea.String("AK"),
+		Style:       tea.String("RPC"),
+		ReqBodyType: tea.String("formData"),
+		BodyType:    tea.String("json"),
+	}
+	_result = &AssociateAdditionalCertificatesWithListenerResponse{}
+	_body, _err := client.CallApi(params, req, runtime)
+	if _err != nil {
+		return _result, _err
+	}
+	_err = tea.Convert(_body, &_result)
+	return _result, _err
+}
+
+func (client *Client) AssociateAdditionalCertificatesWithListener(request *AssociateAdditionalCertificatesWithListenerRequest) (_result *AssociateAdditionalCertificatesWithListenerResponse, _err error) {
+	runtime := &util.RuntimeOptions{}
+	_result = &AssociateAdditionalCertificatesWithListenerResponse{}
+	_body, _err := client.AssociateAdditionalCertificatesWithListenerWithOptions(request, runtime)
+	if _err != nil {
+		return _result, _err
+	}
+	_result = _body
+	return _result, _err
+}
+
 func (client *Client) AttachCommonBandwidthPackageToLoadBalancerWithOptions(request *AttachCommonBandwidthPackageToLoadBalancerRequest, runtime *util.RuntimeOptions) (_result *AttachCommonBandwidthPackageToLoadBalancerResponse, _err error) {
 	_err = util.ValidateModel(request)
 	if _err != nil {
@@ -7000,6 +8839,10 @@ func (client *Client) CreateListenerWithOptions(request *CreateListenerRequest, 
 		body["StartPort"] = request.StartPort
 	}
 
+	if !tea.BoolValue(util.IsUnset(request.Tag)) {
+		body["Tag"] = request.Tag
+	}
+
 	req := &openapi.OpenApiRequest{
 		Body: openapiutil.ParseToMap(body),
 	}
@@ -7034,6 +8877,16 @@ func (client *Client) CreateListener(request *CreateListenerRequest) (_result *C
 	return _result, _err
 }
 
+/**
+ * *   When you create an NLB instance, the service-linked role AliyunServiceRoleForNlb is automatically created and assigned to you.
+ * *   **CreateLoadBalancer** is an asynchronous operation. After you send a request, the system returns an instance ID and runs the task in the background. You can call [GetLoadBalancerAttribute](~~445873~~) to query the status of an NLB instance.
+ *     *   If an NLB instance is in the **Provisioning** state, the NLB instance is being created.
+ *     *   If an NLB instance is in the **Active** state, the NLB instance is created.
+ *
+ * @param request CreateLoadBalancerRequest
+ * @param runtime runtime options for this request RuntimeOptions
+ * @return CreateLoadBalancerResponse
+ */
 func (client *Client) CreateLoadBalancerWithOptions(request *CreateLoadBalancerRequest, runtime *util.RuntimeOptions) (_result *CreateLoadBalancerResponse, _err error) {
 	_err = util.ValidateModel(request)
 	if _err != nil {
@@ -7089,6 +8942,10 @@ func (client *Client) CreateLoadBalancerWithOptions(request *CreateLoadBalancerR
 		body["ResourceGroupId"] = request.ResourceGroupId
 	}
 
+	if !tea.BoolValue(util.IsUnset(request.Tag)) {
+		body["Tag"] = request.Tag
+	}
+
 	if !tea.BoolValue(util.IsUnset(request.VpcId)) {
 		body["VpcId"] = request.VpcId
 	}
@@ -7122,6 +8979,15 @@ func (client *Client) CreateLoadBalancerWithOptions(request *CreateLoadBalancerR
 	return _result, _err
 }
 
+/**
+ * *   When you create an NLB instance, the service-linked role AliyunServiceRoleForNlb is automatically created and assigned to you.
+ * *   **CreateLoadBalancer** is an asynchronous operation. After you send a request, the system returns an instance ID and runs the task in the background. You can call [GetLoadBalancerAttribute](~~445873~~) to query the status of an NLB instance.
+ *     *   If an NLB instance is in the **Provisioning** state, the NLB instance is being created.
+ *     *   If an NLB instance is in the **Active** state, the NLB instance is created.
+ *
+ * @param request CreateLoadBalancerRequest
+ * @return CreateLoadBalancerResponse
+ */
 func (client *Client) CreateLoadBalancer(request *CreateLoadBalancerRequest) (_result *CreateLoadBalancerResponse, _err error) {
 	runtime := &util.RuntimeOptions{}
 	_result = &CreateLoadBalancerResponse{}
@@ -7163,6 +9029,10 @@ func (client *Client) CreateSecurityPolicyWithOptions(request *CreateSecurityPol
 		body["SecurityPolicyName"] = request.SecurityPolicyName
 	}
 
+	if !tea.BoolValue(util.IsUnset(request.Tag)) {
+		body["Tag"] = request.Tag
+	}
+
 	if !tea.BoolValue(util.IsUnset(request.TlsVersions)) {
 		body["TlsVersions"] = request.TlsVersions
 	}
@@ -7201,6 +9071,17 @@ func (client *Client) CreateSecurityPolicy(request *CreateSecurityPolicyRequest)
 	return _result, _err
 }
 
+/**
+ * *   **protocol** specifies the protocol used to forward requests to the backend servers.
+ * *   NLB instances support only backend server groups that use TCP, UDP, or SSL over TCP.
+ * *   **CreateServerGroup** is an asynchronous operation. After you send the request, the system returns a request ID even though the operation is still being performed in the background. You can call the [GetJobStatus](~~445904~~) operation to query the creation status of a server group.
+ *     *   If the task is in the **Succeeded** status, the server group is created.
+ *     *   If the task is in the **Processing** status, the server group is being created.
+ *
+ * @param request CreateServerGroupRequest
+ * @param runtime runtime options for this request RuntimeOptions
+ * @return CreateServerGroupResponse
+ */
 func (client *Client) CreateServerGroupWithOptions(request *CreateServerGroupRequest, runtime *util.RuntimeOptions) (_result *CreateServerGroupResponse, _err error) {
 	_err = util.ValidateModel(request)
 	if _err != nil {
@@ -7264,6 +9145,10 @@ func (client *Client) CreateServerGroupWithOptions(request *CreateServerGroupReq
 		body["ServerGroupType"] = request.ServerGroupType
 	}
 
+	if !tea.BoolValue(util.IsUnset(request.Tag)) {
+		body["Tag"] = request.Tag
+	}
+
 	if !tea.BoolValue(util.IsUnset(request.VpcId)) {
 		body["VpcId"] = request.VpcId
 	}
@@ -7293,6 +9178,16 @@ func (client *Client) CreateServerGroupWithOptions(request *CreateServerGroupReq
 	return _result, _err
 }
 
+/**
+ * *   **protocol** specifies the protocol used to forward requests to the backend servers.
+ * *   NLB instances support only backend server groups that use TCP, UDP, or SSL over TCP.
+ * *   **CreateServerGroup** is an asynchronous operation. After you send the request, the system returns a request ID even though the operation is still being performed in the background. You can call the [GetJobStatus](~~445904~~) operation to query the creation status of a server group.
+ *     *   If the task is in the **Succeeded** status, the server group is created.
+ *     *   If the task is in the **Processing** status, the server group is being created.
+ *
+ * @param request CreateServerGroupRequest
+ * @return CreateServerGroupResponse
+ */
 func (client *Client) CreateServerGroup(request *CreateServerGroupRequest) (_result *CreateServerGroupResponse, _err error) {
 	runtime := &util.RuntimeOptions{}
 	_result = &CreateServerGroupResponse{}
@@ -7472,6 +9367,13 @@ func (client *Client) DeleteSecurityPolicy(request *DeleteSecurityPolicyRequest)
 	return _result, _err
 }
 
+/**
+ * You can delete server groups that are not associated with listeners.
+ *
+ * @param request DeleteServerGroupRequest
+ * @param runtime runtime options for this request RuntimeOptions
+ * @return DeleteServerGroupResponse
+ */
 func (client *Client) DeleteServerGroupWithOptions(request *DeleteServerGroupRequest, runtime *util.RuntimeOptions) (_result *DeleteServerGroupResponse, _err error) {
 	_err = util.ValidateModel(request)
 	if _err != nil {
@@ -7517,6 +9419,12 @@ func (client *Client) DeleteServerGroupWithOptions(request *DeleteServerGroupReq
 	return _result, _err
 }
 
+/**
+ * You can delete server groups that are not associated with listeners.
+ *
+ * @param request DeleteServerGroupRequest
+ * @return DeleteServerGroupResponse
+ */
 func (client *Client) DeleteServerGroup(request *DeleteServerGroupRequest) (_result *DeleteServerGroupResponse, _err error) {
 	runtime := &util.RuntimeOptions{}
 	_result = &DeleteServerGroupResponse{}
@@ -7747,6 +9655,66 @@ func (client *Client) DisableLoadBalancerIpv6Internet(request *DisableLoadBalanc
 	runtime := &util.RuntimeOptions{}
 	_result = &DisableLoadBalancerIpv6InternetResponse{}
 	_body, _err := client.DisableLoadBalancerIpv6InternetWithOptions(request, runtime)
+	if _err != nil {
+		return _result, _err
+	}
+	_result = _body
+	return _result, _err
+}
+
+func (client *Client) DisassociateAdditionalCertificatesWithListenerWithOptions(request *DisassociateAdditionalCertificatesWithListenerRequest, runtime *util.RuntimeOptions) (_result *DisassociateAdditionalCertificatesWithListenerResponse, _err error) {
+	_err = util.ValidateModel(request)
+	if _err != nil {
+		return _result, _err
+	}
+	body := map[string]interface{}{}
+	if !tea.BoolValue(util.IsUnset(request.AdditionalCertificateIds)) {
+		body["AdditionalCertificateIds"] = request.AdditionalCertificateIds
+	}
+
+	if !tea.BoolValue(util.IsUnset(request.ClientToken)) {
+		body["ClientToken"] = request.ClientToken
+	}
+
+	if !tea.BoolValue(util.IsUnset(request.DryRun)) {
+		body["DryRun"] = request.DryRun
+	}
+
+	if !tea.BoolValue(util.IsUnset(request.ListenerId)) {
+		body["ListenerId"] = request.ListenerId
+	}
+
+	if !tea.BoolValue(util.IsUnset(request.RegionId)) {
+		body["RegionId"] = request.RegionId
+	}
+
+	req := &openapi.OpenApiRequest{
+		Body: openapiutil.ParseToMap(body),
+	}
+	params := &openapi.Params{
+		Action:      tea.String("DisassociateAdditionalCertificatesWithListener"),
+		Version:     tea.String("2022-04-30"),
+		Protocol:    tea.String("HTTPS"),
+		Pathname:    tea.String("/"),
+		Method:      tea.String("POST"),
+		AuthType:    tea.String("AK"),
+		Style:       tea.String("RPC"),
+		ReqBodyType: tea.String("formData"),
+		BodyType:    tea.String("json"),
+	}
+	_result = &DisassociateAdditionalCertificatesWithListenerResponse{}
+	_body, _err := client.CallApi(params, req, runtime)
+	if _err != nil {
+		return _result, _err
+	}
+	_err = tea.Convert(_body, &_result)
+	return _result, _err
+}
+
+func (client *Client) DisassociateAdditionalCertificatesWithListener(request *DisassociateAdditionalCertificatesWithListenerRequest) (_result *DisassociateAdditionalCertificatesWithListenerResponse, _err error) {
+	runtime := &util.RuntimeOptions{}
+	_result = &DisassociateAdditionalCertificatesWithListenerResponse{}
+	_body, _err := client.DisassociateAdditionalCertificatesWithListenerWithOptions(request, runtime)
 	if _err != nil {
 		return _result, _err
 	}
@@ -8032,6 +10000,10 @@ func (client *Client) ListListenerCertificatesWithOptions(request *ListListenerC
 		return _result, _err
 	}
 	body := map[string]interface{}{}
+	if !tea.BoolValue(util.IsUnset(request.CertType)) {
+		body["CertType"] = request.CertType
+	}
+
 	if !tea.BoolValue(util.IsUnset(request.ListenerId)) {
 		body["ListenerId"] = request.ListenerId
 	}
@@ -8042,14 +10014,6 @@ func (client *Client) ListListenerCertificatesWithOptions(request *ListListenerC
 
 	if !tea.BoolValue(util.IsUnset(request.NextToken)) {
 		body["NextToken"] = request.NextToken
-	}
-
-	if !tea.BoolValue(util.IsUnset(request.Page)) {
-		body["Page"] = request.Page
-	}
-
-	if !tea.BoolValue(util.IsUnset(request.PageSize)) {
-		body["PageSize"] = request.PageSize
 	}
 
 	if !tea.BoolValue(util.IsUnset(request.RegionId)) {
@@ -8118,6 +10082,10 @@ func (client *Client) ListListenersWithOptions(request *ListListenersRequest, ru
 
 	if !tea.BoolValue(util.IsUnset(request.RegionId)) {
 		query["RegionId"] = request.RegionId
+	}
+
+	if !tea.BoolValue(util.IsUnset(request.Tag)) {
+		query["Tag"] = request.Tag
 	}
 
 	req := &openapi.OpenApiRequest{
@@ -8472,36 +10440,8 @@ func (client *Client) ListSystemSecurityPolicyWithOptions(request *ListSystemSec
 		return _result, _err
 	}
 	body := map[string]interface{}{}
-	if !tea.BoolValue(util.IsUnset(request.CallerBidLoginEmail)) {
-		body["CallerBidLoginEmail"] = request.CallerBidLoginEmail
-	}
-
-	if !tea.BoolValue(util.IsUnset(request.CallerUidLoginEmail)) {
-		body["CallerUidLoginEmail"] = request.CallerUidLoginEmail
-	}
-
-	if !tea.BoolValue(util.IsUnset(request.Channel)) {
-		body["Channel"] = request.Channel
-	}
-
-	if !tea.BoolValue(util.IsUnset(request.OwnerAccount)) {
-		body["OwnerAccount"] = request.OwnerAccount
-	}
-
-	if !tea.BoolValue(util.IsUnset(request.OwnerIdLoginEmail)) {
-		body["OwnerIdLoginEmail"] = request.OwnerIdLoginEmail
-	}
-
 	if !tea.BoolValue(util.IsUnset(request.RegionId)) {
 		body["RegionId"] = request.RegionId
-	}
-
-	if !tea.BoolValue(util.IsUnset(request.RequestContent)) {
-		body["RequestContent"] = request.RequestContent
-	}
-
-	if !tea.BoolValue(util.IsUnset(request.ResourceOwnerAccount)) {
-		body["ResourceOwnerAccount"] = request.ResourceOwnerAccount
 	}
 
 	req := &openapi.OpenApiRequest{
@@ -8550,14 +10490,6 @@ func (client *Client) ListTagResourcesWithOptions(request *ListTagResourcesReque
 
 	if !tea.BoolValue(util.IsUnset(request.NextToken)) {
 		body["NextToken"] = request.NextToken
-	}
-
-	if !tea.BoolValue(util.IsUnset(request.Page)) {
-		body["Page"] = request.Page
-	}
-
-	if !tea.BoolValue(util.IsUnset(request.PageSize)) {
-		body["PageSize"] = request.PageSize
 	}
 
 	if !tea.BoolValue(util.IsUnset(request.RegionId)) {
@@ -8613,6 +10545,18 @@ func (client *Client) ListTagResources(request *ListTagResourcesRequest) (_resul
 	return _result, _err
 }
 
+/**
+ * *   Make sure that you have created a security group. For more information about how to create a security group, see [CreateSecurityGroup](~~25553~~).
+ * *   An NLB instance can be associated with up to four security groups.
+ * *   You can query the security groups that are associated with an NLB instance by calling the [GetLoadBalancerAttribute](~~214362~~) operation.
+ * *   LoadBalancerJoinSecurityGroup is an asynchronous operation. After you call the operation, the system returns a request ID and runs the task in the background. You can call the [GetJobStatus](~~445904~~) operation to query the status of a task.
+ *     *   If the task is in the **Succeeded** state, the security group is associated.
+ *     *   If the task is in the **Processing** state, the security group is being associated. In this case, you can perform only query operations.
+ *
+ * @param request LoadBalancerJoinSecurityGroupRequest
+ * @param runtime runtime options for this request RuntimeOptions
+ * @return LoadBalancerJoinSecurityGroupResponse
+ */
 func (client *Client) LoadBalancerJoinSecurityGroupWithOptions(request *LoadBalancerJoinSecurityGroupRequest, runtime *util.RuntimeOptions) (_result *LoadBalancerJoinSecurityGroupResponse, _err error) {
 	_err = util.ValidateModel(request)
 	if _err != nil {
@@ -8662,6 +10606,17 @@ func (client *Client) LoadBalancerJoinSecurityGroupWithOptions(request *LoadBala
 	return _result, _err
 }
 
+/**
+ * *   Make sure that you have created a security group. For more information about how to create a security group, see [CreateSecurityGroup](~~25553~~).
+ * *   An NLB instance can be associated with up to four security groups.
+ * *   You can query the security groups that are associated with an NLB instance by calling the [GetLoadBalancerAttribute](~~214362~~) operation.
+ * *   LoadBalancerJoinSecurityGroup is an asynchronous operation. After you call the operation, the system returns a request ID and runs the task in the background. You can call the [GetJobStatus](~~445904~~) operation to query the status of a task.
+ *     *   If the task is in the **Succeeded** state, the security group is associated.
+ *     *   If the task is in the **Processing** state, the security group is being associated. In this case, you can perform only query operations.
+ *
+ * @param request LoadBalancerJoinSecurityGroupRequest
+ * @return LoadBalancerJoinSecurityGroupResponse
+ */
 func (client *Client) LoadBalancerJoinSecurityGroup(request *LoadBalancerJoinSecurityGroupRequest) (_result *LoadBalancerJoinSecurityGroupResponse, _err error) {
 	runtime := &util.RuntimeOptions{}
 	_result = &LoadBalancerJoinSecurityGroupResponse{}
@@ -8673,6 +10628,15 @@ func (client *Client) LoadBalancerJoinSecurityGroup(request *LoadBalancerJoinSec
 	return _result, _err
 }
 
+/**
+ * LoadBalancerLeaveSecurityGroup is an asynchronous operation. After you call the operation, the system returns a request ID and runs the task in the background. You can call the [GetJobStatus](~~445904~~) operation to query the status of a task.
+ * *   If the task is in the **Succeeded** state, the security group is disassociated.
+ * *   If the task is in the **Processing** state, the security group is being disassociated. In this case, you can perform only query operations.
+ *
+ * @param request LoadBalancerLeaveSecurityGroupRequest
+ * @param runtime runtime options for this request RuntimeOptions
+ * @return LoadBalancerLeaveSecurityGroupResponse
+ */
 func (client *Client) LoadBalancerLeaveSecurityGroupWithOptions(request *LoadBalancerLeaveSecurityGroupRequest, runtime *util.RuntimeOptions) (_result *LoadBalancerLeaveSecurityGroupResponse, _err error) {
 	_err = util.ValidateModel(request)
 	if _err != nil {
@@ -8722,10 +10686,74 @@ func (client *Client) LoadBalancerLeaveSecurityGroupWithOptions(request *LoadBal
 	return _result, _err
 }
 
+/**
+ * LoadBalancerLeaveSecurityGroup is an asynchronous operation. After you call the operation, the system returns a request ID and runs the task in the background. You can call the [GetJobStatus](~~445904~~) operation to query the status of a task.
+ * *   If the task is in the **Succeeded** state, the security group is disassociated.
+ * *   If the task is in the **Processing** state, the security group is being disassociated. In this case, you can perform only query operations.
+ *
+ * @param request LoadBalancerLeaveSecurityGroupRequest
+ * @return LoadBalancerLeaveSecurityGroupResponse
+ */
 func (client *Client) LoadBalancerLeaveSecurityGroup(request *LoadBalancerLeaveSecurityGroupRequest) (_result *LoadBalancerLeaveSecurityGroupResponse, _err error) {
 	runtime := &util.RuntimeOptions{}
 	_result = &LoadBalancerLeaveSecurityGroupResponse{}
 	_body, _err := client.LoadBalancerLeaveSecurityGroupWithOptions(request, runtime)
+	if _err != nil {
+		return _result, _err
+	}
+	_result = _body
+	return _result, _err
+}
+
+func (client *Client) MoveResourceGroupWithOptions(request *MoveResourceGroupRequest, runtime *util.RuntimeOptions) (_result *MoveResourceGroupResponse, _err error) {
+	_err = util.ValidateModel(request)
+	if _err != nil {
+		return _result, _err
+	}
+	body := map[string]interface{}{}
+	if !tea.BoolValue(util.IsUnset(request.NewResourceGroupId)) {
+		body["NewResourceGroupId"] = request.NewResourceGroupId
+	}
+
+	if !tea.BoolValue(util.IsUnset(request.RegionId)) {
+		body["RegionId"] = request.RegionId
+	}
+
+	if !tea.BoolValue(util.IsUnset(request.ResourceId)) {
+		body["ResourceId"] = request.ResourceId
+	}
+
+	if !tea.BoolValue(util.IsUnset(request.ResourceType)) {
+		body["ResourceType"] = request.ResourceType
+	}
+
+	req := &openapi.OpenApiRequest{
+		Body: openapiutil.ParseToMap(body),
+	}
+	params := &openapi.Params{
+		Action:      tea.String("MoveResourceGroup"),
+		Version:     tea.String("2022-04-30"),
+		Protocol:    tea.String("HTTPS"),
+		Pathname:    tea.String("/"),
+		Method:      tea.String("POST"),
+		AuthType:    tea.String("AK"),
+		Style:       tea.String("RPC"),
+		ReqBodyType: tea.String("formData"),
+		BodyType:    tea.String("json"),
+	}
+	_result = &MoveResourceGroupResponse{}
+	_body, _err := client.CallApi(params, req, runtime)
+	if _err != nil {
+		return _result, _err
+	}
+	_err = tea.Convert(_body, &_result)
+	return _result, _err
+}
+
+func (client *Client) MoveResourceGroup(request *MoveResourceGroupRequest) (_result *MoveResourceGroupResponse, _err error) {
+	runtime := &util.RuntimeOptions{}
+	_result = &MoveResourceGroupResponse{}
+	_body, _err := client.MoveResourceGroupWithOptions(request, runtime)
 	if _err != nil {
 		return _result, _err
 	}
@@ -9151,6 +11179,17 @@ func (client *Client) UpdateListenerAttribute(request *UpdateListenerAttributeRe
 	return _result, _err
 }
 
+/**
+ * *   Make sure that an NLB instance is created. For more information, see [CreateLoadBalancer](~~445868~~).
+ * *   You can call the [GetLoadBalancerAttribute](~~445873~~) operation to query the **AddressType** value of an NLB instance after you change the network type.
+ * *   **UpdateLoadBalancerAddressTypeConfig** is an asynchronous operation. After you send a request, the request ID is returned but the operation is still being performed in the system background. You can call the [GetJobStatus](~~445904~~) operation to query the task status:
+ *     *   If the task is in the **Succeeded** state, the network type of the IPv4 address of the NLB instance is changed.
+ *     *   If the task is in the **Processing** state, the network type of the IPv4 address of the NLB instance is being changed. In this case, you can perform only query operations.
+ *
+ * @param request UpdateLoadBalancerAddressTypeConfigRequest
+ * @param runtime runtime options for this request RuntimeOptions
+ * @return UpdateLoadBalancerAddressTypeConfigResponse
+ */
 func (client *Client) UpdateLoadBalancerAddressTypeConfigWithOptions(request *UpdateLoadBalancerAddressTypeConfigRequest, runtime *util.RuntimeOptions) (_result *UpdateLoadBalancerAddressTypeConfigResponse, _err error) {
 	_err = util.ValidateModel(request)
 	if _err != nil {
@@ -9204,6 +11243,16 @@ func (client *Client) UpdateLoadBalancerAddressTypeConfigWithOptions(request *Up
 	return _result, _err
 }
 
+/**
+ * *   Make sure that an NLB instance is created. For more information, see [CreateLoadBalancer](~~445868~~).
+ * *   You can call the [GetLoadBalancerAttribute](~~445873~~) operation to query the **AddressType** value of an NLB instance after you change the network type.
+ * *   **UpdateLoadBalancerAddressTypeConfig** is an asynchronous operation. After you send a request, the request ID is returned but the operation is still being performed in the system background. You can call the [GetJobStatus](~~445904~~) operation to query the task status:
+ *     *   If the task is in the **Succeeded** state, the network type of the IPv4 address of the NLB instance is changed.
+ *     *   If the task is in the **Processing** state, the network type of the IPv4 address of the NLB instance is being changed. In this case, you can perform only query operations.
+ *
+ * @param request UpdateLoadBalancerAddressTypeConfigRequest
+ * @return UpdateLoadBalancerAddressTypeConfigResponse
+ */
 func (client *Client) UpdateLoadBalancerAddressTypeConfig(request *UpdateLoadBalancerAddressTypeConfigRequest) (_result *UpdateLoadBalancerAddressTypeConfigResponse, _err error) {
 	runtime := &util.RuntimeOptions{}
 	_result = &UpdateLoadBalancerAddressTypeConfigResponse{}
@@ -9283,6 +11332,13 @@ func (client *Client) UpdateLoadBalancerAttribute(request *UpdateLoadBalancerAtt
 	return _result, _err
 }
 
+/**
+ * >  You can call the [GetLoadBalancerAttribute](~~445873~~) operation to query the details of deletion protection and the configuration read-only mode.
+ *
+ * @param request UpdateLoadBalancerProtectionRequest
+ * @param runtime runtime options for this request RuntimeOptions
+ * @return UpdateLoadBalancerProtectionResponse
+ */
 func (client *Client) UpdateLoadBalancerProtectionWithOptions(request *UpdateLoadBalancerProtectionRequest, runtime *util.RuntimeOptions) (_result *UpdateLoadBalancerProtectionResponse, _err error) {
 	_err = util.ValidateModel(request)
 	if _err != nil {
@@ -9344,6 +11400,12 @@ func (client *Client) UpdateLoadBalancerProtectionWithOptions(request *UpdateLoa
 	return _result, _err
 }
 
+/**
+ * >  You can call the [GetLoadBalancerAttribute](~~445873~~) operation to query the details of deletion protection and the configuration read-only mode.
+ *
+ * @param request UpdateLoadBalancerProtectionRequest
+ * @return UpdateLoadBalancerProtectionResponse
+ */
 func (client *Client) UpdateLoadBalancerProtection(request *UpdateLoadBalancerProtectionRequest) (_result *UpdateLoadBalancerProtectionResponse, _err error) {
 	runtime := &util.RuntimeOptions{}
 	_result = &UpdateLoadBalancerProtectionResponse{}
@@ -9355,6 +11417,19 @@ func (client *Client) UpdateLoadBalancerProtection(request *UpdateLoadBalancerPr
 	return _result, _err
 }
 
+/**
+ * - Make sure that an NLB instance is created. For more information, see [CreateLoadBalancer](/help/en/server-load-balancer/latest/createloadbalancer).
+ * - You can call the [GetLoadBalancerAttribute](/help/en/server-load-balancer/latest/getloadbalancerattribute-nlb) operation to query the zones and zone attributes of an NLB instance.
+ * - **UpdateLoadBalancerZones** is an asynchronous operation. After you send a request, the request ID is returned but the operation is still being performed in the system background. You can call the [GetJobStatus](/help/en/server-load-balancer/latest/getjobstatus) operation to query the status of a task:
+ *          - If the task is in the **Succeeded** state, the zones and zone attributes are modified.
+ *   - If the task is in the **Processing** state, the zones and zone attributes are being modified. In this case, you can perform only query operations.
+ * ## Precautions
+ * When you call this operation, make sure that you specify all the zones of the NLB instance, including the existing zones and new zones. If you do not specify the existing zones, the existing zones are removed.
+ *
+ * @param request UpdateLoadBalancerZonesRequest
+ * @param runtime runtime options for this request RuntimeOptions
+ * @return UpdateLoadBalancerZonesResponse
+ */
 func (client *Client) UpdateLoadBalancerZonesWithOptions(request *UpdateLoadBalancerZonesRequest, runtime *util.RuntimeOptions) (_result *UpdateLoadBalancerZonesResponse, _err error) {
 	_err = util.ValidateModel(request)
 	if _err != nil {
@@ -9404,6 +11479,18 @@ func (client *Client) UpdateLoadBalancerZonesWithOptions(request *UpdateLoadBala
 	return _result, _err
 }
 
+/**
+ * - Make sure that an NLB instance is created. For more information, see [CreateLoadBalancer](/help/en/server-load-balancer/latest/createloadbalancer).
+ * - You can call the [GetLoadBalancerAttribute](/help/en/server-load-balancer/latest/getloadbalancerattribute-nlb) operation to query the zones and zone attributes of an NLB instance.
+ * - **UpdateLoadBalancerZones** is an asynchronous operation. After you send a request, the request ID is returned but the operation is still being performed in the system background. You can call the [GetJobStatus](/help/en/server-load-balancer/latest/getjobstatus) operation to query the status of a task:
+ *          - If the task is in the **Succeeded** state, the zones and zone attributes are modified.
+ *   - If the task is in the **Processing** state, the zones and zone attributes are being modified. In this case, you can perform only query operations.
+ * ## Precautions
+ * When you call this operation, make sure that you specify all the zones of the NLB instance, including the existing zones and new zones. If you do not specify the existing zones, the existing zones are removed.
+ *
+ * @param request UpdateLoadBalancerZonesRequest
+ * @return UpdateLoadBalancerZonesResponse
+ */
 func (client *Client) UpdateLoadBalancerZones(request *UpdateLoadBalancerZonesRequest) (_result *UpdateLoadBalancerZonesResponse, _err error) {
 	runtime := &util.RuntimeOptions{}
 	_result = &UpdateLoadBalancerZonesResponse{}
@@ -9566,6 +11653,19 @@ func (client *Client) UpdateServerGroupAttribute(request *UpdateServerGroupAttri
 	return _result, _err
 }
 
+/**
+ * The **UpdateServerGroupServersAttribute** operation is asynchronous. After you send a request, the system returns the request ID, but the operation is still being performed in the system background.
+ * 1\\. You can call [ListServerGroups](~~445895~~) to query the status of a server group.
+ * *   If a server group is in the **Configuring** state, it indicates that the server group is being modified.
+ * *   If a server group is in the **Available** state, it indicates that the server group is running.
+ * 2\\. You can call [ListServerGroupServers](~~445896~~) to query the status of a backend server.
+ * *   If a backend server is in the **Configuring** state, it indicates that the backend server is being modified.
+ * *   If a backend server is in the **Available** state, it indicates that the backend server is running.
+ *
+ * @param request UpdateServerGroupServersAttributeRequest
+ * @param runtime runtime options for this request RuntimeOptions
+ * @return UpdateServerGroupServersAttributeResponse
+ */
 func (client *Client) UpdateServerGroupServersAttributeWithOptions(request *UpdateServerGroupServersAttributeRequest, runtime *util.RuntimeOptions) (_result *UpdateServerGroupServersAttributeResponse, _err error) {
 	_err = util.ValidateModel(request)
 	if _err != nil {
@@ -9615,6 +11715,18 @@ func (client *Client) UpdateServerGroupServersAttributeWithOptions(request *Upda
 	return _result, _err
 }
 
+/**
+ * The **UpdateServerGroupServersAttribute** operation is asynchronous. After you send a request, the system returns the request ID, but the operation is still being performed in the system background.
+ * 1\\. You can call [ListServerGroups](~~445895~~) to query the status of a server group.
+ * *   If a server group is in the **Configuring** state, it indicates that the server group is being modified.
+ * *   If a server group is in the **Available** state, it indicates that the server group is running.
+ * 2\\. You can call [ListServerGroupServers](~~445896~~) to query the status of a backend server.
+ * *   If a backend server is in the **Configuring** state, it indicates that the backend server is being modified.
+ * *   If a backend server is in the **Available** state, it indicates that the backend server is running.
+ *
+ * @param request UpdateServerGroupServersAttributeRequest
+ * @return UpdateServerGroupServersAttributeResponse
+ */
 func (client *Client) UpdateServerGroupServersAttribute(request *UpdateServerGroupServersAttributeRequest) (_result *UpdateServerGroupServersAttributeResponse, _err error) {
 	runtime := &util.RuntimeOptions{}
 	_result = &UpdateServerGroupServersAttributeResponse{}
