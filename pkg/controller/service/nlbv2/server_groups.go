@@ -447,10 +447,8 @@ func setBackendsFromEndpointSlices(candidates *reconbackend.EndpointWithENI, sg 
 					continue
 				}
 				endpointMap[addr] = true
-				// NodeName of endpoint is nil, use topology.hostname instead of NodeName
-				hostName := ep.Topology[v1.LabelHostname]
 				backends = append(backends, nlbmodel.ServerGroupServer{
-					NodeName: &hostName,
+					NodeName: ep.NodeName,
 					ServerIp: addr,
 					// set backend port to targetPort by default
 					// if backend type is ecs, update backend port to nodePort
