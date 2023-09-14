@@ -155,7 +155,7 @@ func (mgr *VGroupManager) DescribeVServerGroups(reqCtx *svcCtx.RequestContext, l
 
 func (mgr *VGroupManager) BatchAddVServerGroupBackendServers(reqCtx *svcCtx.RequestContext, vGroup model.VServerGroup, add interface{}) error {
 	batch := 0
-	return backend.Batch(add, backend.MaxBackendNum,
+	return backend.Batch(add, ctrlCfg.ControllerCFG.ServerGroupBatchSize,
 		func(list []interface{}) error {
 			batch += 1
 			additions, err := json.Marshal(list)
@@ -169,7 +169,7 @@ func (mgr *VGroupManager) BatchAddVServerGroupBackendServers(reqCtx *svcCtx.Requ
 
 func (mgr *VGroupManager) BatchRemoveVServerGroupBackendServers(reqCtx *svcCtx.RequestContext, vGroup model.VServerGroup, del interface{}) error {
 	batch := 0
-	return backend.Batch(del, backend.MaxBackendNum,
+	return backend.Batch(del, ctrlCfg.ControllerCFG.ServerGroupBatchSize,
 		func(list []interface{}) error {
 			batch += 1
 			deletions, err := json.Marshal(list)
@@ -183,7 +183,7 @@ func (mgr *VGroupManager) BatchRemoveVServerGroupBackendServers(reqCtx *svcCtx.R
 
 func (mgr *VGroupManager) BatchUpdateVServerGroupBackendServers(reqCtx *svcCtx.RequestContext, vGroup model.VServerGroup, update interface{}) error {
 	batch := 0
-	return backend.Batch(update, backend.MaxBackendNum,
+	return backend.Batch(update, ctrlCfg.ControllerCFG.ServerGroupBatchSize,
 		func(list []interface{}) error {
 			batch += 1
 			updateJson, err := json.Marshal(list)
