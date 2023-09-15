@@ -73,7 +73,7 @@ func add(mgr manager.Manager, r *ReconcileNode) error {
 	}
 
 	// Watch for changes to primary resource AutoRepair
-	if err := c.Watch(&source.Kind{Type: &corev1.Node{}}, &handler.EnqueueRequestForObject{}); err != nil {
+	if err := c.Watch(source.Kind(mgr.GetCache(), &corev1.Node{}), &handler.EnqueueRequestForObject{}); err != nil {
 		return err
 	}
 

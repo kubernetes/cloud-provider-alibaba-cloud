@@ -21,10 +21,9 @@ const (
 	flagLeaderElectResourceName      = "leader-elect-resource-name"
 	flagLeaderElectResourceNamespace = "leader-elect-resource-namespace"
 	flagLeaderElectRetryPeriod       = "leader-elect-retry-period"
-	flagSyncPeriod                   = "sync-period"
 
 	defaultMetricsAddr                  = ":8080"
-	defaultHealthProbeBindAddress       = ":10258"
+	defaultHealthProbeBindAddr          = ":10258"
 	defaultLeaderElect                  = true
 	defaultLeaderElectLeaseDuration     = 15 * time.Second
 	defaultElectRenewDeadline           = 10 * time.Second
@@ -32,7 +31,6 @@ const (
 	defaultLeaderElectResourceLock      = "leases"
 	defaultLeaderElectResourceName      = "ccm"
 	defaultLeaderElectResourceNamespace = "kube-system"
-	defaultSyncPeriod                   = 60 * time.Minute
 	defaultQPS                          = 20.0
 	defaultBurst                        = 30
 )
@@ -48,14 +46,13 @@ type RuntimeConfig struct {
 	LeaderElectResourceLock      string
 	LeaderElectResourceName      string
 	LeaderElectResourceNamespace string
-	SyncPeriod                   time.Duration
 	QPS                          float32
 	Burst                        int
 }
 
 func (c *RuntimeConfig) BindFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&c.MetricsBindAddress, flagMetricsBindAddr, defaultMetricsAddr, "The address the metric endpoint binds to.")
-	fs.StringVar(&c.HealthProbeBindAddress, flagHealthProbeBindAddr, defaultHealthProbeBindAddress, "The address the health probes binds to.")
+	fs.StringVar(&c.HealthProbeBindAddress, flagHealthProbeBindAddr, defaultHealthProbeBindAddr, "The address the health probes binds to.")
 	fs.Float32Var(&c.QPS, flagQPS, defaultQPS, "QPS to use while talking with kubernetes apiserver.")
 	fs.IntVar(&c.Burst, flagBurst, defaultBurst, "Burst to use while talking with kubernetes apiserver.")
 	fs.BoolVar(&c.LeaderElect, flagLeaderElect, defaultLeaderElect,
@@ -77,9 +74,6 @@ func (c *RuntimeConfig) BindFlags(fs *pflag.FlagSet) {
 		"The name of resource object that is used for locking during leader election. ")
 	fs.StringVar(&c.LeaderElectResourceNamespace, flagLeaderElectResourceNamespace, defaultLeaderElectResourceNamespace,
 		"The namespace of resource object that is used for locking during leader election.")
-	fs.DurationVar(&c.SyncPeriod, flagSyncPeriod, defaultSyncPeriod,
-		"Period at which the controller forces the repopulation of its local object stores.")
-
 }
 
 func BuildRuntimeOptions(rtCfg RuntimeConfig) manager.Options {
@@ -99,6 +93,5 @@ func BuildRuntimeOptions(rtCfg RuntimeConfig) manager.Options {
 		LeaseDuration:              &rtCfg.LeaderElectLeaseDuration,
 		RenewDeadline:              &rtCfg.LeaderElectRenewDeadline,
 		RetryPeriod:                &rtCfg.LeaderElectRetryPeriod,
-		SyncPeriod:                 &rtCfg.SyncPeriod,
 	}
 }

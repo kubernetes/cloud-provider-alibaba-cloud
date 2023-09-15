@@ -30,7 +30,7 @@ type enqueueRequestForServiceEvent struct {
 
 var _ handler.EventHandler = (*enqueueRequestForServiceEvent)(nil)
 
-func (h *enqueueRequestForServiceEvent) Create(e event.CreateEvent, queue workqueue.RateLimitingInterface) {
+func (h *enqueueRequestForServiceEvent) Create(_ context.Context, e event.CreateEvent, queue workqueue.RateLimitingInterface) {
 	svc, ok := e.Object.(*v1.Service)
 	if ok && needAdd(svc) {
 		util.ServiceLog.Info("controller: service create event", "service", util.Key(svc))
@@ -38,7 +38,7 @@ func (h *enqueueRequestForServiceEvent) Create(e event.CreateEvent, queue workqu
 	}
 }
 
-func (h *enqueueRequestForServiceEvent) Update(e event.UpdateEvent, queue workqueue.RateLimitingInterface) {
+func (h *enqueueRequestForServiceEvent) Update(_ context.Context, e event.UpdateEvent, queue workqueue.RateLimitingInterface) {
 	oldSvc, ok1 := e.ObjectOld.(*v1.Service)
 	newSvc, ok2 := e.ObjectNew.(*v1.Service)
 
@@ -48,12 +48,12 @@ func (h *enqueueRequestForServiceEvent) Update(e event.UpdateEvent, queue workqu
 	}
 }
 
-func (h *enqueueRequestForServiceEvent) Delete(e event.DeleteEvent, queue workqueue.RateLimitingInterface) {
+func (h *enqueueRequestForServiceEvent) Delete(_ context.Context, e event.DeleteEvent, queue workqueue.RateLimitingInterface) {
 	// Services have the finalizer. When a service is deleted, it will update the deletionTimestamp of the service.
 	// Since a delete event has changed to an update event, it is safe to ignore it.
 }
 
-func (h *enqueueRequestForServiceEvent) Generic(e event.GenericEvent, queue workqueue.RateLimitingInterface) {
+func (h *enqueueRequestForServiceEvent) Generic(_ context.Context, e event.GenericEvent, queue workqueue.RateLimitingInterface) {
 	// unknown type event, ignore
 }
 
@@ -166,7 +166,7 @@ func (h *enqueueRequestForEndpointEvent) InjectClient(c client.Client) error {
 
 var _ handler.EventHandler = (*enqueueRequestForEndpointEvent)(nil)
 
-func (h *enqueueRequestForEndpointEvent) Create(e event.CreateEvent, queue workqueue.RateLimitingInterface) {
+func (h *enqueueRequestForEndpointEvent) Create(_ context.Context, e event.CreateEvent, queue workqueue.RateLimitingInterface) {
 	ep, ok := e.Object.(*v1.Endpoints)
 	if ok && isEndpointProcessNeeded(ep, h.client) {
 		util.ServiceLog.Info("controller: endpoint create event", "endpoint", util.Key(ep))
@@ -174,7 +174,7 @@ func (h *enqueueRequestForEndpointEvent) Create(e event.CreateEvent, queue workq
 	}
 }
 
-func (h *enqueueRequestForEndpointEvent) Update(e event.UpdateEvent, queue workqueue.RateLimitingInterface) {
+func (h *enqueueRequestForEndpointEvent) Update(_ context.Context, e event.UpdateEvent, queue workqueue.RateLimitingInterface) {
 	ep1, ok1 := e.ObjectOld.(*v1.Endpoints)
 	ep2, ok2 := e.ObjectNew.(*v1.Endpoints)
 
@@ -187,7 +187,7 @@ func (h *enqueueRequestForEndpointEvent) Update(e event.UpdateEvent, queue workq
 	}
 }
 
-func (h *enqueueRequestForEndpointEvent) Delete(e event.DeleteEvent, queue workqueue.RateLimitingInterface) {
+func (h *enqueueRequestForEndpointEvent) Delete(_ context.Context, e event.DeleteEvent, queue workqueue.RateLimitingInterface) {
 	ep, ok := e.Object.(*v1.Endpoints)
 	if ok && isEndpointProcessNeeded(ep, h.client) {
 		util.ServiceLog.Info("controller: endpoint delete event", "endpoint", util.Key(ep))
@@ -195,7 +195,7 @@ func (h *enqueueRequestForEndpointEvent) Delete(e event.DeleteEvent, queue workq
 	}
 }
 
-func (h *enqueueRequestForEndpointEvent) Generic(e event.GenericEvent, queue workqueue.RateLimitingInterface) {
+func (h *enqueueRequestForEndpointEvent) Generic(_ context.Context, e event.GenericEvent, queue workqueue.RateLimitingInterface) {
 	// unknown event, ignore
 }
 
@@ -260,7 +260,7 @@ func (h *enqueueRequestForNodeEvent) InjectClient(c client.Client) error {
 	return nil
 }
 
-func (h *enqueueRequestForNodeEvent) Create(e event.CreateEvent, queue workqueue.RateLimitingInterface) {
+func (h *enqueueRequestForNodeEvent) Create(_ context.Context, e event.CreateEvent, queue workqueue.RateLimitingInterface) {
 	node, ok := e.Object.(*v1.Node)
 	if ok && !canNodeSkipEventHandler(node) {
 		util.ServiceLog.Info("controller: node create event", "node", node.Name)
@@ -268,7 +268,7 @@ func (h *enqueueRequestForNodeEvent) Create(e event.CreateEvent, queue workqueue
 	}
 }
 
-func (h *enqueueRequestForNodeEvent) Update(e event.UpdateEvent, queue workqueue.RateLimitingInterface) {
+func (h *enqueueRequestForNodeEvent) Update(_ context.Context, e event.UpdateEvent, queue workqueue.RateLimitingInterface) {
 	oldNode, ok1 := e.ObjectOld.(*v1.Node)
 	newNode, ok2 := e.ObjectNew.(*v1.Node)
 
@@ -285,7 +285,7 @@ func (h *enqueueRequestForNodeEvent) Update(e event.UpdateEvent, queue workqueue
 	}
 }
 
-func (h *enqueueRequestForNodeEvent) Delete(e event.DeleteEvent, queue workqueue.RateLimitingInterface) {
+func (h *enqueueRequestForNodeEvent) Delete(_ context.Context, e event.DeleteEvent, queue workqueue.RateLimitingInterface) {
 	node, ok := e.Object.(*v1.Node)
 	if ok && !canNodeSkipEventHandler(node) {
 		util.ServiceLog.Info("controller: node delete event", "node", node.Name)
@@ -293,7 +293,7 @@ func (h *enqueueRequestForNodeEvent) Delete(e event.DeleteEvent, queue workqueue
 	}
 }
 
-func (h *enqueueRequestForNodeEvent) Generic(e event.GenericEvent, queue workqueue.RateLimitingInterface) {
+func (h *enqueueRequestForNodeEvent) Generic(_ context.Context, e event.GenericEvent, queue workqueue.RateLimitingInterface) {
 	// unknown event, ignore
 }
 
@@ -340,7 +340,7 @@ func (h *enqueueRequestForEndpointSliceEvent) InjectClient(c client.Client) erro
 	return nil
 }
 
-func (h *enqueueRequestForEndpointSliceEvent) Create(e event.CreateEvent, queue workqueue.RateLimitingInterface) {
+func (h *enqueueRequestForEndpointSliceEvent) Create(_ context.Context, e event.CreateEvent, queue workqueue.RateLimitingInterface) {
 	es, ok := e.Object.(*discovery.EndpointSlice)
 	if ok && isEndpointSliceProcessNeeded(es, h.client) {
 		util.ServiceLog.Info("controller: endpointslice create event", "endpointslice", util.Key(es))
@@ -348,7 +348,7 @@ func (h *enqueueRequestForEndpointSliceEvent) Create(e event.CreateEvent, queue 
 	}
 }
 
-func (h *enqueueRequestForEndpointSliceEvent) Update(e event.UpdateEvent, queue workqueue.RateLimitingInterface) {
+func (h *enqueueRequestForEndpointSliceEvent) Update(_ context.Context, e event.UpdateEvent, queue workqueue.RateLimitingInterface) {
 	es1, ok1 := e.ObjectOld.(*discovery.EndpointSlice)
 	es2, ok2 := e.ObjectNew.(*discovery.EndpointSlice)
 
@@ -361,7 +361,7 @@ func (h *enqueueRequestForEndpointSliceEvent) Update(e event.UpdateEvent, queue 
 	}
 }
 
-func (h *enqueueRequestForEndpointSliceEvent) Delete(e event.DeleteEvent, queue workqueue.RateLimitingInterface) {
+func (h *enqueueRequestForEndpointSliceEvent) Delete(_ context.Context, e event.DeleteEvent, queue workqueue.RateLimitingInterface) {
 	es, ok := e.Object.(*discovery.EndpointSlice)
 	if ok && isEndpointSliceProcessNeeded(es, h.client) {
 		util.ServiceLog.Info("controller: endpointslice delete event", "endpointslice", util.Key(es))
@@ -369,7 +369,7 @@ func (h *enqueueRequestForEndpointSliceEvent) Delete(e event.DeleteEvent, queue 
 	}
 }
 
-func (h *enqueueRequestForEndpointSliceEvent) Generic(e event.GenericEvent, queue workqueue.RateLimitingInterface) {
+func (h *enqueueRequestForEndpointSliceEvent) Generic(_ context.Context, e event.GenericEvent, queue workqueue.RateLimitingInterface) {
 	// unknown event, ignore
 }
 

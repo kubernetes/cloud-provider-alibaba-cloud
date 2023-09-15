@@ -36,7 +36,6 @@ func printVersion() {
 }
 
 func main() {
-	ctrl.SetLogger(klogr.New())
 	printVersion()
 
 	err := ctrlCfg.ControllerCFG.LoadControllerConfig()
@@ -45,8 +44,6 @@ func main() {
 		os.Exit(1)
 	}
 	ctrl.SetLogger(klogr.New().V(ctrlCfg.ControllerCFG.LogLevel))
-
-	printVersion()
 
 	// Get a config to talk to the api-server
 	cfg := config.GetConfigOrDie()

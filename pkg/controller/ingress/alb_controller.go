@@ -130,14 +130,14 @@ type albconfigReconciler struct {
 	maxConcurrentReconciles int
 }
 
-func (g *albconfigReconciler) setupWatches(_ context.Context, c controller.Controller) error {
+func (g *albconfigReconciler) setupWatches(_ context.Context, c controller.Controller, mgr manager.Manager) error {
 	g.acEventChan = make(chan event.GenericEvent)
 	acEventHandler := NewEnqueueRequestsForAlbconfigEvent(g.k8sClient, g.eventRecorder, g.logger)
 	if err := c.Watch(&source.Channel{Source: g.acEventChan}, acEventHandler); err != nil {
 		return err
 	}
 
-	if err := c.Watch(&source.Kind{Type: &v1.AlbConfig{}}, acEventHandler); err != nil {
+	if err := c.Watch(source.Kind(mgr.GetCache(), &v1.AlbConfig{}), acEventHandler); err != nil {
 		return err
 	}
 
@@ -153,7 +153,7 @@ func (g *albconfigReconciler) SetupWithManager(ctx context.Context, mgr manager.
 		return err
 	}
 
-	if err := g.setupWatches(ctx, c); err != nil {
+	if err := g.setupWatches(ctx, c, mgr); err != nil {
 		return err
 	}
 

@@ -92,17 +92,17 @@ func add(mgr manager.Manager, r *ReconcileNLB) error {
 		return err
 	}
 
-	if err := c.Watch(&source.Kind{Type: &v1.Service{}},
+	if err := c.Watch(source.Kind(mgr.GetCache(), &v1.Service{}),
 		NewEnqueueRequestForServiceEvent(mgr.GetEventRecorderFor("nlb-controller"))); err != nil {
 		return fmt.Errorf("watch resource svc error: %s", err.Error())
 	}
 
-	if err := c.Watch(&source.Kind{Type: &v1.Endpoints{}},
+	if err := c.Watch(source.Kind(mgr.GetCache(), &v1.Endpoints{}),
 		NewEnqueueRequestForEndpointEvent(mgr.GetEventRecorderFor("nlb-controller"))); err != nil {
 		return fmt.Errorf("watch resource endpoint error: %s", err.Error())
 	}
 
-	if err := c.Watch(&source.Kind{Type: &v1.Node{}},
+	if err := c.Watch(source.Kind(mgr.GetCache(), &v1.Node{}),
 		NewEnqueueRequestForNodeEvent(mgr.GetEventRecorderFor("nlb-controller"))); err != nil {
 		return fmt.Errorf("watch resource node error: %s", err.Error())
 	}
