@@ -12,6 +12,7 @@ import (
 const (
 	flagMetricsBindAddr              = "metrics-bind-addr"
 	flagHealthProbeBindAddr          = "health-probe-bind-addr"
+	flagPprofBindAddr                = "pprof-bind-addr"
 	flagQPS                          = "kube-api-qps"
 	flagBurst                        = "kube-api-burst"
 	flagLeaderElect                  = "leader-elect"
@@ -24,6 +25,7 @@ const (
 
 	defaultMetricsAddr                  = ":8080"
 	defaultHealthProbeBindAddr          = ":10258"
+	defaultPprofBindAddr                = ":6060"
 	defaultLeaderElect                  = true
 	defaultLeaderElectLeaseDuration     = 15 * time.Second
 	defaultElectRenewDeadline           = 10 * time.Second
@@ -39,6 +41,7 @@ const (
 type RuntimeConfig struct {
 	MetricsBindAddress           string
 	HealthProbeBindAddress       string
+	PprofBindAddress             string
 	LeaderElect                  bool
 	LeaderElectLeaseDuration     time.Duration
 	LeaderElectRenewDeadline     time.Duration
@@ -53,6 +56,8 @@ type RuntimeConfig struct {
 func (c *RuntimeConfig) BindFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&c.MetricsBindAddress, flagMetricsBindAddr, defaultMetricsAddr, "The address the metric endpoint binds to.")
 	fs.StringVar(&c.HealthProbeBindAddress, flagHealthProbeBindAddr, defaultHealthProbeBindAddr, "The address the health probes binds to.")
+	fs.StringVar(&c.PprofBindAddress, flagPprofBindAddr, defaultPprofBindAddr,
+		"The address that the controller should bind to for serving pprof. It can be set to '' or 0 to disable the pprof serving.")
 	fs.Float32Var(&c.QPS, flagQPS, defaultQPS, "QPS to use while talking with kubernetes apiserver.")
 	fs.IntVar(&c.Burst, flagBurst, defaultBurst, "Burst to use while talking with kubernetes apiserver.")
 	fs.BoolVar(&c.LeaderElect, flagLeaderElect, defaultLeaderElect,
@@ -86,6 +91,7 @@ func BuildRuntimeOptions(rtCfg RuntimeConfig) manager.Options {
 		},
 		MetricsBindAddress:         rtCfg.MetricsBindAddress,
 		HealthProbeBindAddress:     rtCfg.HealthProbeBindAddress,
+		PprofBindAddress:           rtCfg.PprofBindAddress,
 		LeaderElection:             rtCfg.LeaderElect,
 		LeaderElectionID:           rtCfg.LeaderElectResourceName,
 		LeaderElectionResourceLock: rtCfg.LeaderElectResourceLock,
