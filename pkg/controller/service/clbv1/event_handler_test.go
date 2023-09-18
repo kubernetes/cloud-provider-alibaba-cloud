@@ -82,11 +82,9 @@ func TestNeedAdd(t *testing.T) {
 }
 
 func TestEnqueueRequestForEndpointEvent(t *testing.T) {
-	h := NewEnqueueRequestForEndpointEvent(record.NewFakeRecorder(100))
-	queue := workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter())
-
 	cl := getFakeKubeClient()
-	_ = h.InjectClient(cl)
+	h := NewEnqueueRequestForEndpointEvent(cl, record.NewFakeRecorder(100))
+	queue := workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter())
 
 	ep := &v1.Endpoints{}
 	if err := cl.Get(context.TODO(), types.NamespacedName{
@@ -115,10 +113,9 @@ func TestIsEndpointProcessNeeded(t *testing.T) {
 }
 
 func TestEnqueueRequestForNodeEvent(t *testing.T) {
-	h := NewEnqueueRequestForNodeEvent(record.NewFakeRecorder(100))
-	queue := workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter())
 	cl := getFakeKubeClient()
-	_ = h.InjectClient(cl)
+	h := NewEnqueueRequestForNodeEvent(cl, record.NewFakeRecorder(100))
+	queue := workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter())
 
 	node := &v1.Node{}
 	if err := cl.Get(context.TODO(), types.NamespacedName{
@@ -183,11 +180,9 @@ func TestNodeSpecChanged(t *testing.T) {
 }
 
 func TestEnqueueRequestForEndpointSliceEvent(t *testing.T) {
-	h := NewEnqueueRequestForEndpointSliceEvent(record.NewFakeRecorder(100))
-	queue := workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter())
-
 	cl := getFakeKubeClient()
-	_ = h.InjectClient(cl)
+	h := NewEnqueueRequestForEndpointSliceEvent(cl, record.NewFakeRecorder(100))
+	queue := workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter())
 
 	es := &discovery.EndpointSlice{}
 	if err := cl.Get(context.TODO(), types.NamespacedName{

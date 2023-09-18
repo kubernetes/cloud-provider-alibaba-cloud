@@ -88,11 +88,9 @@ func TestEnqueueRequestForServiceEvent(t *testing.T) {
 }
 
 func TestNewEnqueueRequestForEndpointEvent(t *testing.T) {
-	h := NewEnqueueRequestForEndpointEvent(record.NewFakeRecorder(100))
-	queue := workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter())
-
 	kubeClient := getFakeKubeClient()
-	_ = h.InjectClient(kubeClient)
+	h := NewEnqueueRequestForEndpointEvent(kubeClient, record.NewFakeRecorder(100))
+	queue := workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter())
 
 	ep := &v1.Endpoints{}
 	_ = kubeClient.Get(context.TODO(), types.NamespacedName{
@@ -143,11 +141,9 @@ func TestNewEnqueueRequestForEndpointEvent(t *testing.T) {
 }
 
 func TestNewEnqueueRequestForEndpointSliceEvent(t *testing.T) {
-	h := NewEnqueueRequestForEndpointSliceEvent(record.NewFakeRecorder(100))
-	queue := workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter())
-
 	kubeClient := getFakeKubeClient()
-	_ = h.InjectClient(kubeClient)
+	h := NewEnqueueRequestForEndpointSliceEvent(kubeClient, record.NewFakeRecorder(100))
+	queue := workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter())
 
 	es := &discovery.EndpointSlice{}
 	_ = kubeClient.Get(context.TODO(), types.NamespacedName{
@@ -183,10 +179,9 @@ func TestNewEnqueueRequestForEndpointSliceEvent(t *testing.T) {
 }
 
 func TestNewEnqueueRequestForNodeEvent(t *testing.T) {
-	h := NewEnqueueRequestForNodeEvent(record.NewFakeRecorder(100))
-	queue := workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter())
 	kubeClient := getFakeKubeClient()
-	_ = h.InjectClient(kubeClient)
+	h := NewEnqueueRequestForNodeEvent(kubeClient, record.NewFakeRecorder(100))
+	queue := workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter())
 
 	node := &v1.Node{}
 	_ = kubeClient.Get(context.TODO(), types.NamespacedName{

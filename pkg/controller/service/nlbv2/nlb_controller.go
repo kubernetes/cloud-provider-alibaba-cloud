@@ -7,11 +7,14 @@ import (
 	"github.com/go-logr/logr"
 	"golang.org/x/time/rate"
 	v1 "k8s.io/api/core/v1"
+	discovery "k8s.io/api/discovery/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
+	ctrlCfg "k8s.io/cloud-provider-alibaba-cloud/pkg/config"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/context/shared"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/helper"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/service/reconcile/annotation"
@@ -97,15 +100,25 @@ func add(mgr manager.Manager, r *ReconcileNLB) error {
 		return fmt.Errorf("watch resource svc error: %s", err.Error())
 	}
 
-	if err := c.Watch(source.Kind(mgr.GetCache(), &v1.Endpoints{}),
-		NewEnqueueRequestForEndpointEvent(mgr.GetEventRecorderFor("nlb-controller"))); err != nil {
-		return fmt.Errorf("watch resource endpoint error: %s", err.Error())
+	if utilfeature.DefaultFeatureGate.Enabled(ctrlCfg.EndpointSlice) {
+		// watch endpointslice
+		if err := c.Watch(source.Kind(mgr.GetCache(), &discovery.EndpointSlice{}),
+			NewEnqueueRequestForEndpointSliceEvent(mgr.GetClient(), mgr.GetEventRecorderFor("service-controller"))); err != nil {
+			return fmt.Errorf("watch resource endpointslice error: %s", err.Error())
+		}
+	} else {
+		// watch endpoints
+		if err := c.Watch(source.Kind(mgr.GetCache(), &v1.Endpoints{}),
+			NewEnqueueRequestForEndpointEvent(mgr.GetClient(), mgr.GetEventRecorderFor("service-controller"))); err != nil {
+			return fmt.Errorf("watch resource endpoint error: %s", err.Error())
+		}
 	}
 
 	if err := c.Watch(source.Kind(mgr.GetCache(), &v1.Node{}),
-		NewEnqueueRequestForNodeEvent(mgr.GetEventRecorderFor("nlb-controller"))); err != nil {
+		NewEnqueueRequestForNodeEvent(mgr.GetClient(), mgr.GetEventRecorderFor("nlb-controller"))); err != nil {
 		return fmt.Errorf("watch resource node error: %s", err.Error())
 	}
+
 	return mgr.Add(&nlbController{c: c, recon: r})
 }
 

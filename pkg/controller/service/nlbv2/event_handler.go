@@ -145,18 +145,16 @@ func needAdd(newService *v1.Service) bool {
 }
 
 // NewEnqueueRequestForEndpointEvent, event handler for endpoint events
-func NewEnqueueRequestForEndpointEvent(eventRecorder record.EventRecorder) *enqueueRequestForEndpointEvent {
-	return &enqueueRequestForEndpointEvent{eventRecorder: eventRecorder}
+func NewEnqueueRequestForEndpointEvent(client client.Client, eventRecorder record.EventRecorder) *enqueueRequestForEndpointEvent {
+	return &enqueueRequestForEndpointEvent{
+		client:        client,
+		eventRecorder: eventRecorder,
+	}
 }
 
 type enqueueRequestForEndpointEvent struct {
 	client        client.Client
 	eventRecorder record.EventRecorder
-}
-
-func (h *enqueueRequestForEndpointEvent) InjectClient(c client.Client) error {
-	h.client = c
-	return nil
 }
 
 var _ handler.EventHandler = (*enqueueRequestForEndpointEvent)(nil)
@@ -239,8 +237,11 @@ func isEndpointProcessNeeded(ep *v1.Endpoints, client client.Client) bool {
 }
 
 // NewEnqueueRequestForNodeEvent, event handler for node event
-func NewEnqueueRequestForNodeEvent(record record.EventRecorder) *enqueueRequestForNodeEvent {
-	return &enqueueRequestForNodeEvent{eventRecorder: record}
+func NewEnqueueRequestForNodeEvent(client client.Client, record record.EventRecorder) *enqueueRequestForNodeEvent {
+	return &enqueueRequestForNodeEvent{
+		client:        client,
+		eventRecorder: record,
+	}
 }
 
 type enqueueRequestForNodeEvent struct {
@@ -249,11 +250,6 @@ type enqueueRequestForNodeEvent struct {
 }
 
 var _ handler.EventHandler = (*enqueueRequestForNodeEvent)(nil)
-
-func (h *enqueueRequestForNodeEvent) InjectClient(c client.Client) error {
-	h.client = c
-	return nil
-}
 
 func (h *enqueueRequestForNodeEvent) Create(_ context.Context, e event.CreateEvent, queue workqueue.RateLimitingInterface) {
 	node, ok := e.Object.(*v1.Node)
@@ -319,8 +315,11 @@ func (h *enqueueRequestForNodeEvent) enqueueManagedNode(queue workqueue.RateLimi
 }
 
 // NewEnqueueRequestForEndpointSliceEvent, event handler for endpointslice event
-func NewEnqueueRequestForEndpointSliceEvent(record record.EventRecorder) *enqueueRequestForEndpointSliceEvent {
-	return &enqueueRequestForEndpointSliceEvent{eventRecorder: record}
+func NewEnqueueRequestForEndpointSliceEvent(client client.Client, record record.EventRecorder) *enqueueRequestForEndpointSliceEvent {
+	return &enqueueRequestForEndpointSliceEvent{
+		client:        client,
+		eventRecorder: record,
+	}
 }
 
 type enqueueRequestForEndpointSliceEvent struct {
@@ -329,11 +328,6 @@ type enqueueRequestForEndpointSliceEvent struct {
 }
 
 var _ handler.EventHandler = (*enqueueRequestForEndpointSliceEvent)(nil)
-
-func (h *enqueueRequestForEndpointSliceEvent) InjectClient(c client.Client) error {
-	h.client = c
-	return nil
-}
 
 func (h *enqueueRequestForEndpointSliceEvent) Create(_ context.Context, e event.CreateEvent, queue workqueue.RateLimitingInterface) {
 	es, ok := e.Object.(*discovery.EndpointSlice)
