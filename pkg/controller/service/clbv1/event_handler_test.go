@@ -22,14 +22,15 @@ func TestEnqueueRequestForServiceEvent(t *testing.T) {
 	queue := workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter())
 	svc := getDefaultService()
 	svc.Annotations[annotation.Annotation(annotation.Spec)] = "slb.s1.small"
+	ctx := context.TODO()
 	// create event
-	h.Create(event.CreateEvent{Object: svc}, queue)
+	h.Create(ctx, event.CreateEvent{Object: svc}, queue)
 	// delete event
-	h.Delete(event.DeleteEvent{Object: svc}, queue)
+	h.Delete(ctx, event.DeleteEvent{Object: svc}, queue)
 	// update event
 	newSvc := svc.DeepCopy()
 	newSvc.Annotations[annotation.Annotation(annotation.Spec)] = "slb.s2.small"
-	h.Update(event.UpdateEvent{ObjectOld: svc, ObjectNew: newSvc}, queue)
+	h.Update(ctx, event.UpdateEvent{ObjectOld: svc, ObjectNew: newSvc}, queue)
 
 }
 
@@ -94,10 +95,11 @@ func TestEnqueueRequestForEndpointEvent(t *testing.T) {
 	}, ep); err != nil {
 		t.Error(err)
 	}
+	ctx := context.TODO()
 
-	h.Create(event.CreateEvent{Object: ep}, queue)
-	h.Delete(event.DeleteEvent{Object: ep}, queue)
-	h.Update(event.UpdateEvent{ObjectOld: ep, ObjectNew: ep}, queue)
+	h.Create(ctx, event.CreateEvent{Object: ep}, queue)
+	h.Delete(ctx, event.DeleteEvent{Object: ep}, queue)
+	h.Update(ctx, event.UpdateEvent{ObjectOld: ep, ObjectNew: ep}, queue)
 }
 
 func TestIsEndpointProcessNeeded(t *testing.T) {
@@ -124,13 +126,14 @@ func TestEnqueueRequestForNodeEvent(t *testing.T) {
 	}, node); err != nil {
 		t.Error(err)
 	}
+	ctx := context.TODO()
 
-	h.Create(event.CreateEvent{Object: node}, queue)
-	h.Delete(event.DeleteEvent{Object: node}, queue)
+	h.Create(ctx, event.CreateEvent{Object: node}, queue)
+	h.Delete(ctx, event.DeleteEvent{Object: node}, queue)
 
 	newN := node.DeepCopy()
 	newN.Spec.Unschedulable = true
-	h.Update(event.UpdateEvent{ObjectOld: node, ObjectNew: newN}, queue)
+	h.Update(ctx, event.UpdateEvent{ObjectOld: node, ObjectNew: newN}, queue)
 }
 
 func TestNodeSpecChanged(t *testing.T) {
@@ -193,10 +196,11 @@ func TestEnqueueRequestForEndpointSliceEvent(t *testing.T) {
 	}, es); err != nil {
 		t.Error(err)
 	}
+	ctx := context.TODO()
 
-	h.Create(event.CreateEvent{Object: es}, queue)
-	h.Delete(event.DeleteEvent{Object: es}, queue)
-	h.Update(event.UpdateEvent{ObjectOld: es, ObjectNew: es}, queue)
+	h.Create(ctx, event.CreateEvent{Object: es}, queue)
+	h.Delete(ctx, event.DeleteEvent{Object: es}, queue)
+	h.Update(ctx, event.UpdateEvent{ObjectOld: es, ObjectNew: es}, queue)
 }
 
 func TestIsEndpointSliceProcessNeeded(t *testing.T) {
