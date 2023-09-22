@@ -70,37 +70,9 @@ func (p *NLBProvider) FindNLB(ctx context.Context, mdl *nlbmodel.NetworkLoadBala
 }
 
 func (p *NLBProvider) DescribeNLB(ctx context.Context, mdl *nlbmodel.NetworkLoadBalancer) error {
-	var (
-		retErr error
-		resp   *nlb.GetLoadBalancerAttributeResponse
-	)
-	_ = wait.PollImmediate(20*time.Second, 2*time.Minute, func() (bool, error) {
-		req := &nlb.GetLoadBalancerAttributeRequest{}
-		req.LoadBalancerId = tea.String(mdl.LoadBalancerAttribute.LoadBalancerId)
-
-		resp, retErr = p.auth.NLB.GetLoadBalancerAttribute(req)
-		if retErr != nil {
-			retErr = util.SDKError("GetLoadBalancerAttribute", retErr)
-			return false, retErr
-		}
-
-		if resp == nil || resp.Body == nil {
-			retErr = fmt.Errorf("nlbId %s GetLoadBalancerAttribute response is nil, resp [%+v]",
-				mdl.LoadBalancerAttribute.LoadBalancerId, resp)
-			return false, retErr
-		}
-
-		if tea.StringValue(resp.Body.LoadBalancerStatus) == string(Provisioning) {
-			retErr = fmt.Errorf("nlb %s is in creating status", mdl.LoadBalancerAttribute.LoadBalancerId)
-			return false, nil
-		}
-
-		retErr = nil
-		return true, retErr
-	})
-
-	if retErr != nil {
-		return retErr
+	resp, err := p.waitNLBActive(mdl.LoadBalancerAttribute.LoadBalancerId)
+	if err != nil {
+		return err
 	}
 
 	return loadResponse(resp.Body, mdl)
@@ -308,7 +280,15 @@ func (p *NLBProvider) findNLBByTag(mdl *nlbmodel.NetworkLoadBalancer) error {
 			strings.Join(lbIds, ","))
 	}
 
-	return loadResponse(resp.Body.LoadBalancers[0], mdl)
+	if tea.StringValue(resp.Body.LoadBalancers[0].LoadBalancerStatus) == string(Active) {
+		return loadResponse(resp.Body.LoadBalancers[0], mdl)
+	}
+
+	getResp, err := p.waitNLBActive(tea.StringValue(resp.Body.LoadBalancers[0].LoadBalancerId))
+	if err != nil {
+		return err
+	}
+	return loadResponse(getResp.Body, mdl)
 }
 
 func (p *NLBProvider) FindNLBByName(ctx context.Context, mdl *nlbmodel.NetworkLoadBalancer) error {
@@ -346,7 +326,15 @@ func (p *NLBProvider) findNLBByName(mdl *nlbmodel.NetworkLoadBalancer) error {
 			strings.Join(lbIds, ","))
 	}
 
-	return loadResponse(resp.Body.LoadBalancers[0], mdl)
+	if tea.StringValue(resp.Body.LoadBalancers[0].LoadBalancerStatus) == string(Active) {
+		return loadResponse(resp.Body.LoadBalancers[0], mdl)
+	}
+
+	getResp, err := p.waitNLBActive(tea.StringValue(resp.Body.LoadBalancers[0].LoadBalancerId))
+	if err != nil {
+		return err
+	}
+	return loadResponse(getResp.Body, mdl)
 }
 
 func loadResponse(resp interface{}, lb *nlbmodel.NetworkLoadBalancer) error {
@@ -429,6 +417,39 @@ func (p *NLBProvider) waitJobFinish(api, jobId string, args ...time.Duration) er
 		return tea.StringValue(resp.Body.Status) == "Succeeded", retErr
 	})
 	return retErr
+}
+
+func (p *NLBProvider) waitNLBActive(lbId string) (*nlb.GetLoadBalancerAttributeResponse, error) {
+	var (
+		retErr error
+		resp   *nlb.GetLoadBalancerAttributeResponse
+	)
+	_ = wait.PollImmediate(20*time.Second, 2*time.Minute, func() (bool, error) {
+		req := &nlb.GetLoadBalancerAttributeRequest{}
+		req.LoadBalancerId = tea.String(lbId)
+
+		resp, retErr = p.auth.NLB.GetLoadBalancerAttribute(req)
+		if retErr != nil {
+			retErr = util.SDKError("GetLoadBalancerAttribute", retErr)
+			return false, retErr
+		}
+
+		if resp == nil || resp.Body == nil {
+			retErr = fmt.Errorf("nlbId %s GetLoadBalancerAttribute response is nil, resp [%+v]", lbId, resp)
+			return false, retErr
+		}
+
+		if tea.StringValue(resp.Body.LoadBalancerStatus) == string(Provisioning) {
+			klog.V(5).Info("wait nlb to be active... ", "NLBId", lbId)
+			retErr = fmt.Errorf("nlb %s is in creating status", lbId)
+			return false, nil
+		}
+
+		retErr = nil
+		return true, retErr
+	})
+
+	return resp, retErr
 }
 
 // NLBRegionIds used for e2etest
