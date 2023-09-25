@@ -51,6 +51,8 @@ func TestE2E(t *testing.T) {
 		gomega.Expect(err).To(gomega.BeNil())
 	})
 
+	gomega.RegisterFailHandler(ginkgo.Fail)
+
 	ginkgo.Describe("Run cloud controller manager e2e tests", func() {
 		AddControllerTests(f)
 	})

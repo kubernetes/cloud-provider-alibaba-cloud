@@ -300,6 +300,12 @@ func nlbVsgAttrEqual(f *Framework, reqCtx *svcCtx.RequestContext, remote *nlbmod
 				sg.IsUserManaged = true
 			}
 			if found {
+				sgType := reqCtx.Anno.Get(annotation.ServerGroupType)
+				if sgType != "" && nlbmodel.ServerGroupType(sgType) != sg.ServerGroupType {
+					return fmt.Errorf("server group %s type not equal, local: %s, remote: %s",
+						sg.ServerGroupName, reqCtx.Anno.Get(annotation.ServerGroupType), sg.ServerGroupType)
+				}
+
 				sg.ServicePort = &port
 				sg.ServicePort.Protocol = v1.Protocol(proto)
 				if isOverride(reqCtx.Anno) && !isNLBServerGroupUsedByPort(sg, remote.Listeners) {
@@ -444,36 +450,21 @@ func isNLBBackendEqual(client *client.KubeClient, reqCtx *svcCtx.RequestContext,
 	for _, l := range backends {
 		found := false
 		for _, r := range sg.Servers {
-			if policy == helper.ENITrafficPolicy {
-				if l.ServerIp == r.ServerIp &&
-					l.Port == r.Port &&
-					l.ServerType == model.ENIBackendType {
-					if !sg.IsUserManaged && l.Description != r.Description {
-						return false, fmt.Errorf("mode %s expected vgroup [%s] backend %s description not equal,"+
-							" expect %s, got %s", policy, sg.ServerGroupId, l.ServerIp, l.Description, r.Description)
-					}
-					if l.Weight != r.Weight {
-						return false, fmt.Errorf("mode %s expected vgroup [%s] backend %s weight not equal,"+
-							" expect %d, got %d", policy, sg.ServerGroupId, l.ServerIp, l.Weight, r.Weight)
-					}
-					found = true
-					break
+			if isServerEqual(l, r) {
+				if l.Port != r.Port {
+					return false, fmt.Errorf("expected servergroup [%s] backend %s port not equal,"+
+						" expect %d, got %d", sg.ServerGroupId, r.ServerId, l.Port, r.Port)
 				}
-			} else {
-				if l.ServerId == r.ServerId &&
-					l.Port == r.Port &&
-					l.ServerType == model.ECSBackendType {
-					if !sg.IsUserManaged && l.Description != r.Description {
-						return false, fmt.Errorf("mode %s expected vgroup [%s] backend %s description not equal,"+
-							" expect %s, got %s", policy, sg.ServerGroupId, l.ServerIp, l.Description, r.Description)
-					}
-					if l.Weight != r.Weight {
-						return false, fmt.Errorf("mode %s expected vgroup [%s] backend %s weight not equal,"+
-							" expect %d, got %d", policy, sg.ServerGroupId, l.ServerIp, l.Weight, r.Weight)
-					}
-					found = true
-					break
+				if l.Weight != r.Weight {
+					return false, fmt.Errorf("expected servergroup [%s] backend %s weight not equal,"+
+						" expect %d, got %d", sg.ServerGroupId, r.ServerId, l.Weight, r.Weight)
 				}
+				if l.Description != r.Description {
+					return false, fmt.Errorf("expected servergroup [%s] backend %s description not equal,"+
+						" expect %s, got %s", sg.ServerGroupId, r.ServerId, l.Description, r.Description)
+				}
+				found = true
+				break
 			}
 		}
 		if !found {
@@ -482,6 +473,24 @@ func isNLBBackendEqual(client *client.KubeClient, reqCtx *svcCtx.RequestContext,
 		}
 	}
 	return true, nil
+}
+
+func isServerEqual(a, b nlbmodel.ServerGroupServer) bool {
+	if a.ServerType != b.ServerType {
+		return false
+	}
+
+	switch a.ServerType {
+	case nlbmodel.EniServerType:
+		return a.ServerId == b.ServerId && a.ServerIp == b.ServerIp
+	case nlbmodel.EcsServerType:
+		return a.ServerId == b.ServerId
+	case nlbmodel.IpServerType:
+		return a.ServerId == b.ServerId && a.ServerIp == b.ServerIp
+	default:
+		klog.Errorf("%s is not supported, skip", a.ServerType)
+		return false
+	}
 }
 
 func nlbTCPEqual(reqCtx *svcCtx.RequestContext, local v1.ServicePort, remote *nlbmodel.ListenerAttribute) error {
@@ -589,8 +598,18 @@ func buildServerGroupENIBackends(anno *annotation.AnnotationRequest, ep *v1.Endp
 				Description: sg.ServerGroupName,
 				ServerIp:    address.IP,
 				Port:        int32(backendPort),
-				ServerType:  model.ENIBackendType,
 			})
+		}
+	}
+
+	if sg.ServerGroupType == nlbmodel.IpServerGroupType {
+		for i := range ret {
+			ret[i].ServerId = ret[i].ServerIp
+			ret[i].ServerType = nlbmodel.IpServerType
+		}
+	} else {
+		for i := range ret {
+			ret[i].ServerType = model.ENIBackendType
 		}
 	}
 	return setServerGroupWeightBackends(helper.ENITrafficPolicy, ret, sg.Weight), nil
@@ -615,12 +634,27 @@ func buildServerGroupLocalBackends(anno *annotation.AnnotationRequest, ep *v1.En
 			if err != nil {
 				return nil, fmt.Errorf("providerID %s parse error: %s", node.Spec.ProviderID, err.Error())
 			}
-			ret = append(ret, nlbmodel.ServerGroupServer{
-				Description: sg.ServerGroupName,
-				ServerId:    id,
-				Port:        sg.ServicePort.NodePort,
-				ServerType:  model.ECSBackendType,
-			})
+			if sg.ServerGroupType == nlbmodel.IpServerGroupType {
+				ip, err := helper.GetNodeInternalIP(node)
+				if err != nil {
+					return nil, fmt.Errorf("get node address err: %s", err.Error())
+				}
+				ret = append(ret, nlbmodel.ServerGroupServer{
+					Description: sg.ServerGroupName,
+					ServerId:    ip,
+					ServerIp:    ip,
+					Port:        sg.ServicePort.NodePort,
+					ServerType:  nlbmodel.IpServerType,
+				})
+			} else {
+				ret = append(ret, nlbmodel.ServerGroupServer{
+					Description: sg.ServerGroupName,
+					ServerId:    id,
+					Port:        sg.ServicePort.NodePort,
+					ServerType:  nlbmodel.EcsServerType,
+				})
+			}
+
 		}
 	}
 
@@ -645,12 +679,22 @@ func buildServerGroupECIBackends(ep *v1.Endpoints, nodes []v1.Node, sg *nlbmodel
 			}
 			if isVKNode(*node) {
 				backendPort := getBackendPort(*sg.ServicePort, subset)
-				ret = append(ret, nlbmodel.ServerGroupServer{
-					Description: sg.ServerGroupName,
-					ServerIp:    addr.IP,
-					Port:        int32(backendPort),
-					ServerType:  model.ENIBackendType,
-				})
+				if sg.ServerGroupType == nlbmodel.IpServerGroupType {
+					ret = append(ret, nlbmodel.ServerGroupServer{
+						Description: sg.ServerGroupName,
+						ServerId:    addr.IP,
+						ServerIp:    addr.IP,
+						Port:        int32(backendPort),
+						ServerType:  nlbmodel.IpServerType,
+					})
+				} else {
+					ret = append(ret, nlbmodel.ServerGroupServer{
+						Description: sg.ServerGroupName,
+						ServerIp:    addr.IP,
+						Port:        int32(backendPort),
+						ServerType:  model.ENIBackendType,
+					})
+				}
 			}
 		}
 	}
@@ -667,12 +711,28 @@ func buildServerGroupClusterBackends(anno *annotation.AnnotationRequest, ep *v1.
 		if err != nil {
 			return nil, fmt.Errorf("providerID %s parse error: %s", n.Spec.ProviderID, err.Error())
 		}
-		ret = append(ret, nlbmodel.ServerGroupServer{
-			Description: sg.ServerGroupName,
-			ServerId:    id,
-			ServerType:  model.ECSBackendType,
-			Port:        sg.ServicePort.NodePort,
-		})
+
+		if sg.ServerGroupType == nlbmodel.IpServerGroupType {
+			ip, err := helper.GetNodeInternalIP(&n)
+			if err != nil {
+				return nil, fmt.Errorf("get node address err: %s", err.Error())
+			}
+			ret = append(ret, nlbmodel.ServerGroupServer{
+				Description: sg.ServerGroupName,
+				ServerId:    ip,
+				ServerIp:    ip,
+				ServerType:  nlbmodel.IpServerType,
+				Port:        sg.ServicePort.NodePort,
+			})
+		} else {
+			ret = append(ret, nlbmodel.ServerGroupServer{
+				Description: sg.ServerGroupName,
+				ServerId:    id,
+				ServerType:  nlbmodel.EcsServerType,
+				Port:        sg.ServicePort.NodePort,
+			})
+		}
+
 	}
 
 	eciBackends, err := buildServerGroupECIBackends(ep, nodes, sg)

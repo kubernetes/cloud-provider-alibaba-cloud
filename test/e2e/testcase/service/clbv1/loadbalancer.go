@@ -625,14 +625,6 @@ func RunLoadBalancerTestCases(f *framework.Framework) {
 		}
 
 		ginkgo.Context("instance-charge-type", func() {
-			ginkgo.It("instance-charge-type: PayByCLCU", func() {
-				svc, err := f.Client.KubeClient.CreateServiceByAnno(map[string]string{
-					annotation.Annotation(annotation.InstanceChargeType): "PayByCLCU",
-				})
-				gomega.Expect(err).To(gomega.BeNil())
-				err = f.ExpectLoadBalancerEqual(svc)
-				gomega.Expect(err).To(gomega.BeNil())
-			})
 			ginkgo.It("instance-charge-type: PayBySpec -> PayByCLCU", func() {
 				oldsvc, err := f.Client.KubeClient.CreateServiceByAnno(map[string]string{
 					annotation.Annotation(annotation.InstanceChargeType): "PayBySpec",
@@ -681,37 +673,35 @@ func RunLoadBalancerTestCases(f *framework.Framework) {
 				err = f.ExpectLoadBalancerEqual(newsvc)
 				gomega.Expect(err).To(gomega.BeNil())
 			})
-			ginkgo.It("instance-charge-type: PayBySpec & spec annotation", func() {
+			ginkgo.It("instance-charge-type: PayByCLCU & spec annotation", func() {
 				oldsvc, err := f.Client.KubeClient.CreateServiceByAnno(map[string]string{
-					annotation.Annotation(annotation.InstanceChargeType): "PayBySpec",
-					annotation.Annotation(annotation.Spec):               model.S1Small,
+					annotation.Annotation(annotation.InstanceChargeType): "PayByCLCU",
 				})
 				gomega.Expect(err).To(gomega.BeNil())
 				err = f.ExpectLoadBalancerEqual(oldsvc)
 				gomega.Expect(err).To(gomega.BeNil())
 
 				newsvc := oldsvc.DeepCopy()
-				newsvc.Annotations[annotation.Annotation(annotation.Spec)] = "slb.s2.small"
+				newsvc.Annotations[annotation.Annotation(annotation.Spec)] = "slb.s1.small"
 				newsvc, err = f.Client.KubeClient.PatchService(oldsvc, newsvc)
 				gomega.Expect(err).To(gomega.BeNil())
 				err = f.ExpectLoadBalancerEqual(newsvc)
 				gomega.Expect(err).To(gomega.BeNil())
 			})
-			ginkgo.It("instance-charge-type: PayByCLCU & spec annotation", func() {
+			ginkgo.It("instance-charge-type: PayBySpec & spec annotation", func() {
 				oldsvc, err := f.Client.KubeClient.CreateServiceByAnno(map[string]string{
-					annotation.Annotation(annotation.InstanceChargeType): "PayByCLCU",
-					annotation.Annotation(annotation.Spec):               model.S1Small,
+					annotation.Annotation(annotation.Spec): "slb.s2.small",
 				})
 				gomega.Expect(err).To(gomega.BeNil())
 				err = f.ExpectLoadBalancerEqual(oldsvc)
-				gomega.Expect(err).NotTo(gomega.BeNil())
+				gomega.Expect(err).To(gomega.BeNil())
 
 				newsvc := oldsvc.DeepCopy()
-				newsvc.Annotations[annotation.Annotation(annotation.Spec)] = "slb.s2.small"
+				newsvc.Annotations[annotation.Annotation(annotation.Spec)] = "slb.s1.small"
 				newsvc, err = f.Client.KubeClient.PatchService(oldsvc, newsvc)
 				gomega.Expect(err).To(gomega.BeNil())
 				err = f.ExpectLoadBalancerEqual(newsvc)
-				gomega.Expect(err).NotTo(gomega.BeNil())
+				gomega.Expect(err).To(gomega.BeNil())
 			})
 		})
 
