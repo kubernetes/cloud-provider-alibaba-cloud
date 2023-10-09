@@ -2,10 +2,11 @@ package config
 
 import (
 	"fmt"
-	"github.com/ghodss/yaml"
+	"os"
+
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/util"
 	"k8s.io/klog/v2"
-	"os"
+	"sigs.k8s.io/yaml"
 )
 
 var CloudCFG = &CloudConfig{}
