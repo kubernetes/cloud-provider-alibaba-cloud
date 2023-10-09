@@ -70,7 +70,7 @@ func (e ELBProvider) CreateEdgeLoadBalancer(ctx context.Context, mdl *elbmodel.E
 
 func (e ELBProvider) SetEdgeLoadBalancerStatus(ctx context.Context, status string, mdl *elbmodel.EdgeLoadBalancer) error {
 	if mdl.GetLoadBalancerId() == "" {
-		return fmt.Errorf("laodbalancer id is empty")
+		return fmt.Errorf("loadbalancer id is empty")
 	}
 	req := ens.CreateSetLoadBalancerStatusRequest()
 	req.Scheme = "https"
@@ -134,7 +134,7 @@ func (e ELBProvider) DescribeEdgeLoadBalancerByName(ctx context.Context, lbName 
 
 func (e ELBProvider) DeleteEdgeLoadBalancer(ctx context.Context, mdl *elbmodel.EdgeLoadBalancer) error {
 	if mdl.GetLoadBalancerId() == "" {
-		return fmt.Errorf("laodbalancer id is empty")
+		return fmt.Errorf("loadbalancer id is empty")
 	}
 	req := ens.CreateReleaseInstanceRequest()
 	req.Scheme = "https"
