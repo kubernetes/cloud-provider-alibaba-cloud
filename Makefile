@@ -111,7 +111,7 @@ gofmt:
 golint:
 	which golangci-lint 2>&1 >/dev/null || go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.54.2
 	go env GOPATH
-	golangci-lint run pkg/... -v
+	golangci-lint run ./pkg/... -v
 
 unit-test:
 	GO111MODULE=on go test -mod vendor -v -race -coverprofile=coverage.txt -covermode=atomic \
