@@ -1,5 +1,6 @@
 run:
   deadline: 13m
+  modules-download-mode: vendor
 
 linters-settings:
   dupl:
