@@ -109,8 +109,8 @@ gofmt:
 
 .PHONY: golint
 golint:
-	which golangci-lint 2>&1 >/dev/null || go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.52.2
-	golangci-lint run pkg/... --timeout=300s -v
+	which golangci-lint 2>&1 >/dev/null || go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.54.2
+	golangci-lint run pkg/... -v
 
 unit-test:
 	GO111MODULE=on go test -mod vendor -v -race -coverprofile=coverage.txt -covermode=atomic \
