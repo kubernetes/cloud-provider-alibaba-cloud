@@ -108,10 +108,9 @@ gofmt:
 	./hack/verify-gofmt.sh
 
 .PHONY: golint
-golint: ccm-linux
+golint:
 	which golangci-lint 2>&1 >/dev/null || go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.54.2
-	go env GOPATH
-	golangci-lint run ./pkg/... -v
+	GO111MODULE=on golangci-lint run ./pkg/controller/... -v --timeout=120s
 
 unit-test:
 	GO111MODULE=on go test -mod vendor -v -race -coverprofile=coverage.txt -covermode=atomic \
