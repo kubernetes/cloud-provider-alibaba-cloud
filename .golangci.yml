@@ -1,0 +1,22 @@
+run:
+  deadline: 13m
+
+linters-settings:
+  dupl:
+    threshold: 100
+  gocyclo:
+    min-complexity: 50
+  govet:
+    enable:
+      - nilness
+
+linters:
+  enable:
+    - govet
+    - unused
+    - ineffassign
+    - staticcheck
+    - gosimple
+    - exportloopref
+  disable-all: true
+
