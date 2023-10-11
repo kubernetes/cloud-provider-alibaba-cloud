@@ -17,8 +17,6 @@ limitations under the License.
 package base
 
 import (
-	"encoding/base64"
-	"encoding/json"
 	"fmt"
 	openapi "github.com/alibabacloud-go/darabonba-openapi/v2/client"
 	"github.com/alibabacloud-go/tea/tea"
@@ -26,7 +24,6 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -40,7 +37,6 @@ import (
 	"github.com/aliyun/alibaba-cloud-sdk-go/services/slb"
 	"github.com/aliyun/alibaba-cloud-sdk-go/services/sls"
 	"github.com/aliyun/alibaba-cloud-sdk-go/services/vpc"
-	"github.com/go-cmd/cmd"
 	"k8s.io/klog/v2/klogr"
 
 	nlb "github.com/alibabacloud-go/nlb-20220430/client"
@@ -54,14 +50,9 @@ const (
 	KubernetesCloudControllerManager = "ack.ccm"
 	AgentClusterId                   = "ClusterId"
 	TokenSyncPeriod                  = 10 * time.Minute
-)
 
-type AuthMode string
-
-const (
-	AKMode      = AuthMode("ak")      //get token by accessKeyId and accessKeySecretId
-	SAMode      = AuthMode("service") //get token by assuming role
-	RamRoleMode = AuthMode("ramrole") //get token by ecs ram role
+	AccessKeyID     = "ACCESS_KEY_ID"
+	AccessKeySecret = "ACCESS_KEY_SECRET"
 )
 
 var log = klogr.New().WithName("clientMgr")
@@ -191,30 +182,15 @@ func NewClientMgr() (*ClientMgr, error) {
 }
 
 func (mgr *ClientMgr) Start(
-	settoken func(mgr *ClientMgr, token *Token) error,
+	settoken func(mgr *ClientMgr, token *DefaultToken) error,
 ) error {
 	initialized := false
-	authMode := mgr.GetAuthMode()
+	tokenAuth := mgr.GetTokenAuth()
 
-	tokenfunc := func(authMode AuthMode) {
-		var err error
-		token := &Token{
-			Region: mgr.Region,
-		}
-		switch authMode {
-		case AKMode:
-			akToken := &AkAuthToken{ak: token}
-			token, err = akToken.NextToken()
-		case SAMode:
-			saToken := &ServiceToken{svcak: token}
-			token, err = saToken.NextToken()
-		case RamRoleMode:
-			ramRoleToken := &RamRoleToken{meta: mgr.Meta}
-			token, err = ramRoleToken.NextToken()
-		}
+	tokenfunc := func() {
+		token, err := tokenAuth.NextToken()
 		if err != nil {
 			log.Error(err, "fail to get next token")
-			return
 		}
 		err = settoken(mgr, token)
 		if err != nil {
@@ -223,11 +199,13 @@ func (mgr *ClientMgr) Start(
 		}
 		initialized = true
 	}
+
 	go wait.Until(
-		func() { tokenfunc(authMode) },
+		func() { tokenfunc() },
 		TokenSyncPeriod,
 		mgr.stop,
 	)
+
 	return wait.ExponentialBackoff(
 		wait.Backoff{
 			Steps:    7,
@@ -235,40 +213,45 @@ func (mgr *ClientMgr) Start(
 			Jitter:   1,
 			Factor:   2,
 		}, func() (done bool, err error) {
-			tokenfunc(authMode)
+			tokenfunc()
 			log.Info("wait for Token ready")
 			return initialized, nil
 		},
 	)
 }
 
-func (mgr *ClientMgr) GetAuthMode() AuthMode {
-	if ctrlCfg.CloudCFG.Global.AccessKeyID != "" &&
-		ctrlCfg.CloudCFG.Global.AccessKeySecret != "" {
+func (mgr *ClientMgr) GetTokenAuth() TokenAuth {
+	// priority: AddonToken > ServiceToken > AKMode > RamRoleToken
+	if _, err := os.Stat(AddonTokenFilePath); err == nil {
+		log.Info("use addon token mode to get token")
+		return &AddonToken{Region: mgr.Region}
+	}
+
+	if ctrlCfg.CloudCFG.Global.AccessKeyID != "" && ctrlCfg.CloudCFG.Global.AccessKeySecret != "" {
 		if ctrlCfg.CloudCFG.Global.UID != "" {
 			log.Info("use assume role mode to get token")
-			return SAMode
+			return &ServiceToken{Region: mgr.Region}
 		} else {
 			log.Info("use ak mode to get token")
-			return AKMode
+			return &AkAuthToken{Region: mgr.Region}
 		}
 	}
 
-	if os.Getenv("ACCESS_KEY_ID") != "" &&
-		os.Getenv("ACCESS_KEY_SECRET") != "" {
+	if os.Getenv(AccessKeyID) != "" && os.Getenv(AccessKeySecret) != "" {
 		log.Info("use ak mode to get token")
-		return AKMode
+		return &AkAuthToken{Region: mgr.Region}
 	}
+
 	log.Info("use ram role mode to get token")
-	return RamRoleMode
+	return &RamRoleToken{meta: mgr.Meta}
 }
 
-func RefreshToken(mgr *ClientMgr, token *Token) error {
+func RefreshToken(mgr *ClientMgr, token *DefaultToken) error {
 	log.V(5).Info("refresh token", "region", token.Region)
 	credential := &credentials.StsTokenCredential{
-		AccessKeyId:       token.AccessKey,
-		AccessKeySecret:   token.AccessSecret,
-		AccessKeyStsToken: token.Token,
+		AccessKeyId:       token.AccessKeyId,
+		AccessKeySecret:   token.AccessKeySecret,
+		AccessKeyStsToken: token.SecurityToken,
 	}
 
 	err := mgr.ECS.InitWithOptions(token.Region, clientCfg(), credential)
@@ -391,125 +374,6 @@ func openapiCfg(region string, credential *credentials.StsTokenCredential, netwo
 		AccessKeySecret: tea.String(credential.AccessKeySecret),
 		SecurityToken:   tea.String(credential.AccessKeyStsToken),
 	}
-}
-
-// Token base Token info
-type Token struct {
-	Region       string `json:"region,omitempty"`
-	AccessSecret string `json:"accessSecret,omitempty"`
-	UID          string `json:"uid,omitempty"`
-	Token        string `json:"token,omitempty"`
-	AccessKey    string `json:"accesskey,omitempty"`
-}
-
-// TokenAuth is an interface of Token auth method
-type TokenAuth interface {
-	NextToken() (*Token, error)
-}
-
-// AkAuthToken implement ak auth
-type AkAuthToken struct{ ak *Token }
-
-func (f *AkAuthToken) NextToken() (*Token, error) {
-	key, secret, err := LoadAK()
-	if err != nil {
-		return f.ak, err
-	}
-	f.ak = &Token{
-		AccessSecret: secret,
-		AccessKey:    key,
-		Region:       f.ak.Region,
-	}
-	return f.ak, nil
-}
-
-type RamRoleToken struct {
-	meta prvd.IMetaData
-}
-
-func (f *RamRoleToken) NextToken() (*Token, error) {
-	roleName, err := f.meta.RoleName()
-	if err != nil {
-		return nil, fmt.Errorf("role name: %s", err.Error())
-	}
-	// use instance ram file way.
-	role, err := f.meta.RamRoleToken(roleName)
-	if err != nil {
-		return nil, fmt.Errorf("ramrole Token retrieve: %s", err.Error())
-	}
-	region, err := f.meta.Region()
-	if err != nil {
-		return nil, fmt.Errorf("read region error: %s", err.Error())
-	}
-
-	return &Token{
-		Token:        role.SecurityToken,
-		Region:       region,
-		AccessKey:    role.AccessKeyId,
-		AccessSecret: role.AccessKeySecret,
-	}, nil
-}
-
-// ServiceToken is an implemention of service account auth
-type ServiceToken struct {
-	svcak    *Token
-	execpath string
-}
-
-func (f *ServiceToken) NextToken() (*Token, error) {
-	key, secret, err := LoadAK()
-	if err != nil {
-		return nil, err
-	}
-	status := <-cmd.NewCmd(
-		filepath.Join(f.execpath, "servicetoken"),
-		fmt.Sprintf("--uid=%s", ctrlCfg.CloudCFG.Global.UID),
-		fmt.Sprintf("--key=%s", key),
-		fmt.Sprintf("--secret=%s", secret),
-		fmt.Sprintf("--region=%s", f.svcak.Region),
-	).Start()
-	if status.Error != nil {
-		return nil, fmt.Errorf("invoke servicetoken: %s", status.Error.Error())
-	}
-	token := &Token{Region: f.svcak.Region}
-	if err = json.Unmarshal([]byte(strings.Join(status.Stdout, "")), token); err != nil {
-		return nil, fmt.Errorf("unmarshal Token error: %s, %s, %s", err.Error(), status.Stdout, status.Stderr)
-	}
-
-	return token, nil
-}
-
-func LoadAK() (string, string, error) {
-	var keyId, keySecret string
-	log.V(5).Info(fmt.Sprintf("load cfg from file: %s", ctrlCfg.ControllerCFG.CloudConfigPath))
-	if err := ctrlCfg.CloudCFG.LoadCloudCFG(); err != nil {
-		return "", "", fmt.Errorf("load cloud config %s error: %v",
-			ctrlCfg.ControllerCFG.CloudConfigPath, err.Error())
-	}
-
-	if ctrlCfg.CloudCFG.Global.AccessKeyID != "" && ctrlCfg.CloudCFG.Global.AccessKeySecret != "" {
-		key, err := base64.StdEncoding.DecodeString(ctrlCfg.CloudCFG.Global.AccessKeyID)
-		if err != nil {
-			return "", "", err
-		}
-		keyId = string(key)
-		secret, err := base64.StdEncoding.DecodeString(ctrlCfg.CloudCFG.Global.AccessKeySecret)
-		if err != nil {
-			return "", "", err
-		}
-		keySecret = string(secret)
-	}
-
-	if keyId == "" || keySecret == "" {
-		log.V(5).Info("LoadAK: cloud config does not have keyId or keySecret. " +
-			"try environment ACCESS_KEY_ID ACCESS_KEY_SECRET")
-		keyId = os.Getenv("ACCESS_KEY_ID")
-		keySecret = os.Getenv("ACCESS_KEY_SECRET")
-		if keyId == "" || keySecret == "" {
-			return "", "", fmt.Errorf("cloud config and env do not have keyId or keySecret, load AK failed")
-		}
-	}
-	return keyId, keySecret, nil
 }
 
 func getUserAgent() string {
