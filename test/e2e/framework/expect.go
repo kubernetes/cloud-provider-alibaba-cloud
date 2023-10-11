@@ -142,9 +142,20 @@ func loadBalancerAttrEqual(f *Framework, anno *annotation.AnnotationRequest, svc
 			return fmt.Errorf("expected slb id %s, got %s", id, lb.LoadBalancerId)
 		}
 	}
+	instanceChargeType := anno.Get(annotation.InstanceChargeType)
 
-	if spec := anno.Get(annotation.Spec); spec != "" && string(lb.LoadBalancerSpec) != spec {
-		return fmt.Errorf("expected slb spec %s, got %s", spec, lb.LoadBalancerSpec)
+	if instanceChargeType != "" {
+		if instanceChargeType != string(lb.InstanceChargeType) {
+			return fmt.Errorf("expected slb instanceChargeType %s, got %s", instanceChargeType, lb.InstanceChargeType)
+		}
+	} else {
+		instanceChargeType = string(lb.InstanceChargeType)
+	}
+	if model.InstanceChargeType(instanceChargeType).IsPayBySpec() {
+		spec := anno.Get(annotation.Spec)
+		if spec != "" && string(lb.LoadBalancerSpec) != spec {
+			return fmt.Errorf("expected slb spec %s, got %s", spec, lb.LoadBalancerSpec)
+		}
 	}
 
 	if paymentType := anno.Get(annotation.ChargeType); paymentType != "" {

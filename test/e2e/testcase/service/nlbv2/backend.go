@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/helper"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/service/reconcile/annotation"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/model/nlb"
 	"time"
 
 	"github.com/onsi/ginkgo/v2"
@@ -649,6 +650,40 @@ func RunBackendTestCases(f *framework.Framework) {
 				}()
 
 				err = f.ExpectNetworkLoadBalancerEqual(oldSvc)
+				gomega.Expect(err).To(gomega.BeNil())
+			})
+		})
+
+		ginkgo.Context("server-group-type", func() {
+			ginkgo.It("ip", func() {
+				rawsvc := f.Client.KubeClient.DefaultNLBService()
+				rawsvc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyTypeLocal
+				rawsvc.Annotations = map[string]string{
+					annotation.Annotation(annotation.ZoneMaps):        options.TestConfig.NLBZoneMaps,
+					annotation.Annotation(annotation.ServerGroupType): string(nlb.IpServerGroupType),
+				}
+				svc, err := f.Client.KubeClient.CreateService(rawsvc)
+				gomega.Expect(err).To(gomega.BeNil())
+				err = f.ExpectNetworkLoadBalancerEqual(svc)
+				gomega.Expect(err).To(gomega.BeNil())
+			})
+			ginkgo.It("ip -> instance", func() {
+				rawsvc := f.Client.KubeClient.DefaultNLBService()
+				rawsvc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyTypeLocal
+				rawsvc.Annotations = map[string]string{
+					annotation.Annotation(annotation.ZoneMaps):        options.TestConfig.NLBZoneMaps,
+					annotation.Annotation(annotation.ServerGroupType): string(nlb.IpServerGroupType),
+				}
+				oldsvc, err := f.Client.KubeClient.CreateService(rawsvc)
+				gomega.Expect(err).To(gomega.BeNil())
+				err = f.ExpectNetworkLoadBalancerEqual(oldsvc)
+				gomega.Expect(err).To(gomega.BeNil())
+
+				newsvc := oldsvc.DeepCopy()
+				newsvc.Annotations[annotation.Annotation(annotation.ServerGroupType)] = string(nlb.InstanceServerGroupType)
+				newsvc, err = f.Client.KubeClient.PatchService(oldsvc, newsvc)
+				gomega.Expect(err).To(gomega.BeNil())
+				err = f.ExpectNetworkLoadBalancerEqual(newsvc)
 				gomega.Expect(err).To(gomega.BeNil())
 			})
 		})
