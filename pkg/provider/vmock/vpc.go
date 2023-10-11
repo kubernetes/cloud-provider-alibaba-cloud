@@ -6,6 +6,7 @@ import (
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/model"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/base"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/vpc"
+	"net"
 )
 
 func NewMockVPC(
@@ -55,4 +56,11 @@ func (m *MockVPC) DescribeEipAddresses(ctx context.Context, instanceType string,
 
 func (m *MockVPC) DescribeVSwitches(ctx context.Context, vpcID string) ([]servicesvpc.VSwitch, error) {
 	panic("implement me")
+}
+
+func (m *MockVPC) DescribeVpcCIDRBlock(ctx context.Context, vpcId string, ipVersion model.AddressIPVersionType) (*net.IPNet, error) {
+	return &net.IPNet{
+		IP:   net.ParseIP("10.96.0.0"),
+		Mask: net.CIDRMask(16, 32),
+	}, nil
 }
