@@ -35,6 +35,9 @@ GIT_COMMIT=$(shell git rev-parse HEAD)
 BUILD_DATE=$(shell date +%Y-%m-%dT%H:%M:%S%z)
 ldflags="-s -w -X $(VERSION_PKG).Version=$(TAG) -X $(VERSION_PKG).GitCommit=${GIT_COMMIT} -X ${VERSION_PKG}.BuildDate=${BUILD_DATE}"
 
+#tools
+GOLANGCI_LINT = go run ${REPO_ROOT}/vendor/github.com/golangci/golangci-lint/cmd/golangci-lint
+
 .PHONY: cloud-controller-manager
 cloud-controller-manager: gofmt unit-test
 	@echo + Building cloud-controller-manager binary
@@ -110,8 +113,8 @@ gofmt:
 .PHONY: golint
 golint:
 	export GO111MODULE=on
-	which golangci-lint 2>&1 >/dev/null || go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.54.2
-	golangci-lint --config ".golangci.yml" run ./pkg/controller/... -v --timeout=300s
+	GOLANGCI_LINT_CACHE=/tmp/.cache GOFLAGS="-mod=vendor"
+	${GOLANGCI_LINT} run pkg/... --timeout=300s
 
 unit-test:
 	GO111MODULE=on go test -mod vendor -v -race -coverprofile=coverage.txt -covermode=atomic \

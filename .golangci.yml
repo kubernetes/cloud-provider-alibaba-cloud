@@ -13,6 +13,11 @@ linters-settings:
 
 linters:
   enable:
-    - golint
+    - govet
+    - unused
+    - ineffassign
+    - staticcheck
+    - gosimple
+    - exportloopref
   disable-all: true
 
