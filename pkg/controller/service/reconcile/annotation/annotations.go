@@ -110,6 +110,7 @@ const (
 	Cps      = AnnotationLoadBalancerPrefix + "cps"
 
 	PreserveClientIp = AnnotationLoadBalancerPrefix + "preserve-client-ip"
+	ServerGroupType  = AnnotationLoadBalancerPrefix + "server-group-type" // ServerGroupType, ECS/ECI; IP
 )
 
 // edge load balancer

@@ -133,7 +133,6 @@ func FindNodeByNodeName(nodes []v1.Node, nodeName string) *v1.Node {
 			return &n
 		}
 	}
-	klog.Infof("node %s not found ", nodeName)
 	return nil
 }
 
@@ -188,6 +187,18 @@ func IsNodeExcludeFromEdgeLoadBalancer(node *v1.Node) bool {
 		return true
 	}
 	return false
+}
+
+func GetNodeInternalIP(node *v1.Node) (string, error) {
+	if len(node.Status.Addresses) == 0 {
+		return "", fmt.Errorf("node %s do not contains addresses", node.Name)
+	}
+	for _, addr := range node.Status.Addresses {
+		if addr.Type == v1.NodeInternalIP {
+			return addr.Address, nil
+		}
+	}
+	return "", fmt.Errorf("node %s can not find InternalIP in node addresses", node.Name)
 }
 
 func NodeInfo(node *v1.Node) string {

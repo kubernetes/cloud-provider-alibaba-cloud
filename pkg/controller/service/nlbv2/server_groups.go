@@ -224,15 +224,20 @@ func (mgr *ServerGroupManager) UpdateServerGroup(reqCtx *svcCtx.RequestContext, 
 
 	}
 update:
+	var errs []error
 	if needUpdate {
 		reqCtx.Log.Info(fmt.Sprintf("update server group: %s [%s] changed, detail %s",
 			local.ServerGroupId, local.ServerGroupName, updateDetail))
 		if err := mgr.cloud.UpdateNLBServerGroup(reqCtx.Ctx, update); err != nil {
-			return fmt.Errorf("UpdateNLBServerGroup error: %s", err.Error())
+			errs = append(errs, fmt.Errorf("UpdateNLBServerGroup error: %s", err.Error()))
 		}
 	}
 
-	return mgr.updateServerGroupServers(reqCtx, local, remote)
+	if err := mgr.updateServerGroupServers(reqCtx, local, remote); err != nil {
+		errs = append(errs, err)
+	}
+
+	return utilerrors.NewAggregate(errs)
 }
 
 func (mgr *ServerGroupManager) updateServerGroupServers(reqCtx *svcCtx.RequestContext, local, remote *nlbmodel.ServerGroup) error {
@@ -457,13 +462,14 @@ func setBackendsFromEndpointSlices(candidates *reconbackend.EndpointWithENI, sg 
 	return backends
 }
 
-func (mgr *ServerGroupManager) buildENIBackends(candidates *reconbackend.EndpointWithENI, sg nlbmodel.ServerGroup) ([]nlbmodel.ServerGroupServer, error) {
+func (mgr *ServerGroupManager) buildENIBackends(candidates *reconbackend.EndpointWithENI, sg nlbmodel.ServerGroup,
+) ([]nlbmodel.ServerGroupServer, error) {
 	backends := setGenericBackendAttribute(candidates, sg)
 	if len(backends) == 0 {
 		return nil, nil
 	}
 
-	backends, err := updateENIBackends(mgr, backends, candidates.AddressIPVersion)
+	backends, err := updateENIBackends(mgr, backends, candidates.AddressIPVersion, sg.ServerGroupType)
 	if err != nil {
 		return backends, err
 	}
@@ -508,14 +514,25 @@ func (mgr *ServerGroupManager) buildLocalBackends(reqCtx *svcCtx.RequestContext,
 			continue
 		}
 
-		_, id, err := helper.NodeFromProviderID(node.Spec.ProviderID)
-		if err != nil {
-			return nil, fmt.Errorf("parse providerid: %s. "+
-				"expected: ${regionid}.${nodeid}, %s", node.Spec.ProviderID, err.Error())
+		if sg.ServerGroupType == nlbmodel.IpServerGroupType {
+			ip, err := helper.GetNodeInternalIP(node)
+			if err != nil {
+				return nil, fmt.Errorf("get node address err: %s", err.Error())
+			}
+			backend.ServerId = ip
+			backend.ServerIp = ip
+			backend.ServerType = nlbmodel.IpServerType
+		} else {
+			_, id, err := helper.NodeFromProviderID(node.Spec.ProviderID)
+			if err != nil {
+				return nil, fmt.Errorf("parse providerid: %s. "+
+					"expected: ${regionid}.${nodeid}, %s", node.Spec.ProviderID, err.Error())
+			}
+			backend.ServerId = id
+			backend.ServerIp = ""
+			backend.ServerType = nlbmodel.EcsServerType
 		}
-		backend.ServerId = id
-		backend.ServerIp = ""
-		backend.ServerType = nlbmodel.EcsServerType
+
 		// for ECS backend type, port should be set to NodePort
 		backend.Port = sg.ServicePort.NodePort
 		ecsBackends = append(ecsBackends, backend)
@@ -524,7 +541,7 @@ func (mgr *ServerGroupManager) buildLocalBackends(reqCtx *svcCtx.RequestContext,
 	// 2. add eci backends
 	if len(eciBackends) != 0 {
 		reqCtx.Log.Info("add eciBackends")
-		eciBackends, err = updateENIBackends(mgr, eciBackends, candidates.AddressIPVersion)
+		eciBackends, err = updateENIBackends(mgr, eciBackends, candidates.AddressIPVersion, sg.ServerGroupType)
 		if err != nil {
 			return nil, fmt.Errorf("update eci backends error: %s", err.Error())
 		}
@@ -553,7 +570,9 @@ func remoteDuplicatedECS(backends []nlbmodel.ServerGroupServer) []nlbmodel.Serve
 
 }
 
-func (mgr *ServerGroupManager) buildClusterBackends(reqCtx *svcCtx.RequestContext, candidates *reconbackend.EndpointWithENI, sg nlbmodel.ServerGroup) ([]nlbmodel.ServerGroupServer, error) {
+func (mgr *ServerGroupManager) buildClusterBackends(
+	reqCtx *svcCtx.RequestContext, candidates *reconbackend.EndpointWithENI, sg nlbmodel.ServerGroup,
+) ([]nlbmodel.ServerGroupServer, error) {
 	initBackends := setGenericBackendAttribute(candidates, sg)
 
 	var (
@@ -567,22 +586,33 @@ func (mgr *ServerGroupManager) buildClusterBackends(reqCtx *svcCtx.RequestContex
 			reqCtx.Log.Info("node has exclude label which cannot be added to lb backend", "node", node.Name)
 			continue
 		}
-		_, id, err := helper.NodeFromProviderID(node.Spec.ProviderID)
-		if err != nil {
-			return nil, fmt.Errorf("normal parse providerid: %s. "+
-				"expected: ${regionid}.${nodeid}, %s", node.Spec.ProviderID, err.Error())
+
+		backend := nlbmodel.ServerGroupServer{
+			Weight:      DefaultServerWeight,
+			Port:        sg.ServicePort.NodePort,
+			Description: sg.ServerGroupName,
 		}
 
-		ecsBackends = append(
-			ecsBackends,
-			nlbmodel.ServerGroupServer{
-				ServerId:    id,
-				Weight:      DefaultServerWeight,
-				Port:        sg.ServicePort.NodePort,
-				ServerType:  nlbmodel.EcsServerType,
-				Description: sg.ServerGroupName,
-			},
-		)
+		if sg.ServerGroupType == nlbmodel.IpServerGroupType {
+			ip, err := helper.GetNodeInternalIP(&node)
+			if err != nil {
+				return nil, fmt.Errorf("get node address err: %s", err.Error())
+			}
+			backend.ServerId = ip
+			backend.ServerIp = ip
+			backend.ServerType = nlbmodel.IpServerType
+		} else {
+			_, id, err := helper.NodeFromProviderID(node.Spec.ProviderID)
+			if err != nil {
+				return nil, fmt.Errorf("normal parse providerid: %s. "+
+					"expected: ${regionid}.${nodeid}, %s", node.Spec.ProviderID, err.Error())
+			}
+			backend.ServerId = id
+			backend.ServerIp = ""
+			backend.ServerType = nlbmodel.EcsServerType
+		}
+
+		ecsBackends = append(ecsBackends, backend)
 	}
 
 	// 2. add eci backends
@@ -606,7 +636,7 @@ func (mgr *ServerGroupManager) buildClusterBackends(reqCtx *svcCtx.RequestContex
 	}
 
 	if len(eciBackends) != 0 {
-		eciBackends, err = updateENIBackends(mgr, eciBackends, candidates.AddressIPVersion)
+		eciBackends, err = updateENIBackends(mgr, eciBackends, candidates.AddressIPVersion, sg.ServerGroupType)
 		if err != nil {
 			return nil, fmt.Errorf("update eci backends error: %s", err.Error())
 		}
@@ -617,8 +647,17 @@ func (mgr *ServerGroupManager) buildClusterBackends(reqCtx *svcCtx.RequestContex
 	return setWeightBackends(helper.ClusterTrafficPolicy, backends, sg.Weight), nil
 }
 
-func updateENIBackends(mgr *ServerGroupManager, backends []nlbmodel.ServerGroupServer, ipVersion model.AddressIPVersionType) (
-	[]nlbmodel.ServerGroupServer, error) {
+func updateENIBackends(mgr *ServerGroupManager, backends []nlbmodel.ServerGroupServer,
+	ipVersion model.AddressIPVersionType, serverGroupType nlbmodel.ServerGroupType,
+) ([]nlbmodel.ServerGroupServer, error) {
+	if serverGroupType == nlbmodel.IpServerGroupType {
+		for i := range backends {
+			backends[i].ServerId = backends[i].ServerIp
+			backends[i].ServerType = nlbmodel.IpServerType
+		}
+		return backends, nil
+	}
+
 	var ips []string
 	for _, b := range backends {
 		ips = append(ips, b.ServerIp)
@@ -761,6 +800,16 @@ func getServerGroupTag(reqCtx *svcCtx.RequestContext) []tag.Tag {
 }
 
 func setServerGroupAttributeFromAnno(sg *nlbmodel.ServerGroup, anno *annotation.AnnotationRequest) error {
+	if anno.Get(annotation.ServerGroupType) != "" {
+		if strings.EqualFold(anno.Get(annotation.ServerGroupType), string(nlbmodel.IpServerGroupType)) {
+			sg.ServerGroupType = nlbmodel.IpServerGroupType
+		} else if strings.EqualFold(anno.Get(annotation.ServerGroupType), string(nlbmodel.InstanceServerGroupType)) {
+			sg.ServerGroupType = nlbmodel.InstanceServerGroupType
+		} else {
+			return fmt.Errorf("unsupport server ServerGroupType [%s]", sg.ServerGroupType)
+		}
+	}
+
 	if anno.Get(annotation.ConnectionDrain) != "" {
 		sg.ConnectionDrainEnabled = tea.Bool(strings.EqualFold(anno.Get(annotation.ConnectionDrain), string(model.OnFlag)))
 	}
@@ -899,7 +948,7 @@ func isServerEqual(a, b nlbmodel.ServerGroupServer) bool {
 	case nlbmodel.EcsServerType:
 		return a.ServerId == b.ServerId
 	case nlbmodel.IpServerType:
-		return a.ServerIp == b.ServerIp
+		return a.ServerId == b.ServerId && a.ServerIp == b.ServerIp
 	default:
 		klog.Errorf("%s is not supported, skip", a.ServerType)
 		return false

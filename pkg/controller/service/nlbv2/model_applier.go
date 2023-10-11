@@ -13,7 +13,6 @@ import (
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/base"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/dryrun"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/util"
-	"k8s.io/klog/v2"
 )
 
 func NewModelApplier(nlbMgr *NLBManager, lisMgr *ListenerManager, sgMgr *ServerGroupManager) *ModelApplier {
@@ -41,7 +40,6 @@ func (m *ModelApplier) Apply(reqCtx *svcCtx.RequestContext, local *nlbmodel.Netw
 		return remote, fmt.Errorf("get nlb attribute from cloud error: %s", err.Error())
 	}
 	reqCtx.Ctx = context.WithValue(reqCtx.Ctx, dryrun.ContextNLB, remote.GetLoadBalancerId())
-	klog.Infof("%s find nlb with result: \n%+v", util.Key(reqCtx.Service), util.PrettyJson(remote))
 
 	serviceHashChanged := helper.IsServiceHashChanged(reqCtx.Service)
 	errs := []error{}
@@ -164,7 +162,7 @@ func (m *ModelApplier) applyLoadBalancerAttribute(reqCtx *svcCtx.RequestContext,
 }
 
 func (m *ModelApplier) applyVGroups(reqCtx *svcCtx.RequestContext, local, remote *nlbmodel.NetworkLoadBalancer) error {
-
+	var errs []error
 	for i := range local.ServerGroups {
 		found := false
 		var old nlbmodel.ServerGroup
@@ -188,8 +186,18 @@ func (m *ModelApplier) applyVGroups(reqCtx *svcCtx.RequestContext, local, remote
 
 		// update
 		if found {
-			if err := m.sgMgr.UpdateServerGroup(reqCtx, local.ServerGroups[i], &old); err != nil {
-				return fmt.Errorf("EnsureServerGroupUpdated error: %s", err.Error())
+			// if server group type changed, need to recreate
+			if local.ServerGroups[i].ServerGroupType != "" &&
+				local.ServerGroups[i].ServerGroupType != old.ServerGroupType {
+				reqCtx.Log.Info(fmt.Sprintf("ServerGroupType changed [%s] - [%s], need to recreate server group",
+					old.ServerGroupType, local.ServerGroups[i].ServerGroupType),
+					"sgId", old.ServerGroupId, "sgName", old.ServerGroupName)
+				found = false
+			} else {
+				if err := m.sgMgr.UpdateServerGroup(reqCtx, local.ServerGroups[i], &old); err != nil {
+					errs = append(errs, fmt.Errorf("EnsureServerGroupUpdated error: %s", err.Error()))
+					continue
+				}
 			}
 		}
 
@@ -198,19 +206,20 @@ func (m *ModelApplier) applyVGroups(reqCtx *svcCtx.RequestContext, local, remote
 			reqCtx.Log.Info(fmt.Sprintf("create server group %s", local.ServerGroups[i].ServerGroupName))
 			// to avoid add too many backends in one action, create server group with empty backends,
 			// then use AddNLBServers to add backends
-			err := m.sgMgr.CreateServerGroup(reqCtx, local.ServerGroups[i])
-			if err != nil {
-				return fmt.Errorf("EnsureServerGroupCreated error: %s", err.Error())
+			if err := m.sgMgr.CreateServerGroup(reqCtx, local.ServerGroups[i]); err != nil {
+				errs = append(errs, fmt.Errorf("EnsureServerGroupCreated error: %s", err.Error()))
+				continue
 			}
 			if err := m.sgMgr.BatchAddServers(reqCtx, local.ServerGroups[i],
 				local.ServerGroups[i].Servers); err != nil {
-				return err
+				errs = append(errs, fmt.Errorf("BatchAddServers error: %s", err.Error()))
+				continue
 			}
 			remote.ServerGroups = append(remote.ServerGroups, local.ServerGroups[i])
 		}
 	}
 
-	return nil
+	return utilerrors.NewAggregate(errs)
 }
 
 func (m *ModelApplier) applyListeners(reqCtx *svcCtx.RequestContext, local, remote *nlbmodel.NetworkLoadBalancer) error {

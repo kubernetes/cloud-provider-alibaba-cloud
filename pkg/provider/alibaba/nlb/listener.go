@@ -26,6 +26,8 @@ func (p *NLBProvider) ListNLBListeners(ctx context.Context, lbId string) ([]*nlb
 		if resp == nil || resp.Body == nil {
 			return nil, fmt.Errorf("OpenAPI ListNLBListeners resp is nil")
 		}
+		klog.V(5).Infof("RequestId: %s, API: %s", tea.StringValue(resp.Body.RequestId), "ListNLBListeners")
+
 		respListeners = append(respListeners, resp.Body.Listeners...)
 
 		nextToken = tea.StringValue(resp.Body.NextToken)
@@ -99,8 +101,15 @@ func (p *NLBProvider) CreateNLBListener(ctx context.Context, lbId string, lis *n
 	}
 	req.CaEnabled = lis.CaEnabled
 
-	_, err := p.auth.NLB.CreateListener(req)
-	return util.SDKError("CreateListener", err)
+	resp, err := p.auth.NLB.CreateListener(req)
+	if err != nil {
+		return util.SDKError("CreateListener", err)
+	}
+	if resp == nil || resp.Body == nil {
+		return fmt.Errorf("OpenAPI CreateListener resp is nil")
+	}
+	klog.V(5).Infof("RequestId: %s, API: %s", tea.StringValue(resp.Body.RequestId), "CreateListener")
+	return nil
 }
 
 func (p *NLBProvider) UpdateNLBListener(ctx context.Context, lis *nlbmodel.ListenerAttribute) error {
@@ -124,8 +133,15 @@ func (p *NLBProvider) UpdateNLBListener(ctx context.Context, lis *nlbmodel.Liste
 	}
 	req.CaEnabled = lis.CaEnabled
 
-	_, err := p.auth.NLB.UpdateListenerAttribute(req)
-	return util.SDKError("UpdateListenerAttribute", err)
+	resp, err := p.auth.NLB.UpdateListenerAttribute(req)
+	if err != nil {
+		return util.SDKError("UpdateListenerAttribute", err)
+	}
+	if resp == nil || resp.Body == nil {
+		return fmt.Errorf("OpenAPI UpdateListenerAttribute resp is nil")
+	}
+	klog.V(5).Infof("RequestId: %s, API: %s", tea.StringValue(resp.Body.RequestId), "UpdateListenerAttribute")
+	return nil
 }
 
 func (p *NLBProvider) DeleteNLBListener(ctx context.Context, listenerId string) error {
@@ -139,6 +155,7 @@ func (p *NLBProvider) DeleteNLBListener(ctx context.Context, listenerId string) 
 	if resp == nil || resp.Body == nil {
 		return fmt.Errorf("OpenAPI DeleteNLBListener resp is nil")
 	}
+	klog.V(5).Infof("RequestId: %s, API: %s", tea.StringValue(resp.Body.RequestId), "DeleteNLBListener")
 	return p.waitJobFinish("DeleteListener", tea.StringValue(resp.Body.JobId))
 }
 
@@ -146,6 +163,13 @@ func (p *NLBProvider) StartNLBListener(ctx context.Context, listenerId string) e
 	req := &nlb.StartListenerRequest{}
 	req.ListenerId = tea.String(listenerId)
 
-	_, err := p.auth.NLB.StartListener(req)
-	return util.SDKError("StartListener", err)
+	resp, err := p.auth.NLB.StartListener(req)
+	if err != nil {
+		return util.SDKError("StartListener", err)
+	}
+	if resp == nil || resp.Body == nil {
+		return fmt.Errorf("OpenAPI StartListener resp is nil")
+	}
+	klog.V(5).Infof("RequestId: %s, API: %s", tea.StringValue(resp.Body.RequestId), "StartListener")
+	return nil
 }

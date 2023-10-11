@@ -11,6 +11,7 @@ import (
 	prvd "k8s.io/cloud-provider-alibaba-cloud/pkg/provider"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/base"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/util"
+	pkgUtil "k8s.io/cloud-provider-alibaba-cloud/pkg/util"
 	"k8s.io/klog/v2"
 	"strings"
 	"time"
@@ -38,8 +39,8 @@ const (
 func (p *NLBProvider) FindNLB(ctx context.Context, mdl *nlbmodel.NetworkLoadBalancer) error {
 	// 1. find by nlb id
 	if mdl.LoadBalancerAttribute.LoadBalancerId != "" {
-		klog.Infof("[%s] find nlb by id, LoadBalancerId [%s]",
-			mdl.NamespacedName, mdl.LoadBalancerAttribute.LoadBalancerId)
+		klog.Infof("[%s] find nlb by id, nlb info [%+v]",
+			mdl.NamespacedName, pkgUtil.PrettyJson(mdl))
 		return p.DescribeNLB(ctx, mdl)
 	}
 
@@ -49,8 +50,8 @@ func (p *NLBProvider) FindNLB(ctx context.Context, mdl *nlbmodel.NetworkLoadBala
 		return err
 	}
 	if mdl.LoadBalancerAttribute.LoadBalancerId != "" {
-		klog.Infof("[%s] find nlb by tag, LoadBalancerId [%s]",
-			mdl.NamespacedName, mdl.LoadBalancerAttribute.LoadBalancerId)
+		klog.Infof("[%s] find nlb by tag, nlb info [%+v]",
+			mdl.NamespacedName, pkgUtil.PrettyJson(mdl))
 		return nil
 	}
 
@@ -60,8 +61,8 @@ func (p *NLBProvider) FindNLB(ctx context.Context, mdl *nlbmodel.NetworkLoadBala
 		return err
 	}
 	if mdl.LoadBalancerAttribute.LoadBalancerId != "" {
-		klog.Infof("[%s] find nlb by name, LoadBalancerId [%s]",
-			mdl.NamespacedName, mdl.LoadBalancerAttribute.LoadBalancerId)
+		klog.Infof("[%s] find nlb by name, nlb info [%+v]",
+			mdl.NamespacedName, pkgUtil.PrettyJson(mdl))
 		return nil
 	}
 
@@ -109,6 +110,7 @@ func (p *NLBProvider) CreateNLB(ctx context.Context, mdl *nlbmodel.NetworkLoadBa
 	if resp == nil || resp.Body == nil {
 		return fmt.Errorf("OpenAPI CreateLoadBalancer resp is nil")
 	}
+	klog.V(5).Infof("RequestId: %s, API: %s", tea.StringValue(resp.Body.RequestId), "CreateLoadBalancer")
 
 	mdl.LoadBalancerAttribute.LoadBalancerId = tea.StringValue(resp.Body.LoadbalancerId)
 	return nil
@@ -124,6 +126,8 @@ func (p *NLBProvider) DeleteNLB(ctx context.Context, mdl *nlbmodel.NetworkLoadBa
 	if resp == nil || resp.Body == nil {
 		return fmt.Errorf("OpenAPI DeleteNLB resp is nil")
 	}
+	klog.V(5).Infof("RequestId: %s, API: %s", tea.StringValue(resp.Body.RequestId), "DeleteLoadBalancer")
+
 	return p.waitJobFinish("DeleteLoadBalancer", tea.StringValue(resp.Body.JobId), 20*time.Second, 3*time.Minute)
 }
 
@@ -133,8 +137,16 @@ func (p *NLBProvider) UpdateNLB(ctx context.Context, mdl *nlbmodel.NetworkLoadBa
 	if mdl.LoadBalancerAttribute.Name != "" {
 		req.LoadBalancerName = tea.String(mdl.LoadBalancerAttribute.Name)
 	}
-	_, err := p.auth.NLB.UpdateLoadBalancerAttribute(req)
-	return util.SDKError("UpdateLoadBalancerAttribute", err)
+	resp, err := p.auth.NLB.UpdateLoadBalancerAttribute(req)
+	if err != nil {
+		return util.SDKError("UpdateLoadBalancerAttribute", err)
+	}
+	if resp == nil || resp.Body == nil {
+		return fmt.Errorf("OpenAPI UpdateLoadBalancerAttribute resp is nil")
+	}
+
+	klog.V(5).Infof("RequestId: %s, API: %s", tea.StringValue(resp.Body.RequestId), "UpdateLoadBalancerAttribute")
+	return nil
 }
 
 func (p *NLBProvider) UpdateNLBAddressType(ctx context.Context, mdl *nlbmodel.NetworkLoadBalancer) error {
@@ -142,8 +154,16 @@ func (p *NLBProvider) UpdateNLBAddressType(ctx context.Context, mdl *nlbmodel.Ne
 	req.LoadBalancerId = tea.String(mdl.LoadBalancerAttribute.LoadBalancerId)
 	req.AddressType = tea.String(mdl.LoadBalancerAttribute.AddressType)
 
-	_, err := p.auth.NLB.UpdateLoadBalancerAddressTypeConfig(req)
-	return util.SDKError("UpdateNLBAddressType", err)
+	resp, err := p.auth.NLB.UpdateLoadBalancerAddressTypeConfig(req)
+	if err != nil {
+		return util.SDKError("UpdateNLBAddressType", err)
+	}
+	if resp == nil || resp.Body == nil {
+		return fmt.Errorf("OpenAPI UpdateLoadBalancerAddressTypeConfig resp is nil")
+	}
+
+	klog.V(5).Infof("RequestId: %s, API: %s", tea.StringValue(resp.Body.RequestId), "UpdateLoadBalancerAddressTypeConfig")
+	return nil
 }
 
 func (p *NLBProvider) UpdateNLBZones(ctx context.Context, mdl *nlbmodel.NetworkLoadBalancer) error {
@@ -164,8 +184,16 @@ func (p *NLBProvider) UpdateNLBZones(ctx context.Context, mdl *nlbmodel.NetworkL
 		req.ZoneMappings = append(req.ZoneMappings, zoneMapping)
 	}
 
-	_, err := p.auth.NLB.UpdateLoadBalancerZones(req)
-	return util.SDKError("UpdateLoadBalancerZones", err)
+	resp, err := p.auth.NLB.UpdateLoadBalancerZones(req)
+	if err != nil {
+		return util.SDKError("UpdateLoadBalancerZones", err)
+	}
+	if resp == nil || resp.Body == nil {
+		return fmt.Errorf("OpenAPI UpdateLoadBalancerZones resp is nil")
+	}
+
+	klog.V(5).Infof("RequestId: %s, API: %s", tea.StringValue(resp.Body.RequestId), "UpdateLoadBalancerZones")
+	return nil
 }
 
 func (p *NLBProvider) UpdateNLBSecurityGroupIds(ctx context.Context, mdl *nlbmodel.NetworkLoadBalancer, added, removed []string) error {
@@ -178,6 +206,11 @@ func (p *NLBProvider) UpdateNLBSecurityGroupIds(ctx context.Context, mdl *nlbmod
 		if err != nil {
 			return util.SDKError("LoadBalancerLeaveSecurityGroup", err)
 		}
+		if resp == nil || resp.Body == nil {
+			return fmt.Errorf("OpenAPI LoadBalancerLeaveSecurityGroup resp is nil")
+		}
+		klog.V(5).Infof("RequestId: %s, API: %s", tea.StringValue(resp.Body.RequestId), "LoadBalancerLeaveSecurityGroup")
+
 		err = p.waitJobFinish("LoadBalancerLeaveSecurityGroup", tea.StringValue(resp.Body.JobId))
 		if err != nil {
 			return err
@@ -192,6 +225,11 @@ func (p *NLBProvider) UpdateNLBSecurityGroupIds(ctx context.Context, mdl *nlbmod
 		if err != nil {
 			return util.SDKError("LoadBalancerJoinSecurityGroup", err)
 		}
+		if resp == nil || resp.Body == nil {
+			return fmt.Errorf("OpenAPI LoadBalancerJoinSecurityGroup resp is nil")
+		}
+		klog.V(5).Infof("RequestId: %s, API: %s", tea.StringValue(resp.Body.RequestId), "LoadBalancerJoinSecurityGroup")
+
 		err = p.waitJobFinish("LoadBalancerJoinSecurityGroup", tea.StringValue(resp.Body.JobId))
 		if err != nil {
 			return err
@@ -214,8 +252,15 @@ func (p *NLBProvider) TagNLBResource(ctx context.Context, resourceId string, res
 		})
 	}
 
-	_, err := p.auth.NLB.TagResources(req)
-	return util.SDKError("TagResources", err)
+	resp, err := p.auth.NLB.TagResources(req)
+	if err != nil {
+		return util.SDKError("TagResources", err)
+	}
+	if resp == nil || resp.Body == nil {
+		return fmt.Errorf("OpenAPI TagResources resp is nil")
+	}
+	klog.V(5).Infof("RequestId: %s, API: %s", tea.StringValue(resp.Body.RequestId), "TagResources")
+	return nil
 }
 
 func (p *NLBProvider) ListNLBTagResources(ctx context.Context, lbId string) ([]tag.Tag, error) {
@@ -230,6 +275,8 @@ func (p *NLBProvider) ListNLBTagResources(ctx context.Context, lbId string) ([]t
 	if resp == nil || resp.Body == nil {
 		return nil, fmt.Errorf("OpenAPI ListTagResources resp is nil")
 	}
+	klog.V(5).Infof("RequestId: %s, API: %s", tea.StringValue(resp.Body.RequestId), "ListTagResources")
+
 	var ret []tag.Tag
 	for _, v := range resp.Body.TagResources {
 		if v != nil {
@@ -260,6 +307,8 @@ func (p *NLBProvider) findNLBByTag(mdl *nlbmodel.NetworkLoadBalancer) error {
 	if resp == nil || resp.Body == nil {
 		return fmt.Errorf("OpenAPI ListLoadBalancers resp is nil")
 	}
+	klog.V(5).Infof("RequestId: %s, API: %s", tea.StringValue(resp.Body.RequestId), "ListLoadBalancers")
+
 	num := len(resp.Body.LoadBalancers)
 	if num == 0 {
 		return nil
@@ -312,6 +361,8 @@ func (p *NLBProvider) findNLBByName(mdl *nlbmodel.NetworkLoadBalancer) error {
 	if resp == nil || resp.Body == nil {
 		return fmt.Errorf("OpenAPI ListLoadBalancers resp is nil")
 	}
+	klog.V(5).Infof("RequestId: %s, API: %s", tea.StringValue(resp.Body.RequestId), "ListLoadBalancers")
+
 	num := len(resp.Body.LoadBalancers)
 	if num == 0 {
 		return nil
@@ -460,6 +511,10 @@ func (p *NLBProvider) NLBRegionIds() ([]string, error) {
 	if err != nil {
 		return nil, fmt.Errorf("describe nlb regions error: %s", err.Error())
 	}
+	if resp == nil || resp.Body == nil {
+		return nil, fmt.Errorf("OpenAPI DescribeRegions resp is nil")
+	}
+	klog.V(5).Infof("RequestId: %s, API: %s", tea.StringValue(resp.Body.RequestId), "DescribeRegions")
 
 	var ids []string
 	for _, r := range resp.Body.Regions {
@@ -480,6 +535,10 @@ func (p *NLBProvider) NLBZoneIds(regionId string) ([]string, error) {
 	if err != nil {
 		return nil, fmt.Errorf("describe nlb zones error: %s", err.Error())
 	}
+	if resp == nil || resp.Body == nil {
+		return nil, fmt.Errorf("OpenAPI DescribeZones resp is nil")
+	}
+	klog.V(5).Infof("RequestId: %s, API: %s", tea.StringValue(resp.Body.RequestId), "DescribeZones")
 
 	var ids []string
 	for _, z := range resp.Body.Zones {
@@ -498,6 +557,13 @@ func (p *NLBProvider) UntagNLBResources(ctx context.Context, lbId string, tagKey
 	req.ResourceType = tea.String("loadbalancer")
 	req.TagKey = tagKey
 
-	_, err := p.auth.NLB.UntagResources(req)
-	return err
+	resp, err := p.auth.NLB.UntagResources(req)
+	if err != nil {
+		return util.SDKError("UntagResources", err)
+	}
+	if resp == nil || resp.Body == nil {
+		return fmt.Errorf("OpenAPI UntagResources resp is nil")
+	}
+	klog.V(5).Infof("RequestId: %s, API: %s", tea.StringValue(resp.Body.RequestId), "UntagResources")
+	return nil
 }
