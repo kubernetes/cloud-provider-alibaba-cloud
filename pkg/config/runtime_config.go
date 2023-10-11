@@ -2,6 +2,9 @@ package config
 
 import (
 	"github.com/spf13/pflag"
+	v1 "k8s.io/api/core/v1"
+	discovery "k8s.io/api/discovery/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"time"
 )
@@ -81,6 +84,12 @@ func (c *RuntimeConfig) BindFlags(fs *pflag.FlagSet) {
 
 func BuildRuntimeOptions(rtCfg RuntimeConfig) manager.Options {
 	return manager.Options{
+		ClientDisableCacheFor: []client.Object{
+			&v1.Node{},
+			&v1.Service{},
+			&v1.Endpoints{},
+			&discovery.EndpointSlice{},
+		},
 		MetricsBindAddress:         rtCfg.MetricsBindAddress,
 		HealthProbeBindAddress:     rtCfg.HealthProbeBindAddress,
 		LeaderElection:             rtCfg.LeaderElect,
