@@ -22,44 +22,30 @@ var (
 
 func TestUpdateNetworkingCondition(t *testing.T) {
 	r := getReconcileRoute()
-	node := &v1.Node{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: NodeName,
-		},
-		Spec: v1.NodeSpec{
-			PodCIDR:    "10.96.0.64/26",
-			ProviderID: "cn-hangzhou.ecs-id",
-		},
-		Status: v1.NodeStatus{
-			Conditions: []v1.NodeCondition{
-				{
-					Type:   v1.NodeReady,
-					Reason: string(v1.NodeReady),
-					Status: v1.ConditionTrue,
-				},
-				{
-					Type:   v1.NodeNetworkUnavailable,
-					Reason: string(v1.NodeNetworkUnavailable),
-					Status: v1.ConditionTrue,
-				},
-			},
-		},
-	}
 
-	err := r.updateNetworkingCondition(context.TODO(), node, true)
+	nodes := &v1.NodeList{}
+
+	err := r.client.List(context.TODO(), nodes)
 	if err != nil {
-		t.Error(err)
+		panic(err)
 	}
+	for _, node := range nodes.Items {
 
-	updatedNode := &v1.Node{}
-	err = r.client.Get(context.TODO(), util.NamespacedName(node), updatedNode)
-	if err != nil {
-		t.Error(err)
-	}
+		err := r.updateNetworkingCondition(context.TODO(), &node, true)
+		if err != nil {
+			t.Error(err)
+		}
 
-	networkCondition, ok := helper.FindCondition(updatedNode.Status.Conditions, v1.NodeNetworkUnavailable)
-	if !ok || networkCondition.Status != v1.ConditionFalse {
-		t.Error("node condition update failed")
+		updatedNode := &v1.Node{}
+		err = r.client.Get(context.TODO(), util.NamespacedName(&node), updatedNode)
+		if err != nil {
+			t.Error(err)
+		}
+
+		networkCondition, ok := helper.FindCondition(updatedNode.Status.Conditions, v1.NodeNetworkUnavailable)
+		if !ok || networkCondition.Status != v1.ConditionFalse {
+			t.Error("node condition update failed")
+		}
 	}
 
 }
