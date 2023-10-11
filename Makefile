@@ -114,7 +114,7 @@ gofmt:
 golint:
 	export GO111MODULE=on
 	GOLANGCI_LINT_CACHE=/tmp/.cache GOFLAGS="-mod=vendor"
-	${GOLANGCI_LINT} run pkg/... --timeout=300s
+	${GOLANGCI_LINT} run pkg/... -v
 
 unit-test:
 	GO111MODULE=on go test -mod vendor -v -race -coverprofile=coverage.txt -covermode=atomic \
