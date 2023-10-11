@@ -270,7 +270,7 @@ func (mgr *ServerGroupManager) updateServerGroupServers(reqCtx *svcCtx.RequestCo
 func (mgr *ServerGroupManager) BatchAddServers(reqCtx *svcCtx.RequestContext, sg *nlbmodel.ServerGroup,
 	add []nlbmodel.ServerGroupServer) error {
 	reqCtx.Log.Info(fmt.Sprintf("reconcile server group: [%s] backend add [%+v]", sg.ServerGroupId, add))
-	return reconbackend.Batch(add, reconbackend.MaxBackendNum,
+	return reconbackend.Batch(add, ctrlCfg.ControllerCFG.ServerGroupBatchSize,
 		func(list []interface{}) error {
 			var batchAdds []nlbmodel.ServerGroupServer
 			for _, item := range list {
@@ -285,7 +285,7 @@ func (mgr *ServerGroupManager) BatchAddServers(reqCtx *svcCtx.RequestContext, sg
 func (mgr *ServerGroupManager) BatchRemoveServers(reqCtx *svcCtx.RequestContext, sg *nlbmodel.ServerGroup,
 	del []nlbmodel.ServerGroupServer) error {
 	reqCtx.Log.Info(fmt.Sprintf("reconcile server group: [%s] backend del [%+v]", sg.ServerGroupId, del))
-	return reconbackend.Batch(del, reconbackend.MaxBackendNum,
+	return reconbackend.Batch(del, ctrlCfg.ControllerCFG.ServerGroupBatchSize,
 		func(list []interface{}) error {
 			var batchDels []nlbmodel.ServerGroupServer
 			for _, item := range list {
@@ -300,7 +300,7 @@ func (mgr *ServerGroupManager) BatchRemoveServers(reqCtx *svcCtx.RequestContext,
 func (mgr *ServerGroupManager) BatchUpdateServers(reqCtx *svcCtx.RequestContext, sg *nlbmodel.ServerGroup,
 	update []nlbmodel.ServerGroupServer) error {
 	reqCtx.Log.Info(fmt.Sprintf("reconcile server group: [%s] backend update [%+v]", sg.ServerGroupId, update))
-	return reconbackend.Batch(update, reconbackend.MaxBackendNum,
+	return reconbackend.Batch(update, ctrlCfg.ControllerCFG.ServerGroupBatchSize,
 		func(list []interface{}) error {
 			var batchUpdates []nlbmodel.ServerGroupServer
 			for _, item := range list {

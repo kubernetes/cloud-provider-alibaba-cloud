@@ -27,6 +27,7 @@ const (
 	flagServiceMaxConcurrentReconciles = "concurrent-service-syncs"
 	flagRouteReconciliationPeriod      = "route-reconciliation-period"
 	flagNodeMonitorPeriod              = "node-monitor-period"
+	flagServerGroupBatchSize           = "sg-batch-size"
 	flagNetwork                        = "network"
 
 	defaultCloudProvider             = "alibabacloud"
@@ -36,6 +37,7 @@ const (
 	defaultCloudConfig               = ""
 	defaultRouteReconciliationPeriod = 5 * time.Minute
 	defaultNodeMonitorPeriod         = 5 * time.Minute
+	defaultServerGroupBatchSize      = 40
 	defaultNetwork                   = "vpc"
 )
 
@@ -50,6 +52,7 @@ type ControllerConfig struct {
 	Controllers                    []string
 	FeatureGates                   string
 	ServiceMaxConcurrentReconciles int
+	ServerGroupBatchSize           int
 	LogLevel                       int
 	DryRun                         bool
 	NetWork                        string
@@ -75,6 +78,7 @@ func (cfg *ControllerConfig) BindFlags(fs *pflag.FlagSet) {
 	fs.DurationVar(&cfg.RouteReconciliationPeriod.Duration, flagRouteReconciliationPeriod, defaultRouteReconciliationPeriod,
 		"The period for reconciling routes created for nodes by cloud provider. The minimum value is 1 minute")
 	fs.DurationVar(&cfg.NodeMonitorPeriod.Duration, flagNodeMonitorPeriod, defaultNodeMonitorPeriod, "The period for syncing NodeStatus in NodeController.")
+	fs.IntVar(&cfg.ServerGroupBatchSize, flagServerGroupBatchSize, defaultServerGroupBatchSize, "The batch size for syncing server group. The value range is 1-40")
 	fs.StringVar(&cfg.FeatureGates, flagFeatureGates, "", "A set of key=value pairs that describe feature gates for alpha/experimental features.")
 	fs.BoolVar(&cfg.AllowUntaggedCloud, "allow-untagged-cloud", false, "Allow the cluster to run without the cluster-id on cloud instances. This is a legacy mode of operation and a cluster-id will be required in the future.")
 	_ = fs.MarkDeprecated("allow-untagged-cloud", "This flag is deprecated and will be removed in a future release. A cluster-id will be required on cloud instances.")
