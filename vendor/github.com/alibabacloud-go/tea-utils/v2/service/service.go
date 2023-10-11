@@ -155,13 +155,7 @@ func StringifyMapValue(a map[string]interface{}) map[string]*string {
 	res := make(map[string]*string)
 	for key, value := range a {
 		if value != nil {
-			switch value.(type) {
-			case string:
-				res[key] = tea.String(value.(string))
-			default:
-				byt, _ := json.Marshal(value)
-				res[key] = tea.String(string(byt))
-			}
+			res[key] = ToJSONString(value)
 		}
 	}
 	return res
@@ -310,6 +304,26 @@ func AssertAsNumber(a interface{}) (_result *int, _err error) {
 		res = tea.IntValue(tmp)
 	default:
 		return nil, errors.New(fmt.Sprintf("%v is not a int", a))
+	}
+
+	return tea.Int(res), nil
+}
+
+/**
+ * Assert a value, if it is a integer, return it, otherwise throws
+ * @return the integer value
+ */
+func AssertAsInteger(value interface{}) (_result *int, _err error) {
+	res := 0
+	switch value.(type) {
+	case int:
+		tmp := value.(int)
+		res = tmp
+	case *int:
+		tmp := value.(*int)
+		res = tea.IntValue(tmp)
+	default:
+		return nil, errors.New(fmt.Sprintf("%v is not a int", value))
 	}
 
 	return tea.Int(res), nil

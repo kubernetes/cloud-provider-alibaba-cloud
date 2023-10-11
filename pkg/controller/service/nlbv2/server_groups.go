@@ -87,12 +87,7 @@ func (mgr *ServerGroupManager) BuildRemoteModel(reqCtx *svcCtx.RequestContext, m
 }
 
 func (mgr *ServerGroupManager) CreateServerGroup(reqCtx *svcCtx.RequestContext, sg *nlbmodel.ServerGroup) error {
-	err := mgr.cloud.CreateNLBServerGroup(reqCtx.Ctx, sg)
-	if err != nil {
-		return err
-	}
-	// add tag
-	return mgr.cloud.TagNLBResource(reqCtx.Ctx, sg.ServerGroupId, nlbmodel.ServerGroupTagType, sg.Tags)
+	return mgr.cloud.CreateNLBServerGroup(reqCtx.Ctx, sg)
 }
 
 func (mgr *ServerGroupManager) DeleteServerGroup(reqCtx *svcCtx.RequestContext, sgId string) error {
