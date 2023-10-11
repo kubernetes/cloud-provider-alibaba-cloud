@@ -109,6 +109,7 @@ gofmt:
 
 .PHONY: golint
 golint:
+	export GO111MODULE=on
 	which golangci-lint 2>&1 >/dev/null || go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.54.2
 	golangci-lint --config ".golangci.yml" run ./pkg/controller/... -v --timeout=300s
 
