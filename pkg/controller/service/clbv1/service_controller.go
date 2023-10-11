@@ -97,27 +97,27 @@ func add(mgr manager.Manager, r *ReconcileService) error {
 		return err
 	}
 
-	if err := c.Watch(&source.Kind{Type: &v1.Service{}},
+	if err := c.Watch(source.Kind(mgr.GetCache(), &v1.Service{}),
 		NewEnqueueRequestForServiceEvent(mgr.GetEventRecorderFor("service-controller"))); err != nil {
 		return fmt.Errorf("watch resource svc error: %s", err.Error())
 	}
 
 	if utilfeature.DefaultFeatureGate.Enabled(ctrlCfg.EndpointSlice) {
 		// watch endpointslice
-		if err := c.Watch(&source.Kind{Type: &discovery.EndpointSlice{}},
-			NewEnqueueRequestForEndpointSliceEvent(mgr.GetEventRecorderFor("service-controller"))); err != nil {
+		if err := c.Watch(source.Kind(mgr.GetCache(), &discovery.EndpointSlice{}),
+			NewEnqueueRequestForEndpointSliceEvent(mgr.GetClient(), mgr.GetEventRecorderFor("service-controller"))); err != nil {
 			return fmt.Errorf("watch resource endpointslice error: %s", err.Error())
 		}
 	} else {
 		// watch endpoints
-		if err := c.Watch(&source.Kind{Type: &v1.Endpoints{}},
-			NewEnqueueRequestForEndpointEvent(mgr.GetEventRecorderFor("service-controller"))); err != nil {
+		if err := c.Watch(source.Kind(mgr.GetCache(), &v1.Endpoints{}),
+			NewEnqueueRequestForEndpointEvent(mgr.GetClient(), mgr.GetEventRecorderFor("service-controller"))); err != nil {
 			return fmt.Errorf("watch resource endpoint error: %s", err.Error())
 		}
 	}
 
-	if err := c.Watch(&source.Kind{Type: &v1.Node{}},
-		NewEnqueueRequestForNodeEvent(mgr.GetEventRecorderFor("service-controller"))); err != nil {
+	if err := c.Watch(source.Kind(mgr.GetCache(), &v1.Node{}),
+		NewEnqueueRequestForNodeEvent(mgr.GetClient(), mgr.GetEventRecorderFor("service-controller"))); err != nil {
 		return fmt.Errorf("watch resource node error: %s", err.Error())
 	}
 	return mgr.Add(&serviceController{c: c, recon: r})

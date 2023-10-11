@@ -1,6 +1,7 @@
 package pvtz
 
 import (
+	"context"
 	"k8s.io/klog/v2"
 	"reflect"
 
@@ -22,7 +23,7 @@ type EventHandlerWithClient struct {
 }
 
 // norm changes endpoints/services update into services
-func (e *EventHandlerWithClient) norm(o client.Object) []reconcile.Request {
+func (e *EventHandlerWithClient) norm(_ context.Context, o client.Object) []reconcile.Request {
 	var request []reconcile.Request
 	switch o := o.(type) {
 	case *v1.Endpoints:

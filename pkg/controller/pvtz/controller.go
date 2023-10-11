@@ -53,19 +53,16 @@ func addServiceReconciler(mgr manager.Manager, ctx *shared.SharedContext) error 
 		return err
 	}
 	eventHandler := NewEventHandlerWithClient()
-	kinds := []*source.Kind{
-		{
-			Type: &corev1.Service{},
-		},
-		{
-			Type: &corev1.Endpoints{},
-		},
+	kinds := []source.Source{
+		source.Kind(mgr.GetCache(), &corev1.Service{}),
+		source.Kind(mgr.GetCache(), &corev1.Endpoints{}),
 	}
+
 	sp := &ServicePredicate{}
 	for i := range kinds {
 		err = c.Watch(kinds[i], eventHandler, sp)
 		if err != nil {
-			return fmt.Errorf("watch resource: %s, %s", kinds[i].Type, err.Error())
+			return fmt.Errorf("watch resource %s", err.Error())
 		}
 	}
 	return nil
@@ -125,7 +122,7 @@ func addPodReconciler(mgr manager.Manager, ctx *shared.SharedContext) error {
 		return err
 	}
 	eventHandler := NewEventHandlerWithClient()
-	err = c.Watch(&source.Kind{Type: &corev1.Pod{}}, eventHandler)
+	err = c.Watch(source.Kind(mgr.GetCache(), &corev1.Pod{}), eventHandler)
 	if err != nil {
 		return fmt.Errorf("watch resource: pod, %s", err.Error())
 	}

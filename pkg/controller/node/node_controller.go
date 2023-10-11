@@ -13,12 +13,12 @@ import (
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/context/shared"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/helper"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/util"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/util/metric"
 	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/klogr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
-	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
@@ -73,7 +73,7 @@ func add(mgr manager.Manager, r *ReconcileNode) error {
 	}
 
 	// Watch for changes to primary resource AutoRepair
-	if err := c.Watch(&source.Kind{Type: &corev1.Node{}}, &handler.EnqueueRequestForObject{}); err != nil {
+	if err := c.Watch(source.Kind(mgr.GetCache(), &corev1.Node{}), NewEnqueueRequestForNodeEvent()); err != nil {
 		return err
 	}
 
@@ -101,15 +101,13 @@ type ReconcileNode struct {
 	record record.EventRecorder
 }
 
-func (m *ReconcileNode) Reconcile(
-	ctx context.Context, request reconcile.Request,
-) (reconcile.Result, error) {
-	klog.V(5).Infof("reconcile node: %s", request.NamespacedName)
+func (m *ReconcileNode) Reconcile(_ context.Context, request reconcile.Request) (reconcile.Result, error) {
+	log.Info("reconcile node", "node", request.NamespacedName)
 	node := &corev1.Node{}
 	err := m.client.Get(context.TODO(), request.NamespacedName, node)
 	if err != nil {
 		if errors.IsNotFound(err) {
-			klog.Infof("node not found, skip")
+			log.Info("node not found, skip", "node", request.NamespacedName)
 			// Request object not found, could have been deleted
 			// after reconcile request.
 			// Owned objects are automatically garbage collected.
@@ -117,6 +115,7 @@ func (m *ReconcileNode) Reconcile(
 			// Return and don't requeue
 			return reconcile.Result{}, nil
 		}
+		log.Error(err, "get node error", "node", request.NamespacedName)
 		return reconcile.Result{}, err
 	}
 	return reconcile.Result{}, m.syncCloudNode(node)
@@ -216,12 +215,14 @@ func (m *ReconcileNode) syncNode(nodes []corev1.Node) error {
 		}
 
 		if cloudNode == nil {
+			log.V(5).Info(util.PrettyJson(helper.NodeInfo(node)))
 			// if cloud node has been deleted, try to delete node from cluster
 			condition := nodeConditionReady(m.client, node)
 			if condition != nil && condition.Status == corev1.ConditionUnknown {
 				log.Info("node is NotReady and cloud node can not found by prvdId, try to delete node from cluster ", "node", node.Name, "prvdId", node.Spec.ProviderID)
 				// ignore error, retry next loop
 				deleteNode(m, node)
+				continue
 			}
 
 			log.Info("cloud node not found by prvdId, skip update node address", "node", node.Name, "prvdId", node.Spec.ProviderID)

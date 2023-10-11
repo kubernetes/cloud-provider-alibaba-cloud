@@ -189,3 +189,14 @@ func IsNodeExcludeFromEdgeLoadBalancer(node *v1.Node) bool {
 	}
 	return false
 }
+
+func NodeInfo(node *v1.Node) string {
+	if node == nil {
+		return ""
+	}
+	pNode := node.DeepCopy()
+	pNode.ManagedFields = nil
+	pNode.Status.Images = nil
+	jsonByte, _ := json.Marshal(pNode)
+	return string(jsonByte)
+}

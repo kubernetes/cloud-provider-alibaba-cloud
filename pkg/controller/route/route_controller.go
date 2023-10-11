@@ -79,9 +79,7 @@ func add(mgr manager.Manager, r *ReconcileRoute) error {
 
 	// Watch for changes to primary resource AutoRepair
 	err = c.Watch(
-		&source.Kind{
-			Type: &corev1.Node{},
-		},
+		source.Kind(mgr.GetCache(), &corev1.Node{}),
 		&handler.EnqueueRequestForObject{},
 		&predicateForNodeEvent{},
 	)

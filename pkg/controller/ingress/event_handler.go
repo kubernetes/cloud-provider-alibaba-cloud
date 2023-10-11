@@ -1,6 +1,7 @@
 package ingress
 
 import (
+	"context"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
@@ -30,7 +31,7 @@ type enqueueRequestsForAlbconfigEvent struct {
 	logger        logr.Logger
 }
 
-func (h *enqueueRequestsForAlbconfigEvent) Create(e event.CreateEvent, queue workqueue.RateLimitingInterface) {
+func (h *enqueueRequestsForAlbconfigEvent) Create(_ context.Context, e event.CreateEvent, queue workqueue.RateLimitingInterface) {
 	albconfig, ok := e.Object.(*v1.AlbConfig)
 	if ok {
 		h.logger.Info("controller: albconfig Create event", "albconfig", util.NamespacedName(albconfig).String())
@@ -38,7 +39,7 @@ func (h *enqueueRequestsForAlbconfigEvent) Create(e event.CreateEvent, queue wor
 	}
 }
 
-func (h *enqueueRequestsForAlbconfigEvent) Update(e event.UpdateEvent, queue workqueue.RateLimitingInterface) {
+func (h *enqueueRequestsForAlbconfigEvent) Update(_ context.Context, e event.UpdateEvent, queue workqueue.RateLimitingInterface) {
 	albconfigOld := e.ObjectOld.(*v1.AlbConfig)
 	albconfigNew := e.ObjectNew.(*v1.AlbConfig)
 
@@ -52,10 +53,10 @@ func (h *enqueueRequestsForAlbconfigEvent) Update(e event.UpdateEvent, queue wor
 	h.enqueueAlbconfig(queue, albconfigNew)
 }
 
-func (h *enqueueRequestsForAlbconfigEvent) Delete(e event.DeleteEvent, queue workqueue.RateLimitingInterface) {
+func (h *enqueueRequestsForAlbconfigEvent) Delete(_ context.Context, e event.DeleteEvent, queue workqueue.RateLimitingInterface) {
 }
 
-func (h *enqueueRequestsForAlbconfigEvent) Generic(e event.GenericEvent, queue workqueue.RateLimitingInterface) {
+func (h *enqueueRequestsForAlbconfigEvent) Generic(_ context.Context, e event.GenericEvent, queue workqueue.RateLimitingInterface) {
 	albconfig, ok := e.Object.(*v1.AlbConfig)
 	if ok {
 		h.logger.Info("controller: albconfig Generic event", "albconfig", util.NamespacedName(albconfig).String())
