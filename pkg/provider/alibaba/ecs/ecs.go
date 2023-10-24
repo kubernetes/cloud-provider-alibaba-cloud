@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
 	"strings"
 
@@ -120,6 +121,7 @@ func (e *ECSProvider) getInstances(ids []string, region string) ([]ecs.Instance,
 	req.InstanceIds = string(bids)
 	req.NextToken = ""
 	req.MaxResults = requests.NewInteger(50)
+	req.AdditionalAttributes = &[]string{"NETWORK_PRIMARY_ENI_IP"}
 
 	var ecsInstances []ecs.Instance
 	for {
@@ -224,6 +226,24 @@ func findAddress(instance *ecs.Instance) []v1.NodeAddress {
 	if len(instance.VpcAttributes.PrivateIpAddress.IpAddress) > 0 {
 		for _, ipaddr := range instance.VpcAttributes.PrivateIpAddress.IpAddress {
 			addrs = append(addrs, v1.NodeAddress{Type: v1.NodeInternalIP, Address: ipaddr})
+		}
+	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(ctrlCfg.IPv6DualStack) {
+		if len(instance.NetworkInterfaces.NetworkInterface) > 0 {
+			var primary *ecs.NetworkInterface
+			for i := range instance.NetworkInterfaces.NetworkInterface {
+				if instance.NetworkInterfaces.NetworkInterface[i].Type == "Primary" {
+					primary = &instance.NetworkInterfaces.NetworkInterface[i]
+					break
+				}
+			}
+			if primary != nil {
+				// add all ipv6 address of primary network interface to node address
+				for _, addr := range primary.Ipv6Sets.Ipv6Set {
+					addrs = append(addrs, v1.NodeAddress{Type: v1.NodeInternalIP, Address: addr.Ipv6Address})
+				}
+			}
 		}
 	}
 

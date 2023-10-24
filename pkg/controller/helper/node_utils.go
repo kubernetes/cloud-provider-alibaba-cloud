@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
@@ -87,6 +88,112 @@ func PatchM(mclient client.Client, target client.Object, getter func(runtime.Obj
 		)
 	}
 	return nil
+}
+
+func PatchNodeStatus(mclient client.Client, target *v1.Node, getter func(*v1.Node) (*v1.Node, error)) error {
+	err := mclient.Get(
+		context.TODO(),
+		client.ObjectKey{
+			Name: target.GetName(),
+		}, target,
+	)
+	if err != nil {
+		return fmt.Errorf("get origin object: %s", err.Error())
+	}
+
+	ntarget, err := getter(target.DeepCopy())
+	if err != nil {
+		return fmt.Errorf("get object diff patch: %s", err.Error())
+	}
+
+	diffTarget := ntarget
+	manuallyPatchAddresses := (len(target.Status.Addresses) > 0) &&
+		!equality.Semantic.DeepEqual(target.Status.Addresses, ntarget.Status.Addresses)
+	if manuallyPatchAddresses {
+		diffTarget = diffTarget.DeepCopy()
+		diffTarget.Status.Addresses = target.Status.Addresses
+	}
+
+	oldData, err := json.Marshal(target)
+	if err != nil {
+		return fmt.Errorf("ensure marshal: %s", err.Error())
+	}
+	newData, err := json.Marshal(diffTarget)
+	if err != nil {
+		return fmt.Errorf("ensure marshal: %s", err.Error())
+	}
+	patchBytes, patchErr := strategicpatch.CreateTwoWayMergePatch(oldData, newData, target)
+	if patchErr != nil {
+		return fmt.Errorf("create merge patch: %s", patchErr.Error())
+	}
+
+	if string(patchBytes) == "{}" && !manuallyPatchAddresses {
+		return nil
+	}
+
+	if manuallyPatchAddresses {
+		patchBytes, err = fixupPatchForNodeStatusAddresses(patchBytes, ntarget.Status.Addresses)
+		if err != nil {
+			return fmt.Errorf("fixup patch for node status addresses: %s", err.Error())
+		}
+	}
+
+	klog.Infof("try to patch node status %s/%s, %s ", target.GetNamespace(), target.GetName(), string(patchBytes))
+
+	return mclient.Status().Patch(
+		context.TODO(), ntarget,
+		client.RawPatch(types.StrategicMergePatchType, patchBytes))
+}
+
+// fixupPatchForNodeStatusAddresses adds a replace-strategy patch for Status.Addresses to
+// the existing patch
+func fixupPatchForNodeStatusAddresses(patchBytes []byte, addresses []v1.NodeAddress) ([]byte, error) {
+	// Given patchBytes='{"status": {"conditions": [ ... ], "phase": ...}}' and
+	// addresses=[{"type": "InternalIP", "address": "10.0.0.1"}], we need to generate:
+	//
+	//   {
+	//     "status": {
+	//       "conditions": [ ... ],
+	//       "phase": ...,
+	//       "addresses": [
+	//         {
+	//           "type": "InternalIP",
+	//           "address": "10.0.0.1"
+	//         },
+	//         {
+	//           "$patch": "replace"
+	//         }
+	//       ]
+	//     }
+	//   }
+
+	var patchMap map[string]interface{}
+	if err := json.Unmarshal(patchBytes, &patchMap); err != nil {
+		return nil, err
+	}
+
+	addrBytes, err := json.Marshal(addresses)
+	if err != nil {
+		return nil, err
+	}
+	var addrArray []interface{}
+	if err := json.Unmarshal(addrBytes, &addrArray); err != nil {
+		return nil, err
+	}
+	addrArray = append(addrArray, map[string]interface{}{"$patch": "replace"})
+
+	status := patchMap["status"]
+	if status == nil {
+		status = map[string]interface{}{}
+		patchMap["status"] = status
+	}
+	statusMap, ok := status.(map[string]interface{})
+	if !ok {
+		return nil, fmt.Errorf("unexpected data in patch")
+	}
+	statusMap["addresses"] = addrArray
+
+	return json.Marshal(patchMap)
 }
 
 func FindCondition(conds []v1.NodeCondition, conditionType v1.NodeConditionType) (*v1.NodeCondition, bool) {
@@ -178,23 +285,12 @@ func IsNodeExcludeFromLoadBalancer(node *v1.Node) bool {
 	return false
 }
 
-func IsNodeExcludeFromEdgeLoadBalancer(node *v1.Node) bool {
-	if _, exclude := node.Labels[LabelNodeExcludeBalancer]; exclude {
-		return true
-	}
-
-	if _, exclude := node.Labels[LabelNodeExcludeBalancerDeprecated]; exclude {
-		return true
-	}
-	return false
-}
-
 func GetNodeInternalIP(node *v1.Node) (string, error) {
 	if len(node.Status.Addresses) == 0 {
 		return "", fmt.Errorf("node %s do not contains addresses", node.Name)
 	}
 	for _, addr := range node.Status.Addresses {
-		if addr.Type == v1.NodeInternalIP {
+		if addr.Type == v1.NodeInternalIP && IsIPv4(addr.Address) {
 			return addr.Address, nil
 		}
 	}
