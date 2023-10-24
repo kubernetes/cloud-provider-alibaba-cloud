@@ -26,6 +26,7 @@ type E2EConfig struct {
 	ResourceGroupID   string `json:"ResourceGroupID"`
 	NLBZoneMaps       string `json:"NLBZoneMaps"`
 	SecurityGroupIDs  string `json:"SecurityGroupIDs"`
+	IPv6              bool   `json:"ipv6"`
 
 	// described by cluster info
 	Network      string `json:"network"`
@@ -86,6 +87,7 @@ func (e *E2EConfig) BindFlags() {
 	flag.StringVar(&e.NLBZoneMaps, "nlb-zone-maps", "", "nlb zone maps")
 	flag.StringVar(&e.SecurityGroupIDs, "security-group-ids", "", "security group ids used by nlb tests")
 	flag.StringVar(&e.Address, "address", "", "loadbalancer address")
+	flag.BoolVar(&e.IPv6, "ipv6", false, "ipv6")
 }
 
 func (e *E2EConfig) Validate() error {

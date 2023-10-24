@@ -63,6 +63,9 @@ func (mgr *ServerGroupManager) BuildLocalModel(reqCtx *svcCtx.RequestContext, md
 			Tags:        getServerGroupTag(reqCtx),
 			Protocol:    nlbmodel.GetListenerProtocolType(lis.ListenerProtocol),
 		}
+		if candidates.AddressIPVersion == model.IPv6 {
+			sg.AddressIPVersion = string(model.DualStack)
+		}
 		sg.NamedKey = getServerGroupNamedKey(reqCtx.Service, sg.Protocol, lis.ServicePort)
 		sg.ServerGroupName = sg.NamedKey.Key()
 		if err := setServerGroupAttributeFromAnno(sg, reqCtx.Anno); err != nil {

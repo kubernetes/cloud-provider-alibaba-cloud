@@ -91,7 +91,7 @@ func (e *EndpointWithENI) setAddressIpVersion(reqCtx *svcCtx.RequestContext) {
 	// Enable IPv6DualStack and EndpointSlice feature gates if you want to use ipv6 backends
 	if utilfeature.DefaultMutableFeatureGate.Enabled(ctrlCfg.IPv6DualStack) &&
 		utilfeature.DefaultMutableFeatureGate.Enabled(ctrlCfg.EndpointSlice) &&
-		reqCtx.Anno.Get(annotation.IPVersion) == string(model.IPv6) &&
+		strings.EqualFold(reqCtx.Anno.Get(annotation.IPVersion), string(model.DualStack)) &&
 		reqCtx.Anno.Get(annotation.BackendIPVersion) == string(model.IPv6) {
 		e.AddressIPVersion = model.IPv6
 		reqCtx.Log.Info("backend address ip version is ipv6")

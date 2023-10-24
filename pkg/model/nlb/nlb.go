@@ -3,12 +3,13 @@ package nlb
 import (
 	"encoding/json"
 	"fmt"
+	"strconv"
+	"strings"
+
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/model"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/model/tag"
-	"strconv"
-	"strings"
 )
 
 const (
@@ -114,6 +115,7 @@ type LoadBalancerAttribute struct {
 	Name                         string
 	AddressType                  string
 	AddressIpVersion             string
+	IPv6AddressType              string
 	VpcId                        string
 	ZoneMappings                 []ZoneMapping
 	ResourceGroupId              string

@@ -2,9 +2,10 @@ package prvd
 
 import (
 	"context"
-	"k8s.io/cloud-provider-alibaba-cloud/pkg/model/tag"
 	"net"
 	"time"
+
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/model/tag"
 
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/ingress/reconcile/tracking"
 
@@ -207,6 +208,7 @@ type INLB interface {
 	UpdateLoadBalancerProtection(ctx context.Context, lbId string, delCfg *nlbmodel.DeletionProtectionConfig, modCfg *nlbmodel.ModificationProtectionConfig) error
 	AttachCommonBandwidthPackageToLoadBalancer(ctx context.Context, lbId string, bandwidthPackageId string) error
 	DetachCommonBandwidthPackageFromLoadBalancer(ctx context.Context, lbId string, bandwidthPackageId string) error
+	UpdateNLBIPv6AddressType(ctx context.Context, mdl *nlbmodel.NetworkLoadBalancer) error
 
 	// ServerGroup
 	ListNLBServerGroups(ctx context.Context, tags []tag.Tag) ([]*nlbmodel.ServerGroup, error)

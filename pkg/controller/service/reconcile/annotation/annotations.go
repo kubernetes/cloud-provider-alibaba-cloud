@@ -2,8 +2,9 @@ package annotation
 
 import (
 	"fmt"
-	"k8s.io/cloud-provider-alibaba-cloud/pkg/model/tag"
 	"strings"
+
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/model/tag"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/helper"
@@ -105,6 +106,7 @@ const (
 	ZoneMaps           = AnnotationLoadBalancerPrefix + "zone-maps" // ZoneMaps zone maps
 	SecurityGroupIds   = AnnotationLoadBalancerPrefix + "security-group-ids"
 	BandwidthPackageId = AnnotationLoadBalancerPrefix + "bandwidth-package-id"
+	IPv6AddressType    = AnnotationLoadBalancerPrefix + "ipv6-address-type"
 
 	CaCertID = AnnotationLoadBalancerPrefix + "cacert-id" // CertID cert id
 	CaCert   = AnnotationLoadBalancerPrefix + "cacert"    // CaCert enable ca

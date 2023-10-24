@@ -190,6 +190,47 @@ func (p *NLBProvider) UpdateNLBAddressType(ctx context.Context, mdl *nlbmodel.Ne
 	return nil
 }
 
+func (p *NLBProvider) UpdateNLBIPv6AddressType(ctx context.Context, mdl *nlbmodel.NetworkLoadBalancer) error {
+	switch mdl.LoadBalancerAttribute.IPv6AddressType {
+	case nlbmodel.InternetAddressType:
+		return p.enableIPv6Internet(ctx, mdl)
+	case nlbmodel.IntranetAddressType:
+		return p.disableIPv6Internet(ctx, mdl)
+	default:
+		return fmt.Errorf("invalid ipv6 address type %s", mdl.LoadBalancerAttribute.IPv6AddressType)
+	}
+}
+
+func (p *NLBProvider) enableIPv6Internet(ctx context.Context, mdl *nlbmodel.NetworkLoadBalancer) error {
+	req := &nlb.EnableLoadBalancerIpv6InternetRequest{}
+	req.LoadBalancerId = tea.String(mdl.LoadBalancerAttribute.LoadBalancerId)
+
+	resp, err := p.auth.NLB.EnableLoadBalancerIpv6Internet(req)
+	if err != nil {
+		return util.SDKError("EnableLoadBalancerIpv6Internet", err)
+	}
+	if resp == nil || resp.Body == nil {
+		return fmt.Errorf("OpenAPI EnableLoadBalancerIpv6Internet resp is nil")
+	}
+	klog.V(5).Infof("RequestId: %s, API: %s", tea.StringValue(resp.Body.RequestId), "EnableLoadBalancerIpv6Internet")
+	return nil
+}
+
+func (p *NLBProvider) disableIPv6Internet(ctx context.Context, mdl *nlbmodel.NetworkLoadBalancer) error {
+	req := &nlb.DisableLoadBalancerIpv6InternetRequest{}
+	req.LoadBalancerId = tea.String(mdl.LoadBalancerAttribute.LoadBalancerId)
+
+	resp, err := p.auth.NLB.DisableLoadBalancerIpv6Internet(req)
+	if err != nil {
+		return util.SDKError("DisableLoadBalancerIpv6Internet", err)
+	}
+	if resp == nil || resp.Body == nil {
+		return fmt.Errorf("OpenAPI DisableLoadBalancerIpv6Internet resp is nil")
+	}
+	klog.V(5).Infof("RequestId: %s, API: %s", tea.StringValue(resp.Body.RequestId), "DisableLoadBalancerIpv6Internet")
+	return nil
+}
+
 func (p *NLBProvider) UpdateNLBZones(ctx context.Context, mdl *nlbmodel.NetworkLoadBalancer) error {
 	req := &nlb.UpdateLoadBalancerZonesRequest{}
 	req.LoadBalancerId = tea.String(mdl.LoadBalancerAttribute.LoadBalancerId)
@@ -486,6 +527,7 @@ func loadResponse(resp interface{}, lb *nlbmodel.NetworkLoadBalancer) error {
 		lb.LoadBalancerAttribute.VpcId = tea.StringValue(resp.VpcId)
 		lb.LoadBalancerAttribute.Name = tea.StringValue(resp.LoadBalancerName)
 		lb.LoadBalancerAttribute.AddressType = tea.StringValue(resp.AddressType)
+		lb.LoadBalancerAttribute.IPv6AddressType = tea.StringValue(resp.Ipv6AddressType)
 		lb.LoadBalancerAttribute.AddressIpVersion = tea.StringValue(resp.AddressIpVersion)
 		lb.LoadBalancerAttribute.LoadBalancerStatus = tea.StringValue(resp.LoadBalancerStatus)
 		lb.LoadBalancerAttribute.ResourceGroupId = tea.StringValue(resp.ResourceGroupId)
@@ -507,6 +549,7 @@ func loadResponse(resp interface{}, lb *nlbmodel.NetworkLoadBalancer) error {
 		lb.LoadBalancerAttribute.VpcId = tea.StringValue(resp.VpcId)
 		lb.LoadBalancerAttribute.Name = tea.StringValue(resp.LoadBalancerName)
 		lb.LoadBalancerAttribute.AddressType = tea.StringValue(resp.AddressType)
+		lb.LoadBalancerAttribute.IPv6AddressType = tea.StringValue(resp.Ipv6AddressType)
 		lb.LoadBalancerAttribute.AddressIpVersion = tea.StringValue(resp.AddressIpVersion)
 		lb.LoadBalancerAttribute.LoadBalancerStatus = tea.StringValue(resp.LoadBalancerStatus)
 		lb.LoadBalancerAttribute.ResourceGroupId = tea.StringValue(resp.ResourceGroupId)
