@@ -13,6 +13,7 @@ const (
 	FailedRemoveHash       = "FailedRemoveHash"
 	FailedUpdateStatus     = "FailedUpdateStatus"
 	UnAvailableBackends    = "UnAvailableLoadBalancer"
+	NotFoundENIID          = "NotFoundENIID"
 	FailedSyncLB           = "SyncLoadBalancerFailed"
 	SucceedCleanLB         = "CleanLoadBalancer"
 	FailedCleanLB          = "CleanLoadBalancerFailed"

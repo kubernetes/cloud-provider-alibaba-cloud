@@ -694,6 +694,12 @@ func updateENIBackends(reqCtx *svcCtx.RequestContext, mgr *VGroupManager, backen
 
 	if len(skipIPs) > 0 {
 		reqCtx.Log.Info(fmt.Sprintf("warning: filter pods by vpc cidr %+v, podIPs=%+v", vpcCIDRs, skipIPs))
+		reqCtx.Recorder.Event(
+			reqCtx.Service,
+			v1.EventTypeNormal,
+			helper.NotFoundENIID,
+			fmt.Sprintf("Can not find eni id by ip [%s]", strings.Join(skipIPs, ",")),
+		)
 	}
 
 	return backends, nil
