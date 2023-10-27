@@ -697,8 +697,8 @@ func updateENIBackends(reqCtx *svcCtx.RequestContext, mgr *VGroupManager, backen
 		reqCtx.Recorder.Event(
 			reqCtx.Service,
 			v1.EventTypeNormal,
-			helper.NotFoundENIID,
-			fmt.Sprintf("Can not find eni id by ip [%s]", strings.Join(skipIPs, ",")),
+			helper.SkipSyncBackends,
+			fmt.Sprintf("Not sync pods [%s] whose ip is not in vpc cidrs", strings.Join(skipIPs, ",")),
 		)
 	}
 
