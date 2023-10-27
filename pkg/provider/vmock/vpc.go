@@ -58,9 +58,11 @@ func (m *MockVPC) DescribeVSwitches(ctx context.Context, vpcID string) ([]servic
 	panic("implement me")
 }
 
-func (m *MockVPC) DescribeVpcCIDRBlock(ctx context.Context, vpcId string, ipVersion model.AddressIPVersionType) (*net.IPNet, error) {
-	return &net.IPNet{
-		IP:   net.ParseIP("10.96.0.0"),
-		Mask: net.CIDRMask(16, 32),
+func (m *MockVPC) DescribeVpcCIDRBlock(ctx context.Context, vpcId string, ipVersion model.AddressIPVersionType) ([]*net.IPNet, error) {
+	return []*net.IPNet{
+		{
+			IP:   net.ParseIP("10.96.0.0"),
+			Mask: net.CIDRMask(16, 32),
+		},
 	}, nil
 }

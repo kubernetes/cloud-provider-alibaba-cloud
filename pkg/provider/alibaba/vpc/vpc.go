@@ -230,7 +230,7 @@ func (r *VPCProvider) DescribeEipAddresses(ctx context.Context, instanceType str
 	return ips, nil
 }
 
-func (r *VPCProvider) DescribeVpcCIDRBlock(ctx context.Context, vpcId string, ipVersion model.AddressIPVersionType) (*net.IPNet, error) {
+func (r *VPCProvider) DescribeVpcCIDRBlock(ctx context.Context, vpcId string, ipVersion model.AddressIPVersionType) ([]*net.IPNet, error) {
 	req := vpc.CreateDescribeVpcAttributeRequest()
 	req.VpcId = vpcId
 	resp, err := r.auth.VPC.DescribeVpcAttribute(req)
@@ -240,13 +240,42 @@ func (r *VPCProvider) DescribeVpcCIDRBlock(ctx context.Context, vpcId string, ip
 	if resp == nil {
 		return nil, fmt.Errorf("DescribeVpcAttribute resp is nil")
 	}
+
+	var cidrs []*net.IPNet
 	if ipVersion == model.IPv6 {
-		_, ipv6CIDR, err := net.ParseCIDR(resp.Ipv6CidrBlock)
-		return ipv6CIDR, err
+		var ipv6CidrBlocks []string
+		ipv6CidrBlocks = append(ipv6CidrBlocks, resp.Ipv6CidrBlock)
+		if len(resp.Ipv6CidrBlocks.Ipv6CidrBlock) > 0 {
+			for _, ipv6 := range resp.Ipv6CidrBlocks.Ipv6CidrBlock {
+				ipv6CidrBlocks = append(ipv6CidrBlocks, ipv6.Ipv6CidrBlock)
+			}
+		}
+
+		for _, ipv6 := range ipv6CidrBlocks {
+			_, ipv6CIDR, err := net.ParseCIDR(ipv6)
+			if err != nil {
+				klog.Warningf("can not parse ipv6 cidr %s, error: %s", ipv6, err.Error())
+			} else {
+				cidrs = append(cidrs, ipv6CIDR)
+			}
+		}
+	} else {
+		var ipv4CidrBlocks []string
+		ipv4CidrBlocks = append(ipv4CidrBlocks, resp.CidrBlock)
+		if len(resp.SecondaryCidrBlocks.SecondaryCidrBlock) > 0 {
+			ipv4CidrBlocks = append(ipv4CidrBlocks, resp.SecondaryCidrBlocks.SecondaryCidrBlock...)
+		}
+		for _, ipv4 := range ipv4CidrBlocks {
+			_, ipv4CIDR, err := net.ParseCIDR(ipv4)
+			if err != nil {
+				klog.Warningf("can not parse ipv4 cidr %s, error: %s", ipv4, err.Error())
+			} else {
+				cidrs = append(cidrs, ipv4CIDR)
+			}
+		}
 	}
 
-	_, ipv4CIDR, err := net.ParseCIDR(resp.CidrBlock)
-	return ipv4CIDR, err
+	return cidrs, err
 }
 
 // DescribeVSwitches used for e2etest

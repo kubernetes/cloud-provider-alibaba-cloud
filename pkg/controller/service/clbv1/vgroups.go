@@ -662,44 +662,47 @@ func updateENIBackends(reqCtx *svcCtx.RequestContext, mgr *VGroupManager, backen
 	if err != nil {
 		return nil, fmt.Errorf("get vpc id from metadata error:%s", err.Error())
 	}
-	vpcCIDR, err := mgr.cloud.DescribeVpcCIDRBlock(context.TODO(), vpcId, ipVersion)
+	vpcCIDRs, err := mgr.cloud.DescribeVpcCIDRBlock(context.TODO(), vpcId, ipVersion)
 	if err != nil {
 		return nil, fmt.Errorf("get vpc cidr error: %s", err.Error())
 	}
 
-	var retBackends []model.BackendAttribute
-	var ips, skipIPs []string
+	var ips []string
 	for _, b := range backends {
-		// filter pods whose ip not in the vpc cidr
-		ip := net.ParseIP(b.ServerIp)
-		if !vpcCIDR.Contains(ip) {
-			skipIPs = append(skipIPs, b.ServerIp)
-			continue
-		}
-
 		ips = append(ips, b.ServerIp)
-		retBackends = append(retBackends, b)
 	}
-
-	if len(skipIPs) != 0 {
-		reqCtx.Log.Info(fmt.Sprintf("warning: filter pods by vpc cidr %s, podIPs=%+v", vpcCIDR.String(), skipIPs))
-	}
-
 	result, err := mgr.cloud.DescribeNetworkInterfaces(vpcId, ips, ipVersion)
 	if err != nil {
 		return nil, fmt.Errorf("call DescribeNetworkInterfaces: %s", err.Error())
 	}
 
-	for i := range retBackends {
-		eniid, ok := result[retBackends[i].ServerIp]
+	var skipIPs []string
+	for i := range backends {
+		eniid, ok := result[backends[i].ServerIp]
 		if !ok {
-			return nil, fmt.Errorf("can not find eniid for ip %s in vpc %s", backends[i].ServerIp, vpcId)
+			// if ip in vpcCIDRs, it should have a eni id
+			if containsIP(vpcCIDRs, backends[i].ServerIp) {
+				return nil, fmt.Errorf("can not find eniid for ip %s in vpc %s", backends[i].ServerIp, vpcId)
+			} else {
+				skipIPs = append(skipIPs, backends[i].ServerIp)
+			}
 		}
 		// for ENI backend type, port should be set to targetPort (default value), no need to update
-		retBackends[i].ServerId = eniid
-		retBackends[i].Type = model.ENIBackendType
+		backends[i].ServerId = eniid
+		backends[i].Type = model.ENIBackendType
 	}
-	return retBackends, nil
+
+	if len(skipIPs) > 0 {
+		reqCtx.Log.Info(fmt.Sprintf("warning: filter pods by vpc cidr %+v, podIPs=%+v", vpcCIDRs, skipIPs))
+		reqCtx.Recorder.Event(
+			reqCtx.Service,
+			v1.EventTypeNormal,
+			helper.SkipSyncBackends,
+			fmt.Sprintf("Not sync pods [%s] whose ip is not in vpc cidrs", strings.Join(skipIPs, ",")),
+		)
+	}
+
+	return backends, nil
 }
 
 func setWeightBackends(mode helper.TrafficPolicy, backends []model.BackendAttribute, weight *int) []model.BackendAttribute {
@@ -798,4 +801,14 @@ func getVGroupIDs(annotation string) ([]string, error) {
 		ids = append(ids, pp[0])
 	}
 	return ids, nil
+}
+
+func containsIP(cidrs []*net.IPNet, serverIp string) bool {
+	ip := net.ParseIP(serverIp)
+	for _, cidr := range cidrs {
+		if cidr.Contains(ip) {
+			return true
+		}
+	}
+	return false
 }

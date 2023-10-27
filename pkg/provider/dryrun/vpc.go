@@ -55,6 +55,6 @@ func (m *DryRunVPC) DescribeVSwitches(ctx context.Context, vpcID string) ([]serv
 	return m.vpc.DescribeVSwitches(ctx, vpcID)
 }
 
-func (m *DryRunVPC) DescribeVpcCIDRBlock(ctx context.Context, vpcId string, ipVersion model.AddressIPVersionType) (*net.IPNet, error) {
+func (m *DryRunVPC) DescribeVpcCIDRBlock(ctx context.Context, vpcId string, ipVersion model.AddressIPVersionType) ([]*net.IPNet, error) {
 	return m.vpc.DescribeVpcCIDRBlock(ctx, vpcId, ipVersion)
 }

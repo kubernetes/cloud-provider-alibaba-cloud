@@ -90,7 +90,7 @@ type IVPC interface {
 	ListRouteTables(ctx context.Context, vpcID string) ([]string, error)
 	DescribeEipAddresses(ctx context.Context, instanceType string, instanceId string) ([]string, error)
 	DescribeVSwitches(ctx context.Context, vpcID string) ([]vpc.VSwitch, error)
-	DescribeVpcCIDRBlock(ctx context.Context, vpcId string, ipVersion model.AddressIPVersionType) (*net.IPNet, error)
+	DescribeVpcCIDRBlock(ctx context.Context, vpcId string, ipVersion model.AddressIPVersionType) ([]*net.IPNet, error)
 }
 
 type ILoadBalancer interface {
