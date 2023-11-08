@@ -2,8 +2,9 @@ package annotation
 
 import (
 	"fmt"
-	"k8s.io/cloud-provider-alibaba-cloud/pkg/model/tag"
 	"strings"
+
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/model/tag"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/helper"
@@ -91,6 +92,7 @@ const (
 	RequestTimeout            = AnnotationLoadBalancerPrefix + "request-timeout"              // RequestTimeout request timeout for L7
 	EstablishedTimeout        = AnnotationLoadBalancerPrefix + "established-timeout"          // EstablishedTimeout connection established time out for TCP
 	ProxyProtocol             = AnnotationLoadBalancerPrefix + "proxy-protocol"
+	ProxyProtocolEnabledPorts = AnnotationLoadBalancerPrefix + "proxy-protocol-enabled-ports" // ProxyProtocolEnabledPorts protocol port list indicates which port should have ppv2
 
 	// VServerBackend Attribute
 	BackendLabel      = AnnotationLoadBalancerPrefix + "backend-label"              // BackendLabel backend labels
