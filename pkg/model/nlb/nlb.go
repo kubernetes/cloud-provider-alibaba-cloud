@@ -3,12 +3,13 @@ package nlb
 import (
 	"encoding/json"
 	"fmt"
+	"strconv"
+	"strings"
+
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/model"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/model/tag"
-	"strconv"
-	"strings"
 )
 
 const (
@@ -140,29 +141,36 @@ type ModificationProtectionConfig struct {
 	Reason string
 }
 
+type ProxyProtocolV2Config struct {
+	PrivateLinkEpIdEnabled  *bool
+	PrivateLinkEpsIdEnabled *bool
+	VpcIdEnabled            *bool
+}
+
 type ListenerAttribute struct {
 	IsUserManaged   bool
 	NamedKey        *ListenerNamedKey
 	ServerGroupName string
 	ServicePort     *v1.ServicePort
 
-	ListenerProtocol     string
-	ListenerPort         int32
-	ListenerDescription  string
-	ServerGroupId        string
-	LoadBalancerId       string
-	IdleTimeout          int32 // 1-900
-	SecurityPolicyId     string
-	CertificateIds       []string // tcpssl
-	CaCertificateIds     []string
-	CaEnabled            *bool
-	ProxyProtocolEnabled *bool
-	SecSensorEnabled     *bool
-	AlpnEnabled          *bool
-	AlpnPolicy           string
-	StartPort            *int32 //0-65535
-	EndPort              *int32 //0-65535
-	Cps                  *int32 //0-1000000
+	ListenerProtocol      string
+	ListenerPort          int32
+	ListenerDescription   string
+	ServerGroupId         string
+	LoadBalancerId        string
+	IdleTimeout           int32 // 1-900
+	SecurityPolicyId      string
+	CertificateIds        []string // tcpssl
+	CaCertificateIds      []string
+	CaEnabled             *bool
+	ProxyProtocolEnabled  *bool
+	ProxyProtocolV2Config ProxyProtocolV2Config
+	SecSensorEnabled      *bool
+	AlpnEnabled           *bool
+	AlpnPolicy            string
+	StartPort             *int32 //0-65535
+	EndPort               *int32 //0-65535
+	Cps                   *int32 //0-1000000
 
 	// auto-generated parameters
 	ListenerId string

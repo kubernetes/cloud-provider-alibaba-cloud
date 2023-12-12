@@ -13,9 +13,9 @@ github.com/alibabacloud-go/debug/debug
 # github.com/alibabacloud-go/endpoint-util v1.1.0
 ## explicit
 github.com/alibabacloud-go/endpoint-util/service
-# github.com/alibabacloud-go/nlb-20220430 v1.1.1
+# github.com/alibabacloud-go/nlb-20220430/v3 v3.0.0
 ## explicit; go 1.15
-github.com/alibabacloud-go/nlb-20220430/client
+github.com/alibabacloud-go/nlb-20220430/v3/client
 # github.com/alibabacloud-go/openapi-util v0.1.0
 ## explicit; go 1.14
 github.com/alibabacloud-go/openapi-util/service

@@ -3,6 +3,7 @@ package framework
 import (
 	"context"
 	"fmt"
+	"github.com/alibabacloud-go/tea/tea"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -844,6 +845,30 @@ func genericNLBServerEqual(reqCtx *svcCtx.RequestContext, local v1.ServicePort, 
 		remoteEnabled := remote.ProxyProtocolEnabled != nil && *remote.ProxyProtocolEnabled
 		if localEnabled != remoteEnabled {
 			return fmt.Errorf("expected nlb proxy protocol %t, got %+v", localEnabled, remote.ProxyProtocolEnabled)
+		}
+	}
+
+	if epIDEnabled := reqCtx.Anno.Get(annotation.Ppv2PrivateLinkEpIdEnabled); epIDEnabled != "" {
+		localEnabled := strings.EqualFold(epIDEnabled, string(model.OnFlag))
+		remoteEnabled := tea.BoolValue(remote.ProxyProtocolV2Config.PrivateLinkEpIdEnabled)
+		if localEnabled != remoteEnabled {
+			return fmt.Errorf("expected nlb ppv2 privatelink ep id enabled %t, got %t(%+v)", localEnabled, remoteEnabled, remote.ProxyProtocolV2Config.PrivateLinkEpIdEnabled)
+		}
+	}
+
+	if epsIDEnabled := reqCtx.Anno.Get(annotation.Ppv2PrivateLinkEpsIdEnabled); epsIDEnabled != "" {
+		localEnabled := strings.EqualFold(epsIDEnabled, string(model.OnFlag))
+		remoteEnabled := tea.BoolValue(remote.ProxyProtocolV2Config.PrivateLinkEpsIdEnabled)
+		if localEnabled != remoteEnabled {
+			return fmt.Errorf("expected nlb ppv2 privatelink eps id enabled %t, got %t(%+v)", localEnabled, remoteEnabled, remote.ProxyProtocolV2Config.PrivateLinkEpsIdEnabled)
+		}
+	}
+
+	if vpcIDEnabled := reqCtx.Anno.Get(annotation.Ppv2VpcIdEnabled); vpcIDEnabled != "" {
+		localEnabled := strings.EqualFold(vpcIDEnabled, string(model.OnFlag))
+		remoteEnabled := tea.BoolValue(remote.ProxyProtocolV2Config.VpcIdEnabled)
+		if localEnabled != remoteEnabled {
+			return fmt.Errorf("expected nlb ppv2 privatelink vpc id enabled %t, got %t(%+v)", localEnabled, remoteEnabled, remote.ProxyProtocolV2Config.VpcIdEnabled)
 		}
 	}
 

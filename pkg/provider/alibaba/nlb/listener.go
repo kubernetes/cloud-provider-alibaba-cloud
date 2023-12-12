@@ -3,7 +3,7 @@ package nlb
 import (
 	"context"
 	"fmt"
-	nlb "github.com/alibabacloud-go/nlb-20220430/client"
+	nlb "github.com/alibabacloud-go/nlb-20220430/v3/client"
 	"github.com/alibabacloud-go/tea/tea"
 	nlbmodel "k8s.io/cloud-provider-alibaba-cloud/pkg/model/nlb"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/util"
@@ -65,6 +65,13 @@ func (p *NLBProvider) ListNLBListeners(ctx context.Context, lbId string) ([]*nlb
 		n.CaEnabled = lis.CaEnabled
 		n.Cps = lis.Cps
 		n.ProxyProtocolEnabled = lis.ProxyProtocolEnabled
+		if lis.ProxyProtocolV2Config != nil {
+			n.ProxyProtocolV2Config = nlbmodel.ProxyProtocolV2Config{
+				PrivateLinkEpIdEnabled:  lis.ProxyProtocolV2Config.Ppv2PrivateLinkEpIdEnabled,
+				PrivateLinkEpsIdEnabled: lis.ProxyProtocolV2Config.Ppv2PrivateLinkEpsIdEnabled,
+				VpcIdEnabled:            lis.ProxyProtocolV2Config.Ppv2VpcIdEnabled,
+			}
+		}
 		nameKey, err := nlbmodel.LoadNLBListenerNamedKey(n.ListenerDescription)
 		if err != nil {
 			n.IsUserManaged = true
@@ -87,6 +94,16 @@ func (p *NLBProvider) CreateNLBListener(ctx context.Context, lbId string, lis *n
 	req.ServerGroupId = tea.String(lis.ServerGroupId)
 	req.Cps = lis.Cps
 	req.ProxyProtocolEnabled = lis.ProxyProtocolEnabled
+	if lis.ProxyProtocolV2Config.PrivateLinkEpIdEnabled != nil ||
+		lis.ProxyProtocolV2Config.PrivateLinkEpsIdEnabled != nil ||
+		lis.ProxyProtocolV2Config.VpcIdEnabled != nil {
+		req.ProxyProtocolV2Config = &nlb.CreateListenerRequestProxyProtocolV2Config{
+			Ppv2PrivateLinkEpIdEnabled:  lis.ProxyProtocolV2Config.PrivateLinkEpIdEnabled,
+			Ppv2PrivateLinkEpsIdEnabled: lis.ProxyProtocolV2Config.PrivateLinkEpsIdEnabled,
+			Ppv2VpcIdEnabled:            lis.ProxyProtocolV2Config.VpcIdEnabled,
+		}
+	}
+
 	if lis.IdleTimeout != 0 {
 		req.IdleTimeout = tea.Int32(lis.IdleTimeout)
 	}
@@ -119,6 +136,15 @@ func (p *NLBProvider) UpdateNLBListener(ctx context.Context, lis *nlbmodel.Liste
 	req.ServerGroupId = tea.String(lis.ServerGroupId)
 	req.Cps = lis.Cps
 	req.ProxyProtocolEnabled = lis.ProxyProtocolEnabled
+	if lis.ProxyProtocolV2Config.PrivateLinkEpIdEnabled != nil ||
+		lis.ProxyProtocolV2Config.PrivateLinkEpsIdEnabled != nil ||
+		lis.ProxyProtocolV2Config.VpcIdEnabled != nil {
+		req.ProxyProtocolV2Config = &nlb.UpdateListenerAttributeRequestProxyProtocolV2Config{
+			Ppv2PrivateLinkEpIdEnabled:  lis.ProxyProtocolV2Config.PrivateLinkEpIdEnabled,
+			Ppv2PrivateLinkEpsIdEnabled: lis.ProxyProtocolV2Config.PrivateLinkEpsIdEnabled,
+			Ppv2VpcIdEnabled:            lis.ProxyProtocolV2Config.VpcIdEnabled,
+		}
+	}
 	if lis.IdleTimeout != 0 {
 		req.IdleTimeout = tea.Int32(lis.IdleTimeout)
 	}

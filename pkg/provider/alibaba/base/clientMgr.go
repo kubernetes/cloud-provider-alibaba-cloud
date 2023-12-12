@@ -38,7 +38,7 @@ import (
 	"github.com/aliyun/alibaba-cloud-sdk-go/services/vpc"
 	"k8s.io/klog/v2/klogr"
 
-	nlb "github.com/alibabacloud-go/nlb-20220430/client"
+	nlb "github.com/alibabacloud-go/nlb-20220430/v3/client"
 	"k8s.io/apimachinery/pkg/util/wait"
 	ctrlCfg "k8s.io/cloud-provider-alibaba-cloud/pkg/config"
 	prvd "k8s.io/cloud-provider-alibaba-cloud/pkg/provider"
