@@ -101,7 +101,7 @@ func (mgr *ListenerManager) Describe(reqCtx *svcCtx.RequestContext, lbId string)
 
 func (mgr *ListenerManager) BuildLocalModel(reqCtx *svcCtx.RequestContext, mdl *model.LoadBalancer) error {
 	for _, port := range reqCtx.Service.Spec.Ports {
-		listener, err := mgr.buildListenerFromServicePort(reqCtx, port)
+		listener, err := mgr.buildListenerFromServicePort(reqCtx, port, mdl.LoadBalancerAttribute.IsUserManaged)
 		if err != nil {
 			return fmt.Errorf("build listener from servicePort %d error: %s", port.Port, err.Error())
 		}
@@ -119,7 +119,7 @@ func (mgr *ListenerManager) BuildRemoteModel(reqCtx *svcCtx.RequestContext, mdl 
 	return nil
 }
 
-func (mgr *ListenerManager) buildListenerFromServicePort(reqCtx *svcCtx.RequestContext, port v1.ServicePort) (model.ListenerAttribute, error) {
+func (mgr *ListenerManager) buildListenerFromServicePort(reqCtx *svcCtx.RequestContext, port v1.ServicePort, isUserManagedLB bool) (model.ListenerAttribute, error) {
 	listener := model.ListenerAttribute{
 		NamedKey: &model.ListenerNamedKey{
 			Prefix:      model.DEFAULT_PREFIX,
@@ -140,7 +140,7 @@ func (mgr *ListenerManager) buildListenerFromServicePort(reqCtx *svcCtx.RequestC
 	}
 	listener.Protocol = proto
 
-	if reqCtx.Anno.Get(annotation.VGroupPort) != "" {
+	if isUserManagedLB && reqCtx.Anno.Get(annotation.VGroupPort) != "" {
 		vGroupId, err := vgroup(reqCtx.Anno.Get(annotation.VGroupPort), port)
 		if err != nil {
 			return listener, err

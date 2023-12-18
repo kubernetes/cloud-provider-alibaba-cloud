@@ -687,5 +687,171 @@ func RunBackendTestCases(f *framework.Framework) {
 				gomega.Expect(err).To(gomega.BeNil())
 			})
 		})
+
+		if options.TestConfig.InternetNetworkLoadBalancerID != "" && options.TestConfig.NLBServerGroupID != "" {
+			ginkgo.Context("vgroup-port", func() {
+				ginkgo.It("vgroup-port: sg-id-1:80", func() {
+					vGroupPort := fmt.Sprintf("%s:%d", options.TestConfig.NLBServerGroupID, 80)
+					svc, err := f.Client.KubeClient.CreateNLBServiceByAnno(map[string]string{
+						annotation.Annotation(annotation.LoadBalancerId):   options.TestConfig.InternetNetworkLoadBalancerID,
+						annotation.Annotation(annotation.VGroupPort):       vGroupPort,
+						annotation.Annotation(annotation.OverrideListener): "false",
+					})
+					gomega.Expect(err).To(gomega.BeNil())
+					err = f.ExpectNetworkLoadBalancerEqual(svc)
+					gomega.Expect(err).To(gomega.BeNil())
+				})
+
+				if options.TestConfig.NLBServerGroupID2 != "" {
+					ginkgo.It("vgroup-port: sg-id-1:80, sg-id-2:443", func() {
+						vGroupPort := fmt.Sprintf("%s:%d,%s:%d", options.TestConfig.NLBServerGroupID, 80, options.TestConfig.NLBServerGroupID2, 443)
+						svc, err := f.Client.KubeClient.CreateNLBServiceByAnno(map[string]string{
+							annotation.Annotation(annotation.LoadBalancerId):   options.TestConfig.InternetNetworkLoadBalancerID,
+							annotation.Annotation(annotation.VGroupPort):       vGroupPort,
+							annotation.Annotation(annotation.OverrideListener): "false",
+						})
+						gomega.Expect(err).To(gomega.BeNil())
+						err = f.ExpectNetworkLoadBalancerEqual(svc)
+						gomega.Expect(err).To(gomega.BeNil())
+					})
+					ginkgo.It("vgroup-port: sg-id-1:80 -> sg-id-2:80", func() {
+						vGroupPort := fmt.Sprintf("%s:%d", options.TestConfig.NLBServerGroupID, 80)
+						oldSvc, err := f.Client.KubeClient.CreateNLBServiceByAnno(map[string]string{
+							annotation.Annotation(annotation.LoadBalancerId):   options.TestConfig.InternetNetworkLoadBalancerID,
+							annotation.Annotation(annotation.VGroupPort):       vGroupPort,
+							annotation.Annotation(annotation.OverrideListener): "false",
+						})
+						gomega.Expect(err).To(gomega.BeNil())
+						err = f.ExpectNetworkLoadBalancerEqual(oldSvc)
+						gomega.Expect(err).To(gomega.BeNil())
+						newSvc := oldSvc.DeepCopy()
+						newVGroupPort := fmt.Sprintf("%s:%d", options.TestConfig.NLBServerGroupID2, 80)
+						newSvc.Annotations[annotation.Annotation(annotation.VGroupPort)] = newVGroupPort
+						newSvc, err = f.Client.KubeClient.PatchService(oldSvc, newSvc)
+						gomega.Expect(err).To(gomega.BeNil())
+						err = f.ExpectNetworkLoadBalancerEqual(newSvc)
+						gomega.Expect(err).To(gomega.BeNil())
+					})
+					ginkgo.It("vgroup-port: not exist sgp-id", func() {
+						svc, err := f.Client.KubeClient.CreateNLBServiceByAnno(map[string]string{
+							annotation.Annotation(annotation.LoadBalancerId):   options.TestConfig.InternetNetworkLoadBalancerID,
+							annotation.Annotation(annotation.VGroupPort):       "sgp-id-not-exist:80",
+							annotation.Annotation(annotation.OverrideListener): "false",
+						})
+						gomega.Expect(err).To(gomega.BeNil())
+						err = f.ExpectNetworkLoadBalancerEqual(svc)
+						gomega.Expect(err).NotTo(gomega.BeNil())
+					})
+				}
+			})
+
+			ginkgo.Context("weight", func() {
+				ginkgo.It("cluster mode: weight: 60 -> 80", func() {
+					vGroupPort := fmt.Sprintf("%s:%d", options.TestConfig.NLBServerGroupID, 80)
+					oldSvc, err := f.Client.KubeClient.CreateNLBServiceByAnno(map[string]string{
+						annotation.Annotation(annotation.LoadBalancerId):   options.TestConfig.InternetNetworkLoadBalancerID,
+						annotation.Annotation(annotation.VGroupPort):       vGroupPort,
+						annotation.Annotation(annotation.VGroupWeight):     "60",
+						annotation.Annotation(annotation.OverrideListener): "false",
+					})
+					gomega.Expect(err).To(gomega.BeNil())
+					err = f.ExpectNetworkLoadBalancerEqual(oldSvc)
+					gomega.Expect(err).To(gomega.BeNil())
+
+					newSvc := oldSvc.DeepCopy()
+					newSvc.Annotations[annotation.Annotation(annotation.VGroupWeight)] = "80"
+					newSvc, err = f.Client.KubeClient.PatchService(oldSvc, newSvc)
+					gomega.Expect(err).To(gomega.BeNil())
+					err = f.ExpectNetworkLoadBalancerEqual(newSvc)
+					gomega.Expect(err).To(gomega.BeNil())
+				})
+
+				ginkgo.It("local mode: weight: 60 -> 80", func() {
+					vGroupPort := fmt.Sprintf("%s:%d", options.TestConfig.NLBServerGroupID, 80)
+					svc := f.Client.KubeClient.DefaultNLBService()
+					svc.Annotations = map[string]string{
+						annotation.Annotation(annotation.LoadBalancerId):   options.TestConfig.InternetNetworkLoadBalancerID,
+						annotation.Annotation(annotation.VGroupPort):       vGroupPort,
+						annotation.Annotation(annotation.VGroupWeight):     "60",
+						annotation.Annotation(annotation.OverrideListener): "false",
+					}
+					svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyTypeLocal
+					oldSvc, err := f.Client.KubeClient.CreateService(svc)
+					gomega.Expect(err).To(gomega.BeNil())
+					err = f.ExpectNetworkLoadBalancerEqual(oldSvc)
+					gomega.Expect(err).To(gomega.BeNil())
+
+					newSvc := oldSvc.DeepCopy()
+					newSvc.Annotations[annotation.Annotation(annotation.VGroupWeight)] = "80"
+					newSvc, err = f.Client.KubeClient.PatchService(oldSvc, newSvc)
+					gomega.Expect(err).To(gomega.BeNil())
+					err = f.ExpectNetworkLoadBalancerEqual(newSvc)
+					gomega.Expect(err).To(gomega.BeNil())
+				})
+				if options.TestConfig.Network == options.Terway {
+					ginkgo.It("eni mode: weight: 60 -> 80", func() {
+						vGroupPort := fmt.Sprintf("%s:%d", options.TestConfig.NLBServerGroupID, 80)
+						oldSvc, err := f.Client.KubeClient.CreateNLBServiceByAnno(map[string]string{
+							annotation.Annotation(annotation.LoadBalancerId):   options.TestConfig.InternetNetworkLoadBalancerID,
+							annotation.Annotation(annotation.VGroupPort):       vGroupPort,
+							annotation.Annotation(annotation.VGroupWeight):     "60",
+							annotation.Annotation(annotation.OverrideListener): "false",
+							annotation.BackendType:                             model.ENIBackendType,
+						})
+						gomega.Expect(err).To(gomega.BeNil())
+						err = f.ExpectNetworkLoadBalancerEqual(oldSvc)
+						gomega.Expect(err).To(gomega.BeNil())
+
+						newSvc := oldSvc.DeepCopy()
+						newSvc.Annotations[annotation.Annotation(annotation.VGroupWeight)] = "80"
+						newSvc, err = f.Client.KubeClient.PatchService(oldSvc, newSvc)
+						gomega.Expect(err).To(gomega.BeNil())
+						err = f.ExpectNetworkLoadBalancerEqual(newSvc)
+						gomega.Expect(err).To(gomega.BeNil())
+					})
+					ginkgo.It("ecs mode; weight: nil -> 80", func() {
+						vGroupPort := fmt.Sprintf("%s:%d", options.TestConfig.NLBServerGroupID, 80)
+						svc := f.Client.KubeClient.DefaultNLBService()
+						svc.Annotations = map[string]string{
+							annotation.Annotation(annotation.LoadBalancerId):   options.TestConfig.InternetNetworkLoadBalancerID,
+							annotation.Annotation(annotation.VGroupPort):       vGroupPort,
+							annotation.Annotation(annotation.OverrideListener): "false",
+							annotation.BackendType:                             model.ECSBackendType,
+						}
+						svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyTypeLocal
+						oldSvc, err := f.Client.KubeClient.CreateService(svc)
+						gomega.Expect(err).To(gomega.BeNil())
+						err = f.ExpectNetworkLoadBalancerEqual(oldSvc)
+						gomega.Expect(err).To(gomega.BeNil())
+
+						newSvc := oldSvc.DeepCopy()
+						newSvc.Annotations[annotation.Annotation(annotation.VGroupWeight)] = "80"
+						newSvc, err = f.Client.KubeClient.PatchService(oldSvc, newSvc)
+						gomega.Expect(err).To(gomega.BeNil())
+						err = f.ExpectNetworkLoadBalancerEqual(newSvc)
+						gomega.Expect(err).To(gomega.BeNil())
+					})
+					ginkgo.It("weight: 0 -> 100", func() {
+						vGroupPort := fmt.Sprintf("%s:%d", options.TestConfig.NLBServerGroupID, 80)
+						oldSvc, err := f.Client.KubeClient.CreateNLBServiceByAnno(map[string]string{
+							annotation.Annotation(annotation.LoadBalancerId):   options.TestConfig.InternetNetworkLoadBalancerID,
+							annotation.Annotation(annotation.VGroupPort):       vGroupPort,
+							annotation.Annotation(annotation.VGroupWeight):     "0",
+							annotation.Annotation(annotation.OverrideListener): "false",
+						})
+						gomega.Expect(err).To(gomega.BeNil())
+						err = f.ExpectNetworkLoadBalancerEqual(oldSvc)
+						gomega.Expect(err).To(gomega.BeNil())
+						newSvc := oldSvc.DeepCopy()
+						newSvc.Annotations[annotation.Annotation(annotation.VGroupWeight)] = "100"
+						newSvc, err = f.Client.KubeClient.PatchService(oldSvc, newSvc)
+						gomega.Expect(err).To(gomega.BeNil())
+						err = f.ExpectNetworkLoadBalancerEqual(newSvc)
+						gomega.Expect(err).To(gomega.BeNil())
+					})
+				}
+			})
+		}
+
 	})
 }

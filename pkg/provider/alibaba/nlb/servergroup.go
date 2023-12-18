@@ -13,6 +13,54 @@ import (
 	"time"
 )
 
+func (p *NLBProvider) toLocalServerGroup(ctx context.Context, remote *nlb.ListServerGroupsResponseBodyServerGroups) (*nlbmodel.ServerGroup, error) {
+	var err error
+	sg := &nlbmodel.ServerGroup{
+		ServerGroupId:           tea.StringValue(remote.ServerGroupId),
+		ServerGroupType:         nlbmodel.ServerGroupType(tea.StringValue(remote.ServerGroupType)),
+		ServerGroupName:         tea.StringValue(remote.ServerGroupName),
+		AddressIPVersion:        tea.StringValue(remote.AddressIPVersion),
+		Scheduler:               tea.StringValue(remote.Scheduler),
+		Protocol:                tea.StringValue(remote.Protocol),
+		ConnectionDrainEnabled:  remote.ConnectionDrainEnabled,
+		ConnectionDrainTimeout:  tea.Int32Value(remote.ConnectionDrainTimeout),
+		ResourceGroupId:         tea.StringValue(remote.ResourceGroupId),
+		PreserveClientIpEnabled: remote.PreserveClientIpEnabled,
+	}
+	if remote.HealthCheck != nil {
+		sg.HealthCheckConfig = &nlbmodel.HealthCheckConfig{
+			HealthCheckEnabled:        remote.HealthCheck.HealthCheckEnabled,
+			HealthCheckType:           tea.StringValue(remote.HealthCheck.HealthCheckType),
+			HealthCheckConnectPort:    tea.Int32Value(remote.HealthCheck.HealthCheckConnectPort),
+			HealthyThreshold:          tea.Int32Value(remote.HealthCheck.HealthyThreshold),
+			UnhealthyThreshold:        tea.Int32Value(remote.HealthCheck.UnhealthyThreshold),
+			HealthCheckConnectTimeout: tea.Int32Value(remote.HealthCheck.HealthCheckConnectTimeout),
+			HealthCheckInterval:       tea.Int32Value(remote.HealthCheck.HealthCheckInterval),
+			HealthCheckDomain:         tea.StringValue(remote.HealthCheck.HealthCheckDomain),
+			HealthCheckUrl:            tea.StringValue(remote.HealthCheck.HealthCheckUrl),
+			HttpCheckMethod:           tea.StringValue(remote.HealthCheck.HttpCheckMethod),
+		}
+		if len(remote.HealthCheck.HealthCheckHttpCode) != 0 {
+			for _, code := range remote.HealthCheck.HealthCheckHttpCode {
+				sg.HealthCheckConfig.HealthCheckHttpCode = append(sg.HealthCheckConfig.HealthCheckHttpCode,
+					tea.StringValue(code))
+			}
+		}
+	}
+	sg.NamedKey, err = nlbmodel.LoadNLBSGNamedKey(sg.ServerGroupName)
+	if err != nil {
+		sg.IsUserManaged = true
+	}
+
+	servers, err := p.ListNLBServers(ctx, sg.ServerGroupId)
+	if err != nil {
+		return nil, fmt.Errorf("[%s] [%s] %s", sg.ServerGroupId, sg.ServerGroupName,
+			util.SDKError("ListNLBServers", err).Error())
+	}
+	sg.Servers = servers
+	return sg, nil
+}
+
 // ServerGroup
 func (p *NLBProvider) ListNLBServerGroups(ctx context.Context, tags []tag.Tag) ([]*nlbmodel.ServerGroup, error) {
 	var remoteServerGroups []*nlb.ListServerGroupsResponseBodyServerGroups
@@ -46,57 +94,35 @@ func (p *NLBProvider) ListNLBServerGroups(ctx context.Context, tags []tag.Tag) (
 
 	var (
 		sgs []*nlbmodel.ServerGroup
-		err error
 	)
 	for _, ret := range remoteServerGroups {
-		sg := &nlbmodel.ServerGroup{
-			ServerGroupId:           tea.StringValue(ret.ServerGroupId),
-			ServerGroupType:         nlbmodel.ServerGroupType(tea.StringValue(ret.ServerGroupType)),
-			ServerGroupName:         tea.StringValue(ret.ServerGroupName),
-			AddressIPVersion:        tea.StringValue(ret.AddressIPVersion),
-			Scheduler:               tea.StringValue(ret.Scheduler),
-			Protocol:                tea.StringValue(ret.Protocol),
-			ConnectionDrainEnabled:  ret.ConnectionDrainEnabled,
-			ConnectionDrainTimeout:  tea.Int32Value(ret.ConnectionDrainTimeout),
-			ResourceGroupId:         tea.StringValue(ret.ResourceGroupId),
-			PreserveClientIpEnabled: ret.PreserveClientIpEnabled,
-		}
-		if ret.HealthCheck != nil {
-			sg.HealthCheckConfig = &nlbmodel.HealthCheckConfig{
-				HealthCheckEnabled:        ret.HealthCheck.HealthCheckEnabled,
-				HealthCheckType:           tea.StringValue(ret.HealthCheck.HealthCheckType),
-				HealthCheckConnectPort:    tea.Int32Value(ret.HealthCheck.HealthCheckConnectPort),
-				HealthyThreshold:          tea.Int32Value(ret.HealthCheck.HealthyThreshold),
-				UnhealthyThreshold:        tea.Int32Value(ret.HealthCheck.UnhealthyThreshold),
-				HealthCheckConnectTimeout: tea.Int32Value(ret.HealthCheck.HealthCheckConnectTimeout),
-				HealthCheckInterval:       tea.Int32Value(ret.HealthCheck.HealthCheckInterval),
-				HealthCheckDomain:         tea.StringValue(ret.HealthCheck.HealthCheckDomain),
-				HealthCheckUrl:            tea.StringValue(ret.HealthCheck.HealthCheckUrl),
-				HttpCheckMethod:           tea.StringValue(ret.HealthCheck.HttpCheckMethod),
-			}
-			if len(ret.HealthCheck.HealthCheckHttpCode) != 0 {
-				for _, code := range ret.HealthCheck.HealthCheckHttpCode {
-					sg.HealthCheckConfig.HealthCheckHttpCode = append(sg.HealthCheckConfig.HealthCheckHttpCode,
-						tea.StringValue(code))
-				}
-			}
-		}
-		sg.NamedKey, err = nlbmodel.LoadNLBSGNamedKey(sg.ServerGroupName)
+		sg, err := p.toLocalServerGroup(ctx, ret)
 		if err != nil {
-			sg.IsUserManaged = true
+			return nil, err
 		}
-
-		servers, err := p.ListNLBServers(ctx, sg.ServerGroupId)
-		if err != nil {
-			return nil, fmt.Errorf("[%s] [%s] %s", sg.ServerGroupId, sg.ServerGroupName,
-				util.SDKError("ListNLBServers", err).Error())
-		}
-		sg.Servers = servers
 
 		sgs = append(sgs, sg)
 	}
 
 	return sgs, nil
+}
+
+func (p *NLBProvider) GetNLBServerGroup(ctx context.Context, sgId string) (*nlbmodel.ServerGroup, error) {
+	req := &nlb.ListServerGroupsRequest{}
+	req.ServerGroupIds = []*string{tea.String(sgId)}
+	resp, err := p.auth.NLB.ListServerGroups(req)
+	if err != nil {
+		return nil, util.SDKError("ListServerGroups", err)
+	}
+	if resp == nil || resp.Body == nil {
+		return nil, fmt.Errorf("OpenAPI ListServerGroups resp is nil")
+	}
+	klog.V(5).Infof("RequestId: %s, API: %s, ServerGroupId: %s", tea.StringValue(resp.Body.RequestId), "ListServerGroups", sgId)
+	remoteServerGroups := resp.Body.ServerGroups
+	if len(remoteServerGroups) == 0 {
+		return nil, nil
+	}
+	return p.toLocalServerGroup(ctx, remoteServerGroups[0])
 }
 
 func (p *NLBProvider) CreateNLBServerGroup(ctx context.Context, sg *nlbmodel.ServerGroup) error {

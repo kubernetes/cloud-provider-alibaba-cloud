@@ -2,6 +2,7 @@ package dryrun
 
 import (
 	"context"
+
 	nlbmodel "k8s.io/cloud-provider-alibaba-cloud/pkg/model/nlb"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/model/tag"
 	prvd "k8s.io/cloud-provider-alibaba-cloud/pkg/provider"
@@ -154,6 +155,10 @@ func (d DryRunNLB) StopNLBListener(ctx context.Context, listenerId string) error
 }
 
 func (d DryRunNLB) UpdateNLBIPv6AddressType(ctx context.Context, mdl *nlbmodel.NetworkLoadBalancer) error {
+	panic("implement me")
+}
+
+func (d DryRunNLB) GetNLBServerGroup(ctx context.Context, sgId string) (*nlbmodel.ServerGroup, error) {
 	//TODO implement me
 	panic("implement me")
 }
