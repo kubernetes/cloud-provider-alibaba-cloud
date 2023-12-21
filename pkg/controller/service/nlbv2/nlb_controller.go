@@ -86,7 +86,7 @@ func add(mgr manager.Manager, r *ReconcileNLB) error {
 		"nlb-controller", mgr,
 		controller.Options{
 			Reconciler:              r,
-			MaxConcurrentReconciles: 2,
+			MaxConcurrentReconciles: ctrlCfg.CloudCFG.Global.ServiceMaxConcurrentReconciles,
 			RateLimiter:             rateLimit,
 			RecoverPanic:            &recoverPanic,
 		},

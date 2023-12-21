@@ -5,6 +5,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/workqueue"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/util"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -27,6 +28,7 @@ func (h *enqueueRequestForNodeEvent) Create(_ context.Context, e event.CreateEve
 				Name: node.Name,
 			},
 		})
+		util.NodeLog.Info("enqueue: node create", "node", util.Key(node), "queueLen", queue.Len())
 	}
 }
 

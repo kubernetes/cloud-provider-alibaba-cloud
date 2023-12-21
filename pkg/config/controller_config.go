@@ -30,15 +30,15 @@ const (
 	flagServerGroupBatchSize           = "sg-batch-size"
 	flagNetwork                        = "network"
 
-	defaultCloudProvider             = "alibabacloud"
-	defaultClusterName               = "kubernetes"
-	defaultConfigureCloudRoutes      = true
-	defaultMaxConcurrentReconciles   = 3
-	defaultCloudConfig               = ""
-	defaultRouteReconciliationPeriod = 5 * time.Minute
-	defaultNodeMonitorPeriod         = 5 * time.Minute
-	defaultServerGroupBatchSize      = 40
-	defaultNetwork                   = "vpc"
+	defaultCloudProvider                  = "alibabacloud"
+	defaultClusterName                    = "kubernetes"
+	defaultConfigureCloudRoutes           = true
+	defaultServiceMaxConcurrentReconciles = 3
+	defaultCloudConfig                    = ""
+	defaultRouteReconciliationPeriod      = 5 * time.Minute
+	defaultNodeMonitorPeriod              = 5 * time.Minute
+	defaultServerGroupBatchSize           = 40
+	defaultNetwork                        = "vpc"
 )
 
 var ControllerCFG = &ControllerConfig{
@@ -48,14 +48,13 @@ var ControllerCFG = &ControllerConfig{
 // Flag stores the configuration for global usage
 type ControllerConfig struct {
 	config.KubeCloudSharedConfiguration
-	CloudConfigPath                string
-	Controllers                    []string
-	FeatureGates                   string
-	ServiceMaxConcurrentReconciles int
-	ServerGroupBatchSize           int
-	LogLevel                       int
-	DryRun                         bool
-	NetWork                        string
+	CloudConfigPath      string
+	Controllers          []string
+	FeatureGates         string
+	ServerGroupBatchSize int
+	LogLevel             int
+	DryRun               bool
+	NetWork              string
 
 	RuntimeConfig RuntimeConfig
 	CloudConfig   *CloudConfig
@@ -71,15 +70,14 @@ func (cfg *ControllerConfig) BindFlags(fs *pflag.FlagSet) {
 	fs.BoolVar(&cfg.ConfigureCloudRoutes, flagConfigureCloudRoutes, defaultConfigureCloudRoutes, "Should CIDRs allocated by allocate-node-cidrs be configured on the cloud provider.")
 	fs.StringVar(&cfg.ClusterCIDR, flagClusterCidr, "", "CIDR Range for Pods in cluster. Requires --allocate-node-cidrs to be true.")
 	fs.BoolVar(&cfg.AllocateNodeCIDRs, flagAllocateNodeCIDRs, false, "Should CIDRs for Pods be allocated and set on the cloud provider.")
-	fs.IntVar(&cfg.ServiceMaxConcurrentReconciles, flagServiceMaxConcurrentReconciles, defaultMaxConcurrentReconciles,
-		"Maximum number of concurrently running reconcile loops for service")
+	fs.IntVar(&cfg.CloudConfig.Global.ServiceMaxConcurrentReconciles, flagServiceMaxConcurrentReconciles, defaultServiceMaxConcurrentReconciles,
+		"[Deprecated, please use cloud-config config file instead] Maximum number of concurrently running reconcile loops for service")
 	fs.BoolVar(&cfg.DryRun, flagDryRun, false, "whether to perform a dry run")
 	fs.StringVar(&cfg.NetWork, flagNetwork, defaultNetwork, "Set network type for controller.")
 	fs.DurationVar(&cfg.RouteReconciliationPeriod.Duration, flagRouteReconciliationPeriod, defaultRouteReconciliationPeriod,
 		"The period for reconciling routes created for nodes by cloud provider. The minimum value is 1 minute")
 	fs.DurationVar(&cfg.NodeMonitorPeriod.Duration, flagNodeMonitorPeriod, defaultNodeMonitorPeriod, "The period for syncing NodeStatus in NodeController.")
 	fs.IntVar(&cfg.ServerGroupBatchSize, flagServerGroupBatchSize, defaultServerGroupBatchSize, "The batch size for syncing server group. The value range is 1-40")
-	fs.StringVar(&cfg.FeatureGates, flagFeatureGates, "", "A set of key=value pairs that describe feature gates for alpha/experimental features.")
 	fs.BoolVar(&cfg.AllowUntaggedCloud, "allow-untagged-cloud", false, "Allow the cluster to run without the cluster-id on cloud instances. This is a legacy mode of operation and a cluster-id will be required in the future.")
 	_ = fs.MarkDeprecated("allow-untagged-cloud", "This flag is deprecated and will be removed in a future release. A cluster-id will be required on cloud instances.")
 

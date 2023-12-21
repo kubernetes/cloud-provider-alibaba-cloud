@@ -8,9 +8,11 @@ import (
 var (
 	ServiceLog logr.Logger
 	NLBLog     logr.Logger
+	NodeLog    logr.Logger
 )
 
 func init() {
 	ServiceLog = klogr.New().WithName("service-controller")
 	NLBLog = klogr.New().WithName("nlb-controller")
+	NodeLog = klogr.New().WithName("node-controller")
 }

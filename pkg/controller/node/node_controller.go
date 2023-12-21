@@ -65,7 +65,7 @@ func add(mgr manager.Manager, r *ReconcileNode) error {
 		"node-controller", mgr,
 		controller.Options{
 			Reconciler:              r,
-			MaxConcurrentReconciles: 1,
+			MaxConcurrentReconciles: ctrlCfg.CloudCFG.Global.NodeMaxConcurrentReconciles,
 			RecoverPanic:            &recoverPanic,
 		},
 	)
