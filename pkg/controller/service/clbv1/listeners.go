@@ -260,6 +260,12 @@ func (mgr *ListenerManager) buildListenerFromServicePort(reqCtx *svcCtx.RequestC
 	if reqCtx.Anno.Get(annotation.XForwardedForProto) != "" {
 		listener.XForwardedForProto = model.FlagType(reqCtx.Anno.Get(annotation.XForwardedForProto))
 	}
+	if reqCtx.Anno.Get(annotation.XForwardedForSLBPort) != "" {
+		listener.XForwardedForSLBPort = model.FlagType(reqCtx.Anno.Get(annotation.XForwardedForSLBPort))
+	}
+	if reqCtx.Anno.Get(annotation.XForwardedForClientSrcPort) != "" {
+		listener.XForwardedForClientSrcPort = model.FlagType(reqCtx.Anno.Get(annotation.XForwardedForClientSrcPort))
+	}
 
 	// health check
 	if reqCtx.Anno.Get(annotation.HealthyThreshold) != "" {
@@ -850,13 +856,28 @@ func isNeedUpdate(reqCtx *svcCtx.RequestContext, local model.ListenerAttribute, 
 	}
 
 	// x-forwarded-for
-	if helper.Is7LayerProtocol(local.Protocol) &&
-		local.XForwardedForProto != "" &&
-		remote.XForwardedForProto != local.XForwardedForProto {
-		needUpdate = true
-		update.XForwardedForProto = local.XForwardedForProto
-		updateDetail += fmt.Sprintf("lb XForwardedForProto %v should be changed to %v;",
-			remote.XForwardedForProto, local.XForwardedForProto)
+	if helper.Is7LayerProtocol(local.Protocol) {
+		if local.XForwardedForProto != "" &&
+			remote.XForwardedForProto != local.XForwardedForProto {
+			needUpdate = true
+			update.XForwardedForProto = local.XForwardedForProto
+			updateDetail += fmt.Sprintf("lb XForwardedForProto %v should be changed to %v;",
+				remote.XForwardedForProto, local.XForwardedForProto)
+		}
+		if local.XForwardedForSLBPort != "" &&
+			remote.XForwardedForSLBPort != local.XForwardedForSLBPort {
+			needUpdate = true
+			update.XForwardedForSLBPort = local.XForwardedForSLBPort
+			updateDetail += fmt.Sprintf("lb XForwardedForSLBPort %v should be changed to %v;",
+				remote.XForwardedForSLBPort, local.XForwardedForSLBPort)
+		}
+		if local.XForwardedForClientSrcPort != "" &&
+			remote.XForwardedForClientSrcPort != local.XForwardedForClientSrcPort {
+			needUpdate = true
+			update.XForwardedForClientSrcPort = local.XForwardedForClientSrcPort
+			updateDetail += fmt.Sprintf("lb XForwardedForClientSrcPort %v should be changed to %v;",
+				remote.XForwardedForClientSrcPort, update.XForwardedForClientSrcPort)
+		}
 	}
 
 	// health check

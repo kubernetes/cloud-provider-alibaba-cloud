@@ -134,40 +134,42 @@ type ListenerAttribute struct {
 
 	// parameters can be modified by annotation
 	// values of these parameters can not be set to the default value, no need to use ptr type
-	Protocol                  string
-	Bandwidth                 int // values: -1 or 1~5120
-	Scheduler                 string
-	CertId                    string
-	TLSCipherPolicy           string
-	ForwardPort               int
-	EnableHttp2               FlagType
-	EnableProxyProtocolV2     *bool
-	StickySession             FlagType
-	StickySessionType         string
-	Cookie                    string
-	CookieTimeout             int // values: 1~86400
-	XForwardedFor             FlagType
-	XForwardedForProto        FlagType
-	AclId                     string
-	AclType                   string
-	AclStatus                 FlagType
-	ConnectionDrain           FlagType
-	ConnectionDrainTimeout    int // values: 10~900
-	IdleTimeout               int // values: 1~60
-	RequestTimeout            int // values: 1~180, http & https
-	EstablishedTimeout        int // values: 10~900, tcp
-	HealthCheckConnectPort    int
-	HealthCheckInterval       int      // values: 1~50
-	HealthyThreshold          int      // values: 2~10
-	UnhealthyThreshold        int      // values: 2~10
-	HealthCheckType           string   // tcp
-	HealthCheckConnectTimeout int      // tcp & udp values: 1~300
-	HealthCheckTimeout        int      // http & https values: 1~300
-	HealthCheck               FlagType // http & https
-	HealthCheckDomain         string   // tcp & http & https
-	HealthCheckURI            string   // tcp & http & https
-	HealthCheckHttpCode       string   // tcp & http & https
-	HealthCheckMethod         string   // http & https
+	Protocol                   string
+	Bandwidth                  int // values: -1 or 1~5120
+	Scheduler                  string
+	CertId                     string
+	TLSCipherPolicy            string
+	ForwardPort                int
+	EnableHttp2                FlagType
+	EnableProxyProtocolV2      *bool
+	StickySession              FlagType
+	StickySessionType          string
+	Cookie                     string
+	CookieTimeout              int // values: 1~86400
+	XForwardedFor              FlagType
+	XForwardedForProto         FlagType
+	XForwardedForSLBPort       FlagType
+	XForwardedForClientSrcPort FlagType
+	AclId                      string
+	AclType                    string
+	AclStatus                  FlagType
+	ConnectionDrain            FlagType
+	ConnectionDrainTimeout     int // values: 10~900
+	IdleTimeout                int // values: 1~60
+	RequestTimeout             int // values: 1~180, http & https
+	EstablishedTimeout         int // values: 10~900, tcp
+	HealthCheckConnectPort     int
+	HealthCheckInterval        int      // values: 1~50
+	HealthyThreshold           int      // values: 2~10
+	UnhealthyThreshold         int      // values: 2~10
+	HealthCheckType            string   // tcp
+	HealthCheckConnectTimeout  int      // tcp & udp values: 1~300
+	HealthCheckTimeout         int      // http & https values: 1~300
+	HealthCheck                FlagType // http & https
+	HealthCheckDomain          string   // tcp & http & https
+	HealthCheckURI             string   // tcp & http & https
+	HealthCheckHttpCode        string   // tcp & http & https
+	HealthCheckMethod          string   // http & https
 
 	// The following parameters can be set to the default value.
 	// Use the pointer type to distinguish. If the user does not set the param, the param is nil
