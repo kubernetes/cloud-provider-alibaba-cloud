@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/util"
 	"k8s.io/klog/v2"
@@ -61,8 +62,8 @@ func (cc *CloudConfig) GetKubernetesClusterTag() string {
 }
 
 func (cc *CloudConfig) PrintInfo() {
-	if cc.Global.RouteTableIDS != "" {
-		klog.Infof("using user customized route table ids [%s]", cc.Global.RouteTableIDS)
+	if strings.TrimSpace(cc.Global.RouteTableIDS) != "" {
+		klog.Infof("using user customized route table ids [%s]", strings.TrimSpace(cc.Global.RouteTableIDS))
 	}
 
 	if cc.Global.FeatureGates != "" {
