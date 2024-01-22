@@ -50,7 +50,6 @@ func NewDryRunCloud() prvd.Provider {
 		DryRunSLS:  NewDryRunSLS(auth, cloud.SLSProvider),
 		DryRunCAS:  NewDryRunCAS(auth, cloud.CASProvider),
 		DryRunNLB:  NewDryRunNLB(auth, cloud.NLBProvider),
-		DryRunELB:  NewDryRunELB(auth, cloud.ELBProvider),
 	}
 }
 
@@ -65,6 +64,5 @@ type DryRunCloud struct {
 	*DryRunSLS
 	*DryRunCAS
 	*DryRunNLB
-	*DryRunELB
 	prvd.IMetaData
 }

@@ -2,8 +2,6 @@ package controller
 
 import (
 	"fmt"
-	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/service/elb"
-
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/context/shared"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/ingress"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/node"
@@ -23,7 +21,6 @@ func init() {
 		"ingress": ingress.Add,
 		"pvtz":    pvtz.Add,
 		"nlb":     nlbv2.Add,
-		"elb":     elb.Add,
 	}
 }
 
