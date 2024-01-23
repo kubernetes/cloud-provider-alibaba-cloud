@@ -31,7 +31,6 @@ import (
 	"github.com/aliyun/alibaba-cloud-sdk-go/services/alb"
 	"github.com/aliyun/alibaba-cloud-sdk-go/services/cas"
 	"github.com/aliyun/alibaba-cloud-sdk-go/services/ecs"
-	"github.com/aliyun/alibaba-cloud-sdk-go/services/ens"
 	"github.com/aliyun/alibaba-cloud-sdk-go/services/ess"
 	"github.com/aliyun/alibaba-cloud-sdk-go/services/pvtz"
 	"github.com/aliyun/alibaba-cloud-sdk-go/services/slb"
@@ -72,7 +71,6 @@ type ClientMgr struct {
 	SLS  *sls.Client
 	CAS  *cas.Client
 	ESS  *ess.Client
-	ELB  *ens.Client
 }
 
 // NewClientMgr return a new client manager
@@ -156,13 +154,6 @@ func NewClientMgr() (*ClientMgr, error) {
 		return nil, fmt.Errorf("initialize alibaba nlb client: %s", err.Error())
 	}
 
-	elbcli, err := ens.NewClientWithOptions(region, clientCfg(), credential)
-	if err != nil {
-		return nil, fmt.Errorf("initialize alibaba elb client: %s", err.Error())
-	}
-	elbcli.AppendUserAgent(KubernetesCloudControllerManager, version.Version)
-	elbcli.AppendUserAgent(AgentClusterId, CLUSTER_ID)
-
 	auth := &ClientMgr{
 		Meta:   meta,
 		ECS:    ecli,
@@ -174,7 +165,6 @@ func NewClientMgr() (*ClientMgr, error) {
 		SLS:    slscli,
 		CAS:    cascli,
 		ESS:    esscli,
-		ELB:    elbcli,
 		Region: region,
 		stop:   make(<-chan struct{}, 1),
 	}
@@ -287,11 +277,6 @@ func RefreshToken(mgr *ClientMgr, token *DefaultToken) error {
 	err = mgr.PVTZ.InitWithOptions(token.Region, clientCfg(), credential)
 	if err != nil {
 		return fmt.Errorf("init pvtz sts token config: %s", err.Error())
-	}
-
-	err = mgr.ELB.InitWithOptions(token.Region, clientCfg(), credential)
-	if err != nil {
-		return fmt.Errorf("init elb sts token config: %s", err.Error())
 	}
 
 	err = mgr.NLB.Init(openapiCfg(token.Region, credential, ctrlCfg.ControllerCFG.NetWork))
