@@ -26,11 +26,13 @@ const (
 	AnnotationLoadBalancerPrefix = "loadbalancer-"
 
 	// Load Balancer Attribute
-	AddressType      = AnnotationLoadBalancerPrefix + "address-type"             // AddressType loadbalancer address type
-	LoadBalancerId   = AnnotationLoadBalancerPrefix + "id"                       // LoadBalancerId lb id
-	LoadBalancerName = AnnotationLoadBalancerPrefix + "name"                     // LoadBalancerName slb name
-	ResourceGroupId  = AnnotationLoadBalancerPrefix + "resource-group-id"        // ResourceGroupId resource group id
-	AdditionalTags   = AnnotationLoadBalancerPrefix + "additional-resource-tags" // AdditionalTags For example: "Key1=Val1,Key2=Val2,KeyNoVal1=,KeyNoVal2",same with aws
+	AddressType            = AnnotationLoadBalancerPrefix + "address-type"             // AddressType loadbalancer address type
+	LoadBalancerId         = AnnotationLoadBalancerPrefix + "id"                       // LoadBalancerId lb id
+	LoadBalancerName       = AnnotationLoadBalancerPrefix + "name"                     // LoadBalancerName slb name
+	ResourceGroupId        = AnnotationLoadBalancerPrefix + "resource-group-id"        // ResourceGroupId resource group id
+	AdditionalTags         = AnnotationLoadBalancerPrefix + "additional-resource-tags" // AdditionalTags For example: "Key1=Val1,Key2=Val2,KeyNoVal1=,KeyNoVal2",same with aws
+	DeleteProtection       = AnnotationLoadBalancerPrefix + "delete-protection"        // DeleteProtection delete protection
+	ModificationProtection = AnnotationLoadBalancerPrefix + "modification-protection"  // ModificationProtection modification type
 
 	CertID          = AnnotationLoadBalancerPrefix + "cert-id"           // CertID cert id
 	ProtocolPort    = AnnotationLoadBalancerPrefix + "protocol-port"     // ProtocolPort protocol port
@@ -46,21 +48,19 @@ const (
 // classic load balancer
 
 const (
-	VswitchId              = AnnotationLoadBalancerPrefix + "vswitch-id"               // VswitchId loadbalancer vswitch id
-	SLBNetworkType         = AnnotationLoadBalancerPrefix + "slb-network-type"         // SLBNetworkType loadbalancer network type
-	ChargeType             = AnnotationLoadBalancerPrefix + "charge-type"              // InternetChargeType lb internet charge type, paybytraffic or paybybandwidth
-	OverrideListener       = AnnotationLoadBalancerPrefix + "force-override-listeners" // OverrideListener force override listeners
-	MasterZoneID           = AnnotationLoadBalancerPrefix + "master-zoneid"            // MasterZoneID master zone id
-	SlaveZoneID            = AnnotationLoadBalancerPrefix + "slave-zoneid"             // SlaveZoneID slave zone id
-	Bandwidth              = AnnotationLoadBalancerPrefix + "bandwidth"                // Bandwidth bandwidth
-	Spec                   = AnnotationLoadBalancerPrefix + "spec"                     // Spec slb spec
-	InstanceChargeType     = AnnotationLoadBalancerPrefix + "instance-charge-type"     // InstanceChargeType the charge type of lb instance
-	IPVersion              = AnnotationLoadBalancerPrefix + "ip-version"               // IPVersion ip version
-	DeleteProtection       = AnnotationLoadBalancerPrefix + "delete-protection"        // DeleteProtection delete protection
-	ModificationProtection = AnnotationLoadBalancerPrefix + "modification-protection"  // ModificationProtection modification type
-	ExternalIPType         = AnnotationLoadBalancerPrefix + "external-ip-type"         // ExternalIPType external ip type
-	HostName               = AnnotationLoadBalancerPrefix + "hostname"                 // HostName hostname for service.status.ingress.hostname
-	IP                     = AnnotationLoadBalancerPrefix + "ip"                       // Ip Address
+	VswitchId          = AnnotationLoadBalancerPrefix + "vswitch-id"               // VswitchId loadbalancer vswitch id
+	SLBNetworkType     = AnnotationLoadBalancerPrefix + "slb-network-type"         // SLBNetworkType loadbalancer network type
+	ChargeType         = AnnotationLoadBalancerPrefix + "charge-type"              // InternetChargeType lb internet charge type, paybytraffic or paybybandwidth
+	OverrideListener   = AnnotationLoadBalancerPrefix + "force-override-listeners" // OverrideListener force override listeners
+	MasterZoneID       = AnnotationLoadBalancerPrefix + "master-zoneid"            // MasterZoneID master zone id
+	SlaveZoneID        = AnnotationLoadBalancerPrefix + "slave-zoneid"             // SlaveZoneID slave zone id
+	Bandwidth          = AnnotationLoadBalancerPrefix + "bandwidth"                // Bandwidth bandwidth
+	Spec               = AnnotationLoadBalancerPrefix + "spec"                     // Spec slb spec
+	InstanceChargeType = AnnotationLoadBalancerPrefix + "instance-charge-type"     // InstanceChargeType the charge type of lb instance
+	IPVersion          = AnnotationLoadBalancerPrefix + "ip-version"               // IPVersion ip version
+	ExternalIPType     = AnnotationLoadBalancerPrefix + "external-ip-type"         // ExternalIPType external ip type
+	HostName           = AnnotationLoadBalancerPrefix + "hostname"                 // HostName hostname for service.status.ingress.hostname
+	IP                 = AnnotationLoadBalancerPrefix + "ip"                       // Ip Address
 
 	// Listener Attribute
 	AclStatus                 = AnnotationLoadBalancerPrefix + "acl-status"                   // AclStatus enable or disable acl on all listener
@@ -102,8 +102,9 @@ const (
 
 // network load balancer
 const (
-	ZoneMaps         = AnnotationLoadBalancerPrefix + "zone-maps" // ZoneMaps zone maps
-	SecurityGroupIds = AnnotationLoadBalancerPrefix + "security-group-ids"
+	ZoneMaps           = AnnotationLoadBalancerPrefix + "zone-maps" // ZoneMaps zone maps
+	SecurityGroupIds   = AnnotationLoadBalancerPrefix + "security-group-ids"
+	BandwidthPackageId = AnnotationLoadBalancerPrefix + "bandwidth-package-id"
 
 	CaCertID = AnnotationLoadBalancerPrefix + "cacert-id" // CertID cert id
 	CaCert   = AnnotationLoadBalancerPrefix + "cacert"    // CaCert enable ca

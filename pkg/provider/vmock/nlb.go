@@ -94,6 +94,19 @@ func (m MockNLB) UpdateNLBZones(ctx context.Context, mdl *nlbmodel.NetworkLoadBa
 	return nil
 }
 
+func (m MockNLB) UpdateLoadBalancerProtection(ctx context.Context, lbId string,
+	delCfg *nlbmodel.DeletionProtectionConfig, modCfg *nlbmodel.ModificationProtectionConfig) error {
+	return nil
+}
+
+func (m MockNLB) AttachCommonBandwidthPackageToLoadBalancer(ctx context.Context, lbId string, bandwidthPackageId string) error {
+	return nil
+}
+
+func (m MockNLB) DetachCommonBandwidthPackageFromLoadBalancer(ctx context.Context, lbId string, bandwidthPackageId string) error {
+	return nil
+}
+
 func (m MockNLB) ListNLBServerGroups(ctx context.Context, tags []tag.Tag) ([]*nlbmodel.ServerGroup, error) {
 	found := false
 	for _, t := range tags {

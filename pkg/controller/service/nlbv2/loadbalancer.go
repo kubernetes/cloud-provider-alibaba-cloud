@@ -2,6 +2,7 @@ package nlbv2
 
 import (
 	"fmt"
+	"github.com/alibabacloud-go/tea/tea"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	ctrlCfg "k8s.io/cloud-provider-alibaba-cloud/pkg/config"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/helper"
@@ -57,6 +58,11 @@ func (mgr *NLBManager) BuildLocalModel(reqCtx *svcCtx.RequestContext, mdl *nlbmo
 	mdl.LoadBalancerAttribute.Name = reqCtx.Anno.Get(annotation.LoadBalancerName)
 
 	mdl.LoadBalancerAttribute.Tags = reqCtx.Anno.GetLoadBalancerAdditionalTags()
+
+	if reqCtx.Anno.Has(annotation.BandwidthPackageId) {
+		mdl.LoadBalancerAttribute.BandwidthPackageId = tea.String(reqCtx.Anno.Get(annotation.BandwidthPackageId))
+	}
+
 	return nil
 }
 
@@ -108,6 +114,13 @@ func (mgr *NLBManager) Create(reqCtx *svcCtx.RequestContext, mdl *nlbmodel.Netwo
 func (mgr *NLBManager) Delete(reqCtx *svcCtx.RequestContext, mdl *nlbmodel.NetworkLoadBalancer) error {
 	if mdl.LoadBalancerAttribute.LoadBalancerId == "" {
 		return nil
+	}
+
+	// disable delete protection
+	err := mgr.cloud.UpdateLoadBalancerProtection(reqCtx.Ctx, mdl.LoadBalancerAttribute.LoadBalancerId,
+		&nlbmodel.DeletionProtectionConfig{Enabled: false}, nil)
+	if err != nil {
+		return fmt.Errorf("disable delete protection error: %s", err.Error())
 	}
 
 	return mgr.cloud.DeleteNLB(reqCtx.Ctx, mdl)
@@ -188,23 +201,58 @@ func (mgr *NLBManager) Update(reqCtx *svcCtx.RequestContext, local, remote *nlbm
 
 		reqCtx.Log.Info(fmt.Sprintf("security groups added %v, removed %v", added, removed))
 		if err := mgr.cloud.UpdateNLBSecurityGroupIds(reqCtx.Ctx, local, added, removed); err != nil {
-			return fmt.Errorf("update security group ids error: %s", err.Error())
+			errs = append(errs, fmt.Errorf("update security group ids error: %s", err.Error()))
 		}
 	}
 
-	needUpdate = false
 	if local.LoadBalancerAttribute.Name != "" &&
 		local.LoadBalancerAttribute.Name != remote.LoadBalancerAttribute.Name {
 		reqCtx.Log.Info(fmt.Sprintf("name changed from [%s] to [%s]",
 			remote.LoadBalancerAttribute.Name, local.LoadBalancerAttribute.Name))
-		needUpdate = true
-	}
-
-	if needUpdate {
 		errs = append(errs, mgr.cloud.UpdateNLB(reqCtx.Ctx, local))
 	}
 
+	if err := updateBandwidthPackageId(mgr, reqCtx, local, remote); err != nil {
+		errs = append(errs, err)
+	}
+
 	return utilerrors.NewAggregate(errs)
+}
+
+func updateBandwidthPackageId(mgr *NLBManager, reqCtx *svcCtx.RequestContext, local, remote *nlbmodel.NetworkLoadBalancer) error {
+	// local not set, return
+	if local.LoadBalancerAttribute.BandwidthPackageId == nil {
+		return nil
+	}
+
+	// local == remote, return
+	if tea.StringValue(local.LoadBalancerAttribute.BandwidthPackageId) ==
+		tea.StringValue(remote.LoadBalancerAttribute.BandwidthPackageId) {
+		return nil
+	}
+
+	// local != remote
+	// detach
+	if tea.StringValue(remote.LoadBalancerAttribute.BandwidthPackageId) != "" {
+		reqCtx.Log.Info(fmt.Sprintf("detach bandwidthPackageId [%s]",
+			*remote.LoadBalancerAttribute.BandwidthPackageId))
+		if err := mgr.cloud.DetachCommonBandwidthPackageFromLoadBalancer(reqCtx.Ctx,
+			local.LoadBalancerAttribute.LoadBalancerId, *remote.LoadBalancerAttribute.BandwidthPackageId); err != nil {
+			return err
+		}
+	}
+
+	// attach
+	if tea.StringValue(local.LoadBalancerAttribute.BandwidthPackageId) != "" {
+		reqCtx.Log.Info(fmt.Sprintf("attach bandwidthPackageId [%s]",
+			*local.LoadBalancerAttribute.BandwidthPackageId))
+		if err := mgr.cloud.AttachCommonBandwidthPackageToLoadBalancer(reqCtx.Ctx,
+			local.LoadBalancerAttribute.LoadBalancerId, *local.LoadBalancerAttribute.BandwidthPackageId); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func setDefaultValueForLoadBalancer(mgr *NLBManager, mdl *nlbmodel.NetworkLoadBalancer, anno *annotation.AnnotationRequest,
@@ -227,6 +275,19 @@ func setDefaultValueForLoadBalancer(mgr *NLBManager, mdl *nlbmodel.NetworkLoadBa
 
 	if mdl.LoadBalancerAttribute.ResourceGroupId == "" {
 		mdl.LoadBalancerAttribute.ResourceGroupId = ctrlCfg.CloudCFG.Global.ResourceGroupID
+	}
+
+	if mdl.LoadBalancerAttribute.DeletionProtectionConfig == nil {
+		mdl.LoadBalancerAttribute.DeletionProtectionConfig = &nlbmodel.DeletionProtectionConfig{
+			Enabled: true,
+		}
+	}
+
+	if mdl.LoadBalancerAttribute.ModificationProtectionConfig == nil {
+		mdl.LoadBalancerAttribute.ModificationProtectionConfig = &nlbmodel.ModificationProtectionConfig{
+			Status: nlbmodel.ConsoleProtection,
+			Reason: nlbmodel.ModificationProtectionReason,
+		}
 	}
 
 	mdl.LoadBalancerAttribute.Tags = append(anno.GetDefaultTags(), mdl.LoadBalancerAttribute.Tags...)
