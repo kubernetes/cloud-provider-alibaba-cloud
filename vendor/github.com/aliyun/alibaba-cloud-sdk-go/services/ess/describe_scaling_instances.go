@@ -81,9 +81,11 @@ type DescribeScalingInstancesRequest struct {
 	OwnerAccount           string           `position:"Query" name:"OwnerAccount"`
 	OwnerId                requests.Integer `position:"Query" name:"OwnerId"`
 	ScalingActivityId      string           `position:"Query" name:"ScalingActivityId"`
+	CreationTypes          *[]string        `position:"Query" name:"CreationTypes"  type:"Repeated"`
 	ScalingConfigurationId string           `position:"Query" name:"ScalingConfigurationId"`
 	InstanceId             *[]string        `position:"Query" name:"InstanceId"  type:"Repeated"`
 	HealthStatus           string           `position:"Query" name:"HealthStatus"`
+	LifecycleStates        *[]string        `position:"Query" name:"LifecycleStates"  type:"Repeated"`
 }
 
 // DescribeScalingInstancesResponse is the response struct for api DescribeScalingInstances

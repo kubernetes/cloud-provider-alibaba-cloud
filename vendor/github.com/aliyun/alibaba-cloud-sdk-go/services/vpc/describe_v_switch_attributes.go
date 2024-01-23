@@ -98,8 +98,10 @@ type DescribeVSwitchAttributesResponse struct {
 	Ipv6CidrBlock           string                                    `json:"Ipv6CidrBlock" xml:"Ipv6CidrBlock"`
 	VSwitchName             string                                    `json:"VSwitchName" xml:"VSwitchName"`
 	ShareType               string                                    `json:"ShareType" xml:"ShareType"`
+	EnabledIpv6             bool                                      `json:"EnabledIpv6" xml:"EnabledIpv6"`
 	RouteTable              RouteTable                                `json:"RouteTable" xml:"RouteTable"`
 	CloudResources          CloudResourcesInDescribeVSwitchAttributes `json:"CloudResources" xml:"CloudResources"`
+	Tags                    TagsInDescribeVSwitchAttributes           `json:"Tags" xml:"Tags"`
 }
 
 // CreateDescribeVSwitchAttributesRequest creates a request to invoke DescribeVSwitchAttributes API

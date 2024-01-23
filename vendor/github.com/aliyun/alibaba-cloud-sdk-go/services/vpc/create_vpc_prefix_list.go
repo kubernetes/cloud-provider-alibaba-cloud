@@ -75,8 +75,10 @@ type CreateVpcPrefixListRequest struct {
 	ResourceOwnerId       requests.Integer                        `position:"Query" name:"ResourceOwnerId"`
 	ClientToken           string                                  `position:"Query" name:"ClientToken"`
 	MaxEntries            requests.Integer                        `position:"Query" name:"MaxEntries"`
+	ResourceGroupId       string                                  `position:"Query" name:"ResourceGroupId"`
 	IpVersion             string                                  `position:"Query" name:"IpVersion"`
 	PrefixListEntries     *[]CreateVpcPrefixListPrefixListEntries `position:"Query" name:"PrefixListEntries"  type:"Repeated"`
+	Tag                   *[]CreateVpcPrefixListTag               `position:"Query" name:"Tag"  type:"Repeated"`
 	DryRun                requests.Boolean                        `position:"Query" name:"DryRun"`
 	ResourceOwnerAccount  string                                  `position:"Query" name:"ResourceOwnerAccount"`
 	OwnerAccount          string                                  `position:"Query" name:"OwnerAccount"`
@@ -97,11 +99,18 @@ type CreateVpcPrefixListPrefixListEntries struct {
 	Description string `name:"Description"`
 }
 
+// CreateVpcPrefixListTag is a repeated param struct in CreateVpcPrefixListRequest
+type CreateVpcPrefixListTag struct {
+	Key   string `name:"Key"`
+	Value string `name:"Value"`
+}
+
 // CreateVpcPrefixListResponse is the response struct for api CreateVpcPrefixList
 type CreateVpcPrefixListResponse struct {
 	*responses.BaseResponse
-	PrefixListId string `json:"PrefixListId" xml:"PrefixListId"`
-	RequestId    string `json:"RequestId" xml:"RequestId"`
+	PrefixListId    string `json:"PrefixListId" xml:"PrefixListId"`
+	RequestId       string `json:"RequestId" xml:"RequestId"`
+	ResourceGroupId string `json:"ResourceGroupId" xml:"ResourceGroupId"`
 }
 
 // CreateCreateVpcPrefixListRequest creates a request to invoke CreateVpcPrefixList API

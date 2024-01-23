@@ -78,6 +78,7 @@ type CreateLaunchTemplateVersionRequest struct {
 	KeyPairName                    string                                         `position:"Query" name:"KeyPairName"`
 	SpotPriceLimit                 requests.Float                                 `position:"Query" name:"SpotPriceLimit"`
 	ImageOwnerAlias                string                                         `position:"Query" name:"ImageOwnerAlias"`
+	DeletionProtection             requests.Boolean                               `position:"Query" name:"DeletionProtection"`
 	ResourceGroupId                string                                         `position:"Query" name:"ResourceGroupId"`
 	HostName                       string                                         `position:"Query" name:"HostName"`
 	SystemDiskIops                 requests.Integer                               `position:"Query" name:"SystemDisk.Iops"`
@@ -116,6 +117,7 @@ type CreateLaunchTemplateVersionRequest struct {
 	SystemDiskDiskName             string                                         `position:"Query" name:"SystemDisk.DiskName"`
 	RamRoleName                    string                                         `position:"Query" name:"RamRoleName"`
 	AutoReleaseTime                string                                         `position:"Query" name:"AutoReleaseTime"`
+	CreditSpecification            string                                         `position:"Query" name:"CreditSpecification"`
 	SpotDuration                   requests.Integer                               `position:"Query" name:"SpotDuration"`
 	SecurityGroupIds               *[]string                                      `position:"Query" name:"SecurityGroupIds"  type:"Repeated"`
 	DataDisk                       *[]CreateLaunchTemplateVersionDataDisk         `position:"Query" name:"DataDisk"  type:"Repeated"`
@@ -123,6 +125,7 @@ type CreateLaunchTemplateVersionRequest struct {
 	SystemDiskSize                 requests.Integer                               `position:"Query" name:"SystemDisk.Size"`
 	VpcId                          string                                         `position:"Query" name:"VpcId"`
 	SystemDiskDescription          string                                         `position:"Query" name:"SystemDisk.Description"`
+	SystemDiskEncrypted            string                                         `position:"Query" name:"SystemDisk.Encrypted"`
 }
 
 // CreateLaunchTemplateVersionTag is a repeated param struct in CreateLaunchTemplateVersionRequest
@@ -164,6 +167,7 @@ type CreateLaunchTemplateVersionResponse struct {
 	*responses.BaseResponse
 	LaunchTemplateVersionNumber int64  `json:"LaunchTemplateVersionNumber" xml:"LaunchTemplateVersionNumber"`
 	RequestId                   string `json:"RequestId" xml:"RequestId"`
+	LaunchTemplateId            string `json:"LaunchTemplateId" xml:"LaunchTemplateId"`
 }
 
 // CreateCreateLaunchTemplateVersionRequest creates a request to invoke CreateLaunchTemplateVersion API

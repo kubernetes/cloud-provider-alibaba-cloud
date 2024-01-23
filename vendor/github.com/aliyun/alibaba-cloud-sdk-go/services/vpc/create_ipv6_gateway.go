@@ -71,22 +71,31 @@ func (client *Client) CreateIpv6GatewayWithCallback(request *CreateIpv6GatewayRe
 // CreateIpv6GatewayRequest is the request struct for api CreateIpv6Gateway
 type CreateIpv6GatewayRequest struct {
 	*requests.RpcRequest
-	ResourceOwnerId      requests.Integer `position:"Query" name:"ResourceOwnerId"`
-	ClientToken          string           `position:"Query" name:"ClientToken"`
-	Description          string           `position:"Query" name:"Description"`
-	Spec                 string           `position:"Query" name:"Spec"`
-	ResourceOwnerAccount string           `position:"Query" name:"ResourceOwnerAccount"`
-	OwnerAccount         string           `position:"Query" name:"OwnerAccount"`
-	OwnerId              requests.Integer `position:"Query" name:"OwnerId"`
-	VpcId                string           `position:"Query" name:"VpcId"`
-	Name                 string           `position:"Query" name:"Name"`
+	ResourceOwnerId      requests.Integer        `position:"Query" name:"ResourceOwnerId"`
+	ClientToken          string                  `position:"Query" name:"ClientToken"`
+	Description          string                  `position:"Query" name:"Description"`
+	Spec                 string                  `position:"Query" name:"Spec"`
+	ResourceGroupId      string                  `position:"Query" name:"ResourceGroupId"`
+	Tag                  *[]CreateIpv6GatewayTag `position:"Query" name:"Tag"  type:"Repeated"`
+	ResourceOwnerAccount string                  `position:"Query" name:"ResourceOwnerAccount"`
+	OwnerAccount         string                  `position:"Query" name:"OwnerAccount"`
+	OwnerId              requests.Integer        `position:"Query" name:"OwnerId"`
+	VpcId                string                  `position:"Query" name:"VpcId"`
+	Name                 string                  `position:"Query" name:"Name"`
+}
+
+// CreateIpv6GatewayTag is a repeated param struct in CreateIpv6GatewayRequest
+type CreateIpv6GatewayTag struct {
+	Key   string `name:"Key"`
+	Value string `name:"Value"`
 }
 
 // CreateIpv6GatewayResponse is the response struct for api CreateIpv6Gateway
 type CreateIpv6GatewayResponse struct {
 	*responses.BaseResponse
-	Ipv6GatewayId string `json:"Ipv6GatewayId" xml:"Ipv6GatewayId"`
-	RequestId     string `json:"RequestId" xml:"RequestId"`
+	Ipv6GatewayId   string `json:"Ipv6GatewayId" xml:"Ipv6GatewayId"`
+	ResourceGroupId string `json:"ResourceGroupId" xml:"ResourceGroupId"`
+	RequestId       string `json:"RequestId" xml:"RequestId"`
 }
 
 // CreateCreateIpv6GatewayRequest creates a request to invoke CreateIpv6Gateway API

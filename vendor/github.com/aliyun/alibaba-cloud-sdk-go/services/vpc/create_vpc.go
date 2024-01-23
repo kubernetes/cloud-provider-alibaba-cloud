@@ -77,14 +77,22 @@ type CreateVpcRequest struct {
 	Description          string           `position:"Query" name:"Description"`
 	VpcName              string           `position:"Query" name:"VpcName"`
 	ResourceGroupId      string           `position:"Query" name:"ResourceGroupId"`
+	Ipv4IpamPoolId       string           `position:"Query" name:"Ipv4IpamPoolId"`
 	Ipv6Isp              string           `position:"Query" name:"Ipv6Isp"`
 	UserCidr             string           `position:"Query" name:"UserCidr"`
+	Tag                  *[]CreateVpcTag  `position:"Query" name:"Tag"  type:"Repeated"`
 	DryRun               requests.Boolean `position:"Query" name:"DryRun"`
 	ResourceOwnerAccount string           `position:"Query" name:"ResourceOwnerAccount"`
 	OwnerAccount         string           `position:"Query" name:"OwnerAccount"`
 	OwnerId              requests.Integer `position:"Query" name:"OwnerId"`
 	Ipv6CidrBlock        string           `position:"Query" name:"Ipv6CidrBlock"`
 	CidrBlock            string           `position:"Query" name:"CidrBlock"`
+}
+
+// CreateVpcTag is a repeated param struct in CreateVpcRequest
+type CreateVpcTag struct {
+	Value string `name:"Value"`
+	Key   string `name:"Key"`
 }
 
 // CreateVpcResponse is the response struct for api CreateVpc

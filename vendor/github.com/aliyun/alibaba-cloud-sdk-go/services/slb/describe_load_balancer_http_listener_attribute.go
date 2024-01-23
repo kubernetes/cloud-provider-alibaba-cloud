@@ -127,8 +127,10 @@ type DescribeLoadBalancerHTTPListenerAttributeResponse struct {
 	StickySession              string                                            `json:"StickySession" xml:"StickySession"`
 	HealthCheckMethod          string                                            `json:"HealthCheckMethod" xml:"HealthCheckMethod"`
 	HealthCheck                string                                            `json:"HealthCheck" xml:"HealthCheck"`
+	LoadBalancerId             string                                            `json:"LoadBalancerId" xml:"LoadBalancerId"`
 	AclIds                     AclIdsInDescribeLoadBalancerHTTPListenerAttribute `json:"AclIds" xml:"AclIds"`
 	Rules                      RulesInDescribeLoadBalancerHTTPListenerAttribute  `json:"Rules" xml:"Rules"`
+	Tags                       TagsInDescribeLoadBalancerHTTPListenerAttribute   `json:"Tags" xml:"Tags"`
 }
 
 // CreateDescribeLoadBalancerHTTPListenerAttributeRequest creates a request to invoke DescribeLoadBalancerHTTPListenerAttribute API
