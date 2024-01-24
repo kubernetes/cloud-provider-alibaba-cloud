@@ -35,9 +35,19 @@ func (p SLBProvider) FindLoadBalancer(ctx context.Context, mdl *model.LoadBalanc
 
 	// 1. find by loadbalancer id
 	if mdl.LoadBalancerAttribute.LoadBalancerId != "" {
+		lbId := mdl.LoadBalancerAttribute.LoadBalancerId
 		klog.Infof("[%s] find loadbalancer by id, LoadBalancerId [%s]",
 			mdl.NamespacedName, mdl.LoadBalancerAttribute.LoadBalancerId)
-		return p.DescribeLoadBalancer(ctx, mdl)
+		err := p.DescribeLoadBalancer(ctx, mdl)
+		if err != nil {
+			return err
+		}
+		// Check LoadBalancer ID once more to prevent from an abnormal response from API.
+		if mdl.LoadBalancerAttribute.LoadBalancerId != lbId {
+			return fmt.Errorf("[%s] find loadbalancer by id error: loadbalancer id from API not match, expect [%s], actual [%s]",
+				mdl.NamespacedName, lbId, mdl.LoadBalancerAttribute.LoadBalancerId)
+		}
+		return nil
 	}
 
 	// 2. find by tags
