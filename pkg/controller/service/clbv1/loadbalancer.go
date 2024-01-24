@@ -3,6 +3,7 @@ package clbv1
 import (
 	"fmt"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	ctrlcfg "k8s.io/cloud-provider-alibaba-cloud/pkg/config"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/helper"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/service/reconcile/annotation"
 	svcCtx "k8s.io/cloud-provider-alibaba-cloud/pkg/controller/service/reconcile/context"
@@ -282,6 +283,10 @@ func setModelDefaultValue(mgr *LoadBalancerManager, mdl *model.LoadBalancer, ann
 	if mdl.LoadBalancerAttribute.ModificationProtectionStatus == "" {
 		mdl.LoadBalancerAttribute.ModificationProtectionStatus = model.ModificationProtectionType(anno.GetDefaultValue(annotation.ModificationProtection))
 		mdl.LoadBalancerAttribute.ModificationProtectionReason = model.ModificationProtectionReason
+	}
+
+	if mdl.LoadBalancerAttribute.ResourceGroupId == "" {
+		mdl.LoadBalancerAttribute.ResourceGroupId = ctrlcfg.CloudCFG.Global.ResourceGroupID
 	}
 
 	mdl.LoadBalancerAttribute.Tags = append(anno.GetDefaultTags(), mdl.LoadBalancerAttribute.Tags...)

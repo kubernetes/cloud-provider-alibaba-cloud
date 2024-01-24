@@ -130,6 +130,9 @@ func (p *NLBProvider) CreateNLBServerGroup(ctx context.Context, sg *nlbmodel.Ser
 	if sg.ServerGroupId != "" {
 		req.ResourceGroupId = tea.String(sg.ResourceGroupId)
 	}
+	if sg.ResourceGroupId != "" {
+		req.ResourceGroupId = tea.String(sg.ResourceGroupId)
+	}
 	// health check
 	if sg.HealthCheckConfig != nil {
 		req.HealthCheckConfig = &nlb.CreateServerGroupRequestHealthCheckConfig{

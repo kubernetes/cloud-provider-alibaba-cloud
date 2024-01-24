@@ -87,6 +87,10 @@ func (mgr *ServerGroupManager) BuildRemoteModel(reqCtx *svcCtx.RequestContext, m
 }
 
 func (mgr *ServerGroupManager) CreateServerGroup(reqCtx *svcCtx.RequestContext, sg *nlbmodel.ServerGroup) error {
+	err := setDefaultValueForServerGroup(sg)
+	if err != nil {
+		return err
+	}
 	return mgr.cloud.CreateNLBServerGroup(reqCtx.Ctx, sg)
 }
 
@@ -249,7 +253,7 @@ func (mgr *ServerGroupManager) updateServerGroupServers(reqCtx *svcCtx.RequestCo
 	}
 
 	reqCtx.Log.Info(fmt.Sprintf("reconcile sg: [%s] changed, local: [%s], remote: [%s]",
-		remote.ResourceGroupId, local.BackendInfo(), remote.BackendInfo()), "sgName", remote.ServerGroupName)
+		remote.ServerGroupId, local.BackendInfo(), remote.BackendInfo()), "sgName", remote.ServerGroupName)
 
 	var errs []error
 
@@ -829,6 +833,10 @@ func setServerGroupAttributeFromAnno(sg *nlbmodel.ServerGroup, anno *annotation.
 			strings.EqualFold(anno.Get(annotation.PreserveClientIp), string(model.OnFlag)))
 	}
 
+	if rgID := anno.Get(annotation.ResourceGroupId); rgID != "" {
+		sg.ResourceGroupId = rgID
+	}
+
 	// healthcheck
 	if anno.Get(annotation.HealthCheckFlag) != "" {
 		healthCheckConfig := &nlbmodel.HealthCheckConfig{
@@ -953,4 +961,11 @@ func isServerEqual(a, b nlbmodel.ServerGroupServer) bool {
 		klog.Errorf("%s is not supported, skip", a.ServerType)
 		return false
 	}
+}
+
+func setDefaultValueForServerGroup(sg *nlbmodel.ServerGroup) error {
+	if sg.ResourceGroupId == "" {
+		sg.ResourceGroupId = ctrlCfg.CloudCFG.Global.ResourceGroupID
+	}
+	return nil
 }

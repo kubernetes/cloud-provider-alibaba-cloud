@@ -26,6 +26,7 @@ type CloudConfig struct {
 		VpcID                string `json:"vpcid"`
 		ZoneID               string `json:"zoneid"`
 		VswitchID            string `json:"vswitchid"`
+		ResourceGroupID      string `json:"resourceGroupID"`
 
 		// service controller
 		ServiceBackendType string `json:"serviceBackendType"`
@@ -51,7 +52,14 @@ func (cc *CloudConfig) LoadCloudCFG() error {
 	if err != nil {
 		return fmt.Errorf("read cloud config error: %s ", err.Error())
 	}
-	return yaml.Unmarshal(content, CloudCFG)
+	err = yaml.Unmarshal(content, CloudCFG)
+	if err != nil {
+		return err
+	}
+
+	CloudCFG.Global.ResourceGroupID = strings.TrimSpace(CloudCFG.Global.ResourceGroupID)
+	CloudCFG.Global.RouteTableIDS = strings.TrimSpace(CloudCFG.Global.RouteTableIDS)
+	return nil
 }
 
 func (cc *CloudConfig) GetKubernetesClusterTag() string {
@@ -62,8 +70,12 @@ func (cc *CloudConfig) GetKubernetesClusterTag() string {
 }
 
 func (cc *CloudConfig) PrintInfo() {
-	if strings.TrimSpace(cc.Global.RouteTableIDS) != "" {
-		klog.Infof("using user customized route table ids [%s]", strings.TrimSpace(cc.Global.RouteTableIDS))
+	if cc.Global.RouteTableIDS != "" {
+		klog.Infof("using user customized route table ids [%s]", cc.Global.RouteTableIDS)
+	}
+
+	if cc.Global.ResourceGroupID != "" {
+		klog.Infof("using default resource group id [%s]", cc.Global.ResourceGroupID)
 	}
 
 	if cc.Global.FeatureGates != "" {
