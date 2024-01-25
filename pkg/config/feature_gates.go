@@ -19,7 +19,7 @@ const (
 
 var CloudProviderFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
 	IPv6DualStack: {Default: false, PreRelease: featuregate.Alpha},
-	EndpointSlice: {Default: false, PreRelease: featuregate.Alpha},
+	EndpointSlice: {Default: true, PreRelease: featuregate.GA},
 }
 
 func init() {
