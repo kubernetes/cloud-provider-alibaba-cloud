@@ -204,6 +204,9 @@ func (m *ModelApplier) applyVGroups(reqCtx *svcCtx.RequestContext, local, remote
 		// create
 		if !found {
 			reqCtx.Log.Info(fmt.Sprintf("create server group %s", local.ServerGroups[i].ServerGroupName))
+			if remote.LoadBalancerAttribute.VpcId != "" {
+				local.ServerGroups[i].VPCId = remote.LoadBalancerAttribute.VpcId
+			}
 			// to avoid add too many backends in one action, create server group with empty backends,
 			// then use AddNLBServers to add backends
 			if err := m.sgMgr.CreateServerGroup(reqCtx, local.ServerGroups[i]); err != nil {

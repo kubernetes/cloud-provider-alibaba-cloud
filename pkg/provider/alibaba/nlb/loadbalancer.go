@@ -392,6 +392,7 @@ func loadResponse(resp interface{}, lb *nlbmodel.NetworkLoadBalancer) error {
 	switch resp := resp.(type) {
 	case *nlb.GetLoadBalancerAttributeResponseBody:
 		lb.LoadBalancerAttribute.LoadBalancerId = tea.StringValue(resp.LoadBalancerId)
+		lb.LoadBalancerAttribute.VpcId = tea.StringValue(resp.VpcId)
 		lb.LoadBalancerAttribute.Name = tea.StringValue(resp.LoadBalancerName)
 		lb.LoadBalancerAttribute.AddressType = tea.StringValue(resp.AddressType)
 		lb.LoadBalancerAttribute.AddressIpVersion = tea.StringValue(resp.AddressIpVersion)
@@ -411,6 +412,7 @@ func loadResponse(resp interface{}, lb *nlbmodel.NetworkLoadBalancer) error {
 
 	case *nlb.ListLoadBalancersResponseBodyLoadBalancers:
 		lb.LoadBalancerAttribute.LoadBalancerId = tea.StringValue(resp.LoadBalancerId)
+		lb.LoadBalancerAttribute.VpcId = tea.StringValue(resp.VpcId)
 		lb.LoadBalancerAttribute.Name = tea.StringValue(resp.LoadBalancerName)
 		lb.LoadBalancerAttribute.AddressType = tea.StringValue(resp.AddressType)
 		lb.LoadBalancerAttribute.AddressIpVersion = tea.StringValue(resp.AddressIpVersion)
