@@ -34,8 +34,9 @@ func Add(mgr manager.Manager, ctx *shared.SharedContext) error {
 // newReconciler returns a new reconcile.Reconciler
 func newReconciler(mgr manager.Manager, ctx *shared.SharedContext) *ReconcileNode {
 	recon := &ReconcileNode{
-		monitorPeriod:   ctrlCfg.ControllerCFG.NodeMonitorPeriod.Duration,
-		statusFrequency: 5 * time.Minute,
+		monitorPeriod:    ctrlCfg.ControllerCFG.NodeMonitorPeriod.Duration,
+		statusFrequency:  5 * time.Minute,
+		configCloudRoute: ctrlCfg.ControllerCFG.ConfigureCloudRoutes,
 		// provider
 		cloud:  ctx.Provider(),
 		client: mgr.GetClient(),
