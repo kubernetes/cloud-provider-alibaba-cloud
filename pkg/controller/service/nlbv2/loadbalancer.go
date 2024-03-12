@@ -143,10 +143,11 @@ func (mgr *NLBManager) Update(reqCtx *svcCtx.RequestContext, local, remote *nlbm
 	for _, l := range local.LoadBalancerAttribute.ZoneMappings {
 		match := false
 		for _, r := range remote.LoadBalancerAttribute.ZoneMappings {
-			if l.ZoneId == r.ZoneId && l.VSwitchId == r.VSwitchId &&
-				l.IPv4Addr == r.IPv4Addr && l.AllocationId == r.AllocationId {
-				match = true
-				break
+			if l.ZoneId == r.ZoneId && l.VSwitchId == r.VSwitchId {
+				if l.AllocationId == "" || l.AllocationId != "" && l.AllocationId == r.AllocationId {
+					match = true
+					break
+				}
 			}
 		}
 		if !match {
