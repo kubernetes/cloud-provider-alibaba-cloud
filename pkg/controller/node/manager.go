@@ -314,7 +314,11 @@ func excludeTaintFromList(taints []v1.Taint, toExclude v1.Taint) []v1.Taint {
 
 func NodeList(kclient client.Client) (*v1.NodeList, error) {
 	nodes := &v1.NodeList{}
-	err := kclient.List(context.TODO(), nodes)
+	err := kclient.List(context.TODO(), nodes, &client.ListOptions{
+		Raw: &metav1.ListOptions{
+			ResourceVersion: "0",
+		},
+	})
 	if err != nil {
 		return nil, err
 	}
