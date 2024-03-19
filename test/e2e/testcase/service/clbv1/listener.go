@@ -198,6 +198,86 @@ func RunListenerTestCases(f *framework.Framework) {
 			}
 		})
 
+		ginkgo.Context("X-Forwarded-SLBPort", func() {
+			ginkgo.It("X-Forwarded-SLBPort; http", func() {
+				oldsvc, err := f.Client.KubeClient.CreateServiceByAnno(map[string]string{
+					annotation.Annotation(annotation.ProtocolPort):         "http:80",
+					annotation.Annotation(annotation.XForwardedForSLBPort): string(model.OnFlag),
+				})
+				gomega.Expect(err).To(gomega.BeNil())
+				err = f.ExpectLoadBalancerEqual(oldsvc)
+				gomega.Expect(err).To(gomega.BeNil())
+
+				newsvc := oldsvc.DeepCopy()
+				newsvc.Annotations[annotation.Annotation(annotation.XForwardedForSLBPort)] = string(model.OffFlag)
+				newsvc, err = f.Client.KubeClient.PatchService(oldsvc, newsvc)
+				gomega.Expect(err).To(gomega.BeNil())
+
+				err = f.ExpectLoadBalancerEqual(newsvc)
+				gomega.Expect(err).To(gomega.BeNil())
+			})
+			if options.TestConfig.CertID != "" {
+				ginkgo.It("X-Forwarded-SLBPort; https", func() {
+					oldsvc, err := f.Client.KubeClient.CreateServiceByAnno(map[string]string{
+						annotation.Annotation(annotation.ProtocolPort):         "http:443",
+						annotation.Annotation(annotation.CertID):               options.TestConfig.CertID,
+						annotation.Annotation(annotation.XForwardedForSLBPort): string(model.OnFlag),
+					})
+					gomega.Expect(err).To(gomega.BeNil())
+					err = f.ExpectLoadBalancerEqual(oldsvc)
+					gomega.Expect(err).To(gomega.BeNil())
+
+					newsvc := oldsvc.DeepCopy()
+					newsvc.Annotations[annotation.Annotation(annotation.XForwardedForSLBPort)] = string(model.OffFlag)
+					newsvc, err = f.Client.KubeClient.PatchService(oldsvc, newsvc)
+					gomega.Expect(err).To(gomega.BeNil())
+
+					err = f.ExpectLoadBalancerEqual(newsvc)
+					gomega.Expect(err).To(gomega.BeNil())
+				})
+			}
+		})
+
+		ginkgo.Context("X-Forwarded-Client-srcport", func() {
+			ginkgo.It("X-Forwarded-Client-srcport; http", func() {
+				oldsvc, err := f.Client.KubeClient.CreateServiceByAnno(map[string]string{
+					annotation.Annotation(annotation.ProtocolPort):               "http:80",
+					annotation.Annotation(annotation.XForwardedForClientSrcPort): string(model.OnFlag),
+				})
+				gomega.Expect(err).To(gomega.BeNil())
+				err = f.ExpectLoadBalancerEqual(oldsvc)
+				gomega.Expect(err).To(gomega.BeNil())
+
+				newsvc := oldsvc.DeepCopy()
+				newsvc.Annotations[annotation.Annotation(annotation.XForwardedForClientSrcPort)] = string(model.OffFlag)
+				newsvc, err = f.Client.KubeClient.PatchService(oldsvc, newsvc)
+				gomega.Expect(err).To(gomega.BeNil())
+
+				err = f.ExpectLoadBalancerEqual(newsvc)
+				gomega.Expect(err).To(gomega.BeNil())
+			})
+			if options.TestConfig.CertID != "" {
+				ginkgo.It("X-Forwarded-Client-srcport; https", func() {
+					oldsvc, err := f.Client.KubeClient.CreateServiceByAnno(map[string]string{
+						annotation.Annotation(annotation.ProtocolPort):               "http:443",
+						annotation.Annotation(annotation.CertID):                     options.TestConfig.CertID,
+						annotation.Annotation(annotation.XForwardedForClientSrcPort): string(model.OnFlag),
+					})
+					gomega.Expect(err).To(gomega.BeNil())
+					err = f.ExpectLoadBalancerEqual(oldsvc)
+					gomega.Expect(err).To(gomega.BeNil())
+
+					newsvc := oldsvc.DeepCopy()
+					newsvc.Annotations[annotation.Annotation(annotation.XForwardedForClientSrcPort)] = string(model.OffFlag)
+					newsvc, err = f.Client.KubeClient.PatchService(oldsvc, newsvc)
+					gomega.Expect(err).To(gomega.BeNil())
+
+					err = f.ExpectLoadBalancerEqual(newsvc)
+					gomega.Expect(err).To(gomega.BeNil())
+				})
+			}
+		})
+
 		ginkgo.Context("idle timeout", func() {
 			ginkgo.It("idle-timeout: 10 -> 40", func() {
 				oldsvc, err := f.Client.KubeClient.CreateServiceByAnno(map[string]string{
