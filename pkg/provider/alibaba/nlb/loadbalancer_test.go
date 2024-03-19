@@ -3,7 +3,7 @@ package nlb
 import (
 	"fmt"
 	openapi "github.com/alibabacloud-go/darabonba-openapi/v2/client"
-	nlb "github.com/alibabacloud-go/nlb-20220430/client"
+	nlb "github.com/alibabacloud-go/nlb-20220430/v3/client"
 	"github.com/alibabacloud-go/tea/tea"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/util"

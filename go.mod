@@ -5,7 +5,7 @@ go 1.20
 require (
 	github.com/alibabacloud-go/cs-20151215/v3 v3.0.21
 	github.com/alibabacloud-go/darabonba-openapi/v2 v2.0.5
-	github.com/alibabacloud-go/nlb-20220430 v1.1.1
+	github.com/alibabacloud-go/nlb-20220430/v3 v3.0.0
 	github.com/alibabacloud-go/tea v1.2.1
 	github.com/aliyun/alibaba-cloud-sdk-go v1.62.664
 	github.com/eapache/channels v1.1.0

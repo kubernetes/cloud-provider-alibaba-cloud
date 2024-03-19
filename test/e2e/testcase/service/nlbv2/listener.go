@@ -613,5 +613,78 @@ func RunListenerTestCases(f *framework.Framework) {
 			})
 
 		})
+
+		ginkgo.Context("ppv2 privatelink", func() {
+			ginkgo.It("all features on", func() {
+				svc := testsvc.DeepCopy()
+				svc.Annotations[annotation.Annotation(annotation.ProxyProtocol)] = string(model.OnFlag)
+				svc.Annotations[annotation.Annotation(annotation.Ppv2PrivateLinkEpIdEnabled)] = string(model.OnFlag)
+				svc.Annotations[annotation.Annotation(annotation.Ppv2PrivateLinkEpsIdEnabled)] = string(model.OnFlag)
+				svc.Annotations[annotation.Annotation(annotation.Ppv2VpcIdEnabled)] = string(model.OnFlag)
+				svc, err := f.Client.KubeClient.CreateService(svc)
+				gomega.Expect(err).To(gomega.BeNil())
+				err = f.ExpectNetworkLoadBalancerEqual(svc)
+				gomega.Expect(err).To(gomega.BeNil())
+			})
+
+			ginkgo.It("all features off -> on", func() {
+				oldsvc := testsvc.DeepCopy()
+				oldsvc, err := f.Client.KubeClient.CreateService(oldsvc)
+				gomega.Expect(err).To(gomega.BeNil())
+				err = f.ExpectNetworkLoadBalancerEqual(oldsvc)
+				gomega.Expect(err).To(gomega.BeNil())
+
+				newsvc := oldsvc.DeepCopy()
+				newsvc.Annotations[annotation.Annotation(annotation.ProxyProtocol)] = string(model.OnFlag)
+				newsvc.Annotations[annotation.Annotation(annotation.Ppv2PrivateLinkEpIdEnabled)] = string(model.OnFlag)
+				newsvc.Annotations[annotation.Annotation(annotation.Ppv2PrivateLinkEpsIdEnabled)] = string(model.OnFlag)
+				newsvc.Annotations[annotation.Annotation(annotation.Ppv2VpcIdEnabled)] = string(model.OnFlag)
+				newsvc, err = f.Client.KubeClient.PatchService(oldsvc, newsvc)
+				gomega.Expect(err).To(gomega.BeNil())
+				err = f.ExpectNetworkLoadBalancerEqual(newsvc)
+				gomega.Expect(err).To(gomega.BeNil())
+			})
+
+			ginkgo.It("only proxy protocol on -> all features on", func() {
+				oldsvc := testsvc.DeepCopy()
+				oldsvc.Annotations[annotation.Annotation(annotation.ProxyProtocol)] = string(model.OnFlag)
+				oldsvc, err := f.Client.KubeClient.CreateService(oldsvc)
+				gomega.Expect(err).To(gomega.BeNil())
+				err = f.ExpectNetworkLoadBalancerEqual(oldsvc)
+				gomega.Expect(err).To(gomega.BeNil())
+
+				newsvc := oldsvc.DeepCopy()
+				newsvc.Annotations[annotation.Annotation(annotation.ProxyProtocol)] = string(model.OnFlag)
+				newsvc.Annotations[annotation.Annotation(annotation.Ppv2PrivateLinkEpIdEnabled)] = string(model.OnFlag)
+				newsvc.Annotations[annotation.Annotation(annotation.Ppv2PrivateLinkEpsIdEnabled)] = string(model.OnFlag)
+				newsvc.Annotations[annotation.Annotation(annotation.Ppv2VpcIdEnabled)] = string(model.OnFlag)
+				newsvc, err = f.Client.KubeClient.PatchService(oldsvc, newsvc)
+				gomega.Expect(err).To(gomega.BeNil())
+				err = f.ExpectNetworkLoadBalancerEqual(newsvc)
+				gomega.Expect(err).To(gomega.BeNil())
+			})
+
+			ginkgo.It("all features on -> only proxy protocol on ", func() {
+				oldsvc := testsvc.DeepCopy()
+				oldsvc.Annotations[annotation.Annotation(annotation.ProxyProtocol)] = string(model.OnFlag)
+				oldsvc.Annotations[annotation.Annotation(annotation.Ppv2PrivateLinkEpIdEnabled)] = string(model.OnFlag)
+				oldsvc.Annotations[annotation.Annotation(annotation.Ppv2PrivateLinkEpsIdEnabled)] = string(model.OnFlag)
+				oldsvc.Annotations[annotation.Annotation(annotation.Ppv2VpcIdEnabled)] = string(model.OnFlag)
+				oldsvc, err := f.Client.KubeClient.CreateService(oldsvc)
+				gomega.Expect(err).To(gomega.BeNil())
+				err = f.ExpectNetworkLoadBalancerEqual(oldsvc)
+				gomega.Expect(err).To(gomega.BeNil())
+
+				newsvc := oldsvc.DeepCopy()
+				newsvc.Annotations[annotation.Annotation(annotation.ProxyProtocol)] = string(model.OnFlag)
+				newsvc.Annotations[annotation.Annotation(annotation.Ppv2PrivateLinkEpIdEnabled)] = string(model.OffFlag)
+				newsvc.Annotations[annotation.Annotation(annotation.Ppv2PrivateLinkEpsIdEnabled)] = string(model.OffFlag)
+				newsvc.Annotations[annotation.Annotation(annotation.Ppv2VpcIdEnabled)] = string(model.OffFlag)
+				newsvc, err = f.Client.KubeClient.PatchService(oldsvc, newsvc)
+				gomega.Expect(err).To(gomega.BeNil())
+				err = f.ExpectNetworkLoadBalancerEqual(newsvc)
+				gomega.Expect(err).To(gomega.BeNil())
+			})
+		})
 	})
 }
