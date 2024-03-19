@@ -76,6 +76,7 @@ type CreateScalingGroupRequest struct {
 	MaxInstanceLifetime                 requests.Integer                            `position:"Query" name:"MaxInstanceLifetime"`
 	SpotInstanceRemedy                  requests.Boolean                            `position:"Query" name:"SpotInstanceRemedy"`
 	ScaleOutAmountCheck                 requests.Boolean                            `position:"Query" name:"ScaleOutAmountCheck"`
+	ResourceGroupId                     string                                      `position:"Query" name:"ResourceGroupId"`
 	GroupType                           string                                      `position:"Query" name:"GroupType"`
 	SyncAlarmRuleToCms                  requests.Boolean                            `position:"Query" name:"SyncAlarmRuleToCms"`
 	CustomPolicyARN                     string                                      `position:"Query" name:"CustomPolicyARN"`
@@ -86,6 +87,7 @@ type CreateScalingGroupRequest struct {
 	DBInstanceIds                       string                                      `position:"Query" name:"DBInstanceIds"`
 	LaunchTemplateId                    string                                      `position:"Query" name:"LaunchTemplateId"`
 	DesiredCapacity                     requests.Integer                            `position:"Query" name:"DesiredCapacity"`
+	ServerGroup                         *[]CreateScalingGroupServerGroup            `position:"Query" name:"ServerGroup"  type:"Repeated"`
 	LaunchTemplateOverride              *[]CreateScalingGroupLaunchTemplateOverride `position:"Query" name:"LaunchTemplateOverride"  type:"Repeated"`
 	CompensateWithOnDemand              requests.Boolean                            `position:"Query" name:"CompensateWithOnDemand"`
 	MinSize                             requests.Integer                            `position:"Query" name:"MinSize"`
@@ -98,6 +100,7 @@ type CreateScalingGroupRequest struct {
 	LoadBalancerIds                     string                                      `position:"Query" name:"LoadBalancerIds"`
 	ClientToken                         string                                      `position:"Query" name:"ClientToken"`
 	SystemTag                           *[]CreateScalingGroupSystemTag              `position:"Query" name:"SystemTag"  type:"Repeated"`
+	LoadBalancerConfig                  *[]CreateScalingGroupLoadBalancerConfig     `position:"Query" name:"LoadBalancerConfig"  type:"Repeated"`
 	OnDemandBaseCapacity                requests.Integer                            `position:"Query" name:"OnDemandBaseCapacity"`
 	OnDemandPercentageAboveBaseCapacity requests.Integer                            `position:"Query" name:"OnDemandPercentageAboveBaseCapacity"`
 	SpotAllocationStrategy              string                                      `position:"Query" name:"SpotAllocationStrategy"`
@@ -123,10 +126,19 @@ type CreateScalingGroupTag struct {
 	Key       string `name:"Key"`
 }
 
+// CreateScalingGroupServerGroup is a repeated param struct in CreateScalingGroupRequest
+type CreateScalingGroupServerGroup struct {
+	ServerGroupId string `name:"ServerGroupId"`
+	Port          string `name:"Port"`
+	Weight        string `name:"Weight"`
+	Type          string `name:"Type"`
+}
+
 // CreateScalingGroupLaunchTemplateOverride is a repeated param struct in CreateScalingGroupRequest
 type CreateScalingGroupLaunchTemplateOverride struct {
 	WeightedCapacity string `name:"WeightedCapacity"`
 	InstanceType     string `name:"InstanceType"`
+	SpotPriceLimit   string `name:"SpotPriceLimit"`
 }
 
 // CreateScalingGroupAlbServerGroup is a repeated param struct in CreateScalingGroupRequest
@@ -152,6 +164,12 @@ type CreateScalingGroupSystemTag struct {
 	Value  string `name:"Value"`
 	Key    string `name:"Key"`
 	Spread string `name:"Spread"`
+}
+
+// CreateScalingGroupLoadBalancerConfig is a repeated param struct in CreateScalingGroupRequest
+type CreateScalingGroupLoadBalancerConfig struct {
+	LoadBalancerId string `name:"LoadBalancerId"`
+	Weight         string `name:"Weight"`
 }
 
 // CreateScalingGroupVServerGroup is a repeated param struct in CreateScalingGroupRequest

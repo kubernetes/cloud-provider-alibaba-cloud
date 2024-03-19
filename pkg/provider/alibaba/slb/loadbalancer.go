@@ -15,7 +15,6 @@ import (
 	"strings"
 
 	"github.com/aliyun/alibaba-cloud-sdk-go/sdk/requests"
-	"github.com/aliyun/alibaba-cloud-sdk-go/sdk/utils"
 	"github.com/aliyun/alibaba-cloud-sdk-go/services/slb"
 )
 
@@ -149,10 +148,12 @@ func (p SLBProvider) FindLoadBalancerByName(mdl *model.LoadBalancer) error {
 	return nil
 }
 
-func (p SLBProvider) CreateLoadBalancer(ctx context.Context, mdl *model.LoadBalancer) error {
+func (p SLBProvider) CreateLoadBalancer(ctx context.Context, mdl *model.LoadBalancer, clientToken string) error {
 	req := slb.CreateCreateLoadBalancerRequest()
 	setRequest(req, mdl)
-	req.ClientToken = utils.GetUUID()
+	if clientToken != "" {
+		req.ClientToken = clientToken
+	}
 	if ascmContext := os.Getenv("X-ACSPROXY-ASCM-CONTEXT"); ascmContext != "" {
 		req.GetHeaders()["x-acsproxy-ascm-context"] = ascmContext
 	}

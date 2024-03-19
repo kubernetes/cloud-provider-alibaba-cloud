@@ -309,7 +309,6 @@ func listenerAttrEqual(reqCtx *svcCtx.RequestContext, remote []model.ListenerAtt
 					if err := tcpEqual(reqCtx, port, r); err != nil {
 						return err
 					}
-
 				case model.UDP:
 					if err := udpEqual(reqCtx, port, r); err != nil {
 						return err
@@ -640,6 +639,16 @@ func httpEqual(reqCtx *svcCtx.RequestContext, local v1.ServicePort, remote model
 	if xForwardedForProto := reqCtx.Anno.Get(annotation.XForwardedForProto); xForwardedForProto != "" {
 		if string(remote.XForwardedForProto) != xForwardedForProto {
 			return fmt.Errorf("expected slb XForwardedForProto %s, got %s", xForwardedForProto, remote.XForwardedForProto)
+		}
+	}
+	if xForwardedForSLBPort := reqCtx.Anno.Get(annotation.XForwardedForSLBPort); xForwardedForSLBPort != "" {
+		if string(remote.XForwardedForSLBPort) != xForwardedForSLBPort {
+			return fmt.Errorf("expected slb XForwardedForSLBPort %s, got %s", xForwardedForSLBPort, remote.XForwardedForSLBPort)
+		}
+	}
+	if xForwardedForClientSrcPort := reqCtx.Anno.Get(annotation.XForwardedForClientSrcPort); xForwardedForClientSrcPort != "" {
+		if string(remote.XForwardedForClientSrcPort) != xForwardedForClientSrcPort {
+			return fmt.Errorf("expected slb XForwardedForClientSrcPort %s, got %s", xForwardedForClientSrcPort, remote.XForwardedForClientSrcPort)
 		}
 	}
 	if requestTimeout := reqCtx.Anno.Get(annotation.RequestTimeout); requestTimeout != "" {

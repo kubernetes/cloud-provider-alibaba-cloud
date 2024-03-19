@@ -84,6 +84,7 @@ type ModifyEciScalingConfigurationRequest struct {
 	ImageSnapshotId               string                                                  `position:"Query" name:"ImageSnapshotId"`
 	Tag                           *[]ModifyEciScalingConfigurationTag                     `position:"Query" name:"Tag"  type:"Repeated"`
 	CpuOptionsThreadsPerCore      requests.Integer                                        `position:"Query" name:"CpuOptionsThreadsPerCore"`
+	DataCachePL                   string                                                  `position:"Query" name:"DataCachePL"`
 	Ipv6AddressCount              requests.Integer                                        `position:"Query" name:"Ipv6AddressCount"`
 	Cpu                           requests.Float                                          `position:"Query" name:"Cpu"`
 	OwnerId                       requests.Integer                                        `position:"Query" name:"OwnerId"`
@@ -93,17 +94,22 @@ type ModifyEciScalingConfigurationRequest struct {
 	Volume                        *[]ModifyEciScalingConfigurationVolume                  `position:"Query" name:"Volume"  type:"Repeated"`
 	InstanceFamilyLevel           string                                                  `position:"Query" name:"InstanceFamilyLevel"`
 	DnsConfigOption               *[]ModifyEciScalingConfigurationDnsConfigOption         `position:"Query" name:"DnsConfigOption"  type:"Repeated"`
+	ContainersUpdateType          string                                                  `position:"Query" name:"ContainersUpdateType"`
 	EphemeralStorage              requests.Integer                                        `position:"Query" name:"EphemeralStorage"`
+	DataCacheProvisionedIops      requests.Integer                                        `position:"Query" name:"DataCacheProvisionedIops"`
 	EipBandwidth                  requests.Integer                                        `position:"Query" name:"EipBandwidth"`
 	CostOptimization              requests.Boolean                                        `position:"Query" name:"CostOptimization"`
+	DataCacheBurstingEnabled      requests.Boolean                                        `position:"Query" name:"DataCacheBurstingEnabled"`
 	Memory                        requests.Float                                          `position:"Query" name:"Memory"`
 	SecurityGroupId               string                                                  `position:"Query" name:"SecurityGroupId"`
 	Description                   string                                                  `position:"Query" name:"Description"`
 	IngressBandwidth              requests.Integer                                        `position:"Query" name:"IngressBandwidth"`
 	DnsPolicy                     string                                                  `position:"Query" name:"DnsPolicy"`
 	SecurityContextSysctl         *[]ModifyEciScalingConfigurationSecurityContextSysctl   `position:"Query" name:"SecurityContextSysctl"  type:"Repeated"`
+	DataCacheBucket               string                                                  `position:"Query" name:"DataCacheBucket"`
 	DnsConfigNameServer           *[]string                                               `position:"Query" name:"DnsConfigNameServer"  type:"Repeated"`
 	InitContainer                 *[]ModifyEciScalingConfigurationInitContainer           `position:"Query" name:"InitContainer"  type:"Repeated"`
+	InstanceType                  *[]string                                               `position:"Query" name:"InstanceType"  type:"Repeated"`
 	TerminationGracePeriodSeconds requests.Integer                                        `position:"Query" name:"TerminationGracePeriodSeconds"`
 	ImageRegistryCredential       *[]ModifyEciScalingConfigurationImageRegistryCredential `position:"Query" name:"ImageRegistryCredential"  type:"Repeated"`
 	ResourceOwnerAccount          string                                                  `position:"Query" name:"ResourceOwnerAccount"`
@@ -174,6 +180,7 @@ type ModifyEciScalingConfigurationTag struct {
 // ModifyEciScalingConfigurationVolume is a repeated param struct in ModifyEciScalingConfigurationRequest
 type ModifyEciScalingConfigurationVolume struct {
 	DiskVolumeFsType                 string                                                                 `name:"DiskVolume.FsType"`
+	EmptyDirVolumeSizeLimit          string                                                                 `name:"EmptyDirVolume.SizeLimit"`
 	NFSVolumePath                    string                                                                 `name:"NFSVolume.Path"`
 	DiskVolumeDiskId                 string                                                                 `name:"DiskVolume.DiskId"`
 	FlexVolumeFsType                 string                                                                 `name:"FlexVolume.FsType"`

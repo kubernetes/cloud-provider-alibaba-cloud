@@ -125,8 +125,10 @@ type DescribeLoadBalancerUDPListenerAttributeResponse struct {
 	HealthCheckReq            string                                               `json:"HealthCheckReq" xml:"HealthCheckReq"`
 	HealthCheckMethod         string                                               `json:"HealthCheckMethod" xml:"HealthCheckMethod"`
 	HealthCheck               string                                               `json:"HealthCheck" xml:"HealthCheck"`
+	LoadBalancerId            string                                               `json:"LoadBalancerId" xml:"LoadBalancerId"`
 	AclIds                    AclIdsInDescribeLoadBalancerUDPListenerAttribute     `json:"AclIds" xml:"AclIds"`
 	PortRanges                PortRangesInDescribeLoadBalancerUDPListenerAttribute `json:"PortRanges" xml:"PortRanges"`
+	Tags                      TagsInDescribeLoadBalancerUDPListenerAttribute       `json:"Tags" xml:"Tags"`
 }
 
 // CreateDescribeLoadBalancerUDPListenerAttributeRequest creates a request to invoke DescribeLoadBalancerUDPListenerAttribute API

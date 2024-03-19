@@ -73,26 +73,30 @@ type DescribeAccessControlListAttributeRequest struct {
 	*requests.RpcRequest
 	AccessKeyId          string           `position:"Query" name:"access_key_id"`
 	ResourceOwnerId      requests.Integer `position:"Query" name:"ResourceOwnerId"`
+	PageSize             requests.Integer `position:"Query" name:"PageSize"`
 	AclId                string           `position:"Query" name:"AclId"`
 	ResourceOwnerAccount string           `position:"Query" name:"ResourceOwnerAccount"`
 	OwnerAccount         string           `position:"Query" name:"OwnerAccount"`
 	AclEntryComment      string           `position:"Query" name:"AclEntryComment"`
 	OwnerId              requests.Integer `position:"Query" name:"OwnerId"`
 	Tags                 string           `position:"Query" name:"Tags"`
+	Page                 requests.Integer `position:"Query" name:"Page"`
 }
 
 // DescribeAccessControlListAttributeResponse is the response struct for api DescribeAccessControlListAttribute
 type DescribeAccessControlListAttributeResponse struct {
 	*responses.BaseResponse
-	ServiceManagedMode string           `json:"ServiceManagedMode" xml:"ServiceManagedMode"`
-	AclId              string           `json:"AclId" xml:"AclId"`
-	AddressIPVersion   string           `json:"AddressIPVersion" xml:"AddressIPVersion"`
-	RequestId          string           `json:"RequestId" xml:"RequestId"`
-	ResourceGroupId    string           `json:"ResourceGroupId" xml:"ResourceGroupId"`
-	AclName            string           `json:"AclName" xml:"AclName"`
-	CreateTime         string           `json:"CreateTime" xml:"CreateTime"`
-	AclEntrys          AclEntrys        `json:"AclEntrys" xml:"AclEntrys"`
-	RelatedListeners   RelatedListeners `json:"RelatedListeners" xml:"RelatedListeners"`
+	ServiceManagedMode string                                   `json:"ServiceManagedMode" xml:"ServiceManagedMode"`
+	AclId              string                                   `json:"AclId" xml:"AclId"`
+	AddressIPVersion   string                                   `json:"AddressIPVersion" xml:"AddressIPVersion"`
+	RequestId          string                                   `json:"RequestId" xml:"RequestId"`
+	ResourceGroupId    string                                   `json:"ResourceGroupId" xml:"ResourceGroupId"`
+	AclName            string                                   `json:"AclName" xml:"AclName"`
+	CreateTime         string                                   `json:"CreateTime" xml:"CreateTime"`
+	TotalAclEntry      int                                      `json:"TotalAclEntry" xml:"TotalAclEntry"`
+	Tags               TagsInDescribeAccessControlListAttribute `json:"Tags" xml:"Tags"`
+	AclEntrys          AclEntrys                                `json:"AclEntrys" xml:"AclEntrys"`
+	RelatedListeners   RelatedListeners                         `json:"RelatedListeners" xml:"RelatedListeners"`
 }
 
 // CreateDescribeAccessControlListAttributeRequest creates a request to invoke DescribeAccessControlListAttribute API

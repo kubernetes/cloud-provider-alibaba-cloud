@@ -109,6 +109,7 @@ type DescribeNetworkInterfaceAttributeResponse struct {
 	ZoneId                      string                                              `json:"ZoneId" xml:"ZoneId"`
 	PrivateIpAddress            string                                              `json:"PrivateIpAddress" xml:"PrivateIpAddress"`
 	QueueNumber                 int                                                 `json:"QueueNumber" xml:"QueueNumber"`
+	DeleteOnRelease             bool                                                `json:"DeleteOnRelease" xml:"DeleteOnRelease"`
 	SecurityGroupIds            SecurityGroupIdsInDescribeNetworkInterfaceAttribute `json:"SecurityGroupIds" xml:"SecurityGroupIds"`
 	AssociatedPublicIp          AssociatedPublicIp                                  `json:"AssociatedPublicIp" xml:"AssociatedPublicIp"`
 	Attachment                  Attachment                                          `json:"Attachment" xml:"Attachment"`
@@ -116,6 +117,8 @@ type DescribeNetworkInterfaceAttributeResponse struct {
 	SlaveInterfaceSpecification SlaveInterfaceSpecification                         `json:"SlaveInterfaceSpecification" xml:"SlaveInterfaceSpecification"`
 	PrivateIpSets               PrivateIpSetsInDescribeNetworkInterfaceAttribute    `json:"PrivateIpSets" xml:"PrivateIpSets"`
 	Ipv6Sets                    Ipv6SetsInDescribeNetworkInterfaceAttribute         `json:"Ipv6Sets" xml:"Ipv6Sets"`
+	Ipv4PrefixSets              Ipv4PrefixSetsInDescribeNetworkInterfaceAttribute   `json:"Ipv4PrefixSets" xml:"Ipv4PrefixSets"`
+	Ipv6PrefixSets              Ipv6PrefixSetsInDescribeNetworkInterfaceAttribute   `json:"Ipv6PrefixSets" xml:"Ipv6PrefixSets"`
 	Tags                        TagsInDescribeNetworkInterfaceAttribute             `json:"Tags" xml:"Tags"`
 }
 

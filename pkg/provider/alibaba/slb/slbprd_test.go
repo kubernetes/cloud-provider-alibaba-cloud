@@ -30,7 +30,7 @@ func TestNewLBProvider_CreateSLB(t *testing.T) {
 	request.LoadBalancerSpec = "slb.s1.small"
 	request.AddressType = "Internet"
 	request.LoadBalancerName = "test"
-	request.ClientToken = utils.GetUUID()
+	request.ClientToken = utils.GetTimeInFormatISO8601()
 
 	resp, err := client.CreateLoadBalancer(request)
 	if err != nil {

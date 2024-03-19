@@ -94,7 +94,7 @@ type IVPC interface {
 type ILoadBalancer interface {
 	// LoadBalancer
 	FindLoadBalancer(ctx context.Context, mdl *model.LoadBalancer) error
-	CreateLoadBalancer(ctx context.Context, mdl *model.LoadBalancer) error
+	CreateLoadBalancer(ctx context.Context, mdl *model.LoadBalancer, clientToken string) error
 	DescribeLoadBalancer(ctx context.Context, mdl *model.LoadBalancer) error
 	DeleteLoadBalancer(ctx context.Context, mdl *model.LoadBalancer) error
 	ModifyLoadBalancerInstanceSpec(ctx context.Context, lbId string, spec string) error

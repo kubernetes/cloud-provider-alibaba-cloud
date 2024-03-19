@@ -373,6 +373,14 @@ func setHTTPListenerValue(req interface{}, listener *model.ListenerAttribute) {
 		xForwardedForProto := v.FieldByName("XForwardedForProto")
 		xForwardedForProto.SetString(string(listener.XForwardedForProto))
 	}
+	if listener.XForwardedForSLBPort != "" {
+		xForwardedForSLBPORT := v.FieldByName("XForwardedForSLBPORT")
+		xForwardedForSLBPORT.SetString(string(listener.XForwardedForSLBPort))
+	}
+	if listener.XForwardedForClientSrcPort != "" {
+		xForwardedForClientSrcPort := v.FieldByName("XForwardedForClientSrcPort")
+		xForwardedForClientSrcPort.SetString(string(listener.XForwardedForClientSrcPort))
+	}
 	if listener.IdleTimeout != 0 {
 		idleTimeout := v.FieldByName("IdleTimeout")
 		idleTimeout.SetString(strconv.Itoa(listener.IdleTimeout))
@@ -429,6 +437,14 @@ func setHTTPSListenerValue(req interface{}, listener *model.ListenerAttribute) {
 	if listener.XForwardedForProto != "" {
 		xForwardedForProto := v.FieldByName("XForwardedForProto")
 		xForwardedForProto.SetString(string(listener.XForwardedForProto))
+	}
+	if listener.XForwardedForSLBPort != "" {
+		xForwardedForSLBPORT := v.FieldByName("XForwardedForSLBPORT")
+		xForwardedForSLBPORT.SetString(string(listener.XForwardedForSLBPort))
+	}
+	if listener.XForwardedForClientSrcPort != "" {
+		xForwardedForClientSrcPort := v.FieldByName("XForwardedForClientSrcPort")
+		xForwardedForClientSrcPort.SetString(string(listener.XForwardedForClientSrcPort))
 	}
 
 	certId := v.FieldByName("ServerCertificateId")
@@ -494,6 +510,8 @@ func loadHTTPListener(config slb.HTTPListenerConfig, listener *model.ListenerAtt
 	listener.Cookie = config.Cookie
 	listener.RequestTimeout = config.RequestTimeout
 	listener.XForwardedForProto = model.FlagType(config.XForwardedForProto)
+	listener.XForwardedForSLBPort = model.FlagType(config.XForwardedForSLBPORT)
+	listener.XForwardedForClientSrcPort = model.FlagType(config.XForwardedForClientSrcPort)
 	listener.IdleTimeout = config.IdleTimeout
 	listener.HealthCheck = model.FlagType(config.HealthCheck)
 	listener.HealthCheckDomain = config.HealthCheckDomain
@@ -516,6 +534,8 @@ func loadHTTPSListener(config slb.HTTPSListenerConfig, listener *model.ListenerA
 	listener.Cookie = config.Cookie
 	listener.RequestTimeout = config.RequestTimeout
 	listener.XForwardedForProto = model.FlagType(config.XForwardedForProto)
+	listener.XForwardedForSLBPort = model.FlagType(config.XForwardedForSLBPORT)
+	listener.XForwardedForClientSrcPort = model.FlagType(config.XForwardedForClientSrcPort)
 	listener.IdleTimeout = config.IdleTimeout
 	listener.HealthCheck = model.FlagType(config.HealthCheck)
 	listener.HealthCheckDomain = config.HealthCheckDomain

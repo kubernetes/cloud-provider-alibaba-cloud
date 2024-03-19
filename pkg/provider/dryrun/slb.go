@@ -30,7 +30,7 @@ func (m *DryRunSLB) FindLoadBalancer(ctx context.Context, mdl *model.LoadBalance
 	return m.slb.FindLoadBalancer(ctx, mdl)
 }
 
-func (m *DryRunSLB) CreateLoadBalancer(ctx context.Context, mdl *model.LoadBalancer) error {
+func (m *DryRunSLB) CreateLoadBalancer(ctx context.Context, mdl *model.LoadBalancer, clientToken string) error {
 	mtype := "CreateLoadBalancer"
 	svc := getService(ctx)
 	AddEvent(SLB, util.Key(svc), "", "CreateSLB", ERROR, "")

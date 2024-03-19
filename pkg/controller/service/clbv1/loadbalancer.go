@@ -10,6 +10,7 @@ import (
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/model"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/model/tag"
 	prvd "k8s.io/cloud-provider-alibaba-cloud/pkg/provider"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/base"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/util"
 	"strconv"
 )
@@ -51,7 +52,8 @@ func (mgr *LoadBalancerManager) Create(reqCtx *svcCtx.RequestContext, local *mod
 	if err := setModelDefaultValue(mgr, local, reqCtx.Anno); err != nil {
 		return fmt.Errorf("set model default value error: %s", err.Error())
 	}
-	err := mgr.cloud.CreateLoadBalancer(reqCtx.Ctx, local)
+	clientToken := fmt.Sprintf("%s-%s", base.CLUSTER_ID[:8], reqCtx.Anno.GetDefaultLoadBalancerName())
+	err := mgr.cloud.CreateLoadBalancer(reqCtx.Ctx, local, clientToken)
 	if err != nil {
 		return fmt.Errorf("create slb error: %s", err.Error())
 	}

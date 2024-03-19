@@ -162,7 +162,7 @@ func (g *albconfigReconciler) SetupWithManager(ctx context.Context, mgr manager.
 
 func (g *albconfigReconciler) syncIngress(obj interface{}) error {
 	g.logger.Info("start syncIngress")
-	traceID := sdkutils.GetUUID()
+	traceID := sdkutils.GetTimeInFormatISO8601()
 	ctx := context.WithValue(context.Background(), util.TraceID, traceID)
 	e := obj.(helper.Element)
 	evt := e.Event
@@ -236,7 +236,7 @@ func (g *albconfigReconciler) syncIngress(obj interface{}) error {
 }
 
 func (g *albconfigReconciler) syncServers(obj interface{}) error {
-	traceID := sdkutils.GetUUID()
+	traceID := sdkutils.GetTimeInFormatISO8601()
 	ctx := context.WithValue(context.Background(), util.TraceID, traceID)
 
 	e := obj.(helper.Element)
@@ -464,7 +464,7 @@ func (g *albconfigReconciler) makeAlbConfig(ctx context.Context, groupName strin
 }
 
 func (g *albconfigReconciler) Reconcile(ctx context.Context, req reconcile.Request) (reconcile.Result, error) {
-	traceID := sdkutils.GetUUID()
+	traceID := sdkutils.GetTimeInFormatISO8601()
 	ctx = context.WithValue(ctx, util.TraceID, traceID)
 
 	var err error

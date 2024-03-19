@@ -47,7 +47,7 @@ func (m *MockCLB) FindLoadBalancer(ctx context.Context, mdl *model.LoadBalancer)
 	}
 	return nil
 }
-func (m *MockCLB) CreateLoadBalancer(ctx context.Context, mdl *model.LoadBalancer) error {
+func (m *MockCLB) CreateLoadBalancer(ctx context.Context, mdl *model.LoadBalancer, clientToken string) error {
 	mdl.LoadBalancerAttribute.LoadBalancerId = "lb-new-created-id"
 	return nil
 }

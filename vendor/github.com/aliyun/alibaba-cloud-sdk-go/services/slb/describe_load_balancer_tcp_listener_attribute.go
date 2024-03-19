@@ -124,8 +124,10 @@ type DescribeLoadBalancerTCPListenerAttributeResponse struct {
 	ConnectionDrain                string                                               `json:"ConnectionDrain" xml:"ConnectionDrain"`
 	HealthCheckMethod              string                                               `json:"HealthCheckMethod" xml:"HealthCheckMethod"`
 	HealthCheck                    string                                               `json:"HealthCheck" xml:"HealthCheck"`
+	LoadBalancerId                 string                                               `json:"LoadBalancerId" xml:"LoadBalancerId"`
 	AclIds                         AclIdsInDescribeLoadBalancerTCPListenerAttribute     `json:"AclIds" xml:"AclIds"`
 	PortRanges                     PortRangesInDescribeLoadBalancerTCPListenerAttribute `json:"PortRanges" xml:"PortRanges"`
+	Tags                           TagsInDescribeLoadBalancerTCPListenerAttribute       `json:"Tags" xml:"Tags"`
 }
 
 // CreateDescribeLoadBalancerTCPListenerAttributeRequest creates a request to invoke DescribeLoadBalancerTCPListenerAttribute API
