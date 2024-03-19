@@ -2,17 +2,21 @@ package service
 
 import (
 	"bytes"
+	"crypto/md5"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
+	"math/rand"
 	"net/http"
 	"net/url"
 	"reflect"
 	"runtime"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/alibabacloud-go/tea/tea"
@@ -39,6 +43,19 @@ type RuntimeOptions struct {
 	Socks5Proxy    *string `json:"socks5Proxy" xml:"socks5Proxy"`
 	Socks5NetWork  *string `json:"socks5NetWork" xml:"socks5NetWork"`
 	KeepAlive      *bool   `json:"keepAlive" xml:"keepAlive"`
+}
+
+var processStartTime int64 = time.Now().UnixNano() / 1e6
+var seqId int64 = 0
+
+func getGID() uint64 {
+	// https://blog.sgmansfield.com/2015/12/goroutine-ids/
+	b := make([]byte, 64)
+	b = b[:runtime.Stack(b, false)]
+	b = bytes.TrimPrefix(b, []byte("goroutine "))
+	b = b[:bytes.IndexByte(b, ' ')]
+	n, _ := strconv.ParseUint(string(b), 10, 64)
+	return n
 }
 
 func (s RuntimeOptions) String() string {
@@ -236,7 +253,15 @@ func ReadAsJSON(body io.Reader) (result interface{}, err error) {
 }
 
 func GetNonce() *string {
-	return tea.String(getUUID())
+	routineId := getGID()
+	currentTime := time.Now().UnixNano() / 1e6
+	seq := atomic.AddInt64(&seqId, 1)
+	randNum := rand.Int63()
+	msg := fmt.Sprintf("%d-%d-%d-%d-%d", processStartTime, routineId, currentTime, seq, randNum)
+	h := md5.New()
+	h.Write([]byte(msg))
+	ret := hex.EncodeToString(h.Sum(nil))
+	return &ret
 }
 
 func Empty(val *string) *bool {
