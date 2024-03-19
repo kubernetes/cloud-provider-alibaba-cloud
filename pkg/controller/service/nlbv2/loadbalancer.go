@@ -3,6 +3,7 @@ package nlbv2
 import (
 	"fmt"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	ctrlCfg "k8s.io/cloud-provider-alibaba-cloud/pkg/config"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/helper"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/service/reconcile/annotation"
 	svcCtx "k8s.io/cloud-provider-alibaba-cloud/pkg/controller/service/reconcile/context"
@@ -222,6 +223,10 @@ func setDefaultValueForLoadBalancer(mgr *NLBManager, mdl *nlbmodel.NetworkLoadBa
 			return fmt.Errorf("get vpc id error: %s", err.Error())
 		}
 		mdl.LoadBalancerAttribute.VpcId = vpcId
+	}
+
+	if mdl.LoadBalancerAttribute.ResourceGroupId == "" {
+		mdl.LoadBalancerAttribute.ResourceGroupId = ctrlCfg.CloudCFG.Global.ResourceGroupID
 	}
 
 	mdl.LoadBalancerAttribute.Tags = append(anno.GetDefaultTags(), mdl.LoadBalancerAttribute.Tags...)

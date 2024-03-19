@@ -72,8 +72,8 @@ func getRouteTables(ctx context.Context, providerIns prvd.Provider) ([]string, e
 	if err != nil {
 		return nil, fmt.Errorf("get vpc id from metadata error: %s", err.Error())
 	}
-	if strings.TrimSpace(ctrlCfg.CloudCFG.Global.RouteTableIDS) != "" {
-		return strings.Split(strings.TrimSpace(ctrlCfg.CloudCFG.Global.RouteTableIDS), ","), nil
+	if ctrlCfg.CloudCFG.Global.RouteTableIDS != "" {
+		return strings.Split(ctrlCfg.CloudCFG.Global.RouteTableIDS, ","), nil
 	}
 	tables, err := providerIns.ListRouteTables(ctx, vpcId)
 	if err != nil {

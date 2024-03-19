@@ -35,11 +35,6 @@ func TestGetRouteTables(t *testing.T) {
 	assert.Equal(t, 0, len(tables), "assert route tables from no table vpc")
 	assert.Equal(t, false, err == nil, "assert route tables from no table vpc")
 
-	globalCtx.CloudCFG.Global.RouteTableIDS = " "
-	tables, err = getRouteTables(context.Background(), noRouteTableVPC)
-	assert.Equal(t, 0, len(tables), "assert route tables from no table vpc")
-	assert.Equal(t, false, err == nil, "assert route tables from no table vpc")
-
 	globalCtx.CloudCFG.Global.RouteTableIDS = ""
 	tables, err = getRouteTables(context.Background(), singleRouteTableVPC)
 	assert.Equal(t, 1, len(tables), "assert route tables from no single vpc")
