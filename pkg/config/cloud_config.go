@@ -10,6 +10,11 @@ import (
 	"sigs.k8s.io/yaml"
 )
 
+const (
+	DefaultServiceMaxConcurrentReconciles = 3
+	DefaultNodeMaxConcurrentReconciles    = 1
+)
+
 var CloudCFG = &CloudConfig{}
 
 // CloudConfig wraps the settings for the Alibaba Cloud provider.
@@ -29,12 +34,14 @@ type CloudConfig struct {
 		ResourceGroupID      string `json:"resourceGroupID"`
 
 		// service controller
-		ServiceBackendType string `json:"serviceBackendType"`
-		DisablePublicSLB   bool   `json:"disablePublicSLB"`
+		ServiceMaxConcurrentReconciles int    `json:"serviceMaxConcurrentReconciles"`
+		ServiceBackendType             string `json:"serviceBackendType"`
+		DisablePublicSLB               bool   `json:"disablePublicSLB"`
 
 		// node controller
-		NodeMonitorPeriod  int64 `json:"nodeMonitorPeriod"`
-		NodeAddrSyncPeriod int64 `json:"nodeAddrSyncPeriod"`
+		NodeMaxConcurrentReconciles int   `json:"nodeMaxConcurrentReconciles"`
+		NodeMonitorPeriod           int64 `json:"nodeMonitorPeriod"`
+		NodeAddrSyncPeriod          int64 `json:"nodeAddrSyncPeriod"`
 
 		// route controller
 		RouteTableIDS string `json:"routeTableIDs"`
@@ -56,10 +63,19 @@ func (cc *CloudConfig) LoadCloudCFG() error {
 	if err != nil {
 		return err
 	}
+	CloudCFG.SetDefaultValue()
+	return nil
+}
 
+func (cc *CloudConfig) SetDefaultValue() {
+	if cc.Global.ServiceMaxConcurrentReconciles == 0 {
+		cc.Global.ServiceMaxConcurrentReconciles = DefaultServiceMaxConcurrentReconciles
+	}
+	if cc.Global.NodeMaxConcurrentReconciles == 0 {
+		cc.Global.NodeMaxConcurrentReconciles = DefaultNodeMaxConcurrentReconciles
+	}
 	CloudCFG.Global.ResourceGroupID = strings.TrimSpace(CloudCFG.Global.ResourceGroupID)
 	CloudCFG.Global.RouteTableIDS = strings.TrimSpace(CloudCFG.Global.RouteTableIDS)
-	return nil
 }
 
 func (cc *CloudConfig) GetKubernetesClusterTag() string {
@@ -81,4 +97,7 @@ func (cc *CloudConfig) PrintInfo() {
 	if cc.Global.FeatureGates != "" {
 		klog.Infof("using feature gate: %s", cc.Global.FeatureGates)
 	}
+
+	klog.Infof("NodeMaxConcurrentReconciles: %d, ServiceMaxConcurrentReconciles: %d",
+		cc.Global.NodeMaxConcurrentReconciles, cc.Global.ServiceMaxConcurrentReconciles)
 }

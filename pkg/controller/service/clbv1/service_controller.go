@@ -88,7 +88,7 @@ func add(mgr manager.Manager, r *ReconcileService) error {
 		"service-controller", mgr,
 		controller.Options{
 			Reconciler:              r,
-			MaxConcurrentReconciles: ctrlCfg.ControllerCFG.ServiceMaxConcurrentReconciles,
+			MaxConcurrentReconciles: ctrlCfg.CloudCFG.Global.ServiceMaxConcurrentReconciles,
 			RateLimiter:             rateLimit,
 			RecoverPanic:            &recoverPanic,
 		},
