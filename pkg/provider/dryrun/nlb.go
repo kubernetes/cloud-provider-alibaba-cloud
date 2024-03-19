@@ -72,6 +72,22 @@ func (d DryRunNLB) UpdateNLBZones(ctx context.Context, mdl *nlbmodel.NetworkLoad
 	panic("implement me")
 }
 
+func (d DryRunNLB) UpdateLoadBalancerProtection(ctx context.Context, lbId string,
+	delCfg *nlbmodel.DeletionProtectionConfig, modCfg *nlbmodel.ModificationProtectionConfig) error {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (d DryRunNLB) AttachCommonBandwidthPackageToLoadBalancer(ctx context.Context, lbId string, bandwidthPackageId string) error {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (d DryRunNLB) DetachCommonBandwidthPackageFromLoadBalancer(ctx context.Context, lbId string, bandwidthPackageId string) error {
+	//TODO implement me
+	panic("implement me")
+}
+
 func (d DryRunNLB) ListNLBServerGroups(ctx context.Context, tags []tag.Tag) ([]*nlbmodel.ServerGroup, error) {
 	//TODO implement me
 	panic("implement me")

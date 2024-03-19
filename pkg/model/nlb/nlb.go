@@ -88,6 +88,11 @@ const (
 	ServerGroupTagType  = TagResourceType("servergroup")
 )
 
+type ModificationProtectionType string
+
+const ConsoleProtection = ModificationProtectionType("ConsoleProtection")
+const ModificationProtectionReason = "managed.by.ack"
+
 // NetworkLoadBalancer represents a AlibabaCloud NetworkLoadBalancer.
 type NetworkLoadBalancer struct {
 	NamespacedName        types.NamespacedName
@@ -106,20 +111,33 @@ func (l *NetworkLoadBalancer) GetLoadBalancerId() string {
 type LoadBalancerAttribute struct {
 	IsUserManaged bool
 
-	Name             string
-	AddressType      string
-	AddressIpVersion string
-	VpcId            string
-	ZoneMappings     []ZoneMapping
-	ResourceGroupId  string
-	Tags             []tag.Tag
-	SecurityGroupIds []string
+	Name                         string
+	AddressType                  string
+	AddressIpVersion             string
+	VpcId                        string
+	ZoneMappings                 []ZoneMapping
+	ResourceGroupId              string
+	Tags                         []tag.Tag
+	SecurityGroupIds             []string
+	BandwidthPackageId           *string
+	DeletionProtectionConfig     *DeletionProtectionConfig
+	ModificationProtectionConfig *ModificationProtectionConfig
 
 	// auto-generated parameters
 	LoadBalancerId             string
 	LoadBalancerStatus         string
 	LoadBalancerBusinessStatus string
 	DNSName                    string
+}
+
+type DeletionProtectionConfig struct {
+	Enabled bool
+	Reason  string
+}
+
+type ModificationProtectionConfig struct {
+	Status ModificationProtectionType
+	Reason string
 }
 
 type ListenerAttribute struct {
