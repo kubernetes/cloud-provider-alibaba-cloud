@@ -115,6 +115,7 @@ type LoadBalancerAttribute struct {
 	Name                         string
 	AddressType                  string
 	AddressIpVersion             string
+	IPv6AddressType              string
 	VpcId                        string
 	ZoneMappings                 []ZoneMapping
 	ResourceGroupId              string

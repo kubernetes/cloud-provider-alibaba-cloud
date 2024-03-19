@@ -2,6 +2,7 @@ package vmock
 
 import (
 	"context"
+
 	"github.com/alibabacloud-go/tea/tea"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/helper"
 	nlbmodel "k8s.io/cloud-provider-alibaba-cloud/pkg/model/nlb"
@@ -326,5 +327,9 @@ func (m MockNLB) StartNLBListener(ctx context.Context, listenerId string) error 
 }
 
 func (m MockNLB) UpdateNLBSecurityGroupIds(ctx context.Context, mdl *nlbmodel.NetworkLoadBalancer, added, removed []string) error {
+	return nil
+}
+
+func (m MockNLB) UpdateNLBIPv6AddressType(ctx context.Context, mdl *nlbmodel.NetworkLoadBalancer) error {
 	return nil
 }

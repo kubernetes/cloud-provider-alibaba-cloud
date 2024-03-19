@@ -173,8 +173,8 @@ func (e *ECSProvider) DescribeNetworkInterfaces(vpcId string, ips []string, ipVe
 			if err != nil {
 				return result, err
 			}
-			klog.V(5).Infof("RequestId: %s, API: %s, ips: %s, privateIpAddress[%d:%d]",
-				resp.RequestId, "DescribeNetworkInterfaces", privateIpAddress, begin, last)
+			klog.V(5).Infof("RequestId: %s, API: %s, ips: %s, privateIpAddress[%d:%d], ipVersionType: %s",
+				resp.RequestId, "DescribeNetworkInterfaces", privateIpAddress, begin, last, ipVersionType)
 
 			for _, eni := range resp.NetworkInterfaceSets.NetworkInterfaceSet {
 

@@ -97,6 +97,66 @@ func RunLoadBalancerTestCases(f *framework.Framework) {
 				err = f.ExpectNetworkLoadBalancerEqual(newSvc)
 				gomega.Expect(err).To(gomega.BeNil())
 			})
+
+			if options.TestConfig.IPv6 {
+				ginkgo.It("ipv6-address-type=internet", func() {
+					svc, err := f.Client.KubeClient.CreateNLBServiceByAnno(map[string]string{
+						annotation.Annotation(annotation.ZoneMaps):        options.TestConfig.NLBZoneMaps,
+						annotation.Annotation(annotation.IPVersion):       string(model.DualStack),
+						annotation.Annotation(annotation.IPv6AddressType): string(model.InternetAddressType),
+					})
+					gomega.Expect(err).To(gomega.BeNil())
+
+					err = f.ExpectNetworkLoadBalancerEqual(svc)
+					gomega.Expect(err).To(gomega.BeNil())
+				})
+
+				ginkgo.It("ipv6-address-type=intranet", func() {
+					svc, err := f.Client.KubeClient.CreateNLBServiceByAnno(map[string]string{
+						annotation.Annotation(annotation.ZoneMaps):        options.TestConfig.NLBZoneMaps,
+						annotation.Annotation(annotation.IPVersion):       string(model.DualStack),
+						annotation.Annotation(annotation.IPv6AddressType): string(model.IntranetAddressType),
+					})
+					gomega.Expect(err).To(gomega.BeNil())
+
+					err = f.ExpectNetworkLoadBalancerEqual(svc)
+					gomega.Expect(err).To(gomega.BeNil())
+				})
+
+				ginkgo.It("ipv6-address-type: intranet->internet", func() {
+					oldSvc, err := f.Client.KubeClient.CreateNLBServiceByAnno(map[string]string{
+						annotation.Annotation(annotation.ZoneMaps):        options.TestConfig.NLBZoneMaps,
+						annotation.Annotation(annotation.IPVersion):       string(model.DualStack),
+						annotation.Annotation(annotation.IPv6AddressType): string(model.IntranetAddressType),
+					})
+					gomega.Expect(err).To(gomega.BeNil())
+					err = f.ExpectNetworkLoadBalancerEqual(oldSvc)
+					gomega.Expect(err).To(gomega.BeNil())
+					newSvc := oldSvc.DeepCopy()
+					newSvc.Annotations[annotation.Annotation(annotation.IPv6AddressType)] = string(model.InternetAddressType)
+					newSvc, err = f.Client.KubeClient.PatchService(oldSvc, newSvc)
+					gomega.Expect(err).To(gomega.BeNil())
+					err = f.ExpectNetworkLoadBalancerEqual(newSvc)
+					gomega.Expect(err).To(gomega.BeNil())
+				})
+
+				ginkgo.It("ipv6-address-type: internet->intranet", func() {
+					oldSvc, err := f.Client.KubeClient.CreateNLBServiceByAnno(map[string]string{
+						annotation.Annotation(annotation.ZoneMaps):        options.TestConfig.NLBZoneMaps,
+						annotation.Annotation(annotation.IPVersion):       string(model.DualStack),
+						annotation.Annotation(annotation.IPv6AddressType): string(model.InternetAddressType),
+					})
+					gomega.Expect(err).To(gomega.BeNil())
+					err = f.ExpectNetworkLoadBalancerEqual(oldSvc)
+					gomega.Expect(err).To(gomega.BeNil())
+					newSvc := oldSvc.DeepCopy()
+					newSvc.Annotations[annotation.Annotation(annotation.IPv6AddressType)] = string(model.IntranetAddressType)
+					newSvc, err = f.Client.KubeClient.PatchService(oldSvc, newSvc)
+					gomega.Expect(err).To(gomega.BeNil())
+					err = f.ExpectNetworkLoadBalancerEqual(newSvc)
+					gomega.Expect(err).To(gomega.BeNil())
+				})
+			}
 		})
 
 		ginkgo.Context("nlb reuse lb", func() {

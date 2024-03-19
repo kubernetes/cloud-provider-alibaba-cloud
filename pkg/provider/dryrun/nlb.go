@@ -152,3 +152,8 @@ func (d DryRunNLB) StopNLBListener(ctx context.Context, listenerId string) error
 	//TODO implement me
 	panic("implement me")
 }
+
+func (d DryRunNLB) UpdateNLBIPv6AddressType(ctx context.Context, mdl *nlbmodel.NetworkLoadBalancer) error {
+	//TODO implement me
+	panic("implement me")
+}

@@ -2,6 +2,8 @@ package nlbv2
 
 import (
 	"fmt"
+	"strings"
+
 	"github.com/alibabacloud-go/tea/tea"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	ctrlCfg "k8s.io/cloud-provider-alibaba-cloud/pkg/config"
@@ -12,7 +14,6 @@ import (
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/model/tag"
 	prvd "k8s.io/cloud-provider-alibaba-cloud/pkg/provider"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/util"
-	"strings"
 )
 
 func NewNLBManager(cloud prvd.Provider) *NLBManager {
@@ -54,6 +55,7 @@ func (mgr *NLBManager) BuildLocalModel(reqCtx *svcCtx.RequestContext, mdl *nlbmo
 	mdl.LoadBalancerAttribute.ResourceGroupId = reqCtx.Anno.Get(annotation.ResourceGroupId)
 
 	mdl.LoadBalancerAttribute.AddressIpVersion = nlbmodel.GetAddressIpVersion(reqCtx.Anno.Get(annotation.IPVersion))
+	mdl.LoadBalancerAttribute.IPv6AddressType = nlbmodel.GetAddressType(reqCtx.Anno.Get(annotation.IPv6AddressType))
 
 	mdl.LoadBalancerAttribute.Name = reqCtx.Anno.Get(annotation.LoadBalancerName)
 
@@ -202,6 +204,15 @@ func (mgr *NLBManager) Update(reqCtx *svcCtx.RequestContext, local, remote *nlbm
 		reqCtx.Log.Info(fmt.Sprintf("security groups added %v, removed %v", added, removed))
 		if err := mgr.cloud.UpdateNLBSecurityGroupIds(reqCtx.Ctx, local, added, removed); err != nil {
 			errs = append(errs, fmt.Errorf("update security group ids error: %s", err.Error()))
+		}
+	}
+
+	if local.LoadBalancerAttribute.IPv6AddressType != "" &&
+		!strings.EqualFold(local.LoadBalancerAttribute.IPv6AddressType, remote.LoadBalancerAttribute.IPv6AddressType) {
+		reqCtx.Log.Info(fmt.Sprintf("IPv6AddressType changed from [%s] to [%s]",
+			remote.LoadBalancerAttribute.IPv6AddressType, local.LoadBalancerAttribute.IPv6AddressType))
+		if err := mgr.cloud.UpdateNLBIPv6AddressType(reqCtx.Ctx, local); err != nil {
+			errs = append(errs, fmt.Errorf("UpdateNLBIPv6AddressType error: %s", err.Error()))
 		}
 	}
 
