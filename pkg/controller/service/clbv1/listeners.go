@@ -3,17 +3,19 @@ package clbv1
 import (
 	"context"
 	"fmt"
+	"time"
+
 	"github.com/alibabacloud-go/tea/tea"
 	"github.com/mohae/deepcopy"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/helper"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/service/reconcile/annotation"
 	svcCtx "k8s.io/cloud-provider-alibaba-cloud/pkg/controller/service/reconcile/context"
-	"time"
+
+	"strconv"
+	"strings"
 
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/dryrun"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/util"
-	"strconv"
-	"strings"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -181,7 +183,21 @@ func (mgr *ListenerManager) buildListenerFromServicePort(reqCtx *svcCtx.RequestC
 	}
 
 	if reqCtx.Anno.Get(annotation.ProxyProtocol) != "" {
-		listener.EnableProxyProtocolV2 = tea.Bool(reqCtx.Anno.Get(annotation.ProxyProtocol) == string(model.OnFlag))
+		if reqCtx.Anno.Get(annotation.ProxyProtocolEnabledPorts) != "" {
+			// if enabled ports is set, only enable ppv2 on specific port
+			enabled, err := helper.IsProxyProtocolEnabledOn(reqCtx.Anno.Get(annotation.ProxyProtocolEnabledPorts), listener.Protocol, port.Port)
+			if err != nil {
+				return listener, err
+			}
+
+			if enabled {
+				listener.EnableProxyProtocolV2 = tea.Bool(reqCtx.Anno.Get(annotation.ProxyProtocol) == string(model.OnFlag))
+			} else {
+				listener.EnableProxyProtocolV2 = tea.Bool(false)
+			}
+		} else {
+			listener.EnableProxyProtocolV2 = tea.Bool(reqCtx.Anno.Get(annotation.ProxyProtocol) == string(model.OnFlag))
+		}
 	}
 
 	if reqCtx.Anno.Get(annotation.ForwardPort) != "" && listener.Protocol == model.HTTP {

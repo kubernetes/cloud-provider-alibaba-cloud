@@ -1,11 +1,13 @@
 package helper
 
 import (
+	"fmt"
+	"testing"
+
 	"github.com/stretchr/testify/assert"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	"testing"
 )
 
 func TestIsServiceHashChanged(t *testing.T) {
@@ -54,5 +56,35 @@ func getDefaultService() *v1.Service {
 			Type:                  v1.ServiceTypeLoadBalancer,
 			ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeLocal,
 		},
+	}
+}
+
+func TestIsProxyProtocolEnabledOn(t *testing.T) {
+	type test struct {
+		annotation string
+		protocol   string
+		port       int32
+
+		wantErr error
+		result  bool
+	}
+	tests := []test{
+		{annotation: "", protocol: "tcp", port: 80, wantErr: nil, result: true},
+		{annotation: "udp:53,tcp:53", protocol: "tcp", port: 80, wantErr: nil, result: false},
+		{annotation: "tcp|80,", protocol: "tcp", port: 80, wantErr: fmt.Errorf("port and "+
+			"protocol format must be like 'https:443' with colon separated. got=[%+v]", "[tcp|80]"), result: false},
+		{annotation: "tcp:80|udp:53", protocol: "tcp", port: 80, wantErr: nil, result: false},
+		{annotation: "tcp:80,tcp:81", protocol: "tcp", port: 81, wantErr: nil, result: true},
+	}
+
+	for i, tc := range tests {
+		t.Run(fmt.Sprintf("[%v/%v]", i+1, len(tests)), func(t *testing.T) {
+			result, err := IsProxyProtocolEnabledOn(tc.annotation, tc.protocol, tc.port)
+
+			assert.Equal(t, result, tc.result)
+			if err != tc.wantErr && err.Error() != tc.wantErr.Error() {
+				t.Errorf("%s not captured. %s", tc.wantErr, err.Error())
+			}
+		})
 	}
 }

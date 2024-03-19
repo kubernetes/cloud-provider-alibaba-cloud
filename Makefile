@@ -50,7 +50,7 @@ cloud-controller-manager: gofmt unit-test
 .PHONY: image
 image:
 ifeq ($(TARGETPLATFORM),linux/amd64)
-	sed -i "" 's/\$$BUILDPLATFORM/linux\/amd64/g' Dockerfile
+	sed -i 's/\$$BUILDPLATFORM/linux\/amd64/g' Dockerfile
 	docker build -t $(REGISTRY):$(TAG) -f Dockerfile .
 	@echo + Building image $(REGISTRY):$(TAG) successfully
 else

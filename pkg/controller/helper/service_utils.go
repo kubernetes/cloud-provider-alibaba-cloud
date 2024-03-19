@@ -2,16 +2,18 @@ package helper
 
 import (
 	"fmt"
+
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	ctrlCfg "k8s.io/cloud-provider-alibaba-cloud/pkg/config"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/model"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/util/hash"
 
-	"k8s.io/klog/v2"
 	"os"
 	"strings"
 	"time"
+
+	"k8s.io/klog/v2"
 )
 
 // Finalizer
@@ -167,4 +169,24 @@ func IsServiceOwnIngress(service *v1.Service) bool {
 		return false
 	}
 	return true
+}
+
+func IsProxyProtocolEnabledOn(annotation string, protocol string, port int32) (bool, error) {
+	if annotation == "" {
+		return true, nil
+	}
+
+	for _, v := range strings.Split(annotation, ",") {
+		pp := strings.Split(v, ":")
+		if len(pp) < 2 {
+			return false, fmt.Errorf("port and "+
+				"protocol format must be like 'https:443' with colon separated. got=[%+v]", pp)
+		}
+
+		if pp[0] == protocol && pp[1] == fmt.Sprintf("%d", port) {
+			return true, nil
+		}
+	}
+
+	return false, nil
 }
