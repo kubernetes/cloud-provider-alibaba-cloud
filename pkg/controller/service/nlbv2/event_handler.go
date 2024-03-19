@@ -6,6 +6,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/leaderelection/resourcelock"
 	"k8s.io/client-go/tools/record"
@@ -292,7 +293,11 @@ func (h *enqueueRequestForNodeEvent) enqueueManagedNode(queue workqueue.RateLimi
 
 	// node change would cause all service object reconcile
 	svcs := v1.ServiceList{}
-	err := h.client.List(context.TODO(), &svcs)
+	err := h.client.List(context.TODO(), &svcs, &client.ListOptions{
+		Raw: &metav1.ListOptions{
+			ResourceVersion: "0",
+		},
+	})
 	if err != nil {
 		util.NLBLog.Error(err, "fail to list services for node",
 			"node", node.Name)

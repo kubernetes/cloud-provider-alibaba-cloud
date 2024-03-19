@@ -6,6 +6,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	ctrlCfg "k8s.io/cloud-provider-alibaba-cloud/pkg/config"
@@ -101,7 +102,11 @@ func (e *EndpointWithENI) setAddressIpVersion(reqCtx *svcCtx.RequestContext) {
 
 func GetNodes(reqCtx *svcCtx.RequestContext, kubeClient client.Client) ([]v1.Node, error) {
 	nodeList := v1.NodeList{}
-	err := kubeClient.List(reqCtx.Ctx, &nodeList)
+	err := kubeClient.List(reqCtx.Ctx, &nodeList, &client.ListOptions{
+		Raw: &metav1.ListOptions{
+			ResourceVersion: "0",
+		},
+	})
 	if err != nil {
 		return nil, fmt.Errorf("get nodes error: %s", err.Error())
 	}
