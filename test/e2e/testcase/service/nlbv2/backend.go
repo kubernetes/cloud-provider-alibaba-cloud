@@ -69,7 +69,7 @@ func RunBackendTestCases(f *framework.Framework) {
 				svc.Annotations[annotation.Annotation(annotation.HealthCheckConnectTimeout)] = "12"
 				svc.Annotations[annotation.Annotation(annotation.HealthyThreshold)] = "4"
 				svc.Annotations[annotation.Annotation(annotation.UnhealthyThreshold)] = "4"
-				svc.Annotations[annotation.Annotation(annotation.HealthCheckInterval)] = "3"
+				svc.Annotations[annotation.Annotation(annotation.HealthCheckInterval)] = "5"
 
 				svc, err := f.Client.KubeClient.CreateService(svc)
 				gomega.Expect(err).To(gomega.BeNil())
@@ -86,7 +86,7 @@ func RunBackendTestCases(f *framework.Framework) {
 				svc.Annotations[annotation.Annotation(annotation.HealthyThreshold)] = "4"
 				svc.Annotations[annotation.Annotation(annotation.UnhealthyThreshold)] = "4"
 				svc.Annotations[annotation.Annotation(annotation.HealthCheckConnectTimeout)] = "12"
-				svc.Annotations[annotation.Annotation(annotation.HealthCheckInterval)] = "3"
+				svc.Annotations[annotation.Annotation(annotation.HealthCheckInterval)] = "5"
 				svc, err := f.Client.KubeClient.CreateService(svc)
 				gomega.Expect(err).To(gomega.BeNil())
 				err = f.ExpectNetworkLoadBalancerEqual(svc)
@@ -106,7 +106,7 @@ func RunBackendTestCases(f *framework.Framework) {
 				newsvc.Annotations[annotation.Annotation(annotation.HealthCheckConnectTimeout)] = "12"
 				newsvc.Annotations[annotation.Annotation(annotation.HealthyThreshold)] = "4"
 				newsvc.Annotations[annotation.Annotation(annotation.UnhealthyThreshold)] = "4"
-				newsvc.Annotations[annotation.Annotation(annotation.HealthCheckInterval)] = "3"
+				newsvc.Annotations[annotation.Annotation(annotation.HealthCheckInterval)] = "5"
 				newsvc, err = f.Client.KubeClient.PatchService(oldsvc, newsvc)
 				gomega.Expect(err).To(gomega.BeNil())
 				err = f.ExpectNetworkLoadBalancerEqual(newsvc)
@@ -128,7 +128,7 @@ func RunBackendTestCases(f *framework.Framework) {
 				newsvc.Annotations[annotation.Annotation(annotation.HealthyThreshold)] = "4"
 				newsvc.Annotations[annotation.Annotation(annotation.UnhealthyThreshold)] = "4"
 				newsvc.Annotations[annotation.Annotation(annotation.HealthCheckConnectTimeout)] = "12"
-				newsvc.Annotations[annotation.Annotation(annotation.HealthCheckInterval)] = "3"
+				newsvc.Annotations[annotation.Annotation(annotation.HealthCheckInterval)] = "5"
 				newsvc, err = f.Client.KubeClient.PatchService(oldsvc, newsvc)
 				gomega.Expect(err).To(gomega.BeNil())
 				err = f.ExpectNetworkLoadBalancerEqual(newsvc)
