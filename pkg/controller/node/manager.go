@@ -264,12 +264,18 @@ func setFields(node *v1.Node, ins *prvd.NodeAttribute, cfgRoute bool) {
 
 func setNetworkUnavailable(n *v1.Node) {
 	var conditions []v1.NodeCondition
-	for _, con := range n.Status.Conditions {
-		if con.Type == v1.NodeNetworkUnavailable {
+
+	for _, condition := range n.Status.Conditions {
+		if condition.Type == v1.NodeNetworkUnavailable {
+			if condition.Status == v1.ConditionFalse {
+				klog.Infof("node %s network is available, skip patch node status", n.Name)
+				return
+			}
 			continue
 		}
-		conditions = append(conditions, con)
+		conditions = append(conditions, condition)
 	}
+
 	con := v1.NodeCondition{
 		Type:               v1.NodeNetworkUnavailable,
 		Status:             v1.ConditionTrue,
