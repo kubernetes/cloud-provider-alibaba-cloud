@@ -39,9 +39,19 @@ const (
 func (p *NLBProvider) FindNLB(ctx context.Context, mdl *nlbmodel.NetworkLoadBalancer) error {
 	// 1. find by nlb id
 	if mdl.LoadBalancerAttribute.LoadBalancerId != "" {
+		lbId := mdl.LoadBalancerAttribute.LoadBalancerId
 		klog.Infof("[%s] find nlb by id, nlb info [%+v]",
 			mdl.NamespacedName, pkgUtil.PrettyJson(mdl))
-		return p.DescribeNLB(ctx, mdl)
+		err := p.DescribeNLB(ctx, mdl)
+		if err != nil {
+			return err
+		}
+		// Check LoadBalancer ID once more to prevent from an abnormal response from API.
+		if mdl.LoadBalancerAttribute.LoadBalancerId != lbId {
+			return fmt.Errorf("[%s] find loadbalancer by id error: loadbalancer id from API not match, expect [%s], actual [%s]",
+				mdl.NamespacedName, lbId, mdl.LoadBalancerAttribute.LoadBalancerId)
+		}
+		return nil
 	}
 
 	// 2. find by tags
