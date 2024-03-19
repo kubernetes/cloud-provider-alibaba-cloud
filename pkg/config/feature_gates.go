@@ -2,24 +2,27 @@ package config
 
 import (
 	"fmt"
+	"strconv"
+	"strings"
+
 	apiext "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/util"
 	"k8s.io/component-base/featuregate"
 	"k8s.io/klog/v2"
-	"strconv"
-	"strings"
 )
 
 const (
-	IPv6DualStack featuregate.Feature = "IPv6DualStack"
-	EndpointSlice featuregate.Feature = "EndpointSlice"
+	IPv6DualStack             featuregate.Feature = "IPv6DualStack"
+	EndpointSlice             featuregate.Feature = "EndpointSlice"
+	FilterServiceOnNodeChange featuregate.Feature = "FilterServiceOnNodeChange"
 )
 
 var CloudProviderFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
-	IPv6DualStack: {Default: false, PreRelease: featuregate.Alpha},
-	EndpointSlice: {Default: true, PreRelease: featuregate.GA},
+	IPv6DualStack:             {Default: false, PreRelease: featuregate.Alpha},
+	EndpointSlice:             {Default: true, PreRelease: featuregate.GA},
+	FilterServiceOnNodeChange: {Default: false, PreRelease: featuregate.Alpha},
 }
 
 func init() {
