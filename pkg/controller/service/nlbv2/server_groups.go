@@ -2,6 +2,9 @@ package nlbv2
 
 import (
 	"fmt"
+	"strconv"
+	"strings"
+
 	"github.com/alibabacloud-go/tea/tea"
 	"github.com/mohae/deepcopy"
 	v1 "k8s.io/api/core/v1"
@@ -21,8 +24,6 @@ import (
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/util"
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"strconv"
-	"strings"
 )
 
 const DefaultServerWeight = 100
@@ -71,7 +72,7 @@ func (mgr *ServerGroupManager) BuildLocalModel(reqCtx *svcCtx.RequestContext, md
 		if err := setServerGroupAttributeFromAnno(sg, reqCtx.Anno); err != nil {
 			return err
 		}
-		if err = mgr.setServerGroupServers(reqCtx, sg, candidates); err != nil {
+		if err = mgr.setServerGroupServers(reqCtx, sg, candidates, mdl.LoadBalancerAttribute.IsUserManaged); err != nil {
 			return fmt.Errorf("set ServerGroup for port %d error: %s", lis.ServicePort.Port, err.Error())
 		}
 		sgs = append(sgs, sg)
@@ -80,8 +81,45 @@ func (mgr *ServerGroupManager) BuildLocalModel(reqCtx *svcCtx.RequestContext, md
 	return nil
 }
 
-func (mgr *ServerGroupManager) BuildRemoteModel(reqCtx *svcCtx.RequestContext, mdl *nlbmodel.NetworkLoadBalancer) error {
+func (mgr *ServerGroupManager) ListNLBServerGroups(reqCtx *svcCtx.RequestContext) ([]*nlbmodel.ServerGroup, error) {
 	sgs, err := mgr.cloud.ListNLBServerGroups(reqCtx.Ctx, getServerGroupTag(reqCtx))
+	if err != nil {
+		return sgs, err
+	}
+
+	reusedSgIDs, err := getServerGroupIDs(reqCtx.Anno.Get(annotation.VGroupPort))
+	if err != nil {
+		return sgs, err
+	}
+
+	for _, id := range reusedSgIDs {
+		sg, err := mgr.cloud.GetNLBServerGroup(reqCtx.Ctx, id)
+		if err != nil {
+			return sgs, err
+		}
+		if sg == nil {
+			return sgs, fmt.Errorf("reused server group id %s not found", id)
+		}
+		sg.IsUserManaged = true
+		sgs = append(sgs, sg)
+	}
+
+	for i := range sgs {
+		for j := range sgs[i].Servers {
+			if !isServerManagedByMyService(reqCtx, sgs[i].Servers[j]) {
+				sgs[i].Servers[j].IsUserManaged = true
+				// if backend is managed by user, server group is also managed by user.
+				sgs[i].IsUserManaged = true
+				reqCtx.Log.Info(fmt.Sprintf("server group %s backend is managed by user: [%+v]",
+					sgs[i].ServerGroupName, sgs[i].Servers[j]))
+			}
+		}
+	}
+	return sgs, nil
+}
+
+func (mgr *ServerGroupManager) BuildRemoteModel(reqCtx *svcCtx.RequestContext, mdl *nlbmodel.NetworkLoadBalancer) error {
+	sgs, err := mgr.ListNLBServerGroups(reqCtx)
 	if err != nil {
 		return fmt.Errorf("DescribeVServerGroups error: %s", err.Error())
 	}
@@ -102,142 +140,148 @@ func (mgr *ServerGroupManager) DeleteServerGroup(reqCtx *svcCtx.RequestContext, 
 }
 
 func (mgr *ServerGroupManager) UpdateServerGroup(reqCtx *svcCtx.RequestContext, local, remote *nlbmodel.ServerGroup) error {
-	update := deepcopy.Copy(remote).(*nlbmodel.ServerGroup)
-	needUpdate := false
-	updateDetail := ""
-
-	if local.ServerGroupName != remote.ServerGroupName {
-		needUpdate = true
-		update.ServerGroupName = local.ServerGroupName
-		updateDetail += fmt.Sprintf("ServerGroupName %v should be changed to %v;",
-			remote.ServerGroupName, local.ServerGroupName)
-	}
-	if local.Scheduler != "" &&
-		!strings.EqualFold(local.Scheduler, remote.Scheduler) {
-		needUpdate = true
-		update.Scheduler = local.Scheduler
-		updateDetail += fmt.Sprintf("Scheduler %v should be changed to %v;",
-			remote.Scheduler, local.Scheduler)
-	}
-	if local.ConnectionDrainEnabled != nil &&
-		tea.BoolValue(local.ConnectionDrainEnabled) != tea.BoolValue(remote.ConnectionDrainEnabled) {
-		needUpdate = true
-		update.ConnectionDrainEnabled = local.ConnectionDrainEnabled
-		updateDetail += fmt.Sprintf("ConnectionDrainEnabled %v should be changed to %v;",
-			*remote.ConnectionDrainEnabled, *local.ConnectionDrainEnabled)
-	}
-	if local.ConnectionDrainTimeout != 0 &&
-		local.ConnectionDrainTimeout != remote.ConnectionDrainTimeout {
-		needUpdate = true
-		update.ConnectionDrainTimeout = local.ConnectionDrainTimeout
-		updateDetail += fmt.Sprintf("ConnectionDrainTimeout %v should be changed to %v;",
-			remote.ConnectionDrainTimeout, local.ConnectionDrainTimeout)
-	}
-	if local.PreserveClientIpEnabled != nil &&
-		tea.BoolValue(local.PreserveClientIpEnabled) != tea.BoolValue(remote.PreserveClientIpEnabled) {
-		needUpdate = true
-		update.PreserveClientIpEnabled = local.PreserveClientIpEnabled
-		updateDetail += fmt.Sprintf("PreserveClientIpEnabled %v should be changed to %v;",
-			tea.BoolValue(remote.PreserveClientIpEnabled), tea.BoolValue(local.PreserveClientIpEnabled))
-	}
-	// health check
-	if local.HealthCheckConfig != nil {
-		if remote.HealthCheckConfig == nil {
-			needUpdate = true
-			update.HealthCheckConfig = local.HealthCheckConfig
-			updateDetail += fmt.Sprintf("HealthCheckConfig nil should be changed to %v;",
-				*local.HealthCheckConfig)
-			goto update
-		}
-
-		localHC, remoteHC := local.HealthCheckConfig, remote.HealthCheckConfig
-		if localHC.HealthCheckEnabled != nil &&
-			tea.BoolValue(localHC.HealthCheckEnabled) != tea.BoolValue(remoteHC.HealthCheckEnabled) {
-			needUpdate = true
-			update.HealthCheckConfig.HealthCheckEnabled = localHC.HealthCheckEnabled
-			updateDetail += fmt.Sprintf("HealthCheckEnabled %v should be changed to %v;",
-				*remoteHC.HealthCheckEnabled, *localHC.HealthCheckEnabled)
-		}
-		if localHC.HealthCheckType != "" &&
-			!strings.EqualFold(localHC.HealthCheckType, remoteHC.HealthCheckType) {
-			needUpdate = true
-			update.HealthCheckConfig.HealthCheckType = localHC.HealthCheckType
-			updateDetail += fmt.Sprintf("HealthCheckType %v should be changed to %v;",
-				remoteHC.HealthCheckType, localHC.HealthCheckType)
-		}
-		if localHC.HealthCheckConnectPort != 0 &&
-			localHC.HealthCheckConnectPort != remoteHC.HealthCheckConnectPort {
-			needUpdate = true
-			update.HealthCheckConfig.HealthCheckConnectPort = localHC.HealthCheckConnectPort
-			updateDetail += fmt.Sprintf("HealthCheckConnectPort %v should be changed to %v;",
-				remoteHC.HealthCheckConnectPort, localHC.HealthCheckConnectPort)
-		}
-		if localHC.HealthyThreshold != 0 &&
-			localHC.HealthyThreshold != remoteHC.HealthyThreshold {
-			needUpdate = true
-			update.HealthCheckConfig.HealthyThreshold = localHC.HealthyThreshold
-			updateDetail += fmt.Sprintf("HealthyThreshold %v should be changed to %v;",
-				remoteHC.HealthyThreshold, localHC.HealthyThreshold)
-		}
-		if localHC.UnhealthyThreshold != 0 &&
-			localHC.UnhealthyThreshold != remoteHC.UnhealthyThreshold {
-			needUpdate = true
-			update.HealthCheckConfig.UnhealthyThreshold = localHC.UnhealthyThreshold
-			updateDetail += fmt.Sprintf("UnhealthyThreshold %v should be changed to %v;",
-				remoteHC.UnhealthyThreshold, localHC.UnhealthyThreshold)
-		}
-		if localHC.HealthCheckConnectTimeout != 0 &&
-			localHC.HealthCheckConnectTimeout != remoteHC.HealthCheckConnectTimeout {
-			needUpdate = true
-			update.HealthCheckConfig.HealthCheckConnectTimeout = localHC.HealthCheckConnectTimeout
-			updateDetail += fmt.Sprintf("HealthCheckConnectTimeout %v should be changed to %v;",
-				remoteHC.HealthCheckConnectTimeout, localHC.HealthCheckConnectTimeout)
-		}
-		if localHC.HealthCheckInterval != 0 &&
-			localHC.HealthCheckInterval != remoteHC.HealthCheckInterval {
-			needUpdate = true
-			update.HealthCheckConfig.HealthCheckInterval = localHC.HealthCheckInterval
-			updateDetail += fmt.Sprintf("HealthCheckConnectTimeout %v should be changed to %v;",
-				remoteHC.HealthCheckInterval, localHC.HealthCheckInterval)
-		}
-		if localHC.HealthCheckDomain != "" &&
-			localHC.HealthCheckDomain != remoteHC.HealthCheckDomain {
-			needUpdate = true
-			update.HealthCheckConfig.HealthCheckDomain = localHC.HealthCheckDomain
-			updateDetail += fmt.Sprintf("HealthCheckDomain %v should be changed to %v;",
-				remoteHC.HealthCheckDomain, localHC.HealthCheckDomain)
-		}
-		if localHC.HealthCheckUrl != "" &&
-			localHC.HealthCheckUrl != remoteHC.HealthCheckUrl {
-			needUpdate = true
-			update.HealthCheckConfig.HealthCheckUrl = localHC.HealthCheckUrl
-			updateDetail += fmt.Sprintf("HealthCheckUrl %v should be changed to %v;",
-				remoteHC.HealthCheckUrl, localHC.HealthCheckUrl)
-		}
-		if localHC.HttpCheckMethod != "" &&
-			!strings.EqualFold(localHC.HttpCheckMethod, remoteHC.HttpCheckMethod) {
-			needUpdate = true
-			update.HealthCheckConfig.HttpCheckMethod = localHC.HttpCheckMethod
-			updateDetail += fmt.Sprintf("HttpCheckMethod %v should be changed to %v;",
-				remoteHC.HttpCheckMethod, localHC.HttpCheckMethod)
-		}
-		if len(localHC.HealthCheckHttpCode) != 0 &&
-			!util.IsStringSliceEqual(localHC.HealthCheckHttpCode, remoteHC.HealthCheckHttpCode) {
-			needUpdate = true
-			update.HealthCheckConfig.HealthCheckHttpCode = localHC.HealthCheckHttpCode
-			updateDetail += fmt.Sprintf("HealthCheckHttpCode %v should be changed to %v;",
-				remoteHC.HealthCheckHttpCode, localHC.HealthCheckHttpCode)
-		}
-
-	}
-update:
 	var errs []error
-	if needUpdate {
-		reqCtx.Log.Info(fmt.Sprintf("update server group: %s [%s] changed, detail %s",
-			local.ServerGroupId, local.ServerGroupName, updateDetail))
-		if err := mgr.cloud.UpdateNLBServerGroup(reqCtx.Ctx, update); err != nil {
-			errs = append(errs, fmt.Errorf("UpdateNLBServerGroup error: %s", err.Error()))
+	// skip if server group is managed by user using "vgroup-port"
+	if !local.IsUserManaged {
+		update := deepcopy.Copy(remote).(*nlbmodel.ServerGroup)
+		needUpdate := false
+		updateDetail := ""
+
+		if local.ServerGroupName != remote.ServerGroupName {
+			needUpdate = true
+			update.ServerGroupName = local.ServerGroupName
+			updateDetail += fmt.Sprintf("ServerGroupName %v should be changed to %v;",
+				remote.ServerGroupName, local.ServerGroupName)
 		}
+		if local.Scheduler != "" &&
+			!strings.EqualFold(local.Scheduler, remote.Scheduler) {
+			needUpdate = true
+			update.Scheduler = local.Scheduler
+			updateDetail += fmt.Sprintf("Scheduler %v should be changed to %v;",
+				remote.Scheduler, local.Scheduler)
+		}
+		if local.ConnectionDrainEnabled != nil &&
+			tea.BoolValue(local.ConnectionDrainEnabled) != tea.BoolValue(remote.ConnectionDrainEnabled) {
+			needUpdate = true
+			update.ConnectionDrainEnabled = local.ConnectionDrainEnabled
+			updateDetail += fmt.Sprintf("ConnectionDrainEnabled %v should be changed to %v;",
+				*remote.ConnectionDrainEnabled, *local.ConnectionDrainEnabled)
+		}
+		if local.ConnectionDrainTimeout != 0 &&
+			local.ConnectionDrainTimeout != remote.ConnectionDrainTimeout {
+			needUpdate = true
+			update.ConnectionDrainTimeout = local.ConnectionDrainTimeout
+			updateDetail += fmt.Sprintf("ConnectionDrainTimeout %v should be changed to %v;",
+				remote.ConnectionDrainTimeout, local.ConnectionDrainTimeout)
+		}
+		if local.PreserveClientIpEnabled != nil &&
+			tea.BoolValue(local.PreserveClientIpEnabled) != tea.BoolValue(remote.PreserveClientIpEnabled) {
+			needUpdate = true
+			update.PreserveClientIpEnabled = local.PreserveClientIpEnabled
+			updateDetail += fmt.Sprintf("PreserveClientIpEnabled %v should be changed to %v;",
+				tea.BoolValue(remote.PreserveClientIpEnabled), tea.BoolValue(local.PreserveClientIpEnabled))
+		}
+		// health check
+		if local.HealthCheckConfig != nil {
+			if remote.HealthCheckConfig == nil {
+				needUpdate = true
+				update.HealthCheckConfig = local.HealthCheckConfig
+				updateDetail += fmt.Sprintf("HealthCheckConfig nil should be changed to %v;",
+					*local.HealthCheckConfig)
+				goto update
+			}
+
+			localHC, remoteHC := local.HealthCheckConfig, remote.HealthCheckConfig
+			if localHC.HealthCheckEnabled != nil &&
+				tea.BoolValue(localHC.HealthCheckEnabled) != tea.BoolValue(remoteHC.HealthCheckEnabled) {
+				needUpdate = true
+				update.HealthCheckConfig.HealthCheckEnabled = localHC.HealthCheckEnabled
+				updateDetail += fmt.Sprintf("HealthCheckEnabled %v should be changed to %v;",
+					*remoteHC.HealthCheckEnabled, *localHC.HealthCheckEnabled)
+			}
+			if localHC.HealthCheckType != "" &&
+				!strings.EqualFold(localHC.HealthCheckType, remoteHC.HealthCheckType) {
+				needUpdate = true
+				update.HealthCheckConfig.HealthCheckType = localHC.HealthCheckType
+				updateDetail += fmt.Sprintf("HealthCheckType %v should be changed to %v;",
+					remoteHC.HealthCheckType, localHC.HealthCheckType)
+			}
+			if localHC.HealthCheckConnectPort != 0 &&
+				localHC.HealthCheckConnectPort != remoteHC.HealthCheckConnectPort {
+				needUpdate = true
+				update.HealthCheckConfig.HealthCheckConnectPort = localHC.HealthCheckConnectPort
+				updateDetail += fmt.Sprintf("HealthCheckConnectPort %v should be changed to %v;",
+					remoteHC.HealthCheckConnectPort, localHC.HealthCheckConnectPort)
+			}
+			if localHC.HealthyThreshold != 0 &&
+				localHC.HealthyThreshold != remoteHC.HealthyThreshold {
+				needUpdate = true
+				update.HealthCheckConfig.HealthyThreshold = localHC.HealthyThreshold
+				updateDetail += fmt.Sprintf("HealthyThreshold %v should be changed to %v;",
+					remoteHC.HealthyThreshold, localHC.HealthyThreshold)
+			}
+			if localHC.UnhealthyThreshold != 0 &&
+				localHC.UnhealthyThreshold != remoteHC.UnhealthyThreshold {
+				needUpdate = true
+				update.HealthCheckConfig.UnhealthyThreshold = localHC.UnhealthyThreshold
+				updateDetail += fmt.Sprintf("UnhealthyThreshold %v should be changed to %v;",
+					remoteHC.UnhealthyThreshold, localHC.UnhealthyThreshold)
+			}
+			if localHC.HealthCheckConnectTimeout != 0 &&
+				localHC.HealthCheckConnectTimeout != remoteHC.HealthCheckConnectTimeout {
+				needUpdate = true
+				update.HealthCheckConfig.HealthCheckConnectTimeout = localHC.HealthCheckConnectTimeout
+				updateDetail += fmt.Sprintf("HealthCheckConnectTimeout %v should be changed to %v;",
+					remoteHC.HealthCheckConnectTimeout, localHC.HealthCheckConnectTimeout)
+			}
+			if localHC.HealthCheckInterval != 0 &&
+				localHC.HealthCheckInterval != remoteHC.HealthCheckInterval {
+				needUpdate = true
+				update.HealthCheckConfig.HealthCheckInterval = localHC.HealthCheckInterval
+				updateDetail += fmt.Sprintf("HealthCheckConnectTimeout %v should be changed to %v;",
+					remoteHC.HealthCheckInterval, localHC.HealthCheckInterval)
+			}
+			if localHC.HealthCheckDomain != "" &&
+				localHC.HealthCheckDomain != remoteHC.HealthCheckDomain {
+				needUpdate = true
+				update.HealthCheckConfig.HealthCheckDomain = localHC.HealthCheckDomain
+				updateDetail += fmt.Sprintf("HealthCheckDomain %v should be changed to %v;",
+					remoteHC.HealthCheckDomain, localHC.HealthCheckDomain)
+			}
+			if localHC.HealthCheckUrl != "" &&
+				localHC.HealthCheckUrl != remoteHC.HealthCheckUrl {
+				needUpdate = true
+				update.HealthCheckConfig.HealthCheckUrl = localHC.HealthCheckUrl
+				updateDetail += fmt.Sprintf("HealthCheckUrl %v should be changed to %v;",
+					remoteHC.HealthCheckUrl, localHC.HealthCheckUrl)
+			}
+			if localHC.HttpCheckMethod != "" &&
+				!strings.EqualFold(localHC.HttpCheckMethod, remoteHC.HttpCheckMethod) {
+				needUpdate = true
+				update.HealthCheckConfig.HttpCheckMethod = localHC.HttpCheckMethod
+				updateDetail += fmt.Sprintf("HttpCheckMethod %v should be changed to %v;",
+					remoteHC.HttpCheckMethod, localHC.HttpCheckMethod)
+			}
+			if len(localHC.HealthCheckHttpCode) != 0 &&
+				!util.IsStringSliceEqual(localHC.HealthCheckHttpCode, remoteHC.HealthCheckHttpCode) {
+				needUpdate = true
+				update.HealthCheckConfig.HealthCheckHttpCode = localHC.HealthCheckHttpCode
+				updateDetail += fmt.Sprintf("HealthCheckHttpCode %v should be changed to %v;",
+					remoteHC.HealthCheckHttpCode, localHC.HealthCheckHttpCode)
+			}
+
+		}
+	update:
+		if needUpdate {
+			reqCtx.Log.Info(fmt.Sprintf("update server group: %s [%s] changed, detail %s",
+				local.ServerGroupId, local.ServerGroupName, updateDetail))
+			if err := mgr.cloud.UpdateNLBServerGroup(reqCtx.Ctx, update); err != nil {
+				errs = append(errs, fmt.Errorf("UpdateNLBServerGroup error: %s", err.Error()))
+			}
+		}
+	} else {
+		reqCtx.Log.Info(fmt.Sprintf("server group %s[%s] is user managed, skip update attribute.",
+			remote.ServerGroupId, remote.ServerGroupName))
 	}
 
 	if err := mgr.updateServerGroupServers(reqCtx, local, remote); err != nil {
@@ -324,12 +368,44 @@ func (mgr *ServerGroupManager) BatchUpdateServers(reqCtx *svcCtx.RequestContext,
 }
 
 func (mgr *ServerGroupManager) setServerGroupServers(reqCtx *svcCtx.RequestContext, sg *nlbmodel.ServerGroup,
-	candidates *reconbackend.EndpointWithENI) error {
+	candidates *reconbackend.EndpointWithENI, isUserManagedLB bool) error {
 
 	var (
 		backends []nlbmodel.ServerGroupServer
 		err      error
 	)
+
+	if isUserManagedLB && reqCtx.Anno.Get(annotation.VGroupPort) != "" {
+		sgId, err := serverGroup(reqCtx.Anno.Get(annotation.VGroupPort), *sg.ServicePort)
+
+		if err != nil {
+			return fmt.Errorf("server group id parse error: %s", err.Error())
+		}
+		if sgId != "" {
+			remoteSg, err := mgr.cloud.GetNLBServerGroup(reqCtx.Ctx, sgId)
+			if err != nil {
+				return fmt.Errorf("find server group id %s for nlb %s error: %s", sgId, reqCtx.Anno.Get(annotation.LoadBalancerId), err.Error())
+			}
+			if remoteSg == nil {
+				return fmt.Errorf("cannot find server group id %s for nlb %s", sgId, reqCtx.Anno.Get(annotation.LoadBalancerId))
+			}
+			if !remoteSg.IsUserManaged {
+				return fmt.Errorf("cannot reuse a ccm created server group %s for nlb %s", sgId, reqCtx.Anno.Get(annotation.LoadBalancerId))
+			}
+			reqCtx.Log.Info(fmt.Sprintf("user managed server group id %s for port %d", sgId, sg.ServicePort.Port))
+			sg.ServerGroupId = sgId
+			sg.IsUserManaged = true
+		}
+
+		if reqCtx.Anno.Get(annotation.VGroupWeight) != "" {
+			w, err := strconv.Atoi(reqCtx.Anno.Get(annotation.VGroupWeight))
+			if err != nil || w < 0 || w > 100 {
+				return fmt.Errorf("weight must be integer in range [0, 100], got [%s]",
+					reqCtx.Anno.Get(annotation.VGroupWeight))
+			}
+			sg.Weight = &w
+		}
+	}
 
 	switch candidates.TrafficPolicy {
 	case helper.ENITrafficPolicy:
@@ -560,10 +636,10 @@ func (mgr *ServerGroupManager) buildLocalBackends(reqCtx *svcCtx.RequestContext,
 	backends = setWeightBackends(helper.LocalTrafficPolicy, backends, sg.Weight)
 
 	// 4. remove duplicated ecs
-	return remoteDuplicatedECS(backends), nil
+	return removeDuplicatedECS(backends), nil
 }
 
-func remoteDuplicatedECS(backends []nlbmodel.ServerGroupServer) []nlbmodel.ServerGroupServer {
+func removeDuplicatedECS(backends []nlbmodel.ServerGroupServer) []nlbmodel.ServerGroupServer {
 	nodeMap := make(map[string]bool)
 	var uniqBackends []nlbmodel.ServerGroupServer
 	for _, backend := range backends {
@@ -971,4 +1047,30 @@ func setDefaultValueForServerGroup(sg *nlbmodel.ServerGroup) error {
 		sg.ResourceGroupId = ctrlCfg.CloudCFG.Global.ResourceGroupID
 	}
 	return nil
+}
+
+func getServerGroupIDs(annotation string) ([]string, error) {
+	if annotation == "" {
+		return nil, nil
+	}
+	var ids []string
+	for _, v := range strings.Split(annotation, ",") {
+		pp := strings.Split(v, ":")
+		if len(pp) < 2 {
+			return nil, fmt.Errorf("server group id and protocol format must be like"+
+				"'sgp-xxx:443' with colon separated. got=[%+v]", pp)
+		}
+		ids = append(ids, pp[0])
+	}
+	return ids, nil
+}
+
+func isServerManagedByMyService(reqCtx *svcCtx.RequestContext, remote nlbmodel.ServerGroupServer) bool {
+	namedKey, err := nlbmodel.LoadNLBSGNamedKey(remote.Description)
+	if err != nil {
+		return false
+	}
+	return namedKey.ServiceName == reqCtx.Service.Name &&
+		namedKey.Namespace == reqCtx.Service.Namespace &&
+		namedKey.CID == base.CLUSTER_ID
 }

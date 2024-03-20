@@ -219,6 +219,30 @@ func (m MockNLB) ListNLBServerGroups(ctx context.Context, tags []tag.Tag) ([]*nl
 	return sgs, nil
 }
 
+func (m MockNLB) GetNLBServerGroup(ctx context.Context, sgId string) (*nlbmodel.ServerGroup, error) {
+	// fixme: fixme
+	if sgId == "rsp-tcpssl-443" {
+		return &nlbmodel.ServerGroup{
+			ServerGroupId: "rsp-tcpssl-443",
+			Servers: []nlbmodel.ServerGroupServer{
+				{
+					ServerId:   "ecs-id-1",
+					ServerType: "Ecs",
+					Port:       443,
+					Weight:     100,
+				},
+				{
+					ServerId:   "ecs-id-2",
+					ServerType: "Ecs",
+					Port:       443,
+					Weight:     100,
+				},
+			},
+		}, nil
+	}
+	return nil, nil
+}
+
 func (m MockNLB) CreateNLBServerGroup(ctx context.Context, sg *nlbmodel.ServerGroup) error {
 	sg.ServerGroupId = "sg-created-id"
 	return nil

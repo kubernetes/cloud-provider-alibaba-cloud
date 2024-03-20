@@ -319,14 +319,17 @@ func (mgr *VGroupManager) buildVGroupForServicePort(reqCtx *svcCtx.RequestContex
 			return vg, fmt.Errorf("vgroupid parse error: %s", err.Error())
 		}
 		if vgroupId != "" {
-			exist, err := isVGroupIdExist(mgr, reqCtx, vgroupId)
+			v, err := getVgroupById(mgr, reqCtx, vgroupId)
 			if err != nil {
 				return vg, fmt.Errorf("find vgroupId %s of lb %s error: %s", vgroupId,
 					reqCtx.Anno.Get(annotation.LoadBalancerId), err.Error())
 			}
-			if !exist {
+			if v == nil {
 				return vg, fmt.Errorf("can not find vgroupId %s in lb %s",
 					vgroupId, reqCtx.Anno.Get(annotation.LoadBalancerId))
+			}
+			if !v.IsUserManaged {
+				return vg, fmt.Errorf("cannot reuse a ccm created vgroup %s for slb %s", vgroupId, reqCtx.Anno.Get(annotation.LoadBalancerId))
 			}
 			reqCtx.Log.Info(fmt.Sprintf("user managed vgroupId %s for port %d", vgroupId, port.Port))
 			vg.VGroupId = vgroupId
@@ -384,18 +387,18 @@ func (mgr *VGroupManager) buildVGroupForServicePort(reqCtx *svcCtx.RequestContex
 	return vg, nil
 }
 
-func isVGroupIdExist(mgr *VGroupManager, reqCtx *svcCtx.RequestContext, vgroupId string) (bool, error) {
+func getVgroupById(mgr *VGroupManager, reqCtx *svcCtx.RequestContext, vgroupId string) (*model.VServerGroup, error) {
 	// check vgroup id is existed
 	vgroups, err := mgr.cloud.DescribeVServerGroups(reqCtx.Ctx, reqCtx.Anno.Get(annotation.LoadBalancerId))
 	if err != nil {
-		return false, fmt.Errorf("cannot find vgroup by vgroupId %s error: %s", vgroupId, err.Error())
+		return nil, fmt.Errorf("cannot find vgroup by vgroupId %s error: %s", vgroupId, err.Error())
 	}
 	for _, v := range vgroups {
 		if v.VGroupId == vgroupId {
-			return true, nil
+			return &v, nil
 		}
 	}
-	return false, nil
+	return nil, nil
 }
 
 func setGenericBackendAttribute(candidates *backend.EndpointWithENI, vgroup model.VServerGroup) []model.BackendAttribute {
@@ -576,10 +579,10 @@ func (mgr *VGroupManager) buildLocalBackends(reqCtx *svcCtx.RequestContext, cand
 	backends = setWeightBackends(helper.LocalTrafficPolicy, backends, vgroup.VGroupWeight)
 
 	// 4. remove duplicated ecs
-	return remoteDuplicatedECS(backends), nil
+	return removeDuplicatedECS(backends), nil
 }
 
-func remoteDuplicatedECS(backends []model.BackendAttribute) []model.BackendAttribute {
+func removeDuplicatedECS(backends []model.BackendAttribute) []model.BackendAttribute {
 	nodeMap := make(map[string]bool)
 	var uniqBackends []model.BackendAttribute
 	for _, backend := range backends {

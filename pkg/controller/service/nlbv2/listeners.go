@@ -28,9 +28,25 @@ type ListenerManager struct {
 	cloud prvd.Provider
 }
 
+// serverGroup find the vGroup id associated with the specific ServicePort
+func serverGroup(annotation string, port v1.ServicePort) (string, error) {
+	for _, v := range strings.Split(annotation, ",") {
+		pp := strings.Split(v, ":")
+		if len(pp) < 2 {
+			return "", fmt.Errorf("server group id and "+
+				"protocol format must be like 'sg-xxx:443' with colon separated. got=[%+v]", pp)
+		}
+
+		if pp[1] == fmt.Sprintf("%d", port.Port) {
+			return pp[0], nil
+		}
+	}
+	return "", nil
+}
+
 func (mgr *ListenerManager) BuildLocalModel(reqCtx *svcCtx.RequestContext, mdl *nlbmodel.NetworkLoadBalancer) error {
 	for _, port := range reqCtx.Service.Spec.Ports {
-		listener, err := mgr.buildListenerFromServicePort(reqCtx, port)
+		listener, err := mgr.buildListenerFromServicePort(reqCtx, port, mdl.LoadBalancerAttribute.IsUserManaged)
 		if err != nil {
 			return fmt.Errorf("build listener from servicePort %d error: %s", port.Port, err.Error())
 		}
@@ -49,7 +65,7 @@ func (mgr *ListenerManager) BuildRemoteModel(reqCtx *svcCtx.RequestContext, mdl 
 }
 
 func (mgr *ListenerManager) buildListenerFromServicePort(reqCtx *svcCtx.RequestContext, port v1.ServicePort,
-) (*nlbmodel.ListenerAttribute, error) {
+	isUserManagedLB bool) (*nlbmodel.ListenerAttribute, error) {
 	listener := &nlbmodel.ListenerAttribute{
 		NamedKey: &nlbmodel.ListenerNamedKey{
 			NamedKey: nlbmodel.NamedKey{
@@ -73,6 +89,14 @@ func (mgr *ListenerManager) buildListenerFromServicePort(reqCtx *svcCtx.RequestC
 
 	listener.ListenerDescription = listener.NamedKey.Key()
 	listener.ServerGroupName = getServerGroupNamedKey(reqCtx.Service, proto, &port).Key()
+
+	if isUserManagedLB && reqCtx.Anno.Get(annotation.VGroupPort) != "" {
+		serverGroupId, err := serverGroup(reqCtx.Anno.Get(annotation.VGroupPort), port)
+		if err != nil {
+			return listener, err
+		}
+		listener.ServerGroupId = serverGroupId
+	}
 
 	if reqCtx.Anno.Get(annotation.IdleTimeout) != "" {
 		idleTimeout, err := strconv.Atoi(reqCtx.Anno.Get(annotation.IdleTimeout))

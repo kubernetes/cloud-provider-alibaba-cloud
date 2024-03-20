@@ -3,6 +3,10 @@ package framework
 import (
 	"context"
 	"fmt"
+	"strconv"
+	"strings"
+	"time"
+
 	"github.com/alibabacloud-go/tea/tea"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -19,9 +23,6 @@ import (
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/util"
 	"k8s.io/cloud-provider-alibaba-cloud/test/e2e/options"
 	"k8s.io/klog/v2"
-	"strconv"
-	"strings"
-	"time"
 )
 
 func (f *Framework) ExpectNetworkLoadBalancerEqual(svc *v1.Service) error {
@@ -283,6 +284,7 @@ func nlbVsgAttrEqual(f *Framework, reqCtx *svcCtx.RequestContext, remote *nlbmod
 		var (
 			groupId string
 			err     error
+			weight  *int
 		)
 		proto, err := nlbListenerProtocol(reqCtx.Anno.Get(annotation.ProtocolPort), port)
 		if err != nil {
@@ -294,6 +296,14 @@ func nlbVsgAttrEqual(f *Framework, reqCtx *svcCtx.RequestContext, remote *nlbmod
 			if err != nil {
 				return fmt.Errorf("parse vgroup port annotation %s error: %s", vGroupAnno, err.Error())
 			}
+
+			if weightAnno := reqCtx.Anno.Get(annotation.VGroupWeight); weightAnno != "" {
+				w, err := strconv.Atoi(weightAnno)
+				if err != nil {
+					return fmt.Errorf("parse vgroup weight annotation %s error: %s", weightAnno, err.Error())
+				}
+				weight = &w
+			}
 		}
 
 		found := false
@@ -304,6 +314,7 @@ func nlbVsgAttrEqual(f *Framework, reqCtx *svcCtx.RequestContext, remote *nlbmod
 			if sg.ServerGroupId == groupId {
 				found = true
 				sg.IsUserManaged = true
+				sg.ServerGroupName = name
 			}
 			if found {
 				sgType := reqCtx.Anno.Get(annotation.ServerGroupType)
@@ -314,6 +325,7 @@ func nlbVsgAttrEqual(f *Framework, reqCtx *svcCtx.RequestContext, remote *nlbmod
 
 				sg.ServicePort = &port
 				sg.ServicePort.Protocol = v1.Protocol(proto)
+				sg.Weight = weight
 				if isOverride(reqCtx.Anno) && !isNLBServerGroupUsedByPort(sg, remote.Listeners) {
 					return fmt.Errorf("port %d do not use vgroup id: %s", port.Port, sg.ServerGroupId)
 				}
@@ -488,7 +500,8 @@ func isServerEqual(a, b nlbmodel.ServerGroupServer) bool {
 
 	switch a.ServerType {
 	case nlbmodel.EniServerType:
-		return a.ServerId == b.ServerId && a.ServerIp == b.ServerIp
+		return a.ServerIp == b.ServerIp
+		//return a.ServerId == b.ServerId && a.ServerIp == b.ServerIp
 	case nlbmodel.EcsServerType:
 		return a.ServerId == b.ServerId
 	case nlbmodel.IpServerType:

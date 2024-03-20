@@ -212,6 +212,7 @@ type INLB interface {
 
 	// ServerGroup
 	ListNLBServerGroups(ctx context.Context, tags []tag.Tag) ([]*nlbmodel.ServerGroup, error)
+	GetNLBServerGroup(ctx context.Context, sgId string) (*nlbmodel.ServerGroup, error)
 	CreateNLBServerGroup(ctx context.Context, sg *nlbmodel.ServerGroup) error
 	DeleteNLBServerGroup(ctx context.Context, sgId string) error
 	UpdateNLBServerGroup(ctx context.Context, sg *nlbmodel.ServerGroup) error
