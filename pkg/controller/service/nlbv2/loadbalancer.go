@@ -156,25 +156,23 @@ func (mgr *NLBManager) Update(reqCtx *svcCtx.RequestContext, local, remote *nlbm
 		}
 	}
 
-	needUpdate := false
 	for _, l := range local.LoadBalancerAttribute.ZoneMappings {
-		found := false
+		match := false
 		for _, r := range remote.LoadBalancerAttribute.ZoneMappings {
 			if l.ZoneId == r.ZoneId && l.VSwitchId == r.VSwitchId {
-				found = true
-				break
+				if l.AllocationId == "" || l.AllocationId != "" && l.AllocationId == r.AllocationId {
+					match = true
+					break
+				}
 			}
 		}
-		if !found {
-			needUpdate = true
+		if !match {
+			reqCtx.Log.Info(fmt.Sprintf("ZoneMappings changed from [%s] to [%s]",
+				remote.LoadBalancerAttribute.ZoneMappings, local.LoadBalancerAttribute.ZoneMappings))
+			if err := mgr.cloud.UpdateNLBZones(reqCtx.Ctx, local); err != nil {
+				errs = append(errs, fmt.Errorf("update zone mappings error: %s", err.Error()))
+			}
 			break
-		}
-	}
-	if needUpdate {
-		reqCtx.Log.Info(fmt.Sprintf("ZoneMappings changed from [%s] to [%s]",
-			remote.LoadBalancerAttribute.ZoneMappings, local.LoadBalancerAttribute.ZoneMappings))
-		if err := mgr.cloud.UpdateNLBZones(reqCtx.Ctx, local); err != nil {
-			errs = append(errs, fmt.Errorf("update zone mappings error: %s", err.Error()))
 		}
 	}
 
