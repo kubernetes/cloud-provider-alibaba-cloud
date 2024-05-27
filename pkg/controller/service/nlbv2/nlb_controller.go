@@ -180,7 +180,7 @@ func (m *ReconcileNLB) reconcile(request reconcile.Request) error {
 	}
 
 	reqCtx.Log.Info("successfully reconcile")
-	metric.SLBLatency.WithLabelValues("reconcile").Observe(metric.MsSince(startTime))
+	metric.SLBLatency.WithLabelValues(metric.NLBType, "reconcile").Observe(metric.MsSince(startTime))
 
 	return nil
 }

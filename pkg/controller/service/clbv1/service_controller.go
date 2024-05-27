@@ -4,24 +4,34 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
+	"strings"
+	"time"
+
 	"github.com/go-logr/logr"
 	"golang.org/x/time/rate"
 	discovery "k8s.io/api/discovery/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/util/workqueue"
+	"k8s.io/klog/v2"
+
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/service/reconcile/annotation"
 	svcCtx "k8s.io/cloud-provider-alibaba-cloud/pkg/controller/service/reconcile/context"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/util/metric"
-	"k8s.io/klog/v2"
-	"os"
-	"strings"
-	"time"
 
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/record"
+	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
+	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller"
+	"sigs.k8s.io/controller-runtime/pkg/manager"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+	"sigs.k8s.io/controller-runtime/pkg/source"
+
 	ctrlCfg "k8s.io/cloud-provider-alibaba-cloud/pkg/config"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/context/shared"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/helper"
@@ -30,13 +40,6 @@ import (
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/vpc"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/dryrun"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/util"
-	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
-	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/controller"
-	"sigs.k8s.io/controller-runtime/pkg/manager"
-	"sigs.k8s.io/controller-runtime/pkg/reconcile"
-	"sigs.k8s.io/controller-runtime/pkg/source"
 )
 
 func Add(mgr manager.Manager, ctx *shared.SharedContext) error {
@@ -217,19 +220,52 @@ func (m *ReconcileService) reconcile(request reconcile.Request) (err error) {
 		return nil
 	}
 
+	var operation string
+	svcHash := helper.GetServiceHash(svc)
+	if svc.DeletionTimestamp != nil {
+		operation = metric.VerbDeletion
+	} else if svc.Status.LoadBalancer.Ingress == nil {
+		operation = metric.VerbCreation
+	} else {
+		operation = metric.VerbUpdate
+	}
+
 	// check to see whither if loadbalancer deletion is needed
 	if helper.NeedDeleteLoadBalancer(svc) {
 		err = m.cleanupLoadBalancerResources(reqContext)
 	} else {
 		err = m.reconcileLoadBalancerResources(reqContext)
 	}
+
 	if err != nil {
 		reqContext.Log.Error(err, "reconcile loadbalancer failed")
+		switch operation {
+		case metric.VerbDeletion:
+			metric.SLBOperationStatus.WithLabelValues(metric.CLBType, metric.VerbDeletion, metric.ResultFail).
+				Add(metric.UniqueServiceCnt(string(svc.UID) + metric.VerbDeletion))
+		case metric.VerbCreation:
+			metric.SLBOperationStatus.WithLabelValues(metric.CLBType, metric.VerbCreation, metric.ResultFail).
+				Add(metric.UniqueServiceCnt(string(svc.UID) + metric.VerbCreation))
+		case metric.VerbUpdate:
+			metric.SLBOperationStatus.WithLabelValues(metric.CLBType, metric.VerbUpdate, metric.ResultFail).
+				Add(metric.UniqueServiceCnt(string(svc.UID) + svcHash))
+		}
 		return err
 	}
 
 	reqContext.Log.Info("successfully reconcile")
-	metric.SLBLatency.WithLabelValues("reconcile").Observe(metric.MsSince(startTime))
+	switch operation {
+	case metric.VerbDeletion:
+		metric.SLBLatency.WithLabelValues(metric.CLBType, metric.VerbDeletion).Observe(metric.MsSince(svc.DeletionTimestamp.Time))
+		metric.SLBOperationStatus.WithLabelValues(metric.CLBType, metric.VerbDeletion, metric.ResultSuccess).Inc()
+	case metric.VerbCreation:
+		metric.SLBLatency.WithLabelValues(metric.CLBType, metric.VerbCreation).Observe(metric.MsSince(svc.CreationTimestamp.Time))
+		metric.SLBOperationStatus.WithLabelValues(metric.CLBType, metric.VerbCreation, metric.ResultSuccess).Inc()
+	case metric.VerbUpdate:
+		metric.SLBLatency.WithLabelValues(metric.CLBType, metric.VerbUpdate).Observe(metric.MsSince(startTime))
+		metric.SLBOperationStatus.WithLabelValues(metric.CLBType, metric.VerbUpdate, metric.ResultSuccess).
+			Add(metric.UniqueServiceCnt(string(svc.UID) + svcHash))
+	}
 
 	return nil
 }
