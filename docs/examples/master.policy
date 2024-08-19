@@ -22,6 +22,11 @@
             "Effect": "Allow"
         },
         {
+          "Action": "nlb:*",
+          "Resource": "*",
+          "Effect": "Allow"
+        },
+        {
             "Action": [
                 "slb:Describe*",
                 "slb:CreateLoadBalancer",
