@@ -63,7 +63,7 @@ func (s *serverGroupApplier) addServerToServerGroup(ctx context.Context, serverG
 	if err := s.albProvider.RegisterALBServers(ctx, serverGroupID, backends); err != nil {
 		return err
 	}
-	err = updateTargetHealthPodCondition(ctx, s.kubeClient, helper.BuildReadinessGatePodConditionType(), backends)
+	err = updateTargetHealthPodCondition(ctx, s.kubeClient, helper.BuildReadinessGatePodConditionType(helper.TargetHealthPodConditionALBTypePrefix), backends)
 	if err != nil {
 		return err
 	}

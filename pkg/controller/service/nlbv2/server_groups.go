@@ -2,6 +2,8 @@ package nlbv2
 
 import (
 	"fmt"
+	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/types"
 	"strconv"
 	"strings"
 
@@ -57,6 +59,7 @@ func (mgr *ServerGroupManager) BuildLocalModel(reqCtx *svcCtx.RequestContext, md
 		return err
 	}
 
+	containsPotentialReadyBackends := false
 	for _, lis := range mdl.Listeners {
 		sg := &nlbmodel.ServerGroup{
 			VPCId:       mgr.vpcId,
@@ -72,12 +75,15 @@ func (mgr *ServerGroupManager) BuildLocalModel(reqCtx *svcCtx.RequestContext, md
 		if err := setServerGroupAttributeFromAnno(sg, reqCtx.Anno); err != nil {
 			return err
 		}
-		if err = mgr.setServerGroupServers(reqCtx, sg, candidates, mdl.LoadBalancerAttribute.IsUserManaged); err != nil {
+		cpr, err := mgr.setServerGroupServers(reqCtx, sg, candidates, mdl.LoadBalancerAttribute.IsUserManaged)
+		if err != nil {
 			return fmt.Errorf("set ServerGroup for port %d error: %s", lis.ServicePort.Port, err.Error())
 		}
 		sgs = append(sgs, sg)
+		containsPotentialReadyBackends = containsPotentialReadyBackends || cpr
 	}
 	mdl.ServerGroups = sgs
+	mdl.ContainsPotentialReadyEndpoints = containsPotentialReadyBackends
 	return nil
 }
 
@@ -367,9 +373,7 @@ func (mgr *ServerGroupManager) BatchUpdateServers(reqCtx *svcCtx.RequestContext,
 		})
 }
 
-func (mgr *ServerGroupManager) setServerGroupServers(reqCtx *svcCtx.RequestContext, sg *nlbmodel.ServerGroup,
-	candidates *reconbackend.EndpointWithENI, isUserManagedLB bool) error {
-
+func (mgr *ServerGroupManager) setServerGroupServers(reqCtx *svcCtx.RequestContext, sg *nlbmodel.ServerGroup, candidates *reconbackend.EndpointWithENI, isUserManagedLB bool) (bool, error) {
 	var (
 		backends []nlbmodel.ServerGroupServer
 		err      error
@@ -379,18 +383,18 @@ func (mgr *ServerGroupManager) setServerGroupServers(reqCtx *svcCtx.RequestConte
 		sgId, err := serverGroup(reqCtx.Anno.Get(annotation.VGroupPort), *sg.ServicePort)
 
 		if err != nil {
-			return fmt.Errorf("server group id parse error: %s", err.Error())
+			return false, fmt.Errorf("server group id parse error: %s", err.Error())
 		}
 		if sgId != "" {
 			remoteSg, err := mgr.cloud.GetNLBServerGroup(reqCtx.Ctx, sgId)
 			if err != nil {
-				return fmt.Errorf("find server group id %s for nlb %s error: %s", sgId, reqCtx.Anno.Get(annotation.LoadBalancerId), err.Error())
+				return false, fmt.Errorf("find server group id %s for nlb %s error: %s", sgId, reqCtx.Anno.Get(annotation.LoadBalancerId), err.Error())
 			}
 			if remoteSg == nil {
-				return fmt.Errorf("cannot find server group id %s for nlb %s", sgId, reqCtx.Anno.Get(annotation.LoadBalancerId))
+				return false, fmt.Errorf("cannot find server group id %s for nlb %s", sgId, reqCtx.Anno.Get(annotation.LoadBalancerId))
 			}
 			if !remoteSg.IsUserManaged {
-				return fmt.Errorf("cannot reuse a ccm created server group %s for nlb %s", sgId, reqCtx.Anno.Get(annotation.LoadBalancerId))
+				return false, fmt.Errorf("cannot reuse a ccm created server group %s for nlb %s", sgId, reqCtx.Anno.Get(annotation.LoadBalancerId))
 			}
 			reqCtx.Log.Info(fmt.Sprintf("user managed server group id %s for port %d", sgId, sg.ServicePort.Port))
 			sg.ServerGroupId = sgId
@@ -400,34 +404,39 @@ func (mgr *ServerGroupManager) setServerGroupServers(reqCtx *svcCtx.RequestConte
 		if reqCtx.Anno.Get(annotation.VGroupWeight) != "" {
 			w, err := strconv.Atoi(reqCtx.Anno.Get(annotation.VGroupWeight))
 			if err != nil || w < 0 || w > 100 {
-				return fmt.Errorf("weight must be integer in range [0, 100], got [%s]",
+				return false, fmt.Errorf("weight must be integer in range [0, 100], got [%s]",
 					reqCtx.Anno.Get(annotation.VGroupWeight))
 			}
 			sg.Weight = &w
 		}
 	}
 
+	initialServers, containsPotentialReadyEndpoints, err := mgr.setGenericBackendAttribute(reqCtx, candidates, *sg)
+	if err != nil {
+		return false, err
+	}
+
 	switch candidates.TrafficPolicy {
 	case helper.ENITrafficPolicy:
 		reqCtx.Log.Info(fmt.Sprintf("eni mode, build backends for %s", sg.NamedKey))
-		backends, err = mgr.buildENIBackends(candidates, *sg)
+		backends, err = mgr.buildENIBackends(reqCtx, candidates, initialServers, *sg)
 		if err != nil {
-			return fmt.Errorf("build eni backends error: %s", err.Error())
+			return false, fmt.Errorf("build eni backends error: %s", err.Error())
 		}
 	case helper.LocalTrafficPolicy:
 		reqCtx.Log.Info(fmt.Sprintf("local mode, build backends for %s", sg.NamedKey))
-		backends, err = mgr.buildLocalBackends(reqCtx, candidates, *sg)
+		backends, err = mgr.buildLocalBackends(reqCtx, candidates, initialServers, *sg)
 		if err != nil {
-			return fmt.Errorf("build local backends error: %s", err.Error())
+			return false, fmt.Errorf("build local backends error: %s", err.Error())
 		}
 	case helper.ClusterTrafficPolicy:
 		reqCtx.Log.Info(fmt.Sprintf("cluster mode, build backends for %s", sg.NamedKey))
-		backends, err = mgr.buildClusterBackends(reqCtx, candidates, *sg)
+		backends, err = mgr.buildClusterBackends(reqCtx, candidates, initialServers, *sg)
 		if err != nil {
-			return fmt.Errorf("build cluster backends error: %s", err.Error())
+			return false, fmt.Errorf("build cluster backends error: %s", err.Error())
 		}
 	default:
-		return fmt.Errorf("not supported traffic policy [%s]", candidates.TrafficPolicy)
+		return false, fmt.Errorf("not supported traffic policy [%s]", candidates.TrafficPolicy)
 	}
 
 	if len(backends) == 0 {
@@ -440,23 +449,25 @@ func (mgr *ServerGroupManager) setServerGroupServers(reqCtx *svcCtx.RequestConte
 	}
 
 	sg.Servers = backends
-	return nil
+	sg.InitialServers = initialServers
+	return containsPotentialReadyEndpoints, nil
 }
 
-func setGenericBackendAttribute(candidates *reconbackend.EndpointWithENI, sg nlbmodel.ServerGroup,
-) []nlbmodel.ServerGroupServer {
+func (mgr *ServerGroupManager) setGenericBackendAttribute(reqCtx *svcCtx.RequestContext, candidates *reconbackend.EndpointWithENI, sg nlbmodel.ServerGroup) ([]nlbmodel.ServerGroupServer, bool, error) {
 	if utilfeature.DefaultMutableFeatureGate.Enabled(ctrlCfg.EndpointSlice) {
-		return setBackendsFromEndpointSlices(candidates, sg)
+		return mgr.setBackendsFromEndpointSlices(reqCtx, candidates, sg)
 	}
-	return setBackendsFromEndpoints(candidates, sg)
+	return mgr.setBackendsFromEndpoints(reqCtx, candidates, sg)
 }
 
-func setBackendsFromEndpoints(candidates *reconbackend.EndpointWithENI, sg nlbmodel.ServerGroup,
-) []nlbmodel.ServerGroupServer {
+func (mgr *ServerGroupManager) setBackendsFromEndpoints(reqCtx *svcCtx.RequestContext, candidates *reconbackend.EndpointWithENI, sg nlbmodel.ServerGroup) ([]nlbmodel.ServerGroupServer, bool, error) {
 	var backends []nlbmodel.ServerGroupServer
 
+	readinessGateName := helper.BuildReadinessGatePodConditionTypeWithPrefix(helper.TargetHealthPodConditionServiceTypePrefix, reqCtx.Service.Name)
+	containsPotentialReadyEndpoints := false
+
 	if len(candidates.Endpoints.Subsets) == 0 {
-		return nil
+		return nil, false, nil
 	}
 	for _, ep := range candidates.Endpoints.Subsets {
 		var backendPort int32
@@ -482,20 +493,64 @@ func setBackendsFromEndpoints(candidates *reconbackend.EndpointWithENI, sg nlbmo
 				// if backend type is ecs, update backend port to nodePort
 				Port:        backendPort,
 				Description: sg.ServerGroupName,
+				TargetRef:   addr.TargetRef,
+			})
+		}
+
+		for _, addr := range ep.NotReadyAddresses {
+			// ignore endpoint that not referenced to a pod
+			if addr.TargetRef == nil || addr.TargetRef.Kind != "Pod" {
+				continue
+			}
+
+			pod := &v1.Pod{}
+			podKey := types.NamespacedName{Namespace: addr.TargetRef.Namespace, Name: addr.TargetRef.Name}
+			err := mgr.kubeClient.Get(reqCtx.Ctx, podKey, pod)
+			if err != nil {
+				if errors.IsNotFound(err) {
+					// pod may be not synced to the controller cache, which caused a not found error.
+					// ignore it and set containsPotentialReadyEndpoints to true
+					reqCtx.Log.Info("pod not found, will retry it in next reconcile", "pod", podKey.String())
+					containsPotentialReadyEndpoints = true
+					continue
+				}
+				return nil, false, err
+			}
+
+			if !helper.IsPodHasReadinessGate(pod, string(readinessGateName)) {
+				continue
+			}
+
+			if !helper.IsPodContainersReady(pod) {
+				containsPotentialReadyEndpoints = true
+				continue
+			}
+
+			backends = append(backends, nlbmodel.ServerGroupServer{
+				NodeName: addr.NodeName,
+				ServerIp: addr.IP,
+				// set backend port to targetPort by default
+				// if backend type is ecs, update backend port to nodePort
+				Port:        backendPort,
+				Description: sg.ServerGroupName,
+				TargetRef:   addr.TargetRef,
 			})
 		}
 	}
-	return backends
+	return backends, containsPotentialReadyEndpoints, nil
 }
 
-func setBackendsFromEndpointSlices(candidates *reconbackend.EndpointWithENI, sg nlbmodel.ServerGroup) []nlbmodel.ServerGroupServer {
+func (mgr *ServerGroupManager) setBackendsFromEndpointSlices(reqCtx *svcCtx.RequestContext, candidates *reconbackend.EndpointWithENI, sg nlbmodel.ServerGroup) ([]nlbmodel.ServerGroupServer, bool, error) {
 	// used for deduplicate when endpointslice is enabled
 	// https://kubernetes.io/docs/concepts/services-networking/endpoint-slices/#duplicate-endpoints
 	endpointMap := make(map[string]bool)
 	var backends []nlbmodel.ServerGroupServer
 
+	containsPotentialReadyEndpoints := false
+	readinessGateName := helper.BuildReadinessGatePodConditionTypeWithPrefix(helper.TargetHealthPodConditionServiceTypePrefix, reqCtx.Service.Name)
+
 	if len(candidates.EndpointSlices) == 0 {
-		return nil
+		return nil, false, nil
 	}
 
 	for _, es := range candidates.EndpointSlices {
@@ -518,10 +573,8 @@ func setBackendsFromEndpointSlices(candidates *reconbackend.EndpointWithENI, sg 
 		}
 
 		for _, ep := range es.Endpoints {
-			if ep.Conditions.Ready == nil {
-				continue
-			}
-			if !*ep.Conditions.Ready {
+			// ignore terminating pods
+			if ep.Conditions.Terminating != nil && *ep.Conditions.Terminating {
 				continue
 			}
 
@@ -529,6 +582,52 @@ func setBackendsFromEndpointSlices(candidates *reconbackend.EndpointWithENI, sg 
 				if _, ok := endpointMap[addr]; ok {
 					continue
 				}
+
+				if ep.Conditions.Ready != nil && *ep.Conditions.Ready {
+					endpointMap[addr] = true
+					backends = append(backends, nlbmodel.ServerGroupServer{
+						NodeName: ep.NodeName,
+						ServerIp: addr,
+						// set backend port to targetPort by default
+						// if backend type is ecs, update backend port to nodePort
+						Port:        backendPort,
+						Description: sg.ServerGroupName,
+						TargetRef:   ep.TargetRef,
+					})
+					continue
+				}
+
+				// ignore endpoint that not referenced to a pod
+				if ep.TargetRef == nil || ep.TargetRef.Kind != "Pod" {
+					continue
+				}
+
+				pod := &v1.Pod{}
+				podKey := types.NamespacedName{Namespace: ep.TargetRef.Namespace, Name: ep.TargetRef.Name}
+				err := mgr.kubeClient.Get(reqCtx.Ctx, podKey, pod)
+				if err != nil {
+					if errors.IsNotFound(err) {
+						// pod may be not synced to the controller cache, which caused a not found error.
+						// ignore it and set containsPotentialReadyEndpoints to true
+						reqCtx.Log.Info("pod not found, will retry it in next reconcile", "pod", podKey.String())
+						containsPotentialReadyEndpoints = true
+						continue
+					}
+					return nil, false, err
+				}
+
+				klog.Errorf("readiness gate name: %s, try find it on %s", readinessGateName, pod.Name)
+
+				if !helper.IsPodHasReadinessGate(pod, string(readinessGateName)) {
+					continue
+				}
+
+				if !helper.IsPodContainersReady(pod) {
+					containsPotentialReadyEndpoints = true
+					continue
+				}
+
+				// TODO: may need to check node status
 				endpointMap[addr] = true
 				backends = append(backends, nlbmodel.ServerGroupServer{
 					NodeName: ep.NodeName,
@@ -537,17 +636,17 @@ func setBackendsFromEndpointSlices(candidates *reconbackend.EndpointWithENI, sg 
 					// if backend type is ecs, update backend port to nodePort
 					Port:        backendPort,
 					Description: sg.ServerGroupName,
+					TargetRef:   ep.TargetRef,
 				})
 			}
 		}
 	}
 
-	return backends
+	return backends, containsPotentialReadyEndpoints, nil
 }
 
-func (mgr *ServerGroupManager) buildENIBackends(candidates *reconbackend.EndpointWithENI, sg nlbmodel.ServerGroup,
+func (mgr *ServerGroupManager) buildENIBackends(reqCtx *svcCtx.RequestContext, candidates *reconbackend.EndpointWithENI, backends []nlbmodel.ServerGroupServer, sg nlbmodel.ServerGroup,
 ) ([]nlbmodel.ServerGroupServer, error) {
-	backends := setGenericBackendAttribute(candidates, sg)
 	if len(backends) == 0 {
 		return nil, nil
 	}
@@ -560,9 +659,8 @@ func (mgr *ServerGroupManager) buildENIBackends(candidates *reconbackend.Endpoin
 	return setWeightBackends(helper.ENITrafficPolicy, backends, sg.Weight), nil
 }
 
-func (mgr *ServerGroupManager) buildLocalBackends(reqCtx *svcCtx.RequestContext, candidates *reconbackend.EndpointWithENI,
+func (mgr *ServerGroupManager) buildLocalBackends(reqCtx *svcCtx.RequestContext, candidates *reconbackend.EndpointWithENI, initBackends []nlbmodel.ServerGroupServer,
 	sg nlbmodel.ServerGroup) ([]nlbmodel.ServerGroupServer, error) {
-	initBackends := setGenericBackendAttribute(candidates, sg)
 	if len(initBackends) == 0 {
 		return nil, nil
 	}
@@ -654,10 +752,8 @@ func removeDuplicatedECS(backends []nlbmodel.ServerGroupServer) []nlbmodel.Serve
 }
 
 func (mgr *ServerGroupManager) buildClusterBackends(
-	reqCtx *svcCtx.RequestContext, candidates *reconbackend.EndpointWithENI, sg nlbmodel.ServerGroup,
+	reqCtx *svcCtx.RequestContext, candidates *reconbackend.EndpointWithENI, initBackends []nlbmodel.ServerGroupServer, sg nlbmodel.ServerGroup,
 ) ([]nlbmodel.ServerGroupServer, error) {
-	initBackends := setGenericBackendAttribute(candidates, sg)
-
 	var (
 		ecsBackends, eciBackends []nlbmodel.ServerGroupServer
 		err                      error

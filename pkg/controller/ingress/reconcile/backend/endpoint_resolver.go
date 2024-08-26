@@ -120,7 +120,7 @@ func (r *defaultEndpointResolver) resolvePodEndpoints(ctx context.Context, svc *
 				return nil, false, err
 			}
 
-			if !helper.IsPodHasReadinessGate(pod) {
+			if !helper.IsPodHasReadinessGate(pod, helper.TargetHealthPodConditionALBTypePrefix) {
 				continue
 			}
 			if !helper.IsPodContainersReady(pod) {

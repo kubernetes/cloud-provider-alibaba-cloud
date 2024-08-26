@@ -3,10 +3,14 @@ package clbv1
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"strings"
 	"time"
+
+	"k8s.io/apimachinery/pkg/types"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 
 	"github.com/go-logr/logr"
 	"golang.org/x/time/rate"
@@ -17,6 +21,7 @@ import (
 
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/service/reconcile/annotation"
 	svcCtx "k8s.io/cloud-provider-alibaba-cloud/pkg/controller/service/reconcile/context"
+	prvd "k8s.io/cloud-provider-alibaba-cloud/pkg/provider"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/util/metric"
 
 	v1 "k8s.io/api/core/v1"
@@ -36,7 +41,6 @@ import (
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/context/shared"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/helper"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/model"
-	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/vpc"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/dryrun"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/util"
@@ -147,7 +151,7 @@ type ReconcileService struct {
 }
 
 func (m *ReconcileService) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
-	return reconcile.Result{}, m.reconcile(ctx, request)
+	return util.HandleReconcileResult(request, m.reconcile(ctx, request))
 }
 
 func (m *ReconcileService) reconcile(c context.Context, request reconcile.Request) (err error) {
@@ -217,7 +221,7 @@ func (m *ReconcileService) reconcile(c context.Context, request reconcile.Reques
 	klog.Infof("%s: ensure loadbalancer with service details, reconcileID: %s\n%+v\n", util.Key(svc), reconcileID, util.PrettyJson(svc))
 
 	if ctrlCfg.ControllerCFG.DryRun {
-		if lb, err := m.buildAndApplyModel(reqContext); err != nil {
+		if lb, _, err := m.buildAndApplyModel(reqContext); err != nil {
 			reqContext.Log.Error(err, "DryRun: reconcile loadbalancer failed")
 			m.record.Event(reqContext.Service, v1.EventTypeWarning, helper.FailedSyncLB,
 				fmt.Sprintf("DryRun: Error syncing load balancer [%s]: %s",
@@ -243,7 +247,9 @@ func (m *ReconcileService) reconcile(c context.Context, request reconcile.Reques
 		err = m.reconcileLoadBalancerResources(reqContext)
 	}
 
-	if err != nil {
+	var needRequeue *util.ReconcileNeedRequeue
+
+	if err != nil && !errors.As(err, &needRequeue) {
 		reqContext.Log.Error(err, "reconcile loadbalancer failed")
 		switch operation {
 		case metric.VerbDeletion:
@@ -273,13 +279,18 @@ func (m *ReconcileService) reconcile(c context.Context, request reconcile.Reques
 			Add(metric.UniqueServiceCnt(string(svc.UID) + svcHash))
 	}
 
+	if needRequeue != nil {
+		reqContext.Log.Info("requeue needed", "reason", needRequeue.Error(), "service", util.Key(reqContext.Service))
+		return needRequeue
+	}
+
 	return nil
 }
 
 func (m *ReconcileService) cleanupLoadBalancerResources(reqCtx *svcCtx.RequestContext) error {
 	reqCtx.Log.Info("service do not need lb any more, try to delete it")
 	if helper.HasFinalizer(reqCtx.Service, helper.ServiceFinalizer) {
-		lb, err := m.buildAndApplyModel(reqCtx)
+		lb, _, err := m.buildAndApplyModel(reqCtx)
 		if err != nil && !strings.Contains(err.Error(), "LoadBalancerId does not exist") {
 			m.record.Event(reqCtx.Service, v1.EventTypeWarning, helper.FailedCleanLB,
 				fmt.Sprintf("Error deleting load balancer [%s]: %s",
@@ -319,11 +330,18 @@ func (m *ReconcileService) reconcileLoadBalancerResources(req *svcCtx.RequestCon
 		return err
 	}
 
-	lb, err := m.buildAndApplyModel(req)
+	lb, vservers, err := m.buildAndApplyModel(req)
 	if err != nil {
 		m.record.Event(req.Service, v1.EventTypeWarning, helper.FailedSyncLB,
 			fmt.Sprintf("Error syncing load balancer [%s]: %s",
 				lb.GetLoadBalancerId(), helper.GetLogMessage(err)))
+		return err
+	}
+
+	err = m.updateReadinessCondition(req, vservers)
+	if err != nil {
+		m.record.Event(req.Service, v1.EventTypeWarning, helper.FailedUpdateReadinessGate,
+			fmt.Sprintf("Error updating pod readiness gates for service [%s]: %s", util.Key(req.Service), err.Error()))
 		return err
 	}
 
@@ -341,29 +359,33 @@ func (m *ReconcileService) reconcileLoadBalancerResources(req *svcCtx.RequestCon
 
 	m.record.Event(req.Service, v1.EventTypeNormal, helper.SucceedSyncLB,
 		fmt.Sprintf("Ensured load balancer [%s]", lb.LoadBalancerAttribute.LoadBalancerId))
+
+	if lb.ContainsPotentialReadyEndpoints {
+		return util.NewReconcileNeedRequeue("has potential ready backends")
+	}
+
 	return nil
 }
 
-func (m *ReconcileService) buildAndApplyModel(reqCtx *svcCtx.RequestContext) (*model.LoadBalancer, error) {
-
+func (m *ReconcileService) buildAndApplyModel(reqCtx *svcCtx.RequestContext) (*model.LoadBalancer, []model.VServerGroup, error) {
 	// build local model
 	localModel, err := m.builder.BuildModel(reqCtx, LocalModel)
 	if err != nil {
-		return nil, fmt.Errorf("build lb local model error: %s", err.Error())
+		return nil, nil, fmt.Errorf("build lb local model error: %s", err.Error())
 	}
 
 	mdlJson, err := json.Marshal(localModel)
 	if err != nil {
-		return nil, fmt.Errorf("marshal lbmdl error: %s", err.Error())
+		return nil, nil, fmt.Errorf("marshal lbmdl error: %s", err.Error())
 	}
 	reqCtx.Log.V(5).Info(fmt.Sprintf("local build: %s", mdlJson))
 
 	// apply model
 	remoteModel, err := m.applier.Apply(reqCtx, localModel)
 	if err != nil {
-		return remoteModel, fmt.Errorf("apply model error: %s", err.Error())
+		return remoteModel, nil, fmt.Errorf("apply model error: %s", err.Error())
 	}
-	return remoteModel, nil
+	return remoteModel, localModel.VServerGroups, nil
 }
 
 func (m *ReconcileService) updateServiceStatus(reqCtx *svcCtx.RequestContext, svc *v1.Service, lb *model.LoadBalancer) error {
@@ -562,4 +584,38 @@ func (m *ReconcileService) setEIPAsExternalIP(ctx context.Context, lbId string) 
 			})
 	}
 	return ingress, nil
+}
+
+func (m *ReconcileService) updateReadinessCondition(reqCtx *svcCtx.RequestContext, vgroups []model.VServerGroup) error {
+	var errs []error
+	cond := helper.BuildReadinessGatePodConditionTypeWithPrefix(helper.TargetHealthPodConditionServiceTypePrefix, reqCtx.Service.Name)
+	a := map[string]bool{}
+	for _, vg := range vgroups {
+		for _, b := range vg.InitialBackends {
+			if b.TargetRef == nil {
+				reqCtx.Log.Info("backend TargetRef is nil, skip update readiness gates")
+				continue
+			}
+			key := types.NamespacedName{Namespace: b.TargetRef.Namespace, Name: b.TargetRef.Name}
+			if _, ok := a[key.String()]; ok {
+				continue
+			}
+
+			pod := &v1.Pod{}
+			err := m.kubeClient.Get(reqCtx.Ctx, key, pod)
+			if err != nil {
+				errs = append(errs, err)
+				continue
+			}
+
+			err = helper.UpdateReadinessConditionForPod(reqCtx.Ctx, m.kubeClient, pod, cond,
+				helper.ConditionReasonServerRegistered, helper.ConditionMessageServerRegistered)
+			if err != nil {
+				errs = append(errs, err)
+				continue
+			}
+			a[key.String()] = true
+		}
+	}
+	return utilerrors.NewAggregate(errs)
 }

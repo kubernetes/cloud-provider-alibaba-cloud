@@ -33,7 +33,8 @@ type ModelApplier struct {
 
 func (m *ModelApplier) Apply(reqCtx *svcCtx.RequestContext, local *model.LoadBalancer) (*model.LoadBalancer, error) {
 	remote := &model.LoadBalancer{
-		NamespacedName: util.NamespacedName(reqCtx.Service),
+		NamespacedName:                  util.NamespacedName(reqCtx.Service),
+		ContainsPotentialReadyEndpoints: local.ContainsPotentialReadyEndpoints,
 	}
 
 	err := m.slbMgr.BuildRemoteModel(reqCtx, remote)
