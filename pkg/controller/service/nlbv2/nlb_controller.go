@@ -103,13 +103,13 @@ func add(mgr manager.Manager, r *ReconcileNLB) error {
 	if utilfeature.DefaultFeatureGate.Enabled(ctrlCfg.EndpointSlice) {
 		// watch endpointslice
 		if err := c.Watch(source.Kind(mgr.GetCache(), &discovery.EndpointSlice{}),
-			NewEnqueueRequestForEndpointSliceEvent(mgr.GetClient(), mgr.GetEventRecorderFor("service-controller"))); err != nil {
+			NewEnqueueRequestForEndpointSliceEvent(mgr.GetCache(), mgr.GetEventRecorderFor("service-controller"))); err != nil {
 			return fmt.Errorf("watch resource endpointslice error: %s", err.Error())
 		}
 	} else {
 		// watch endpoints
 		if err := c.Watch(source.Kind(mgr.GetCache(), &v1.Endpoints{}),
-			NewEnqueueRequestForEndpointEvent(mgr.GetClient(), mgr.GetEventRecorderFor("service-controller"))); err != nil {
+			NewEnqueueRequestForEndpointEvent(mgr.GetCache(), mgr.GetEventRecorderFor("service-controller"))); err != nil {
 			return fmt.Errorf("watch resource endpoint error: %s", err.Error())
 		}
 	}

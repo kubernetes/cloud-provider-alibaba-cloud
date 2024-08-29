@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	prvd "k8s.io/cloud-provider-alibaba-cloud/pkg/provider"
+	"k8s.io/klog/v2"
 	"os"
 	"strings"
 	"time"
@@ -13,8 +15,6 @@ import (
 	discovery "k8s.io/api/discovery/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/util/workqueue"
-	"k8s.io/klog/v2"
-
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/service/reconcile/annotation"
 	svcCtx "k8s.io/cloud-provider-alibaba-cloud/pkg/controller/service/reconcile/context"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/util/metric"
@@ -36,7 +36,6 @@ import (
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/context/shared"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/helper"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/model"
-	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/vpc"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/dryrun"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/util"
@@ -108,13 +107,13 @@ func add(mgr manager.Manager, r *ReconcileService) error {
 	if utilfeature.DefaultFeatureGate.Enabled(ctrlCfg.EndpointSlice) {
 		// watch endpointslice
 		if err := c.Watch(source.Kind(mgr.GetCache(), &discovery.EndpointSlice{}),
-			NewEnqueueRequestForEndpointSliceEvent(mgr.GetClient(), mgr.GetEventRecorderFor("service-controller"))); err != nil {
+			NewEnqueueRequestForEndpointSliceEvent(mgr.GetCache(), mgr.GetEventRecorderFor("service-controller"))); err != nil {
 			return fmt.Errorf("watch resource endpointslice error: %s", err.Error())
 		}
 	} else {
 		// watch endpoints
 		if err := c.Watch(source.Kind(mgr.GetCache(), &v1.Endpoints{}),
-			NewEnqueueRequestForEndpointEvent(mgr.GetClient(), mgr.GetEventRecorderFor("service-controller"))); err != nil {
+			NewEnqueueRequestForEndpointEvent(mgr.GetCache(), mgr.GetEventRecorderFor("service-controller"))); err != nil {
 			return fmt.Errorf("watch resource endpoint error: %s", err.Error())
 		}
 	}
