@@ -231,7 +231,7 @@ func (m *ReconcileService) reconcile(request reconcile.Request) (err error) {
 	}
 
 	// check to see whither if loadbalancer deletion is needed
-	if helper.NeedDeleteLoadBalancer(svc) {
+	if helper.NeedDeleteLoadBalancer(svc) || !helper.NeedCLB(svc) {
 		err = m.cleanupLoadBalancerResources(reqContext)
 	} else {
 		err = m.reconcileLoadBalancerResources(reqContext)
