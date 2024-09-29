@@ -9,9 +9,10 @@ import (
 )
 
 type RequestContext struct {
-	Ctx      context.Context
-	Service  *v1.Service
-	Anno     *annotation.AnnotationRequest
-	Log      logr.Logger
-	Recorder record.EventRecorder
+	Ctx         context.Context
+	ReconcileID string
+	Service     *v1.Service
+	Anno        *annotation.AnnotationRequest
+	Log         logr.Logger
+	Recorder    record.EventRecorder
 }

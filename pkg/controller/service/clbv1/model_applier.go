@@ -39,7 +39,7 @@ func (m *ModelApplier) Apply(reqCtx *svcCtx.RequestContext, local *model.LoadBal
 	if err != nil {
 		return remote, fmt.Errorf("get load balancer attribute from cloud, error: %s", err.Error())
 	}
-	klog.Infof("%s find clb with result: \n%+v", util.Key(reqCtx.Service), util.PrettyJson(remote))
+	klog.Infof("%s find clb with result, reconcileID: %s\n%+v", util.Key(reqCtx.Service), reqCtx.ReconcileID, util.PrettyJson(remote))
 
 	serviceHashChanged := helper.IsServiceHashChanged(reqCtx.Service)
 	errs := []error{}

@@ -146,11 +146,11 @@ type ReconcileService struct {
 	finalizerManager helper.FinalizerManager
 }
 
-func (m *ReconcileService) Reconcile(_ context.Context, request reconcile.Request) (reconcile.Result, error) {
-	return reconcile.Result{}, m.reconcile(request)
+func (m *ReconcileService) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
+	return reconcile.Result{}, m.reconcile(ctx, request)
 }
 
-func (m *ReconcileService) reconcile(request reconcile.Request) (err error) {
+func (m *ReconcileService) reconcile(c context.Context, request reconcile.Request) (err error) {
 	startTime := time.Now()
 
 	defer func() {
@@ -168,6 +168,11 @@ func (m *ReconcileService) reconcile(request reconcile.Request) (err error) {
 			err = nil
 		}
 	}()
+
+	reconcileID := controller.ReconcileIDFromContext(c)
+	svcLog := util.ServiceLog.WithValues("service", request.NamespacedName.String(), "reconcileID", reconcileID)
+
+	svcLog.Info("starting reconcile service")
 
 	svc := &v1.Service{}
 	err = m.kubeClient.Get(context.Background(), request.NamespacedName, svc)
@@ -201,14 +206,15 @@ func (m *ReconcileService) reconcile(request reconcile.Request) (err error) {
 	ctx = context.WithValue(ctx, dryrun.ContextService, svc)
 
 	reqContext := &svcCtx.RequestContext{
-		Ctx:      ctx,
-		Service:  svc,
-		Anno:     anno,
-		Log:      util.ServiceLog.WithValues("service", util.Key(svc)),
-		Recorder: m.record,
+		Ctx:         ctx,
+		ReconcileID: string(reconcileID),
+		Service:     svc,
+		Anno:        anno,
+		Log:         svcLog,
+		Recorder:    m.record,
 	}
 
-	klog.Infof("%s: ensure loadbalancer with service details, \n%+v", util.Key(svc), util.PrettyJson(svc))
+	klog.Infof("%s: ensure loadbalancer with service details, reconcileID: %s\n%+v\n", util.Key(svc), reconcileID, util.PrettyJson(svc))
 
 	if ctrlCfg.ControllerCFG.DryRun {
 		if lb, err := m.buildAndApplyModel(reqContext); err != nil {
@@ -253,7 +259,7 @@ func (m *ReconcileService) reconcile(request reconcile.Request) (err error) {
 		return err
 	}
 
-	reqContext.Log.Info("successfully reconcile")
+	reqContext.Log.Info("successfully reconcile", "elapsedTime", time.Since(startTime).Seconds())
 	switch operation {
 	case metric.VerbDeletion:
 		metric.SLBLatency.WithLabelValues(metric.CLBType, metric.VerbDeletion).Observe(metric.MsSince(svc.DeletionTimestamp.Time))
@@ -349,7 +355,7 @@ func (m *ReconcileService) buildAndApplyModel(reqCtx *svcCtx.RequestContext) (*m
 	if err != nil {
 		return nil, fmt.Errorf("marshal lbmdl error: %s", err.Error())
 	}
-	util.ServiceLog.V(5).Info(fmt.Sprintf("local build: %s", mdlJson))
+	reqCtx.Log.V(5).Info(fmt.Sprintf("local build: %s", mdlJson))
 
 	// apply model
 	remoteModel, err := m.applier.Apply(reqCtx, localModel)
