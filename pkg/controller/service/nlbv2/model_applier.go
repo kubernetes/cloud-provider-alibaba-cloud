@@ -41,6 +41,11 @@ func (m *ModelApplier) Apply(reqCtx *svcCtx.RequestContext, local *nlbmodel.Netw
 	}
 	reqCtx.Ctx = context.WithValue(reqCtx.Ctx, dryrun.ContextNLB, remote.GetLoadBalancerId())
 
+	if remote.LoadBalancerAttribute.LoadBalancerId != "" && local.LoadBalancerAttribute.PreserveOnDelete {
+		reqCtx.Recorder.Eventf(reqCtx.Service, v1.EventTypeWarning, helper.PreservedOnDelete,
+			"The lb [%s] will be preserved after the service is deleted.", remote.LoadBalancerAttribute.LoadBalancerId)
+	}
+
 	serviceHashChanged := helper.IsServiceHashChanged(reqCtx.Service)
 	errs := []error{}
 	if serviceHashChanged || ctrlCfg.ControllerCFG.DryRun {
@@ -101,20 +106,36 @@ func (m *ModelApplier) applyLoadBalancerAttribute(reqCtx *svcCtx.RequestContext,
 			local.NamespacedName, remote.NamespacedName)
 	}
 
-	// delete slb
+	// delete nlb
 	if helper.NeedDeleteLoadBalancer(reqCtx.Service) {
 		if !local.LoadBalancerAttribute.IsUserManaged {
-			err := m.nlbMgr.Delete(reqCtx, remote)
-			if err != nil {
-				return fmt.Errorf("delete nlb [%s] error: %s",
-					remote.LoadBalancerAttribute.LoadBalancerId, err.Error())
+			if local.LoadBalancerAttribute.PreserveOnDelete {
+				err := m.nlbMgr.SetProtectionsOff(reqCtx, remote)
+				if err != nil {
+					return fmt.Errorf("set loadbalancer [%s] protections off error: %s",
+						remote.LoadBalancerAttribute.LoadBalancerId, err.Error())
+				}
+
+				err = m.nlbMgr.CleanupLoadBalancerTags(reqCtx, remote)
+				if err != nil {
+					return fmt.Errorf("cleanup loadbalancer [%s] tags error: %s",
+						remote.LoadBalancerAttribute.LoadBalancerId, err.Error())
+				}
+				reqCtx.Log.Info(fmt.Sprintf("successfully cleanup preserved nlb %s", remote.LoadBalancerAttribute.LoadBalancerId))
+			} else {
+				err := m.nlbMgr.Delete(reqCtx, remote)
+				if err != nil {
+					return fmt.Errorf("delete nlb [%s] error: %s",
+						remote.LoadBalancerAttribute.LoadBalancerId, err.Error())
+				}
+				reqCtx.Log.Info(fmt.Sprintf("successfully delete nlb %s", remote.LoadBalancerAttribute.LoadBalancerId))
 			}
-			reqCtx.Log.Info(fmt.Sprintf("successfully delete nlb %s", remote.LoadBalancerAttribute.LoadBalancerId))
+
 			remote.LoadBalancerAttribute.LoadBalancerId = ""
 			remote.LoadBalancerAttribute.DNSName = ""
 			return nil
 		}
-		reqCtx.Log.Info(fmt.Sprintf("slb %s is reused, skip delete it", remote.LoadBalancerAttribute.LoadBalancerId))
+		reqCtx.Log.Info(fmt.Sprintf("nlb %s is reused, skip delete it", remote.LoadBalancerAttribute.LoadBalancerId))
 		return nil
 	}
 
@@ -313,6 +334,15 @@ func (m *ModelApplier) cleanup(reqCtx *svcCtx.RequestContext, local, remote *nlb
 
 		// delete unused vgroup
 		if !found {
+			// if the loadbalancer is preserved, and the service is deleting,
+			// remove the server group tag instead of deleting the server group.
+			if local.LoadBalancerAttribute.PreserveOnDelete {
+				if err := m.sgMgr.CleanupServerGroupTags(reqCtx, r); err != nil {
+					return err
+				}
+				continue
+			}
+
 			// do not delete user managed server group, but need to clean the backends
 			if r.NamedKey == nil || r.IsUserManaged || !r.NamedKey.IsManagedByService(reqCtx.Service, base.CLUSTER_ID) {
 				reqCtx.Log.Info(fmt.Sprintf("try to delete vgroup: [%s] description [%s] is managed by user, skip delete",

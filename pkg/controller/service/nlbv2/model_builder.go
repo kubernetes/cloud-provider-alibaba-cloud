@@ -65,6 +65,9 @@ func (c localModel) Build(reqCtx *svcCtx.RequestContext) (*nlbmodel.NetworkLoadB
 		if reqCtx.Anno.Get(annotation.LoadBalancerId) != "" {
 			lbMdl.LoadBalancerAttribute.IsUserManaged = true
 		}
+		if reqCtx.Anno.Get(annotation.PreserveLBOnDelete) != "" {
+			lbMdl.LoadBalancerAttribute.PreserveOnDelete = true
+		}
 		return lbMdl, nil
 	}
 	if err := c.NLBMgr.BuildLocalModel(reqCtx, lbMdl); err != nil {

@@ -345,6 +345,7 @@ func (m *ReconcileService) buildAndApplyModel(reqCtx *svcCtx.RequestContext) (*m
 	if err != nil {
 		return nil, fmt.Errorf("build lb local model error: %s", err.Error())
 	}
+
 	mdlJson, err := json.Marshal(localModel)
 	if err != nil {
 		return nil, fmt.Errorf("marshal lbmdl error: %s", err.Error())

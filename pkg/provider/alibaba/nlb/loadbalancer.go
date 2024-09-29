@@ -3,6 +3,9 @@ package nlb
 import (
 	"context"
 	"fmt"
+	"strings"
+	"time"
+
 	nlb "github.com/alibabacloud-go/nlb-20220430/v3/client"
 	"github.com/alibabacloud-go/tea/tea"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -13,8 +16,6 @@ import (
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/util"
 	pkgUtil "k8s.io/cloud-provider-alibaba-cloud/pkg/util"
 	"k8s.io/klog/v2"
-	"strings"
-	"time"
 )
 
 func NewNLBProvider(
@@ -544,6 +545,15 @@ func loadResponse(resp interface{}, lb *nlbmodel.NetworkLoadBalancer) error {
 			)
 		}
 
+		var tags []tag.Tag
+		for _, t := range resp.Tags {
+			tags = append(tags, tag.Tag{
+				Key:   tea.StringValue(t.TagKey),
+				Value: tea.StringValue(t.TagValue),
+			})
+		}
+		lb.LoadBalancerAttribute.Tags = tags
+
 	case *nlb.ListLoadBalancersResponseBodyLoadBalancers:
 		lb.LoadBalancerAttribute.LoadBalancerId = tea.StringValue(resp.LoadBalancerId)
 		lb.LoadBalancerAttribute.VpcId = tea.StringValue(resp.VpcId)
@@ -565,6 +575,16 @@ func loadResponse(resp interface{}, lb *nlbmodel.NetworkLoadBalancer) error {
 				},
 			)
 		}
+
+		var tags []tag.Tag
+		for _, t := range resp.Tags {
+			tags = append(tags, tag.Tag{
+				Key:   tea.StringValue(t.Key),
+				Value: tea.StringValue(t.Value),
+			})
+		}
+		lb.LoadBalancerAttribute.Tags = tags
+
 	default:
 		return fmt.Errorf("[%T] type not supported", resp)
 	}
@@ -629,7 +649,7 @@ func (p *NLBProvider) waitNLBActive(lbId string) (*nlb.GetLoadBalancerAttributeR
 		}
 
 		if tea.StringValue(resp.Body.LoadBalancerStatus) == string(Provisioning) {
-			klog.V(5).Info("wait nlb to be active... ", "NLBId", lbId)
+			klog.V(5).InfoS("wait nlb to be active... ", "NLBId", lbId)
 			retErr = fmt.Errorf("nlb %s is in creating status", lbId)
 			return false, nil
 		}
@@ -688,10 +708,10 @@ func (p *NLBProvider) NLBZoneIds(regionId string) ([]string, error) {
 	return ids, nil
 }
 
-func (p *NLBProvider) UntagNLBResources(ctx context.Context, lbId string, tagKey []*string) error {
+func (p *NLBProvider) UntagNLBResources(ctx context.Context, resourceId string, resourceType nlbmodel.TagResourceType, tagKey []*string) error {
 	req := &nlb.UntagResourcesRequest{}
-	req.ResourceId = []*string{&lbId}
-	req.ResourceType = tea.String("loadbalancer")
+	req.ResourceId = []*string{&resourceId}
+	req.ResourceType = tea.String(string(resourceType))
 	req.TagKey = tagKey
 
 	resp, err := p.auth.NLB.UntagResources(req)

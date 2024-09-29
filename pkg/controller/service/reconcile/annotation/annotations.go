@@ -44,6 +44,7 @@ const (
 	ConnectionDrain        = AnnotationLoadBalancerPrefix + "connection-drain"         // ConnectionDrain connection drain
 	ConnectionDrainTimeout = AnnotationLoadBalancerPrefix + "connection-drain-timeout" // ConnectionDrainTimeout connection drain timeout
 
+	PreserveLBOnDelete = AnnotationLoadBalancerPrefix + "preserve-lb-on-delete"
 )
 
 // classic load balancer

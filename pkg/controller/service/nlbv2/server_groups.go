@@ -730,6 +730,26 @@ func (mgr *ServerGroupManager) buildClusterBackends(
 	return setWeightBackends(helper.ClusterTrafficPolicy, backends, sg.Weight), nil
 }
 
+func (mgr *ServerGroupManager) CleanupServerGroupTags(reqCtx *svcCtx.RequestContext, r *nlbmodel.ServerGroup) error {
+	defaultTags := reqCtx.Anno.GetDefaultTags()
+
+	var deletedTags []*string
+	for _, r := range r.Tags {
+		for _, l := range defaultTags {
+			if l.Key == r.Key && l.Value == r.Value {
+				deletedTags = append(deletedTags, tea.String(r.Key))
+				break
+			}
+		}
+	}
+
+	if len(deletedTags) == 0 {
+		return nil
+	}
+
+	return mgr.cloud.UntagNLBResources(reqCtx.Ctx, r.ServerGroupId, nlbmodel.ServerGroupTagType, deletedTags)
+}
+
 func updateENIBackends(mgr *ServerGroupManager, backends []nlbmodel.ServerGroupServer,
 	ipVersion model.AddressIPVersionType, serverGroupType nlbmodel.ServerGroupType,
 ) ([]nlbmodel.ServerGroupServer, error) {

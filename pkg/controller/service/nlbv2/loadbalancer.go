@@ -65,6 +65,10 @@ func (mgr *NLBManager) BuildLocalModel(reqCtx *svcCtx.RequestContext, mdl *nlbmo
 		mdl.LoadBalancerAttribute.BandwidthPackageId = tea.String(reqCtx.Anno.Get(annotation.BandwidthPackageId))
 	}
 
+	if reqCtx.Anno.Get(annotation.PreserveLBOnDelete) != "" {
+		mdl.LoadBalancerAttribute.PreserveOnDelete = true
+	}
+
 	return nil
 }
 
@@ -285,13 +289,49 @@ func (mgr *NLBManager) updateLoadBalancerTags(reqCtx *svcCtx.RequestContext, loc
 		for _, t := range needUntag {
 			untags = append(untags, tea.String(t.Key))
 		}
-		if err := mgr.cloud.UntagNLBResources(reqCtx.Ctx, lbId, untags); err != nil {
+		if err := mgr.cloud.UntagNLBResources(reqCtx.Ctx, lbId, nlbmodel.LoadBalancerTagType, untags); err != nil {
 			return fmt.Errorf("error to untag slb id [%s] with tags %v, svc [%s], err: %s",
 				lbId, needUntag, remote.NamespacedName, err.Error())
 		}
 	}
 
 	return nil
+}
+
+func (mgr *NLBManager) SetProtectionsOff(reqCtx *svcCtx.RequestContext, remote *nlbmodel.NetworkLoadBalancer) error {
+	if remote.LoadBalancerAttribute.LoadBalancerId == "" {
+		return nil
+	}
+
+	modCfg := &nlbmodel.ModificationProtectionConfig{Status: nlbmodel.NonProtection}
+	delCfg := &nlbmodel.DeletionProtectionConfig{Enabled: false}
+	if err := mgr.cloud.UpdateLoadBalancerProtection(reqCtx.Ctx, remote.LoadBalancerAttribute.LoadBalancerId, delCfg, modCfg); err != nil {
+		return fmt.Errorf("error to set nlb id [%s] protections off, svc [%s], err: %s",
+			remote.LoadBalancerAttribute.LoadBalancerId, remote.NamespacedName, err.Error())
+	}
+
+	return nil
+}
+
+func (mgr *NLBManager) CleanupLoadBalancerTags(reqCtx *svcCtx.RequestContext, remote *nlbmodel.NetworkLoadBalancer) error {
+	if remote.LoadBalancerAttribute.LoadBalancerId == "" {
+		return nil
+	}
+
+	defaultTags := reqCtx.Anno.GetDefaultTags()
+	var removedTags []*string
+	for _, r := range remote.LoadBalancerAttribute.Tags {
+		for _, l := range defaultTags {
+			if l.Key == r.Key && l.Value == r.Value {
+				removedTags = append(removedTags, tea.String(r.Key))
+			}
+		}
+	}
+
+	if len(removedTags) == 0 {
+		return nil
+	}
+	return mgr.cloud.UntagNLBResources(reqCtx.Ctx, remote.LoadBalancerAttribute.LoadBalancerId, nlbmodel.LoadBalancerTagType, removedTags)
 }
 
 func updateBandwidthPackageId(mgr *NLBManager, reqCtx *svcCtx.RequestContext, local, remote *nlbmodel.NetworkLoadBalancer) error {

@@ -2,6 +2,8 @@ package clbv1
 
 import (
 	"fmt"
+	"strconv"
+
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	ctrlcfg "k8s.io/cloud-provider-alibaba-cloud/pkg/config"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/helper"
@@ -12,7 +14,6 @@ import (
 	prvd "k8s.io/cloud-provider-alibaba-cloud/pkg/provider"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/base"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/util"
-	"strconv"
 )
 
 const MaxLBTagNum = 10
@@ -239,6 +240,9 @@ func (mgr *LoadBalancerManager) BuildLocalModel(reqCtx *svcCtx.RequestContext, m
 		model.ModificationProtectionType(reqCtx.Anno.Get(annotation.ModificationProtection))
 	mdl.LoadBalancerAttribute.Tags = reqCtx.Anno.GetLoadBalancerAdditionalTags()
 	mdl.LoadBalancerAttribute.Address = reqCtx.Anno.Get(annotation.IP)
+	if reqCtx.Anno.Get(annotation.PreserveLBOnDelete) != "" {
+		mdl.LoadBalancerAttribute.PreserveOnDelete = true
+	}
 	return nil
 }
 
@@ -303,8 +307,57 @@ func (mgr *LoadBalancerManager) updateLoadBalancerTags(reqCtx *svcCtx.RequestCon
 				lbId, needUntag, remote.NamespacedName, err.Error())
 		}
 	}
+	return nil
+}
+
+// SetProtectionsOff turns off modification protection and deletion protection of load balancer
+func (mgr *LoadBalancerManager) SetProtectionsOff(reqCtx *svcCtx.RequestContext, remote *model.LoadBalancer) error {
+	if remote.LoadBalancerAttribute.LoadBalancerId == "" {
+		return nil
+	}
+
+	if remote.LoadBalancerAttribute.DeleteProtection == model.OnFlag {
+		if err := mgr.cloud.SetLoadBalancerDeleteProtection(
+			reqCtx.Ctx,
+			remote.LoadBalancerAttribute.LoadBalancerId,
+			string(model.OffFlag),
+		); err != nil {
+			return fmt.Errorf("error to set slb id [%s] delete protection off, svc [%s], err: %s",
+				remote.LoadBalancerAttribute.LoadBalancerId, remote.NamespacedName, err.Error())
+		}
+	}
+	if remote.LoadBalancerAttribute.ModificationProtectionStatus == model.ConsoleProtection {
+		if err := mgr.cloud.SetLoadBalancerModificationProtection(reqCtx.Ctx,
+			remote.LoadBalancerAttribute.LoadBalancerId,
+			string(model.NonProtection)); err != nil {
+			return fmt.Errorf("error to set slb id [%s] modification protection off, svc [%s], err: %s",
+				remote.LoadBalancerAttribute.LoadBalancerId, remote.NamespacedName, err.Error())
+		}
+	}
 
 	return nil
+}
+
+// CleanupLoadBalancerTags removes service-related tags from remote slb
+func (mgr *LoadBalancerManager) CleanupLoadBalancerTags(reqCtx *svcCtx.RequestContext, remote *model.LoadBalancer) error {
+	if remote.LoadBalancerAttribute.LoadBalancerId == "" {
+		return nil
+	}
+
+	defaultTags := reqCtx.Anno.GetDefaultTags()
+	var removedTags []string
+	for _, r := range remote.LoadBalancerAttribute.Tags {
+		for _, l := range defaultTags {
+			if r.Key == l.Key && r.Value == l.Value {
+				removedTags = append(removedTags, r.Key)
+			}
+		}
+	}
+
+	if len(defaultTags) == 0 {
+		return nil
+	}
+	return mgr.cloud.UntagResources(reqCtx.Ctx, remote.LoadBalancerAttribute.LoadBalancerId, &removedTags)
 }
 
 func equalsAddressIPVersion(local, remote model.AddressIPVersionType) bool {

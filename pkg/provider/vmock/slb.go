@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/model"
@@ -94,6 +95,7 @@ func (m *MockCLB) SetLoadBalancerModificationProtection(ctx context.Context, lbI
 func (m *MockCLB) TagCLBResource(ctx context.Context, resourceId string, tags []tag.Tag) error {
 	return nil
 }
+
 func (m *MockCLB) UntagResources(ctx context.Context, lbId string, tagKey *[]string) error {
 	return nil
 }

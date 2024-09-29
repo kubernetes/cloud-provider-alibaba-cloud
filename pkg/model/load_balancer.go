@@ -51,6 +51,7 @@ const S1Small = "slb.s1.small"
 type ModificationProtectionType string
 
 const ConsoleProtection = ModificationProtectionType("ConsoleProtection")
+const NonProtection = ModificationProtectionType("NonProtection")
 
 type FlagType string
 
@@ -109,6 +110,7 @@ type LoadBalancerAttribute struct {
 	AddressIPVersion             AddressIPVersionType
 	Tags                         []tag.Tag
 	Address                      string
+	PreserveOnDelete             bool
 
 	// parameters are immutable
 	RegionId                     string
