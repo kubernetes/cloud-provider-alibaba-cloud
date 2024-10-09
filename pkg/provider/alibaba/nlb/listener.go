@@ -72,6 +72,9 @@ func (p *NLBProvider) ListNLBListeners(ctx context.Context, lbId string) ([]*nlb
 				VpcIdEnabled:            lis.ProxyProtocolV2Config.Ppv2VpcIdEnabled,
 			}
 		}
+		n.AlpnEnabled = lis.AlpnEnabled
+		n.AlpnPolicy = tea.StringValue(lis.AlpnPolicy)
+
 		nameKey, err := nlbmodel.LoadNLBListenerNamedKey(n.ListenerDescription)
 		if err != nil {
 			n.IsUserManaged = true
@@ -102,6 +105,11 @@ func (p *NLBProvider) CreateNLBListener(ctx context.Context, lbId string, lis *n
 			Ppv2PrivateLinkEpsIdEnabled: lis.ProxyProtocolV2Config.PrivateLinkEpsIdEnabled,
 			Ppv2VpcIdEnabled:            lis.ProxyProtocolV2Config.VpcIdEnabled,
 		}
+	}
+
+	req.AlpnEnabled = lis.AlpnEnabled
+	if tea.BoolValue(lis.AlpnEnabled) {
+		req.AlpnPolicy = tea.String(lis.AlpnPolicy)
 	}
 
 	if lis.IdleTimeout != 0 {
@@ -144,6 +152,10 @@ func (p *NLBProvider) UpdateNLBListener(ctx context.Context, lis *nlbmodel.Liste
 			Ppv2PrivateLinkEpsIdEnabled: lis.ProxyProtocolV2Config.PrivateLinkEpsIdEnabled,
 			Ppv2VpcIdEnabled:            lis.ProxyProtocolV2Config.VpcIdEnabled,
 		}
+	}
+	req.AlpnEnabled = lis.AlpnEnabled
+	if tea.BoolValue(lis.AlpnEnabled) {
+		req.AlpnPolicy = tea.String(lis.AlpnPolicy)
 	}
 	if lis.IdleTimeout != 0 {
 		req.IdleTimeout = tea.Int32(lis.IdleTimeout)

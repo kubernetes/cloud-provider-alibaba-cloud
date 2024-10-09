@@ -579,6 +579,18 @@ func nlbTCPSSLEqual(reqCtx *svcCtx.RequestContext, local v1.ServicePort, remote 
 		}
 	}
 
+	if alpnEnabled := reqCtx.Anno.Get(annotation.AlpnEnabled); alpnEnabled != "" {
+		localEnabled := strings.EqualFold(alpnEnabled, string(model.OnFlag))
+		remoteEnabled := tea.BoolValue(remote.AlpnEnabled)
+		if localEnabled != remoteEnabled {
+			return fmt.Errorf("expected nlb alpn enabled %t, got %t(%+v)", localEnabled, tea.BoolValue(remote.AlpnEnabled), remote.AlpnEnabled)
+		}
+
+		if localEnabled && remote.AlpnPolicy != reqCtx.Anno.Get(annotation.AlpnPolicy) {
+			return fmt.Errorf("expected nlb alpn policy %s, got %s", remote.AlpnPolicy, reqCtx.Anno.Get(annotation.AlpnPolicy))
+		}
+	}
+
 	return nil
 }
 

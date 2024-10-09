@@ -139,6 +139,16 @@ func (mgr *ListenerManager) buildListenerFromServicePort(reqCtx *svcCtx.RequestC
 		listener.ProxyProtocolV2Config.VpcIdEnabled = tea.Bool(strings.EqualFold(reqCtx.Anno.Get(annotation.Ppv2VpcIdEnabled), string(model.OnFlag)))
 	}
 
+	if listener.ListenerProtocol == nlbmodel.TCPSSL {
+		if reqCtx.Anno.Get(annotation.AlpnEnabled) != "" {
+			listener.AlpnEnabled = tea.Bool(strings.EqualFold(reqCtx.Anno.Get(annotation.AlpnEnabled), string(model.OnFlag)))
+		}
+
+		if reqCtx.Anno.Get(annotation.AlpnPolicy) != "" {
+			listener.AlpnPolicy = reqCtx.Anno.Get(annotation.AlpnPolicy)
+		}
+	}
+
 	return listener, nil
 }
 
@@ -247,6 +257,20 @@ func (mgr *ListenerManager) UpdateNLBListener(reqCtx *svcCtx.RequestContext, loc
 			update.SecurityPolicyId = local.SecurityPolicyId
 			updateDetail += fmt.Sprintf("SecurityPolicyId %v should be changed to %v;",
 				remote.SecurityPolicyId, local.SecurityPolicyId)
+		}
+		if local.AlpnEnabled != nil &&
+			*local.AlpnEnabled != tea.BoolValue(remote.AlpnEnabled) {
+			needUpdate = true
+			update.AlpnEnabled = local.AlpnEnabled
+			updateDetail += fmt.Sprintf("AlpnEnabled %v should be changed to %v;", tea.BoolValue(remote.AlpnEnabled),
+				tea.BoolValue(local.AlpnEnabled))
+		}
+		if tea.BoolValue(local.AlpnEnabled) && local.AlpnPolicy != "" &&
+			local.AlpnPolicy != remote.AlpnPolicy {
+			needUpdate = true
+			update.AlpnPolicy = local.AlpnPolicy
+			updateDetail += fmt.Sprintf("AlpnPolicy %v should be changed to %v;",
+				remote.AlpnPolicy, local.AlpnPolicy)
 		}
 	}
 

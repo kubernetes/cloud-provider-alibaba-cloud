@@ -120,6 +120,9 @@ const (
 	Ppv2PrivateLinkEpIdEnabled  = AnnotationLoadBalancerPrefix + "ppv2-pvl-ep-id-enabled"
 	Ppv2PrivateLinkEpsIdEnabled = AnnotationLoadBalancerPrefix + "ppv2-pvl-eps-id-enabled"
 	Ppv2VpcIdEnabled            = AnnotationLoadBalancerPrefix + "ppv2-pvl-vpc-id-enabled"
+
+	AlpnEnabled = AnnotationLoadBalancerPrefix + "alpn"
+	AlpnPolicy  = AnnotationLoadBalancerPrefix + "alpn-policy"
 )
 
 var DefaultValue = map[string]string{
