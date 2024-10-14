@@ -570,7 +570,25 @@ func RunLoadBalancerTestCases(f *framework.Framework) {
 				gomega.Expect(err).To(gomega.BeNil())
 
 				err = f.ExpectLoadBalancerEqual(newSvc)
-				gomega.Expect(err).NotTo(gomega.BeNil())
+				gomega.Expect(err).To(gomega.BeNil())
+			})
+
+			ginkgo.It("update and delete tags", func() {
+				oldSvc, err := f.Client.KubeClient.CreateServiceByAnno(map[string]string{
+					annotation.Annotation(annotation.AdditionalTags): "Key1=Value1,Key2=Value2",
+				})
+				gomega.Expect(err).To(gomega.BeNil())
+				err = f.ExpectLoadBalancerEqual(oldSvc)
+				gomega.Expect(err).To(gomega.BeNil())
+
+				newSvc := oldSvc.DeepCopy()
+				newSvc.Annotations = make(map[string]string)
+				newSvc.Annotations[annotation.Annotation(annotation.AdditionalTags)] = "Key1=Value3"
+				newSvc, err = f.Client.KubeClient.PatchService(oldSvc, newSvc)
+				gomega.Expect(err).To(gomega.BeNil())
+
+				err = f.ExpectLoadBalancerEqual(newSvc)
+				gomega.Expect(err).To(gomega.BeNil())
 			})
 
 			ginkgo.It("add tag for reused lb", func() {
@@ -580,7 +598,7 @@ func RunLoadBalancerTestCases(f *framework.Framework) {
 				})
 				gomega.Expect(err).To(gomega.BeNil())
 				err = f.ExpectLoadBalancerEqual(svc)
-				gomega.Expect(err).NotTo(gomega.BeNil())
+				gomega.Expect(err).To(gomega.BeNil())
 			})
 		})
 

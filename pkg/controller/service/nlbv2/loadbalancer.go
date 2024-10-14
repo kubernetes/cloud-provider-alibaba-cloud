@@ -225,7 +225,73 @@ func (mgr *NLBManager) Update(reqCtx *svcCtx.RequestContext, local, remote *nlbm
 		errs = append(errs, err)
 	}
 
+	if len(local.LoadBalancerAttribute.Tags) != 0 {
+		if err := mgr.updateLoadBalancerTags(reqCtx, local, remote); err != nil {
+			errs = append(errs, err)
+		}
+	}
+
 	return utilerrors.NewAggregate(errs)
+}
+
+func (mgr *NLBManager) updateLoadBalancerTags(reqCtx *svcCtx.RequestContext, local, remote *nlbmodel.NetworkLoadBalancer) error {
+	var localTags, remoteTags []tag.Tag
+	lbId := remote.LoadBalancerAttribute.LoadBalancerId
+	defaultTags := reqCtx.Anno.GetDefaultTags()
+	if local.LoadBalancerAttribute.IsUserManaged {
+		defaultTags = append(defaultTags, tag.Tag{Key: helper.REUSEKEY, Value: "true"})
+	}
+
+	for _, r := range remote.LoadBalancerAttribute.Tags {
+		found := false
+		for _, d := range defaultTags {
+			if r.Key == d.Key {
+				found = true
+				break
+			}
+		}
+		if !found {
+			remoteTags = append(remoteTags, r)
+		}
+	}
+
+	for _, l := range local.LoadBalancerAttribute.Tags {
+		found := false
+		for _, d := range defaultTags {
+			if l.Key == d.Key {
+				found = true
+				break
+			}
+		}
+		if !found {
+			localTags = append(localTags, l)
+		}
+	}
+
+	needTag, needUntag := util.DiffLoadBalancerTags(local.LoadBalancerAttribute.Tags, remoteTags)
+	if len(needTag) != 0 || len(needUntag) != 0 {
+		reqCtx.Log.Info("tag changed", "lb", lbId, "needTag", needTag, "needUntag", needUntag)
+	}
+
+	if len(needTag) != 0 {
+		if err := mgr.cloud.TagNLBResource(reqCtx.Ctx, lbId, nlbmodel.LoadBalancerTagType, needTag); err != nil {
+			return fmt.Errorf("error to tag slb id [%s] with tags %v, svc [%s], err: %s",
+				lbId, needTag, remote.NamespacedName, err.Error())
+		}
+	}
+
+	if len(needUntag) != 0 {
+		var untags []*string
+		for _, t := range needUntag {
+			untags = append(untags, tea.String(t.Key))
+		}
+		if err := mgr.cloud.UntagNLBResources(reqCtx.Ctx, lbId, untags); err != nil {
+			return fmt.Errorf("error to untag slb id [%s] with tags %v, svc [%s], err: %s",
+				lbId, needUntag, remote.NamespacedName, err.Error())
+		}
+	}
+
+	return nil
 }
 
 func updateBandwidthPackageId(mgr *NLBManager, reqCtx *svcCtx.RequestContext, local, remote *nlbmodel.NetworkLoadBalancer) error {

@@ -688,7 +688,6 @@ func (p *NLBProvider) NLBZoneIds(regionId string) ([]string, error) {
 	return ids, nil
 }
 
-// UntagNLBResources used for e2etest
 func (p *NLBProvider) UntagNLBResources(ctx context.Context, lbId string, tagKey []*string) error {
 	req := &nlb.UntagResourcesRequest{}
 	req.ResourceId = []*string{&lbId}

@@ -224,8 +224,23 @@ func loadBalancerAttrEqual(f *Framework, anno *annotation.AnnotationRequest, svc
 		if err != nil {
 			return err
 		}
-		if !tagsEqual(AdditionalTags, tags) {
-			return fmt.Errorf("expected slb AdditionalTags %s, got %s", AdditionalTags, lb.Tags)
+		defaultTags := anno.GetDefaultTags()
+		defaultTags = append(defaultTags, tag.Tag{Key: helper.REUSEKEY, Value: "true"})
+		var remoteTags []tag.Tag
+		for _, r := range tags {
+			found := false
+			for _, t := range defaultTags {
+				if t.Key == r.Key && t.Value == r.Value {
+					found = true
+					break
+				}
+			}
+			if !found {
+				remoteTags = append(remoteTags, r)
+			}
+		}
+		if !tagsEqual(AdditionalTags, remoteTags) {
+			return fmt.Errorf("expected slb AdditionalTags %s, got %s", AdditionalTags, remoteTags)
 		}
 	}
 	if IPVersion := anno.Get(annotation.IPVersion); IPVersion != "" {
@@ -279,6 +294,9 @@ func loadBalancerAttrEqual(f *Framework, anno *annotation.AnnotationRequest, svc
 
 func tagsEqual(tagSvc string, tagSlb []tag.Tag) bool {
 	tags := strings.Split(tagSvc, ",")
+	if len(tags) != len(tagSlb) {
+		return false
+	}
 	for _, m := range tags {
 		found := false
 		for _, v := range tagSlb {

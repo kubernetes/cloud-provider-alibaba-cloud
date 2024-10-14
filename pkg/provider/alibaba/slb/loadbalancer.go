@@ -282,7 +282,6 @@ func (p SLBProvider) ListCLBTagResources(ctx context.Context, lbId string) ([]ta
 	return tags, nil
 }
 
-// UntagResources used for e2etest
 func (p SLBProvider) UntagResources(ctx context.Context, lbId string, tagKey *[]string) error {
 	req := slb.CreateUntagResourcesRequest()
 	req.ResourceId = &[]string{lbId}
