@@ -226,6 +226,7 @@ type INLB interface {
 	UpdateNLBServers(ctx context.Context, sgId string, backends []nlbmodel.ServerGroupServer) error
 
 	// Listener
+
 	ListNLBListeners(ctx context.Context, lbId string) ([]*nlbmodel.ListenerAttribute, error)
 	CreateNLBListener(ctx context.Context, lbId string, lis *nlbmodel.ListenerAttribute) error
 	UpdateNLBListener(ctx context.Context, lis *nlbmodel.ListenerAttribute) error
