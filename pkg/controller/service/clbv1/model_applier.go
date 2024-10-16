@@ -3,6 +3,7 @@ package clbv1
 import (
 	"context"
 	"fmt"
+	v1 "k8s.io/api/core/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	ctrlCfg "k8s.io/cloud-provider-alibaba-cloud/pkg/config"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/helper"
@@ -40,6 +41,11 @@ func (m *ModelApplier) Apply(reqCtx *svcCtx.RequestContext, local *model.LoadBal
 		return remote, fmt.Errorf("get load balancer attribute from cloud, error: %s", err.Error())
 	}
 	klog.Infof("%s find clb with result: \n%+v", util.Key(reqCtx.Service), util.PrettyJson(remote))
+
+	if remote.LoadBalancerAttribute.LoadBalancerId != "" && local.LoadBalancerAttribute.PreserveOnDelete {
+		reqCtx.Recorder.Eventf(reqCtx.Service, v1.EventTypeWarning, helper.PreservedOnDelete,
+			"The lb [%s] will be preserved after the service is deleted.", remote.LoadBalancerAttribute.LoadBalancerId)
+	}
 
 	serviceHashChanged := helper.IsServiceHashChanged(reqCtx.Service)
 	errs := []error{}
@@ -111,16 +117,32 @@ func (m *ModelApplier) applyLoadBalancerAttribute(reqCtx *svcCtx.RequestContext,
 	// delete slb
 	if helper.NeedDeleteLoadBalancer(reqCtx.Service) {
 		if !local.LoadBalancerAttribute.IsUserManaged {
-			err := m.slbMgr.Delete(reqCtx, remote)
-			if err != nil {
-				return fmt.Errorf("delete loadbalancer [%s] error: %s",
-					remote.LoadBalancerAttribute.LoadBalancerId, err.Error())
+			if local.LoadBalancerAttribute.PreserveOnDelete {
+				err := m.slbMgr.SetProtectionsOff(reqCtx, remote)
+				if err != nil {
+					return fmt.Errorf("set loadbalancer [%s] protections off error: %s",
+						remote.LoadBalancerAttribute.LoadBalancerId, err.Error())
+				}
+
+				err = m.slbMgr.CleanupLoadBalancerTags(reqCtx, remote)
+				if err != nil {
+					return fmt.Errorf("cleanup loadbalancer [%s] tags error: %s",
+						remote.LoadBalancerAttribute.LoadBalancerId, err.Error())
+				}
+				reqCtx.Log.Info(fmt.Sprintf("successfully cleanup preserved slb %s", remote.LoadBalancerAttribute.LoadBalancerId))
+			} else {
+				err := m.slbMgr.Delete(reqCtx, remote)
+				if err != nil {
+					return fmt.Errorf("delete loadbalancer [%s] error: %s",
+						remote.LoadBalancerAttribute.LoadBalancerId, err.Error())
+				}
+				reqCtx.Log.Info(fmt.Sprintf("successfully delete slb %s", remote.LoadBalancerAttribute.LoadBalancerId))
 			}
-			reqCtx.Log.Info(fmt.Sprintf("successfully delete slb %s", remote.LoadBalancerAttribute.LoadBalancerId))
 			remote.LoadBalancerAttribute.LoadBalancerId = ""
 			remote.LoadBalancerAttribute.Address = ""
 			return nil
 		}
+
 		reqCtx.Log.Info(fmt.Sprintf("slb %s is reused, skip delete it", remote.LoadBalancerAttribute.LoadBalancerId))
 		return nil
 	}

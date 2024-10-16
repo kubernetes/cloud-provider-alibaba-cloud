@@ -58,6 +58,13 @@ func (p *NLBProvider) toLocalServerGroup(ctx context.Context, remote *nlb.ListSe
 			util.SDKError("ListNLBServers", err).Error())
 	}
 	sg.Servers = servers
+	for _, t := range remote.Tags {
+		tag := tag.Tag{
+			Key:   tea.StringValue(t.Key),
+			Value: tea.StringValue(t.Value),
+		}
+		sg.Tags = append(sg.Tags, tag)
+	}
 	return sg, nil
 }
 

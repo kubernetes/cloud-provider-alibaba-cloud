@@ -33,7 +33,7 @@ func (d DryRunNLB) TagNLBResource(ctx context.Context, resourceId string, resour
 	panic("implement me")
 }
 
-func (d DryRunNLB) UntagNLBResources(ctx context.Context, lbId string, tagKey []*string) error {
+func (d DryRunNLB) UntagNLBResources(ctx context.Context, resourceId string, resourceType nlbmodel.TagResourceType, tagKey []*string) error {
 	//TODO implement me
 	panic("implement me")
 }

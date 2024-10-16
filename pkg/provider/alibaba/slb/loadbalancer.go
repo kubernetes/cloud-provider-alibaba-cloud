@@ -412,9 +412,19 @@ func loadResponse(resp interface{}, lb *model.LoadBalancer) {
 	// DescribeLoadBalancers
 	case slb.LoadBalancer:
 		lb.LoadBalancerAttribute.InternetChargeType = model.InternetChargeType(v.FieldByName("InternetChargeTypeAlias").String())
+		var tags []tag.Tag
+		for _, tg := range t.Tags.Tag {
+			tags = append(tags, tag.Tag{Key: tg.TagKey, Value: tg.TagValue})
+		}
+		lb.LoadBalancerAttribute.Tags = tags
 	// DescribeLoadBalancerAttribute
 	case slb.DescribeLoadBalancerAttributeResponse:
 		lb.LoadBalancerAttribute.InternetChargeType = model.InternetChargeType(v.FieldByName("InternetChargeType").String())
+		var tags []tag.Tag
+		for _, tg := range t.Tags.Tag {
+			tags = append(tags, tag.Tag{Key: tg.TagKey, Value: tg.TagValue})
+		}
+		lb.LoadBalancerAttribute.Tags = tags
 	default:
 		klog.Errorf("not support type: %T", t)
 	}

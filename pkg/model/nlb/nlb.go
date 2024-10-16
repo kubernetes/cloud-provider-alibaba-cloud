@@ -92,6 +92,7 @@ const (
 type ModificationProtectionType string
 
 const ConsoleProtection = ModificationProtectionType("ConsoleProtection")
+const NonProtection = ModificationProtectionType("NonProtection")
 const ModificationProtectionReason = "managed.by.ack"
 
 // NetworkLoadBalancer represents a AlibabaCloud NetworkLoadBalancer.
@@ -124,6 +125,7 @@ type LoadBalancerAttribute struct {
 	BandwidthPackageId           *string
 	DeletionProtectionConfig     *DeletionProtectionConfig
 	ModificationProtectionConfig *ModificationProtectionConfig
+	PreserveOnDelete             bool
 
 	// auto-generated parameters
 	LoadBalancerId             string

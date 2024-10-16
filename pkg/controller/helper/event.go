@@ -22,6 +22,7 @@ const (
 	TypeChanged            = "TypeChanged"
 	SpecChanged            = "ServiceSpecChanged"
 	DeleteTimestampChanged = "DeleteTimestampChanged"
+	PreservedOnDelete      = "PreservedOnDelete"
 )
 
 // NodeEventReason
