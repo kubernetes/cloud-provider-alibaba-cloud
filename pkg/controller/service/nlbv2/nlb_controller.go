@@ -170,7 +170,7 @@ func (m *ReconcileNLB) reconcile(request reconcile.Request) error {
 
 	klog.Infof("%s: ensure loadbalancer with service details, \n%+v", util.Key(svc), util.PrettyJson(svc))
 
-	if helper.NeedDeleteLoadBalancer(svc) {
+	if helper.NeedDeleteLoadBalancer(svc) || !helper.NeedNLB(svc) {
 		err = m.cleanupLoadBalancerResources(reqCtx)
 	} else {
 		err = m.reconcileLoadBalancerResources(reqCtx)
