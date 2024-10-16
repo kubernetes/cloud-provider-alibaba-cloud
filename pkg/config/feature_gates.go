@@ -14,15 +14,17 @@ import (
 )
 
 const (
-	IPv6DualStack             featuregate.Feature = "IPv6DualStack"
-	EndpointSlice             featuregate.Feature = "EndpointSlice"
-	FilterServiceOnNodeChange featuregate.Feature = "FilterServiceOnNodeChange"
+	IPv6DualStack              featuregate.Feature = "IPv6DualStack"
+	EndpointSlice              featuregate.Feature = "EndpointSlice"
+	FilterServiceOnNodeChange  featuregate.Feature = "FilterServiceOnNodeChange"
+	LoadBalancerTypeAnnotation                     = "LoadBalancerTypeAnnotation"
 )
 
 var CloudProviderFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
-	IPv6DualStack:             {Default: false, PreRelease: featuregate.Alpha},
-	EndpointSlice:             {Default: true, PreRelease: featuregate.GA},
-	FilterServiceOnNodeChange: {Default: false, PreRelease: featuregate.Alpha},
+	IPv6DualStack:              {Default: false, PreRelease: featuregate.Alpha},
+	EndpointSlice:              {Default: true, PreRelease: featuregate.GA},
+	FilterServiceOnNodeChange:  {Default: false, PreRelease: featuregate.Alpha},
+	LoadBalancerTypeAnnotation: {Default: false, PreRelease: featuregate.Alpha},
 }
 
 func init() {

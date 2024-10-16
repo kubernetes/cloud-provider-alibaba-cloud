@@ -4,6 +4,7 @@ import (
 	"fmt"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apiserver/pkg/util/feature"
 	ctrlCfg "k8s.io/cloud-provider-alibaba-cloud/pkg/config"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/model"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/util/hash"
@@ -24,6 +25,7 @@ const (
 const (
 	BackendType       = "service.beta.kubernetes.io/backend-type"
 	LoadBalancerClass = "service.beta.kubernetes.io/class"
+	LoadBalancerType  = "service.beta.kubernetes.io/alibaba-cloud-loadbalancer-type"
 )
 
 // load balancer class
@@ -95,11 +97,23 @@ func NeedCLB(service *v1.Service) bool {
 	if service.Spec.LoadBalancerClass != nil {
 		return false
 	}
+	if feature.DefaultFeatureGate.Enabled(ctrlCfg.LoadBalancerTypeAnnotation) && service.Annotations[LoadBalancerType] != "" {
+		return false
+	}
 	return service.Annotations[LoadBalancerClass] == ""
 }
 
 func NeedNLB(service *v1.Service) bool {
-	return service.Spec.Type == v1.ServiceTypeLoadBalancer && service.Spec.LoadBalancerClass != nil && *service.Spec.LoadBalancerClass == NLBClass
+	if service.Spec.Type != v1.ServiceTypeLoadBalancer {
+		return false
+	}
+	if service.Spec.LoadBalancerClass != nil && *service.Spec.LoadBalancerClass == NLBClass {
+		return true
+	}
+	if feature.DefaultFeatureGate.Enabled(ctrlCfg.LoadBalancerTypeAnnotation) && service.Annotations[LoadBalancerType] == "nlb" {
+		return service.Annotations[LoadBalancerType] == "nlb"
+	}
+	return false
 }
 
 func GetServiceHash(svc *v1.Service) string {
