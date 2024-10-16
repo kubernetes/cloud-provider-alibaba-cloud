@@ -3,6 +3,7 @@ package framework
 import (
 	"context"
 	"fmt"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/model/tag"
 	"strconv"
 	"strings"
 	"time"
@@ -227,8 +228,23 @@ func networkLoadBalancerAttrEqual(f *Framework, anno *annotation.AnnotationReque
 		if err != nil {
 			return err
 		}
-		if !tagsEqual(additionalTags, tags) {
-			return fmt.Errorf("expected nlb additional tags %s, got %v", additionalTags, nlb.Tags)
+		defaultTags := anno.GetDefaultTags()
+		defaultTags = append(defaultTags, tag.Tag{Key: helper.REUSEKEY, Value: "true"})
+		var remoteTags []tag.Tag
+		for _, r := range tags {
+			found := false
+			for _, t := range defaultTags {
+				if t.Key == r.Key && t.Value == r.Value {
+					found = true
+					break
+				}
+			}
+			if !found {
+				remoteTags = append(remoteTags, r)
+			}
+		}
+		if !tagsEqual(additionalTags, remoteTags) {
+			return fmt.Errorf("expected nlb additional tags %s, got %v", additionalTags, remoteTags)
 		}
 	}
 

@@ -131,6 +131,7 @@ type ILoadBalancer interface {
 
 	// Tag
 	TagCLBResource(ctx context.Context, resourceId string, tags []tag.Tag) error
+	UntagResources(ctx context.Context, lbId string, tagKey *[]string) error
 	ListCLBTagResources(ctx context.Context, lbId string) ([]tag.Tag, error)
 
 	// Cert
@@ -195,6 +196,7 @@ type IALB interface {
 type INLB interface {
 	//Tag
 	TagNLBResource(ctx context.Context, resourceId string, resourceType nlbmodel.TagResourceType, tags []tag.Tag) error
+	UntagNLBResources(ctx context.Context, lbId string, tagKey []*string) error
 	ListNLBTagResources(ctx context.Context, lbId string) ([]tag.Tag, error)
 	// NetworkLoadBalancer
 	FindNLB(ctx context.Context, mdl *nlbmodel.NetworkLoadBalancer) error

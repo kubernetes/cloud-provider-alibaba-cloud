@@ -94,6 +94,10 @@ func (m *MockCLB) SetLoadBalancerModificationProtection(ctx context.Context, lbI
 func (m *MockCLB) TagCLBResource(ctx context.Context, resourceId string, tags []tag.Tag) error {
 	return nil
 }
+func (m *MockCLB) UntagResources(ctx context.Context, lbId string, tagKey *[]string) error {
+	return nil
+}
+
 func (m *MockCLB) ListCLBTagResources(ctx context.Context, lbId string) ([]tag.Tag, error) {
 	return nil, nil
 }

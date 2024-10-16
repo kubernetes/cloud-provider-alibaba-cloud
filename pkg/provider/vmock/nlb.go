@@ -33,6 +33,10 @@ func (m MockNLB) TagNLBResource(ctx context.Context, resourceId string, resource
 	return nil
 }
 
+func (m MockNLB) UntagNLBResources(ctx context.Context, lbId string, tagKey []*string) error {
+	return nil
+}
+
 func (m MockNLB) ListNLBTagResources(ctx context.Context, lbId string) ([]tag.Tag, error) {
 	return nil, nil
 }

@@ -11,6 +11,7 @@ import (
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/base"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/slb"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/util"
+	"strings"
 )
 
 func NewDryRunSLB(
@@ -94,7 +95,20 @@ func (m *DryRunSLB) ModifyLoadBalancerInstanceChargeType(ctx context.Context, lb
 
 // Tag
 func (m *DryRunSLB) TagCLBResource(ctx context.Context, resourceId string, tags []tag.Tag) error {
-	return nil
+	mtype := "UntagResources"
+	svc := getService(ctx)
+	AddEvent(SLB, util.Key(svc), "", "TagSLB", ERROR, "")
+	return hintError(mtype,
+		fmt.Sprintf("loadbalancer %s tags %q should be added", resourceId, getTagString(tags)))
+}
+
+func (m *DryRunSLB) UntagResources(ctx context.Context, lbId string, tagKey *[]string) error {
+	mtype := "UntagResources"
+	svc := getService(ctx)
+	AddEvent(SLB, util.Key(svc), "", "UntagSLB", ERROR, "")
+	tagString := strings.Join(*tagKey, ",")
+	return hintError(mtype,
+		fmt.Sprintf("loadbalancer %s tags %q should be deleted", lbId, tagString))
 }
 
 func (m *DryRunSLB) ListCLBTagResources(ctx context.Context, lbId string) ([]tag.Tag, error) {
@@ -267,6 +281,14 @@ func (m *DryRunSLB) ModifyVServerGroupBackendServers(ctx context.Context, vGroup
 
 func (m *DryRunSLB) DescribeServerCertificateById(ctx context.Context, serverCertificateId string) (*model.CertAttribute, error) {
 	return m.slb.DescribeServerCertificateById(ctx, serverCertificateId)
+}
+
+func getTagString(tags []tag.Tag) string {
+	var ret []string
+	for _, t := range tags {
+		ret = append(ret, fmt.Sprintf("%s=%s", t.Key, t.Value))
+	}
+	return strings.Join(ret, ",")
 }
 
 func getService(ctx context.Context) *v1.Service {
