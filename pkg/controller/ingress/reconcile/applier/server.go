@@ -80,7 +80,7 @@ func (s *serverApplier) Apply(ctx context.Context) error {
 		if err := s.albProvider.ReplaceALBServers(ctx, s.serverGroupID, unmatchedResEndpoints, unmatchedSDKEndpoints); err != nil {
 			return err
 		}
-		_ = updateTargetHealthPodCondition(ctx, s.kubeClient, helper.BuildReadinessGatePodConditionType(), s.endpoints)
+		_ = updateTargetHealthPodCondition(ctx, s.kubeClient, helper.BuildReadinessGatePodConditionType(helper.TargetHealthPodConditionALBTypePrefix), s.endpoints)
 
 		return nil
 	}
@@ -93,7 +93,7 @@ func (s *serverApplier) Apply(ctx context.Context) error {
 		if err := s.albProvider.RegisterALBServers(ctx, s.serverGroupID, unmatchedResEndpoints); err != nil {
 			return err
 		}
-		_ = updateTargetHealthPodCondition(ctx, s.kubeClient, helper.BuildReadinessGatePodConditionType(), s.endpoints)
+		_ = updateTargetHealthPodCondition(ctx, s.kubeClient, helper.BuildReadinessGatePodConditionType(helper.TargetHealthPodConditionALBTypePrefix), s.endpoints)
 	}
 
 	return nil

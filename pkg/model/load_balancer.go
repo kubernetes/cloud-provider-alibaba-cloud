@@ -76,10 +76,11 @@ const ModificationProtectionReason = "managed.by.ack"
 
 // LoadBalancer represents a AlibabaCloud LoadBalancer.
 type LoadBalancer struct {
-	NamespacedName        types.NamespacedName
-	LoadBalancerAttribute LoadBalancerAttribute
-	Listeners             []ListenerAttribute
-	VServerGroups         []VServerGroup
+	NamespacedName                  types.NamespacedName
+	LoadBalancerAttribute           LoadBalancerAttribute
+	Listeners                       []ListenerAttribute
+	VServerGroups                   []VServerGroup
+	ContainsPotentialReadyEndpoints bool
 }
 
 func (l *LoadBalancer) GetLoadBalancerId() string {
@@ -185,10 +186,12 @@ type VServerGroup struct {
 	NamedKey      *VGroupNamedKey
 	ServicePort   v1.ServicePort
 
-	VGroupId     string
-	VGroupName   string
-	VGroupWeight *int
-	Backends     []BackendAttribute
+	VGroupId                        string
+	VGroupName                      string
+	VGroupWeight                    *int
+	Backends                        []BackendAttribute
+	InitialBackends                 []BackendAttribute
+	ContainsPotentialReadyEndpoints bool
 }
 
 func (v *VServerGroup) BackendInfo() string {
@@ -213,6 +216,7 @@ type BackendAttribute struct {
 	Weight      int    `json:"weight"`
 	Port        int    `json:"port"`
 	Type        string `json:"type"`
+	TargetRef   *v1.ObjectReference
 }
 
 type CertAttribute struct {

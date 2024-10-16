@@ -97,10 +97,11 @@ const ModificationProtectionReason = "managed.by.ack"
 
 // NetworkLoadBalancer represents a AlibabaCloud NetworkLoadBalancer.
 type NetworkLoadBalancer struct {
-	NamespacedName        types.NamespacedName
-	LoadBalancerAttribute *LoadBalancerAttribute
-	Listeners             []*ListenerAttribute
-	ServerGroups          []*ServerGroup
+	NamespacedName                  types.NamespacedName
+	LoadBalancerAttribute           *LoadBalancerAttribute
+	Listeners                       []*ListenerAttribute
+	ServerGroups                    []*ServerGroup
+	ContainsPotentialReadyEndpoints bool
 }
 
 func (l *NetworkLoadBalancer) GetLoadBalancerId() string {
@@ -198,6 +199,7 @@ type ServerGroup struct {
 	PreserveClientIpEnabled *bool
 	HealthCheckConfig       *HealthCheckConfig
 	Servers                 []ServerGroupServer
+	InitialServers          []ServerGroupServer
 	Tags                    []tag.Tag
 
 	// auto-generated parameters
@@ -228,6 +230,8 @@ type ServerGroupServer struct {
 	Weight        int32
 	ZoneId        string
 	Status        string
+
+	TargetRef *v1.ObjectReference
 }
 
 type ZoneMapping struct {
