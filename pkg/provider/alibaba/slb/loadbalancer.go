@@ -100,6 +100,7 @@ func (p SLBProvider) findLoadBalancerByTag(mdl *model.LoadBalancer) error {
 
 	num := len(resp.LoadBalancers.LoadBalancer)
 	if num == 0 {
+		klog.Infof("[%s] find loadbalancer by tag result is empty, RequestID: %s", mdl.NamespacedName, resp.RequestId)
 		return nil
 	}
 
@@ -132,6 +133,7 @@ func (p SLBProvider) FindLoadBalancerByName(mdl *model.LoadBalancer) error {
 	}
 	num := len(resp.LoadBalancers.LoadBalancer)
 	if num == 0 {
+		klog.Infof("[%s] find loadbalancer by name result is empty, RequestID: %s", mdl.NamespacedName, resp.RequestId)
 		return nil
 	}
 

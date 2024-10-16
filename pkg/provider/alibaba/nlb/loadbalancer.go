@@ -444,6 +444,7 @@ func (p *NLBProvider) findNLBByTag(mdl *nlbmodel.NetworkLoadBalancer) error {
 
 	num := len(resp.Body.LoadBalancers)
 	if num == 0 {
+		klog.Infof("[%s] find loadbalancer by tag result is empty, RequestID: %s", mdl.NamespacedName, tea.StringValue(resp.Body.RequestId))
 		return nil
 	}
 
@@ -498,6 +499,7 @@ func (p *NLBProvider) findNLBByName(mdl *nlbmodel.NetworkLoadBalancer) error {
 
 	num := len(resp.Body.LoadBalancers)
 	if num == 0 {
+		klog.Infof("[%s] find loadbalancer by name result is empty, RequestID: %s", mdl.NamespacedName, tea.StringValue(resp.Body.RequestId))
 		return nil
 	}
 
