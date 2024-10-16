@@ -58,12 +58,19 @@ func (e *ECSProvider) ListInstances(ctx context.Context, ids []string) (map[stri
 		mins[id] = nil
 		for _, n := range insList {
 			if strings.Contains(id, n.InstanceId) {
+				tags := map[string]string{}
+				for _, tag := range n.Tags.Tag {
+					tags[tag.TagKey] = tag.TagValue
+				}
+
 				mins[id] = &prvd.NodeAttribute{
-					InstanceID:   n.InstanceId,
-					InstanceType: n.InstanceType,
-					Addresses:    findAddress(&n),
-					Zone:         n.ZoneId,
-					Region:       n.RegionId,
+					InstanceID:         n.InstanceId,
+					InstanceType:       n.InstanceType,
+					Addresses:          findAddress(&n),
+					Zone:               n.ZoneId,
+					Region:             n.RegionId,
+					InstanceChargeType: n.InstanceChargeType,
+					Tags:               tags,
 				}
 				break
 			}
@@ -102,12 +109,19 @@ func (e *ECSProvider) GetInstancesByIP(ctx context.Context, ips []string) (*prvd
 
 	ins := resp.Instances.Instance[0]
 
+	tags := map[string]string{}
+	for _, tag := range ins.Tags.Tag {
+		tags[tag.TagKey] = tag.TagValue
+	}
+
 	return &prvd.NodeAttribute{
-		InstanceID:   ins.InstanceId,
-		InstanceType: ins.InstanceType,
-		Addresses:    findAddress(&ins),
-		Zone:         ins.ZoneId,
-		Region:       e.auth.Region,
+		InstanceID:         ins.InstanceId,
+		InstanceType:       ins.InstanceType,
+		Addresses:          findAddress(&ins),
+		Zone:               ins.ZoneId,
+		Region:             e.auth.Region,
+		InstanceChargeType: ins.InstanceChargeType,
+		Tags:               tags,
 	}, nil
 }
 

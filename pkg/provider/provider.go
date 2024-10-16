@@ -67,11 +67,14 @@ type IMetaData interface {
 
 // NodeAttribute node attribute from cloud instance
 type NodeAttribute struct {
-	InstanceID   string
-	Addresses    []v1.NodeAddress
-	InstanceType string
-	Zone         string
-	Region       string
+	InstanceID         string
+	Addresses          []v1.NodeAddress
+	InstanceType       string
+	Zone               string
+	Region             string
+	NodePool           string
+	InstanceChargeType string
+	Tags               map[string]string
 }
 
 type IInstance interface {

@@ -44,6 +44,13 @@ const (
 	MAX_BATCH_NUM = 50
 )
 
+const (
+	ecsTagNodePoolID = "ack.alibabacloud.com/nodepool-id"
+
+	LabelNodePoolID         = "node.alibabacloud.com/nodepool-id"
+	LabelInstanceChargeType = "node.alibabacloud.com/instance-charge-type"
+)
+
 var ErrNotFound = errors.New("instance not found")
 
 type nodeModifier func(*v1.Node)
@@ -239,13 +246,36 @@ func setFields(node *v1.Node, ins *prvd.NodeAttribute, cfgRoute bool) {
 	if node.Spec.ProviderID == "" && ins.InstanceID != "" {
 		prvdId := fmt.Sprintf("%s.%s", ins.Region, ins.InstanceID)
 		klog.V(5).Infof(
-			"node %s,Adding provider id from cloud provider: %s=%s, %s=%s",
+			"node %s,Adding provider id from cloud provider: %s",
 			node.Name,
-			node.Spec.ProviderID,
 			prvdId,
 		)
 		modify := func(n *v1.Node) {
 			n.Spec.ProviderID = prvdId
+		}
+		modifiers = append(modifiers, modify)
+	}
+
+	if ins.InstanceChargeType != "" {
+		klog.V(5).Infof(
+			"node %s, Adding node label from cloud provider: %s=%s",
+			node.Name,
+			LabelInstanceChargeType, ins.InstanceChargeType,
+		)
+		modify := func(n *v1.Node) {
+			n.Labels[LabelInstanceChargeType] = ins.InstanceChargeType
+		}
+		modifiers = append(modifiers, modify)
+	}
+
+	if nodePoolID, ok := ins.Tags[ecsTagNodePoolID]; ok {
+		klog.V(5).Infof(
+			"node %s, Adding node label from cloud provider: %s=%s",
+			node.Name,
+			LabelNodePoolID, nodePoolID,
+		)
+		modify := func(n *v1.Node) {
+			n.Labels[LabelNodePoolID] = nodePoolID
 		}
 		modifiers = append(modifiers, modify)
 	}

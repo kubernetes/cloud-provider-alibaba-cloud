@@ -21,10 +21,14 @@ type MockECS struct {
 var _ prvd.IInstance = &MockECS{}
 
 const (
-	ZoneID       = "cn-hangzhou-a"
-	RegionID     = "cn-hangzhou"
-	InstanceIP   = "192.0.168.68"
-	InstanceType = "ecs.c6.xlarge"
+	ZoneID             = "cn-hangzhou-a"
+	RegionID           = "cn-hangzhou"
+	InstanceIP         = "192.0.168.68"
+	InstanceType       = "ecs.c6.xlarge"
+	NodePoolID         = "np-123456"
+	InstanceChargeType = "PostPaid"
+
+	tagKeyNodePoolID = "ack.alibabacloud.com/nodepool-id"
 )
 
 func (d *MockECS) ListInstances(ctx context.Context, ids []string) (map[string]*prvd.NodeAttribute, error) {
@@ -39,8 +43,12 @@ func (d *MockECS) ListInstances(ctx context.Context, ids []string) (map[string]*
 					Address: InstanceIP,
 				},
 			},
-			Zone:   ZoneID,
-			Region: RegionID,
+			Zone:               ZoneID,
+			Region:             RegionID,
+			InstanceChargeType: InstanceChargeType,
+			Tags: map[string]string{
+				tagKeyNodePoolID: NodePoolID,
+			},
 		}
 	}
 	return mins, nil
