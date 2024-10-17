@@ -8,7 +8,7 @@ import (
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/helper"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/service/reconcile/annotation"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/model"
-	"k8s.io/cloud-provider-alibaba-cloud/pkg/model/nlb"
+	nlbmodel "k8s.io/cloud-provider-alibaba-cloud/pkg/model/nlb"
 	"k8s.io/cloud-provider-alibaba-cloud/test/e2e/framework"
 	"k8s.io/cloud-provider-alibaba-cloud/test/e2e/options"
 	"strings"
@@ -575,7 +575,7 @@ func RunLoadBalancerTestCases(f *framework.Framework) {
 				_, nlb, err := f.FindNetworkLoadBalancer()
 				gomega.Expect(err).To(gomega.BeNil())
 				key := helper.TAGKEY
-				err = f.Client.CloudClient.UntagNLBResources(context.TODO(), nlb.LoadBalancerAttribute.LoadBalancerId, nlb.LoadBalancerTagType, []*string{&key})
+				err = f.Client.CloudClient.UntagNLBResources(context.TODO(), nlb.LoadBalancerAttribute.LoadBalancerId, nlbmodel.LoadBalancerTagType, []*string{&key})
 				gomega.Expect(err).To(gomega.BeNil())
 
 				err = f.Client.KubeClient.ScaleDeployment(0)
@@ -610,7 +610,7 @@ func RunLoadBalancerTestCases(f *framework.Framework) {
 				_, slb, err := f.FindNetworkLoadBalancer()
 				gomega.Expect(err).To(gomega.BeNil())
 				key := helper.TAGKEY
-				err = f.Client.CloudClient.UntagNLBResources(context.TODO(), slb.LoadBalancerAttribute.LoadBalancerId, nlb.LoadBalancerTagType, []*string{&key})
+				err = f.Client.CloudClient.UntagNLBResources(context.TODO(), slb.LoadBalancerAttribute.LoadBalancerId, nlbmodel.LoadBalancerTagType, []*string{&key})
 				gomega.Expect(err).To(gomega.BeNil())
 
 				err = f.Client.KubeClient.ScaleDeployment(0)

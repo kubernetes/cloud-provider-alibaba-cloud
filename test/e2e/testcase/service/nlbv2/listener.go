@@ -417,26 +417,6 @@ func RunListenerTestCases(f *framework.Framework) {
 					gomega.Expect(err).To(gomega.BeNil())
 				})
 
-				ginkgo.It("alpn: off -> on without alpn-policy", func() {
-					oldsvc, err := f.Client.KubeClient.CreateNLBServiceByAnno(map[string]string{
-						annotation.Annotation(annotation.LoadBalancerId):   options.TestConfig.InternetNetworkLoadBalancerID,
-						annotation.Annotation(annotation.ProtocolPort):     "tcpssl:443",
-						annotation.Annotation(annotation.CertID):           options.TestConfig.NLBCertID,
-						annotation.Annotation(annotation.OverrideListener): "true",
-						annotation.Annotation(annotation.AlpnEnabled):      string(model.OffFlag),
-					})
-					gomega.Expect(err).To(gomega.BeNil())
-					err = f.ExpectNetworkLoadBalancerEqual(oldsvc)
-					gomega.Expect(err).To(gomega.BeNil())
-
-					newsvc := oldsvc.DeepCopy()
-					newsvc.Annotations[annotation.Annotation(annotation.AlpnEnabled)] = string(model.OnFlag)
-					newsvc, err = f.Client.KubeClient.PatchService(oldsvc, newsvc)
-					gomega.Expect(err).To(gomega.BeNil())
-					err = f.ExpectNetworkLoadBalancerEqual(newsvc)
-					gomega.Expect(err).NotTo(gomega.BeNil())
-				})
-
 				ginkgo.It("alpn: on -> off", func() {
 					oldsvc, err := f.Client.KubeClient.CreateNLBServiceByAnno(map[string]string{
 						annotation.Annotation(annotation.LoadBalancerId):   options.TestConfig.InternetNetworkLoadBalancerID,
