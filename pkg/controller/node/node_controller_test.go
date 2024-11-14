@@ -59,6 +59,9 @@ func TestSyncCloudNode(t *testing.T) {
 	if instanceChargeType, ok := updatedNode.Labels[LabelInstanceChargeType]; !ok || instanceChargeType != vmock.InstanceChargeType {
 		t.Errorf("node label LabelInstanceChargeType not equal, expect %s, got %s", vmock.InstanceChargeType, instanceChargeType)
 	}
+	if spotStrategy, ok := updatedNode.Labels[LabelSpotStrategy]; !ok || spotStrategy != vmock.SpotStrategy {
+		t.Errorf("node label LabelSpotStrategy not equal, expect %s, got %s", vmock.SpotStrategy, spotStrategy)
+	}
 	if len(updatedNode.Status.Addresses) == 0 {
 		t.Error("node address is empty")
 	}

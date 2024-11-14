@@ -74,6 +74,7 @@ type NodeAttribute struct {
 	Region             string
 	NodePool           string
 	InstanceChargeType string
+	SpotStrategy       string
 	Tags               map[string]string
 }
 
