@@ -604,6 +604,12 @@ func (m *ReconcileService) updateReadinessCondition(reqCtx *svcCtx.RequestContex
 			pod := &v1.Pod{}
 			err := m.kubeClient.Get(reqCtx.Ctx, key, pod)
 			if err != nil {
+				// Pod may be deleted at this time,
+				// and there is no need to update readiness condition for it.
+				if apierrors.IsNotFound(err) {
+					reqCtx.Log.Info("pod not found while updating readiness condition, skip", "pod", key.String())
+					continue
+				}
 				errs = append(errs, err)
 				continue
 			}
@@ -611,6 +617,12 @@ func (m *ReconcileService) updateReadinessCondition(reqCtx *svcCtx.RequestContex
 			err = helper.UpdateReadinessConditionForPod(reqCtx.Ctx, m.kubeClient, pod, cond,
 				helper.ConditionReasonServerRegistered, helper.ConditionMessageServerRegistered)
 			if err != nil {
+				// Pod may be deleted at this time,
+				// and there is no need to update readiness condition for it.
+				if apierrors.IsNotFound(err) {
+					reqCtx.Log.Info("pod not found while updating readiness condition, skip", "pod", key.String())
+					continue
+				}
 				errs = append(errs, err)
 				continue
 			}
