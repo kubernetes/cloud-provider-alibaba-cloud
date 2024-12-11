@@ -2,6 +2,8 @@ package clbv1
 
 import (
 	"fmt"
+	"github.com/aliyun/credentials-go/credentials/utils"
+	cmap "github.com/orcaman/concurrent-map"
 	"strconv"
 
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
@@ -12,7 +14,6 @@ import (
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/model"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/model/tag"
 	prvd "k8s.io/cloud-provider-alibaba-cloud/pkg/provider"
-	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/base"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/util"
 )
 
@@ -20,12 +21,14 @@ const MaxLBTagNum = 10
 
 func NewLoadBalancerManager(cloud prvd.Provider) *LoadBalancerManager {
 	return &LoadBalancerManager{
-		cloud: cloud,
+		cloud:      cloud,
+		tokenCache: cmap.New(),
 	}
 }
 
 type LoadBalancerManager struct {
-	cloud prvd.Provider
+	cloud      prvd.Provider
+	tokenCache cmap.ConcurrentMap
 }
 
 func (mgr *LoadBalancerManager) Find(reqCtx *svcCtx.RequestContext, mdl *model.LoadBalancer) error {
@@ -53,13 +56,22 @@ func (mgr *LoadBalancerManager) Create(reqCtx *svcCtx.RequestContext, local *mod
 	if err := setModelDefaultValue(mgr, local, reqCtx.Anno); err != nil {
 		return fmt.Errorf("set model default value error: %s", err.Error())
 	}
-	clientToken := fmt.Sprintf("%s-%s", base.CLUSTER_ID[:8], reqCtx.Anno.GetDefaultLoadBalancerName())
+
+	key := reqCtx.Anno.GetDefaultLoadBalancerName()
+	clientToken := ""
+	if t, ok := mgr.tokenCache.Get(key); ok {
+		clientToken = t.(string)
+	} else {
+		clientToken = utils.GetUUID()
+		mgr.tokenCache.Set(key, clientToken)
+	}
+
 	err := mgr.cloud.CreateLoadBalancer(reqCtx.Ctx, local, clientToken)
 	if err != nil {
 		return fmt.Errorf("create slb error: %s", err.Error())
 	}
 
-	return mgr.cloud.TagCLBResource(reqCtx.Ctx, local.LoadBalancerAttribute.LoadBalancerId, local.LoadBalancerAttribute.Tags)
+	return nil
 }
 
 func (mgr *LoadBalancerManager) Delete(reqCtx *svcCtx.RequestContext, remote *model.LoadBalancer) error {
@@ -79,6 +91,8 @@ func (mgr *LoadBalancerManager) Delete(reqCtx *svcCtx.RequestContext, remote *mo
 		}
 	}
 
+	key := reqCtx.Anno.GetDefaultLoadBalancerName()
+	mgr.tokenCache.Remove(key)
 	return mgr.cloud.DeleteLoadBalancer(reqCtx.Ctx, remote)
 
 }

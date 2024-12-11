@@ -79,7 +79,7 @@ func (m MockNLB) DescribeNLB(ctx context.Context, mdl *nlbmodel.NetworkLoadBalan
 	return nil
 }
 
-func (m MockNLB) CreateNLB(ctx context.Context, mdl *nlbmodel.NetworkLoadBalancer) error {
+func (m MockNLB) CreateNLB(ctx context.Context, mdl *nlbmodel.NetworkLoadBalancer, clientToken string) error {
 	mdl.LoadBalancerAttribute.LoadBalancerId = "nlb-new-created-id"
 	return nil
 }

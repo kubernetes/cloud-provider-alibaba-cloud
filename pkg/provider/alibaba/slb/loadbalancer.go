@@ -163,6 +163,7 @@ func (p SLBProvider) CreateLoadBalancer(ctx context.Context, mdl *model.LoadBala
 	if err != nil {
 		return util.SDKError("CreateLoadBalancer", err)
 	}
+	klog.V(5).Infof("RequestId: %s, API: %s, lbId: %s", resp.RequestId, "CreateLoadbalancer", resp.LoadBalancerId)
 	mdl.LoadBalancerAttribute.LoadBalancerId = resp.LoadBalancerId
 	mdl.LoadBalancerAttribute.Address = resp.Address
 	return nil
@@ -387,6 +388,17 @@ func setRequest(request *slb.CreateLoadBalancerRequest, mdl *model.LoadBalancer)
 	}
 	if mdl.LoadBalancerAttribute.Address != "" {
 		request.Address = mdl.LoadBalancerAttribute.Address
+	}
+
+	if len(mdl.LoadBalancerAttribute.Tags) != 0 {
+		var tags []slb.CreateLoadBalancerTag
+		for _, t := range mdl.LoadBalancerAttribute.Tags {
+			tags = append(tags, slb.CreateLoadBalancerTag{
+				Key:   t.Key,
+				Value: t.Value,
+			})
+		}
+		request.Tag = &tags
 	}
 }
 

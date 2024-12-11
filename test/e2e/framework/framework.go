@@ -207,7 +207,7 @@ func (f *Framework) CreateCloudResource() error {
 			return err
 		}
 		if slbM.LoadBalancerAttribute.LoadBalancerId == "" {
-			if err := f.Client.CloudClient.CreateNLB(context.TODO(), slbM); err != nil {
+			if err := f.Client.CloudClient.CreateNLB(context.TODO(), slbM, ""); err != nil {
 				return fmt.Errorf("create internet nlb error: %s", err.Error())
 			}
 		}
@@ -229,7 +229,7 @@ func (f *Framework) CreateCloudResource() error {
 			return err
 		}
 		if slbM.LoadBalancerAttribute.LoadBalancerId == "" {
-			if err := f.Client.CloudClient.CreateNLB(context.TODO(), slbM); err != nil {
+			if err := f.Client.CloudClient.CreateNLB(context.TODO(), slbM, ""); err != nil {
 				return fmt.Errorf("create intranet nlb error: %s", err.Error())
 			}
 		}

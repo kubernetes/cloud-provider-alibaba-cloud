@@ -204,7 +204,7 @@ type INLB interface {
 	// NetworkLoadBalancer
 	FindNLB(ctx context.Context, mdl *nlbmodel.NetworkLoadBalancer) error
 	DescribeNLB(ctx context.Context, mdl *nlbmodel.NetworkLoadBalancer) error
-	CreateNLB(ctx context.Context, mdl *nlbmodel.NetworkLoadBalancer) error
+	CreateNLB(ctx context.Context, mdl *nlbmodel.NetworkLoadBalancer, clientToken string) error
 	DeleteNLB(ctx context.Context, mdl *nlbmodel.NetworkLoadBalancer) error
 	UpdateNLB(ctx context.Context, mdl *nlbmodel.NetworkLoadBalancer) error
 	UpdateNLBAddressType(ctx context.Context, mdl *nlbmodel.NetworkLoadBalancer) error
