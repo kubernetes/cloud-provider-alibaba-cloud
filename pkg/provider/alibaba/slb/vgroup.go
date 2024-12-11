@@ -44,6 +44,7 @@ func (p SLBProvider) CreateVServerGroup(ctx context.Context, vg *model.VServerGr
 	if err != nil {
 		return util.SDKError("CreateVServerGroup", err)
 	}
+	klog.V(5).Infof("RequestId: %s, API: %s, vGroupId: %s", resp.RequestId, "CreateVServerGroup", resp.VServerGroupId)
 	vg.VGroupId = resp.VServerGroupId
 	return nil
 }
@@ -64,16 +65,24 @@ func (p SLBProvider) DescribeVServerGroupAttribute(ctx context.Context, vGroupId
 func (p SLBProvider) DeleteVServerGroup(ctx context.Context, vGroupId string) error {
 	req := slb.CreateDeleteVServerGroupRequest()
 	req.VServerGroupId = vGroupId
-	_, err := p.auth.SLB.DeleteVServerGroup(req)
-	return util.SDKError("DeleteVServerGroup", err)
+	resp, err := p.auth.SLB.DeleteVServerGroup(req)
+	if err != nil {
+		return util.SDKError("DeleteVServerGroup", err)
+	}
+	klog.V(5).Infof("RequestId: %s, API: %s, vGroupId: %s", resp.RequestId, "DeleteVServerGroup", vGroupId)
+	return nil
 }
 
 func (p SLBProvider) AddVServerGroupBackendServers(ctx context.Context, vGroupId string, backends string) error {
 	req := slb.CreateAddVServerGroupBackendServersRequest()
 	req.VServerGroupId = vGroupId
 	req.BackendServers = backends
-	_, err := p.auth.SLB.AddVServerGroupBackendServers(req)
-	return util.SDKError("AddVServerGroupBackendServers", err)
+	resp, err := p.auth.SLB.AddVServerGroupBackendServers(req)
+	if err != nil {
+		return util.SDKError("AddVServerGroupBackendServers", err)
+	}
+	klog.V(5).Infof("RequestId: %s, API: %s, vGroupId: %s", resp.RequestId, "AddVServerGroupBackendServers", vGroupId)
+	return nil
 
 }
 
@@ -81,8 +90,12 @@ func (p SLBProvider) RemoveVServerGroupBackendServers(ctx context.Context, vGrou
 	req := slb.CreateRemoveVServerGroupBackendServersRequest()
 	req.VServerGroupId = vGroupId
 	req.BackendServers = backends
-	_, err := p.auth.SLB.RemoveVServerGroupBackendServers(req)
-	return util.SDKError("RemoveVServerGroupBackendServers", err)
+	resp, err := p.auth.SLB.RemoveVServerGroupBackendServers(req)
+	if err != nil {
+		return util.SDKError("RemoveVServerGroupBackendServers", err)
+	}
+	klog.V(5).Infof("RequestId: %s, API: %s, vGroupId: %s", resp.RequestId, "RemoveVServerGroupBackendServers", vGroupId)
+	return nil
 }
 
 func (p SLBProvider) SetVServerGroupAttribute(ctx context.Context, vGroupId string, backends string) error {

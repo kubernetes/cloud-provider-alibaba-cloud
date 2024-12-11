@@ -190,6 +190,8 @@ func (m *ModelApplier) applyLoadBalancerAttribute(reqCtx *svcCtx.RequestContext,
 
 func (m *ModelApplier) applyVGroups(reqCtx *svcCtx.RequestContext, local, remote *nlbmodel.NetworkLoadBalancer) error {
 	var errs []error
+	updatedServerGroups := map[string]bool{}
+
 	for i := range local.ServerGroups {
 		found := false
 		var old nlbmodel.ServerGroup
@@ -211,6 +213,12 @@ func (m *ModelApplier) applyVGroups(reqCtx *svcCtx.RequestContext, local, remote
 			}
 		}
 
+		if updatedServerGroups[local.ServerGroups[i].ServerGroupId] {
+			reqCtx.Log.Info("already updated server group, skip",
+				"vgroupID", local.ServerGroups[i].ServerGroupId, "vgroupName", local.ServerGroups[i].ServerGroupId)
+			continue
+		}
+
 		// update
 		if found {
 			// if server group type changed, need to recreate
@@ -229,6 +237,7 @@ func (m *ModelApplier) applyVGroups(reqCtx *svcCtx.RequestContext, local, remote
 					errs = append(errs, fmt.Errorf("EnsureServerGroupUpdated error: %s", err.Error()))
 					continue
 				}
+				updatedServerGroups[local.ServerGroups[i].ServerGroupId] = true
 			}
 		}
 
@@ -250,6 +259,7 @@ func (m *ModelApplier) applyVGroups(reqCtx *svcCtx.RequestContext, local, remote
 				continue
 			}
 			remote.ServerGroups = append(remote.ServerGroups, local.ServerGroups[i])
+			updatedServerGroups[local.ServerGroups[i].ServerGroupId] = true
 		}
 	}
 

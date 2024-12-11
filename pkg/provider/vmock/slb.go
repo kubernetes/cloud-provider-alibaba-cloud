@@ -309,6 +309,7 @@ func (m *MockCLB) DescribeVServerGroups(ctx context.Context, lbId string) ([]mod
 	return nil, nil
 }
 func (m *MockCLB) CreateVServerGroup(ctx context.Context, vg *model.VServerGroup, lbId string) error {
+	vg.VGroupId = fmt.Sprintf("rsp-%s", vg.VGroupName)
 	return nil
 }
 func (m *MockCLB) DescribeVServerGroupAttribute(ctx context.Context, vGroupId string) (model.VServerGroup, error) {
