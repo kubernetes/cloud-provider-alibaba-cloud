@@ -145,7 +145,7 @@ func (e *ECSProvider) getInstances(ids []string, region string) ([]ecs.Instance,
 	req.RegionId = region
 	req.InstanceIds = string(bids)
 	req.NextToken = ""
-	req.MaxResults = requests.NewInteger(50)
+	req.MaxResults = requests.NewInteger(100)
 	req.AdditionalAttributes = &[]string{"NETWORK_PRIMARY_ENI_IP"}
 
 	var ecsInstances []ecs.Instance

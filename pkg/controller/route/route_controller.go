@@ -3,7 +3,9 @@ package route
 import (
 	"context"
 	"fmt"
+	"github.com/google/uuid"
 	cmap "github.com/orcaman/concurrent-map"
+	"golang.org/x/time/rate"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -12,17 +14,20 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/util/workqueue"
 	ctrlCfg "k8s.io/cloud-provider-alibaba-cloud/pkg/config"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/context/shared"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/helper"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/node"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/model"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/util"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/util/metric"
 	"k8s.io/klog/v2"
+	"k8s.io/klog/v2/klogr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
-	"sigs.k8s.io/controller-runtime/pkg/handler"
+	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
@@ -30,39 +35,18 @@ import (
 	"time"
 )
 
+var log = klogr.New().WithName("route-controller")
+
 func Add(mgr manager.Manager, ctx *shared.SharedContext) error {
-	return add(mgr, newReconciler(mgr, ctx))
-}
+	requeueChan := make(chan event.GenericEvent, ctrlCfg.ControllerCFG.RouteReconcileBatchSize*ctrlCfg.CloudCFG.Global.RouteMaxConcurrentReconciles)
+	rateLimiter := workqueue.NewMaxOfRateLimiter(
+		workqueue.NewItemExponentialFailureRateLimiter(5*time.Second, 300*time.Second),
+		// 10 qps, 100 bucket size.  This is only for retry speed, and it's only the overall factor (not per item)
+		&workqueue.BucketRateLimiter{Limiter: rate.NewLimiter(rate.Limit(10), 100)},
+	)
 
-// newReconciler returns a new reconcile.Reconciler
-func newReconciler(mgr manager.Manager, ctx *shared.SharedContext) *ReconcileRoute {
-	recon := &ReconcileRoute{
-		cloud:           ctx.Provider(),
-		client:          mgr.GetClient(),
-		scheme:          mgr.GetScheme(),
-		record:          mgr.GetEventRecorderFor("route-controller"),
-		nodeCache:       cmap.New(),
-		configRoutes:    ctrlCfg.ControllerCFG.ConfigureCloudRoutes,
-		reconcilePeriod: ctrlCfg.ControllerCFG.RouteReconciliationPeriod.Duration,
-	}
-	return recon
-}
+	r := newReconciler(mgr, ctx, requeueChan, rateLimiter)
 
-type routeController struct {
-	c     controller.Controller
-	recon *ReconcileRoute
-}
-
-// Start() function will not be called until the resource lock is acquired
-func (controller routeController) Start(ctx context.Context) error {
-	if controller.recon.configRoutes {
-		controller.recon.periodicalSync()
-	}
-	return controller.c.Start(ctx)
-}
-
-// add adds a new Controller to mgr with r as the reconcile.Reconciler
-func add(mgr manager.Manager, r *ReconcileRoute) error {
 	recoverPanic := true
 	// Create a new controller
 	c, err := controller.NewUnmanaged(
@@ -77,17 +61,59 @@ func add(mgr manager.Manager, r *ReconcileRoute) error {
 		return err
 	}
 
+	enqueueRequest := &enqueueRequestForNodeEvent{
+		rateLimiter: rateLimiter,
+	}
 	// Watch for changes to primary resource AutoRepair
-	err = c.Watch(
+	if err := c.Watch(
 		source.Kind(mgr.GetCache(), &corev1.Node{}),
-		&handler.EnqueueRequestForObject{},
+		enqueueRequest,
 		&predicateForNodeEvent{},
-	)
-	if err != nil {
+	); err != nil {
+		return err
+	}
+
+	if err := c.Watch(
+		&source.Channel{Source: requeueChan},
+		enqueueRequest); err != nil {
 		return err
 	}
 
 	return mgr.Add(&routeController{c: c, recon: r})
+}
+
+// newReconciler returns a new reconcile.Reconciler
+func newReconciler(mgr manager.Manager, ctx *shared.SharedContext, requeue chan<- event.GenericEvent, rateLimiter workqueue.RateLimiter) *ReconcileRoute {
+
+	recon := &ReconcileRoute{
+		cloud:           ctx.Provider(),
+		client:          mgr.GetClient(),
+		scheme:          mgr.GetScheme(),
+		record:          mgr.GetEventRecorderFor("route-controller"),
+		nodeCache:       cmap.New(),
+		configRoutes:    ctrlCfg.ControllerCFG.ConfigureCloudRoutes,
+		reconcilePeriod: ctrlCfg.ControllerCFG.RouteReconciliationPeriod.Duration,
+		requeueChan:     requeue,
+		requestChan:     make(chan reconcile.Request, ctrlCfg.ControllerCFG.RouteReconcileBatchSize*ctrlCfg.CloudCFG.Global.RouteMaxConcurrentReconciles),
+		rateLimiter:     rateLimiter,
+	}
+	return recon
+}
+
+type routeController struct {
+	c     controller.Controller
+	recon *ReconcileRoute
+}
+
+// Start function will not be called until the resource lock is acquired
+func (controller routeController) Start(ctx context.Context) error {
+	if controller.recon.configRoutes {
+		controller.recon.periodicalSync()
+		for i := range ctrlCfg.CloudCFG.Global.RouteMaxConcurrentReconciles {
+			go controller.recon.batchWorker(ctx, i)
+		}
+	}
+	return controller.c.Start(ctx)
 }
 
 // ReconcileRoute implements reconcile.Reconciler
@@ -107,6 +133,11 @@ type ReconcileRoute struct {
 
 	//record event recorder
 	record record.EventRecorder
+
+	requeueChan chan<- event.GenericEvent
+	requestChan chan reconcile.Request
+
+	rateLimiter workqueue.RateLimiter
 }
 
 func (r *ReconcileRoute) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
@@ -114,55 +145,73 @@ func (r *ReconcileRoute) Reconcile(ctx context.Context, request reconcile.Reques
 	if !r.configRoutes {
 		return reconcile.Result{}, nil
 	}
+	log.Info("enqueue route reconcile request", "node", request.Name)
+	r.requestChan <- request
+	return reconcile.Result{}, nil
+}
 
-	reconcileNode := &corev1.Node{}
-	err := r.client.Get(context.TODO(), request.NamespacedName, reconcileNode)
-	if err != nil {
-		if errors.IsNotFound(err) {
-			if o, ok := r.nodeCache.Get(request.Name); ok {
-				if route, ok := o.(*model.Route); ok {
-					start := time.Now()
-					tables, err := getRouteTables(ctx, r.cloud)
-					if err != nil {
-						klog.Errorf("error get route tables to delete node %s route %v, error: %v", request.Name, route, err)
-						return reconcile.Result{}, err
-					}
-					var errList []error
-					for _, table := range tables {
-						if err = deleteRouteForInstance(ctx, table, route.ProviderId, route.DestinationCIDR, r.cloud); err != nil {
-							errList = append(errList, err)
-							klog.Errorf("error delete route entry for delete node %s route %v, error: %v", request.Name, route, err)
-						} else {
-							klog.Infof("successfully delete route entry for node %s route %s", request.Name, route)
-						}
-					}
-					metric.RouteLatency.WithLabelValues("delete").Observe(metric.MsSince(start))
-					if aggrErr := utilerrors.NewAggregate(errList); aggrErr == nil {
-						r.nodeCache.Remove(request.Name)
+func (r *ReconcileRoute) batchWorker(ctx context.Context, idx int) {
+	log.Info("starting batch worker", "worker", idx)
+outer:
+	for {
+		var requests []reconcile.Request
+		var names []string
+		var requestMap map[string]bool
+		select {
+		case m := <-r.requestChan:
+			requests = []reconcile.Request{m}
+			names = []string{m.Name}
+			requestMap = map[string]bool{m.Name: true}
+			// sleep to aggregate recently events as many as possible
+			time.Sleep(time.Duration(ctrlCfg.ControllerCFG.NodeEventAggregationWaitSeconds) * time.Second)
+		inner:
+			for {
+				if len(requests) >= ctrlCfg.ControllerCFG.RouteReconcileBatchSize {
+					break
+				}
+				select {
+				case m = <-r.requestChan:
+					if !requestMap[m.Name] {
+						requests = append(requests, m)
+						names = append(names, m.Name)
+						requestMap[m.Name] = true
 					} else {
-						// requeue for remove error
-						return reconcile.Result{}, aggrErr
+						log.V(4).Info("duplicated request", "request", m)
 					}
+				default:
+					break inner
 				}
 			}
-			return reconcile.Result{}, nil
+		case <-ctx.Done():
+			log.Info("context done, batch worker is shutting down")
+			break outer
 		}
-		return reconcile.Result{}, err
-	}
 
-	err = r.syncCloudRoute(ctx, reconcileNode)
-	if err != nil {
-		klog.Errorf("add route for node %s failed, err: %s", reconcileNode.Name, err.Error())
-		nodeRef := &corev1.ObjectReference{
-			Kind:      "Node",
-			Name:      reconcileNode.Name,
-			UID:       types.UID(reconcileNode.Name),
-			Namespace: "",
+		startTime := time.Now()
+		reconcileID := uuid.New().String()
+		log.Info("batch reconcile routes",
+			"length", len(requests), "names", names, "worker", idx, "reconcileID", reconcileID)
+		if err := r.batchSyncCloudRoutes(ctx, reconcileID, requests); err != nil {
+			log.Error(err, "Sync routes error, requeue", "names", names, "reconcileID", reconcileID)
+			r.record.Eventf(
+				&corev1.Event{ObjectMeta: metav1.ObjectMeta{Name: "route-controller"}},
+				corev1.EventTypeWarning, helper.FailedSyncRoute,
+				"Reconciling route error: %s",
+				err.Error(),
+			)
+			for _, req := range requests {
+				r.requeueNode(&corev1.Node{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: req.Name,
+					},
+				})
+			}
+			continue
 		}
-		r.record.Event(nodeRef, corev1.EventTypeWarning, helper.FailedSyncRoute, "sync cloud route failed")
+		log.Info("Successfully reconcile routes",
+			"nodes", names, "worker", idx,
+			"elapsedTime", time.Since(startTime).Seconds(), "reconcileID", reconcileID)
 	}
-	// no need to retry, reconcileForCluster() will reconcile routes periodically
-	return reconcile.Result{}, nil
 }
 
 func (r *ReconcileRoute) syncCloudRoute(ctx context.Context, node *corev1.Node) error {
@@ -309,7 +358,10 @@ func (r *ReconcileRoute) updateNetworkingCondition(ctx context.Context, node *co
 }
 
 func (r *ReconcileRoute) periodicalSync() {
-	go wait.Until(r.reconcileForCluster, r.reconcilePeriod, wait.NeverStop)
+	go func() {
+		time.Sleep(r.reconcilePeriod)
+		wait.Until(r.reconcileForCluster, r.reconcilePeriod, wait.NeverStop)
+	}()
 }
 
 func (r *ReconcileRoute) reconcileForCluster() {
@@ -353,5 +405,177 @@ func (r *ReconcileRoute) reconcileForCluster() {
 		)
 	} else {
 		klog.Infof("sync route tables successfully, tables [%s]", strings.Join(tables, ","))
+	}
+}
+
+func (r *ReconcileRoute) batchSyncCloudRoutes(ctx context.Context, reconcileID string, requests []reconcile.Request) error {
+	startTime := time.Now()
+	var toAddedNodes []*corev1.Node
+	toAdd := map[string][]*model.Route{}
+	var toDelete []*model.Route
+
+	for _, request := range requests {
+		n := &corev1.Node{}
+		err := r.client.Get(ctx, request.NamespacedName, n)
+		if err != nil {
+			// todo: check deletion timestamp
+			if errors.IsNotFound(err) {
+				if o, ok := r.nodeCache.Get(request.Name); ok {
+					if route, ok := o.(*model.Route); ok {
+						toDelete = append(toDelete, &model.Route{
+							Name:            route.Name,
+							DestinationCIDR: route.DestinationCIDR,
+							ProviderId:      route.ProviderId,
+							NodeReference: &corev1.Node{
+								ObjectMeta: metav1.ObjectMeta{
+									Name: request.Name,
+								},
+							},
+						})
+					}
+				}
+				// node not found, ignore
+				continue
+			}
+			log.Error(err, "error getting node, requeue", "node", request.Name, "reconcileID", reconcileID)
+			r.requeueNode(&corev1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: request.Name,
+				},
+			})
+		}
+		if !needSyncRoute(n) {
+			continue
+		}
+		if n.Spec.ProviderID == "" {
+			log.Info("node's provider id is not exist, skip creating route", "node", n.Name, "reconcileID", reconcileID)
+			continue
+		}
+
+		if _, _, err := util.NodeFromProviderID(n.Spec.ProviderID); err != nil {
+			log.Error(err, "invalid providerID, requeue", "node", n.Name, "providerID", n.Spec.ProviderID, "reconcileID", reconcileID)
+			r.requeueChan <- event.GenericEvent{Object: n}
+			continue
+
+		}
+
+		_, ipv4RouteCidr, err := getIPv4RouteForNode(n)
+		if err != nil || ipv4RouteCidr == "" {
+			log.Error(err, "node parse podCIDR error, skip creating route",
+				"node", n.Name, "cidr", n.Spec.PodCIDR, "reconcileID", reconcileID)
+			if err1 := r.updateNetworkingCondition(ctx, n, false); err1 != nil {
+				klog.Errorf("route, update network condition error: %v", err1)
+			}
+			r.requeueChan <- event.GenericEvent{Object: n}
+			continue
+		}
+
+		toAddedNodes = append(toAddedNodes, n)
+	}
+
+	if len(toAddedNodes) == 0 && len(toDelete) == 0 {
+		log.Info("no route need to be added.", "reconcileID", reconcileID)
+		return nil
+	}
+
+	tables, err := getRouteTables(ctx, r.cloud)
+	if err != nil {
+		// todo: add event
+		return err
+	}
+
+	cachedRoutes := map[string][]*model.Route{}
+	for _, t := range tables {
+		routes, err := r.cloud.ListRoute(ctx, t)
+		if err != nil {
+			return err
+		}
+		cachedRoutes[t] = routes
+	}
+
+	for _, n := range toAddedNodes {
+		for _, table := range tables {
+			_, ipv4RouteCidr, _ := getIPv4RouteForNode(n)
+
+			route, err := findRoute(ctx, table, n.Spec.ProviderID, ipv4RouteCidr, cachedRoutes[table], r.cloud)
+			if err != nil {
+				log.Error(err, "error find route existence for instance", "providerID", n.Spec.ProviderID, "reconcileID", reconcileID)
+				nodeRef := &corev1.ObjectReference{
+					Kind: "Node",
+					Name: n.Name,
+					UID:  n.UID,
+				}
+				r.record.Event(
+					nodeRef,
+					corev1.EventTypeWarning,
+					"DescriberRouteFailed",
+					fmt.Sprintf("Describe Route Failed for %s reason: %s", table, helper.GetLogMessage(err)),
+				)
+				r.requeueNode(n)
+				continue
+			}
+
+			if route == nil {
+				toAdd[table] = append(toAdd[table], &model.Route{
+					Name:            fmt.Sprintf("%s-%s", n.Spec.ProviderID, ipv4RouteCidr),
+					DestinationCIDR: ipv4RouteCidr,
+					ProviderId:      n.Spec.ProviderID,
+					NodeReference:   n,
+				})
+			} else {
+				r.rateLimiter.Forget(reconcile.Request{
+					NamespacedName: types.NamespacedName{
+						Name: n.Name,
+					},
+				})
+			}
+		}
+	}
+
+	preparedTime := time.Now()
+	log.Info("Start sync routes", "reconcileID", reconcileID)
+
+	var errs []error
+	for _, t := range tables {
+		err = r.batchDeleteRoutes(ctx, reconcileID, t, toDelete)
+		if err != nil {
+			var toDeleteNames []string
+			for _, d := range toDelete {
+				toDeleteNames = append(toDeleteNames, d.Name)
+			}
+			log.Error(err, "batch delete routes failed, requeue all routes", "table", t, "entries", toDeleteNames, "reconcileID", reconcileID)
+			for _, route := range toDelete {
+				r.requeueNode(route.NodeReference)
+			}
+			errs = append(errs, err)
+		}
+		err = r.batchAddRoutes(ctx, reconcileID, t, toAdd[t])
+		if err != nil {
+			var toAddNames []string
+			for _, d := range toAdd[t] {
+				toAddNames = append(toAddNames, d.Name)
+			}
+			log.Error(err, "batch add routes failed, requeue all routes", "table", t, "entries", toAdd[t], "reconcileID", reconcileID)
+			for _, route := range toAdd[t] {
+				r.requeueNode(route.NodeReference)
+			}
+			errs = append(errs, err)
+			continue
+		}
+	}
+
+	log.Info("Sync cloud routes done", "reconcileID", reconcileID,
+		"prepareTime", preparedTime.Sub(startTime).Seconds(), "syncTime", time.Now().Sub(preparedTime).Seconds())
+
+	return utilerrors.NewAggregate(errs)
+}
+
+func (r *ReconcileRoute) requeueNode(n *corev1.Node) {
+	// if the channel is full, drop the event to prevent blocking
+	select {
+	case r.requeueChan <- event.GenericEvent{Object: n}:
+		break
+	default:
+		log.Info("requeue channel is full, drop the request", "node", n.Name)
 	}
 }

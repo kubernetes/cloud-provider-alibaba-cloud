@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/model"
+	prvd "k8s.io/cloud-provider-alibaba-cloud/pkg/provider"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/base"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/vpc"
 	"net"
@@ -24,12 +25,20 @@ type DryRunVPC struct {
 	routetables []string
 }
 
+func (m *DryRunVPC) CreateRoutes(ctx context.Context, table string, routes []*model.Route) ([]string, []prvd.RouteUpdateStatus, error) {
+	return m.vpc.CreateRoutes(ctx, table, routes)
+}
+
 func (m *DryRunVPC) CreateRoute(ctx context.Context, table string, provideID string, destinationCIDR string) (*model.Route, error) {
 	return m.vpc.CreateRoute(ctx, table, provideID, destinationCIDR)
 }
 
 func (m *DryRunVPC) DeleteRoute(ctx context.Context, table, provideID, destinationCIDR string) error {
 	return m.vpc.DeleteRoute(ctx, table, provideID, destinationCIDR)
+}
+
+func (m *DryRunVPC) DeleteRoutes(ctx context.Context, table string, routes []*model.Route) ([]prvd.RouteUpdateStatus, error) {
+	return m.vpc.DeleteRoutes(ctx, table, routes)
 }
 
 func (m *DryRunVPC) ListRoute(ctx context.Context, table string) ([]*model.Route, error) {

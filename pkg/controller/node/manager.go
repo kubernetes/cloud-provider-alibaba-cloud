@@ -41,7 +41,7 @@ const (
 	NODE_CONTROLLER = "cloud-node-controller"
 
 	// MAX_BATCH_NUM batch process per loop.
-	MAX_BATCH_NUM = 50
+	MAX_BATCH_NUM = 100
 )
 
 const (
@@ -58,10 +58,10 @@ type nodeModifier func(*v1.Node)
 
 func batchOperate(
 	nodes []v1.Node,
-	batch func([]v1.Node) error,
+	batch func([]v1.Node, bool) error,
 ) error {
 	for len(nodes) > MAX_BATCH_NUM {
-		if err := batch(nodes[0:MAX_BATCH_NUM]); err != nil {
+		if err := batch(nodes[0:MAX_BATCH_NUM], false); err != nil {
 			klog.Errorf("batch process func error: %s", err.Error())
 			return err
 		}
@@ -70,7 +70,7 @@ func batchOperate(
 	if len(nodes) <= 0 {
 		return nil
 	}
-	return batch(nodes)
+	return batch(nodes, false)
 }
 
 func nodeids(nodes []v1.Node) []string {
@@ -194,7 +194,7 @@ func findCloudECSByIp(ins prvd.IInstance, node *v1.Node) (*prvd.NodeAttribute, e
 	return cloudIns, nil
 }
 
-func setFields(node *v1.Node, ins *prvd.NodeAttribute, cfgRoute bool) {
+func setFields(node *v1.Node, ins *prvd.NodeAttribute, cfgRoute bool, removeTaints bool) {
 
 	if node.Labels == nil {
 		node.Labels = make(map[string]string)
@@ -291,10 +291,13 @@ func setFields(node *v1.Node, ins *prvd.NodeAttribute, cfgRoute bool) {
 		modifiers = append(modifiers, modify)
 	}
 
-	modifiers = append(modifiers, removeCloudTaints)
+	if removeTaints {
+		modifiers = append(modifiers, removeCloudTaints)
+	} else {
+		klog.V(5).Infof("node %s, skip remove cloud taints", node.Name)
+	}
 
 	if cfgRoute && !helper.HasExcludeLabel(node) {
-
 		modifiers = append(modifiers, setNetworkUnavailable)
 	}
 

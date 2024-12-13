@@ -4,6 +4,7 @@ import (
 	"context"
 	servicesvpc "github.com/aliyun/alibaba-cloud-sdk-go/services/vpc"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/model"
+	prvd "k8s.io/cloud-provider-alibaba-cloud/pkg/provider"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/base"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/vpc"
 	"net"
@@ -19,11 +20,18 @@ type MockVPC struct {
 	auth *base.ClientMgr
 }
 
+func (m *MockVPC) CreateRoutes(ctx context.Context, table string, routes []*model.Route) ([]string, []prvd.RouteUpdateStatus, error) {
+	panic("implement me")
+}
+
 func (m *MockVPC) CreateRoute(ctx context.Context, table string, provideID string, destinationCIDR string) (*model.Route, error) {
 	panic("implement me")
 }
 
 func (m *MockVPC) DeleteRoute(ctx context.Context, table, provideID, destinationCIDR string) error {
+	panic("implement me")
+}
+func (m *MockVPC) DeleteRoutes(ctx context.Context, table string, routes []*model.Route) ([]prvd.RouteUpdateStatus, error) {
 	panic("implement me")
 }
 

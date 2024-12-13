@@ -69,9 +69,18 @@ func (d *MockECS) DescribeNetworkInterfaces(vpcId string, ips []string, ipVersio
 }
 
 func (d *MockECS) DescribeNetworkInterfacesByIDs(ids []string) ([]*prvd.EniAttribute, error) {
-	panic("implement me!")
+	var ret []*prvd.EniAttribute
+	for _, i := range ids {
+		ret = append(ret, &prvd.EniAttribute{
+			NetworkInterfaceID: i,
+			Status:             "Attached",
+			PrivateIPAddress:   "192.168.0.1",
+			SourceDestCheck:    true,
+		})
+	}
+	return ret, nil
 }
 
 func (d *MockECS) ModifyNetworkInterfaceSourceDestCheck(id string, enabled bool) error {
-	panic("implement me!")
+	return nil
 }

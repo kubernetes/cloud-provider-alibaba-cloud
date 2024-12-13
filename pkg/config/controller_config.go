@@ -13,15 +13,17 @@ import (
 )
 
 const (
-	flagCloudProvider                = "cloud-provider"
-	flagClusterName                  = "cluster-name"
-	flagCloudConfig                  = "cloud-config"
-	flagControllers                  = "controllers"
-	flagConfigureCloudRoutes         = "configure-cloud-routes"
-	flagClusterCidr                  = "cluster-cidr"
-	flagAllocateNodeCIDRs            = "allocate-node-cidrs"
-	flagFeatureGates                 = "feature-gates"
-	flagUseServiceAccountCredentials = "use-service-account-credentials"
+	flagCloudProvider                   = "cloud-provider"
+	flagClusterName                     = "cluster-name"
+	flagCloudConfig                     = "cloud-config"
+	flagControllers                     = "controllers"
+	flagConfigureCloudRoutes            = "configure-cloud-routes"
+	flagClusterCidr                     = "cluster-cidr"
+	flagAllocateNodeCIDRs               = "allocate-node-cidrs"
+	flagFeatureGates                    = "feature-gates"
+	flagUseServiceAccountCredentials    = "use-service-account-credentials"
+	flagSkipDisableSourceDestCheck      = "skip-disable-source-dest-check"
+	flagNodeEventAggregationWaitSeconds = "node-event-aggregation-wait-seconds"
 
 	flagDryRun                         = "dry-run"
 	flagServiceMaxConcurrentReconciles = "concurrent-service-syncs"
@@ -48,13 +50,17 @@ var ControllerCFG = &ControllerConfig{
 // Flag stores the configuration for global usage
 type ControllerConfig struct {
 	config.KubeCloudSharedConfiguration
-	CloudConfigPath      string
-	Controllers          []string
-	FeatureGates         string
-	ServerGroupBatchSize int
-	LogLevel             int
-	DryRun               bool
-	NetWork              string
+	CloudConfigPath                 string
+	Controllers                     []string
+	FeatureGates                    string
+	ServerGroupBatchSize            int
+	LogLevel                        int
+	DryRun                          bool
+	NetWork                         string
+	NodeReconcileBatchSize          int
+	RouteReconcileBatchSize         int
+	SkipDisableSourceDestCheck      bool
+	NodeEventAggregationWaitSeconds int
 
 	RuntimeConfig RuntimeConfig
 	CloudConfig   *CloudConfig
@@ -81,6 +87,11 @@ func (cfg *ControllerConfig) BindFlags(fs *pflag.FlagSet) {
 	fs.BoolVar(&cfg.AllowUntaggedCloud, "allow-untagged-cloud", false, "Allow the cluster to run without the cluster-id on cloud instances. This is a legacy mode of operation and a cluster-id will be required in the future.")
 	_ = fs.MarkDeprecated("allow-untagged-cloud", "This flag is deprecated and will be removed in a future release. A cluster-id will be required on cloud instances.")
 
+	fs.IntVar(&cfg.NodeReconcileBatchSize, "node-reconcile-batch-size", 100, "The batch size for syncing node status. The value range is 1-100")
+	fs.IntVar(&cfg.RouteReconcileBatchSize, "route-reconcile-batch-size", 50, "The batch size for syncing route status. The value range is 1-50")
+	fs.BoolVar(&cfg.SkipDisableSourceDestCheck, flagSkipDisableSourceDestCheck, false, "Skip disable source dest check for nodes")
+	fs.IntVar(&cfg.NodeEventAggregationWaitSeconds, flagNodeEventAggregationWaitSeconds, 1, "The wait second for aggregating node events in node & route controller")
+
 	cfg.RuntimeConfig.BindFlags(fs)
 }
 
@@ -97,6 +108,15 @@ func (cfg *ControllerConfig) Validate() error {
 	if cfg.RouteReconciliationPeriod.Duration < 1*time.Minute {
 		cfg.RouteReconciliationPeriod.Duration = 1 * time.Minute
 	}
+
+	if cfg.NodeReconcileBatchSize == 0 {
+		cfg.NodeReconcileBatchSize = 100
+	}
+
+	if cfg.NodeEventAggregationWaitSeconds < 0 {
+		cfg.NodeEventAggregationWaitSeconds = 0
+	}
+
 	return nil
 }
 
@@ -119,6 +139,7 @@ func (cfg *ControllerConfig) LoadControllerConfig() error {
 		return fmt.Errorf("load cloud config error: %s", err.Error())
 	}
 	cfg.CloudConfig.PrintInfo()
+	klog.Infof("NodeReconcileBatchSize: %d, RouteReconcileBatchSize: %d", cfg.NodeReconcileBatchSize, cfg.RouteReconcileBatchSize)
 
 	if cfg.CloudConfig.Global.FeatureGates != "" {
 		apiClient := apiext.NewForConfigOrDie(sigConfig.GetConfigOrDie())

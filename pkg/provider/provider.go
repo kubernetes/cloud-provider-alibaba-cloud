@@ -95,9 +95,18 @@ type IInstance interface {
 	ModifyNetworkInterfaceSourceDestCheck(id string, enabled bool) error
 }
 
+type RouteUpdateStatus struct {
+	Route         *model.Route
+	Failed        bool
+	FailedCode    string
+	FailedMessage string
+}
+
 type IVPC interface {
 	CreateRoute(ctx context.Context, table string, provideID string, destinationCIDR string) (*model.Route, error)
+	CreateRoutes(ctx context.Context, table string, routes []*model.Route) ([]string, []RouteUpdateStatus, error)
 	DeleteRoute(ctx context.Context, table, provideID, destinationCIDR string) error
+	DeleteRoutes(ctx context.Context, table string, routes []*model.Route) ([]RouteUpdateStatus, error)
 	ListRoute(ctx context.Context, table string) ([]*model.Route, error)
 	FindRoute(ctx context.Context, table, pvid, cidr string) (*model.Route, error)
 	ListRouteTables(ctx context.Context, vpcID string) ([]string, error)

@@ -2,7 +2,6 @@ package vmock
 
 import (
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider"
-	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/base"
 )
 
@@ -21,7 +20,7 @@ func NewMockCloud(auth *base.ClientMgr) prvd.Provider {
 	}
 }
 
-var _ prvd.Provider = alibaba.AlibabaCloud{}
+var _ prvd.Provider = MockCloud{}
 
 // MockCloud for unit test
 type MockCloud struct {
