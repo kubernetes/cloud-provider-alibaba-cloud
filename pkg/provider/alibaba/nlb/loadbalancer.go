@@ -91,13 +91,28 @@ func (p *NLBProvider) DescribeNLB(ctx context.Context, mdl *nlbmodel.NetworkLoad
 
 }
 
-func (p *NLBProvider) CreateNLB(ctx context.Context, mdl *nlbmodel.NetworkLoadBalancer) error {
+func (p *NLBProvider) CreateNLB(ctx context.Context, mdl *nlbmodel.NetworkLoadBalancer, clientToken string) error {
 	req := &nlb.CreateLoadBalancerRequest{
 		AddressType:      tea.String(mdl.LoadBalancerAttribute.AddressType),
 		LoadBalancerName: tea.String(mdl.LoadBalancerAttribute.Name),
 		VpcId:            tea.String(mdl.LoadBalancerAttribute.VpcId),
 		ZoneMappings:     []*nlb.CreateLoadBalancerRequestZoneMappings{},
 	}
+	if clientToken != "" {
+		req.ClientToken = &clientToken
+	}
+
+	if len(mdl.LoadBalancerAttribute.Tags) != 0 {
+		var tags []*nlb.CreateLoadBalancerRequestTag
+		for _, t := range mdl.LoadBalancerAttribute.Tags {
+			tags = append(tags, &nlb.CreateLoadBalancerRequestTag{
+				Key:   tea.String(t.Key),
+				Value: tea.String(t.Value),
+			})
+		}
+		req.Tag = tags
+	}
+
 	if mdl.LoadBalancerAttribute.ResourceGroupId != "" {
 		req.ResourceGroupId = tea.String(mdl.LoadBalancerAttribute.ResourceGroupId)
 	}

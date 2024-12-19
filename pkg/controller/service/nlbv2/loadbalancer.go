@@ -2,6 +2,8 @@ package nlbv2
 
 import (
 	"fmt"
+	"github.com/aliyun/credentials-go/credentials/utils"
+	cmap "github.com/orcaman/concurrent-map"
 	"strings"
 
 	"github.com/alibabacloud-go/tea/tea"
@@ -18,12 +20,14 @@ import (
 
 func NewNLBManager(cloud prvd.Provider) *NLBManager {
 	return &NLBManager{
-		cloud: cloud,
+		cloud:      cloud,
+		tokenCache: cmap.New(),
 	}
 }
 
 type NLBManager struct {
-	cloud prvd.Provider
+	cloud      prvd.Provider
+	tokenCache cmap.ConcurrentMap
 }
 
 func (mgr *NLBManager) BuildLocalModel(reqCtx *svcCtx.RequestContext, mdl *nlbmodel.NetworkLoadBalancer) error {
@@ -108,13 +112,21 @@ func (mgr *NLBManager) Create(reqCtx *svcCtx.RequestContext, mdl *nlbmodel.Netwo
 		return fmt.Errorf("set model default value error: %s", err.Error())
 	}
 
-	err := mgr.cloud.CreateNLB(reqCtx.Ctx, mdl)
+	key := reqCtx.Anno.GetDefaultLoadBalancerName()
+	clientToken := ""
+	if t, ok := mgr.tokenCache.Get(key); ok {
+		clientToken = t.(string)
+	} else {
+		clientToken = utils.GetUUID()
+		mgr.tokenCache.Set(key, clientToken)
+	}
+
+	err := mgr.cloud.CreateNLB(reqCtx.Ctx, mdl, clientToken)
 	if err != nil {
 		return err
 	}
 
-	return mgr.cloud.TagNLBResource(reqCtx.Ctx, mdl.LoadBalancerAttribute.LoadBalancerId,
-		nlbmodel.LoadBalancerTagType, mdl.LoadBalancerAttribute.Tags)
+	return nil
 }
 
 func (mgr *NLBManager) Delete(reqCtx *svcCtx.RequestContext, mdl *nlbmodel.NetworkLoadBalancer) error {
@@ -129,6 +141,8 @@ func (mgr *NLBManager) Delete(reqCtx *svcCtx.RequestContext, mdl *nlbmodel.Netwo
 		return fmt.Errorf("disable delete protection error: %s", err.Error())
 	}
 
+	key := reqCtx.Anno.GetDefaultLoadBalancerName()
+	mgr.tokenCache.Remove(key)
 	return mgr.cloud.DeleteNLB(reqCtx.Ctx, mdl)
 }
 

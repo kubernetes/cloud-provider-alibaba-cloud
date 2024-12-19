@@ -53,7 +53,7 @@ func (d DryRunNLB) DescribeNLB(ctx context.Context, mdl *nlbmodel.NetworkLoadBal
 	panic("implement me")
 }
 
-func (d DryRunNLB) CreateNLB(ctx context.Context, mdl *nlbmodel.NetworkLoadBalancer) error {
+func (d DryRunNLB) CreateNLB(ctx context.Context, mdl *nlbmodel.NetworkLoadBalancer, clientToken string) error {
 	//TODO implement me
 	panic("implement me")
 }
