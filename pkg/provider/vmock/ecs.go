@@ -27,6 +27,7 @@ const (
 	InstanceType       = "ecs.c6.xlarge"
 	NodePoolID         = "np-123456"
 	InstanceChargeType = "PostPaid"
+	SpotStrategy       = "SpotAsPriceGo"
 
 	tagKeyNodePoolID = "ack.alibabacloud.com/nodepool-id"
 )
@@ -46,6 +47,7 @@ func (d *MockECS) ListInstances(ctx context.Context, ids []string) (map[string]*
 			Zone:               ZoneID,
 			Region:             RegionID,
 			InstanceChargeType: InstanceChargeType,
+			SpotStrategy:       SpotStrategy,
 			Tags: map[string]string{
 				tagKeyNodePoolID: NodePoolID,
 			},

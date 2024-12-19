@@ -49,6 +49,7 @@ const (
 
 	LabelNodePoolID         = "node.alibabacloud.com/nodepool-id"
 	LabelInstanceChargeType = "node.alibabacloud.com/instance-charge-type"
+	LabelSpotStrategy       = "node.alibabacloud.com/spot-strategy"
 )
 
 var ErrNotFound = errors.New("instance not found")
@@ -264,6 +265,17 @@ func setFields(node *v1.Node, ins *prvd.NodeAttribute, cfgRoute bool) {
 		)
 		modify := func(n *v1.Node) {
 			n.Labels[LabelInstanceChargeType] = ins.InstanceChargeType
+		}
+		modifiers = append(modifiers, modify)
+	}
+
+	if ins.SpotStrategy != "" {
+		klog.V(5).Infof(
+			"node %s, Adding node label from cloud provider: %s=%s",
+			node.Name,
+			LabelSpotStrategy, ins.SpotStrategy)
+		modify := func(n *v1.Node) {
+			n.Labels[LabelSpotStrategy] = ins.SpotStrategy
 		}
 		modifiers = append(modifiers, modify)
 	}

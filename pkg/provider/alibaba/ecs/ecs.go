@@ -70,6 +70,7 @@ func (e *ECSProvider) ListInstances(ctx context.Context, ids []string) (map[stri
 					Zone:               n.ZoneId,
 					Region:             n.RegionId,
 					InstanceChargeType: n.InstanceChargeType,
+					SpotStrategy:       n.SpotStrategy,
 					Tags:               tags,
 				}
 				break
@@ -121,6 +122,7 @@ func (e *ECSProvider) GetInstancesByIP(ctx context.Context, ips []string) (*prvd
 		Zone:               ins.ZoneId,
 		Region:             e.auth.Region,
 		InstanceChargeType: ins.InstanceChargeType,
+		SpotStrategy:       ins.SpotStrategy,
 		Tags:               tags,
 	}, nil
 }
