@@ -18,6 +18,7 @@ import (
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/util"
 	"k8s.io/klog/v2"
 	"reflect"
+	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
@@ -149,15 +150,15 @@ func needAdd(newService *v1.Service) bool {
 }
 
 // NewEnqueueRequestForEndpointEvent, event handler for endpoint events
-func NewEnqueueRequestForEndpointEvent(client client.Client, eventRecorder record.EventRecorder) *enqueueRequestForEndpointEvent {
+func NewEnqueueRequestForEndpointEvent(cache cache.Cache, eventRecorder record.EventRecorder) *enqueueRequestForEndpointEvent {
 	return &enqueueRequestForEndpointEvent{
-		client:        client,
+		cache:         cache,
 		eventRecorder: eventRecorder,
 	}
 }
 
 type enqueueRequestForEndpointEvent struct {
-	client        client.Client
+	cache         cache.Cache
 	eventRecorder record.EventRecorder
 }
 
@@ -165,7 +166,7 @@ var _ handler.EventHandler = (*enqueueRequestForEndpointEvent)(nil)
 
 func (h *enqueueRequestForEndpointEvent) Create(_ context.Context, e event.CreateEvent, queue workqueue.RateLimitingInterface) {
 	ep, ok := e.Object.(*v1.Endpoints)
-	if ok && isEndpointProcessNeeded(ep, h.client) {
+	if ok && isEndpointProcessNeeded(ep, h.cache) {
 		util.NLBLog.Info("controller: endpoint create event", "endpoint", util.Key(ep))
 		h.enqueueManagedEndpoint(queue, ep)
 	}
@@ -175,7 +176,7 @@ func (h *enqueueRequestForEndpointEvent) Update(_ context.Context, e event.Updat
 	ep1, ok1 := e.ObjectOld.(*v1.Endpoints)
 	ep2, ok2 := e.ObjectNew.(*v1.Endpoints)
 
-	if ok1 && ok2 && isEndpointProcessNeeded(ep1, h.client) &&
+	if ok1 && ok2 && isEndpointProcessNeeded(ep1, h.cache) &&
 		!reflect.DeepEqual(ep1.Subsets, ep2.Subsets) {
 		util.NLBLog.Info("controller: endpoint update event", "endpoint", util.Key(ep1))
 		util.NLBLog.Info(fmt.Sprintf("endpoints before [%s], afeter [%s]",
@@ -186,7 +187,7 @@ func (h *enqueueRequestForEndpointEvent) Update(_ context.Context, e event.Updat
 
 func (h *enqueueRequestForEndpointEvent) Delete(_ context.Context, e event.DeleteEvent, queue workqueue.RateLimitingInterface) {
 	ep, ok := e.Object.(*v1.Endpoints)
-	if ok && isEndpointProcessNeeded(ep, h.client) {
+	if ok && isEndpointProcessNeeded(ep, h.cache) {
 		util.NLBLog.Info("controller: endpoint delete event", "endpoint", util.Key(ep))
 		h.enqueueManagedEndpoint(queue, ep)
 	}
@@ -206,7 +207,7 @@ func (h *enqueueRequestForEndpointEvent) enqueueManagedEndpoint(queue workqueue.
 	util.NLBLog.Info("enqueue", "endpoint", util.Key(endpoint), "queueLen", queue.Len())
 }
 
-func isEndpointProcessNeeded(ep *v1.Endpoints, client client.Client) bool {
+func isEndpointProcessNeeded(ep *v1.Endpoints, cache cache.Cache) bool {
 	if ep == nil {
 		return false
 	}
@@ -219,7 +220,7 @@ func isEndpointProcessNeeded(ep *v1.Endpoints, client client.Client) bool {
 	}
 
 	svc := &v1.Service{}
-	err := client.Get(context.TODO(),
+	err := cache.Get(context.TODO(),
 		types.NamespacedName{
 			Namespace: ep.GetNamespace(),
 			Name:      ep.GetName(),
@@ -350,15 +351,15 @@ func (h *enqueueRequestForNodeEvent) checkServiceAffected(node *v1.Node, svc *v1
 }
 
 // NewEnqueueRequestForEndpointSliceEvent, event handler for endpointslice event
-func NewEnqueueRequestForEndpointSliceEvent(client client.Client, record record.EventRecorder) *enqueueRequestForEndpointSliceEvent {
+func NewEnqueueRequestForEndpointSliceEvent(cache cache.Cache, record record.EventRecorder) *enqueueRequestForEndpointSliceEvent {
 	return &enqueueRequestForEndpointSliceEvent{
-		client:        client,
+		cache:         cache,
 		eventRecorder: record,
 	}
 }
 
 type enqueueRequestForEndpointSliceEvent struct {
-	client        client.Client
+	cache         cache.Cache
 	eventRecorder record.EventRecorder
 }
 
@@ -366,7 +367,7 @@ var _ handler.EventHandler = (*enqueueRequestForEndpointSliceEvent)(nil)
 
 func (h *enqueueRequestForEndpointSliceEvent) Create(_ context.Context, e event.CreateEvent, queue workqueue.RateLimitingInterface) {
 	es, ok := e.Object.(*discovery.EndpointSlice)
-	if ok && isEndpointSliceProcessNeeded(es, h.client) {
+	if ok && isEndpointSliceProcessNeeded(es, h.cache) {
 		util.NLBLog.Info("controller: endpointslice create event", "endpointslice", util.Key(es))
 		h.enqueueManagedEndpointSlice(queue, es)
 	}
@@ -376,7 +377,7 @@ func (h *enqueueRequestForEndpointSliceEvent) Update(_ context.Context, e event.
 	es1, ok1 := e.ObjectOld.(*discovery.EndpointSlice)
 	es2, ok2 := e.ObjectNew.(*discovery.EndpointSlice)
 
-	if ok1 && ok2 && isEndpointSliceProcessNeeded(es1, h.client) &&
+	if ok1 && ok2 && isEndpointSliceProcessNeeded(es1, h.cache) &&
 		isEndpointSliceUpdateNeeded(es1, es2) {
 		util.NLBLog.Info("controller: endpointslice update event", "endpointslice", util.Key(es1))
 		util.NLBLog.Info(fmt.Sprintf("endpoints before [%s], afeter [%s]",
@@ -387,7 +388,7 @@ func (h *enqueueRequestForEndpointSliceEvent) Update(_ context.Context, e event.
 
 func (h *enqueueRequestForEndpointSliceEvent) Delete(_ context.Context, e event.DeleteEvent, queue workqueue.RateLimitingInterface) {
 	es, ok := e.Object.(*discovery.EndpointSlice)
-	if ok && isEndpointSliceProcessNeeded(es, h.client) {
+	if ok && isEndpointSliceProcessNeeded(es, h.cache) {
 		util.NLBLog.Info("controller: endpointslice delete event", "endpointslice", util.Key(es))
 		h.enqueueManagedEndpointSlice(queue, es)
 	}
@@ -413,7 +414,7 @@ func (h *enqueueRequestForEndpointSliceEvent) enqueueManagedEndpointSlice(queue 
 	util.NLBLog.Info("enqueue", "endpointslice", util.Key(endpointSlice), "queueLen", queue.Len())
 }
 
-func isEndpointSliceProcessNeeded(es *discovery.EndpointSlice, client client.Client) bool {
+func isEndpointSliceProcessNeeded(es *discovery.EndpointSlice, cache cache.Cache) bool {
 	if es == nil {
 		return false
 	}
@@ -424,7 +425,7 @@ func isEndpointSliceProcessNeeded(es *discovery.EndpointSlice, client client.Cli
 	}
 
 	svc := &v1.Service{}
-	err := client.Get(context.TODO(),
+	err := cache.Get(context.TODO(),
 		types.NamespacedName{
 			Namespace: es.Namespace,
 			Name:      serviceName,
