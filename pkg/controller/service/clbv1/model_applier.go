@@ -188,9 +188,12 @@ func (m *ModelApplier) applyLoadBalancerAttribute(reqCtx *svcCtx.RequestContext,
 
 func (m *ModelApplier) applyVGroups(reqCtx *svcCtx.RequestContext, local *model.LoadBalancer, remote *model.LoadBalancer) error {
 	var errs []error
+	updatedVGroups := map[string]bool{}
+
 	for i := range local.VServerGroups {
 		found := false
 		var old model.VServerGroup
+
 		for _, rv := range remote.VServerGroups {
 			// for reuse vgroup case, find by vgroup id first
 			if local.VServerGroups[i].VGroupId != "" &&
@@ -209,12 +212,19 @@ func (m *ModelApplier) applyVGroups(reqCtx *svcCtx.RequestContext, local *model.
 			}
 		}
 
+		if updatedVGroups[local.VServerGroups[i].VGroupId] {
+			reqCtx.Log.Info("already updated vgroup, skip",
+				"vgroupID", local.VServerGroups[i].VGroupId, "vgroupName", local.VServerGroups[i].VGroupName)
+			continue
+		}
+
 		// update
 		if found {
 			if err := m.vGroupMgr.UpdateVServerGroup(reqCtx, local.VServerGroups[i], old); err != nil {
 				errs = append(errs, fmt.Errorf("EnsureVGroupUpdated error: %s", err.Error()))
 				continue
 			}
+			updatedVGroups[local.VServerGroups[i].VGroupId] = true
 		}
 
 		// create
@@ -233,6 +243,7 @@ func (m *ModelApplier) applyVGroups(reqCtx *svcCtx.RequestContext, local *model.
 				continue
 			}
 			remote.VServerGroups = append(remote.VServerGroups, local.VServerGroups[i])
+			updatedVGroups[local.VServerGroups[i].VGroupId] = true
 		}
 	}
 
