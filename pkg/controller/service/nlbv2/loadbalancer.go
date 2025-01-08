@@ -253,40 +253,11 @@ func (mgr *NLBManager) Update(reqCtx *svcCtx.RequestContext, local, remote *nlbm
 }
 
 func (mgr *NLBManager) updateLoadBalancerTags(reqCtx *svcCtx.RequestContext, local, remote *nlbmodel.NetworkLoadBalancer) error {
-	var localTags, remoteTags []tag.Tag
 	lbId := remote.LoadBalancerAttribute.LoadBalancerId
-	defaultTags := reqCtx.Anno.GetDefaultTags()
-	if local.LoadBalancerAttribute.IsUserManaged {
-		defaultTags = append(defaultTags, tag.Tag{Key: helper.REUSEKEY, Value: "true"})
-	}
 
-	for _, r := range remote.LoadBalancerAttribute.Tags {
-		found := false
-		for _, d := range defaultTags {
-			if r.Key == d.Key {
-				found = true
-				break
-			}
-		}
-		if !found {
-			remoteTags = append(remoteTags, r)
-		}
-	}
-
-	for _, l := range local.LoadBalancerAttribute.Tags {
-		found := false
-		for _, d := range defaultTags {
-			if l.Key == d.Key {
-				found = true
-				break
-			}
-		}
-		if !found {
-			localTags = append(localTags, l)
-		}
-	}
-
-	needTag, needUntag := util.DiffLoadBalancerTags(local.LoadBalancerAttribute.Tags, remoteTags)
+	localTags := helper.FilterTags(local.LoadBalancerAttribute.Tags, reqCtx.Anno.GetDefaultTags(), local.LoadBalancerAttribute.IsUserManaged)
+	remoteTags := helper.FilterTags(remote.LoadBalancerAttribute.Tags, reqCtx.Anno.GetDefaultTags(), local.LoadBalancerAttribute.IsUserManaged)
+	needTag, needUntag := helper.DiffLoadBalancerTags(localTags, remoteTags)
 	if len(needTag) != 0 || len(needUntag) != 0 {
 		reqCtx.Log.Info("tag changed", "lb", lbId, "needTag", needTag, "needUntag", needUntag)
 	}
