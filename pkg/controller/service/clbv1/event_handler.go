@@ -3,6 +3,8 @@ package clbv1
 import (
 	"context"
 	"fmt"
+	"reflect"
+
 	v1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -17,7 +19,6 @@ import (
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/service/reconcile/annotation"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/util"
 	"k8s.io/klog/v2"
-	"reflect"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
@@ -73,6 +74,9 @@ func (h *enqueueRequestForServiceEvent) enqueueManagedService(queue workqueue.Ra
 
 func needUpdate(oldSvc, newSvc *v1.Service, recorder record.EventRecorder) bool {
 	if !helper.NeedCLB(oldSvc) && !helper.NeedCLB(newSvc) {
+		return false
+	}
+	if helper.IsTunnelTypeService(newSvc) {
 		return false
 	}
 
@@ -144,7 +148,9 @@ func needAdd(newService *v1.Service) bool {
 	if helper.NeedCLB(newService) {
 		return true
 	}
-
+	if helper.IsTunnelTypeService(newService) {
+		return false
+	}
 	// was LoadBalancer
 	if helper.HasFinalizer(newService, helper.ServiceFinalizer) {
 		util.ServiceLog.Info("service has service finalizer, which may was LoadBalancer", "service", util.Key(newService))

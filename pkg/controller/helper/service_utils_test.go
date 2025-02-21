@@ -56,3 +56,16 @@ func getDefaultService() *v1.Service {
 		},
 	}
 }
+
+func TestIsTunnelTypeService(t *testing.T) {
+	svc := getDefaultService()
+	svc.Annotations = map[string]string{
+		"service.beta.kubernetes.io/alibaba-cloud-loadbalancer-tunnel-type": "tunnel",
+	}
+	assert.Equal(t, true, IsTunnelTypeService(svc))
+
+	svc.Annotations = map[string]string{
+		"service.beta.kubernetes.io/alibaba-cloud-loadbalancer-tunnel-type": "",
+	}
+	assert.Equal(t, true, IsTunnelTypeService(svc))
+}

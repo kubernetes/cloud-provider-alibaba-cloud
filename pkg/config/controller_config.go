@@ -66,9 +66,8 @@ type ControllerConfig struct {
 	SkipDisableSourceDestCheck      bool
 	NodeEventAggregationWaitSeconds int
 	EnableIMDSv2                    bool
-
-	RuntimeConfig RuntimeConfig
-	CloudConfig   *CloudConfig
+	RuntimeConfig                   RuntimeConfig
+	CloudConfig                     *CloudConfig
 }
 
 func (cfg *ControllerConfig) BindFlags(fs *pflag.FlagSet) {
@@ -93,12 +92,10 @@ func (cfg *ControllerConfig) BindFlags(fs *pflag.FlagSet) {
 	fs.IntVar(&cfg.MaxConcurrentActions, "max-concurrent-actions", defaultMaxConcurrentActions, "The max concurrent number of actions for listener and server group updates")
 	fs.BoolVar(&cfg.EnableIMDSv2, "enable-imdsv2", true, "Use IMDSv2 for metadata api.")
 	_ = fs.MarkDeprecated("allow-untagged-cloud", "This flag is deprecated and will be removed in a future release. A cluster-id will be required on cloud instances.")
-
 	fs.IntVar(&cfg.NodeReconcileBatchSize, "node-reconcile-batch-size", 100, "The batch size for syncing node status. The value range is 1-100")
 	fs.IntVar(&cfg.RouteReconcileBatchSize, "route-reconcile-batch-size", 50, "The batch size for syncing route status. The value range is 1-50")
 	fs.BoolVar(&cfg.SkipDisableSourceDestCheck, flagSkipDisableSourceDestCheck, false, "Skip disable source dest check for nodes")
 	fs.IntVar(&cfg.NodeEventAggregationWaitSeconds, flagNodeEventAggregationWaitSeconds, 1, "The wait second for aggregating node events in node & route controller")
-
 	cfg.RuntimeConfig.BindFlags(fs)
 }
 
@@ -127,6 +124,7 @@ func (cfg *ControllerConfig) Validate() error {
 	if cfg.MaxConcurrentActions <= 0 {
 		return fmt.Errorf("--max-concurrent-actions must be set to a positive integer")
 	}
+
 	return nil
 }
 
