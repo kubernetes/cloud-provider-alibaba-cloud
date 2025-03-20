@@ -230,6 +230,20 @@ func (m *ReconcileNode) syncNode(nodes []corev1.Node) error {
 			continue
 		}
 
+		if findCloudTaint(node.Spec.Taints) != nil {
+			// disable network interfaces source dest IP check only on newly added node
+			if cloudNode.PrimaryNetworkInterfaceID != "" {
+				log.V(5).Info("try to disable sourceDestCheck for network interface", "eni", cloudNode.PrimaryNetworkInterfaceID, "node", node.Name, "ecs", cloudNode.InstanceID)
+				err := m.cloud.ModifyNetworkInterfaceSourceDestCheck(cloudNode.PrimaryNetworkInterfaceID, false)
+				if err != nil {
+					log.Error(err, "disable sourceDestCheck for network interface error", "eni", cloudNode.PrimaryNetworkInterfaceID, "node", node.Name, "ecs", cloudNode.InstanceID)
+					continue
+				}
+			} else {
+				log.Info("can not find cloud node primary network interface id, skip update sourceDestCheck")
+			}
+		}
+
 		cloudNode.Addresses = setHostnameAddress(node, cloudNode.Addresses)
 		// If nodeIP was suggested by user, ensure that
 		// it can be found in the cloud as well (consistent with the behaviour in kubelet)

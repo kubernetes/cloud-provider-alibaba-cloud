@@ -79,6 +79,7 @@ type ModifyInstanceSpecRequest struct {
 	InstanceType                     string                    `position:"Query" name:"InstanceType"`
 	TemporaryEndTime                 string                    `position:"Query" name:"Temporary.EndTime"`
 	ModifyMode                       string                    `position:"Query" name:"ModifyMode"`
+	DryRun                           requests.Boolean          `position:"Query" name:"DryRun"`
 	ResourceOwnerAccount             string                    `position:"Query" name:"ResourceOwnerAccount"`
 	OwnerAccount                     string                    `position:"Query" name:"OwnerAccount"`
 	OwnerId                          requests.Integer          `position:"Query" name:"OwnerId"`
@@ -101,6 +102,7 @@ type ModifyInstanceSpecDisk struct {
 type ModifyInstanceSpecResponse struct {
 	*responses.BaseResponse
 	RequestId string `json:"RequestId" xml:"RequestId"`
+	TaskId    string `json:"TaskId" xml:"TaskId"`
 }
 
 // CreateModifyInstanceSpecRequest creates a request to invoke ModifyInstanceSpec API

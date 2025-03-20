@@ -67,15 +67,23 @@ type IMetaData interface {
 
 // NodeAttribute node attribute from cloud instance
 type NodeAttribute struct {
-	InstanceID         string
-	Addresses          []v1.NodeAddress
-	InstanceType       string
-	Zone               string
-	Region             string
-	NodePool           string
-	InstanceChargeType string
-	SpotStrategy       string
-	Tags               map[string]string
+	InstanceID                string
+	Addresses                 []v1.NodeAddress
+	InstanceType              string
+	Zone                      string
+	Region                    string
+	NodePool                  string
+	InstanceChargeType        string
+	SpotStrategy              string
+	PrimaryNetworkInterfaceID string
+	Tags                      map[string]string
+}
+
+type EniAttribute struct {
+	NetworkInterfaceID string
+	Status             string
+	PrivateIPAddress   string
+	SourceDestCheck    bool
 }
 
 type IInstance interface {
@@ -83,6 +91,8 @@ type IInstance interface {
 	GetInstancesByIP(ctx context.Context, ips []string) (*NodeAttribute, error)
 	// DescribeNetworkInterfaces query one or more elastic network interfaces (ENIs)
 	DescribeNetworkInterfaces(vpcId string, ips []string, ipVersionType model.AddressIPVersionType) (map[string]string, error)
+	DescribeNetworkInterfacesByIDs(ids []string) ([]*EniAttribute, error)
+	ModifyNetworkInterfaceSourceDestCheck(id string, enabled bool) error
 }
 
 type IVPC interface {

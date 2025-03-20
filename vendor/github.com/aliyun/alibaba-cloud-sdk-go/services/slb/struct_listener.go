@@ -29,14 +29,15 @@ type Listener struct {
 	BackendServerPort   int                                   `json:"BackendServerPort" xml:"BackendServerPort"`
 	VServerGroupId      string                                `json:"VServerGroupId" xml:"VServerGroupId"`
 	Bandwidth           int                                   `json:"Bandwidth" xml:"Bandwidth"`
+	BackendProtocol     string                                `json:"BackendProtocol" xml:"BackendProtocol"`
 	Status              string                                `json:"Status" xml:"Status"`
 	ListenerPort        int                                   `json:"ListenerPort" xml:"ListenerPort"`
 	Description         string                                `json:"Description" xml:"Description"`
 	AclIds              AclIdsInDescribeLoadBalancerListeners `json:"AclIds" xml:"AclIds"`
-	HTTPListenerConfig  HTTPListenerConfig                    `json:"HTTPListenerConfig" xml:"HTTPListenerConfig"`
-	TCPListenerConfig   TCPListenerConfig                     `json:"TCPListenerConfig" xml:"TCPListenerConfig"`
 	HTTPSListenerConfig HTTPSListenerConfig                   `json:"HTTPSListenerConfig" xml:"HTTPSListenerConfig"`
-	TCPSListenerConfig  TCPSListenerConfig                    `json:"TCPSListenerConfig" xml:"TCPSListenerConfig"`
+	TCPListenerConfig   TCPListenerConfig                     `json:"TCPListenerConfig" xml:"TCPListenerConfig"`
 	UDPListenerConfig   UDPListenerConfig                     `json:"UDPListenerConfig" xml:"UDPListenerConfig"`
+	HTTPListenerConfig  HTTPListenerConfig                    `json:"HTTPListenerConfig" xml:"HTTPListenerConfig"`
+	TCPSListenerConfig  TCPSListenerConfig                    `json:"TCPSListenerConfig" xml:"TCPSListenerConfig"`
 	Tags                []Tag                                 `json:"Tags" xml:"Tags"`
 }

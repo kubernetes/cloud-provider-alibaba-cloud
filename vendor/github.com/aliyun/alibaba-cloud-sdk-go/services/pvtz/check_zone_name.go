@@ -80,8 +80,8 @@ type CheckZoneNameRequest struct {
 type CheckZoneNameResponse struct {
 	*responses.BaseResponse
 	RequestId string `json:"RequestId" xml:"RequestId"`
-	Success   bool   `json:"Success" xml:"Success"`
 	Check     bool   `json:"Check" xml:"Check"`
+	Success   bool   `json:"Success" xml:"Success"`
 }
 
 // CreateCheckZoneNameRequest creates a request to invoke CheckZoneName API

@@ -67,3 +67,11 @@ func (d *MockECS) DescribeNetworkInterfaces(vpcId string, ips []string, ipVersio
 	}
 	return eniids, nil
 }
+
+func (d *MockECS) DescribeNetworkInterfacesByIDs(ids []string) ([]*prvd.EniAttribute, error) {
+	panic("implement me!")
+}
+
+func (d *MockECS) ModifyNetworkInterfaceSourceDestCheck(id string, enabled bool) error {
+	panic("implement me!")
+}

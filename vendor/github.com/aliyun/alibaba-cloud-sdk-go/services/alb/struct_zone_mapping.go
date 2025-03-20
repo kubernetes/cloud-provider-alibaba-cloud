@@ -19,8 +19,8 @@ package alb
 type ZoneMapping struct {
 	VSwitchId             string                `json:"VSwitchId" xml:"VSwitchId"`
 	ZoneId                string                `json:"ZoneId" xml:"ZoneId"`
-	Status                string                `json:"Status" xml:"Status"`
 	AllocationId          string                `json:"AllocationId" xml:"AllocationId"`
 	EipType               string                `json:"EipType" xml:"EipType"`
+	Status                string                `json:"Status" xml:"Status"`
 	LoadBalancerAddresses []LoadBalancerAddress `json:"LoadBalancerAddresses" xml:"LoadBalancerAddresses"`
 }

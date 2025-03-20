@@ -17,24 +17,31 @@ package slb
 
 // TCPListenerConfig is a nested struct in slb response
 type TCPListenerConfig struct {
-	HealthCheckHttpCode       string      `json:"HealthCheckHttpCode" xml:"HealthCheckHttpCode"`
-	ConnectionDrainTimeout    int         `json:"ConnectionDrainTimeout" xml:"ConnectionDrainTimeout"`
-	PersistenceTimeout        int         `json:"PersistenceTimeout" xml:"PersistenceTimeout"`
-	HealthCheckInterval       int         `json:"HealthCheckInterval" xml:"HealthCheckInterval"`
-	HealthCheckURI            string      `json:"HealthCheckURI" xml:"HealthCheckURI"`
-	HealthCheckSwitch         string      `json:"HealthCheckSwitch" xml:"HealthCheckSwitch"`
-	FullNatEnabled            string      `json:"FullNatEnabled" xml:"FullNatEnabled"`
-	HealthCheckConnectPort    int         `json:"HealthCheckConnectPort" xml:"HealthCheckConnectPort"`
-	EstablishedTimeout        int         `json:"EstablishedTimeout" xml:"EstablishedTimeout"`
-	HealthCheckType           string      `json:"HealthCheckType" xml:"HealthCheckType"`
-	HealthCheckConnectTimeout int         `json:"HealthCheckConnectTimeout" xml:"HealthCheckConnectTimeout"`
-	MasterSlaveServerGroupId  string      `json:"MasterSlaveServerGroupId" xml:"MasterSlaveServerGroupId"`
-	HealthyThreshold          int         `json:"HealthyThreshold" xml:"HealthyThreshold"`
-	HealthCheckDomain         string      `json:"HealthCheckDomain" xml:"HealthCheckDomain"`
-	UnhealthyThreshold        int         `json:"UnhealthyThreshold" xml:"UnhealthyThreshold"`
-	ConnectionDrain           string      `json:"ConnectionDrain" xml:"ConnectionDrain"`
-	HealthCheckMethod         string      `json:"HealthCheckMethod" xml:"HealthCheckMethod"`
-	HealthCheck               string      `json:"HealthCheck" xml:"HealthCheck"`
-	ProxyProtocolV2Enabled    string      `json:"ProxyProtocolV2Enabled" xml:"ProxyProtocolV2Enabled"`
-	PortRanges                []PortRange `json:"PortRanges" xml:"PortRanges"`
+	HealthCheckHttpCode            string      `json:"HealthCheckHttpCode" xml:"HealthCheckHttpCode"`
+	ConnectionDrainTimeout         int         `json:"ConnectionDrainTimeout" xml:"ConnectionDrainTimeout"`
+	PersistenceTimeout             int         `json:"PersistenceTimeout" xml:"PersistenceTimeout"`
+	HealthCheckInterval            int         `json:"HealthCheckInterval" xml:"HealthCheckInterval"`
+	HealthCheckURI                 string      `json:"HealthCheckURI" xml:"HealthCheckURI"`
+	HealthCheckSwitch              string      `json:"HealthCheckSwitch" xml:"HealthCheckSwitch"`
+	FullNatEnabled                 string      `json:"FullNatEnabled" xml:"FullNatEnabled"`
+	HealthCheckConnectPort         int         `json:"HealthCheckConnectPort" xml:"HealthCheckConnectPort"`
+	EstablishedTimeout             int         `json:"EstablishedTimeout" xml:"EstablishedTimeout"`
+	HealthCheckType                string      `json:"HealthCheckType" xml:"HealthCheckType"`
+	HealthCheckConnectTimeout      int         `json:"HealthCheckConnectTimeout" xml:"HealthCheckConnectTimeout"`
+	MasterSlaveServerGroupId       string      `json:"MasterSlaveServerGroupId" xml:"MasterSlaveServerGroupId"`
+	HealthyThreshold               int         `json:"HealthyThreshold" xml:"HealthyThreshold"`
+	HealthCheckDomain              string      `json:"HealthCheckDomain" xml:"HealthCheckDomain"`
+	UnhealthyThreshold             int         `json:"UnhealthyThreshold" xml:"UnhealthyThreshold"`
+	ConnectionDrain                string      `json:"ConnectionDrain" xml:"ConnectionDrain"`
+	HealthCheckMethod              string      `json:"HealthCheckMethod" xml:"HealthCheckMethod"`
+	HealthCheck                    string      `json:"HealthCheck" xml:"HealthCheck"`
+	ProxyProtocolV2Enabled         string      `json:"ProxyProtocolV2Enabled" xml:"ProxyProtocolV2Enabled"`
+	HealthCheckTcpFastCloseEnabled bool        `json:"HealthCheckTcpFastCloseEnabled" xml:"HealthCheckTcpFastCloseEnabled"`
+	MasterSlaveModeEnabled         bool        `json:"MasterSlaveModeEnabled" xml:"MasterSlaveModeEnabled"`
+	MasterServerGroupId            string      `json:"MasterServerGroupId" xml:"MasterServerGroupId"`
+	SlaveServerGroupId             string      `json:"SlaveServerGroupId" xml:"SlaveServerGroupId"`
+	FailoverThreshold              int         `json:"FailoverThreshold" xml:"FailoverThreshold"`
+	FailoverStrategy               string      `json:"FailoverStrategy" xml:"FailoverStrategy"`
+	MaxConnection                  int         `json:"MaxConnection" xml:"MaxConnection"`
+	PortRanges                     []PortRange `json:"PortRanges" xml:"PortRanges"`
 }

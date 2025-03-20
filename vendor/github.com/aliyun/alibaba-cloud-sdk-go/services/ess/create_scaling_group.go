@@ -81,7 +81,9 @@ type CreateScalingGroupRequest struct {
 	SyncAlarmRuleToCms                  requests.Boolean                            `position:"Query" name:"SyncAlarmRuleToCms"`
 	CustomPolicyARN                     string                                      `position:"Query" name:"CustomPolicyARN"`
 	Tag                                 *[]CreateScalingGroupTag                    `position:"Query" name:"Tag"  type:"Repeated"`
+	StopInstanceTimeout                 requests.Integer                            `position:"Query" name:"StopInstanceTimeout"`
 	DefaultCooldown                     requests.Integer                            `position:"Query" name:"DefaultCooldown"`
+	HealthCheckTypes                    *[]string                                   `position:"Query" name:"HealthCheckTypes"  type:"Repeated"`
 	ContainerGroupId                    string                                      `position:"Query" name:"ContainerGroupId"`
 	MultiAZPolicy                       string                                      `position:"Query" name:"MultiAZPolicy"`
 	DBInstanceIds                       string                                      `position:"Query" name:"DBInstanceIds"`
@@ -90,6 +92,7 @@ type CreateScalingGroupRequest struct {
 	ServerGroup                         *[]CreateScalingGroupServerGroup            `position:"Query" name:"ServerGroup"  type:"Repeated"`
 	LaunchTemplateOverride              *[]CreateScalingGroupLaunchTemplateOverride `position:"Query" name:"LaunchTemplateOverride"  type:"Repeated"`
 	CompensateWithOnDemand              requests.Boolean                            `position:"Query" name:"CompensateWithOnDemand"`
+	CapacityOptions                     CreateScalingGroupCapacityOptions           `position:"Query" name:"CapacityOptions"  type:"Struct"`
 	MinSize                             requests.Integer                            `position:"Query" name:"MinSize"`
 	OwnerId                             requests.Integer                            `position:"Query" name:"OwnerId"`
 	AlbServerGroup                      *[]CreateScalingGroupAlbServerGroup         `position:"Query" name:"AlbServerGroup"  type:"Repeated"`
@@ -112,6 +115,7 @@ type CreateScalingGroupRequest struct {
 	ScalingGroupName                    string                                      `position:"Query" name:"ScalingGroupName"`
 	OwnerAccount                        string                                      `position:"Query" name:"OwnerAccount"`
 	SpotInstancePools                   requests.Integer                            `position:"Query" name:"SpotInstancePools"`
+	DBInstance                          *[]CreateScalingGroupDBInstance             `position:"Query" name:"DBInstance"  type:"Repeated"`
 	GroupDeletionProtection             requests.Boolean                            `position:"Query" name:"GroupDeletionProtection"`
 	LaunchTemplateVersion               string                                      `position:"Query" name:"LaunchTemplateVersion"`
 	ScalingPolicy                       string                                      `position:"Query" name:"ScalingPolicy"`
@@ -139,6 +143,15 @@ type CreateScalingGroupLaunchTemplateOverride struct {
 	WeightedCapacity string `name:"WeightedCapacity"`
 	InstanceType     string `name:"InstanceType"`
 	SpotPriceLimit   string `name:"SpotPriceLimit"`
+}
+
+// CreateScalingGroupCapacityOptions is a repeated param struct in CreateScalingGroupRequest
+type CreateScalingGroupCapacityOptions struct {
+	CompensateWithOnDemand              string `name:"CompensateWithOnDemand"`
+	PriceComparisonMode                 string `name:"PriceComparisonMode"`
+	OnDemandBaseCapacity                string `name:"OnDemandBaseCapacity"`
+	SpotAutoReplaceOnDemand             string `name:"SpotAutoReplaceOnDemand"`
+	OnDemandPercentageAboveBaseCapacity string `name:"OnDemandPercentageAboveBaseCapacity"`
 }
 
 // CreateScalingGroupAlbServerGroup is a repeated param struct in CreateScalingGroupRequest
@@ -170,6 +183,13 @@ type CreateScalingGroupSystemTag struct {
 type CreateScalingGroupLoadBalancerConfig struct {
 	LoadBalancerId string `name:"LoadBalancerId"`
 	Weight         string `name:"Weight"`
+}
+
+// CreateScalingGroupDBInstance is a repeated param struct in CreateScalingGroupRequest
+type CreateScalingGroupDBInstance struct {
+	DBInstanceId string `name:"DBInstanceId"`
+	Type         string `name:"Type"`
+	AttachMode   string `name:"AttachMode"`
 }
 
 // CreateScalingGroupVServerGroup is a repeated param struct in CreateScalingGroupRequest

@@ -74,6 +74,7 @@ type DescribeMasterSlaveServerGroupsRequest struct {
 	AccessKeyId          string                                `position:"Query" name:"access_key_id"`
 	ResourceOwnerId      requests.Integer                      `position:"Query" name:"ResourceOwnerId"`
 	IncludeListener      requests.Boolean                      `position:"Query" name:"IncludeListener"`
+	Description          string                                `position:"Query" name:"Description"`
 	Tag                  *[]DescribeMasterSlaveServerGroupsTag `position:"Query" name:"Tag"  type:"Repeated"`
 	ResourceOwnerAccount string                                `position:"Query" name:"ResourceOwnerAccount"`
 	OwnerAccount         string                                `position:"Query" name:"OwnerAccount"`
