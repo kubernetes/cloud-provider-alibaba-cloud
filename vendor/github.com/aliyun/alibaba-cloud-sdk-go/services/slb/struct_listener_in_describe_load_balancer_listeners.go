@@ -30,6 +30,7 @@ type ListenerInDescribeLoadBalancerListeners struct {
 	Description         string              `json:"Description" xml:"Description"`
 	AclStatus           string              `json:"AclStatus" xml:"AclStatus"`
 	BackendServerPort   int                 `json:"BackendServerPort" xml:"BackendServerPort"`
+	BackendProtocol     string              `json:"BackendProtocol" xml:"BackendProtocol"`
 	AclIds              []string            `json:"AclIds" xml:"AclIds"`
 	HTTPListenerConfig  HTTPListenerConfig  `json:"HTTPListenerConfig" xml:"HTTPListenerConfig"`
 	HTTPSListenerConfig HTTPSListenerConfig `json:"HTTPSListenerConfig" xml:"HTTPSListenerConfig"`

@@ -63,15 +63,24 @@ func (e *ECSProvider) ListInstances(ctx context.Context, ids []string) (map[stri
 					tags[tag.TagKey] = tag.TagValue
 				}
 
+				primaryNetworkInterface := ""
+				for _, i := range n.NetworkInterfaces.NetworkInterface {
+					if i.Type == "Primary" {
+						primaryNetworkInterface = i.NetworkInterfaceId
+						break
+					}
+				}
+
 				mins[id] = &prvd.NodeAttribute{
-					InstanceID:         n.InstanceId,
-					InstanceType:       n.InstanceType,
-					Addresses:          findAddress(&n),
-					Zone:               n.ZoneId,
-					Region:             n.RegionId,
-					InstanceChargeType: n.InstanceChargeType,
-					SpotStrategy:       n.SpotStrategy,
-					Tags:               tags,
+					InstanceID:                n.InstanceId,
+					InstanceType:              n.InstanceType,
+					Addresses:                 findAddress(&n),
+					Zone:                      n.ZoneId,
+					Region:                    n.RegionId,
+					InstanceChargeType:        n.InstanceChargeType,
+					SpotStrategy:              n.SpotStrategy,
+					PrimaryNetworkInterfaceID: primaryNetworkInterface,
+					Tags:                      tags,
 				}
 				break
 			}
@@ -218,6 +227,63 @@ func (e *ECSProvider) DescribeNetworkInterfaces(vpcId string, ips []string, ipVe
 
 	}
 	return result, nil
+}
+
+func (e *ECSProvider) DescribeNetworkInterfacesByIDs(ids []string) ([]*prvd.EniAttribute, error) {
+	var result []*prvd.EniAttribute
+	for begin := 0; begin < len(ids); begin += MaxNetworkInterfaceNum {
+		last := len(ids)
+		if begin+MaxNetworkInterfaceNum < last {
+			last = begin + MaxNetworkInterfaceNum
+		}
+		networkInterfaceId := ids[begin:last]
+
+		req := ecs.CreateDescribeNetworkInterfacesRequest()
+		req.NetworkInterfaceId = &networkInterfaceId
+
+		nextToken := ""
+		for {
+			req.NextToken = nextToken
+			resp, err := e.auth.ECS.DescribeNetworkInterfaces(req)
+			if err != nil {
+				return result, err
+			}
+			klog.V(5).Infof("RequestId: %s, API: %s, ips: %s, networkInterfaceIds[%d:%d]",
+				resp.RequestId, "DescribeNetworkInterfaces", networkInterfaceId, begin, last)
+
+			for _, eni := range resp.NetworkInterfaceSets.NetworkInterfaceSet {
+				eni := &prvd.EniAttribute{
+					NetworkInterfaceID: eni.NetworkInterfaceId,
+					Status:             eni.Status,
+					PrivateIPAddress:   eni.PrivateIpAddress,
+					SourceDestCheck:    eni.SourceDestCheck,
+				}
+				result = append(result, eni)
+			}
+
+			if resp.NextToken == "" {
+				break
+			}
+			nextToken = resp.NextToken
+		}
+	}
+	return result, nil
+}
+
+func (e *ECSProvider) ModifyNetworkInterfaceSourceDestCheck(id string, enabled bool) error {
+	req := ecs.CreateModifyNetworkInterfaceAttributeRequest()
+	req.NetworkInterfaceId = id
+	req.SourceDestCheck = requests.NewBoolean(enabled)
+
+	resp, err := e.auth.ECS.ModifyNetworkInterfaceAttribute(req)
+	if err != nil {
+		return err
+	}
+
+	klog.V(5).Infof("RequestId: %s, API: %s, sourceDestCheck: %t",
+		resp.RequestId, "ModifyNetworkInterfaceAttribute", enabled)
+
+	return nil
 }
 
 func findAddress(instance *ecs.Instance) []v1.NodeAddress {

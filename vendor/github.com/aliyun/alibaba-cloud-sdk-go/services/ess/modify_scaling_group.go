@@ -79,12 +79,15 @@ type ModifyScalingGroupRequest struct {
 	SpotInstanceRemedy                  requests.Boolean                            `position:"Query" name:"SpotInstanceRemedy"`
 	ScaleOutAmountCheck                 requests.Boolean                            `position:"Query" name:"ScaleOutAmountCheck"`
 	CustomPolicyARN                     string                                      `position:"Query" name:"CustomPolicyARN"`
+	StopInstanceTimeout                 requests.Integer                            `position:"Query" name:"StopInstanceTimeout"`
 	DefaultCooldown                     requests.Integer                            `position:"Query" name:"DefaultCooldown"`
+	HealthCheckTypes                    *[]string                                   `position:"Query" name:"HealthCheckTypes"  type:"Repeated"`
 	MultiAZPolicy                       string                                      `position:"Query" name:"MultiAZPolicy"`
 	LaunchTemplateId                    string                                      `position:"Query" name:"LaunchTemplateId"`
 	DesiredCapacity                     requests.Integer                            `position:"Query" name:"DesiredCapacity"`
 	LaunchTemplateOverride              *[]ModifyScalingGroupLaunchTemplateOverride `position:"Query" name:"LaunchTemplateOverride"  type:"Repeated"`
 	CompensateWithOnDemand              requests.Boolean                            `position:"Query" name:"CompensateWithOnDemand"`
+	CapacityOptions                     ModifyScalingGroupCapacityOptions           `position:"Query" name:"CapacityOptions"  type:"Struct"`
 	MinSize                             requests.Integer                            `position:"Query" name:"MinSize"`
 	OwnerId                             requests.Integer                            `position:"Query" name:"OwnerId"`
 	MaxSize                             requests.Integer                            `position:"Query" name:"MaxSize"`
@@ -103,6 +106,7 @@ type ModifyScalingGroupRequest struct {
 	SpotInstancePools                   requests.Integer                            `position:"Query" name:"SpotInstancePools"`
 	GroupDeletionProtection             requests.Boolean                            `position:"Query" name:"GroupDeletionProtection"`
 	LaunchTemplateVersion               string                                      `position:"Query" name:"LaunchTemplateVersion"`
+	ScalingPolicy                       string                                      `position:"Query" name:"ScalingPolicy"`
 	AllocationStrategy                  string                                      `position:"Query" name:"AllocationStrategy"`
 }
 
@@ -111,6 +115,15 @@ type ModifyScalingGroupLaunchTemplateOverride struct {
 	WeightedCapacity string `name:"WeightedCapacity"`
 	InstanceType     string `name:"InstanceType"`
 	SpotPriceLimit   string `name:"SpotPriceLimit"`
+}
+
+// ModifyScalingGroupCapacityOptions is a repeated param struct in ModifyScalingGroupRequest
+type ModifyScalingGroupCapacityOptions struct {
+	CompensateWithOnDemand              string `name:"CompensateWithOnDemand"`
+	PriceComparisonMode                 string `name:"PriceComparisonMode"`
+	OnDemandBaseCapacity                string `name:"OnDemandBaseCapacity"`
+	SpotAutoReplaceOnDemand             string `name:"SpotAutoReplaceOnDemand"`
+	OnDemandPercentageAboveBaseCapacity string `name:"OnDemandPercentageAboveBaseCapacity"`
 }
 
 // ModifyScalingGroupResponse is the response struct for api ModifyScalingGroup

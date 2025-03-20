@@ -33,3 +33,11 @@ func (d *DryRunECS) GetInstancesByIP(ctx context.Context, ips []string) (*prvd.N
 func (d *DryRunECS) DescribeNetworkInterfaces(vpcId string, ips []string, ipVersionType model.AddressIPVersionType) (map[string]string, error) {
 	return d.ecs.DescribeNetworkInterfaces(vpcId, ips, ipVersionType)
 }
+
+func (d *DryRunECS) DescribeNetworkInterfacesByIDs(ids []string) ([]*prvd.EniAttribute, error) {
+	return d.ecs.DescribeNetworkInterfacesByIDs(ids)
+}
+
+func (d *DryRunECS) ModifyNetworkInterfaceSourceDestCheck(id string, enabled bool) error {
+	panic("implement me!")
+}

@@ -102,7 +102,6 @@ func setHostnameAddress(node *v1.Node, addrs []v1.NodeAddress) []v1.NodeAddress 
 }
 
 func deleteNode(cnc *ReconcileNode, node *v1.Node) {
-
 	ref := &v1.ObjectReference{
 		Kind:      "Node",
 		Name:      node.Name,

@@ -36,5 +36,13 @@ type UDPListenerConfig struct {
 	HealthCheckMethod         string      `json:"HealthCheckMethod" xml:"HealthCheckMethod"`
 	HealthCheck               string      `json:"HealthCheck" xml:"HealthCheck"`
 	ProxyProtocolV2Enabled    string      `json:"ProxyProtocolV2Enabled" xml:"ProxyProtocolV2Enabled"`
+	QuicVersion               string      `json:"QuicVersion" xml:"QuicVersion"`
+	PersistenceTimeout        int         `json:"PersistenceTimeout" xml:"PersistenceTimeout"`
+	MasterSlaveModeEnabled    bool        `json:"MasterSlaveModeEnabled" xml:"MasterSlaveModeEnabled"`
+	MasterServerGroupId       string      `json:"MasterServerGroupId" xml:"MasterServerGroupId"`
+	SlaveServerGroupId        string      `json:"SlaveServerGroupId" xml:"SlaveServerGroupId"`
+	FailoverThreshold         int         `json:"FailoverThreshold" xml:"FailoverThreshold"`
+	FailoverStrategy          string      `json:"FailoverStrategy" xml:"FailoverStrategy"`
+	MaxConnection             int         `json:"MaxConnection" xml:"MaxConnection"`
 	PortRanges                []PortRange `json:"PortRanges" xml:"PortRanges"`
 }

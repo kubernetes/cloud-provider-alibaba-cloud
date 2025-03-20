@@ -72,8 +72,10 @@ func (client *Client) DescribeLoadBalancerListenersWithCallback(request *Describ
 type DescribeLoadBalancerListenersRequest struct {
 	*requests.RpcRequest
 	ResourceOwnerId      requests.Integer                    `position:"Query" name:"ResourceOwnerId"`
+	Description          string                              `position:"Query" name:"Description"`
 	NextToken            string                              `position:"Query" name:"NextToken"`
 	Tag                  *[]DescribeLoadBalancerListenersTag `position:"Query" name:"Tag"  type:"Repeated"`
+	ListenerPort         requests.Integer                    `position:"Query" name:"ListenerPort"`
 	ResourceOwnerAccount string                              `position:"Query" name:"ResourceOwnerAccount"`
 	OwnerAccount         string                              `position:"Query" name:"OwnerAccount"`
 	OwnerId              requests.Integer                    `position:"Query" name:"OwnerId"`

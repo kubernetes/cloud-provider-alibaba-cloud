@@ -45,4 +45,5 @@ type HTTPListenerConfig struct {
 	StickySession              string `json:"StickySession" xml:"StickySession"`
 	HealthCheckMethod          string `json:"HealthCheckMethod" xml:"HealthCheckMethod"`
 	HealthCheck                string `json:"HealthCheck" xml:"HealthCheck"`
+	MaxConnection              int    `json:"MaxConnection" xml:"MaxConnection"`
 }

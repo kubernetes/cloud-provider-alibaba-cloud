@@ -72,6 +72,7 @@ func (client *Client) ModifyScalingConfigurationWithCallback(request *ModifyScal
 type ModifyScalingConfigurationRequest struct {
 	*requests.RpcRequest
 	HpcClusterId                    string                                            `position:"Query" name:"HpcClusterId"`
+	SecurityOptions                 ModifyScalingConfigurationSecurityOptions         `position:"Query" name:"SecurityOptions"  type:"Struct"`
 	KeyPairName                     string                                            `position:"Query" name:"KeyPairName"`
 	SpotPriceLimit                  *[]ModifyScalingConfigurationSpotPriceLimit       `position:"Query" name:"SpotPriceLimit"  type:"Repeated"`
 	DeletionProtection              requests.Boolean                                  `position:"Query" name:"DeletionProtection"`
@@ -81,6 +82,7 @@ type ModifyScalingConfigurationRequest struct {
 	Password                        string                                            `position:"Query" name:"Password"`
 	InstanceDescription             string                                            `position:"Query" name:"InstanceDescription"`
 	StorageSetPartitionNumber       requests.Integer                                  `position:"Query" name:"StorageSetPartitionNumber"`
+	CustomPriorities                *[]ModifyScalingConfigurationCustomPriorities     `position:"Query" name:"CustomPriorities"  type:"Repeated"`
 	SystemDiskAutoSnapshotPolicyId  string                                            `position:"Query" name:"SystemDisk.AutoSnapshotPolicyId"`
 	PrivatePoolOptionsId            string                                            `position:"Query" name:"PrivatePoolOptions.Id"`
 	ImageOptionsLoginAsNonRoot      requests.Boolean                                  `position:"Query" name:"ImageOptions.LoginAsNonRoot"`
@@ -92,12 +94,15 @@ type ModifyScalingConfigurationRequest struct {
 	Tags                            string                                            `position:"Query" name:"Tags"`
 	ScalingConfigurationId          string                                            `position:"Query" name:"ScalingConfigurationId"`
 	SpotStrategy                    string                                            `position:"Query" name:"SpotStrategy"`
+	CpuOptions                      ModifyScalingConfigurationCpuOptions              `position:"Query" name:"CpuOptions"  type:"Struct"`
 	SystemDiskBurstingEnabled       requests.Boolean                                  `position:"Query" name:"SystemDisk.BurstingEnabled"`
 	InstanceName                    string                                            `position:"Query" name:"InstanceName"`
 	InternetChargeType              string                                            `position:"Query" name:"InternetChargeType"`
 	ZoneId                          string                                            `position:"Query" name:"ZoneId"`
+	InternetMaxBandwidthIn          requests.Integer                                  `position:"Query" name:"InternetMaxBandwidthIn"`
 	InstancePatternInfo             *[]ModifyScalingConfigurationInstancePatternInfo  `position:"Query" name:"InstancePatternInfo"  type:"Repeated"`
 	Affinity                        string                                            `position:"Query" name:"Affinity"`
+	NetworkInterfaces               *[]ModifyScalingConfigurationNetworkInterfaces    `position:"Query" name:"NetworkInterfaces"  type:"Repeated"`
 	ImageId                         string                                            `position:"Query" name:"ImageId"`
 	Memory                          requests.Integer                                  `position:"Query" name:"Memory"`
 	SpotInterruptionBehavior        string                                            `position:"Query" name:"SpotInterruptionBehavior"`
@@ -111,6 +116,8 @@ type ModifyScalingConfigurationRequest struct {
 	UserData                        string                                            `position:"Query" name:"UserData"`
 	PasswordInherit                 requests.Boolean                                  `position:"Query" name:"PasswordInherit"`
 	ImageName                       string                                            `position:"Query" name:"ImageName"`
+	HttpEndpoint                    string                                            `position:"Query" name:"HttpEndpoint"`
+	DedicatedHostClusterId          string                                            `position:"Query" name:"DedicatedHostClusterId"`
 	Override                        requests.Boolean                                  `position:"Query" name:"Override"`
 	SchedulerOptions                map[string]interface{}                            `position:"Query" name:"SchedulerOptions"`
 	DeploymentSetId                 string                                            `position:"Query" name:"DeploymentSetId"`
@@ -131,8 +138,14 @@ type ModifyScalingConfigurationRequest struct {
 	StorageSetId                    string                                            `position:"Query" name:"StorageSetId"`
 	SystemDiskSize                  requests.Integer                                  `position:"Query" name:"SystemDisk.Size"`
 	ImageFamily                     string                                            `position:"Query" name:"ImageFamily"`
+	HttpTokens                      string                                            `position:"Query" name:"HttpTokens"`
 	SystemDiskDescription           string                                            `position:"Query" name:"SystemDisk.Description"`
 	SystemDiskEncrypted             requests.Boolean                                  `position:"Query" name:"SystemDisk.Encrypted"`
+}
+
+// ModifyScalingConfigurationSecurityOptions is a repeated param struct in ModifyScalingConfigurationRequest
+type ModifyScalingConfigurationSecurityOptions struct {
+	ConfidentialComputingMode string `name:"ConfidentialComputingMode"`
 }
 
 // ModifyScalingConfigurationSpotPriceLimit is a repeated param struct in ModifyScalingConfigurationRequest
@@ -141,15 +154,50 @@ type ModifyScalingConfigurationSpotPriceLimit struct {
 	PriceLimit   string `name:"PriceLimit"`
 }
 
+// ModifyScalingConfigurationCustomPriorities is a repeated param struct in ModifyScalingConfigurationRequest
+type ModifyScalingConfigurationCustomPriorities struct {
+	VswitchId    string `name:"VswitchId"`
+	InstanceType string `name:"InstanceType"`
+}
+
+// ModifyScalingConfigurationCpuOptions is a repeated param struct in ModifyScalingConfigurationRequest
+type ModifyScalingConfigurationCpuOptions struct {
+	Accelerators *[]string `name:"Accelerators" type:"Repeated"`
+}
+
 // ModifyScalingConfigurationInstancePatternInfo is a repeated param struct in ModifyScalingConfigurationRequest
 type ModifyScalingConfigurationInstancePatternInfo struct {
-	Cores                string    `name:"Cores"`
-	InstanceFamilyLevel  string    `name:"InstanceFamilyLevel"`
-	Memory               string    `name:"Memory"`
-	MaxPrice             string    `name:"MaxPrice"`
-	ExcludedInstanceType *[]string `name:"ExcludedInstanceType" type:"Repeated"`
-	BurstablePerformance string    `name:"BurstablePerformance"`
-	Architecture         *[]string `name:"Architecture" type:"Repeated"`
+	InstanceCategories                 *[]string `name:"InstanceCategories" type:"Repeated"`
+	Memory                             string    `name:"Memory"`
+	MaximumCpuCoreCount                string    `name:"MaximumCpuCoreCount"`
+	MaxPrice                           string    `name:"MaxPrice"`
+	MinimumGpuAmount                   string    `name:"MinimumGpuAmount"`
+	MaximumGpuAmount                   string    `name:"MaximumGpuAmount"`
+	MaximumMemorySize                  string    `name:"MaximumMemorySize"`
+	MinimumInitialCredit               string    `name:"MinimumInitialCredit"`
+	ExcludedInstanceType               *[]string `name:"ExcludedInstanceType" type:"Repeated"`
+	MinimumEniIpv6AddressQuantity      string    `name:"MinimumEniIpv6AddressQuantity"`
+	MinimumEniPrivateIpAddressQuantity string    `name:"MinimumEniPrivateIpAddressQuantity"`
+	BurstablePerformance               string    `name:"BurstablePerformance"`
+	PhysicalProcessorModels            *[]string `name:"PhysicalProcessorModels" type:"Repeated"`
+	MinimumCpuCoreCount                string    `name:"MinimumCpuCoreCount"`
+	GpuSpecs                           *[]string `name:"GpuSpecs" type:"Repeated"`
+	MinimumEniQuantity                 string    `name:"MinimumEniQuantity"`
+	MinimumMemorySize                  string    `name:"MinimumMemorySize"`
+	Cores                              string    `name:"Cores"`
+	InstanceFamilyLevel                string    `name:"InstanceFamilyLevel"`
+	InstanceTypeFamilies               *[]string `name:"InstanceTypeFamilies" type:"Repeated"`
+	MinimumBaselineCredit              string    `name:"MinimumBaselineCredit"`
+	CpuArchitectures                   *[]string `name:"CpuArchitectures" type:"Repeated"`
+	Architecture                       *[]string `name:"Architecture" type:"Repeated"`
+}
+
+// ModifyScalingConfigurationNetworkInterfaces is a repeated param struct in ModifyScalingConfigurationRequest
+type ModifyScalingConfigurationNetworkInterfaces struct {
+	Ipv6AddressCount            string    `name:"Ipv6AddressCount"`
+	InstanceType                string    `name:"InstanceType"`
+	SecurityGroupIds            *[]string `name:"SecurityGroupIds" type:"Repeated"`
+	NetworkInterfaceTrafficMode string    `name:"NetworkInterfaceTrafficMode"`
 }
 
 // ModifyScalingConfigurationDataDisk is a repeated param struct in ModifyScalingConfigurationRequest
