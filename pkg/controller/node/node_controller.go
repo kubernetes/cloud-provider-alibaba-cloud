@@ -237,7 +237,6 @@ func (m *ReconcileNode) syncNode(nodes []corev1.Node) error {
 				err := m.cloud.ModifyNetworkInterfaceSourceDestCheck(cloudNode.PrimaryNetworkInterfaceID, false)
 				if err != nil {
 					log.Error(err, "disable sourceDestCheck for network interface error", "eni", cloudNode.PrimaryNetworkInterfaceID, "node", node.Name, "ecs", cloudNode.InstanceID)
-					continue
 				}
 			} else {
 				log.Info("can not find cloud node primary network interface id, skip update sourceDestCheck")
