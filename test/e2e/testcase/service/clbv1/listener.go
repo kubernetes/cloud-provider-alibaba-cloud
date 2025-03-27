@@ -2,6 +2,7 @@ package clbv1
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
@@ -124,6 +125,18 @@ func RunListenerTestCases(f *framework.Framework) {
 						gomega.Expect(err).To(gomega.BeNil())
 
 						err = f.ExpectLoadBalancerEqual(newsvc)
+						gomega.Expect(err).To(gomega.BeNil())
+					})
+					ginkgo.It("multi acl-id", func() {
+						svc, err := f.Client.KubeClient.CreateServiceByAnno(map[string]string{
+							annotation.Annotation(annotation.AclStatus): string(model.OnFlag),
+							annotation.Annotation(annotation.AclType):   "white",
+							annotation.Annotation(annotation.AclID): fmt.Sprintf("%s,%s",
+								options.TestConfig.AclID, options.TestConfig.AclID2),
+						})
+						gomega.Expect(err).To(gomega.BeNil())
+
+						err = f.ExpectLoadBalancerEqual(svc)
 						gomega.Expect(err).To(gomega.BeNil())
 					})
 				}

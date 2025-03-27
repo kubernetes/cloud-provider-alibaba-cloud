@@ -397,8 +397,8 @@ func genericListenerEqual(reqCtx *svcCtx.RequestContext, local v1.ServicePort, r
 		}
 		if aclStatus == string(model.OnFlag) {
 			if aclID := reqCtx.Anno.Get(annotation.AclID); aclID != "" {
-				if remote.AclId != aclID {
-					return fmt.Errorf("expected slb aclID %s, got %s", aclID, remote.AclId)
+				if !clbv1.IsListenerACLIDsEqual(model.ListenerAttribute{AclId: aclID}, remote) {
+					return fmt.Errorf("expected slb aclID %s, got %v", aclID, remote.AclIds)
 				}
 			}
 			if aclType := reqCtx.Anno.Get(annotation.AclType); aclType != "" {
