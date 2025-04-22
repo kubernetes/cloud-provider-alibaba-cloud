@@ -209,6 +209,7 @@ type ServerGroup struct {
 	InitialServers          []ServerGroupServer
 	Tags                    []tag.Tag
 	AnyPortEnabled          bool
+	IgnoreWeightUpdate      bool
 
 	// auto-generated parameters
 	ServerGroupId string

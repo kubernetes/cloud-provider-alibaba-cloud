@@ -264,13 +264,13 @@ func diff(remote, local model.VServerGroup) (
 			if l.Type == "eni" {
 				if l.ServerId == r.ServerId &&
 					l.ServerIp == r.ServerIp &&
-					(l.Port != r.Port || l.Weight != r.Weight || l.Description != r.Description) {
+					(l.Port != r.Port || (!local.IgnoreWeightUpdate && l.Weight != r.Weight) || l.Description != r.Description) {
 					updates = append(updates, l)
 					break
 				}
 			} else {
 				if l.ServerId == r.ServerId &&
-					(l.Port != r.Port || l.Weight != r.Weight || l.Description != r.Description) {
+					(l.Port != r.Port || (!local.IgnoreWeightUpdate && l.Weight != r.Weight) || l.Description != r.Description) {
 					updates = append(updates, l)
 					break
 				}
@@ -349,6 +349,10 @@ func (mgr *VGroupManager) buildVGroupForServicePort(reqCtx *svcCtx.RequestContex
 			}
 			vg.VGroupWeight = &w
 		}
+	}
+
+	if strings.EqualFold(reqCtx.Anno.Get(annotation.IgnoreWeightUpdate), string(model.OnFlag)) {
+		vg.IgnoreWeightUpdate = true
 	}
 
 	// build backends
