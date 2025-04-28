@@ -3,13 +3,14 @@ package config
 import (
 	"flag"
 	"fmt"
+	"os"
+	"time"
+
 	"github.com/spf13/pflag"
 	apiext "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/cloud-provider/config"
 	"k8s.io/klog/v2"
-	"os"
 	sigConfig "sigs.k8s.io/controller-runtime/pkg/client/config"
-	"time"
 )
 
 const (
@@ -41,6 +42,8 @@ const (
 	defaultNodeMonitorPeriod              = 5 * time.Minute
 	defaultServerGroupBatchSize           = 40
 	defaultNetwork                        = "vpc"
+
+	defaultParallelizeNumber = 10
 )
 
 var ControllerCFG = &ControllerConfig{
@@ -54,6 +57,7 @@ type ControllerConfig struct {
 	Controllers                     []string
 	FeatureGates                    string
 	ServerGroupBatchSize            int
+	MaxParallelizeNumber            int
 	LogLevel                        int
 	DryRun                          bool
 	NetWork                         string
@@ -85,6 +89,7 @@ func (cfg *ControllerConfig) BindFlags(fs *pflag.FlagSet) {
 	fs.DurationVar(&cfg.NodeMonitorPeriod.Duration, flagNodeMonitorPeriod, defaultNodeMonitorPeriod, "The period for syncing NodeStatus in NodeController.")
 	fs.IntVar(&cfg.ServerGroupBatchSize, flagServerGroupBatchSize, defaultServerGroupBatchSize, "The batch size for syncing server group. The value range is 1-40")
 	fs.BoolVar(&cfg.AllowUntaggedCloud, "allow-untagged-cloud", false, "Allow the cluster to run without the cluster-id on cloud instances. This is a legacy mode of operation and a cluster-id will be required in the future.")
+	fs.IntVar(&cfg.MaxParallelizeNumber, "max-parallelize-number", defaultParallelizeNumber, "The max parallelize number of actions for listener and server group updates")
 	_ = fs.MarkDeprecated("allow-untagged-cloud", "This flag is deprecated and will be removed in a future release. A cluster-id will be required on cloud instances.")
 
 	fs.IntVar(&cfg.NodeReconcileBatchSize, "node-reconcile-batch-size", 100, "The batch size for syncing node status. The value range is 1-100")

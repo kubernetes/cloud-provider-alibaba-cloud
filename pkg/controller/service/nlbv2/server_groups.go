@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/util/workqueue"
 	"strconv"
 	"strings"
 
@@ -51,16 +52,32 @@ type ServerGroupManager struct {
 	vpcId      string
 }
 
+type serverGroupActionType string
+
+const (
+	serverGroupActionCreateAndAddBackendServers serverGroupActionType = "createAndAddBackendServers"
+	serverGroupActionDelete                     serverGroupActionType = "delete"
+	serverGroupActionUpdate                     serverGroupActionType = "update"
+)
+
+type serverGroupAction struct {
+	Action serverGroupActionType
+	Local  *nlbmodel.ServerGroup
+	Remote *nlbmodel.ServerGroup
+}
+
 func (mgr *ServerGroupManager) BuildLocalModel(reqCtx *svcCtx.RequestContext, mdl *nlbmodel.NetworkLoadBalancer) error {
-	var sgs []*nlbmodel.ServerGroup
 
 	candidates, err := reconbackend.NewEndpointWithENI(reqCtx, mgr.kubeClient)
 	if err != nil {
 		return err
 	}
 
-	containsPotentialReadyBackends := false
-	for _, lis := range mdl.Listeners {
+	sgs := make([]*nlbmodel.ServerGroup, len(mdl.Listeners))
+	errs := make([]error, len(mdl.Listeners))
+	containsPotentialReadyBackends := make([]bool, len(mdl.Listeners))
+	workqueue.ParallelizeUntil(reqCtx.Ctx, ctrlCfg.ControllerCFG.MaxParallelizeNumber, len(mdl.Listeners), func(i int) {
+		lis := mdl.Listeners[i]
 		sg := &nlbmodel.ServerGroup{
 			VPCId:       mgr.vpcId,
 			ServicePort: lis.ServicePort,
@@ -82,18 +99,29 @@ func (mgr *ServerGroupManager) BuildLocalModel(reqCtx *svcCtx.RequestContext, md
 		}
 		sg.ServerGroupName = sg.NamedKey.Key()
 		if err := setServerGroupAttributeFromAnno(sg, reqCtx.Anno); err != nil {
-			return err
+			errs[i] = err
+			return
 		}
 		cpr, err := mgr.setServerGroupServers(reqCtx, sg, candidates, mdl.LoadBalancerAttribute.IsUserManaged)
 		if err != nil {
-			return fmt.Errorf("set ServerGroup for port %d error: %s", lis.ServicePort.Port, err.Error())
+			errs[i] = fmt.Errorf("set ServerGroup for port %d error: %s", lis.ServicePort.Port, err.Error())
+			return
 		}
-		sgs = append(sgs, sg)
-		containsPotentialReadyBackends = containsPotentialReadyBackends || cpr
+		sgs[i] = sg
+		containsPotentialReadyBackends[i] = cpr
+	})
+
+	cpr := false
+	for _, c := range containsPotentialReadyBackends {
+		if c {
+			cpr = true
+			break
+		}
 	}
+
 	mdl.ServerGroups = sgs
-	mdl.ContainsPotentialReadyEndpoints = containsPotentialReadyBackends
-	return nil
+	mdl.ContainsPotentialReadyEndpoints = cpr
+	return utilerrors.NewAggregate(errs)
 }
 
 func (mgr *ServerGroupManager) ListNLBServerGroups(reqCtx *svcCtx.RequestContext) ([]*nlbmodel.ServerGroup, error) {
@@ -142,6 +170,40 @@ func (mgr *ServerGroupManager) BuildRemoteModel(reqCtx *svcCtx.RequestContext, m
 	return nil
 }
 
+func (mgr *ServerGroupManager) ParallelUpdateServerGroups(reqCtx *svcCtx.RequestContext, actions []serverGroupAction) []error {
+	if len(actions) == 0 {
+		reqCtx.Log.Info("no action to do for server group")
+		return nil
+	}
+	errs := make([]error, len(actions))
+	reqCtx.Log.V(5).Info("update server groups parallelly", "actionsCount", len(actions))
+	workqueue.ParallelizeUntil(reqCtx.Ctx, ctrlCfg.ControllerCFG.MaxParallelizeNumber, len(actions), func(i int) {
+		var err error
+		act := actions[i]
+		switch act.Action {
+		case serverGroupActionCreateAndAddBackendServers:
+			err = mgr.CreateServerGroupAndAddServers(reqCtx, act.Local)
+		case serverGroupActionUpdate:
+			err = mgr.UpdateServerGroup(reqCtx, act.Local, act.Remote)
+		case serverGroupActionDelete:
+			err = mgr.DeleteServerGroup(reqCtx, act.Remote.ServerGroupId)
+		}
+		errs[i] = err
+	})
+	return errs
+}
+
+func (mgr *ServerGroupManager) CreateServerGroupAndAddServers(reqCtx *svcCtx.RequestContext, local *nlbmodel.ServerGroup) error {
+	err := mgr.CreateServerGroup(reqCtx, local)
+	if err != nil {
+		return fmt.Errorf("EnsureServerGroupCreated error: %w", err)
+	}
+	err = mgr.BatchAddServers(reqCtx, local, local.Servers)
+	if err != nil {
+		return fmt.Errorf("BatchAddServers error: %w", err)
+	}
+	return nil
+}
 func (mgr *ServerGroupManager) CreateServerGroup(reqCtx *svcCtx.RequestContext, sg *nlbmodel.ServerGroup) error {
 	err := setDefaultValueForServerGroup(sg)
 	if err != nil {

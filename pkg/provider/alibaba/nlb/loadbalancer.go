@@ -3,6 +3,7 @@ package nlb
 import (
 	"context"
 	"fmt"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"strings"
 	"time"
 
@@ -647,6 +648,60 @@ func (p *NLBProvider) waitJobFinish(api, jobId string, args ...time.Duration) er
 		return tea.StringValue(resp.Body.Status) == "Succeeded", retErr
 	})
 	return retErr
+}
+
+func (p *NLBProvider) BatchWaitJobsFinish(ctx context.Context, api string, jobIds []string, args ...time.Duration) error {
+	// todo: use ListAsyncJobs when it ready
+	var interval, timeout time.Duration
+	if len(args) < 2 {
+		interval = DefaultRetryInterval
+		timeout = DefaultRetryTimeout
+	} else {
+		interval = args[0]
+		timeout = args[1]
+	}
+
+	var currentJobs []string
+	currentJobs = append(currentJobs, jobIds...)
+
+	var errs []error
+	err := wait.PollUntilContextTimeout(ctx, interval, timeout, false, func(ctx context.Context) (bool, error) {
+		klog.V(5).Infof("batch wait jobs %s ready, count=%d", api, len(currentJobs))
+		var newJobs []string
+		for _, j := range currentJobs {
+			req := &nlb.GetJobStatusRequest{}
+			req.JobId = tea.String(j)
+			resp, retErr := p.auth.NLB.GetJobStatus(req)
+			if retErr != nil {
+				errs = append(errs, util.SDKError(fmt.Sprintf("%s-GetJobStatus", api), retErr))
+				continue
+			}
+			if resp == nil || resp.Body == nil {
+				errs = append(errs, fmt.Errorf("OpenAPI %s GetJobStatus resp is nil, JobId: %s", api, j))
+				continue
+			}
+			if tea.StringValue(resp.Body.Status) == "Succeeded" {
+				klog.V(5).Infof("job %s succeeded", j)
+				continue
+			}
+
+			// job is unfinished, retry in next poll
+			newJobs = append(newJobs, j)
+		}
+
+		if len(newJobs) == 0 {
+			return true, nil
+		}
+		return false, nil
+	})
+
+	if err != nil {
+		errs = append(errs, err)
+	}
+	if len(errs) != 0 {
+		return utilerrors.NewAggregate(errs)
+	}
+	return nil
 }
 
 func (p *NLBProvider) waitNLBActive(lbId string) (*nlb.GetLoadBalancerAttributeResponse, error) {

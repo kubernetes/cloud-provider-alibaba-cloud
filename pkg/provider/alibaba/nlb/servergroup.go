@@ -5,7 +5,9 @@ import (
 	"fmt"
 	nlb "github.com/alibabacloud-go/nlb-20220430/v3/client"
 	"github.com/alibabacloud-go/tea/tea"
-	"k8s.io/apimachinery/pkg/util/wait"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/client-go/util/workqueue"
+	ctrlCfg "k8s.io/cloud-provider-alibaba-cloud/pkg/config"
 	nlbmodel "k8s.io/cloud-provider-alibaba-cloud/pkg/model/nlb"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/model/tag"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/util"
@@ -13,7 +15,7 @@ import (
 	"time"
 )
 
-func (p *NLBProvider) toLocalServerGroup(ctx context.Context, remote *nlb.ListServerGroupsResponseBodyServerGroups) (*nlbmodel.ServerGroup, error) {
+func (p *NLBProvider) toLocalServerGroup(ctx context.Context, remote *nlb.ListServerGroupsResponseBodyServerGroups, servers []nlbmodel.ServerGroupServer) (*nlbmodel.ServerGroup, error) {
 	var err error
 	sg := &nlbmodel.ServerGroup{
 		ServerGroupId:           tea.StringValue(remote.ServerGroupId),
@@ -53,11 +55,6 @@ func (p *NLBProvider) toLocalServerGroup(ctx context.Context, remote *nlb.ListSe
 		sg.IsUserManaged = true
 	}
 
-	servers, err := p.ListNLBServers(ctx, sg.ServerGroupId)
-	if err != nil {
-		return nil, fmt.Errorf("[%s] [%s] %s", sg.ServerGroupId, sg.ServerGroupName,
-			util.SDKError("ListNLBServers", err).Error())
-	}
 	sg.Servers = servers
 	for _, t := range remote.Tags {
 		tag := tag.Tag{
@@ -100,11 +97,20 @@ func (p *NLBProvider) ListNLBServerGroups(ctx context.Context, tags []tag.Tag) (
 		}
 	}
 
+	var sgIds []string
+	for _, r := range remoteServerGroups {
+		sgIds = append(sgIds, tea.StringValue(r.ServerGroupId))
+	}
+	serversMap, err := p.parallelListNLBServers(ctx, sgIds)
+	if err != nil {
+		return nil, err
+	}
+
 	var (
 		sgs []*nlbmodel.ServerGroup
 	)
 	for _, ret := range remoteServerGroups {
-		sg, err := p.toLocalServerGroup(ctx, ret)
+		sg, err := p.toLocalServerGroup(ctx, ret, serversMap[tea.StringValue(ret.ServerGroupId)])
 		if err != nil {
 			return nil, err
 		}
@@ -113,6 +119,23 @@ func (p *NLBProvider) ListNLBServerGroups(ctx context.Context, tags []tag.Tag) (
 	}
 
 	return sgs, nil
+}
+
+func (p *NLBProvider) parallelListNLBServers(ctx context.Context, sgId []string) (map[string][]nlbmodel.ServerGroupServer, error) {
+	servers := make([][]nlbmodel.ServerGroupServer, len(sgId))
+	errs := make([]error, len(sgId))
+	workqueue.ParallelizeUntil(ctx, ctrlCfg.ControllerCFG.MaxParallelizeNumber, len(sgId), func(i int) {
+		s, err := p.ListNLBServers(ctx, sgId[i])
+		if err != nil {
+			errs[i] = err
+		}
+		servers[i] = s
+	})
+	ret := map[string][]nlbmodel.ServerGroupServer{}
+	for i, id := range sgId {
+		ret[id] = servers[i]
+	}
+	return ret, utilerrors.NewAggregate(errs)
 }
 
 func (p *NLBProvider) GetNLBServerGroup(ctx context.Context, sgId string) (*nlbmodel.ServerGroup, error) {
@@ -130,10 +153,99 @@ func (p *NLBProvider) GetNLBServerGroup(ctx context.Context, sgId string) (*nlbm
 	if len(remoteServerGroups) == 0 {
 		return nil, nil
 	}
-	return p.toLocalServerGroup(ctx, remoteServerGroups[0])
+	servers, err := p.ListNLBServers(ctx, sgId)
+	if err != nil {
+		return nil, err
+	}
+	return p.toLocalServerGroup(ctx, remoteServerGroups[0], servers)
 }
 
 func (p *NLBProvider) CreateNLBServerGroup(ctx context.Context, sg *nlbmodel.ServerGroup) error {
+	jobId, err := p.CreateNLBServerGroupAsync(ctx, sg)
+	if err != nil {
+		return err
+	}
+	return p.waitJobFinish("CreateServerGroup", jobId, 1200*time.Millisecond, DefaultRetryTimeout)
+}
+
+func (p *NLBProvider) DeleteNLBServerGroup(ctx context.Context, sgId string) error {
+	_, err := p.DeleteNLBServerGroupAsync(ctx, sgId)
+	return err
+
+}
+
+func (p *NLBProvider) UpdateNLBServerGroup(ctx context.Context, sg *nlbmodel.ServerGroup) error {
+	_, err := p.UpdateNLBServerGroupAsync(ctx, sg)
+	return err
+}
+
+// ServerGroupServer
+func (p *NLBProvider) AddNLBServers(ctx context.Context, sgId string, backends []nlbmodel.ServerGroupServer,
+) error {
+	jobId, err := p.AddNLBServersAsync(ctx, sgId, backends)
+	if err != nil {
+		return err
+	}
+	return p.waitJobFinish("AddServersToServerGroup", jobId, 1200*time.Millisecond, DefaultRetryTimeout)
+}
+
+func (p *NLBProvider) RemoveNLBServers(ctx context.Context, sgId string, backends []nlbmodel.ServerGroupServer,
+) error {
+	jobId, err := p.RemoveNLBServersAsync(ctx, sgId, backends)
+	if err != nil {
+		return err
+	}
+	return p.waitJobFinish("RemoveServersFromServerGroup", jobId, 1200*time.Millisecond, DefaultRetryTimeout)
+}
+
+func (p *NLBProvider) UpdateNLBServers(ctx context.Context, sgId string, backends []nlbmodel.ServerGroupServer,
+) error {
+	jobId, err := p.UpdateNLBServersAsync(ctx, sgId, backends)
+	if err != nil {
+		return err
+	}
+	return p.waitJobFinish("UpdateServerGroupServersAttribute", jobId, 1200*time.Millisecond, DefaultRetryTimeout)
+}
+
+func (p *NLBProvider) ListNLBServers(ctx context.Context, sgId string) ([]nlbmodel.ServerGroupServer, error) {
+	var ret []nlbmodel.ServerGroupServer
+	var nextToken = ""
+	for {
+		req := &nlb.ListServerGroupServersRequest{}
+		req.ServerGroupId = tea.String(sgId)
+		req.MaxResults = tea.Int32(100)
+		req.NextToken = tea.String(nextToken)
+
+		resp, err := p.auth.NLB.ListServerGroupServers(req)
+		if err != nil {
+			return nil, util.SDKError("ListServerGroupServers", err)
+		}
+		if resp == nil || resp.Body == nil {
+			return nil, fmt.Errorf("OpenAPI ListServerGroupServers resp is nil")
+		}
+		klog.V(5).Infof("RequestId: %s, API: %s, ServerGroupId: %s",
+			tea.StringValue(resp.Body.RequestId), "ListServerGroupServers", tea.StringValue(req.ServerGroupId))
+
+		for _, s := range resp.Body.Servers {
+			ret = append(ret, nlbmodel.ServerGroupServer{
+				ServerGroupId: tea.StringValue(s.ServerGroupId),
+				Description:   tea.StringValue(s.Description),
+				ServerId:      tea.StringValue(s.ServerId),
+				ServerIp:      tea.StringValue(s.ServerIp),
+				ServerType:    nlbmodel.ServerType(tea.StringValue(s.ServerType)),
+				Port:          tea.Int32Value(s.Port),
+				Weight:        tea.Int32Value(s.Weight),
+			})
+		}
+
+		nextToken = tea.StringValue(resp.Body.NextToken)
+		if nextToken == "" {
+			return ret, nil
+		}
+	}
+}
+
+func (p *NLBProvider) CreateNLBServerGroupAsync(ctx context.Context, sg *nlbmodel.ServerGroup) (string, error) {
 	req := &nlb.CreateServerGroupRequest{}
 	req.ServerGroupName = tea.String(sg.ServerGroupName)
 	req.VpcId = tea.String(sg.VPCId)
@@ -210,59 +322,32 @@ func (p *NLBProvider) CreateNLBServerGroup(ctx context.Context, sg *nlbmodel.Ser
 
 	resp, err := p.auth.NLB.CreateServerGroup(req)
 	if err != nil {
-		return util.SDKError("CreateServerGroup", err)
+		return "", util.SDKError("CreateServerGroup", err)
 	}
 	if resp == nil || resp.Body == nil {
-		return fmt.Errorf("OpenAPI CreateServerGroup resp is nil")
+		return "", fmt.Errorf("OpenAPI CreateServerGroup resp is nil")
 	}
 	klog.V(5).Infof("RequestId: %s, API: %s", tea.StringValue(resp.Body.RequestId), "CreateServerGroup")
 
 	sg.ServerGroupId = tea.StringValue(resp.Body.ServerGroupId)
-
-	var (
-		getResp *nlb.ListServerGroupsResponse
-		retErr  error
-	)
-
-	_ = wait.PollImmediate(3*time.Second, 10*time.Second, func() (bool, error) {
-		getReq := &nlb.ListServerGroupsRequest{}
-		getReq.ServerGroupIds = []*string{tea.String(sg.ServerGroupId)}
-
-		getResp, retErr = p.auth.NLB.ListServerGroups(getReq)
-		if retErr != nil {
-			retErr = util.SDKError("ListServerGroups", retErr)
-			return false, retErr
-		}
-		if getResp == nil || getResp.Body == nil {
-			retErr = fmt.Errorf("OpenAPI ListServerGroups resp is nil, req: %+v", getReq)
-			return false, nil
-		}
-		if tea.StringValue(getResp.Body.ServerGroups[0].ServerGroupStatus) == "Creating" {
-			klog.V(5).Infof("%s is still in creating status, wait next time", sg.ServerGroupId)
-			return false, nil
-		}
-		retErr = nil
-		return true, retErr
-	})
-	return retErr
+	return tea.StringValue(resp.Body.JobId), nil
 }
 
-func (p *NLBProvider) DeleteNLBServerGroup(ctx context.Context, sgId string) error {
+func (p *NLBProvider) DeleteNLBServerGroupAsync(ctx context.Context, sgId string) (string, error) {
 	req := &nlb.DeleteServerGroupRequest{}
 	req.ServerGroupId = tea.String(sgId)
 	resp, err := p.auth.NLB.DeleteServerGroup(req)
 	if err != nil {
-		return util.SDKError("DeleteServerGroup", err)
+		return "", util.SDKError("DeleteServerGroup", err)
 	}
 	if resp == nil || resp.Body == nil {
-		return fmt.Errorf("OpenAPI DeleteServerGroup resp is nil")
+		return "", fmt.Errorf("OpenAPI DeleteServerGroup resp is nil")
 	}
 	klog.V(5).Infof("RequestId: %s, API: %s", tea.StringValue(resp.Body.RequestId), "DeleteServerGroup")
-	return nil
-
+	return tea.StringValue(resp.Body.JobId), nil
 }
 
-func (p *NLBProvider) UpdateNLBServerGroup(ctx context.Context, sg *nlbmodel.ServerGroup) error {
+func (p *NLBProvider) UpdateNLBServerGroupAsync(ctx context.Context, sg *nlbmodel.ServerGroup) (string, error) {
 	req := &nlb.UpdateServerGroupAttributeRequest{}
 	// required
 	req.ServerGroupId = tea.String(sg.ServerGroupId)
@@ -319,18 +404,16 @@ func (p *NLBProvider) UpdateNLBServerGroup(ctx context.Context, sg *nlbmodel.Ser
 
 	resp, err := p.auth.NLB.UpdateServerGroupAttribute(req)
 	if err != nil {
-		return util.SDKError("UpdateServerGroupAttribute", err)
+		return "", util.SDKError("UpdateServerGroupAttribute", err)
 	}
 	if resp == nil || resp.Body == nil {
-		return fmt.Errorf("OpenAPI UpdateServerGroupAttribute resp is nil")
+		return "", fmt.Errorf("OpenAPI UpdateServerGroupAttribute resp is nil")
 	}
 	klog.V(5).Infof("RequestId: %s, API: %s", tea.StringValue(resp.Body.RequestId), "UpdateServerGroupAttribute")
-	return nil
+	return tea.StringValue(resp.Body.JobId), nil
 }
 
-// ServerGroupServer
-func (p *NLBProvider) AddNLBServers(ctx context.Context, sgId string, backends []nlbmodel.ServerGroupServer,
-) error {
+func (p *NLBProvider) AddNLBServersAsync(ctx context.Context, sgId string, backends []nlbmodel.ServerGroupServer) (string, error) {
 	req := &nlb.AddServersToServerGroupRequest{}
 	req.ServerGroupId = tea.String(sgId)
 	for _, b := range backends {
@@ -349,18 +432,16 @@ func (p *NLBProvider) AddNLBServers(ctx context.Context, sgId string, backends [
 
 	resp, err := p.auth.NLB.AddServersToServerGroup(req)
 	if err != nil {
-		return util.SDKError("AddServersToServerGroup", err)
+		return "", util.SDKError("AddServersToServerGroup", err)
 	}
 	if resp == nil || resp.Body == nil {
-		return fmt.Errorf("OpenAPI AddServersToServerGroup resp is nil")
+		return "", fmt.Errorf("OpenAPI AddServersToServerGroup resp is nil")
 	}
 	klog.V(5).Infof("RequestId: %s, API: %s", tea.StringValue(resp.Body.RequestId), "AddServersToServerGroup")
-	return p.waitJobFinish("AddServersToServerGroup", tea.StringValue(resp.Body.JobId))
+	return tea.StringValue(resp.Body.JobId), nil
 }
 
-func (p *NLBProvider) RemoveNLBServers(ctx context.Context, sgId string, backends []nlbmodel.ServerGroupServer,
-) error {
-
+func (p *NLBProvider) RemoveNLBServersAsync(ctx context.Context, sgId string, backends []nlbmodel.ServerGroupServer) (string, error) {
 	req := &nlb.RemoveServersFromServerGroupRequest{}
 	req.ServerGroupId = tea.String(sgId)
 
@@ -378,17 +459,16 @@ func (p *NLBProvider) RemoveNLBServers(ctx context.Context, sgId string, backend
 
 	resp, err := p.auth.NLB.RemoveServersFromServerGroup(req)
 	if err != nil {
-		return util.SDKError("RemoveServersFromServerGroup", err)
+		return "", util.SDKError("RemoveServersFromServerGroup", err)
 	}
 	if resp == nil || resp.Body == nil {
-		return fmt.Errorf("OpenAPI RemoveServersFromServerGroup resp is nil")
+		return "", fmt.Errorf("OpenAPI RemoveServersFromServerGroup resp is nil")
 	}
 	klog.V(5).Infof("RequestId: %s, API: %s", tea.StringValue(resp.Body.RequestId), "RemoveServersFromServerGroup")
-	return p.waitJobFinish("RemoveServersFromServerGroup", tea.StringValue(resp.Body.JobId))
+	return tea.StringValue(resp.Body.JobId), nil
 }
 
-func (p *NLBProvider) UpdateNLBServers(ctx context.Context, sgId string, backends []nlbmodel.ServerGroupServer,
-) error {
+func (p *NLBProvider) UpdateNLBServersAsync(ctx context.Context, sgId string, backends []nlbmodel.ServerGroupServer) (string, error) {
 	req := &nlb.UpdateServerGroupServersAttributeRequest{}
 	req.ServerGroupId = tea.String(sgId)
 
@@ -409,49 +489,11 @@ func (p *NLBProvider) UpdateNLBServers(ctx context.Context, sgId string, backend
 
 	resp, err := p.auth.NLB.UpdateServerGroupServersAttribute(req)
 	if err != nil {
-		return util.SDKError("UpdateServerGroupServersAttribute", err)
+		return "", util.SDKError("UpdateServerGroupServersAttribute", err)
 	}
 	if resp == nil || resp.Body == nil {
-		return fmt.Errorf("OpenAPI UpdateServerGroupServersAttribute resp is nil")
+		return "", fmt.Errorf("OpenAPI UpdateServerGroupServersAttribute resp is nil")
 	}
 	klog.V(5).Infof("RequestId: %s, API: %s", tea.StringValue(resp.Body.RequestId), "UpdateServerGroupServersAttribute")
-	return p.waitJobFinish("UpdateServerGroupServersAttribute", tea.StringValue(resp.Body.JobId))
-}
-
-func (p *NLBProvider) ListNLBServers(ctx context.Context, sgId string) ([]nlbmodel.ServerGroupServer, error) {
-	var ret []nlbmodel.ServerGroupServer
-	var nextToken = ""
-	for {
-		req := &nlb.ListServerGroupServersRequest{}
-		req.ServerGroupId = tea.String(sgId)
-		req.MaxResults = tea.Int32(100)
-		req.NextToken = tea.String(nextToken)
-
-		resp, err := p.auth.NLB.ListServerGroupServers(req)
-		if err != nil {
-			return nil, util.SDKError("ListServerGroupServers", err)
-		}
-		if resp == nil || resp.Body == nil {
-			return nil, fmt.Errorf("OpenAPI ListServerGroupServers resp is nil")
-		}
-		klog.V(5).Infof("RequestId: %s, API: %s, ServerGroupId: %s",
-			tea.StringValue(resp.Body.RequestId), "ListServerGroupServers", tea.StringValue(req.ServerGroupId))
-
-		for _, s := range resp.Body.Servers {
-			ret = append(ret, nlbmodel.ServerGroupServer{
-				ServerGroupId: tea.StringValue(s.ServerGroupId),
-				Description:   tea.StringValue(s.Description),
-				ServerId:      tea.StringValue(s.ServerId),
-				ServerIp:      tea.StringValue(s.ServerIp),
-				ServerType:    nlbmodel.ServerType(tea.StringValue(s.ServerType)),
-				Port:          tea.Int32Value(s.Port),
-				Weight:        tea.Int32Value(s.Weight),
-			})
-		}
-
-		nextToken = tea.StringValue(resp.Body.NextToken)
-		if nextToken == "" {
-			return ret, nil
-		}
-	}
+	return tea.StringValue(resp.Body.JobId), nil
 }

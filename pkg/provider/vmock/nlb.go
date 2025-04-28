@@ -2,6 +2,7 @@ package vmock
 
 import (
 	"context"
+	"time"
 
 	"github.com/alibabacloud-go/tea/tea"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/helper"
@@ -22,6 +23,51 @@ var _ prvd.INLB = &MockNLB{}
 
 type MockNLB struct {
 	auth *base.ClientMgr
+}
+
+func (m MockNLB) DeleteNLBListenerAsync(ctx context.Context, listenerId string) (string, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (m MockNLB) UpdateNLBListenerAsync(ctx context.Context, lis *nlbmodel.ListenerAttribute) (string, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (m MockNLB) CreateNLBListenerAsync(ctx context.Context, lbId string, lis *nlbmodel.ListenerAttribute) (string, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (m MockNLB) CreateNLBServerGroupAsync(ctx context.Context, sg *nlbmodel.ServerGroup) (string, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (m MockNLB) DeleteNLBServerGroupAsync(ctx context.Context, sgId string) (string, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (m MockNLB) UpdateNLBServerGroupAsync(ctx context.Context, sg *nlbmodel.ServerGroup) (string, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (m MockNLB) AddNLBServersAsync(ctx context.Context, sgId string, backends []nlbmodel.ServerGroupServer) (string, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (m MockNLB) RemoveNLBServersAsync(ctx context.Context, sgId string, backends []nlbmodel.ServerGroupServer) (string, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (m MockNLB) UpdateNLBServersAsync(ctx context.Context, sgId string, backends []nlbmodel.ServerGroupServer) (string, error) {
+	//TODO implement me
+	panic("implement me")
 }
 
 const (
@@ -360,5 +406,9 @@ func (m MockNLB) UpdateNLBSecurityGroupIds(ctx context.Context, mdl *nlbmodel.Ne
 }
 
 func (m MockNLB) UpdateNLBIPv6AddressType(ctx context.Context, mdl *nlbmodel.NetworkLoadBalancer) error {
+	return nil
+}
+
+func (m MockNLB) BatchWaitJobsFinish(ctx context.Context, api string, jobIds []string, args ...time.Duration) error {
 	return nil
 }

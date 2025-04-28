@@ -187,19 +187,23 @@ func (m *ModelApplier) applyLoadBalancerAttribute(reqCtx *svcCtx.RequestContext,
 }
 
 func (m *ModelApplier) applyVGroups(reqCtx *svcCtx.RequestContext, local *model.LoadBalancer, remote *model.LoadBalancer) error {
-	var errs []error
+	var updateActions []vGroupAction
+	var addToRemote []int
 	updatedVGroups := map[string]bool{}
 
 	for i := range local.VServerGroups {
 		found := false
-		var old model.VServerGroup
-
+		var old *model.VServerGroup
+		sgKey := "name-" + local.VServerGroups[i].VGroupName
+		if local.VServerGroups[i].VGroupId != "" {
+			sgKey = "id-" + local.VServerGroups[i].VGroupId
+		}
 		for _, rv := range remote.VServerGroups {
 			// for reuse vgroup case, find by vgroup id first
 			if local.VServerGroups[i].VGroupId != "" &&
 				local.VServerGroups[i].VGroupId == rv.VGroupId {
 				found = true
-				old = rv
+				old = &rv
 				break
 			}
 			// find by vgroup name
@@ -207,12 +211,12 @@ func (m *ModelApplier) applyVGroups(reqCtx *svcCtx.RequestContext, local *model.
 				local.VServerGroups[i].VGroupName == rv.VGroupName {
 				found = true
 				local.VServerGroups[i].VGroupId = rv.VGroupId
-				old = rv
+				old = &rv
 				break
 			}
 		}
 
-		if updatedVGroups[local.VServerGroups[i].VGroupId] {
+		if updatedVGroups[sgKey] {
 			reqCtx.Log.Info("already updated vgroup, skip",
 				"vgroupID", local.VServerGroups[i].VGroupId, "vgroupName", local.VServerGroups[i].VGroupName)
 			continue
@@ -220,33 +224,39 @@ func (m *ModelApplier) applyVGroups(reqCtx *svcCtx.RequestContext, local *model.
 
 		// update
 		if found {
-			if err := m.vGroupMgr.UpdateVServerGroup(reqCtx, local.VServerGroups[i], old); err != nil {
-				errs = append(errs, fmt.Errorf("EnsureVGroupUpdated error: %s", err.Error()))
+			add, del, update := diff(*old, local.VServerGroups[i])
+			if len(add) == 0 && len(del) == 0 && len(update) == 0 {
+				reqCtx.Log.Info(fmt.Sprintf("reconcile vgroup: [%s] not change, skip reconcile", old.VGroupId),
+					"vgroupName", old.VGroupName)
 				continue
 			}
-			updatedVGroups[local.VServerGroups[i].VGroupId] = true
+			updateActions = append(updateActions, vGroupAction{
+				Action: vGroupActionUpdate,
+				LBId:   remote.LoadBalancerAttribute.LoadBalancerId,
+				Local:  &local.VServerGroups[i],
+				Remote: old,
+			})
+			updatedVGroups[sgKey] = true
 		}
 
 		// create
 		if !found {
 			reqCtx.Log.Info(fmt.Sprintf("try to create vgroup %s", local.VServerGroups[i].VGroupName))
-			// to avoid add too many backends in one action, create vserver group with empty backends,
-			// then use AddVServerGroupBackendServers to add backends
-			err := m.vGroupMgr.CreateVServerGroup(reqCtx, &local.VServerGroups[i], remote.LoadBalancerAttribute.LoadBalancerId)
-			if err != nil {
-				errs = append(errs, fmt.Errorf("CreateVServerGroup error: %s", err.Error()))
-				continue
-			}
-			if err := m.vGroupMgr.BatchAddVServerGroupBackendServers(reqCtx, local.VServerGroups[i],
-				local.VServerGroups[i].Backends); err != nil {
-				errs = append(errs, fmt.Errorf("BatchAddVServerGroupBackendServers error: %s", err.Error()))
-				continue
-			}
-			remote.VServerGroups = append(remote.VServerGroups, local.VServerGroups[i])
-			updatedVGroups[local.VServerGroups[i].VGroupId] = true
+			updateActions = append(updateActions, vGroupAction{
+				Action: vGroupActionCreateAndAddBackendServers,
+				LBId:   remote.LoadBalancerAttribute.LoadBalancerId,
+				Local:  &local.VServerGroups[i],
+			})
+			// the vgorup will be added to remote model after vgroup has been created on the cloud
+			addToRemote = append(addToRemote, i)
+			updatedVGroups[sgKey] = true
 		}
 	}
 
+	errs := m.vGroupMgr.ParallelUpdateVServerGroup(reqCtx, updateActions)
+	for _, i := range addToRemote {
+		remote.VServerGroups = append(remote.VServerGroups, local.VServerGroups[i])
+	}
 	return utilerrors.NewAggregate(errs)
 }
 

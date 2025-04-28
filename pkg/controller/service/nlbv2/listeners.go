@@ -13,10 +13,19 @@ import (
 	nlbmodel "k8s.io/cloud-provider-alibaba-cloud/pkg/model/nlb"
 	prvd "k8s.io/cloud-provider-alibaba-cloud/pkg/provider"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/base"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/nlb"
+	prvdutil "k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/util"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/dryrun"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/util"
+	"k8s.io/klog/v2"
 	"strconv"
 	"strings"
+	"time"
+)
+
+const (
+	defaultListenerMaxRetry     = 3
+	defaultListenerWaitInterval = 100 * time.Millisecond
 )
 
 func NewListenerManager(cloud prvd.Provider) *ListenerManager {
@@ -27,6 +36,21 @@ func NewListenerManager(cloud prvd.Provider) *ListenerManager {
 
 type ListenerManager struct {
 	cloud prvd.Provider
+}
+
+type listenerActionType string
+
+const (
+	listenerActionCreate listenerActionType = "create"
+	listenerActionUpdate listenerActionType = "update"
+	listenerActionDelete listenerActionType = "delete"
+)
+
+type listenerAction struct {
+	Action listenerActionType
+	Local  *nlbmodel.ListenerAttribute
+	Remote *nlbmodel.ListenerAttribute
+	LBId   string
 }
 
 // serverGroup find the vGroup id associated with the specific ServicePort
@@ -210,20 +234,77 @@ func (mgr *ListenerManager) buildListenerFromServicePort(reqCtx *svcCtx.RequestC
 	return listener, nil
 }
 
+func (mgr *ListenerManager) ParallelUpdateListeners(reqCtx *svcCtx.RequestContext, actions []listenerAction) []error {
+	if len(actions) == 0 {
+		reqCtx.Log.Info("no action to do for listeners")
+		return nil
+	}
+
+	var jobIds []string
+	var errs []error
+	for _, a := range actions {
+		id := ""
+		var err error
+		switch a.Action {
+		case listenerActionCreate:
+			id, err = mgr.CreateListener(reqCtx, a.LBId, a.Local)
+			if err != nil {
+				klog.Errorf("error create listener [%d]: %s", a.Local.ListenerPort, err)
+				errs = append(errs, fmt.Errorf("EnsureListenerUpdated error: %w", err))
+				continue
+			}
+		case listenerActionUpdate:
+			id, err = mgr.UpdateNLBListener(reqCtx, a.Local, a.Remote)
+			if err != nil {
+				klog.Errorf("error update listener [%d]: %s", a.Local.ListenerPort, err)
+				errs = append(errs, fmt.Errorf("EnsureListenerCreated error: %w", err))
+				continue
+			}
+		case listenerActionDelete:
+			id, err = mgr.DeleteListener(reqCtx, a.Remote.ListenerId)
+			if err != nil {
+				klog.Errorf("error delete listener [%s]: %s", a.Remote.ListenerId, err)
+				errs = append(errs, fmt.Errorf("EnsureListenerDeleted error: %w", err))
+				continue
+			}
+		}
+
+		if id != "" {
+			jobIds = append(jobIds, id)
+		}
+	}
+
+	if len(jobIds) > 0 {
+		if err := mgr.cloud.BatchWaitJobsFinish(reqCtx.Ctx, "EnsuredListenerChanged", jobIds, 2200*time.Millisecond, nlb.DefaultRetryTimeout); err != nil {
+			errs = append(errs, fmt.Errorf("wait jobs error: %w", err))
+		}
+	}
+
+	return errs
+}
+
 func (mgr *ListenerManager) ListListeners(reqCtx *svcCtx.RequestContext, lbId string,
 ) ([]*nlbmodel.ListenerAttribute, error) {
 	return mgr.cloud.ListNLBListeners(reqCtx.Ctx, lbId)
 }
 
-func (mgr *ListenerManager) CreateListener(reqCtx *svcCtx.RequestContext, lbId string, local *nlbmodel.ListenerAttribute) error {
-	return mgr.cloud.CreateNLBListener(reqCtx.Ctx, lbId, local)
+func (mgr *ListenerManager) CreateListener(reqCtx *svcCtx.RequestContext, lbId string, local *nlbmodel.ListenerAttribute) (string, error) {
+	var jobId string
+	err := prvdutil.RetryOnNLBConflict(defaultListenerMaxRetry, defaultListenerWaitInterval, func() error {
+		id, err := mgr.cloud.CreateNLBListenerAsync(reqCtx.Ctx, lbId, local)
+		if err != nil {
+			return err
+		}
+		jobId = id
+		return nil
+	})
+	return jobId, err
 }
 
-func (mgr *ListenerManager) UpdateNLBListener(reqCtx *svcCtx.RequestContext, local, remote *nlbmodel.ListenerAttribute,
-) error {
+func (mgr *ListenerManager) UpdateNLBListener(reqCtx *svcCtx.RequestContext, local, remote *nlbmodel.ListenerAttribute) (string, error) {
 	if remote.ListenerStatus == nlbmodel.StoppedListenerStatus {
 		if err := mgr.cloud.StartNLBListener(reqCtx.Ctx, remote.ListenerId); err != nil {
-			return fmt.Errorf("start listener %s error: %s", remote.ListenerId, err.Error())
+			return "", fmt.Errorf("start listener %s error: %s", remote.ListenerId, err.Error())
 		}
 	}
 
@@ -336,19 +417,36 @@ func (mgr *ListenerManager) UpdateNLBListener(reqCtx *svcCtx.RequestContext, loc
 		reqCtx.Ctx = context.WithValue(reqCtx.Ctx, dryrun.ContextMessage, updateDetail)
 		reqCtx.Log.Info(fmt.Sprintf("update listener: %s [%d] changed, detail %s", local.ListenerProtocol, local.ListenerPort, updateDetail))
 
-		return mgr.cloud.UpdateNLBListener(reqCtx.Ctx, update)
+		var jobId string
+		err := prvdutil.RetryOnNLBConflict(defaultListenerMaxRetry, defaultListenerWaitInterval, func() error {
+			id, err := mgr.cloud.UpdateNLBListenerAsync(reqCtx.Ctx, update)
+			if err != nil {
+				return err
+			}
+			jobId = id
+			return nil
+		})
+		return jobId, err
 	}
 
 	reqCtx.Log.Info(fmt.Sprintf("update listener: %s [%d] not changed, skip", local.ListenerProtocol, local.ListenerPort))
-	return nil
+	return "", nil
 }
 
-func (mgr *ListenerManager) DeleteListener(reqCtx *svcCtx.RequestContext, lisId string) error {
-	return mgr.cloud.DeleteNLBListener(reqCtx.Ctx, lisId)
+func (mgr *ListenerManager) DeleteListener(reqCtx *svcCtx.RequestContext, lisId string) (string, error) {
+	var jobId string
+	err := prvdutil.RetryOnNLBConflict(defaultListenerMaxRetry, defaultListenerWaitInterval, func() error {
+		id, err := mgr.cloud.DeleteNLBListenerAsync(reqCtx.Ctx, lisId)
+		if err != nil {
+			return err
+		}
+		jobId = id
+		return nil
+	})
+	return jobId, err
 }
 
 func nlbListenerProtocol(annotation string, port v1.ServicePort) (string, error) {
-
 	if annotation == "" {
 		return strings.ToUpper(string(port.Protocol)), nil
 	}

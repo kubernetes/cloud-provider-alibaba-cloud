@@ -12,7 +12,7 @@ import (
 )
 
 func TestVGroupManager_BatchSyncVServerGroupBackendServers(t *testing.T) {
-	vgroupManager := getTestVGroupManager()
+	vgroupManager, _ := getTestVGroupManager()
 
 	var local, remote []model.BackendAttribute
 	for i := 0; i < 200; i++ {

@@ -9,6 +9,7 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/client-go/util/workqueue"
 	ctrlCfg "k8s.io/cloud-provider-alibaba-cloud/pkg/config"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/service/reconcile/annotation"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/service/reconcile/backend"
@@ -29,38 +30,75 @@ import (
 
 const DefaultServerWeight = 100
 
-func NewVGroupManager(kubeClient client.Client, cloud prvd.Provider) *VGroupManager {
+func NewVGroupManager(kubeClient client.Client, cloud prvd.Provider) (*VGroupManager, error) {
+	vpcId, err := cloud.VpcID()
+	if err != nil {
+		return nil, err
+	}
 	return &VGroupManager{
 		kubeClient: kubeClient,
 		cloud:      cloud,
-	}
+		vpcId:      vpcId,
+	}, nil
 }
 
 type VGroupManager struct {
 	kubeClient client.Client
 	cloud      prvd.Provider
+	vpcId      string
+}
+
+type vGroupActionType string
+
+const (
+	vGroupActionCreateAndAddBackendServers vGroupActionType = "create_and_add"
+	vGroupActionDelete                     vGroupActionType = "delete"
+	vGroupActionUpdate                     vGroupActionType = "update"
+)
+
+type vGroupAction struct {
+	Action vGroupActionType
+	Local  *model.VServerGroup
+	Remote *model.VServerGroup
+	LBId   string
 }
 
 func (mgr *VGroupManager) BuildLocalModel(reqCtx *svcCtx.RequestContext, m *model.LoadBalancer) error {
-	var vgs []model.VServerGroup
-
 	candidates, err := backend.NewEndpointWithENI(reqCtx, mgr.kubeClient)
 	if err != nil {
 		return err
 	}
 
-	containsPotentialReadyEndpoints := false
-	for _, port := range reqCtx.Service.Spec.Ports {
-		vg, cpr, err := mgr.buildVGroupForServicePort(reqCtx, port, candidates, m.LoadBalancerAttribute.IsUserManaged)
-		if err != nil {
-			return fmt.Errorf("build vgroup for port %d error: %s", port.Port, err.Error())
-		}
-		vgs = append(vgs, vg)
-		containsPotentialReadyEndpoints = containsPotentialReadyEndpoints || cpr
+	vpcCIDRs, err := mgr.cloud.DescribeVpcCIDRBlock(reqCtx.Ctx, mgr.vpcId, candidates.AddressIPVersion)
+	if err != nil {
+		return fmt.Errorf("get vpc cidr error: %s", err.Error())
 	}
+
+	vgs := make([]model.VServerGroup, len(reqCtx.Service.Spec.Ports))
+	errs := make([]error, len(reqCtx.Service.Spec.Ports))
+	containsPotentialReadyEndpoints := make([]bool, len(reqCtx.Service.Spec.Ports))
+	workqueue.ParallelizeUntil(reqCtx.Ctx, ctrlCfg.ControllerCFG.MaxParallelizeNumber, len(vgs), func(i int) {
+		port := reqCtx.Service.Spec.Ports[i]
+		vg, cpr, err := mgr.buildVGroupForServicePort(reqCtx, vpcCIDRs, port, candidates, m.LoadBalancerAttribute.IsUserManaged)
+		if err != nil {
+			errs[i] = fmt.Errorf("build vgroup for port %d error: %s", port.Port, err.Error())
+			return
+		}
+		vgs[i] = vg
+		containsPotentialReadyEndpoints[i] = cpr
+	})
+
+	cpr := false
+	for _, c := range containsPotentialReadyEndpoints {
+		if c {
+			cpr = true
+			break
+		}
+	}
+
 	m.VServerGroups = vgs
-	m.ContainsPotentialReadyEndpoints = containsPotentialReadyEndpoints
-	return nil
+	m.ContainsPotentialReadyEndpoints = cpr
+	return utilerrors.NewAggregate(errs)
 }
 
 func (mgr *VGroupManager) BuildRemoteModel(reqCtx *svcCtx.RequestContext, m *model.LoadBalancer) error {
@@ -69,6 +107,41 @@ func (mgr *VGroupManager) BuildRemoteModel(reqCtx *svcCtx.RequestContext, m *mod
 		return fmt.Errorf("DescribeVServerGroups error: %s", err.Error())
 	}
 	m.VServerGroups = vgs
+	return nil
+}
+
+func (mgr *VGroupManager) ParallelUpdateVServerGroup(reqCtx *svcCtx.RequestContext, actions []vGroupAction) []error {
+	if len(actions) == 0 {
+		reqCtx.Log.Info("no action to do for vgroup")
+		return nil
+	}
+	errs := make([]error, len(actions))
+	reqCtx.Log.V(5).Info("update vgroups parallelly", "actionsCount", len(actions))
+	workqueue.ParallelizeUntil(reqCtx.Ctx, ctrlCfg.ControllerCFG.MaxParallelizeNumber, len(actions), func(i int) {
+		var err error
+		act := actions[i]
+		switch act.Action {
+		case vGroupActionCreateAndAddBackendServers:
+			err = mgr.CreateVServerGroupAndAddBackendServers(reqCtx, act.Local, act.LBId)
+		case vGroupActionUpdate:
+			err = mgr.UpdateVServerGroup(reqCtx, *act.Local, *act.Remote)
+		case vGroupActionDelete:
+			err = mgr.DeleteVServerGroup(reqCtx, act.Remote.VGroupId)
+		}
+		errs[i] = err
+	})
+	return errs
+}
+
+func (mgr *VGroupManager) CreateVServerGroupAndAddBackendServers(reqCtx *svcCtx.RequestContext, local *model.VServerGroup, lbId string) error {
+	err := mgr.CreateVServerGroup(reqCtx, local, lbId)
+	if err != nil {
+		return err
+	}
+	err = mgr.BatchAddVServerGroupBackendServers(reqCtx, *local, local.Backends)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -138,11 +211,13 @@ func (mgr *VGroupManager) DescribeVServerGroups(reqCtx *svcCtx.RequestContext, l
 		return vgs, err
 	}
 
-	for i, vg := range vgs {
-		if isVGroupManagedByMyService(vg, reqCtx.Service) || isReusedVGroup(reusedVgIDs, vg.VGroupId) {
-			vs, err := mgr.cloud.DescribeVServerGroupAttribute(context.TODO(), vg.VGroupId)
+	errs := make([]error, len(vgs))
+	workqueue.ParallelizeUntil(reqCtx.Ctx, ctrlCfg.ControllerCFG.MaxParallelizeNumber, len(vgs), func(i int) {
+		if isVGroupManagedByMyService(vgs[i], reqCtx.Service) || isReusedVGroup(reusedVgIDs, vgs[i].VGroupId) {
+			vs, err := mgr.cloud.DescribeVServerGroupAttribute(reqCtx.Ctx, vgs[i].VGroupId)
 			if err != nil {
-				return vgs, err
+				errs[i] = err
+				return
 			}
 			for idx, backend := range vs.Backends {
 				if !isBackendManagedByMyService(reqCtx, backend) {
@@ -150,12 +225,13 @@ func (mgr *VGroupManager) DescribeVServerGroups(reqCtx *svcCtx.RequestContext, l
 					// if backend is managed by user, vServerGroup is also managed by user.
 					vgs[i].IsUserManaged = true
 					reqCtx.Log.Info(fmt.Sprintf("vgroup %s backend is managed by user: [%+v]",
-						vg.VGroupName, vs.Backends[idx]))
+						vgs[i].VGroupName, vs.Backends[idx]))
 				}
 			}
 			vgs[i].Backends = vs.Backends
 		}
-	}
+	})
+
 	return vgs, nil
 }
 
@@ -310,8 +386,9 @@ func isReusedVGroup(reusedVgIDs []string, vGroupId string) bool {
 	return false
 }
 
-func (mgr *VGroupManager) buildVGroupForServicePort(reqCtx *svcCtx.RequestContext, port v1.ServicePort,
-	candidates *backend.EndpointWithENI, isUserManagedLB bool) (model.VServerGroup, bool, error) {
+func (mgr *VGroupManager) buildVGroupForServicePort(reqCtx *svcCtx.RequestContext, vpcCIDRs []*net.IPNet,
+	port v1.ServicePort, candidates *backend.EndpointWithENI, isUserManagedLB bool) (model.VServerGroup, bool, error) {
+
 	vg := model.VServerGroup{
 		NamedKey:    getVGroupNamedKey(reqCtx.Service, port),
 		ServicePort: port,
@@ -369,19 +446,19 @@ func (mgr *VGroupManager) buildVGroupForServicePort(reqCtx *svcCtx.RequestContex
 	switch candidates.TrafficPolicy {
 	case helper.ENITrafficPolicy:
 		reqCtx.Log.Info(fmt.Sprintf("eni mode, build backends for %s", vg.NamedKey))
-		backends, err = mgr.buildENIBackends(reqCtx, candidates, initialBackends, vg)
+		backends, err = mgr.buildENIBackends(reqCtx, vpcCIDRs, candidates, initialBackends, vg)
 		if err != nil {
 			return vg, false, fmt.Errorf("build eni backends error: %s", err.Error())
 		}
 	case helper.LocalTrafficPolicy:
 		reqCtx.Log.Info(fmt.Sprintf("local mode, build backends for %s", vg.NamedKey))
-		backends, err = mgr.buildLocalBackends(reqCtx, candidates, initialBackends, vg)
+		backends, err = mgr.buildLocalBackends(reqCtx, vpcCIDRs, candidates, initialBackends, vg)
 		if err != nil {
 			return vg, false, fmt.Errorf("build local backends error: %s", err.Error())
 		}
 	case helper.ClusterTrafficPolicy:
 		reqCtx.Log.Info(fmt.Sprintf("cluster mode, build backends for %s", vg.NamedKey))
-		backends, err = mgr.buildClusterBackends(reqCtx, candidates, initialBackends, vg)
+		backends, err = mgr.buildClusterBackends(reqCtx, vpcCIDRs, candidates, initialBackends, vg)
 		if err != nil {
 			return vg, false, fmt.Errorf("build cluster backends error: %s", err.Error())
 		}
@@ -604,12 +681,13 @@ func (mgr *VGroupManager) setBackendsFromEndpointSlices(reqCtx *svcCtx.RequestCo
 	return backends, containsPotentialReadyEndpoints, nil
 }
 
-func (mgr *VGroupManager) buildENIBackends(reqCtx *svcCtx.RequestContext, candidates *backend.EndpointWithENI, backends []model.BackendAttribute, vgroup model.VServerGroup) ([]model.BackendAttribute, error) {
+func (mgr *VGroupManager) buildENIBackends(reqCtx *svcCtx.RequestContext, vpcCIDRs []*net.IPNet,
+	candidates *backend.EndpointWithENI, backends []model.BackendAttribute, vgroup model.VServerGroup) ([]model.BackendAttribute, error) {
 	if len(backends) == 0 {
 		return nil, nil
 	}
 
-	backends, err := updateENIBackends(reqCtx, mgr, backends, candidates.AddressIPVersion)
+	backends, err := updateENIBackends(reqCtx, mgr, vpcCIDRs, backends, candidates.AddressIPVersion)
 	if err != nil {
 		return backends, err
 	}
@@ -617,7 +695,8 @@ func (mgr *VGroupManager) buildENIBackends(reqCtx *svcCtx.RequestContext, candid
 	return setWeightBackends(helper.ENITrafficPolicy, backends, vgroup.VGroupWeight), nil
 }
 
-func (mgr *VGroupManager) buildLocalBackends(reqCtx *svcCtx.RequestContext, candidates *backend.EndpointWithENI, initBackends []model.BackendAttribute, vgroup model.VServerGroup) ([]model.BackendAttribute, error) {
+func (mgr *VGroupManager) buildLocalBackends(reqCtx *svcCtx.RequestContext, vpcCIDRs []*net.IPNet,
+	candidates *backend.EndpointWithENI, initBackends []model.BackendAttribute, vgroup model.VServerGroup) ([]model.BackendAttribute, error) {
 	var (
 		ecsBackends, eciBackends []model.BackendAttribute
 		err                      error
@@ -664,7 +743,7 @@ func (mgr *VGroupManager) buildLocalBackends(reqCtx *svcCtx.RequestContext, cand
 	// 2. add eci backends
 	if len(eciBackends) != 0 {
 		reqCtx.Log.Info("add eciBackends")
-		eciBackends, err = updateENIBackends(reqCtx, mgr, eciBackends, candidates.AddressIPVersion)
+		eciBackends, err = updateENIBackends(reqCtx, mgr, vpcCIDRs, eciBackends, candidates.AddressIPVersion)
 		if err != nil {
 			return nil, fmt.Errorf("update eci backends error: %s", err.Error())
 		}
@@ -693,7 +772,8 @@ func removeDuplicatedECS(backends []model.BackendAttribute) []model.BackendAttri
 
 }
 
-func (mgr *VGroupManager) buildClusterBackends(reqCtx *svcCtx.RequestContext, candidates *backend.EndpointWithENI, initBackends []model.BackendAttribute, vgroup model.VServerGroup) ([]model.BackendAttribute, error) {
+func (mgr *VGroupManager) buildClusterBackends(reqCtx *svcCtx.RequestContext, vpcCIDRs []*net.IPNet,
+	candidates *backend.EndpointWithENI, initBackends []model.BackendAttribute, vgroup model.VServerGroup) ([]model.BackendAttribute, error) {
 	var (
 		ecsBackends, eciBackends []model.BackendAttribute
 		err                      error
@@ -743,7 +823,7 @@ func (mgr *VGroupManager) buildClusterBackends(reqCtx *svcCtx.RequestContext, ca
 	}
 
 	if len(eciBackends) != 0 {
-		eciBackends, err = updateENIBackends(reqCtx, mgr, eciBackends, candidates.AddressIPVersion)
+		eciBackends, err = updateENIBackends(reqCtx, mgr, vpcCIDRs, eciBackends, candidates.AddressIPVersion)
 		if err != nil {
 			return nil, fmt.Errorf("update eci backends error: %s", err.Error())
 		}
@@ -754,22 +834,14 @@ func (mgr *VGroupManager) buildClusterBackends(reqCtx *svcCtx.RequestContext, ca
 	return setWeightBackends(helper.ClusterTrafficPolicy, backends, vgroup.VGroupWeight), nil
 }
 
-func updateENIBackends(reqCtx *svcCtx.RequestContext, mgr *VGroupManager, backends []model.BackendAttribute, ipVersion model.AddressIPVersionType) (
+func updateENIBackends(reqCtx *svcCtx.RequestContext, mgr *VGroupManager, vpcCIDRs []*net.IPNet,
+	backends []model.BackendAttribute, ipVersion model.AddressIPVersionType) (
 	[]model.BackendAttribute, error) {
-	vpcId, err := mgr.cloud.VpcID()
-	if err != nil {
-		return nil, fmt.Errorf("get vpc id from metadata error:%s", err.Error())
-	}
-	vpcCIDRs, err := mgr.cloud.DescribeVpcCIDRBlock(context.TODO(), vpcId, ipVersion)
-	if err != nil {
-		return nil, fmt.Errorf("get vpc cidr error: %s", err.Error())
-	}
-
 	var ips []string
 	for _, b := range backends {
 		ips = append(ips, b.ServerIp)
 	}
-	result, err := mgr.cloud.DescribeNetworkInterfaces(vpcId, ips, ipVersion)
+	result, err := mgr.cloud.DescribeNetworkInterfaces(mgr.vpcId, ips, ipVersion)
 	if err != nil {
 		return nil, fmt.Errorf("call DescribeNetworkInterfaces: %s", err.Error())
 	}
@@ -780,7 +852,7 @@ func updateENIBackends(reqCtx *svcCtx.RequestContext, mgr *VGroupManager, backen
 		if !ok {
 			// if ip in vpcCIDRs, it should have a eni id
 			if containsIP(vpcCIDRs, backends[i].ServerIp) {
-				return nil, fmt.Errorf("can not find eniid for ip %s in vpc %s", backends[i].ServerIp, vpcId)
+				return nil, fmt.Errorf("can not find eniid for ip %s in vpc %s", backends[i].ServerIp, mgr.vpcId)
 			} else {
 				skipIPs = append(skipIPs, backends[i].ServerIp)
 			}
