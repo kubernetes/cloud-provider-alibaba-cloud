@@ -288,7 +288,7 @@ func (m *ModelApplier) applyListeners(reqCtx *svcCtx.RequestContext, local, remo
 	for _, r := range remote.Listeners {
 		found := false
 		for i, l := range local.Listeners {
-			if r.ListenerPort == l.ListenerPort && r.ListenerProtocol == l.ListenerProtocol {
+			if isListenerPortMatch(l, r) && r.ListenerProtocol == l.ListenerProtocol {
 				found = true
 				local.Listeners[i].ListenerId = r.ListenerId
 			}
@@ -302,7 +302,7 @@ func (m *ModelApplier) applyListeners(reqCtx *svcCtx.RequestContext, local, remo
 				}
 			}
 
-			reqCtx.Log.Info(fmt.Sprintf("delete listener: %s [%d]", r.ListenerProtocol, r.ListenerPort))
+			reqCtx.Log.Info(fmt.Sprintf("delete listener: %s [%s]", r.ListenerProtocol, r.PortString()))
 			if err := m.lisMgr.DeleteListener(reqCtx, r.ListenerId); err != nil {
 				return fmt.Errorf("EnsureListenerDeleted error: %s", err.Error())
 			}
@@ -322,7 +322,7 @@ func (m *ModelApplier) applyListeners(reqCtx *svcCtx.RequestContext, local, remo
 
 		// create
 		if !found {
-			reqCtx.Log.Info(fmt.Sprintf("create listener: %s [%d]", local.Listeners[i].ListenerProtocol, local.Listeners[i].ListenerPort))
+			reqCtx.Log.Info(fmt.Sprintf("create listener: %s [%s]", local.Listeners[i].ListenerProtocol, local.Listeners[i].PortString()))
 			if err := m.lisMgr.CreateListener(reqCtx, remote.LoadBalancerAttribute.LoadBalancerId, local.Listeners[i]); err != nil {
 				return fmt.Errorf("EnsureListenerCreated error: %s", err.Error())
 			}
@@ -416,4 +416,11 @@ func findServerGroup(sgs []*nlbmodel.ServerGroup, lis *nlbmodel.ListenerAttribut
 	}
 	return fmt.Errorf("can not find server group by name %s", lis.ServerGroupName)
 
+}
+
+func isListenerPortMatch(l, r *nlbmodel.ListenerAttribute) bool {
+	if l.ListenerPort != 0 {
+		return l.ListenerPort == r.ListenerPort
+	}
+	return l.StartPort == r.StartPort && l.EndPort == r.EndPort
 }

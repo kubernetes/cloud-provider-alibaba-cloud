@@ -6,6 +6,7 @@ import (
 	"github.com/alibabacloud-go/tea/tea"
 	"github.com/mohae/deepcopy"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/helper"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/service/reconcile/annotation"
 	svcCtx "k8s.io/cloud-provider-alibaba-cloud/pkg/controller/service/reconcile/context"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/model"
@@ -44,6 +45,41 @@ func serverGroup(annotation string, port v1.ServicePort) (string, error) {
 	return "", nil
 }
 
+func portRange(annotation string, port v1.ServicePort) (int32, int32, error) {
+	for _, v := range strings.Split(annotation, ",") {
+		pp := strings.Split(v, ":")
+		if len(pp) != 2 {
+			return 0, 0, fmt.Errorf("listener port range must be like 1000-2000:80 with colon separated. "+
+				"got [%+v]", v)
+		}
+		if pp[1] == fmt.Sprintf("%d", port.Port) {
+			portRanges := strings.Split(pp[0], "-")
+			if len(portRanges) != 2 {
+				return 0, 0, fmt.Errorf("listener port range must be like 1000-2000:80 with colon separated. "+
+					"got [%+v]", v)
+			}
+
+			startPort, err := strconv.Atoi(portRanges[0])
+			if err != nil {
+				return 0, 0, fmt.Errorf("failed to convert port range [%+v] to int: %w", v, err)
+			}
+			endPort, err := strconv.Atoi(portRanges[1])
+			if err != nil {
+				return 0, 0, fmt.Errorf("failed to convert port range [%+v] to int: %w", v, err)
+			}
+			if startPort >= endPort {
+				return 0, 0, fmt.Errorf("start port should be smaller than end port for port range [%+v]", v)
+			}
+			if startPort < 1 || endPort > 65535 {
+				return 0, 0, fmt.Errorf("port range [%+v] is invalid", v)
+			}
+
+			return int32(startPort), int32(endPort), nil
+		}
+	}
+	return 0, 0, nil
+}
+
 func (mgr *ListenerManager) BuildLocalModel(reqCtx *svcCtx.RequestContext, mdl *nlbmodel.NetworkLoadBalancer) error {
 	for _, port := range reqCtx.Service.Spec.Ports {
 		listener, err := mgr.buildListenerFromServicePort(reqCtx, port, mdl.LoadBalancerAttribute.IsUserManaged)
@@ -52,7 +88,7 @@ func (mgr *ListenerManager) BuildLocalModel(reqCtx *svcCtx.RequestContext, mdl *
 		}
 		mdl.Listeners = append(mdl.Listeners, listener)
 	}
-	return nil
+	return checkListenersPortOverlap(mdl.Listeners)
 }
 
 func (mgr *ListenerManager) BuildRemoteModel(reqCtx *svcCtx.RequestContext, mdl *nlbmodel.NetworkLoadBalancer) error {
@@ -67,15 +103,6 @@ func (mgr *ListenerManager) BuildRemoteModel(reqCtx *svcCtx.RequestContext, mdl 
 func (mgr *ListenerManager) buildListenerFromServicePort(reqCtx *svcCtx.RequestContext, port v1.ServicePort,
 	isUserManagedLB bool) (*nlbmodel.ListenerAttribute, error) {
 	listener := &nlbmodel.ListenerAttribute{
-		NamedKey: &nlbmodel.ListenerNamedKey{
-			NamedKey: nlbmodel.NamedKey{
-				Prefix:      model.DEFAULT_PREFIX,
-				CID:         base.CLUSTER_ID,
-				Namespace:   reqCtx.Service.Namespace,
-				ServiceName: reqCtx.Service.Name,
-			},
-			Port: port.Port,
-		},
 		ServicePort:  &port,
 		ListenerPort: port.Port,
 	}
@@ -85,10 +112,41 @@ func (mgr *ListenerManager) buildListenerFromServicePort(reqCtx *svcCtx.RequestC
 		return listener, err
 	}
 	listener.ListenerProtocol = proto
-	listener.NamedKey.Protocol = proto
 
+	if reqCtx.Anno.Get(annotation.ListenerPortRange) != "" {
+		if !helper.IsENIBackendType(reqCtx.Service) {
+			return listener, fmt.Errorf("listener port range can only be used for eni backend type service")
+		}
+		startPort, endPort, err := portRange(reqCtx.Anno.Get(annotation.ListenerPortRange), port)
+		if err != nil {
+			return listener, err
+		}
+		if startPort != 0 && endPort != 0 {
+			listener.ListenerPort = 0
+			listener.StartPort = startPort
+			listener.EndPort = endPort
+		}
+	}
+
+	listener.NamedKey = &nlbmodel.ListenerNamedKey{
+		NamedKey: nlbmodel.NamedKey{
+			Prefix:      model.DEFAULT_PREFIX,
+			CID:         base.CLUSTER_ID,
+			Namespace:   reqCtx.Service.Namespace,
+			ServiceName: reqCtx.Service.Name,
+		},
+		Port:      listener.ListenerPort,
+		StartPort: listener.StartPort,
+		EndPort:   listener.EndPort,
+		Protocol:  listener.ListenerProtocol,
+	}
 	listener.ListenerDescription = listener.NamedKey.Key()
-	listener.ServerGroupName = getServerGroupNamedKey(reqCtx.Service, proto, &port).Key()
+
+	if listener.ListenerPort != 0 {
+		listener.ServerGroupName = getServerGroupNamedKey(reqCtx.Service, proto, &port).Key()
+	} else {
+		listener.ServerGroupName = getAnyPortServerGroupNamedKey(reqCtx.Service, proto, listener.StartPort, listener.EndPort).Key()
+	}
 
 	if isUserManagedLB && reqCtx.Anno.Get(annotation.VGroupPort) != "" {
 		serverGroupId, err := serverGroup(reqCtx.Anno.Get(annotation.VGroupPort), port)
@@ -318,4 +376,38 @@ func nlbListenerProtocol(annotation string, port v1.ServicePort) (string, error)
 
 func isTCPSSL(proto string) bool {
 	return proto == nlbmodel.TCPSSL
+}
+
+func checkListenersPortOverlap(listeners []*nlbmodel.ListenerAttribute) error {
+	for i := range listeners {
+		for j := i + 1; j < len(listeners); j++ {
+			if isListenerPortOverlapped(listeners[i], listeners[j]) {
+				return fmt.Errorf("port of listener [%s] overlaps with listener [%s]",
+					listeners[i].PortString(), listeners[j].PortString())
+			}
+		}
+	}
+	return nil
+}
+
+func isListenerPortOverlapped(a, b *nlbmodel.ListenerAttribute) bool {
+	if a.ListenerProtocol != b.ListenerProtocol {
+		return false
+	}
+	if a.ListenerPort != 0 && b.ListenerPort != 0 {
+		return a.ListenerPort == b.ListenerPort
+	}
+
+	if a.ListenerPort == 0 && b.ListenerPort == 0 {
+		if a.StartPort > b.StartPort {
+			a, b = b, a
+		}
+		return b.StartPort <= a.EndPort
+	}
+
+	if a.ListenerPort != 0 {
+		return a.ListenerPort >= b.StartPort && a.ListenerPort <= b.EndPort
+	}
+
+	return b.ListenerPort >= a.StartPort && b.ListenerPort <= a.EndPort
 }

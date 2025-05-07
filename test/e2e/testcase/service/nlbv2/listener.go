@@ -765,5 +765,93 @@ func RunListenerTestCases(f *framework.Framework) {
 				gomega.Expect(err).To(gomega.BeNil())
 			})
 		})
+
+		if options.TestConfig.Network == options.Terway {
+			ginkgo.Context("port range", func() {
+				ginkgo.It("80-400", func() {
+					svc, err := f.Client.KubeClient.CreateNLBServiceByAnno(map[string]string{
+						annotation.Annotation(annotation.ListenerPortRange): "80-400:80",
+						annotation.Annotation(annotation.LoadBalancerId):    options.TestConfig.InternetNetworkLoadBalancerID,
+						annotation.Annotation(annotation.OverrideListener):  "true",
+					})
+					gomega.Expect(err).To(gomega.BeNil())
+					err = f.ExpectNetworkLoadBalancerEqual(svc)
+					gomega.Expect(err).To(gomega.BeNil())
+				})
+
+				ginkgo.It("80 to 80-400", func() {
+					oldsvc, err := f.Client.KubeClient.CreateNLBServiceByAnno(map[string]string{
+						annotation.Annotation(annotation.LoadBalancerId):   options.TestConfig.InternetNetworkLoadBalancerID,
+						annotation.Annotation(annotation.OverrideListener): "true",
+					})
+					gomega.Expect(err).To(gomega.BeNil())
+					err = f.ExpectNetworkLoadBalancerEqual(oldsvc)
+					gomega.Expect(err).To(gomega.BeNil())
+
+					newsvc := oldsvc.DeepCopy()
+					newsvc.Annotations[annotation.Annotation(annotation.ListenerPortRange)] = "80-400:80"
+					newsvc, err = f.Client.KubeClient.PatchService(oldsvc, newsvc)
+					gomega.Expect(err).To(gomega.BeNil())
+					err = f.ExpectNetworkLoadBalancerEqual(newsvc)
+					gomega.Expect(err).To(gomega.BeNil())
+				})
+
+				ginkgo.It("80-400 to 80", func() {
+					oldsvc, err := f.Client.KubeClient.CreateNLBServiceByAnno(map[string]string{
+						annotation.Annotation(annotation.ListenerPortRange): "80-400:80",
+						annotation.Annotation(annotation.LoadBalancerId):    options.TestConfig.InternetNetworkLoadBalancerID,
+						annotation.Annotation(annotation.OverrideListener):  "true",
+					})
+					gomega.Expect(err).To(gomega.BeNil())
+					err = f.ExpectNetworkLoadBalancerEqual(oldsvc)
+					gomega.Expect(err).To(gomega.BeNil())
+
+					newsvc := oldsvc.DeepCopy()
+					delete(newsvc.Annotations, annotation.Annotation(annotation.ListenerPortRange))
+					newsvc, err = f.Client.KubeClient.PatchService(oldsvc, newsvc)
+					gomega.Expect(err).To(gomega.BeNil())
+					err = f.ExpectNetworkLoadBalancerEqual(newsvc)
+					gomega.Expect(err).To(gomega.BeNil())
+				})
+
+				ginkgo.It("80-443, conflict with 443", func() {
+					svc, err := f.Client.KubeClient.CreateNLBServiceByAnno(map[string]string{
+						annotation.Annotation(annotation.ListenerPortRange): "80-443:80",
+						annotation.Annotation(annotation.LoadBalancerId):    options.TestConfig.InternetNetworkLoadBalancerID,
+						annotation.Annotation(annotation.OverrideListener):  "true",
+					})
+					gomega.Expect(err).To(gomega.BeNil())
+					err = f.ExpectNetworkLoadBalancerEqual(svc)
+					gomega.Expect(err).NotTo(gomega.BeNil())
+				})
+
+				ginkgo.It("80-443 tcp, 50-100 udp", func() {
+					svc := f.Client.KubeClient.DefaultNLBService()
+					svc.Annotations = map[string]string{
+						annotation.Annotation(annotation.ListenerPortRange): "80-443:80,50-100:443",
+						annotation.Annotation(annotation.LoadBalancerId):    options.TestConfig.InternetNetworkLoadBalancerID,
+						annotation.Annotation(annotation.OverrideListener):  "true",
+					}
+					svc.Spec.Ports = []v1.ServicePort{
+						{
+							Name:       "http",
+							Port:       80,
+							TargetPort: intstr.FromInt32(80),
+							Protocol:   v1.ProtocolTCP,
+						},
+						{
+							Name:       "https",
+							Port:       443,
+							TargetPort: intstr.FromInt32(80),
+							Protocol:   v1.ProtocolUDP,
+						},
+					}
+					svc, err := f.Client.KubeClient.CreateService(svc)
+					gomega.Expect(err).To(gomega.BeNil())
+					err = f.ExpectNetworkLoadBalancerEqual(svc)
+					gomega.Expect(err).To(gomega.BeNil())
+				})
+			})
+		}
 	})
 }

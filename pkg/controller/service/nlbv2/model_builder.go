@@ -60,7 +60,7 @@ func (c localModel) Build(reqCtx *svcCtx.RequestContext) (*nlbmodel.NetworkLoadB
 		NamespacedName:        util.NamespacedName(reqCtx.Service),
 		LoadBalancerAttribute: &nlbmodel.LoadBalancerAttribute{},
 	}
-	// if the service do not need loadbalancer any more, return directly.
+	// if the service do not need loadbalancer anymore, return directly.
 	if helper.NeedDeleteLoadBalancer(reqCtx.Service) {
 		if reqCtx.Anno.Get(annotation.LoadBalancerId) != "" {
 			lbMdl.LoadBalancerAttribute.IsUserManaged = true
@@ -74,10 +74,10 @@ func (c localModel) Build(reqCtx *svcCtx.RequestContext) (*nlbmodel.NetworkLoadB
 		return nil, fmt.Errorf("build nlb attribute error: %s", err.Error())
 	}
 	if err := c.LisMgr.BuildLocalModel(reqCtx, lbMdl); err != nil {
-		return nil, fmt.Errorf("build nlb server group error: %s", err.Error())
+		return nil, fmt.Errorf("build nlb listener error: %s", err.Error())
 	}
 	if err := c.SGMgr.BuildLocalModel(reqCtx, lbMdl); err != nil {
-		return nil, fmt.Errorf("builid nlb listener error: %s", err.Error())
+		return nil, fmt.Errorf("builid nlb server group error: %s", err.Error())
 	}
 
 	return lbMdl, nil

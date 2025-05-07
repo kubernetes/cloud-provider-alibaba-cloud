@@ -172,13 +172,20 @@ type ListenerAttribute struct {
 	SecSensorEnabled      *bool
 	AlpnEnabled           *bool
 	AlpnPolicy            string
-	StartPort             *int32 //0-65535
-	EndPort               *int32 //0-65535
+	StartPort             int32  //0-65535
+	EndPort               int32  //0-65535
 	Cps                   *int32 //0-1000000
 
 	// auto-generated parameters
 	ListenerId string
 	ListenerStatus
+}
+
+func (a *ListenerAttribute) PortString() string {
+	if a.ListenerPort != 0 {
+		return fmt.Sprintf("%d", a.ListenerPort)
+	}
+	return fmt.Sprintf("%d-%d", a.StartPort, a.EndPort)
 }
 
 type ServerGroup struct {
@@ -201,6 +208,7 @@ type ServerGroup struct {
 	Servers                 []ServerGroupServer
 	InitialServers          []ServerGroupServer
 	Tags                    []tag.Tag
+	AnyPortEnabled          bool
 
 	// auto-generated parameters
 	ServerGroupId string
@@ -270,8 +278,10 @@ func (n *NamedKey) IsManagedByService(svc *v1.Service, clusterId string) bool {
 
 type ListenerNamedKey struct {
 	NamedKey
-	Port     int32
-	Protocol string
+	Port      int32
+	StartPort int32
+	EndPort   int32
+	Protocol  string
 }
 
 func (n *ListenerNamedKey) String() string {
@@ -285,7 +295,11 @@ func (n *ListenerNamedKey) Key() string {
 	if n.Prefix == "" {
 		n.Prefix = model.DEFAULT_PREFIX
 	}
-	return fmt.Sprintf("%s.%d.%s.%s.%s.%s", n.Prefix, n.Port, n.Protocol, n.ServiceName, n.Namespace, n.CID)
+	if n.Port != 0 {
+		return fmt.Sprintf("%s.%d.%s.%s.%s.%s", n.Prefix, n.Port, n.Protocol, n.ServiceName, n.Namespace, n.CID)
+	} else {
+		return fmt.Sprintf("%s.%d_%d.%s.%s.%s.%s", n.Prefix, n.StartPort, n.EndPort, n.Protocol, n.ServiceName, n.Namespace, n.CID)
+	}
 }
 
 func LoadNLBListenerNamedKey(key string) (*ListenerNamedKey, error) {
@@ -293,7 +307,7 @@ func LoadNLBListenerNamedKey(key string) (*ListenerNamedKey, error) {
 	if len(metas) != 6 || metas[0] != model.DEFAULT_PREFIX {
 		return nil, fmt.Errorf("ListenerName Format Error: k8s.${port}.${protocol}.${service}.${namespace}.${clusterid} format is expected. Got [%s]", key)
 	}
-	port, err := strconv.Atoi(metas[1])
+	port, startPort, endPort, err := parseListenerPortKey(metas[1])
 	if err != nil {
 		return nil, err
 	}
@@ -304,9 +318,31 @@ func LoadNLBListenerNamedKey(key string) (*ListenerNamedKey, error) {
 			ServiceName: metas[3],
 			Prefix:      model.DEFAULT_PREFIX,
 		},
-		Port:     int32(port),
-		Protocol: metas[2],
+		Port:      port,
+		StartPort: startPort,
+		EndPort:   endPort,
+		Protocol:  metas[2],
 	}, nil
+}
+
+func parseListenerPortKey(p string) (int32, int32, int32, error) {
+	port, err := strconv.Atoi(p)
+	if err == nil {
+		return int32(port), 0, 0, nil
+	}
+	ports := strings.Split(p, "_")
+	if len(ports) != 2 {
+		return 0, 0, 0, fmt.Errorf("parse listener port key failed")
+	}
+	startPort, err := strconv.Atoi(ports[0])
+	if err != nil {
+		return 0, 0, 0, err
+	}
+	endPort, err := strconv.Atoi(ports[1])
+	if err != nil {
+		return 0, 0, 0, err
+	}
+	return 0, int32(startPort), int32(endPort), nil
 }
 
 type SGNamedKey struct {

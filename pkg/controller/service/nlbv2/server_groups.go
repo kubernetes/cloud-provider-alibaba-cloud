@@ -70,7 +70,16 @@ func (mgr *ServerGroupManager) BuildLocalModel(reqCtx *svcCtx.RequestContext, md
 		if candidates.AddressIPVersion == model.IPv6 {
 			sg.AddressIPVersion = string(model.DualStack)
 		}
-		sg.NamedKey = getServerGroupNamedKey(reqCtx.Service, sg.Protocol, lis.ServicePort)
+		if lis.ListenerPort != 0 {
+			sg.NamedKey = getServerGroupNamedKey(reqCtx.Service, sg.Protocol, lis.ServicePort)
+		} else {
+			sg.AnyPortEnabled = true
+			sg.HealthCheckConfig = &nlbmodel.HealthCheckConfig{
+				HealthCheckEnabled:     tea.Bool(true),
+				HealthCheckConnectPort: sg.ServicePort.TargetPort.IntVal,
+			}
+			sg.NamedKey = getAnyPortServerGroupNamedKey(reqCtx.Service, sg.Protocol, lis.StartPort, lis.EndPort)
+		}
 		sg.ServerGroupName = sg.NamedKey.Key()
 		if err := setServerGroupAttributeFromAnno(sg, reqCtx.Anno); err != nil {
 			return err
@@ -590,7 +599,8 @@ func (mgr *ServerGroupManager) setBackendsFromEndpointSlices(reqCtx *svcCtx.Requ
 						ServerIp: addr,
 						// set backend port to targetPort by default
 						// if backend type is ecs, update backend port to nodePort
-						Port:        backendPort,
+						// if server group type is anyport, set port to 0
+						Port:        getBackendPort(backendPort, sg.AnyPortEnabled),
 						Description: sg.ServerGroupName,
 						TargetRef:   ep.TargetRef,
 					})
@@ -634,7 +644,8 @@ func (mgr *ServerGroupManager) setBackendsFromEndpointSlices(reqCtx *svcCtx.Requ
 					ServerIp: addr,
 					// set backend port to targetPort by default
 					// if backend type is ecs, update backend port to nodePort
-					Port:        backendPort,
+					// if server group type is anyport, set port to 0
+					Port:        getBackendPort(backendPort, sg.AnyPortEnabled),
 					Description: sg.ServerGroupName,
 					TargetRef:   ep.TargetRef,
 				})
@@ -643,6 +654,13 @@ func (mgr *ServerGroupManager) setBackendsFromEndpointSlices(reqCtx *svcCtx.Requ
 	}
 
 	return backends, containsPotentialReadyEndpoints, nil
+}
+
+func getBackendPort(port int32, anyPort bool) int32 {
+	if anyPort {
+		return 0
+	}
+	return port
 }
 
 func (mgr *ServerGroupManager) buildENIBackends(reqCtx *svcCtx.RequestContext, candidates *reconbackend.EndpointWithENI, backends []nlbmodel.ServerGroupServer, sg nlbmodel.ServerGroup,
@@ -983,6 +1001,19 @@ func getServerGroupNamedKey(svc *v1.Service, protocol string, servicePort *v1.Se
 		},
 		Protocol:    protocol,
 		SGGroupPort: sgPort}
+}
+
+func getAnyPortServerGroupNamedKey(svc *v1.Service, protocol string, startPort, endPort int32) *nlbmodel.SGNamedKey {
+	return &nlbmodel.SGNamedKey{
+		NamedKey: nlbmodel.NamedKey{
+			Prefix:      model.DEFAULT_PREFIX,
+			Namespace:   svc.Namespace,
+			CID:         base.CLUSTER_ID,
+			ServiceName: svc.Name,
+		},
+		Protocol:    protocol,
+		SGGroupPort: fmt.Sprintf("%d_%d", startPort, endPort),
+	}
 }
 
 func getServerGroupTag(reqCtx *svcCtx.RequestContext) []tag.Tag {
