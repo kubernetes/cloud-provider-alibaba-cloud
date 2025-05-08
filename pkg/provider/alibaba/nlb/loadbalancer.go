@@ -120,13 +120,17 @@ func (p *NLBProvider) CreateNLB(ctx context.Context, mdl *nlbmodel.NetworkLoadBa
 		req.AddressIpVersion = tea.String(mdl.LoadBalancerAttribute.AddressIpVersion)
 	}
 	for _, z := range mdl.LoadBalancerAttribute.ZoneMappings {
-		req.ZoneMappings = append(req.ZoneMappings,
-			&nlb.CreateLoadBalancerRequestZoneMappings{
-				VSwitchId:          tea.String(z.VSwitchId),
-				ZoneId:             tea.String(z.ZoneId),
-				AllocationId:       tea.String(z.AllocationId),
-				PrivateIPv4Address: tea.String(z.IPv4Addr),
-			})
+		zm := &nlb.CreateLoadBalancerRequestZoneMappings{
+			VSwitchId: tea.String(z.VSwitchId),
+			ZoneId:    tea.String(z.ZoneId),
+		}
+		if z.AllocationId != "" {
+			zm.AllocationId = tea.String(z.AllocationId)
+		}
+		if z.IPv4Addr != "" {
+			zm.PrivateIPv4Address = tea.String(z.IPv4Addr)
+		}
+		req.ZoneMappings = append(req.ZoneMappings, zm)
 	}
 	if mdl.LoadBalancerAttribute.DeletionProtectionConfig != nil {
 		req.DeletionProtectionConfig = &nlb.CreateLoadBalancerRequestDeletionProtectionConfig{
