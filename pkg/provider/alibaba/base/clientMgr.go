@@ -314,6 +314,9 @@ func setCustomizedEndpoint(mgr *ClientMgr) {
 	if slbEndpoint, err := parseURL(os.Getenv("SLB_ENDPOINT")); err == nil && slbEndpoint != "" {
 		mgr.SLB.Domain = slbEndpoint
 	}
+	if nlbEndpoint, err := parseURL(os.Getenv("NLB_ENDPOINT")); err == nil && nlbEndpoint != "" {
+		mgr.NLB.Endpoint = tea.String(nlbEndpoint)
+	}
 }
 
 func parseURL(str string) (string, error) {
