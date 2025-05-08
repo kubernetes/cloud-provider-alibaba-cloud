@@ -26,48 +26,39 @@ type MockNLB struct {
 }
 
 func (m MockNLB) DeleteNLBListenerAsync(ctx context.Context, listenerId string) (string, error) {
-	//TODO implement me
-	panic("implement me")
+	return "job-delete-listener", nil
 }
 
 func (m MockNLB) UpdateNLBListenerAsync(ctx context.Context, lis *nlbmodel.ListenerAttribute) (string, error) {
-	//TODO implement me
-	panic("implement me")
+	return "job-update-listener", nil
 }
 
 func (m MockNLB) CreateNLBListenerAsync(ctx context.Context, lbId string, lis *nlbmodel.ListenerAttribute) (string, error) {
-	//TODO implement me
-	panic("implement me")
+	return "job-create-listener", nil
 }
 
 func (m MockNLB) CreateNLBServerGroupAsync(ctx context.Context, sg *nlbmodel.ServerGroup) (string, error) {
-	//TODO implement me
-	panic("implement me")
+	return "job-create-servergroup", nil
 }
 
 func (m MockNLB) DeleteNLBServerGroupAsync(ctx context.Context, sgId string) (string, error) {
-	//TODO implement me
-	panic("implement me")
+	return "job-delete-servergroup", nil
 }
 
 func (m MockNLB) UpdateNLBServerGroupAsync(ctx context.Context, sg *nlbmodel.ServerGroup) (string, error) {
-	//TODO implement me
-	panic("implement me")
+	return "job-update-servergroup", nil
 }
 
 func (m MockNLB) AddNLBServersAsync(ctx context.Context, sgId string, backends []nlbmodel.ServerGroupServer) (string, error) {
-	//TODO implement me
-	panic("implement me")
+	return "job-add-servers", nil
 }
 
 func (m MockNLB) RemoveNLBServersAsync(ctx context.Context, sgId string, backends []nlbmodel.ServerGroupServer) (string, error) {
-	//TODO implement me
-	panic("implement me")
+	return "job-remove-servers", nil
 }
 
 func (m MockNLB) UpdateNLBServersAsync(ctx context.Context, sgId string, backends []nlbmodel.ServerGroupServer) (string, error) {
-	//TODO implement me
-	panic("implement me")
+	return "job-update-servers", nil
 }
 
 const (

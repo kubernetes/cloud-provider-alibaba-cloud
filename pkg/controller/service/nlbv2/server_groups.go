@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/util/workqueue"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/service/reconcile/parallel"
 	"strconv"
 	"strings"
 
@@ -76,7 +76,7 @@ func (mgr *ServerGroupManager) BuildLocalModel(reqCtx *svcCtx.RequestContext, md
 	sgs := make([]*nlbmodel.ServerGroup, len(mdl.Listeners))
 	errs := make([]error, len(mdl.Listeners))
 	containsPotentialReadyBackends := make([]bool, len(mdl.Listeners))
-	workqueue.ParallelizeUntil(reqCtx.Ctx, ctrlCfg.ControllerCFG.MaxParallelizeNumber, len(mdl.Listeners), func(i int) {
+	parallel.Parallelize(reqCtx.Ctx, ctrlCfg.ControllerCFG.MaxConcurrentActions, len(mdl.Listeners), func(i int) {
 		lis := mdl.Listeners[i]
 		sg := &nlbmodel.ServerGroup{
 			VPCId:       mgr.vpcId,
@@ -177,7 +177,7 @@ func (mgr *ServerGroupManager) ParallelUpdateServerGroups(reqCtx *svcCtx.Request
 	}
 	errs := make([]error, len(actions))
 	reqCtx.Log.V(5).Info("update server groups parallelly", "actionsCount", len(actions))
-	workqueue.ParallelizeUntil(reqCtx.Ctx, ctrlCfg.ControllerCFG.MaxParallelizeNumber, len(actions), func(i int) {
+	parallel.Parallelize(reqCtx.Ctx, ctrlCfg.ControllerCFG.MaxConcurrentActions, len(actions), func(i int) {
 		var err error
 		act := actions[i]
 		switch act.Action {

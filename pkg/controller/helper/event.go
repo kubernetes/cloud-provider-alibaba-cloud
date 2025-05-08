@@ -1,6 +1,8 @@
 package helper
 
 import (
+	"errors"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"regexp"
 	"strings"
 )
@@ -47,6 +49,15 @@ var re = regexp.MustCompile(".*(Message:.*)")
 func GetLogMessage(err error) string {
 	if err == nil {
 		return ""
+	}
+
+	var agg utilerrors.Aggregate
+	if errors.As(err, &agg) {
+		message := ""
+		for _, e := range agg.Errors() {
+			message += GetLogMessage(e) + ";"
+		}
+		return message
 	}
 
 	attr := strings.Split(err.Error(), "[SDKError]")

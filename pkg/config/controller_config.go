@@ -43,7 +43,7 @@ const (
 	defaultServerGroupBatchSize           = 40
 	defaultNetwork                        = "vpc"
 
-	defaultParallelizeNumber = 10
+	defaultMaxConcurrentActions = 10
 )
 
 var ControllerCFG = &ControllerConfig{
@@ -57,7 +57,7 @@ type ControllerConfig struct {
 	Controllers                     []string
 	FeatureGates                    string
 	ServerGroupBatchSize            int
-	MaxParallelizeNumber            int
+	MaxConcurrentActions            int
 	LogLevel                        int
 	DryRun                          bool
 	NetWork                         string
@@ -89,7 +89,7 @@ func (cfg *ControllerConfig) BindFlags(fs *pflag.FlagSet) {
 	fs.DurationVar(&cfg.NodeMonitorPeriod.Duration, flagNodeMonitorPeriod, defaultNodeMonitorPeriod, "The period for syncing NodeStatus in NodeController.")
 	fs.IntVar(&cfg.ServerGroupBatchSize, flagServerGroupBatchSize, defaultServerGroupBatchSize, "The batch size for syncing server group. The value range is 1-40")
 	fs.BoolVar(&cfg.AllowUntaggedCloud, "allow-untagged-cloud", false, "Allow the cluster to run without the cluster-id on cloud instances. This is a legacy mode of operation and a cluster-id will be required in the future.")
-	fs.IntVar(&cfg.MaxParallelizeNumber, "max-parallelize-number", defaultParallelizeNumber, "The max parallelize number of actions for listener and server group updates")
+	fs.IntVar(&cfg.MaxConcurrentActions, "max-concurrent-actions", defaultMaxConcurrentActions, "The max concurrent number of actions for listener and server group updates")
 	_ = fs.MarkDeprecated("allow-untagged-cloud", "This flag is deprecated and will be removed in a future release. A cluster-id will be required on cloud instances.")
 
 	fs.IntVar(&cfg.NodeReconcileBatchSize, "node-reconcile-batch-size", 100, "The batch size for syncing node status. The value range is 1-100")
@@ -122,6 +122,9 @@ func (cfg *ControllerConfig) Validate() error {
 		cfg.NodeEventAggregationWaitSeconds = 0
 	}
 
+	if cfg.MaxConcurrentActions <= 0 {
+		return fmt.Errorf("--max-concurrent-actions must be set to a positive integer")
+	}
 	return nil
 }
 

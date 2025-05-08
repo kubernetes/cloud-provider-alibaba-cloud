@@ -9,11 +9,11 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/client-go/util/workqueue"
 	ctrlCfg "k8s.io/cloud-provider-alibaba-cloud/pkg/config"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/service/reconcile/annotation"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/service/reconcile/backend"
 	svcCtx "k8s.io/cloud-provider-alibaba-cloud/pkg/controller/service/reconcile/context"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/service/reconcile/parallel"
 	"k8s.io/klog/v2"
 	"net"
 	"strconv"
@@ -77,7 +77,7 @@ func (mgr *VGroupManager) BuildLocalModel(reqCtx *svcCtx.RequestContext, m *mode
 	vgs := make([]model.VServerGroup, len(reqCtx.Service.Spec.Ports))
 	errs := make([]error, len(reqCtx.Service.Spec.Ports))
 	containsPotentialReadyEndpoints := make([]bool, len(reqCtx.Service.Spec.Ports))
-	workqueue.ParallelizeUntil(reqCtx.Ctx, ctrlCfg.ControllerCFG.MaxParallelizeNumber, len(vgs), func(i int) {
+	parallel.Parallelize(reqCtx.Ctx, ctrlCfg.ControllerCFG.MaxConcurrentActions, len(vgs), func(i int) {
 		port := reqCtx.Service.Spec.Ports[i]
 		vg, cpr, err := mgr.buildVGroupForServicePort(reqCtx, vpcCIDRs, port, candidates, m.LoadBalancerAttribute.IsUserManaged)
 		if err != nil {
@@ -117,7 +117,7 @@ func (mgr *VGroupManager) ParallelUpdateVServerGroup(reqCtx *svcCtx.RequestConte
 	}
 	errs := make([]error, len(actions))
 	reqCtx.Log.V(5).Info("update vgroups parallelly", "actionsCount", len(actions))
-	workqueue.ParallelizeUntil(reqCtx.Ctx, ctrlCfg.ControllerCFG.MaxParallelizeNumber, len(actions), func(i int) {
+	parallel.Parallelize(reqCtx.Ctx, ctrlCfg.ControllerCFG.MaxConcurrentActions, len(actions), func(i int) {
 		var err error
 		act := actions[i]
 		switch act.Action {
@@ -212,7 +212,7 @@ func (mgr *VGroupManager) DescribeVServerGroups(reqCtx *svcCtx.RequestContext, l
 	}
 
 	errs := make([]error, len(vgs))
-	workqueue.ParallelizeUntil(reqCtx.Ctx, ctrlCfg.ControllerCFG.MaxParallelizeNumber, len(vgs), func(i int) {
+	parallel.Parallelize(reqCtx.Ctx, ctrlCfg.ControllerCFG.MaxConcurrentActions, len(vgs), func(i int) {
 		if isVGroupManagedByMyService(vgs[i], reqCtx.Service) || isReusedVGroup(reusedVgIDs, vgs[i].VGroupId) {
 			vs, err := mgr.cloud.DescribeVServerGroupAttribute(reqCtx.Ctx, vgs[i].VGroupId)
 			if err != nil {

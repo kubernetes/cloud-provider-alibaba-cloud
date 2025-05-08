@@ -6,8 +6,8 @@ import (
 	nlb "github.com/alibabacloud-go/nlb-20220430/v3/client"
 	"github.com/alibabacloud-go/tea/tea"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
-	"k8s.io/client-go/util/workqueue"
 	ctrlCfg "k8s.io/cloud-provider-alibaba-cloud/pkg/config"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/service/reconcile/parallel"
 	nlbmodel "k8s.io/cloud-provider-alibaba-cloud/pkg/model/nlb"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/model/tag"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/util"
@@ -124,7 +124,7 @@ func (p *NLBProvider) ListNLBServerGroups(ctx context.Context, tags []tag.Tag) (
 func (p *NLBProvider) parallelListNLBServers(ctx context.Context, sgId []string) (map[string][]nlbmodel.ServerGroupServer, error) {
 	servers := make([][]nlbmodel.ServerGroupServer, len(sgId))
 	errs := make([]error, len(sgId))
-	workqueue.ParallelizeUntil(ctx, ctrlCfg.ControllerCFG.MaxParallelizeNumber, len(sgId), func(i int) {
+	parallel.Parallelize(ctx, ctrlCfg.ControllerCFG.MaxConcurrentActions, len(sgId), func(i int) {
 		s, err := p.ListNLBServers(ctx, sgId[i])
 		if err != nil {
 			errs[i] = err
