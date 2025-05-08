@@ -274,6 +274,11 @@ func (m *ReconcileNLB) reconcileLoadBalancerResources(req *svcCtx.RequestContext
 
 	m.record.Event(req.Service, v1.EventTypeNormal, helper.SucceedSyncLB,
 		fmt.Sprintf("Ensured load balancer [%s]", lb.LoadBalancerAttribute.LoadBalancerId))
+
+	if lb.ContainsPotentialReadyEndpoints {
+		return util.NewReconcileNeedRequeue("has potential ready backends")
+	}
+
 	return nil
 }
 
