@@ -1,6 +1,7 @@
 package nlbv2
 
 import (
+	"context"
 	"fmt"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/helper"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/service/reconcile/annotation"
@@ -853,5 +854,69 @@ func RunBackendTestCases(f *framework.Framework) {
 			})
 		}
 
+		ginkgo.Context("ignore-weight-update", func() {
+			ginkgo.It("should update weight without annotation", func() {
+				oldsvc, err := f.Client.KubeClient.CreateNLBServiceByAnno(map[string]string{
+					annotation.Annotation(annotation.LoadBalancerId): options.TestConfig.InternetNetworkLoadBalancerID,
+				})
+				gomega.Expect(err).To(gomega.BeNil())
+				err = f.ExpectNetworkLoadBalancerEqual(oldsvc)
+				gomega.Expect(err).To(gomega.BeNil())
+
+				_, lb, err := f.FindNetworkLoadBalancer()
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(lb.ServerGroups).NotTo(gomega.BeEmpty())
+
+				b := lb.ServerGroups[0].Servers
+				gomega.Expect(b).NotTo(gomega.BeEmpty())
+				if b[0].Weight == 100 {
+					b[0].Weight = 1
+				} else {
+					b[0].Weight += 1
+				}
+
+				err = f.Client.CloudClient.UpdateNLBServers(context.TODO(), lb.ServerGroups[0].ServerGroupId, b)
+				gomega.Expect(err).To(gomega.BeNil())
+
+				newSvc := oldsvc.DeepCopy()
+				newSvc.Annotations["reconcile-timestamp"] = time.Now().String()
+				newSvc, err = f.Client.KubeClient.PatchService(oldsvc, newSvc)
+				gomega.Expect(err).To(gomega.BeNil())
+				err = f.ExpectNetworkLoadBalancerEqual(newSvc)
+				gomega.Expect(err).To(gomega.BeNil())
+			})
+
+			ginkgo.It("should not update weight", func() {
+				oldsvc, err := f.Client.KubeClient.CreateNLBServiceByAnno(map[string]string{
+					annotation.Annotation(annotation.LoadBalancerId):     options.TestConfig.InternetNetworkLoadBalancerID,
+					annotation.Annotation(annotation.IgnoreWeightUpdate): string(model.OnFlag),
+				})
+				gomega.Expect(err).To(gomega.BeNil())
+				err = f.ExpectNetworkLoadBalancerEqual(oldsvc)
+				gomega.Expect(err).To(gomega.BeNil())
+
+				_, lb, err := f.FindNetworkLoadBalancer()
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(lb.ServerGroups).NotTo(gomega.BeEmpty())
+
+				b := lb.ServerGroups[0].Servers
+				gomega.Expect(b).NotTo(gomega.BeEmpty())
+				if b[0].Weight == 100 {
+					b[0].Weight = 1
+				} else {
+					b[0].Weight += 1
+				}
+
+				err = f.Client.CloudClient.UpdateNLBServers(context.TODO(), lb.ServerGroups[0].ServerGroupId, b)
+				gomega.Expect(err).To(gomega.BeNil())
+
+				newSvc := oldsvc.DeepCopy()
+				newSvc.Annotations["reconcile-timestamp"] = time.Now().String()
+				newSvc, err = f.Client.KubeClient.PatchService(oldsvc, newSvc)
+				gomega.Expect(err).To(gomega.BeNil())
+				err = f.ExpectNetworkLoadBalancerEqual(newSvc)
+				gomega.Expect(err).NotTo(gomega.BeNil())
+			})
+		})
 	})
 }
