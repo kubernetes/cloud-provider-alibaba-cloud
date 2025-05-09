@@ -2,7 +2,6 @@ package alibaba
 
 import (
 	"fmt"
-
 	prvd "k8s.io/cloud-provider-alibaba-cloud/pkg/provider"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/alb"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/base"

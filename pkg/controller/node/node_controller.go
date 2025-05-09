@@ -2,13 +2,15 @@ package node
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/util/retry"
 	ctrlCfg "k8s.io/cloud-provider-alibaba-cloud/pkg/config"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/context/shared"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/helper"
@@ -22,13 +24,38 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
+	"strings"
 	"time"
 )
 
 var log = klogr.New().WithName("node-controller")
 
 func Add(mgr manager.Manager, ctx *shared.SharedContext) error {
-	return add(mgr, newReconciler(mgr, ctx))
+	r := newReconciler(mgr, ctx)
+	recoverPanic := true
+	// Create a new controller
+	c, err := controller.NewUnmanaged(
+		"node-controller", mgr,
+		controller.Options{
+			Reconciler:              r,
+			MaxConcurrentReconciles: 3,
+			RecoverPanic:            &recoverPanic,
+		},
+	)
+	if err != nil {
+		return err
+	}
+
+	enqueueRequest := NewEnqueueRequestForNodeEvent()
+	// Watch for changes to primary resource AutoRepair
+	if err := c.Watch(
+		source.Kind(mgr.GetCache(), &corev1.Node{}),
+		enqueueRequest,
+	); err != nil {
+		return err
+	}
+
+	return mgr.Add(&nodeController{c: c, recon: r})
 }
 
 // newReconciler returns a new reconcile.Reconciler
@@ -38,10 +65,11 @@ func newReconciler(mgr manager.Manager, ctx *shared.SharedContext) *ReconcileNod
 		statusFrequency:  5 * time.Minute,
 		configCloudRoute: ctrlCfg.ControllerCFG.ConfigureCloudRoutes,
 		// provider
-		cloud:  ctx.Provider(),
-		client: mgr.GetClient(),
-		scheme: mgr.GetScheme(),
-		record: mgr.GetEventRecorderFor("node-controller"),
+		cloud:       ctx.Provider(),
+		client:      mgr.GetClient(),
+		scheme:      mgr.GetScheme(),
+		record:      mgr.GetEventRecorderFor("node-controller"),
+		requestChan: make(chan *corev1.Node, ctrlCfg.ControllerCFG.NodeReconcileBatchSize),
 	}
 	return recon
 }
@@ -53,32 +81,11 @@ type nodeController struct {
 
 // Start this function will not be called until the resource lock is acquired
 func (controller nodeController) Start(ctx context.Context) error {
+	for i := range ctrlCfg.CloudCFG.Global.NodeMaxConcurrentReconciles {
+		go controller.recon.batchWorker(ctx, i)
+	}
 	controller.recon.PeriodicalSync()
 	return controller.c.Start(ctx)
-}
-
-// add a new Controller to mgr with r as the reconcile.Reconciler
-func add(mgr manager.Manager, r *ReconcileNode) error {
-	recoverPanic := true
-	// Create a new controller
-	c, err := controller.NewUnmanaged(
-		"node-controller", mgr,
-		controller.Options{
-			Reconciler:              r,
-			MaxConcurrentReconciles: ctrlCfg.CloudCFG.Global.NodeMaxConcurrentReconciles,
-			RecoverPanic:            &recoverPanic,
-		},
-	)
-	if err != nil {
-		return err
-	}
-
-	// Watch for changes to primary resource AutoRepair
-	if err := c.Watch(source.Kind(mgr.GetCache(), &corev1.Node{}), NewEnqueueRequestForNodeEvent()); err != nil {
-		return err
-	}
-
-	return mgr.Add(&nodeController{c: c, recon: r})
 }
 
 // ReconcileNode implements reconcile.Reconciler
@@ -100,16 +107,17 @@ type ReconcileNode struct {
 
 	//record event recorder
 	record record.EventRecorder
+
+	requestChan chan *corev1.Node
 }
 
-func (m *ReconcileNode) Reconcile(_ context.Context, request reconcile.Request) (reconcile.Result, error) {
-	log.Info("reconcile node", "node", request.NamespacedName)
+func (m *ReconcileNode) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
 	node := &corev1.Node{}
-	err := m.client.Get(context.TODO(), request.NamespacedName, node)
+	err := m.client.Get(ctx, request.NamespacedName, node)
 	if err != nil {
-		if errors.IsNotFound(err) {
-			log.Info("node not found, skip", "node", request.NamespacedName)
-			// Request object not found, could have been deleted
+		if apierrors.IsNotFound(err) {
+			log.Info("node not found, skip", node, request.Name)
+			// Request object not found, cloud have been deleted
 			// after reconcile request.
 			// Owned objects are automatically garbage collected.
 			// For additional cleanup logic use finalizers.
@@ -119,7 +127,62 @@ func (m *ReconcileNode) Reconcile(_ context.Context, request reconcile.Request) 
 		log.Error(err, "get node error", "node", request.NamespacedName)
 		return reconcile.Result{}, err
 	}
-	return reconcile.Result{}, m.syncCloudNode(node)
+
+	cloudTaint := findCloudTaint(node.Spec.Taints)
+	if cloudTaint == nil {
+		klog.V(5).Infof("node %s is registered without cloud taint. return ok", node.Name)
+		return reconcile.Result{}, nil
+	}
+
+	log.Info("push node request", "request", request)
+	m.requestChan <- node
+	return reconcile.Result{}, nil
+}
+
+func (m *ReconcileNode) batchWorker(ctx context.Context, idx int) {
+	log.Info("starting batch worker", "worker", idx)
+outer:
+	for {
+		var nodes []corev1.Node
+		var names []string
+
+		select {
+		case r := <-m.requestChan:
+			nodes = []corev1.Node{*r}
+			names = []string{r.Name}
+			requestMap := map[string]bool{r.Name: true}
+			// sleep to aggregate recently events as many as possible
+			time.Sleep(time.Duration(ctrlCfg.ControllerCFG.NodeEventAggregationWaitSeconds) * time.Second)
+		inner:
+			for {
+				if len(nodes) >= ctrlCfg.ControllerCFG.NodeReconcileBatchSize {
+					break
+				}
+				select {
+				case r = <-m.requestChan:
+					if !requestMap[r.Name] {
+						nodes = append(nodes, *r)
+						names = append(names, r.Name)
+						requestMap[r.Name] = true
+					} else {
+						log.Info("duplicated request", "request", m)
+					}
+				default:
+					break inner
+				}
+			}
+		case <-ctx.Done():
+			log.Info("context done, batch worker is shutting down")
+			break outer
+		}
+
+		log.Info("batch reconcile nodes", "length", len(nodes), "names", names, "worker", idx)
+		if err := m.syncNode(nodes, m.configCloudRoute); err != nil {
+			log.Error(err, "sync node error", "names", names)
+			continue
+		}
+		log.Info("Successfully initialized nodes", "nodes", names)
+	}
 }
 
 func (m *ReconcileNode) syncCloudNode(node *corev1.Node) error {
@@ -160,7 +223,7 @@ func (m *ReconcileNode) syncCloudNode(node *corev1.Node) error {
 func (m *ReconcileNode) doAddCloudNode(node *corev1.Node) error {
 	instance, err := findCloudECS(m.cloud, node)
 	if err != nil {
-		if err == ErrNotFound {
+		if errors.Is(err, ErrNotFound) {
 			log.Info("cloud instance not found", "node", node.Name)
 			return nil
 		}
@@ -174,12 +237,12 @@ func (m *ReconcileNode) doAddCloudNode(node *corev1.Node) error {
 		return fmt.Errorf("failed to get specified nodeIP in cloud provider")
 	}
 
-	initializer := func() (done bool, err error) {
+	initializer := func(_ context.Context) (done bool, err error) {
 		log.Info("try remove cloud taints", "node", node.Name)
 
 		diff := func(copy runtime.Object) (client.Object, error) {
 			nins := copy.(*corev1.Node)
-			setFields(nins, instance, m.configCloudRoute)
+			setFields(nins, instance, m.configCloudRoute, true)
 			return nins, nil
 		}
 		err = helper.PatchM(m.client, node, diff, helper.PatchAll)
@@ -191,20 +254,20 @@ func (m *ReconcileNode) doAddCloudNode(node *corev1.Node) error {
 		log.Info("finished remove uninitialized cloud taints", "node", node.Name)
 		// After adding, call UpdateNodeAddress to set the CloudProvider provided IPAddresses
 		// So that users do not see any significant delay in IP addresses being filled into the node
-		_ = m.syncNode([]corev1.Node{*node})
+		_ = m.syncNode([]corev1.Node{*node}, false)
 		return true, nil
 	}
-	return wait.PollImmediate(5*time.Second, 20*time.Second, initializer)
+	return wait.PollUntilContextTimeout(context.TODO(), 5*time.Second, 20*time.Second, true, initializer)
 }
 
 // syncNode sync the nodeAddress & cloud node existence
-func (m *ReconcileNode) syncNode(nodes []corev1.Node) error {
-
+func (m *ReconcileNode) syncNode(nodes []corev1.Node, configCloudRoute bool) error {
 	instances, err := m.cloud.ListInstances(context.TODO(), nodeids(nodes))
 	if err != nil {
 		return fmt.Errorf("[NodeAddress] list instances from api: %s", err.Error())
 	}
 
+	var toDisableSourceDestCheckIDs []eniInfo
 	for i := range nodes {
 		node := &nodes[i]
 		cloudNode := instances[node.Spec.ProviderID]
@@ -233,14 +296,37 @@ func (m *ReconcileNode) syncNode(nodes []corev1.Node) error {
 		if findCloudTaint(node.Spec.Taints) != nil {
 			// disable network interfaces source dest IP check only on newly added node
 			if cloudNode.PrimaryNetworkInterfaceID != "" {
-				log.V(5).Info("try to disable sourceDestCheck for network interface", "eni", cloudNode.PrimaryNetworkInterfaceID, "node", node.Name, "ecs", cloudNode.InstanceID)
-				err := m.cloud.ModifyNetworkInterfaceSourceDestCheck(cloudNode.PrimaryNetworkInterfaceID, false)
-				if err != nil {
-					log.Error(err, "disable sourceDestCheck for network interface error", "eni", cloudNode.PrimaryNetworkInterfaceID, "node", node.Name, "ecs", cloudNode.InstanceID)
-				}
+				toDisableSourceDestCheckIDs = append(toDisableSourceDestCheckIDs, eniInfo{
+					ENI:     cloudNode.PrimaryNetworkInterfaceID,
+					NodeRef: nodeRef,
+				})
 			} else {
 				log.Info("can not find cloud node primary network interface id, skip update sourceDestCheck")
 			}
+		}
+	}
+
+	var failedENIs []eniInfo
+	if !ctrlCfg.ControllerCFG.SkipDisableSourceDestCheck && len(toDisableSourceDestCheckIDs) != 0 {
+		failedENIs, err = m.disableNetworkInterfaceSourceDestCheck(toDisableSourceDestCheckIDs)
+		if err != nil {
+			return fmt.Errorf("failed to disable source dest check: %w", err)
+		}
+	}
+
+	failedENIMap := map[string]struct{}{}
+	for _, e := range failedENIs {
+		failedENIMap[e.NodeRef.Name] = struct{}{}
+	}
+
+	for i := range nodes {
+		node := &nodes[i]
+		cloudNode := instances[node.Spec.ProviderID]
+		nodeRef := &corev1.ObjectReference{
+			Kind:      "Node",
+			Name:      node.Name,
+			UID:       types.UID(node.Name),
+			Namespace: "",
 		}
 
 		cloudNode.Addresses = setHostnameAddress(node, cloudNode.Addresses)
@@ -270,9 +356,14 @@ func (m *ReconcileNode) syncNode(nodes []corev1.Node) error {
 			)
 		}
 
+		removeTaints := true
+		if _, existed := failedENIMap[node.Name]; existed {
+			log.Info("disable source dest check for node failed, skip remove taints", "node", node.Name)
+			removeTaints = false
+		}
 		diff := func(copy runtime.Object) (client.Object, error) {
 			nins := copy.(*corev1.Node)
-			setFields(nins, cloudNode, false)
+			setFields(nins, cloudNode, configCloudRoute, removeTaints)
 			return nins, nil
 		}
 
@@ -285,6 +376,54 @@ func (m *ReconcileNode) syncNode(nodes []corev1.Node) error {
 		}
 	}
 	return nil
+}
+
+type eniInfo struct {
+	ENI     string
+	NodeRef *corev1.ObjectReference
+}
+
+func (m *ReconcileNode) disableNetworkInterfaceSourceDestCheck(enis []eniInfo) ([]eniInfo, error) {
+	var eniIDs []string
+	eniMap := map[string]eniInfo{}
+	for _, e := range enis {
+		eniIDs = append(eniIDs, e.ENI)
+		eniMap[e.ENI] = e
+	}
+
+	ifs, err := m.cloud.DescribeNetworkInterfacesByIDs(eniIDs)
+	if err != nil {
+		return nil, err
+	}
+
+	var toDisable []eniInfo
+	var nodeNames []string
+	for _, e := range ifs {
+		if e.SourceDestCheck {
+			toDisable = append(toDisable, eniMap[e.NetworkInterfaceID])
+			nodeNames = append(nodeNames, eniMap[e.NetworkInterfaceID].NodeRef.Name)
+		}
+	}
+
+	log.Info("disable source dest check for nodes", "nodes", nodeNames, "enis", eniIDs)
+
+	var failed []eniInfo
+	for _, d := range toDisable {
+		err := retry.OnError(retry.DefaultRetry, func(err error) bool {
+			return strings.Contains(err.Error(), "InvalidOperation.Conflict")
+		}, func() error {
+			return m.cloud.ModifyNetworkInterfaceSourceDestCheck(d.ENI, false)
+		})
+		if err != nil {
+			log.Error(err, "disable sourceDestCheck for network interface error",
+				"eni", d.ENI, "node", d.NodeRef.Name)
+			m.record.Eventf(d.NodeRef, corev1.EventTypeWarning, helper.FailedSyncNode,
+				fmt.Sprintf("Failed to disable source dest check for node: %s", err.Error()))
+			failed = append(failed, d)
+		}
+	}
+
+	return failed, nil
 }
 
 func (m *ReconcileNode) PeriodicalSync() {

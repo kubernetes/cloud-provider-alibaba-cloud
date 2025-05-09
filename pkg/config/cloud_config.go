@@ -13,6 +13,7 @@ import (
 const (
 	DefaultServiceMaxConcurrentReconciles = 3
 	DefaultNodeMaxConcurrentReconciles    = 1
+	DefaultRouteMaxConcurrentReconciles   = 1
 )
 
 var CloudCFG = &CloudConfig{}
@@ -44,7 +45,8 @@ type CloudConfig struct {
 		NodeAddrSyncPeriod          int64 `json:"nodeAddrSyncPeriod"`
 
 		// route controller
-		RouteTableIDS string `json:"routeTableIDs"`
+		RouteMaxConcurrentReconciles int    `json:"routeMaxConcurrentReconciles"`
+		RouteTableIDS                string `json:"routeTableIDs"`
 
 		// pvtz controller
 		PrivateZoneID        string `json:"privateZoneId"`
@@ -74,6 +76,9 @@ func (cc *CloudConfig) SetDefaultValue() {
 	if cc.Global.NodeMaxConcurrentReconciles == 0 {
 		cc.Global.NodeMaxConcurrentReconciles = DefaultNodeMaxConcurrentReconciles
 	}
+	if cc.Global.RouteMaxConcurrentReconciles == 0 {
+		cc.Global.RouteMaxConcurrentReconciles = DefaultRouteMaxConcurrentReconciles
+	}
 	CloudCFG.Global.ResourceGroupID = strings.TrimSpace(CloudCFG.Global.ResourceGroupID)
 	CloudCFG.Global.RouteTableIDS = strings.TrimSpace(CloudCFG.Global.RouteTableIDS)
 }
@@ -98,6 +103,6 @@ func (cc *CloudConfig) PrintInfo() {
 		klog.Infof("using feature gate: %s", cc.Global.FeatureGates)
 	}
 
-	klog.Infof("NodeMaxConcurrentReconciles: %d, ServiceMaxConcurrentReconciles: %d",
-		cc.Global.NodeMaxConcurrentReconciles, cc.Global.ServiceMaxConcurrentReconciles)
+	klog.Infof("NodeMaxConcurrentReconciles: %d, ServiceMaxConcurrentReconciles: %d, RouteMaxConcurrentReconciles: %d",
+		cc.Global.NodeMaxConcurrentReconciles, cc.Global.ServiceMaxConcurrentReconciles, cc.Global.RouteMaxConcurrentReconciles)
 }

@@ -12,6 +12,7 @@ import (
 	"k8s.io/klog/v2"
 	"net"
 	"strings"
+	"time"
 )
 
 type AssociatedInstanceType string
@@ -118,6 +119,65 @@ func (r *VPCProvider) CreateRoute(
 	}, nil
 }
 
+func (r *VPCProvider) CreateRoutes(ctx context.Context, table string, routes []*model.Route) ([]string, []prvd.RouteUpdateStatus, error) {
+	s := time.Now()
+	if len(routes) == 0 {
+		return nil, nil, nil
+	}
+
+	var routeEntries []vpc.CreateRouteEntriesRouteEntries
+	for _, r := range routes {
+		_, ins, err := util.NodeFromProviderID(r.ProviderId)
+		if err != nil {
+			return nil, nil, fmt.Errorf("invalid provider id: %v, err: %v", r.ProviderId, err)
+		}
+		routeEntries = append(routeEntries, vpc.CreateRouteEntriesRouteEntries{
+			RouteTableId: table,
+			DstCidrBlock: r.DestinationCIDR,
+			NextHop:      ins,
+			NextHopType:  model.RouteNextHopTypeInstance,
+		})
+	}
+
+	createRouteEntriesRequest := vpc.CreateCreateRouteEntriesRequest()
+	createRouteEntriesRequest.RouteEntries = &routeEntries
+
+	resp, err := r.auth.VPC.CreateRouteEntries(createRouteEntriesRequest)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	klog.Infof("RequestId: %s, API: %s, table: %s, elapsedTime: %f", resp.RequestId, "CreateRouteEntries", table, time.Since(s).Seconds())
+
+	var statuses []prvd.RouteUpdateStatus
+	for _, r := range routes {
+		foundFailed := false
+		_, ins, err := util.NodeFromProviderID(r.ProviderId)
+		if err != nil {
+			continue
+		}
+		for _, f := range resp.FailedRouteEntries {
+			if f.NextHop == ins {
+				foundFailed = true
+				statuses = append(statuses, prvd.RouteUpdateStatus{
+					Route:         r,
+					Failed:        true,
+					FailedCode:    f.FailedCode,
+					FailedMessage: f.FailedMessage,
+				})
+				break
+			}
+		}
+		if !foundFailed {
+			statuses = append(statuses, prvd.RouteUpdateStatus{
+				Route: r,
+			})
+		}
+	}
+
+	return resp.RouteEntryIds, statuses, nil
+}
+
 func (r *VPCProvider) DeleteRoute(ctx context.Context, table, provideID, destinationCIDR string) error {
 	deleteRouteEntryRequest := vpc.CreateDeleteRouteEntryRequest()
 	deleteRouteEntryRequest.RouteTableId = table
@@ -136,6 +196,65 @@ func (r *VPCProvider) DeleteRoute(ctx context.Context, table, provideID, destina
 		return fmt.Errorf("error delete route entry for %s, %s, error: %v", provideID, destinationCIDR, err)
 	}
 	return nil
+}
+
+func (r *VPCProvider) DeleteRoutes(ctx context.Context, table string, routes []*model.Route) ([]prvd.RouteUpdateStatus, error) {
+	s := time.Now()
+	if len(routes) == 0 {
+		return nil, nil
+	}
+
+	var routeEntries []vpc.DeleteRouteEntriesRouteEntries
+	for _, r := range routes {
+		_, ins, err := util.NodeFromProviderID(r.ProviderId)
+		if err != nil {
+			return nil, fmt.Errorf("invalid provider id: %v, err: %v", r.ProviderId, err)
+		}
+		routeEntries = append(routeEntries, vpc.DeleteRouteEntriesRouteEntries{
+			RouteTableId: table,
+			DstCidrBlock: r.DestinationCIDR,
+			NextHop:      ins,
+		})
+	}
+
+	deleteRouteEntriesRequest := vpc.CreateDeleteRouteEntriesRequest()
+	deleteRouteEntriesRequest.RouteEntries = &routeEntries
+
+	resp, err := r.auth.VPC.DeleteRouteEntries(deleteRouteEntriesRequest)
+	if err != nil {
+		return nil, err
+	}
+
+	// TODO: V(5)
+	klog.Infof("RequestId: %s, API: %s, table: %s, elapsedTime: %f", resp.RequestId, "DeleteRouteEntries", table, time.Since(s).Seconds())
+
+	var statuses []prvd.RouteUpdateStatus
+	for _, r := range routes {
+		foundFailed := false
+		_, ins, err := util.NodeFromProviderID(r.ProviderId)
+		if err != nil {
+			continue
+		}
+		for _, f := range resp.FailedRouteEntries {
+			if f.NextHop == ins {
+				foundFailed = true
+				statuses = append(statuses, prvd.RouteUpdateStatus{
+					Route:         r,
+					Failed:        true,
+					FailedCode:    f.FailedCode,
+					FailedMessage: f.FailedMessage,
+				})
+				break
+			}
+		}
+		if !foundFailed {
+			statuses = append(statuses, prvd.RouteUpdateStatus{
+				Route: r,
+			})
+		}
+	}
+
+	return statuses, nil
 }
 
 func (r *VPCProvider) ListRoute(ctx context.Context, table string) (routes []*model.Route, err error) {

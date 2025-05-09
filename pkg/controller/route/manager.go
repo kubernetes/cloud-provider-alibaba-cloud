@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	ctrlCfg "k8s.io/cloud-provider-alibaba-cloud/pkg/config"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/helper"
@@ -11,6 +12,7 @@ import (
 	prvd "k8s.io/cloud-provider-alibaba-cloud/pkg/provider"
 	"k8s.io/klog/v2"
 	"net"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"strings"
 	"sync"
 	"time"
@@ -240,4 +242,105 @@ func needSyncRoute(node *v1.Node) bool {
 	}
 
 	return true
+}
+
+func (r *ReconcileRoute) LockedCreateRoutes(ctx context.Context, reconcileID, table string, routes []*model.Route) ([]string, []prvd.RouteUpdateStatus, error) {
+	routeLock.Lock()
+	defer routeLock.Unlock()
+	log.Info("Fetched route lock", "reconcileID", reconcileID)
+	return r.cloud.CreateRoutes(ctx, table, routes)
+}
+
+func (r *ReconcileRoute) LockedDeleteRoutes(ctx context.Context, reconcileID, table string, routes []*model.Route) ([]prvd.RouteUpdateStatus, error) {
+	routeLock.Lock()
+	defer routeLock.Unlock()
+	log.Info("Fetched route lock", "reconcileID", reconcileID)
+	return r.cloud.DeleteRoutes(ctx, table, routes)
+}
+
+func (r *ReconcileRoute) batchAddRoutes(ctx context.Context, reconcileID string, table string, routes []*model.Route) error {
+	if len(routes) == 0 {
+		return nil
+	}
+
+	_, statuses, err := r.LockedCreateRoutes(ctx, reconcileID, table, routes)
+	if err != nil {
+		return err
+	}
+
+	for _, s := range statuses {
+		if s.FailedCode == "VPC_ROUTE_ENTRY_CIDR_BLOCK_DUPLICATE" {
+			log.Info("route already exists, ignore create error", "route", s.Route.Name, "reconcileID", reconcileID)
+			s.Failed = false
+		}
+
+		if s.FailedCode == "VPC_ROUTE_ENTRY_STATUS_ERROR" {
+			log.Info("route has created but in middle status, ignore error",
+				"node", s.Route.NodeReference.Name, "cidr", s.Route.DestinationCIDR)
+			s.Failed = false
+		}
+
+		if !s.Failed {
+			err = r.updateNetworkingCondition(ctx, s.Route.NodeReference, true)
+			if err != nil {
+				log.Error(err, "update node network condition error",
+					"node", s.Route.NodeReference.Name, "reconcileID", reconcileID)
+				continue
+			}
+
+			r.nodeCache.SetIfAbsent(s.Route.NodeReference.Name, s.Route)
+			r.rateLimiter.Forget(reconcile.Request{
+				NamespacedName: types.NamespacedName{
+					Name: s.Route.NodeReference.Name,
+				},
+			})
+			continue
+		}
+
+		log.Info("error creating route entry, requeue",
+			"node", s.Route.NodeReference.Name, "route", s.Route.DestinationCIDR, "table", table,
+			"message", s.FailedMessage, "code", s.FailedCode, "reconcileID", reconcileID)
+		r.record.Eventf(s.Route.NodeReference, v1.EventTypeWarning, helper.FailedCreateRoute,
+			"Error creating route entry in %s: %s", table, s.FailedMessage)
+		r.requeueNode(s.Route.NodeReference)
+	}
+
+	return nil
+}
+
+func (r *ReconcileRoute) batchDeleteRoutes(ctx context.Context, reconcileID string, table string, routes []*model.Route) error {
+	if len(routes) == 0 {
+		return nil
+	}
+
+	statuses, err := r.LockedDeleteRoutes(ctx, reconcileID, table, routes)
+	if err != nil {
+		return err
+	}
+
+	for _, s := range statuses {
+		if s.FailedCode == "VPC_ROUTER_ENTRY_NOT_EXIST" {
+			log.Info("route not found, ignore delete error",
+				"node", s.Route.NodeReference.Name, "route", s.Route.Name, "reconcileID", reconcileID)
+			s.Failed = false
+		}
+
+		if !s.Failed {
+			r.nodeCache.Remove(s.Route.NodeReference.Name)
+			r.rateLimiter.Forget(reconcile.Request{
+				NamespacedName: types.NamespacedName{
+					Name: s.Route.NodeReference.Name,
+				},
+			})
+			continue
+		}
+
+		log.Error(fmt.Errorf(s.FailedMessage),
+			"error delete route entry, requeue",
+			"node", s.Route.NodeReference.Name, "route", s.Route.Name,
+			"message", s.FailedMessage, "code", s.FailedCode, "reconcileID", reconcileID)
+		r.requeueNode(s.Route.NodeReference)
+	}
+
+	return nil
 }
