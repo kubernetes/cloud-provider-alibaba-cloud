@@ -5,6 +5,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/client-go/util/retry"
 	ctrlCfg "k8s.io/cloud-provider-alibaba-cloud/pkg/config"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/model"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/util/hash"
@@ -162,6 +163,12 @@ func Retry(
 			return true, nil
 		},
 	)
+}
+
+func RetryOnErrorContains(contains string, f func() error) error {
+	return retry.OnError(retry.DefaultRetry, func(err error) bool {
+		return strings.Contains(err.Error(), contains)
+	}, f)
 }
 
 func Is7LayerProtocol(protocol string) bool {

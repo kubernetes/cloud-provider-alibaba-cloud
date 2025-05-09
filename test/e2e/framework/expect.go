@@ -1506,10 +1506,14 @@ func (f *Framework) FindLoadBalancer() (*v1.Service, *model.LoadBalancer, error)
 }
 
 func buildRemoteModel(f *Framework, svc *v1.Service) (*model.LoadBalancer, error) {
+	vma, err := clbv1.NewVGroupManager(f.Client.RuntimeClient, f.Client.CloudClient)
+	if err != nil {
+		return nil, err
+	}
 	builder := &clbv1.ModelBuilder{
 		LoadBalancerMgr: clbv1.NewLoadBalancerManager(f.Client.CloudClient),
 		ListenerMgr:     clbv1.NewListenerManager(f.Client.CloudClient),
-		VGroupMgr:       clbv1.NewVGroupManager(f.Client.RuntimeClient, f.Client.CloudClient),
+		VGroupMgr:       vma,
 	}
 	reqCtx := &svcCtx.RequestContext{
 		Service: svc,

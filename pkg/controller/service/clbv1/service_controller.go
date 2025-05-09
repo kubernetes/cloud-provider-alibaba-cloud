@@ -47,11 +47,15 @@ import (
 )
 
 func Add(mgr manager.Manager, ctx *shared.SharedContext) error {
-	return add(mgr, newReconciler(mgr, ctx))
+	r, err := newReconciler(mgr, ctx)
+	if err != nil {
+		return err
+	}
+	return add(mgr, r)
 }
 
 // newReconciler returns a new reconcile.Reconciler
-func newReconciler(mgr manager.Manager, ctx *shared.SharedContext) *ReconcileService {
+func newReconciler(mgr manager.Manager, ctx *shared.SharedContext) (*ReconcileService, error) {
 	recon := &ReconcileService{
 		cloud:            ctx.Provider(),
 		kubeClient:       mgr.GetClient(),
@@ -63,10 +67,13 @@ func newReconciler(mgr manager.Manager, ctx *shared.SharedContext) *ReconcileSer
 
 	slbManager := NewLoadBalancerManager(recon.cloud)
 	listenerManager := NewListenerManager(recon.cloud)
-	vGroupManager := NewVGroupManager(recon.kubeClient, recon.cloud)
+	vGroupManager, err := NewVGroupManager(recon.kubeClient, recon.cloud)
+	if err != nil {
+		return nil, err
+	}
 	recon.builder = NewModelBuilder(slbManager, listenerManager, vGroupManager)
 	recon.applier = NewModelApplier(slbManager, listenerManager, vGroupManager)
-	return recon
+	return recon, nil
 }
 
 type serviceController struct {

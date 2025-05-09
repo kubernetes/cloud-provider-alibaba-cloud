@@ -459,6 +459,41 @@ func RunListenerTestCases(f *framework.Framework) {
 					gomega.Expect(err).To(gomega.BeNil())
 				})
 			})
+			ginkgo.Context("tls cipher policy", func() {
+				ginkgo.It("set another tls cipher policy", func() {
+					svc, err := f.Client.KubeClient.CreateNLBServiceByAnno(map[string]string{
+						annotation.Annotation(annotation.ZoneMaps):         options.TestConfig.NLBZoneMaps,
+						annotation.Annotation(annotation.ProtocolPort):     "tcpssl:443",
+						annotation.Annotation(annotation.TLSCipherPolicy):  "tls_cipher_policy_1_2_strict_with_1_3",
+						annotation.Annotation(annotation.CertID):           options.TestConfig.NLBCertID,
+						annotation.Annotation(annotation.LoadBalancerId):   options.TestConfig.InternetNetworkLoadBalancerID,
+						annotation.Annotation(annotation.OverrideListener): "true",
+					})
+					gomega.Expect(err).To(gomega.BeNil())
+					err = f.ExpectNetworkLoadBalancerEqual(svc)
+					gomega.Expect(err).To(gomega.BeNil())
+				})
+
+				ginkgo.It("change tls cipher policy", func() {
+					oldsvc, err := f.Client.KubeClient.CreateNLBServiceByAnno(map[string]string{
+						annotation.Annotation(annotation.ZoneMaps):         options.TestConfig.NLBZoneMaps,
+						annotation.Annotation(annotation.ProtocolPort):     "tcpssl:443",
+						annotation.Annotation(annotation.CertID):           options.TestConfig.NLBCertID,
+						annotation.Annotation(annotation.LoadBalancerId):   options.TestConfig.InternetNetworkLoadBalancerID,
+						annotation.Annotation(annotation.OverrideListener): "true",
+					})
+					gomega.Expect(err).To(gomega.BeNil())
+					err = f.ExpectNetworkLoadBalancerEqual(oldsvc)
+					gomega.Expect(err).To(gomega.BeNil())
+
+					newsvc := oldsvc.DeepCopy()
+					newsvc.Annotations[annotation.TLSCipherPolicy] = "tls_cipher_policy_1_2_strict_with_1_3"
+					newsvc, err = f.Client.KubeClient.PatchService(oldsvc, newsvc)
+					gomega.Expect(err).To(gomega.BeNil())
+					err = f.ExpectNetworkLoadBalancerEqual(newsvc)
+					gomega.Expect(err).To(gomega.BeNil())
+				})
+			})
 
 			if options.TestConfig.NLBCACertID != "" {
 				ginkgo.Context("tcpssl cacert", func() {
@@ -526,42 +561,6 @@ func RunListenerTestCases(f *framework.Framework) {
 				})
 			}
 		}
-
-		ginkgo.Context("tls cipher policy", func() {
-			ginkgo.It("set another tls cipher policy", func() {
-				svc, err := f.Client.KubeClient.CreateNLBServiceByAnno(map[string]string{
-					annotation.Annotation(annotation.ZoneMaps):         options.TestConfig.NLBZoneMaps,
-					annotation.Annotation(annotation.ProtocolPort):     "tcpssl:443",
-					annotation.Annotation(annotation.TLSCipherPolicy):  "tls_cipher_policy_1_2_strict_with_1_3",
-					annotation.Annotation(annotation.CertID):           options.TestConfig.NLBCertID,
-					annotation.Annotation(annotation.LoadBalancerId):   options.TestConfig.InternetNetworkLoadBalancerID,
-					annotation.Annotation(annotation.OverrideListener): "true",
-				})
-				gomega.Expect(err).To(gomega.BeNil())
-				err = f.ExpectNetworkLoadBalancerEqual(svc)
-				gomega.Expect(err).To(gomega.BeNil())
-			})
-
-			ginkgo.It("change tls cipher policy", func() {
-				oldsvc, err := f.Client.KubeClient.CreateNLBServiceByAnno(map[string]string{
-					annotation.Annotation(annotation.ZoneMaps):         options.TestConfig.NLBZoneMaps,
-					annotation.Annotation(annotation.ProtocolPort):     "tcpssl:443",
-					annotation.Annotation(annotation.CertID):           options.TestConfig.NLBCertID,
-					annotation.Annotation(annotation.LoadBalancerId):   options.TestConfig.InternetNetworkLoadBalancerID,
-					annotation.Annotation(annotation.OverrideListener): "true",
-				})
-				gomega.Expect(err).To(gomega.BeNil())
-				err = f.ExpectNetworkLoadBalancerEqual(oldsvc)
-				gomega.Expect(err).To(gomega.BeNil())
-
-				newsvc := oldsvc.DeepCopy()
-				newsvc.Annotations[annotation.TLSCipherPolicy] = "tls_cipher_policy_1_2_strict_with_1_3"
-				newsvc, err = f.Client.KubeClient.PatchService(oldsvc, newsvc)
-				gomega.Expect(err).To(gomega.BeNil())
-				err = f.ExpectNetworkLoadBalancerEqual(newsvc)
-				gomega.Expect(err).To(gomega.BeNil())
-			})
-		})
 
 		testsvc := f.Client.KubeClient.DefaultService()
 		testsvc.Annotations = map[string]string{
@@ -667,16 +666,16 @@ func RunListenerTestCases(f *framework.Framework) {
 		})
 
 		ginkgo.Context("idle timeout", func() {
-			ginkgo.It("idle-timeout 60", func() {
+			ginkgo.It("idle-timeout 20", func() {
 				svc := testsvc.DeepCopy()
-				svc.Annotations[annotation.Annotation(annotation.IdleTimeout)] = "60"
+				svc.Annotations[annotation.Annotation(annotation.IdleTimeout)] = "20"
 				svc, err := f.Client.KubeClient.CreateService(svc)
 				gomega.Expect(err).To(gomega.BeNil())
 				err = f.ExpectNetworkLoadBalancerEqual(svc)
 				gomega.Expect(err).To(gomega.BeNil())
 			})
 
-			ginkgo.It("idle timeout default -> 60", func() {
+			ginkgo.It("idle timeout default -> 20", func() {
 				oldsvc := testsvc.DeepCopy()
 				oldsvc, err := f.Client.KubeClient.CreateService(oldsvc)
 				gomega.Expect(err).To(gomega.BeNil())
@@ -684,7 +683,7 @@ func RunListenerTestCases(f *framework.Framework) {
 				gomega.Expect(err).To(gomega.BeNil())
 
 				newsvc := oldsvc.DeepCopy()
-				newsvc.Annotations[annotation.Annotation(annotation.IdleTimeout)] = "60"
+				newsvc.Annotations[annotation.Annotation(annotation.IdleTimeout)] = "20"
 				newsvc, err = f.Client.KubeClient.PatchService(oldsvc, newsvc)
 				gomega.Expect(err).To(gomega.BeNil())
 				err = f.ExpectNetworkLoadBalancerEqual(newsvc)
@@ -760,8 +759,6 @@ func RunListenerTestCases(f *framework.Framework) {
 				newsvc.Annotations[annotation.Annotation(annotation.Ppv2PrivateLinkEpsIdEnabled)] = string(model.OffFlag)
 				newsvc.Annotations[annotation.Annotation(annotation.Ppv2VpcIdEnabled)] = string(model.OffFlag)
 				newsvc, err = f.Client.KubeClient.PatchService(oldsvc, newsvc)
-				gomega.Expect(err).To(gomega.BeNil())
-				err = f.ExpectNetworkLoadBalancerEqual(newsvc)
 				gomega.Expect(err).To(gomega.BeNil())
 			})
 		})

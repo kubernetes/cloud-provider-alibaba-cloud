@@ -2,6 +2,7 @@ package vmock
 
 import (
 	"context"
+	"time"
 
 	"github.com/alibabacloud-go/tea/tea"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/helper"
@@ -22,6 +23,42 @@ var _ prvd.INLB = &MockNLB{}
 
 type MockNLB struct {
 	auth *base.ClientMgr
+}
+
+func (m MockNLB) DeleteNLBListenerAsync(ctx context.Context, listenerId string) (string, error) {
+	return "job-delete-listener", nil
+}
+
+func (m MockNLB) UpdateNLBListenerAsync(ctx context.Context, lis *nlbmodel.ListenerAttribute) (string, error) {
+	return "job-update-listener", nil
+}
+
+func (m MockNLB) CreateNLBListenerAsync(ctx context.Context, lbId string, lis *nlbmodel.ListenerAttribute) (string, error) {
+	return "job-create-listener", nil
+}
+
+func (m MockNLB) CreateNLBServerGroupAsync(ctx context.Context, sg *nlbmodel.ServerGroup) (string, error) {
+	return "job-create-servergroup", nil
+}
+
+func (m MockNLB) DeleteNLBServerGroupAsync(ctx context.Context, sgId string) (string, error) {
+	return "job-delete-servergroup", nil
+}
+
+func (m MockNLB) UpdateNLBServerGroupAsync(ctx context.Context, sg *nlbmodel.ServerGroup) (string, error) {
+	return "job-update-servergroup", nil
+}
+
+func (m MockNLB) AddNLBServersAsync(ctx context.Context, sgId string, backends []nlbmodel.ServerGroupServer) (string, error) {
+	return "job-add-servers", nil
+}
+
+func (m MockNLB) RemoveNLBServersAsync(ctx context.Context, sgId string, backends []nlbmodel.ServerGroupServer) (string, error) {
+	return "job-remove-servers", nil
+}
+
+func (m MockNLB) UpdateNLBServersAsync(ctx context.Context, sgId string, backends []nlbmodel.ServerGroupServer) (string, error) {
+	return "job-update-servers", nil
 }
 
 const (
@@ -360,5 +397,9 @@ func (m MockNLB) UpdateNLBSecurityGroupIds(ctx context.Context, mdl *nlbmodel.Ne
 }
 
 func (m MockNLB) UpdateNLBIPv6AddressType(ctx context.Context, mdl *nlbmodel.NetworkLoadBalancer) error {
+	return nil
+}
+
+func (m MockNLB) BatchWaitJobsFinish(ctx context.Context, api string, jobIds []string, args ...time.Duration) error {
 	return nil
 }
