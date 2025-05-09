@@ -262,6 +262,10 @@ func networkLoadBalancerAttrEqual(f *Framework, anno *annotation.AnnotationReque
 }
 
 func nlbListenerAttrEqual(reqCtx *svcCtx.RequestContext, remote []*nlbmodel.ListenerAttribute) error {
+	portRange, err := nlbListenerPortRange(reqCtx)
+	if err != nil {
+		return err
+	}
 	for _, port := range reqCtx.Service.Spec.Ports {
 		proto, err := nlbListenerProtocol(reqCtx.Anno.Get(annotation.ProtocolPort), port)
 		if err != nil {
@@ -269,7 +273,7 @@ func nlbListenerAttrEqual(reqCtx *svcCtx.RequestContext, remote []*nlbmodel.List
 		}
 		find := false
 		for _, r := range remote {
-			if r.ListenerPort == port.Port && r.ListenerProtocol == proto {
+			if nlbListenerPortEqual(r, port, portRange) && r.ListenerProtocol == proto {
 				find = true
 				switch proto {
 				case nlbmodel.TCP:
@@ -295,7 +299,59 @@ func nlbListenerAttrEqual(reqCtx *svcCtx.RequestContext, remote []*nlbmodel.List
 	return nil
 }
 
+func nlbListenerPortEqual(r *nlbmodel.ListenerAttribute, port v1.ServicePort, portRange map[int32][2]int32) bool {
+	if r.ListenerPort != 0 {
+		return r.ListenerPort == port.Port
+	}
+	if len(portRange) == 0 {
+		return false
+	}
+	if ranges, ok := portRange[port.Port]; ok {
+		return r.StartPort == ranges[0] && r.EndPort == ranges[1]
+	}
+	return false
+}
+
+func nlbListenerPortRange(reqCtx *svcCtx.RequestContext) (map[int32][2]int32, error) {
+	ret := make(map[int32][2]int32)
+	// 80-88:80
+	pr := reqCtx.Anno.Get(annotation.ListenerPortRange)
+	if pr == "" {
+		return ret, nil
+	}
+	splits := strings.Split(pr, ",")
+	for _, s := range splits {
+		maps := strings.Split(s, ":")
+		if len(maps) != 2 {
+			return nil, fmt.Errorf("parse listener port range %s error", pr)
+		}
+		servicePort, err := strconv.Atoi(maps[1])
+		if err != nil {
+			return nil, fmt.Errorf("parse listener port range %s error: %s", pr, err.Error())
+		}
+		targetPorts := strings.Split(maps[0], "-")
+		if len(targetPorts) != 2 {
+			return nil, fmt.Errorf("parse listener port range %s error", pr)
+		}
+		startPort, err := strconv.Atoi(targetPorts[0])
+		if err != nil {
+			return nil, fmt.Errorf("parse listener port range %s error: %s", pr, err.Error())
+		}
+		endPort, err := strconv.Atoi(targetPorts[1])
+		if err != nil {
+			return nil, fmt.Errorf("parse listener port range %s error: %s", pr, err.Error())
+		}
+
+		ret[int32(servicePort)] = [2]int32{int32(startPort), int32(endPort)}
+	}
+	return ret, nil
+}
+
 func nlbVsgAttrEqual(f *Framework, reqCtx *svcCtx.RequestContext, remote *nlbmodel.NetworkLoadBalancer) error {
+	portRange, err := nlbListenerPortRange(reqCtx)
+	if err != nil {
+		return err
+	}
 	for _, port := range reqCtx.Service.Spec.Ports {
 		var (
 			groupId string
@@ -306,7 +362,12 @@ func nlbVsgAttrEqual(f *Framework, reqCtx *svcCtx.RequestContext, remote *nlbmod
 		if err != nil {
 			return err
 		}
-		name := getServerGroupName(reqCtx.Service, proto, &port)
+		var name string
+		if portRange, ok := portRange[port.Port]; ok {
+			name = getAnyPortServerGroupName(reqCtx.Service, proto, portRange[0], portRange[1])
+		} else {
+			name = getServerGroupName(reqCtx.Service, proto, &port)
+		}
 		if vGroupAnno := reqCtx.Anno.Get(annotation.VGroupPort); vGroupAnno != "" {
 			groupId, err = getVGroupID(reqCtx.Anno.Get(annotation.VGroupPort), port)
 			if err != nil {
@@ -342,7 +403,7 @@ func nlbVsgAttrEqual(f *Framework, reqCtx *svcCtx.RequestContext, remote *nlbmod
 				sg.ServicePort = &port
 				sg.ServicePort.Protocol = v1.Protocol(proto)
 				sg.Weight = weight
-				if isOverride(reqCtx.Anno) && !isNLBServerGroupUsedByPort(sg, remote.Listeners) {
+				if isOverride(reqCtx.Anno) && !isNLBServerGroupUsedByPort(sg, remote.Listeners, portRange) {
 					return fmt.Errorf("port %d do not use vgroup id: %s", port.Port, sg.ServerGroupId)
 				}
 				equal, err := isNLBBackendEqual(f, reqCtx, sg)
@@ -438,9 +499,9 @@ func nlbListenerProtocol(annotation string, port v1.ServicePort) (string, error)
 	return strings.ToUpper(string(port.Protocol)), nil
 }
 
-func isNLBServerGroupUsedByPort(sg *nlbmodel.ServerGroup, listeners []*nlbmodel.ListenerAttribute) bool {
+func isNLBServerGroupUsedByPort(sg *nlbmodel.ServerGroup, listeners []*nlbmodel.ListenerAttribute, portRange map[int32][2]int32) bool {
 	for _, l := range listeners {
-		if l.ListenerPort == sg.ServicePort.Port &&
+		if nlbListenerPortEqual(l, *sg.ServicePort, portRange) &&
 			strings.EqualFold(l.ListenerProtocol, string(sg.ServicePort.Protocol)) {
 			return sg.ServerGroupId == l.ServerGroupId
 		}
@@ -636,6 +697,21 @@ func getServerGroupName(svc *v1.Service, protocol string, servicePort *v1.Servic
 	return namedKey.Key()
 }
 
+func getAnyPortServerGroupName(svc *v1.Service, protocol string, startPort, endPort int32) string {
+	namedKey := &nlbmodel.SGNamedKey{
+		NamedKey: nlbmodel.NamedKey{
+			Prefix:      model.DEFAULT_PREFIX,
+			Namespace:   svc.Namespace,
+			CID:         base.CLUSTER_ID,
+			ServiceName: svc.Name,
+		},
+		Protocol:    protocol,
+		SGGroupPort: fmt.Sprintf("%d_%d", startPort, endPort),
+	}
+
+	return namedKey.Key()
+}
+
 func buildServerGroupENIBackends(f *Framework, anno *annotation.AnnotationRequest, ep *v1.Endpoints, sg *nlbmodel.ServerGroup, ipVersion model.AddressIPVersionType) ([]nlbmodel.ServerGroupServer, error) {
 	var ret []nlbmodel.ServerGroupServer
 	for _, subset := range ep.Subsets {
@@ -672,6 +748,9 @@ func buildServerGroupENIBackends(f *Framework, anno *annotation.AnnotationReques
 			}
 			ret[i].ServerId = eniid
 			ret[i].ServerType = nlbmodel.EniServerType
+			if sg.AnyPortEnabled {
+				ret[i].Port = 0
+			}
 		}
 	}
 	return setServerGroupWeightBackends(helper.ENITrafficPolicy, ret, sg.Weight), nil
@@ -871,6 +950,10 @@ func nlbPodPercentAlgorithm(mode helper.TrafficPolicy, backends []nlbmodel.Serve
 }
 
 func genericNLBServerEqual(reqCtx *svcCtx.RequestContext, local v1.ServicePort, remote *nlbmodel.ListenerAttribute) error {
+	portRange, err := nlbListenerPortRange(reqCtx)
+	if err != nil {
+		return err
+	}
 	proto, err := nlbListenerProtocol(reqCtx.Anno.Get(annotation.ProtocolPort), local)
 	if err != nil {
 		return err
@@ -884,6 +967,11 @@ func genericNLBServerEqual(reqCtx *svcCtx.RequestContext, local v1.ServicePort, 
 		},
 		Port:     local.Port,
 		Protocol: proto,
+	}
+	if pr, ok := portRange[local.Port]; ok {
+		nameKey.Port = 0
+		nameKey.StartPort = pr[0]
+		nameKey.EndPort = pr[1]
 	}
 
 	if remote.ListenerDescription != nameKey.Key() {

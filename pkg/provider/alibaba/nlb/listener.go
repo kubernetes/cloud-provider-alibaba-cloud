@@ -8,6 +8,7 @@ import (
 	nlbmodel "k8s.io/cloud-provider-alibaba-cloud/pkg/model/nlb"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/util"
 	"k8s.io/klog/v2"
+	"strconv"
 )
 
 func (p *NLBProvider) ListNLBListeners(ctx context.Context, lbId string) ([]*nlbmodel.ListenerAttribute, error) {
@@ -83,6 +84,22 @@ func (p *NLBProvider) ListNLBListeners(ctx context.Context, lbId string) ([]*nlb
 		}
 		n.NamedKey = nameKey
 
+		if lis.StartPort != nil {
+			s, err := strconv.Atoi(tea.StringValue(lis.StartPort))
+			if err != nil {
+				return nil, fmt.Errorf("error converting listener start port to int: %w", err)
+			}
+			n.StartPort = int32(s)
+		}
+
+		if lis.EndPort != nil {
+			e, err := strconv.Atoi(tea.StringValue(lis.EndPort))
+			if err != nil {
+				return nil, fmt.Errorf("error converting listener end port to int: %w", err)
+			}
+			n.EndPort = int32(e)
+		}
+
 		listeners = append(listeners, n)
 	}
 	return listeners, nil
@@ -97,6 +114,12 @@ func (p *NLBProvider) CreateNLBListener(ctx context.Context, lbId string, lis *n
 	req.ServerGroupId = tea.String(lis.ServerGroupId)
 	req.Cps = lis.Cps
 	req.ProxyProtocolEnabled = lis.ProxyProtocolEnabled
+	if lis.StartPort != 0 {
+		req.StartPort = tea.Int32(lis.StartPort)
+	}
+	if lis.EndPort != 0 {
+		req.EndPort = tea.Int32(lis.EndPort)
+	}
 	if lis.ProxyProtocolV2Config.PrivateLinkEpIdEnabled != nil ||
 		lis.ProxyProtocolV2Config.PrivateLinkEpsIdEnabled != nil ||
 		lis.ProxyProtocolV2Config.VpcIdEnabled != nil {

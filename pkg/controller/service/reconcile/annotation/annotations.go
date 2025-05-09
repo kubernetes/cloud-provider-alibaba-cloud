@@ -124,6 +124,8 @@ const (
 
 	AlpnEnabled = AnnotationLoadBalancerPrefix + "alpn"
 	AlpnPolicy  = AnnotationLoadBalancerPrefix + "alpn-policy"
+
+	ListenerPortRange = AnnotationLoadBalancerPrefix + "listener-port-range"
 )
 
 var DefaultValue = map[string]string{

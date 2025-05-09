@@ -26,6 +26,7 @@ func (p *NLBProvider) toLocalServerGroup(ctx context.Context, remote *nlb.ListSe
 		ConnectionDrainTimeout:  tea.Int32Value(remote.ConnectionDrainTimeout),
 		ResourceGroupId:         tea.StringValue(remote.ResourceGroupId),
 		PreserveClientIpEnabled: remote.PreserveClientIpEnabled,
+		AnyPortEnabled:          tea.BoolValue(remote.AnyPortEnabled),
 	}
 	if remote.HealthCheck != nil {
 		sg.HealthCheckConfig = &nlbmodel.HealthCheckConfig{
@@ -137,6 +138,7 @@ func (p *NLBProvider) CreateNLBServerGroup(ctx context.Context, sg *nlbmodel.Ser
 	req.ServerGroupName = tea.String(sg.ServerGroupName)
 	req.VpcId = tea.String(sg.VPCId)
 	req.Protocol = tea.String(sg.Protocol)
+	req.AnyPortEnabled = tea.Bool(sg.AnyPortEnabled)
 	for _, t := range sg.Tags {
 		req.Tag = append(req.Tag, &nlb.CreateServerGroupRequestTag{
 			Key:   tea.String(t.Key),
