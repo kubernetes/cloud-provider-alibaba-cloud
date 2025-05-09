@@ -53,11 +53,9 @@ func GetLogMessage(err error) string {
 
 	var agg utilerrors.Aggregate
 	if errors.As(err, &agg) {
-		message := ""
-		for _, e := range agg.Errors() {
-			message += GetLogMessage(e) + ";"
+		if len(agg.Errors()) != 0 {
+			return GetLogMessage(agg.Errors()[0])
 		}
-		return message
 	}
 
 	attr := strings.Split(err.Error(), "[SDKError]")

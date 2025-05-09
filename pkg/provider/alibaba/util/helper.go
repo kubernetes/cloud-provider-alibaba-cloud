@@ -5,7 +5,6 @@ import (
 	"github.com/alibabacloud-go/tea/tea"
 	"github.com/aliyun/alibaba-cloud-sdk-go/sdk/errors"
 	"strings"
-	"time"
 )
 
 // A PaginationResponse represents a response with pagination information
@@ -74,23 +73,4 @@ func SDKError(api string, err error) error {
 	default:
 		return err
 	}
-}
-
-func RetryOnNLBConflict(maxTry int, waitInterval time.Duration, f func() error) error {
-	var err error
-	for try := 0; try < maxTry; try++ {
-		try++
-		err = f()
-		if err != nil {
-			if strings.Contains(err.Error(), "Conflict.Lock") {
-				if waitInterval != 0 {
-					time.Sleep(waitInterval)
-				}
-				continue
-			}
-			return err
-		}
-		return nil
-	}
-	return err
 }

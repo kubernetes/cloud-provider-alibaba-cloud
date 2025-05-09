@@ -14,7 +14,6 @@ import (
 	prvd "k8s.io/cloud-provider-alibaba-cloud/pkg/provider"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/base"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/nlb"
-	prvdutil "k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/util"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/dryrun"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/util"
 	"k8s.io/klog/v2"
@@ -24,8 +23,7 @@ import (
 )
 
 const (
-	defaultListenerMaxRetry     = 3
-	defaultListenerWaitInterval = 100 * time.Millisecond
+	errorListenerOperationConflict = "Conflict.Lock"
 )
 
 func NewListenerManager(cloud prvd.Provider) *ListenerManager {
@@ -290,7 +288,7 @@ func (mgr *ListenerManager) ListListeners(reqCtx *svcCtx.RequestContext, lbId st
 
 func (mgr *ListenerManager) CreateListener(reqCtx *svcCtx.RequestContext, lbId string, local *nlbmodel.ListenerAttribute) (string, error) {
 	var jobId string
-	err := prvdutil.RetryOnNLBConflict(defaultListenerMaxRetry, defaultListenerWaitInterval, func() error {
+	err := helper.RetryOnErrorContains(errorListenerOperationConflict, func() error {
 		id, err := mgr.cloud.CreateNLBListenerAsync(reqCtx.Ctx, lbId, local)
 		if err != nil {
 			return err
@@ -418,7 +416,7 @@ func (mgr *ListenerManager) UpdateNLBListener(reqCtx *svcCtx.RequestContext, loc
 		reqCtx.Log.Info(fmt.Sprintf("update listener: %s [%d] changed, detail %s", local.ListenerProtocol, local.ListenerPort, updateDetail))
 
 		var jobId string
-		err := prvdutil.RetryOnNLBConflict(defaultListenerMaxRetry, defaultListenerWaitInterval, func() error {
+		err := helper.RetryOnErrorContains(errorListenerOperationConflict, func() error {
 			id, err := mgr.cloud.UpdateNLBListenerAsync(reqCtx.Ctx, update)
 			if err != nil {
 				return err
@@ -435,7 +433,7 @@ func (mgr *ListenerManager) UpdateNLBListener(reqCtx *svcCtx.RequestContext, loc
 
 func (mgr *ListenerManager) DeleteListener(reqCtx *svcCtx.RequestContext, lisId string) (string, error) {
 	var jobId string
-	err := prvdutil.RetryOnNLBConflict(defaultListenerMaxRetry, defaultListenerWaitInterval, func() error {
+	err := helper.RetryOnErrorContains(errorListenerOperationConflict, func() error {
 		id, err := mgr.cloud.DeleteNLBListenerAsync(reqCtx.Ctx, lisId)
 		if err != nil {
 			return err
