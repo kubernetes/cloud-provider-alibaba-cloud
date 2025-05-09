@@ -1,6 +1,8 @@
 package clbv1
 
 import (
+	"context"
+	"encoding/json"
 	"fmt"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/helper"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/service/reconcile/annotation"
@@ -581,6 +583,72 @@ func RunBackendTestCases(f *framework.Framework) {
 
 				err = f.ExpectLoadBalancerEqual(oldSvc)
 				gomega.Expect(err).To(gomega.BeNil())
+			})
+		})
+
+		ginkgo.Context("ignore-weight-update", func() {
+			ginkgo.It("should update weight without annotation", func() {
+				oldsvc, err := f.Client.KubeClient.CreateServiceByAnno(map[string]string{})
+				gomega.Expect(err).To(gomega.BeNil())
+				err = f.ExpectLoadBalancerEqual(oldsvc)
+				gomega.Expect(err).To(gomega.BeNil())
+
+				_, lb, err := f.FindLoadBalancer()
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(lb.VServerGroups).NotTo(gomega.BeEmpty())
+
+				b := lb.VServerGroups[0].Backends
+				gomega.Expect(b).NotTo(gomega.BeEmpty())
+				if b[0].Weight == 100 {
+					b[0].Weight = 1
+				} else {
+					b[0].Weight += 1
+				}
+
+				j, err := json.Marshal(b)
+				gomega.Expect(err).To(gomega.BeNil())
+				err = f.Client.CloudClient.SetVServerGroupAttribute(context.TODO(), lb.VServerGroups[0].VGroupId, string(j))
+				gomega.Expect(err).To(gomega.BeNil())
+
+				newSvc := oldsvc.DeepCopy()
+				newSvc.Annotations = map[string]string{"reconcile-timestamp": time.Now().String()}
+				newSvc, err = f.Client.KubeClient.PatchService(oldsvc, newSvc)
+				gomega.Expect(err).To(gomega.BeNil())
+				err = f.ExpectLoadBalancerEqual(newSvc)
+				gomega.Expect(err).To(gomega.BeNil())
+			})
+
+			ginkgo.It("should not update weight", func() {
+				oldsvc, err := f.Client.KubeClient.CreateServiceByAnno(map[string]string{
+					annotation.Annotation(annotation.IgnoreWeightUpdate): string(model.OnFlag),
+				})
+				gomega.Expect(err).To(gomega.BeNil())
+				err = f.ExpectLoadBalancerEqual(oldsvc)
+				gomega.Expect(err).To(gomega.BeNil())
+
+				_, lb, err := f.FindLoadBalancer()
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(lb.VServerGroups).NotTo(gomega.BeEmpty())
+
+				b := lb.VServerGroups[0].Backends
+				gomega.Expect(b).NotTo(gomega.BeEmpty())
+				if b[0].Weight == 100 {
+					b[0].Weight = 1
+				} else {
+					b[0].Weight += 1
+				}
+
+				j, err := json.Marshal(b)
+				gomega.Expect(err).To(gomega.BeNil())
+				err = f.Client.CloudClient.SetVServerGroupAttribute(context.TODO(), lb.VServerGroups[0].VGroupId, string(j))
+				gomega.Expect(err).To(gomega.BeNil())
+
+				newSvc := oldsvc.DeepCopy()
+				newSvc.Annotations["reconcile-timestamp"] = time.Now().String()
+				newSvc, err = f.Client.KubeClient.PatchService(oldsvc, newSvc)
+				gomega.Expect(err).To(gomega.BeNil())
+				err = f.ExpectLoadBalancerEqual(newSvc)
+				gomega.Expect(err).NotTo(gomega.BeNil())
 			})
 		})
 	})

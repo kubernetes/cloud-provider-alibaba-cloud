@@ -1118,6 +1118,9 @@ func setServerGroupAttributeFromAnno(sg *nlbmodel.ServerGroup, anno *annotation.
 		sg.HealthCheckConfig = healthCheckConfig
 	}
 
+	if strings.EqualFold(anno.Get(annotation.IgnoreWeightUpdate), string(model.OnFlag)) {
+		sg.IgnoreWeightUpdate = true
+	}
 	return nil
 }
 
@@ -1160,7 +1163,7 @@ func diff(remote, local *nlbmodel.ServerGroup) (
 	for _, l := range local.Servers {
 		for _, r := range remote.Servers {
 			if isServerEqual(l, r) {
-				if l.Port != r.Port || l.Weight != r.Weight || l.Description != r.Description {
+				if l.Port != r.Port || (!local.IgnoreWeightUpdate && l.Weight != r.Weight) || l.Description != r.Description {
 					updates = append(updates, l)
 				}
 			}

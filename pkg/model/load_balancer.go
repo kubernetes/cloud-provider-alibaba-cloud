@@ -192,6 +192,7 @@ type VServerGroup struct {
 	Backends                        []BackendAttribute
 	InitialBackends                 []BackendAttribute
 	ContainsPotentialReadyEndpoints bool
+	IgnoreWeightUpdate              bool
 }
 
 func (v *VServerGroup) BackendInfo() string {

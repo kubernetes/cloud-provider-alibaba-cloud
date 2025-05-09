@@ -43,6 +43,7 @@ const (
 	Scheduler              = AnnotationLoadBalancerPrefix + "scheduler"                // Scheduler slb scheduler
 	ConnectionDrain        = AnnotationLoadBalancerPrefix + "connection-drain"         // ConnectionDrain connection drain
 	ConnectionDrainTimeout = AnnotationLoadBalancerPrefix + "connection-drain-timeout" // ConnectionDrainTimeout connection drain timeout
+	IgnoreWeightUpdate     = AnnotationLoadBalancerPrefix + "ignore-weight-update"
 
 	PreserveLBOnDelete = AnnotationLoadBalancerPrefix + "preserve-lb-on-delete"
 )
