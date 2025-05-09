@@ -186,14 +186,9 @@ func (e *ECSProvider) DescribeNetworkInterfaces(vpcId string, ips []string, ipVe
 		} else {
 			req.PrivateIpAddress = &privateIpAddress
 		}
-		next := &util.Pagination{
-			PageNumber: 1,
-			PageSize:   100,
-		}
+		req.MaxResults = requests.NewInteger(100)
 
 		for {
-			req.PageSize = requests.NewInteger(next.PageSize)
-			req.PageNumber = requests.NewInteger(next.PageNumber)
 			resp, err := e.auth.ECS.DescribeNetworkInterfaces(req)
 			if err != nil {
 				return result, err
@@ -202,7 +197,6 @@ func (e *ECSProvider) DescribeNetworkInterfaces(vpcId string, ips []string, ipVe
 				resp.RequestId, "DescribeNetworkInterfaces", privateIpAddress, begin, last, ipVersionType)
 
 			for _, eni := range resp.NetworkInterfaceSets.NetworkInterfaceSet {
-
 				if ipVersionType == model.IPv6 {
 					for _, ipv6 := range eni.Ipv6Sets.Ipv6Set {
 						result[ipv6.Ipv6Address] = eni.NetworkInterfaceId
@@ -214,15 +208,10 @@ func (e *ECSProvider) DescribeNetworkInterfaces(vpcId string, ips []string, ipVe
 				}
 			}
 
-			pageResult := &util.PaginationResult{
-				PageNumber: resp.PageNumber,
-				PageSize:   resp.PageSize,
-				TotalCount: resp.TotalCount,
-			}
-			next = pageResult.NextPage()
-			if next == nil {
+			if resp.NextToken == "" {
 				break
 			}
+			req.NextToken = resp.NextToken
 		}
 
 	}
