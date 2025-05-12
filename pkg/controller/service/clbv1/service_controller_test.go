@@ -225,7 +225,7 @@ func getMockCloudProvider() prvd.Provider {
 	}
 }
 
-func getTestVGroupManager() *VGroupManager {
+func getTestVGroupManager() (*VGroupManager, error) {
 	return NewVGroupManager(getFakeKubeClient(), getMockCloudProvider())
 }
 
@@ -272,7 +272,7 @@ func getReconcileService() *ReconcileService {
 
 	slbManager := NewLoadBalancerManager(recon.cloud)
 	listenerManager := NewListenerManager(recon.cloud)
-	vGroupManager := NewVGroupManager(recon.kubeClient, recon.cloud)
+	vGroupManager, _ := NewVGroupManager(recon.kubeClient, recon.cloud)
 	recon.builder = NewModelBuilder(slbManager, listenerManager, vGroupManager)
 	recon.applier = NewModelApplier(slbManager, listenerManager, vGroupManager)
 

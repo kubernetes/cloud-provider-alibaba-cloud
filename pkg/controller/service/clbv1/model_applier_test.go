@@ -18,13 +18,17 @@ import (
 )
 
 func TestCreateLB(t *testing.T) {
+	vgm, err := getTestVGroupManager()
+	if err != nil {
+		t.Error(err)
+	}
 	builder := &ModelBuilder{
 		LoadBalancerMgr: NewLoadBalancerManager(getMockCloudProvider()),
 		ListenerMgr:     NewListenerManager(getMockCloudProvider()),
-		VGroupMgr:       getTestVGroupManager(),
+		VGroupMgr:       vgm,
 	}
 	applier := NewModelApplier(NewLoadBalancerManager(getMockCloudProvider()),
-		NewListenerManager(getMockCloudProvider()), getTestVGroupManager())
+		NewListenerManager(getMockCloudProvider()), vgm)
 
 	// create new lb
 	svc := getDefaultService()
@@ -72,14 +76,18 @@ func TestCreateLB(t *testing.T) {
 }
 
 func TestSyncLB(t *testing.T) {
+	vgm, err := getTestVGroupManager()
+	if err != nil {
+		t.Error(err)
+	}
 	builder := &ModelBuilder{
 		LoadBalancerMgr: NewLoadBalancerManager(getMockCloudProvider()),
 		ListenerMgr:     NewListenerManager(getMockCloudProvider()),
-		VGroupMgr:       getTestVGroupManager(),
+		VGroupMgr:       vgm,
 	}
 
 	applier := NewModelApplier(NewLoadBalancerManager(getMockCloudProvider()),
-		NewListenerManager(getMockCloudProvider()), getTestVGroupManager())
+		NewListenerManager(getMockCloudProvider()), vgm)
 
 	svc := getDefaultService()
 	svc.Spec.Ports = []v1.ServicePort{
@@ -167,14 +175,18 @@ func TestSyncLB(t *testing.T) {
 }
 
 func TestDeleteLB(t *testing.T) {
+	vgm, err := getTestVGroupManager()
+	if err != nil {
+		t.Error(err)
+	}
 	builder := &ModelBuilder{
 		LoadBalancerMgr: NewLoadBalancerManager(getMockCloudProvider()),
 		ListenerMgr:     NewListenerManager(getMockCloudProvider()),
-		VGroupMgr:       getTestVGroupManager(),
+		VGroupMgr:       vgm,
 	}
 
 	applier := NewModelApplier(NewLoadBalancerManager(getMockCloudProvider()),
-		NewListenerManager(getMockCloudProvider()), getTestVGroupManager())
+		NewListenerManager(getMockCloudProvider()), vgm)
 
 	// delete auto-created lb
 	svc := getDefaultService()
@@ -210,28 +222,36 @@ func TestDeleteLB(t *testing.T) {
 }
 
 func TestBuildRemoteModel(t *testing.T) {
+	vgm, err := getTestVGroupManager()
+	if err != nil {
+		t.Error(err)
+	}
 	builder := &ModelBuilder{
 		LoadBalancerMgr: NewLoadBalancerManager(getMockCloudProvider()),
 		ListenerMgr:     NewListenerManager(getMockCloudProvider()),
-		VGroupMgr:       getTestVGroupManager(),
+		VGroupMgr:       vgm,
 	}
 	svc := getDefaultService()
 	svc.UID = types.UID(SvcUID)
-	_, err := builder.Instance(RemoteModel).Build(getReqCtx(svc))
+	_, err = builder.Instance(RemoteModel).Build(getReqCtx(svc))
 	if err != nil {
 		t.Error(err)
 	}
 }
 
 func TestSyncVGroups(t *testing.T) {
+	vgm, err := getTestVGroupManager()
+	if err != nil {
+		t.Error(err)
+	}
 	builder := &ModelBuilder{
 		LoadBalancerMgr: NewLoadBalancerManager(getMockCloudProvider()),
 		ListenerMgr:     NewListenerManager(getMockCloudProvider()),
-		VGroupMgr:       getTestVGroupManager(),
+		VGroupMgr:       vgm,
 	}
 
 	applier := NewModelApplier(NewLoadBalancerManager(getMockCloudProvider()),
-		NewListenerManager(getMockCloudProvider()), getTestVGroupManager())
+		NewListenerManager(getMockCloudProvider()), vgm)
 
 	svc := getDefaultService()
 	svc.Spec.Ports = []v1.ServicePort{

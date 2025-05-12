@@ -31,7 +31,7 @@ func NewDefaultFinalizerManager(kclient client.Client) *defaultFinalizerManager 
 }
 
 func (m *defaultFinalizerManager) AddFinalizers(ctx context.Context, obj APIObject, finalizers ...string) error {
-	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		if err := m.kubeClient.Get(ctx, util.NamespacedName(obj), obj); err != nil {
 			return err
 		}
@@ -52,7 +52,7 @@ func (m *defaultFinalizerManager) AddFinalizers(ctx context.Context, obj APIObje
 }
 
 func (m *defaultFinalizerManager) RemoveFinalizers(ctx context.Context, obj APIObject, finalizers ...string) error {
-	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		if err := m.kubeClient.Get(ctx, util.NamespacedName(obj), obj); err != nil {
 			return err
 		}

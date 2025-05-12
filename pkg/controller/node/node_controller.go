@@ -10,7 +10,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/record"
-	"k8s.io/client-go/util/retry"
 	ctrlCfg "k8s.io/cloud-provider-alibaba-cloud/pkg/config"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/context/shared"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/helper"
@@ -24,8 +23,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
-	"strings"
 	"time"
+)
+
+const (
+	errorOperationConflict = "InvalidOperation.Conflict"
 )
 
 var log = klogr.New().WithName("node-controller")
@@ -409,9 +411,7 @@ func (m *ReconcileNode) disableNetworkInterfaceSourceDestCheck(enis []eniInfo) (
 
 	var failed []eniInfo
 	for _, d := range toDisable {
-		err := retry.OnError(retry.DefaultRetry, func(err error) bool {
-			return strings.Contains(err.Error(), "InvalidOperation.Conflict")
-		}, func() error {
+		err := helper.RetryOnErrorContains(errorOperationConflict, func() error {
 			return m.cloud.ModifyNetworkInterfaceSourceDestCheck(d.ENI, false)
 		})
 		if err != nil {

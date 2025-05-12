@@ -3,6 +3,7 @@ package nlbv2
 import (
 	"context"
 	"fmt"
+
 	v1 "k8s.io/api/core/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	ctrlCfg "k8s.io/cloud-provider-alibaba-cloud/pkg/config"
@@ -189,12 +190,16 @@ func (m *ModelApplier) applyLoadBalancerAttribute(reqCtx *svcCtx.RequestContext,
 }
 
 func (m *ModelApplier) applyVGroups(reqCtx *svcCtx.RequestContext, local, remote *nlbmodel.NetworkLoadBalancer) error {
-	var errs []error
+	var updateActions []serverGroupAction
 	updatedServerGroups := map[string]bool{}
 
 	for i := range local.ServerGroups {
 		found := false
 		var old nlbmodel.ServerGroup
+		sgKey := fmt.Sprintf("name-%s", local.ServerGroups[i].ServerGroupName)
+		if local.ServerGroups[i].ServerGroupId != "" {
+			sgKey = fmt.Sprintf("id-%s", local.ServerGroups[i].ServerGroupId)
+		}
 		for _, rv := range remote.ServerGroups {
 			// for reuse vgroup case, find by vgroup id first
 			if local.ServerGroups[i].ServerGroupId != "" &&
@@ -213,7 +218,7 @@ func (m *ModelApplier) applyVGroups(reqCtx *svcCtx.RequestContext, local, remote
 			}
 		}
 
-		if updatedServerGroups[local.ServerGroups[i].ServerGroupId] {
+		if updatedServerGroups[sgKey] {
 			reqCtx.Log.Info("already updated server group, skip",
 				"vgroupID", local.ServerGroups[i].ServerGroupId, "vgroupName", local.ServerGroups[i].ServerGroupId)
 			continue
@@ -233,11 +238,12 @@ func (m *ModelApplier) applyVGroups(reqCtx *svcCtx.RequestContext, local, remote
 					"sgId", old.ServerGroupId, "sgName", old.ServerGroupName)
 				found = false
 			} else {
-				if err := m.sgMgr.UpdateServerGroup(reqCtx, local.ServerGroups[i], &old); err != nil {
-					errs = append(errs, fmt.Errorf("EnsureServerGroupUpdated error: %s", err.Error()))
-					continue
-				}
-				updatedServerGroups[local.ServerGroups[i].ServerGroupId] = true
+				updateActions = append(updateActions, serverGroupAction{
+					Action: serverGroupActionUpdate,
+					Local:  local.ServerGroups[i],
+					Remote: &old,
+				})
+				updatedServerGroups[sgKey] = true
 			}
 		}
 
@@ -247,22 +253,17 @@ func (m *ModelApplier) applyVGroups(reqCtx *svcCtx.RequestContext, local, remote
 			if remote.LoadBalancerAttribute.VpcId != "" {
 				local.ServerGroups[i].VPCId = remote.LoadBalancerAttribute.VpcId
 			}
-			// to avoid add too many backends in one action, create server group with empty backends,
-			// then use AddNLBServers to add backends
-			if err := m.sgMgr.CreateServerGroup(reqCtx, local.ServerGroups[i]); err != nil {
-				errs = append(errs, fmt.Errorf("EnsureServerGroupCreated error: %s", err.Error()))
-				continue
-			}
-			if err := m.sgMgr.BatchAddServers(reqCtx, local.ServerGroups[i],
-				local.ServerGroups[i].Servers); err != nil {
-				errs = append(errs, fmt.Errorf("BatchAddServers error: %s", err.Error()))
-				continue
-			}
+			updateActions = append(updateActions, serverGroupAction{
+				Action: serverGroupActionCreateAndAddBackendServers,
+				Local:  local.ServerGroups[i],
+				Remote: local.ServerGroups[i],
+			})
 			remote.ServerGroups = append(remote.ServerGroups, local.ServerGroups[i])
-			updatedServerGroups[local.ServerGroups[i].ServerGroupId] = true
+			updatedServerGroups[sgKey] = true
 		}
 	}
 
+	errs := m.sgMgr.ParallelUpdateServerGroups(reqCtx, updateActions)
 	return utilerrors.NewAggregate(errs)
 }
 
@@ -273,6 +274,8 @@ func (m *ModelApplier) applyListeners(reqCtx *svcCtx.RequestContext, local, remo
 			return nil
 		}
 	}
+
+	var actions []listenerAction
 
 	// associate listener and vGroup
 	for i := range local.Listeners {
@@ -303,9 +306,10 @@ func (m *ModelApplier) applyListeners(reqCtx *svcCtx.RequestContext, local, remo
 			}
 
 			reqCtx.Log.Info(fmt.Sprintf("delete listener: %s [%s]", r.ListenerProtocol, r.PortString()))
-			if err := m.lisMgr.DeleteListener(reqCtx, r.ListenerId); err != nil {
-				return fmt.Errorf("EnsureListenerDeleted error: %s", err.Error())
-			}
+			actions = append(actions, listenerAction{
+				Action: listenerActionDelete,
+				Remote: r,
+			})
 		}
 	}
 
@@ -314,22 +318,27 @@ func (m *ModelApplier) applyListeners(reqCtx *svcCtx.RequestContext, local, remo
 		for j := range remote.Listeners {
 			if local.Listeners[i].ListenerId == remote.Listeners[j].ListenerId {
 				found = true
-				if err := m.lisMgr.UpdateNLBListener(reqCtx, local.Listeners[i], remote.Listeners[j]); err != nil {
-					return fmt.Errorf("EnsureListenerUpdated error: %s", err.Error())
-				}
+				actions = append(actions, listenerAction{
+					Action: listenerActionUpdate,
+					Local:  local.Listeners[i],
+					Remote: remote.Listeners[j],
+				})
 			}
 		}
 
 		// create
 		if !found {
 			reqCtx.Log.Info(fmt.Sprintf("create listener: %s [%s]", local.Listeners[i].ListenerProtocol, local.Listeners[i].PortString()))
-			if err := m.lisMgr.CreateListener(reqCtx, remote.LoadBalancerAttribute.LoadBalancerId, local.Listeners[i]); err != nil {
-				return fmt.Errorf("EnsureListenerCreated error: %s", err.Error())
-			}
+			actions = append(actions, listenerAction{
+				Action: listenerActionCreate,
+				Local:  local.Listeners[i],
+				LBId:   remote.LoadBalancerAttribute.LoadBalancerId,
+			})
 		}
 	}
 
-	return nil
+	errs := m.lisMgr.ParallelUpdateListeners(reqCtx, actions)
+	return utilerrors.NewAggregate(errs)
 }
 
 func (m *ModelApplier) cleanup(reqCtx *svcCtx.RequestContext, local, remote *nlbmodel.NetworkLoadBalancer) error {

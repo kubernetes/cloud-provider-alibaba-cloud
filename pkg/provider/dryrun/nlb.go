@@ -2,6 +2,7 @@ package dryrun
 
 import (
 	"context"
+	"time"
 
 	nlbmodel "k8s.io/cloud-provider-alibaba-cloud/pkg/model/nlb"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/model/tag"
@@ -21,6 +22,21 @@ var _ prvd.INLB = &DryRunNLB{}
 type DryRunNLB struct {
 	auth *base.ClientMgr
 	nlb  *nlb.NLBProvider
+}
+
+func (d DryRunNLB) DeleteNLBListenerAsync(ctx context.Context, listenerId string) (string, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (d DryRunNLB) UpdateNLBListenerAsync(ctx context.Context, lis *nlbmodel.ListenerAttribute) (string, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (d DryRunNLB) CreateNLBListenerAsync(ctx context.Context, lbId string, lis *nlbmodel.ListenerAttribute) (string, error) {
+	//TODO implement me
+	panic("implement me")
 }
 
 func (d DryRunNLB) UpdateNLBSecurityGroupIds(ctx context.Context, mdl *nlbmodel.NetworkLoadBalancer, added, removed []string) error {
@@ -164,6 +180,46 @@ func (d DryRunNLB) UpdateNLBIPv6AddressType(ctx context.Context, mdl *nlbmodel.N
 }
 
 func (d DryRunNLB) GetNLBServerGroup(ctx context.Context, sgId string) (*nlbmodel.ServerGroup, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (d DryRunNLB) CreateNLBServerGroupAsync(ctx context.Context, sg *nlbmodel.ServerGroup) (string, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (d DryRunNLB) DeleteNLBServerGroupAsync(ctx context.Context, sgId string) (string, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (d DryRunNLB) UpdateNLBServerGroupAsync(ctx context.Context, sg *nlbmodel.ServerGroup) (string, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (d DryRunNLB) AddNLBServersAsync(ctx context.Context, sgId string, backends []nlbmodel.ServerGroupServer) (string, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (d DryRunNLB) RemoveNLBServersAsync(ctx context.Context, sgId string, backends []nlbmodel.ServerGroupServer) (string, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (d DryRunNLB) UpdateNLBServersAsync(ctx context.Context, sgId string, backends []nlbmodel.ServerGroupServer) (string, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (*DryRunCloud) CreateNLBListenerAsync(ctx context.Context, lbId string, lis *nlbmodel.ListenerAttribute) (string, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (*DryRunNLB) BatchWaitJobsFinish(ctx context.Context, api string, jobIds []string, args ...time.Duration) error {
 	//TODO implement me
 	panic("implement me")
 }

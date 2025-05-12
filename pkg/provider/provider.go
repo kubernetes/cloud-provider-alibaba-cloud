@@ -241,15 +241,26 @@ type INLB interface {
 	CreateNLBServerGroup(ctx context.Context, sg *nlbmodel.ServerGroup) error
 	DeleteNLBServerGroup(ctx context.Context, sgId string) error
 	UpdateNLBServerGroup(ctx context.Context, sg *nlbmodel.ServerGroup) error
+	CreateNLBServerGroupAsync(ctx context.Context, sg *nlbmodel.ServerGroup) (string, error)
+	DeleteNLBServerGroupAsync(ctx context.Context, sgId string) (string, error)
+	UpdateNLBServerGroupAsync(ctx context.Context, sg *nlbmodel.ServerGroup) (string, error)
 	AddNLBServers(ctx context.Context, sgId string, backends []nlbmodel.ServerGroupServer) error
 	RemoveNLBServers(ctx context.Context, sgId string, backends []nlbmodel.ServerGroupServer) error
 	UpdateNLBServers(ctx context.Context, sgId string, backends []nlbmodel.ServerGroupServer) error
+	AddNLBServersAsync(ctx context.Context, sgId string, backends []nlbmodel.ServerGroupServer) (string, error)
+	RemoveNLBServersAsync(ctx context.Context, sgId string, backends []nlbmodel.ServerGroupServer) (string, error)
+	UpdateNLBServersAsync(ctx context.Context, sgId string, backends []nlbmodel.ServerGroupServer) (string, error)
 
 	// Listener
-
 	ListNLBListeners(ctx context.Context, lbId string) ([]*nlbmodel.ListenerAttribute, error)
 	CreateNLBListener(ctx context.Context, lbId string, lis *nlbmodel.ListenerAttribute) error
 	UpdateNLBListener(ctx context.Context, lis *nlbmodel.ListenerAttribute) error
 	DeleteNLBListener(ctx context.Context, listenerId string) error
 	StartNLBListener(ctx context.Context, listenerId string) error
+	CreateNLBListenerAsync(ctx context.Context, lbId string, lis *nlbmodel.ListenerAttribute) (string, error)
+	UpdateNLBListenerAsync(ctx context.Context, lis *nlbmodel.ListenerAttribute) (string, error)
+	DeleteNLBListenerAsync(ctx context.Context, listenerId string) (string, error)
+
+	// Jobs
+	BatchWaitJobsFinish(ctx context.Context, api string, jobIds []string, args ...time.Duration) error
 }
