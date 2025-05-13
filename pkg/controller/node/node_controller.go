@@ -331,6 +331,10 @@ func (m *ReconcileNode) syncNode(nodes []corev1.Node, configCloudRoute bool) err
 			Namespace: "",
 		}
 
+		if cloudNode == nil {
+			continue
+		}
+
 		cloudNode.Addresses = setHostnameAddress(node, cloudNode.Addresses)
 		// If nodeIP was suggested by user, ensure that
 		// it can be found in the cloud as well (consistent with the behaviour in kubelet)
