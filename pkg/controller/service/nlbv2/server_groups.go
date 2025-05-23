@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/service/reconcile/parallel"
 	"strconv"
 	"strings"
@@ -67,17 +68,15 @@ type serverGroupAction struct {
 }
 
 func (mgr *ServerGroupManager) BuildLocalModel(reqCtx *svcCtx.RequestContext, mdl *nlbmodel.NetworkLoadBalancer) error {
+	var sgs []*nlbmodel.ServerGroup
 
 	candidates, err := reconbackend.NewEndpointWithENI(reqCtx, mgr.kubeClient)
 	if err != nil {
 		return err
 	}
 
-	sgs := make([]*nlbmodel.ServerGroup, len(mdl.Listeners))
-	errs := make([]error, len(mdl.Listeners))
-	containsPotentialReadyBackends := make([]bool, len(mdl.Listeners))
-	parallel.Parallelize(reqCtx.Ctx, ctrlCfg.ControllerCFG.MaxConcurrentActions, len(mdl.Listeners), func(i int) {
-		lis := mdl.Listeners[i]
+	containsPotentialReadyBackends := false
+	for _, lis := range mdl.Listeners {
 		sg := &nlbmodel.ServerGroup{
 			VPCId:       mgr.vpcId,
 			ServicePort: lis.ServicePort,
@@ -87,41 +86,61 @@ func (mgr *ServerGroupManager) BuildLocalModel(reqCtx *svcCtx.RequestContext, md
 		if candidates.AddressIPVersion == model.IPv6 {
 			sg.AddressIPVersion = string(model.DualStack)
 		}
-		if lis.ListenerPort != 0 {
-			sg.NamedKey = getServerGroupNamedKey(reqCtx.Service, sg.Protocol, lis.ServicePort)
-		} else {
-			sg.AnyPortEnabled = true
-			sg.HealthCheckConfig = &nlbmodel.HealthCheckConfig{
-				HealthCheckEnabled:     tea.Bool(true),
-				HealthCheckConnectPort: sg.ServicePort.TargetPort.IntVal,
-			}
-			sg.NamedKey = getAnyPortServerGroupNamedKey(reqCtx.Service, sg.Protocol, lis.StartPort, lis.EndPort)
-		}
+		sg.NamedKey = getServerGroupNamedKey(reqCtx.Service, sg.Protocol, lis.ServicePort)
 		sg.ServerGroupName = sg.NamedKey.Key()
 		if err := setServerGroupAttributeFromAnno(sg, reqCtx.Anno); err != nil {
-			errs[i] = err
-			return
+			return err
 		}
 		cpr, err := mgr.setServerGroupServers(reqCtx, sg, candidates, mdl.LoadBalancerAttribute.IsUserManaged)
 		if err != nil {
-			errs[i] = fmt.Errorf("set ServerGroup for port %d error: %s", lis.ServicePort.Port, err.Error())
-			return
+			return fmt.Errorf("set ServerGroup for port %d error: %s", lis.ServicePort.Port, err.Error())
 		}
-		sgs[i] = sg
-		containsPotentialReadyBackends[i] = cpr
-	})
+		sgs = append(sgs, sg)
+		containsPotentialReadyBackends = containsPotentialReadyBackends || cpr
+	}
 
-	cpr := false
-	for _, c := range containsPotentialReadyBackends {
-		if c {
-			cpr = true
-			break
-		}
+	err = mgr.updateServerGroupENIBackendID(reqCtx, sgs, candidates.AddressIPVersion)
+	if err != nil {
+		return err
 	}
 
 	mdl.ServerGroups = sgs
-	mdl.ContainsPotentialReadyEndpoints = cpr
-	return utilerrors.NewAggregate(errs)
+	mdl.ContainsPotentialReadyEndpoints = containsPotentialReadyBackends
+	return nil
+}
+
+func (mgr *ServerGroupManager) updateServerGroupENIBackendID(reqCtx *svcCtx.RequestContext, sgs []*nlbmodel.ServerGroup, ipVersion model.AddressIPVersionType) error {
+	eniIPs := sets.Set[string]{}
+	for _, sg := range sgs {
+		for _, s := range sg.Servers {
+			if s.ServerType == nlbmodel.EniServerType {
+				eniIPs.Insert(s.ServerIp)
+			}
+		}
+	}
+
+	ips := eniIPs.UnsortedList()
+	if len(ips) == 0 {
+		return nil
+	}
+	result, err := mgr.cloud.DescribeNetworkInterfaces(mgr.vpcId, ips, ipVersion)
+	if err != nil {
+		return fmt.Errorf("call DescribeNetworkInterfaces: %s", err.Error())
+	}
+
+	for _, sg := range sgs {
+		for i := range sg.Servers {
+			if sg.Servers[i].ServerType == nlbmodel.EniServerType {
+				eniid, ok := result[sg.Servers[i].ServerIp]
+				if !ok {
+					return fmt.Errorf("can not find eniid for ip %s in vpc %s", sg.Servers[i].ServerIp, mgr.vpcId)
+				}
+				sg.Servers[i].ServerId = eniid
+			}
+		}
+	}
+
+	return nil
 }
 
 func (mgr *ServerGroupManager) ListNLBServerGroups(reqCtx *svcCtx.RequestContext) ([]*nlbmodel.ServerGroup, error) {
@@ -937,23 +956,8 @@ func updateENIBackends(mgr *ServerGroupManager, backends []nlbmodel.ServerGroupS
 		return backends, nil
 	}
 
-	var ips []string
-	for _, b := range backends {
-		ips = append(ips, b.ServerIp)
-	}
-
-	result, err := mgr.cloud.DescribeNetworkInterfaces(mgr.vpcId, ips, ipVersion)
-	if err != nil {
-		return nil, fmt.Errorf("call DescribeNetworkInterfaces: %s", err.Error())
-	}
-
 	for i := range backends {
-		eniid, ok := result[backends[i].ServerIp]
-		if !ok {
-			return nil, fmt.Errorf("can not find eniid for ip %s in vpc %s", backends[i].ServerIp, mgr.vpcId)
-		}
 		// for ENI backend type, port should be set to targetPort (default value), no need to update
-		backends[i].ServerId = eniid
 		backends[i].ServerType = nlbmodel.EniServerType
 	}
 	return backends, nil

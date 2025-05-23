@@ -8,6 +8,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	ctrlCfg "k8s.io/cloud-provider-alibaba-cloud/pkg/config"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/service/reconcile/annotation"
@@ -35,6 +36,7 @@ func NewVGroupManager(kubeClient client.Client, cloud prvd.Provider) (*VGroupMan
 	if err != nil {
 		return nil, err
 	}
+
 	return &VGroupManager{
 		kubeClient: kubeClient,
 		cloud:      cloud,
@@ -69,36 +71,84 @@ func (mgr *VGroupManager) BuildLocalModel(reqCtx *svcCtx.RequestContext, m *mode
 		return err
 	}
 
-	vpcCIDRs, err := mgr.cloud.DescribeVpcCIDRBlock(reqCtx.Ctx, mgr.vpcId, candidates.AddressIPVersion)
-	if err != nil {
-		return fmt.Errorf("get vpc cidr error: %s", err.Error())
+	var vgs []model.VServerGroup
+	containsPotentialReadyEndpoints := false
+	for _, port := range reqCtx.Service.Spec.Ports {
+		vg, cpr, err := mgr.buildVGroupForServicePort(reqCtx, port, candidates, m.LoadBalancerAttribute.IsUserManaged)
+		if err != nil {
+			return fmt.Errorf("build vgroup for port %d error: %s", port.Port, err.Error())
+		}
+		vgs = append(vgs, vg)
+		containsPotentialReadyEndpoints = containsPotentialReadyEndpoints || cpr
 	}
 
-	vgs := make([]model.VServerGroup, len(reqCtx.Service.Spec.Ports))
-	errs := make([]error, len(reqCtx.Service.Spec.Ports))
-	containsPotentialReadyEndpoints := make([]bool, len(reqCtx.Service.Spec.Ports))
-	parallel.Parallelize(reqCtx.Ctx, ctrlCfg.ControllerCFG.MaxConcurrentActions, len(vgs), func(i int) {
-		port := reqCtx.Service.Spec.Ports[i]
-		vg, cpr, err := mgr.buildVGroupForServicePort(reqCtx, vpcCIDRs, port, candidates, m.LoadBalancerAttribute.IsUserManaged)
-		if err != nil {
-			errs[i] = fmt.Errorf("build vgroup for port %d error: %s", port.Port, err.Error())
-			return
-		}
-		vgs[i] = vg
-		containsPotentialReadyEndpoints[i] = cpr
-	})
-
-	cpr := false
-	for _, c := range containsPotentialReadyEndpoints {
-		if c {
-			cpr = true
-			break
-		}
+	err = mgr.updateVServerGroupENIBackendID(reqCtx, vgs, candidates.AddressIPVersion)
+	if err != nil {
+		return err
 	}
 
 	m.VServerGroups = vgs
-	m.ContainsPotentialReadyEndpoints = cpr
-	return utilerrors.NewAggregate(errs)
+	m.ContainsPotentialReadyEndpoints = containsPotentialReadyEndpoints
+	return nil
+}
+
+func (mgr *VGroupManager) updateVServerGroupENIBackendID(reqCtx *svcCtx.RequestContext, vgs []model.VServerGroup, ipVersion model.AddressIPVersionType) error {
+	eniIPs := sets.Set[string]{}
+	for _, vg := range vgs {
+		for _, b := range vg.Backends {
+			if b.Type == model.ENIBackendType {
+				eniIPs.Insert(b.ServerIp)
+			}
+		}
+	}
+
+	ips := eniIPs.UnsortedList()
+	if len(ips) == 0 {
+		return nil
+	}
+	result, err := mgr.cloud.DescribeNetworkInterfaces(mgr.vpcId, ips, ipVersion)
+	if err != nil {
+		return fmt.Errorf("call DescribeNetworkInterfaces: %s", err.Error())
+	}
+
+	var vpcCIDRs []*net.IPNet
+	for i := range vgs {
+		var filteredBackends []model.BackendAttribute
+		var skipIPs []string
+		for _, b := range vgs[i].Backends {
+			if b.Type == model.ENIBackendType {
+				eniid, ok := result[b.ServerIp]
+				if !ok {
+					if vpcCIDRs == nil {
+						vpcCIDRs, err = mgr.cloud.DescribeVpcCIDRBlock(reqCtx.Ctx, mgr.vpcId, ipVersion)
+						if err != nil {
+							return fmt.Errorf("call DescribeVpcCIDRBlock: %s", err.Error())
+						}
+					}
+					if containsIP(vpcCIDRs, b.ServerIp) {
+						return fmt.Errorf("can not find eniid for ip %s in vpc %s", b.ServerIp, mgr.vpcId)
+					} else {
+						skipIPs = append(skipIPs, b.ServerIp)
+						continue
+					}
+				}
+				b.ServerId = eniid
+			}
+			filteredBackends = append(filteredBackends, b)
+		}
+		vgs[i].Backends = filteredBackends
+		if len(skipIPs) > 0 {
+			reqCtx.Log.Info(fmt.Sprintf("warning: filter pods by vpc cidr %+v, podIPs=%+v", vpcCIDRs, skipIPs))
+			reqCtx.Recorder.Event(
+				reqCtx.Service,
+				v1.EventTypeNormal,
+				helper.SkipSyncBackends,
+				fmt.Sprintf("Not sync pods [%s] whose ip is not in vpc cidrs", strings.Join(skipIPs, ",")),
+			)
+		}
+	}
+
+	return nil
 }
 
 func (mgr *VGroupManager) BuildRemoteModel(reqCtx *svcCtx.RequestContext, m *model.LoadBalancer) error {
@@ -386,7 +436,7 @@ func isReusedVGroup(reusedVgIDs []string, vGroupId string) bool {
 	return false
 }
 
-func (mgr *VGroupManager) buildVGroupForServicePort(reqCtx *svcCtx.RequestContext, vpcCIDRs []*net.IPNet,
+func (mgr *VGroupManager) buildVGroupForServicePort(reqCtx *svcCtx.RequestContext,
 	port v1.ServicePort, candidates *backend.EndpointWithENI, isUserManagedLB bool) (model.VServerGroup, bool, error) {
 
 	vg := model.VServerGroup{
@@ -446,19 +496,19 @@ func (mgr *VGroupManager) buildVGroupForServicePort(reqCtx *svcCtx.RequestContex
 	switch candidates.TrafficPolicy {
 	case helper.ENITrafficPolicy:
 		reqCtx.Log.Info(fmt.Sprintf("eni mode, build backends for %s", vg.NamedKey))
-		backends, err = mgr.buildENIBackends(reqCtx, vpcCIDRs, candidates, initialBackends, vg)
+		backends, err = mgr.buildENIBackends(reqCtx, candidates, initialBackends, vg)
 		if err != nil {
 			return vg, false, fmt.Errorf("build eni backends error: %s", err.Error())
 		}
 	case helper.LocalTrafficPolicy:
 		reqCtx.Log.Info(fmt.Sprintf("local mode, build backends for %s", vg.NamedKey))
-		backends, err = mgr.buildLocalBackends(reqCtx, vpcCIDRs, candidates, initialBackends, vg)
+		backends, err = mgr.buildLocalBackends(reqCtx, candidates, initialBackends, vg)
 		if err != nil {
 			return vg, false, fmt.Errorf("build local backends error: %s", err.Error())
 		}
 	case helper.ClusterTrafficPolicy:
 		reqCtx.Log.Info(fmt.Sprintf("cluster mode, build backends for %s", vg.NamedKey))
-		backends, err = mgr.buildClusterBackends(reqCtx, vpcCIDRs, candidates, initialBackends, vg)
+		backends, err = mgr.buildClusterBackends(reqCtx, candidates, initialBackends, vg)
 		if err != nil {
 			return vg, false, fmt.Errorf("build cluster backends error: %s", err.Error())
 		}
@@ -681,13 +731,13 @@ func (mgr *VGroupManager) setBackendsFromEndpointSlices(reqCtx *svcCtx.RequestCo
 	return backends, containsPotentialReadyEndpoints, nil
 }
 
-func (mgr *VGroupManager) buildENIBackends(reqCtx *svcCtx.RequestContext, vpcCIDRs []*net.IPNet,
-	candidates *backend.EndpointWithENI, backends []model.BackendAttribute, vgroup model.VServerGroup) ([]model.BackendAttribute, error) {
+func (mgr *VGroupManager) buildENIBackends(reqCtx *svcCtx.RequestContext, candidates *backend.EndpointWithENI,
+	backends []model.BackendAttribute, vgroup model.VServerGroup) ([]model.BackendAttribute, error) {
 	if len(backends) == 0 {
 		return nil, nil
 	}
 
-	backends, err := updateENIBackends(reqCtx, mgr, vpcCIDRs, backends, candidates.AddressIPVersion)
+	backends, err := updateENIBackends(reqCtx, mgr, backends, candidates.AddressIPVersion)
 	if err != nil {
 		return backends, err
 	}
@@ -695,8 +745,8 @@ func (mgr *VGroupManager) buildENIBackends(reqCtx *svcCtx.RequestContext, vpcCID
 	return setWeightBackends(helper.ENITrafficPolicy, backends, vgroup.VGroupWeight), nil
 }
 
-func (mgr *VGroupManager) buildLocalBackends(reqCtx *svcCtx.RequestContext, vpcCIDRs []*net.IPNet,
-	candidates *backend.EndpointWithENI, initBackends []model.BackendAttribute, vgroup model.VServerGroup) ([]model.BackendAttribute, error) {
+func (mgr *VGroupManager) buildLocalBackends(reqCtx *svcCtx.RequestContext, candidates *backend.EndpointWithENI,
+	initBackends []model.BackendAttribute, vgroup model.VServerGroup) ([]model.BackendAttribute, error) {
 	var (
 		ecsBackends, eciBackends []model.BackendAttribute
 		err                      error
@@ -743,7 +793,7 @@ func (mgr *VGroupManager) buildLocalBackends(reqCtx *svcCtx.RequestContext, vpcC
 	// 2. add eci backends
 	if len(eciBackends) != 0 {
 		reqCtx.Log.Info("add eciBackends")
-		eciBackends, err = updateENIBackends(reqCtx, mgr, vpcCIDRs, eciBackends, candidates.AddressIPVersion)
+		eciBackends, err = updateENIBackends(reqCtx, mgr, eciBackends, candidates.AddressIPVersion)
 		if err != nil {
 			return nil, fmt.Errorf("update eci backends error: %s", err.Error())
 		}
@@ -772,8 +822,8 @@ func removeDuplicatedECS(backends []model.BackendAttribute) []model.BackendAttri
 
 }
 
-func (mgr *VGroupManager) buildClusterBackends(reqCtx *svcCtx.RequestContext, vpcCIDRs []*net.IPNet,
-	candidates *backend.EndpointWithENI, initBackends []model.BackendAttribute, vgroup model.VServerGroup) ([]model.BackendAttribute, error) {
+func (mgr *VGroupManager) buildClusterBackends(reqCtx *svcCtx.RequestContext, candidates *backend.EndpointWithENI,
+	initBackends []model.BackendAttribute, vgroup model.VServerGroup) ([]model.BackendAttribute, error) {
 	var (
 		ecsBackends, eciBackends []model.BackendAttribute
 		err                      error
@@ -823,7 +873,7 @@ func (mgr *VGroupManager) buildClusterBackends(reqCtx *svcCtx.RequestContext, vp
 	}
 
 	if len(eciBackends) != 0 {
-		eciBackends, err = updateENIBackends(reqCtx, mgr, vpcCIDRs, eciBackends, candidates.AddressIPVersion)
+		eciBackends, err = updateENIBackends(reqCtx, mgr, eciBackends, candidates.AddressIPVersion)
 		if err != nil {
 			return nil, fmt.Errorf("update eci backends error: %s", err.Error())
 		}
@@ -834,42 +884,10 @@ func (mgr *VGroupManager) buildClusterBackends(reqCtx *svcCtx.RequestContext, vp
 	return setWeightBackends(helper.ClusterTrafficPolicy, backends, vgroup.VGroupWeight), nil
 }
 
-func updateENIBackends(reqCtx *svcCtx.RequestContext, mgr *VGroupManager, vpcCIDRs []*net.IPNet,
-	backends []model.BackendAttribute, ipVersion model.AddressIPVersionType) (
-	[]model.BackendAttribute, error) {
-	var ips []string
-	for _, b := range backends {
-		ips = append(ips, b.ServerIp)
-	}
-	result, err := mgr.cloud.DescribeNetworkInterfaces(mgr.vpcId, ips, ipVersion)
-	if err != nil {
-		return nil, fmt.Errorf("call DescribeNetworkInterfaces: %s", err.Error())
-	}
-
-	var skipIPs []string
+func updateENIBackends(reqCtx *svcCtx.RequestContext, mgr *VGroupManager, backends []model.BackendAttribute, ipVersion model.AddressIPVersionType) ([]model.BackendAttribute, error) {
 	for i := range backends {
-		eniid, ok := result[backends[i].ServerIp]
-		if !ok {
-			// if ip in vpcCIDRs, it should have a eni id
-			if containsIP(vpcCIDRs, backends[i].ServerIp) {
-				return nil, fmt.Errorf("can not find eniid for ip %s in vpc %s", backends[i].ServerIp, mgr.vpcId)
-			} else {
-				skipIPs = append(skipIPs, backends[i].ServerIp)
-			}
-		}
 		// for ENI backend type, port should be set to targetPort (default value), no need to update
-		backends[i].ServerId = eniid
 		backends[i].Type = model.ENIBackendType
-	}
-
-	if len(skipIPs) > 0 {
-		reqCtx.Log.Info(fmt.Sprintf("warning: filter pods by vpc cidr %+v, podIPs=%+v", vpcCIDRs, skipIPs))
-		reqCtx.Recorder.Event(
-			reqCtx.Service,
-			v1.EventTypeNormal,
-			helper.SkipSyncBackends,
-			fmt.Sprintf("Not sync pods [%s] whose ip is not in vpc cidrs", strings.Join(skipIPs, ",")),
-		)
 	}
 
 	return backends, nil
