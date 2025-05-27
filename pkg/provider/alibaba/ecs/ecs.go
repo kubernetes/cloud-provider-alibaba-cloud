@@ -21,6 +21,7 @@ import (
 
 const (
 	MaxNetworkInterfaceNum = 100
+	MaxResult              = 100
 )
 
 func NewECSProvider(
@@ -145,7 +146,7 @@ func (e *ECSProvider) getInstances(ids []string, region string) ([]ecs.Instance,
 	req.RegionId = region
 	req.InstanceIds = string(bids)
 	req.NextToken = ""
-	req.MaxResults = requests.NewInteger(100)
+	req.MaxResults = requests.NewInteger(MaxResult)
 	req.AdditionalAttributes = &[]string{"NETWORK_PRIMARY_ENI_IP"}
 
 	var ecsInstances []ecs.Instance
@@ -158,7 +159,7 @@ func (e *ECSProvider) getInstances(ids []string, region string) ([]ecs.Instance,
 		}
 		klog.V(5).Infof("RequestId: %s, API: %s, ids: %s", resp.RequestId, "DescribeInstances", string(bids))
 		ecsInstances = append(ecsInstances, resp.Instances.Instance...)
-		if resp.NextToken == "" {
+		if resp.NextToken == "" || resp.PageSize < MaxResult {
 			break
 		}
 
@@ -186,7 +187,7 @@ func (e *ECSProvider) DescribeNetworkInterfaces(vpcId string, ips []string, ipVe
 		} else {
 			req.PrivateIpAddress = &privateIpAddress
 		}
-		req.MaxResults = requests.NewInteger(100)
+		req.MaxResults = requests.NewInteger(MaxResult)
 
 		for {
 			resp, err := e.auth.ECS.DescribeNetworkInterfaces(req)
@@ -208,7 +209,7 @@ func (e *ECSProvider) DescribeNetworkInterfaces(vpcId string, ips []string, ipVe
 				}
 			}
 
-			if resp.NextToken == "" {
+			if resp.NextToken == "" || resp.PageSize < MaxResult {
 				break
 			}
 			req.NextToken = resp.NextToken
