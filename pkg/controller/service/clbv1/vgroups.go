@@ -573,6 +573,7 @@ func (mgr *VGroupManager) setBackendsFromEndpoints(reqCtx *svcCtx.RequestContext
 			}
 			if backendPort == 0 {
 				klog.Warningf("%s cannot find port according port name: %s", vgroup.VGroupName, vgroup.ServicePort.Name)
+				continue
 			}
 		}
 
@@ -660,6 +661,7 @@ func (mgr *VGroupManager) setBackendsFromEndpointSlices(reqCtx *svcCtx.RequestCo
 			}
 			if backendPort == 0 {
 				klog.Warningf("%s cannot find port according port name: %s", vgroup.VGroupName, vgroup.ServicePort.Name)
+				continue
 			}
 		}
 

@@ -391,6 +391,88 @@ func (client *KubeClient) CreateDeployment() error {
 	)
 }
 
+func (client *KubeClient) CreateSecondaryDeployment() error {
+	var replica int32 = 3
+	nginx := &appv1.Deployment{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      fmt.Sprintf("%s-2", Deployment),
+			Namespace: Namespace,
+			Labels: map[string]string{
+				"run": "nginx",
+			},
+		},
+		Spec: appv1.DeploymentSpec{
+			Selector: &metav1.LabelSelector{
+				MatchLabels: map[string]string{
+					"run": "nginx",
+					"dep": "secondary",
+				},
+			},
+			Replicas: &replica,
+			Template: v1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						"run": "nginx",
+						"dep": "secondary",
+					},
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name:            "nginx",
+							Image:           "registry.cn-hangzhou.aliyuncs.com/acs-sample/nginx:latest",
+							ImagePullPolicy: "Always",
+							Ports: []v1.ContainerPort{
+								{
+									Name:          "http",
+									ContainerPort: 80,
+									Protocol:      v1.ProtocolTCP,
+								},
+								{
+									Name:          "https-1",
+									ContainerPort: 443,
+									Protocol:      v1.ProtocolTCP,
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	_, err := client.AppsV1().Deployments(Namespace).Create(context.Background(), nginx, metav1.CreateOptions{})
+	if err != nil {
+		if !strings.Contains(err.Error(), "exists") {
+			return fmt.Errorf("create nginx error: %s", err.Error())
+		}
+	}
+	return wait.Poll(5*time.Second, 2*time.Minute, func() (done bool, err error) {
+		pods, err := client.CoreV1().Pods(nginx.Namespace).List(context.Background(), metav1.ListOptions{LabelSelector: "dep=secondary"})
+		if err != nil {
+			klog.Infof("wait for nginx pod ready: %s", err.Error())
+			return false, nil
+		}
+		if len(pods.Items) != int(*nginx.Spec.Replicas) {
+			klog.Infof("wait for nginx pod replicas: %d", len(pods.Items))
+			return false, nil
+		}
+		for _, pod := range pods.Items {
+			if pod.Status.Phase != "Running" {
+				klog.Infof("wait for nginx pod Running: %s", pod.Name)
+				return false, nil
+			}
+		}
+		return true, nil
+	},
+	)
+}
+
+func (client *KubeClient) DeleteSecondaryDeployment() error {
+	name := fmt.Sprintf("%s-2", Deployment)
+	return client.AppsV1().Deployments(Namespace).Delete(context.TODO(), name, metav1.DeleteOptions{})
+}
+
 func (client *KubeClient) ScaleDeployment(replica int32) error {
 	deploy, err := client.AppsV1().Deployments(Namespace).Get(context.TODO(), Deployment, metav1.GetOptions{})
 	if err != nil {
