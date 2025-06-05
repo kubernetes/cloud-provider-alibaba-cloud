@@ -59,7 +59,7 @@ func (c localModel) Build(reqCtx *svcCtx.RequestContext) (*model.LoadBalancer, e
 	lbMdl := &model.LoadBalancer{
 		NamespacedName: util.NamespacedName(reqCtx.Service),
 	}
-	// if the service do not need loadbalancer any more, return directly.
+	// if the service do not need loadbalancer anymore, return directly.
 	if helper.NeedDeleteLoadBalancer(reqCtx.Service) {
 		if reqCtx.Anno.Get(annotation.LoadBalancerId) != "" {
 			lbMdl.LoadBalancerAttribute.IsUserManaged = true

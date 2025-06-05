@@ -3,43 +3,59 @@ package nlbv2
 import (
 	"context"
 	"fmt"
-
 	v1 "k8s.io/api/core/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	ctrlCfg "k8s.io/cloud-provider-alibaba-cloud/pkg/config"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/helper"
 	svcCtx "k8s.io/cloud-provider-alibaba-cloud/pkg/controller/service/reconcile/context"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/service/reconcile/parallel"
 	nlbmodel "k8s.io/cloud-provider-alibaba-cloud/pkg/model/nlb"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/model/tag"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/base"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/dryrun"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/util"
+	"sync"
 )
 
-func NewModelApplier(nlbMgr *NLBManager, lisMgr *ListenerManager, sgMgr *ServerGroupManager) *ModelApplier {
-	return &ModelApplier{
-		nlbMgr: nlbMgr,
-		lisMgr: lisMgr,
-		sgMgr:  sgMgr,
-	}
+type serverGroupCreateResult struct {
+	ServerGroupName string
+	ServerGroupID   string
+	Err             error
 }
 
-type ModelApplier struct {
+type ParallelizeModelApplier struct {
 	nlbMgr *NLBManager
 	lisMgr *ListenerManager
 	sgMgr  *ServerGroupManager
 }
 
-func (m *ModelApplier) Apply(reqCtx *svcCtx.RequestContext, local *nlbmodel.NetworkLoadBalancer) (*nlbmodel.NetworkLoadBalancer, error) {
+func NewModelApplier(nlbMgr *NLBManager, lisMgr *ListenerManager, serverGroupManager *ServerGroupManager) *ParallelizeModelApplier {
+	return &ParallelizeModelApplier{
+		nlbMgr: nlbMgr,
+		lisMgr: lisMgr,
+		sgMgr:  serverGroupManager,
+	}
+}
+
+func (m *ParallelizeModelApplier) Apply(reqCtx *svcCtx.RequestContext, local *nlbmodel.NetworkLoadBalancer) (*nlbmodel.NetworkLoadBalancer, error) {
+	if local == nil {
+		return nil, fmt.Errorf("local or remote mdl is nil")
+	}
+	if util.NamespacedName(reqCtx.Service).String() != local.NamespacedName.String() {
+		return nil, fmt.Errorf("models for different svc, local [%s], remote [%s]",
+			local.NamespacedName, util.NamespacedName(reqCtx.Service))
+	}
+
+	hashChangedOrDryRun := helper.IsServiceHashChanged(reqCtx.Service) || ctrlCfg.ControllerCFG.DryRun
 	remote := &nlbmodel.NetworkLoadBalancer{
 		NamespacedName:                  util.NamespacedName(reqCtx.Service),
 		LoadBalancerAttribute:           &nlbmodel.LoadBalancerAttribute{},
 		ContainsPotentialReadyEndpoints: local.ContainsPotentialReadyEndpoints,
 	}
 
-	err := m.nlbMgr.BuildRemoteModel(reqCtx, remote)
+	err := m.buildRemoteModel(reqCtx, local, remote)
 	if err != nil {
-		return remote, fmt.Errorf("get nlb attribute from cloud error: %s", err.Error())
+		return remote, err
 	}
 	reqCtx.Ctx = context.WithValue(reqCtx.Ctx, dryrun.ContextNLB, remote.GetLoadBalancerId())
 
@@ -48,100 +64,125 @@ func (m *ModelApplier) Apply(reqCtx *svcCtx.RequestContext, local *nlbmodel.Netw
 			"The lb [%s] will be preserved after the service is deleted.", remote.LoadBalancerAttribute.LoadBalancerId)
 	}
 
-	serviceHashChanged := helper.IsServiceHashChanged(reqCtx.Service)
-	errs := []error{}
-	if serviceHashChanged || ctrlCfg.ControllerCFG.DryRun {
-		if err := m.applyLoadBalancerAttribute(reqCtx, local, remote); err != nil {
-			_, ok := err.(utilerrors.Aggregate)
-			if ok {
-				// if lb attr update failed, continue to sync vgroup & listener
-				errs = append(errs, fmt.Errorf("update nlb attribute error: %s", err.Error()))
-			} else {
-				return nil, err
-			}
+	var tasks []func() error
+	if hashChangedOrDryRun {
+		err := m.applyLoadBalancer(reqCtx, local, remote)
+		if err != nil {
+			return remote, fmt.Errorf("update nlb attribute error: %s", err.Error())
 		}
+
+		tasks = append(tasks, func() error {
+			if err := m.nlbMgr.Update(reqCtx, local, remote); err != nil {
+				return fmt.Errorf("update nlb attribute error: %s", err.Error())
+			}
+			return nil
+		})
 	}
 
-	if err := m.sgMgr.BuildRemoteModel(reqCtx, remote); err != nil {
-		errs = append(errs, fmt.Errorf("get server group from remote error: %s", err.Error()))
-		return remote, utilerrors.NewAggregate(errs)
-	}
-	if err := m.applyVGroups(reqCtx, local, remote); err != nil {
-		errs = append(errs, fmt.Errorf("reconcile backends error: %s", err.Error()))
-		return remote, utilerrors.NewAggregate(errs)
+	if remote.LoadBalancerAttribute.LoadBalancerId == "" {
+		if helper.NeedDeleteLoadBalancer(reqCtx.Service) {
+			return remote, nil
+		}
+		return remote, fmt.Errorf("alicloud: can not find loadbalancer by tag [%s:%s]",
+			helper.TAGKEY, reqCtx.Anno.GetDefaultLoadBalancerName())
 	}
 
-	if serviceHashChanged || ctrlCfg.ControllerCFG.DryRun {
-		if remote.LoadBalancerAttribute.LoadBalancerId != "" {
-			if err := m.lisMgr.BuildRemoteModel(reqCtx, remote); err != nil {
-				errs = append(errs, fmt.Errorf("get lb listeners from cloud, error: %s", err.Error()))
-				return remote, utilerrors.NewAggregate(errs)
-			}
-			if err := m.applyListeners(reqCtx, local, remote); err != nil {
-				errs = append(errs, fmt.Errorf("reconcile listeners error: %s", err.Error()))
-				return remote, utilerrors.NewAggregate(errs)
-			}
+	var sgChannel chan serverGroupCreateResult
+	if hashChangedOrDryRun {
+		sgChannel = make(chan serverGroupCreateResult, len(local.ServerGroups))
+	}
+
+	actions, err := m.buildServerGroupCreateAndUpdateActions(reqCtx, local, remote)
+	if err != nil {
+		return remote, err
+	}
+
+	tasks = append(tasks, func() error {
+		return m.applyServerGroups(reqCtx, actions, sgChannel)
+	})
+
+	if hashChangedOrDryRun {
+		if local.LoadBalancerAttribute.IsUserManaged && !reqCtx.Anno.IsForceOverride() {
+			reqCtx.Log.Info("listener override is false, skip reconcile listeners")
 		} else {
-			if !helper.NeedDeleteLoadBalancer(reqCtx.Service) {
-				errs = append(errs, fmt.Errorf("alicloud: can not find loadbalancer by tag [%s:%s]",
-					helper.TAGKEY, reqCtx.Anno.GetDefaultLoadBalancerName()))
-				return remote, utilerrors.NewAggregate(errs)
+			actions, err := buildActionsForListeners(reqCtx, local, remote)
+			if err != nil {
+				return remote, err
 			}
+			tasks = append(tasks, func() error {
+				return m.applyListeners(reqCtx, actions, sgChannel)
+			})
 		}
 	}
 
-	if err := m.cleanup(reqCtx, local, remote); err != nil {
-		errs = append(errs, fmt.Errorf("update lb listeners error: %s", err.Error()))
-		return remote, utilerrors.NewAggregate(errs)
+	err = parallel.Do(tasks...)
+	if err != nil {
+		return remote, err
 	}
 
-	return remote, utilerrors.NewAggregate(errs)
+	if hashChangedOrDryRun {
+		err = m.cleanup(reqCtx, local, remote)
+		if err != nil {
+			return remote, err
+		}
+	}
+
+	return remote, err
 }
 
-func (m *ModelApplier) applyLoadBalancerAttribute(reqCtx *svcCtx.RequestContext, local, remote *nlbmodel.NetworkLoadBalancer) error {
-	if local == nil || remote == nil {
-		return fmt.Errorf("local or remote mdl is nil")
+func (m *ParallelizeModelApplier) buildRemoteModel(reqCtx *svcCtx.RequestContext, local, remote *nlbmodel.NetworkLoadBalancer) error {
+	err := m.nlbMgr.BuildRemoteModel(reqCtx, remote)
+	if err != nil {
+		return fmt.Errorf("get nlb attribute from cloud error: %s", err.Error())
 	}
 
-	if local.NamespacedName.String() != remote.NamespacedName.String() {
-		return fmt.Errorf("models for different svc, local [%s], remote [%s]",
-			local.NamespacedName, remote.NamespacedName)
+	if remote.LoadBalancerAttribute.LoadBalancerId == "" {
+		return nil
 	}
 
+	tasks := []func() error{
+		func() error {
+			tags, err := m.nlbMgr.cloud.ListNLBTagResources(reqCtx.Ctx, remote.LoadBalancerAttribute.LoadBalancerId)
+			if err != nil {
+				return fmt.Errorf("ListNLBTagResources: %s", err.Error())
+			}
+			remote.LoadBalancerAttribute.Tags = tags
+			return nil
+		},
+		func() error {
+			if err := m.sgMgr.BuildRemoteModel(reqCtx, remote); err != nil {
+				return fmt.Errorf("get lb backend from remote error: %s", err.Error())
+			}
+			return nil
+		},
+	}
+
+	if helper.IsServiceHashChanged(reqCtx.Service) || ctrlCfg.ControllerCFG.DryRun {
+		if !local.LoadBalancerAttribute.IsUserManaged || reqCtx.Anno.IsForceOverride() {
+			tasks = append(tasks, func() error {
+				if err := m.lisMgr.BuildRemoteModel(reqCtx, remote); err != nil {
+					return fmt.Errorf("get lb listeners from cloud, error: %s", err.Error())
+				}
+				return nil
+			})
+		}
+	}
+
+	return parallel.Do(tasks...)
+}
+
+func (m *ParallelizeModelApplier) applyLoadBalancer(reqCtx *svcCtx.RequestContext, local, remote *nlbmodel.NetworkLoadBalancer) error {
 	// delete nlb
 	if helper.NeedDeleteLoadBalancer(reqCtx.Service) {
-		if !local.LoadBalancerAttribute.IsUserManaged {
-			if local.LoadBalancerAttribute.PreserveOnDelete {
-				err := m.nlbMgr.SetProtectionsOff(reqCtx, remote)
-				if err != nil {
-					return fmt.Errorf("set loadbalancer [%s] protections off error: %s",
-						remote.LoadBalancerAttribute.LoadBalancerId, err.Error())
-				}
-
-				err = m.nlbMgr.CleanupLoadBalancerTags(reqCtx, remote)
-				if err != nil {
-					return fmt.Errorf("cleanup loadbalancer [%s] tags error: %s",
-						remote.LoadBalancerAttribute.LoadBalancerId, err.Error())
-				}
-				reqCtx.Log.Info(fmt.Sprintf("successfully cleanup preserved nlb %s", remote.LoadBalancerAttribute.LoadBalancerId))
-			} else {
-				err := m.nlbMgr.Delete(reqCtx, remote)
-				if err != nil {
-					return fmt.Errorf("delete nlb [%s] error: %s",
-						remote.LoadBalancerAttribute.LoadBalancerId, err.Error())
-				}
-				reqCtx.Log.Info(fmt.Sprintf("successfully delete nlb %s", remote.LoadBalancerAttribute.LoadBalancerId))
-			}
-
-			remote.LoadBalancerAttribute.LoadBalancerId = ""
-			remote.LoadBalancerAttribute.DNSName = ""
-			return nil
+		err := m.deleteLoadBalancer(reqCtx, local, remote)
+		if err != nil {
+			return err
 		}
-		reqCtx.Log.Info(fmt.Sprintf("nlb %s is reused, skip delete it", remote.LoadBalancerAttribute.LoadBalancerId))
 		return nil
 	}
 
 	// create nlb
+	// todo: requeue lb if lb is not ready
 	if remote.LoadBalancerAttribute.LoadBalancerId == "" {
 		if helper.IsServiceOwnIngress(reqCtx.Service) {
 			return fmt.Errorf("alicloud: can not find loadbalancer, but it's defined in service [%v] "+
@@ -167,30 +208,57 @@ func (m *ModelApplier) applyLoadBalancerAttribute(reqCtx *svcCtx.RequestContext,
 				return err
 			}
 		}
-
-		return nil
 	}
-
-	tags, err := m.nlbMgr.cloud.ListNLBTagResources(reqCtx.Ctx, remote.LoadBalancerAttribute.LoadBalancerId)
-	if err != nil {
-		return fmt.Errorf("ListNLBTagResources: %s", err.Error())
-	}
-	remote.LoadBalancerAttribute.Tags = tags
 
 	// check whether slb can be reused
 	if !helper.NeedDeleteLoadBalancer(reqCtx.Service) && local.LoadBalancerAttribute.IsUserManaged {
-		if ok, reason := isNLBReusable(reqCtx.Service, tags, remote.LoadBalancerAttribute.DNSName); !ok {
+		if ok, reason := isNLBReusable(reqCtx.Service, remote.LoadBalancerAttribute.Tags, remote.LoadBalancerAttribute.DNSName); !ok {
 			return fmt.Errorf("the loadbalancer %s can not be reused, %s",
 				remote.LoadBalancerAttribute.LoadBalancerId, reason)
 		}
 	}
 
-	return m.nlbMgr.Update(reqCtx, local, remote)
-
+	return nil
 }
 
-func (m *ModelApplier) applyVGroups(reqCtx *svcCtx.RequestContext, local, remote *nlbmodel.NetworkLoadBalancer) error {
-	var updateActions []serverGroupAction
+func (m *ParallelizeModelApplier) deleteLoadBalancer(reqCtx *svcCtx.RequestContext, local, remote *nlbmodel.NetworkLoadBalancer) error {
+	if !local.LoadBalancerAttribute.IsUserManaged {
+		err := m.sgMgr.BuildRemoteModel(reqCtx, remote)
+		if err != nil {
+			return fmt.Errorf("build remote server group model error: %s", err.Error())
+		}
+		if local.LoadBalancerAttribute.PreserveOnDelete {
+			err := m.nlbMgr.SetProtectionsOff(reqCtx, remote)
+			if err != nil {
+				return fmt.Errorf("set loadbalancer [%s] protections off error: %s",
+					remote.LoadBalancerAttribute.LoadBalancerId, err.Error())
+			}
+
+			err = m.nlbMgr.CleanupLoadBalancerTags(reqCtx, remote)
+			if err != nil {
+				return fmt.Errorf("cleanup loadbalancer [%s] tags error: %s",
+					remote.LoadBalancerAttribute.LoadBalancerId, err.Error())
+			}
+			reqCtx.Log.Info(fmt.Sprintf("successfully cleanup preserved nlb %s", remote.LoadBalancerAttribute.LoadBalancerId))
+		} else {
+			err := m.nlbMgr.Delete(reqCtx, remote)
+			if err != nil {
+				return fmt.Errorf("delete nlb [%s] error: %s",
+					remote.LoadBalancerAttribute.LoadBalancerId, err.Error())
+			}
+			reqCtx.Log.Info(fmt.Sprintf("successfully delete nlb %s", remote.LoadBalancerAttribute.LoadBalancerId))
+			remote.LoadBalancerAttribute.LoadBalancerId = ""
+			remote.LoadBalancerAttribute.DNSName = ""
+		}
+
+		return nil
+	}
+	reqCtx.Log.Info(fmt.Sprintf("nlb %s is reused, skip delete it", remote.LoadBalancerAttribute.LoadBalancerId))
+	return nil
+}
+
+func (m *ParallelizeModelApplier) buildServerGroupCreateAndUpdateActions(reqCtx *svcCtx.RequestContext, local, remote *nlbmodel.NetworkLoadBalancer) ([]serverGroupAction, error) {
+	var actions []serverGroupAction
 	updatedServerGroups := map[string]bool{}
 
 	for i := range local.ServerGroups {
@@ -220,7 +288,7 @@ func (m *ModelApplier) applyVGroups(reqCtx *svcCtx.RequestContext, local, remote
 
 		if updatedServerGroups[sgKey] {
 			reqCtx.Log.Info("already updated server group, skip",
-				"vgroupID", local.ServerGroups[i].ServerGroupId, "vgroupName", local.ServerGroups[i].ServerGroupId)
+				"sgID", local.ServerGroups[i].ServerGroupId, "sgName", local.ServerGroups[i].ServerGroupId)
 			continue
 		}
 
@@ -230,7 +298,7 @@ func (m *ModelApplier) applyVGroups(reqCtx *svcCtx.RequestContext, local, remote
 			if local.ServerGroups[i].ServerGroupType != "" &&
 				local.ServerGroups[i].ServerGroupType != old.ServerGroupType {
 				if local.ServerGroups[i].IsUserManaged {
-					return fmt.Errorf("ServerGroupType of user managed server group %s should be [%s], but [%s]",
+					return nil, fmt.Errorf("ServerGroupType of user managed server group %s should be [%s], but [%s]",
 						local.ServerGroups[i].ServerGroupId, local.ServerGroups[i].ServerGroupType, old.ServerGroupType)
 				}
 				reqCtx.Log.Info(fmt.Sprintf("ServerGroupType changed [%s] - [%s], need to recreate server group",
@@ -238,7 +306,7 @@ func (m *ModelApplier) applyVGroups(reqCtx *svcCtx.RequestContext, local, remote
 					"sgId", old.ServerGroupId, "sgName", old.ServerGroupName)
 				found = false
 			} else {
-				updateActions = append(updateActions, serverGroupAction{
+				actions = append(actions, serverGroupAction{
 					Action: serverGroupActionUpdate,
 					Local:  local.ServerGroups[i],
 					Remote: &old,
@@ -253,7 +321,7 @@ func (m *ModelApplier) applyVGroups(reqCtx *svcCtx.RequestContext, local, remote
 			if remote.LoadBalancerAttribute.VpcId != "" {
 				local.ServerGroups[i].VPCId = remote.LoadBalancerAttribute.VpcId
 			}
-			updateActions = append(updateActions, serverGroupAction{
+			actions = append(actions, serverGroupAction{
 				Action: serverGroupActionCreateAndAddBackendServers,
 				Local:  local.ServerGroups[i],
 				Remote: local.ServerGroups[i],
@@ -263,18 +331,86 @@ func (m *ModelApplier) applyVGroups(reqCtx *svcCtx.RequestContext, local, remote
 		}
 	}
 
-	errs := m.sgMgr.ParallelUpdateServerGroups(reqCtx, updateActions)
+	return actions, nil
+}
+
+func (m *ParallelizeModelApplier) applyServerGroups(reqCtx *svcCtx.RequestContext, actions []serverGroupAction, serverGroupChannel chan serverGroupCreateResult) error {
+	if serverGroupChannel != nil {
+		defer close(serverGroupChannel)
+	}
+
+	errs := m.sgMgr.ParallelUpdateServerGroups(reqCtx, actions, serverGroupChannel)
 	return utilerrors.NewAggregate(errs)
 }
 
-func (m *ModelApplier) applyListeners(reqCtx *svcCtx.RequestContext, local, remote *nlbmodel.NetworkLoadBalancer) error {
-	if local.LoadBalancerAttribute.IsUserManaged {
-		if !reqCtx.Anno.IsForceOverride() {
-			reqCtx.Log.Info("listener override is false, skip reconcile listeners")
-			return nil
+func (m *ParallelizeModelApplier) applyListeners(reqCtx *svcCtx.RequestContext, actions []listenerAction, serverGroupChannel chan serverGroupCreateResult) error {
+	var nowActions []listenerAction
+	var waitActions []listenerAction
+	listenerMap := map[string][]listenerAction{}
+	for _, act := range actions {
+		switch act.Action {
+		case listenerActionDelete:
+			nowActions = append(nowActions, act)
+		default:
+			if act.Local.ServerGroupId == "" {
+				waitActions = append(waitActions, act)
+				listenerMap[act.Local.ServerGroupName] = append(listenerMap[act.Local.ServerGroupName], act)
+			} else {
+				nowActions = append(nowActions, act)
+			}
 		}
 	}
 
+	var errs []error
+	wg := sync.WaitGroup{}
+	mtx := sync.Mutex{}
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		retErrs := m.lisMgr.ParallelUpdateListeners(reqCtx, nowActions)
+		if len(retErrs) != 0 {
+			mtx.Lock()
+			errs = append(errs, retErrs...)
+			mtx.Unlock()
+		}
+	}()
+
+	for n := range serverGroupChannel {
+		reqCtx.Log.V(5).Info("receive server group apply result", "result", n)
+		if n.Err != nil {
+			reqCtx.Log.Error(n.Err, "error applying servergroups, skip listener actions",
+				"vgroupName", n.ServerGroupName)
+			continue
+		}
+		actions := listenerMap[n.ServerGroupName]
+		if len(actions) == 0 {
+			continue
+		}
+		for i := range actions {
+			actions[i].Local.ServerGroupId = n.ServerGroupID
+		}
+		delete(listenerMap, n.ServerGroupName)
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			retErrs := m.lisMgr.ParallelUpdateListeners(reqCtx, actions)
+			if len(retErrs) != 0 {
+				mtx.Lock()
+				errs = append(errs, retErrs...)
+				mtx.Unlock()
+			}
+		}()
+	}
+
+	wg.Wait()
+	if len(listenerMap) != 0 {
+		errs = append(errs, fmt.Errorf("there are unprocessed listeners in reconciles: %+v", listenerMap))
+	}
+	return utilerrors.NewAggregate(errs)
+}
+
+func buildActionsForListeners(reqCtx *svcCtx.RequestContext, local, remote *nlbmodel.NetworkLoadBalancer) ([]listenerAction, error) {
 	var actions []listenerAction
 
 	// associate listener and vGroup
@@ -283,7 +419,7 @@ func (m *ModelApplier) applyListeners(reqCtx *svcCtx.RequestContext, local, remo
 			continue
 		}
 		if err := findServerGroup(local.ServerGroups, local.Listeners[i]); err != nil {
-			return fmt.Errorf("find servergroup error: %s", err.Error())
+			return nil, fmt.Errorf("find servergroup error: %s", err.Error())
 		}
 	}
 
@@ -337,11 +473,11 @@ func (m *ModelApplier) applyListeners(reqCtx *svcCtx.RequestContext, local, remo
 		}
 	}
 
-	errs := m.lisMgr.ParallelUpdateListeners(reqCtx, actions)
-	return utilerrors.NewAggregate(errs)
+	return actions, nil
 }
 
-func (m *ModelApplier) cleanup(reqCtx *svcCtx.RequestContext, local, remote *nlbmodel.NetworkLoadBalancer) error {
+func (m *ParallelizeModelApplier) cleanup(reqCtx *svcCtx.RequestContext, local, remote *nlbmodel.NetworkLoadBalancer) error {
+	var actions []serverGroupAction
 	// delete server groups
 	for _, r := range remote.ServerGroups {
 		found := false
@@ -382,13 +518,15 @@ func (m *ModelApplier) cleanup(reqCtx *svcCtx.RequestContext, local, remote *nlb
 			}
 
 			reqCtx.Log.Info(fmt.Sprintf("delete server group [%s], %s", r.ServerGroupName, r.ServerGroupId))
-			err := m.sgMgr.DeleteServerGroup(reqCtx, r.ServerGroupId)
-			if err != nil {
-				return fmt.Errorf("delete server group %s failed, error: %s", r.ServerGroupId, err.Error())
-			}
+			actions = append(actions, serverGroupAction{
+				Action: serverGroupActionDelete,
+				Remote: r,
+			})
 		}
 	}
-	return nil
+
+	errs := m.sgMgr.ParallelUpdateServerGroups(reqCtx, actions, nil)
+	return utilerrors.NewAggregate(errs)
 }
 
 func isNLBReusable(service *v1.Service, tags []tag.Tag, dnsName string) (bool, string) {

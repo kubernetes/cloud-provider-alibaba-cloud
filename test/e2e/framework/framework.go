@@ -345,7 +345,16 @@ func (f *Framework) DeleteNetworkLoadBalancer(lbid string) error {
 		},
 	}
 
-	err := f.Client.CloudClient.DeleteNLB(context.TODO(), slbM)
+	delCfg := &nlbmodel.DeletionProtectionConfig{
+		Enabled: false,
+	}
+
+	err := f.Client.CloudClient.UpdateLoadBalancerProtection(context.TODO(), lbid, delCfg, nil)
+	if err != nil {
+		return err
+	}
+
+	err = f.Client.CloudClient.DeleteNLB(context.TODO(), slbM)
 	if err != nil {
 		return err
 	}

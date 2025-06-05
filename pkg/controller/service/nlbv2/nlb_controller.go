@@ -131,7 +131,7 @@ var _ reconcile.Reconciler = &ReconcileNLB{}
 type ReconcileNLB struct {
 	scheme  *runtime.Scheme
 	builder *ModelBuilder
-	applier *ModelApplier
+	applier *ParallelizeModelApplier
 
 	// client
 	cloud      prvd.Provider
