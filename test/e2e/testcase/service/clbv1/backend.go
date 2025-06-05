@@ -650,6 +650,94 @@ func RunBackendTestCases(f *framework.Framework) {
 				err = f.ExpectLoadBalancerEqual(newSvc)
 				gomega.Expect(err).NotTo(gomega.BeNil())
 			})
+
+		})
+
+		ginkgo.Describe("named port", func() {
+			ginkgo.It("named http port", func() {
+				svc := f.Client.KubeClient.DefaultService()
+				svc.Spec.Ports = []v1.ServicePort{
+					{
+						Name:       "http",
+						Port:       80,
+						TargetPort: intstr.FromString("http"),
+						Protocol:   v1.ProtocolTCP,
+					},
+					{
+						Name:       "https",
+						Port:       433,
+						TargetPort: intstr.FromString("https"),
+						Protocol:   v1.ProtocolTCP,
+					},
+				}
+
+				svc, err := f.Client.KubeClient.CreateService(svc)
+				gomega.Expect(err).To(gomega.BeNil())
+
+				err = f.ExpectLoadBalancerEqual(svc)
+				gomega.Expect(err).To(gomega.BeNil())
+			})
+		})
+
+		ginkgo.It("nonexistent named port", func() {
+			svc := f.Client.KubeClient.DefaultService()
+			svc.Spec.Ports = []v1.ServicePort{
+				{
+					Name:       "http",
+					Port:       80,
+					TargetPort: intstr.FromString("http"),
+					Protocol:   v1.ProtocolTCP,
+				},
+				{
+					Name:       "https",
+					Port:       433,
+					TargetPort: intstr.FromString("nonexistent"),
+					Protocol:   v1.ProtocolTCP,
+				},
+			}
+
+			svc, err := f.Client.KubeClient.CreateService(svc)
+			gomega.Expect(err).To(gomega.BeNil())
+
+			err = f.ExpectLoadBalancerEqual(svc)
+			gomega.Expect(err).To(gomega.BeNil())
+		})
+
+		ginkgo.It("named port select partial pods", func() {
+			err := f.Client.KubeClient.CreateSecondaryDeployment()
+			gomega.Expect(err).To(gomega.BeNil())
+			defer func() {
+				err = f.Client.KubeClient.DeleteSecondaryDeployment()
+				gomega.Expect(err).To(gomega.BeNil())
+			}()
+
+			svc := f.Client.KubeClient.DefaultService()
+			svc.Spec.Ports = []v1.ServicePort{
+				{
+					Name:       "http",
+					Port:       80,
+					TargetPort: intstr.FromString("http"),
+					Protocol:   v1.ProtocolTCP,
+				},
+				{
+					Name:       "https",
+					Port:       433,
+					TargetPort: intstr.FromString("https"),
+					Protocol:   v1.ProtocolTCP,
+				},
+				{
+					Name:       "https-1",
+					Port:       444,
+					TargetPort: intstr.FromString("https-1"),
+					Protocol:   v1.ProtocolTCP,
+				},
+			}
+
+			svc, err = f.Client.KubeClient.CreateService(svc)
+			gomega.Expect(err).To(gomega.BeNil())
+
+			err = f.ExpectLoadBalancerEqual(svc)
+			gomega.Expect(err).To(gomega.BeNil())
 		})
 	})
 }

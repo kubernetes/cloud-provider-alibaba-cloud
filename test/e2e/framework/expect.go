@@ -1031,6 +1031,10 @@ func buildENIBackends(anno *annotation.AnnotationRequest, ep *v1.Endpoints, vg m
 	var ret []model.BackendAttribute
 	for _, subset := range ep.Subsets {
 		backendPort := getBackendPort(vg.ServicePort, subset)
+		if backendPort == 0 {
+			// named port not found, skip port backends.
+			continue
+		}
 		for _, address := range subset.Addresses {
 			ret = append(ret, model.BackendAttribute{
 				Description: vg.VGroupName,
@@ -1117,6 +1121,9 @@ func buildECIBackends(ep *v1.Endpoints, nodes []v1.Node, vg model.VServerGroup) 
 			}
 			if isVKNode(*node) {
 				backendPort := getBackendPort(vg.ServicePort, subset)
+				if backendPort == 0 {
+					continue
+				}
 				ret = append(ret, model.BackendAttribute{
 					Description: vg.VGroupName,
 					ServerIp:    addr.IP,

@@ -716,6 +716,9 @@ func buildServerGroupENIBackends(f *Framework, anno *annotation.AnnotationReques
 	var ret []nlbmodel.ServerGroupServer
 	for _, subset := range ep.Subsets {
 		backendPort := getBackendPort(*sg.ServicePort, subset)
+		if backendPort == 0 {
+			continue
+		}
 		for _, address := range subset.Addresses {
 			ret = append(ret, nlbmodel.ServerGroupServer{
 				Description: sg.ServerGroupName,
