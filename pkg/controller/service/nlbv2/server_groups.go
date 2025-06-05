@@ -217,10 +217,13 @@ func (mgr *ServerGroupManager) CreateServerGroupAndAddServers(reqCtx *svcCtx.Req
 	if err != nil {
 		return fmt.Errorf("EnsureServerGroupCreated error: %w", err)
 	}
-	err = mgr.BatchAddServers(reqCtx, local, local.Servers)
-	if err != nil {
-		return fmt.Errorf("BatchAddServers error: %w", err)
+	if len(local.Servers) > 0 {
+		err = mgr.BatchAddServers(reqCtx, local, local.Servers)
+		if err != nil {
+			return fmt.Errorf("BatchAddServers error: %w", err)
+		}
 	}
+
 	return nil
 }
 func (mgr *ServerGroupManager) CreateServerGroup(reqCtx *svcCtx.RequestContext, sg *nlbmodel.ServerGroup) error {

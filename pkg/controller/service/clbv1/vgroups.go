@@ -188,10 +188,13 @@ func (mgr *VGroupManager) CreateVServerGroupAndAddBackendServers(reqCtx *svcCtx.
 	if err != nil {
 		return err
 	}
-	err = mgr.BatchAddVServerGroupBackendServers(reqCtx, *local, local.Backends)
-	if err != nil {
-		return err
+	if len(local.Backends) > 0 {
+		err = mgr.BatchAddVServerGroupBackendServers(reqCtx, *local, local.Backends)
+		if err != nil {
+			return err
+		}
 	}
+
 	return nil
 }
 
