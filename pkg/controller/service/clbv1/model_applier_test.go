@@ -12,7 +12,9 @@ import (
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/helper"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/service/reconcile/annotation"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/model"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/base"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/vmock"
+	"reflect"
 	"testing"
 	"time"
 )
@@ -399,5 +401,259 @@ func TestSyncVGroups(t *testing.T) {
 	_, err = applier.Apply(reqCtx, localModel)
 	if err != nil {
 		t.Error(err)
+	}
+}
+
+func TestBuildActionsToUpdate(t *testing.T) {
+	svc := getDefaultService()
+	reqCtx := getReqCtx(svc)
+	listener := func(port int, protocol string) model.ListenerAttribute {
+		return model.ListenerAttribute{
+			Description: fmt.Sprintf("%d-%s", port, protocol),
+			NamedKey: &model.ListenerNamedKey{
+				Prefix:      model.DEFAULT_PREFIX,
+				CID:         base.CLUSTER_ID,
+				Namespace:   "ut-test",
+				ServiceName: "test-name",
+				Port:        int32(port),
+			},
+			Protocol:     protocol,
+			ListenerPort: port,
+		}
+	}
+
+	listenerWithVGroupId := func(port int, protocol string, vGroupId string) model.ListenerAttribute {
+		l := listener(port, protocol)
+		l.VGroupId = vGroupId
+		return l
+	}
+
+	listenerForwardedTo := func(port, forward int, protocol string) model.ListenerAttribute {
+		l := listener(port, protocol)
+		l.ListenerForward = model.OnFlag
+		l.ForwardPort = forward
+		return l
+	}
+
+	createAction := func(listener model.ListenerAttribute) CreateAction {
+		return CreateAction{
+			listener: listener,
+		}
+	}
+
+	updateAction := func(local, remote model.ListenerAttribute) UpdateAction {
+		return UpdateAction{
+			local:  local,
+			remote: remote,
+		}
+	}
+
+	deleteAction := func(listener model.ListenerAttribute) DeleteAction {
+		return DeleteAction{
+			listener: listener,
+		}
+	}
+
+	compareListenerAction := func(a, b listenerAction) bool {
+		if a.ActionType != b.ActionType {
+			return false
+		}
+		switch a.ActionType {
+		case listenerActionTypeCreate:
+			return reflect.DeepEqual(a.Create, b.Create)
+		case listenerActionTypeUpdate:
+			return reflect.DeepEqual(a.Update.local, b.Update.local) && reflect.DeepEqual(a.Update.remote, b.Update.remote)
+		case listenerActionTypeDelete:
+			return reflect.DeepEqual(a.Delete.listener, b.Delete.listener)
+		}
+		return false
+	}
+
+	compareListenerActions := func(a, b []listenerAction) bool {
+		if len(a) != len(b) {
+			return false
+		}
+		for _, a := range a {
+			found := false
+			for _, b := range b {
+				if compareListenerAction(a, b) {
+					found = true
+					break
+				}
+			}
+			if !found {
+				return false
+			}
+		}
+		return true
+	}
+
+	cases := []struct {
+		name   string
+		create []CreateAction
+		update []UpdateAction
+		delete []DeleteAction
+		// expect
+		before []listenerAction
+		wait   []listenerAction
+		after  []listenerAction
+	}{
+		{
+			name: "create-update-delete",
+			create: []CreateAction{
+				createAction(listener(80, model.TCP)),
+				createAction(listenerWithVGroupId(443, model.TCP, "vsg-1")),
+			},
+			update: []UpdateAction{
+				updateAction(listener(444, model.TCP), listener(444, model.TCP)),
+			},
+			delete: []DeleteAction{
+				deleteAction(listener(445, model.TCP)),
+			},
+			before: []listenerAction{
+				{ActionType: listenerActionTypeCreate, Create: createAction(listenerWithVGroupId(443, model.TCP, "vsg-1"))},
+				{ActionType: listenerActionTypeDelete, Delete: deleteAction(listener(445, model.TCP))},
+			},
+			wait: []listenerAction{
+				{ActionType: listenerActionTypeCreate, Create: createAction(listener(80, model.TCP))},
+				{ActionType: listenerActionTypeUpdate, Update: updateAction(listener(444, model.TCP), listener(444, model.TCP))},
+			},
+		},
+		{
+			name: "forward port",
+			create: []CreateAction{
+				createAction(listener(443, model.HTTPS)),
+				createAction(listenerForwardedTo(80, 443, model.HTTP)),
+			},
+			wait: []listenerAction{
+				{ActionType: listenerActionTypeCreate, Create: createAction(listener(443, model.HTTPS))},
+			},
+			after: []listenerAction{
+				{ActionType: listenerActionTypeCreate, Create: createAction(listenerForwardedTo(80, 443, model.HTTP))},
+			},
+		},
+		{
+			name: "forward port delete",
+			delete: []DeleteAction{
+				deleteAction(listenerForwardedTo(80, 443, model.HTTP)),
+				deleteAction(listener(443, model.HTTPS)),
+			},
+			before: []listenerAction{
+				{ActionType: listenerActionTypeDelete, Delete: deleteAction(listenerForwardedTo(80, 443, model.HTTP))},
+			},
+			after: []listenerAction{
+				{ActionType: listenerActionTypeDelete, Delete: deleteAction(listener(443, model.HTTPS))},
+			},
+		},
+		{
+			name: "port recreate",
+			create: []CreateAction{
+				createAction(listener(80, model.UDP)),
+			},
+			delete: []DeleteAction{
+				deleteAction(listener(80, model.TCP)),
+			},
+			before: []listenerAction{
+				{ActionType: listenerActionTypeDelete, Delete: deleteAction(listener(80, model.TCP))},
+			},
+			wait: []listenerAction{
+				{ActionType: listenerActionTypeCreate, Create: createAction(listener(80, model.UDP))},
+			},
+		},
+		{
+			name: "port recreate with existing vgroup id",
+			create: []CreateAction{
+				createAction(listenerWithVGroupId(80, model.UDP, "vsg-1")),
+			},
+			delete: []DeleteAction{
+				deleteAction(listener(80, model.TCP)),
+			},
+			before: []listenerAction{
+				{ActionType: listenerActionTypeDelete, Delete: deleteAction(listener(80, model.TCP))},
+			},
+			after: []listenerAction{
+				{ActionType: listenerActionTypeCreate, Create: createAction(listenerWithVGroupId(80, model.UDP, "vsg-1"))},
+			},
+		},
+		{
+			name: "port recreate with forwarded port before",
+			create: []CreateAction{
+				createAction(listener(80, model.UDP)),
+			},
+			delete: []DeleteAction{
+				deleteAction(listenerForwardedTo(80, 443, model.HTTP)),
+				deleteAction(listener(443, model.HTTPS)),
+			},
+			before: []listenerAction{
+				{ActionType: listenerActionTypeDelete, Delete: deleteAction(listenerForwardedTo(80, 443, model.HTTP))},
+			},
+			wait: []listenerAction{
+				{ActionType: listenerActionTypeCreate, Create: createAction(listener(80, model.UDP))},
+			},
+			after: []listenerAction{
+				{ActionType: listenerActionTypeDelete, Delete: deleteAction(listener(443, model.HTTPS))},
+			},
+		},
+		{
+			name: "port recreate with forwarded port before 2",
+			create: []CreateAction{
+				createAction(listener(443, model.UDP)),
+			},
+			delete: []DeleteAction{
+				deleteAction(listenerForwardedTo(80, 443, model.HTTP)),
+				deleteAction(listener(443, model.HTTPS)),
+			},
+			before: []listenerAction{
+				{ActionType: listenerActionTypeDelete, Delete: deleteAction(listenerForwardedTo(80, 443, model.HTTP))},
+			},
+			wait: []listenerAction{
+				{ActionType: listenerActionTypeCreate, Create: createAction(listener(443, model.UDP))},
+			},
+			after: []listenerAction{
+				{ActionType: listenerActionTypeDelete, Delete: deleteAction(listener(443, model.HTTPS))},
+			},
+		},
+		{
+			name: "port recreate to forwarded port",
+			create: []CreateAction{
+				createAction(listenerForwardedTo(80, 443, model.HTTP)),
+			},
+			delete: []DeleteAction{
+				deleteAction(listener(80, model.HTTP)),
+			},
+			before: []listenerAction{
+				{ActionType: listenerActionTypeDelete, Delete: deleteAction(listener(80, model.HTTP))},
+			},
+			after: []listenerAction{
+				{ActionType: listenerActionTypeCreate, Create: createAction(listenerForwardedTo(80, 443, model.HTTP))},
+			},
+		},
+		{
+			name: "update to another vgroup",
+			update: []UpdateAction{
+				updateAction(listener(80, model.TCP), listenerWithVGroupId(80, model.TCP, "vsg-1")),
+			},
+			wait: []listenerAction{
+				{ActionType: listenerActionTypeUpdate, Update: updateAction(listener(80, model.TCP), listenerWithVGroupId(80, model.TCP, "vsg-1"))},
+			},
+		},
+		{
+			name: "update to another existing vgroup",
+			update: []UpdateAction{
+				updateAction(listenerWithVGroupId(80, model.TCP, "vsg-2"), listenerWithVGroupId(80, model.TCP, "vsg-1")),
+			},
+			before: []listenerAction{
+				{ActionType: listenerActionTypeUpdate, Update: updateAction(listenerWithVGroupId(80, model.TCP, "vsg-2"), listenerWithVGroupId(80, model.TCP, "vsg-1"))},
+			},
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			before, wait, after := buildActionsToUpdate(reqCtx, c.create, c.update, c.delete)
+			assert.Equal(t, true, compareListenerActions(before, c.before))
+			assert.Equal(t, true, compareListenerActions(wait, c.wait))
+			assert.Equal(t, true, compareListenerActions(after, c.after))
+		})
 	}
 }

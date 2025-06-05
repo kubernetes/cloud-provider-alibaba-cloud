@@ -131,10 +131,8 @@ func (p *NLBProvider) ListNLBServerGroups(ctx context.Context, tags []tag.Tag) (
 func (p *NLBProvider) parallelListNLBServers(ctx context.Context, sgId []string) (map[string][]nlbmodel.ServerGroupServer, error) {
 	servers := make([][]nlbmodel.ServerGroupServer, len(sgId))
 	errs := make([]error, len(sgId))
-	parallel.Parallelize(ctx, ctrlCfg.ControllerCFG.MaxConcurrentActions, len(sgId), func(i int) {
-		var s []nlbmodel.ServerGroupServer
-		var err error
-		s, err = p.ListNLBServers(ctx, sgId[i])
+	parallel.DoPiece(ctx, ctrlCfg.ControllerCFG.MaxConcurrentActions, len(sgId), func(i int) {
+		s, err := p.ListNLBServers(ctx, sgId[i])
 		if err != nil {
 			errs[i] = err
 		}
