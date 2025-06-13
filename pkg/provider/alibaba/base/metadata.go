@@ -89,8 +89,9 @@ func NewBaseMetaData(client *http.Client) *BaseMetaData {
 
 func (m *BaseMetaData) New() *MetaDataRequest {
 	return &MetaDataRequest{
-		client:      m.client,
-		sendRequest: m.mock,
+		client:       m.client,
+		sendRequest:  m.mock,
+		enableIMDSv2: ctrlCfg.ControllerCFG.EnableIMDSv2,
 	}
 }
 
@@ -285,11 +286,13 @@ func (m *BaseMetaData) ClusterID() string {
 type requestMock func(resource string) (string, error)
 
 type MetaDataRequest struct {
-	version      string
-	resourceType string
-	resource     string
-	subResource  string
-	client       *http.Client
+	version       string
+	resourceType  string
+	resource      string
+	subResource   string
+	metadataToken string
+	enableIMDSv2  bool
+	client        *http.Client
 
 	sendRequest requestMock
 }
@@ -343,6 +346,13 @@ func (vpc *MetaDataRequest) Url() (string, error) {
 
 func (vpc *MetaDataRequest) Do(api interface{}) (err error) {
 	var res = ""
+	if vpc.enableIMDSv2 && vpc.metadataToken == "" {
+		err := vpc.updateMetadataToken()
+		if err != nil {
+			return err
+		}
+	}
+
 	for r := retry.Start(); r.Next(); {
 		if vpc.sendRequest != nil {
 			res, err = vpc.sendRequest(vpc.resource)
@@ -381,9 +391,12 @@ func (vpc *MetaDataRequest) send() (string, error) {
 		return "", err
 	}
 	requ, err := http.NewRequest(http.MethodGet, url, nil)
-
 	if err != nil {
 		return "", err
+	}
+
+	if vpc.metadataToken != "" {
+		requ.Header.Set("X-aliyun-ecs-metadata-token", vpc.metadataToken)
 	}
 	resp, err := vpc.client.Do(requ)
 	if err != nil {
@@ -399,6 +412,35 @@ func (vpc *MetaDataRequest) send() (string, error) {
 		return "", err
 	}
 	return string(data), nil
+}
+
+func (vpc *MetaDataRequest) updateMetadataToken() error {
+	endpoint := os.Getenv("METADATA_ENDPOINT")
+	if endpoint == "" {
+		endpoint = ENDPOINT
+	}
+	request, err := http.NewRequest(http.MethodPut, fmt.Sprintf("%s/latest/api/token", endpoint), nil)
+	if err != nil {
+		return err
+	}
+	request.Header.Set("X-aliyun-ecs-metadata-token-ttl-seconds", "21600")
+	resp, err := vpc.client.Do(request)
+	if err != nil {
+		return err
+	}
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("Aliyun MetadataAPI Error: Get token failed, status code: %d", resp.StatusCode)
+	}
+	defer func() {
+		_ = resp.Body.Close()
+	}()
+
+	d, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return err
+	}
+	vpc.metadataToken = string(d)
+	return nil
 }
 
 type TimeoutError interface {
