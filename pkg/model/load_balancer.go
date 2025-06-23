@@ -72,6 +72,13 @@ const (
 	ENIBackendType = "eni"
 )
 
+type NetworkType string
+
+const (
+	ClassicNetworkType = NetworkType("classic")
+	VpcNetworkType     = NetworkType("vpc")
+)
+
 const ModificationProtectionReason = "managed.by.ack"
 
 // LoadBalancer represents a AlibabaCloud LoadBalancer.
@@ -98,7 +105,7 @@ type LoadBalancerAttribute struct {
 	LoadBalancerName             string
 	AddressType                  AddressType
 	VSwitchId                    string
-	NetworkType                  string
+	NetworkType                  NetworkType
 	Bandwidth                    int
 	InternetChargeType           InternetChargeType
 	InstanceChargeType           InstanceChargeType

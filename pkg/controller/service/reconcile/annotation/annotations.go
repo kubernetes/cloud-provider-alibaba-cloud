@@ -52,7 +52,7 @@ const (
 
 const (
 	VswitchId          = AnnotationLoadBalancerPrefix + "vswitch-id"               // VswitchId loadbalancer vswitch id
-	SLBNetworkType     = AnnotationLoadBalancerPrefix + "slb-network-type"         // SLBNetworkType loadbalancer network type
+	NetworkType        = AnnotationLoadBalancerPrefix + "network-type"             // NetworkType loadbalancer network type
 	ChargeType         = AnnotationLoadBalancerPrefix + "charge-type"              // InternetChargeType lb internet charge type, paybytraffic or paybybandwidth
 	OverrideListener   = AnnotationLoadBalancerPrefix + "force-override-listeners" // OverrideListener force override listeners
 	MasterZoneID       = AnnotationLoadBalancerPrefix + "master-zoneid"            // MasterZoneID master zone id
