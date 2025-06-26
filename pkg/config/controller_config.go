@@ -65,6 +65,7 @@ type ControllerConfig struct {
 	RouteReconcileBatchSize         int
 	SkipDisableSourceDestCheck      bool
 	NodeEventAggregationWaitSeconds int
+	EnableIMDSv2                    bool
 
 	RuntimeConfig RuntimeConfig
 	CloudConfig   *CloudConfig
@@ -90,6 +91,7 @@ func (cfg *ControllerConfig) BindFlags(fs *pflag.FlagSet) {
 	fs.IntVar(&cfg.ServerGroupBatchSize, flagServerGroupBatchSize, defaultServerGroupBatchSize, "The batch size for syncing server group. The value range is 1-40")
 	fs.BoolVar(&cfg.AllowUntaggedCloud, "allow-untagged-cloud", false, "Allow the cluster to run without the cluster-id on cloud instances. This is a legacy mode of operation and a cluster-id will be required in the future.")
 	fs.IntVar(&cfg.MaxConcurrentActions, "max-concurrent-actions", defaultMaxConcurrentActions, "The max concurrent number of actions for listener and server group updates")
+	fs.BoolVar(&cfg.EnableIMDSv2, "enable-imdsv2", true, "Use IMDSv2 for metadata api.")
 	_ = fs.MarkDeprecated("allow-untagged-cloud", "This flag is deprecated and will be removed in a future release. A cluster-id will be required on cloud instances.")
 
 	fs.IntVar(&cfg.NodeReconcileBatchSize, "node-reconcile-batch-size", 100, "The batch size for syncing node status. The value range is 1-100")
