@@ -247,14 +247,14 @@ func (mgr *ListenerManager) ParallelUpdateListeners(reqCtx *svcCtx.RequestContex
 		case listenerActionCreate:
 			id, err = mgr.CreateListener(reqCtx, a.LBId, a.Local)
 			if err != nil {
-				klog.Errorf("error create listener [%d]: %s", a.Local.ListenerPort, err)
+				klog.Errorf("error create listener [%s]: %s", a.Local.PortString(), err)
 				errs = append(errs, fmt.Errorf("EnsureListenerUpdated error: %w", err))
 				continue
 			}
 		case listenerActionUpdate:
 			id, err = mgr.UpdateNLBListener(reqCtx, a.Local, a.Remote)
 			if err != nil {
-				klog.Errorf("error update listener [%d]: %s", a.Local.ListenerPort, err)
+				klog.Errorf("error update listener [%s]: %s", a.Local.PortString(), err)
 				errs = append(errs, fmt.Errorf("EnsureListenerCreated error: %w", err))
 				continue
 			}
@@ -413,7 +413,7 @@ func (mgr *ListenerManager) UpdateNLBListener(reqCtx *svcCtx.RequestContext, loc
 
 	if needUpdate {
 		reqCtx.Ctx = context.WithValue(reqCtx.Ctx, dryrun.ContextMessage, updateDetail)
-		reqCtx.Log.Info(fmt.Sprintf("update listener: %s [%d] changed, detail %s", local.ListenerProtocol, local.ListenerPort, updateDetail))
+		reqCtx.Log.Info(fmt.Sprintf("update listener: %s [%s] changed, detail %s", local.ListenerProtocol, local.PortString(), updateDetail))
 
 		var jobId string
 		err := helper.RetryOnErrorContains(errorListenerOperationConflict, func() error {
@@ -427,7 +427,7 @@ func (mgr *ListenerManager) UpdateNLBListener(reqCtx *svcCtx.RequestContext, loc
 		return jobId, err
 	}
 
-	reqCtx.Log.Info(fmt.Sprintf("update listener: %s [%d] not changed, skip", local.ListenerProtocol, local.ListenerPort))
+	reqCtx.Log.Info(fmt.Sprintf("update listener: %s [%s] not changed, skip", local.ListenerProtocol, local.PortString()))
 	return "", nil
 }
 
