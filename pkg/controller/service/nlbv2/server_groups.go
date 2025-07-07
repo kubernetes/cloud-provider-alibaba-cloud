@@ -86,7 +86,17 @@ func (mgr *ServerGroupManager) BuildLocalModel(reqCtx *svcCtx.RequestContext, md
 		if candidates.AddressIPVersion == model.IPv6 {
 			sg.AddressIPVersion = string(model.DualStack)
 		}
-		sg.NamedKey = getServerGroupNamedKey(reqCtx.Service, sg.Protocol, lis.ServicePort)
+
+		if lis.ListenerPort != 0 {
+			sg.NamedKey = getServerGroupNamedKey(reqCtx.Service, sg.Protocol, lis.ServicePort)
+		} else {
+			sg.AnyPortEnabled = true
+			sg.HealthCheckConfig = &nlbmodel.HealthCheckConfig{
+				HealthCheckEnabled:     tea.Bool(true),
+				HealthCheckConnectPort: sg.ServicePort.TargetPort.IntVal,
+			}
+			sg.NamedKey = getAnyPortServerGroupNamedKey(reqCtx.Service, sg.Protocol, lis.StartPort, lis.EndPort)
+		}
 		sg.ServerGroupName = sg.NamedKey.Key()
 		if err := setServerGroupAttributeFromAnno(sg, reqCtx.Anno); err != nil {
 			return err
@@ -585,7 +595,8 @@ func (mgr *ServerGroupManager) setBackendsFromEndpoints(reqCtx *svcCtx.RequestCo
 				ServerIp: addr.IP,
 				// set backend port to targetPort by default
 				// if backend type is ecs, update backend port to nodePort
-				Port:        backendPort,
+				// if server group type is anyport, set port to 0
+				Port:        getBackendPort(backendPort, sg.AnyPortEnabled),
 				Description: sg.ServerGroupName,
 				TargetRef:   addr.TargetRef,
 			})
@@ -625,7 +636,8 @@ func (mgr *ServerGroupManager) setBackendsFromEndpoints(reqCtx *svcCtx.RequestCo
 				ServerIp: addr.IP,
 				// set backend port to targetPort by default
 				// if backend type is ecs, update backend port to nodePort
-				Port:        backendPort,
+				// if server group type is anyport, set port to 0
+				Port:        getBackendPort(backendPort, sg.AnyPortEnabled),
 				Description: sg.ServerGroupName,
 				TargetRef:   addr.TargetRef,
 			})
