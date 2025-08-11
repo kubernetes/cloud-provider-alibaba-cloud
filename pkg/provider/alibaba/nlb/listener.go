@@ -20,7 +20,12 @@ func (p *NLBProvider) ListNLBListeners(ctx context.Context, lbId string) ([]*nlb
 		req.MaxResults = tea.Int32(100)
 		req.NextToken = tea.String(nextToken)
 
-		resp, err := p.auth.NLB.ListListeners(req)
+		var resp *nlb.ListListenersResponse
+		err := retryOnThrottling("ListListeners", func() error {
+			var err error
+			resp, err = p.auth.NLB.ListListeners(req)
+			return err
+		})
 		if err != nil {
 			return nil, util.SDKError("ListListeners", err)
 		}
@@ -127,7 +132,12 @@ func (p *NLBProvider) StartNLBListener(ctx context.Context, listenerId string) e
 	req := &nlb.StartListenerRequest{}
 	req.ListenerId = tea.String(listenerId)
 
-	resp, err := p.auth.NLB.StartListener(req)
+	var resp *nlb.StartListenerResponse
+	err := retryOnThrottling("StartListener", func() error {
+		var err error
+		resp, err = p.auth.NLB.StartListener(req)
+		return err
+	})
 	if err != nil {
 		return util.SDKError("StartListener", err)
 	}
@@ -182,7 +192,12 @@ func (p *NLBProvider) CreateNLBListenerAsync(ctx context.Context, lbId string, l
 	}
 	req.CaEnabled = lis.CaEnabled
 
-	resp, err := p.auth.NLB.CreateListener(req)
+	var resp *nlb.CreateListenerResponse
+	err := retryOnThrottling("CreateListener", func() error {
+		var err error
+		resp, err = p.auth.NLB.CreateListener(req)
+		return err
+	})
 	if err != nil {
 		return "", util.SDKError("CreateListener", err)
 	}
@@ -227,7 +242,12 @@ func (p *NLBProvider) UpdateNLBListenerAsync(ctx context.Context, lis *nlbmodel.
 	}
 	req.CaEnabled = lis.CaEnabled
 
-	resp, err := p.auth.NLB.UpdateListenerAttribute(req)
+	var resp *nlb.UpdateListenerAttributeResponse
+	err := retryOnThrottling("UpdateListenerAttribute", func() error {
+		var err error
+		resp, err = p.auth.NLB.UpdateListenerAttribute(req)
+		return err
+	})
 	if err != nil {
 		return "", util.SDKError("UpdateListenerAttribute", err)
 	}
@@ -242,7 +262,12 @@ func (p *NLBProvider) DeleteNLBListenerAsync(ctx context.Context, listenerId str
 	req := &nlb.DeleteListenerRequest{}
 	req.ListenerId = tea.String(listenerId)
 
-	resp, err := p.auth.NLB.DeleteListener(req)
+	var resp *nlb.DeleteListenerResponse
+	err := retryOnThrottling("DeleteListener", func() error {
+		var err error
+		resp, err = p.auth.NLB.DeleteListener(req)
+		return err
+	})
 	if err != nil {
 		return "", util.SDKError("DeleteNLBListener", err)
 	}
