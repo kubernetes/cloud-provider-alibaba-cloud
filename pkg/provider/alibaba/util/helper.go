@@ -1,6 +1,7 @@
 package util
 
 import (
+	stderrors "errors"
 	"fmt"
 	"github.com/alibabacloud-go/tea/tea"
 	"github.com/aliyun/alibaba-cloud-sdk-go/sdk/errors"
@@ -73,4 +74,25 @@ func SDKError(api string, err error) error {
 	default:
 		return err
 	}
+}
+
+func GetErrorMessage(err error) string {
+	if err == nil {
+		return ""
+	}
+	var sdkErr *tea.SDKError
+	var serverErr *errors.ServerError
+	if stderrors.As(err, &sdkErr) {
+		return tea.StringValue(sdkErr.Message)
+	} else if stderrors.As(err, &serverErr) {
+		return serverErr.Message()
+	}
+	return err.Error()
+}
+
+func IsThrottlingError(err error) bool {
+	if err == nil {
+		return false
+	}
+	return strings.Contains(err.Error(), "Throttling")
 }

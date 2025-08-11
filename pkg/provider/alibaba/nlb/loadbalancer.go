@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/client-go/util/retry"
 	"strings"
 	"time"
 
@@ -37,6 +38,22 @@ const (
 	Active       = LoadBalancerStatus("Active")
 	Provisioning = LoadBalancerStatus("Provisioning")
 )
+
+var apiThrottlingBackoff = wait.Backoff{
+	Steps:    10,
+	Duration: 1 * time.Second,
+	Jitter:   0.1,
+}
+
+func retryOnThrottling(api string, fn func() error) error {
+	return retry.OnError(apiThrottlingBackoff, util.IsThrottlingError, func() error {
+		err := fn()
+		if util.IsThrottlingError(err) {
+			klog.Warningf("OpenAPI %s throttled in this try: %s", api, util.GetErrorMessage(err))
+		}
+		return err
+	})
+}
 
 func (p *NLBProvider) FindNLB(ctx context.Context, mdl *nlbmodel.NetworkLoadBalancer) error {
 	// 1. find by nlb id
@@ -89,7 +106,6 @@ func (p *NLBProvider) DescribeNLB(ctx context.Context, mdl *nlbmodel.NetworkLoad
 	}
 
 	return loadResponse(resp.Body, mdl)
-
 }
 
 func (p *NLBProvider) CreateNLB(ctx context.Context, mdl *nlbmodel.NetworkLoadBalancer, clientToken string) error {
@@ -148,7 +164,12 @@ func (p *NLBProvider) CreateNLB(ctx context.Context, mdl *nlbmodel.NetworkLoadBa
 		req.BandwidthPackageId = mdl.LoadBalancerAttribute.BandwidthPackageId
 	}
 
-	resp, err := p.auth.NLB.CreateLoadBalancer(req)
+	var resp *nlb.CreateLoadBalancerResponse
+	err := retryOnThrottling("CreateLoadBalancer", func() error {
+		var err error
+		resp, err = p.auth.NLB.CreateLoadBalancer(req)
+		return err
+	})
 	if err != nil {
 		return util.SDKError("CreateLoadBalancer", err)
 	}
@@ -164,7 +185,12 @@ func (p *NLBProvider) CreateNLB(ctx context.Context, mdl *nlbmodel.NetworkLoadBa
 func (p *NLBProvider) DeleteNLB(ctx context.Context, mdl *nlbmodel.NetworkLoadBalancer) error {
 	req := &nlb.DeleteLoadBalancerRequest{}
 	req.LoadBalancerId = tea.String(mdl.LoadBalancerAttribute.LoadBalancerId)
-	resp, err := p.auth.NLB.DeleteLoadBalancer(req)
+	var resp *nlb.DeleteLoadBalancerResponse
+	err := retryOnThrottling("DeleteLoadBalancer", func() error {
+		var err error
+		resp, err = p.auth.NLB.DeleteLoadBalancer(req)
+		return err
+	})
 	if err != nil {
 		return util.SDKError("DeleteLoadBalancer", err)
 	}
@@ -182,7 +208,12 @@ func (p *NLBProvider) UpdateNLB(ctx context.Context, mdl *nlbmodel.NetworkLoadBa
 	if mdl.LoadBalancerAttribute.Name != "" {
 		req.LoadBalancerName = tea.String(mdl.LoadBalancerAttribute.Name)
 	}
-	resp, err := p.auth.NLB.UpdateLoadBalancerAttribute(req)
+	var resp *nlb.UpdateLoadBalancerAttributeResponse
+	err := retryOnThrottling("UpdateLoadBalancerAttribute", func() error {
+		var err error
+		resp, err = p.auth.NLB.UpdateLoadBalancerAttribute(req)
+		return err
+	})
 	if err != nil {
 		return util.SDKError("UpdateLoadBalancerAttribute", err)
 	}
@@ -199,7 +230,12 @@ func (p *NLBProvider) UpdateNLBAddressType(ctx context.Context, mdl *nlbmodel.Ne
 	req.LoadBalancerId = tea.String(mdl.LoadBalancerAttribute.LoadBalancerId)
 	req.AddressType = tea.String(mdl.LoadBalancerAttribute.AddressType)
 
-	resp, err := p.auth.NLB.UpdateLoadBalancerAddressTypeConfig(req)
+	var resp *nlb.UpdateLoadBalancerAddressTypeConfigResponse
+	err := retryOnThrottling("UpdateLoadBalancerAddressTypeConfig", func() error {
+		var err error
+		resp, err = p.auth.NLB.UpdateLoadBalancerAddressTypeConfig(req)
+		return err
+	})
 	if err != nil {
 		return util.SDKError("UpdateNLBAddressType", err)
 	}
@@ -226,7 +262,12 @@ func (p *NLBProvider) enableIPv6Internet(ctx context.Context, mdl *nlbmodel.Netw
 	req := &nlb.EnableLoadBalancerIpv6InternetRequest{}
 	req.LoadBalancerId = tea.String(mdl.LoadBalancerAttribute.LoadBalancerId)
 
-	resp, err := p.auth.NLB.EnableLoadBalancerIpv6Internet(req)
+	var resp *nlb.EnableLoadBalancerIpv6InternetResponse
+	err := retryOnThrottling("EnableLoadBalancerIpv6Internet", func() error {
+		var err error
+		resp, err = p.auth.NLB.EnableLoadBalancerIpv6Internet(req)
+		return err
+	})
 	if err != nil {
 		return util.SDKError("EnableLoadBalancerIpv6Internet", err)
 	}
@@ -241,7 +282,12 @@ func (p *NLBProvider) disableIPv6Internet(ctx context.Context, mdl *nlbmodel.Net
 	req := &nlb.DisableLoadBalancerIpv6InternetRequest{}
 	req.LoadBalancerId = tea.String(mdl.LoadBalancerAttribute.LoadBalancerId)
 
-	resp, err := p.auth.NLB.DisableLoadBalancerIpv6Internet(req)
+	var resp *nlb.DisableLoadBalancerIpv6InternetResponse
+	err := retryOnThrottling("DisableLoadBalancerIpv6Internet", func() error {
+		var err error
+		resp, err = p.auth.NLB.DisableLoadBalancerIpv6Internet(req)
+		return err
+	})
 	if err != nil {
 		return util.SDKError("DisableLoadBalancerIpv6Internet", err)
 	}
@@ -270,7 +316,12 @@ func (p *NLBProvider) UpdateNLBZones(ctx context.Context, mdl *nlbmodel.NetworkL
 		req.ZoneMappings = append(req.ZoneMappings, zoneMapping)
 	}
 
-	resp, err := p.auth.NLB.UpdateLoadBalancerZones(req)
+	var resp *nlb.UpdateLoadBalancerZonesResponse
+	err := retryOnThrottling("UpdateLoadBalancerZones", func() error {
+		var err error
+		resp, err = p.auth.NLB.UpdateLoadBalancerZones(req)
+		return err
+	})
 	if err != nil {
 		return util.SDKError("UpdateLoadBalancerZones", err)
 	}
@@ -288,7 +339,12 @@ func (p *NLBProvider) UpdateNLBSecurityGroupIds(ctx context.Context, mdl *nlbmod
 		req := &nlb.LoadBalancerLeaveSecurityGroupRequest{}
 		req.LoadBalancerId = tea.String(mdl.LoadBalancerAttribute.LoadBalancerId)
 		req.SecurityGroupIds = tea.StringSlice(removed)
-		resp, err := p.auth.NLB.LoadBalancerLeaveSecurityGroup(req)
+		var resp *nlb.LoadBalancerLeaveSecurityGroupResponse
+		err := retryOnThrottling("LoadBalancerLeaveSecurityGroup", func() error {
+			var err error
+			resp, err = p.auth.NLB.LoadBalancerLeaveSecurityGroup(req)
+			return err
+		})
 		if err != nil {
 			return util.SDKError("LoadBalancerLeaveSecurityGroup", err)
 		}
@@ -307,7 +363,12 @@ func (p *NLBProvider) UpdateNLBSecurityGroupIds(ctx context.Context, mdl *nlbmod
 		req := &nlb.LoadBalancerJoinSecurityGroupRequest{}
 		req.LoadBalancerId = tea.String(mdl.LoadBalancerAttribute.LoadBalancerId)
 		req.SecurityGroupIds = tea.StringSlice(added)
-		resp, err := p.auth.NLB.LoadBalancerJoinSecurityGroup(req)
+		var resp *nlb.LoadBalancerJoinSecurityGroupResponse
+		err := retryOnThrottling("LoadBalancerJoinSecurityGroup", func() error {
+			var err error
+			resp, err = p.auth.NLB.LoadBalancerJoinSecurityGroup(req)
+			return err
+		})
 		if err != nil {
 			return util.SDKError("LoadBalancerJoinSecurityGroup", err)
 		}
@@ -342,7 +403,12 @@ func (p *NLBProvider) UpdateLoadBalancerProtection(ctx context.Context, lbId str
 		}
 	}
 
-	resp, err := p.auth.NLB.UpdateLoadBalancerProtection(req)
+	var resp *nlb.UpdateLoadBalancerProtectionResponse
+	err := retryOnThrottling("UpdateLoadBalancerProtection", func() error {
+		var err error
+		resp, err = p.auth.NLB.UpdateLoadBalancerProtection(req)
+		return err
+	})
 	if err != nil {
 		return util.SDKError("UpdateLoadBalancerProtection", err)
 	}
@@ -359,7 +425,12 @@ func (p *NLBProvider) AttachCommonBandwidthPackageToLoadBalancer(ctx context.Con
 	req.LoadBalancerId = tea.String(lbId)
 	req.BandwidthPackageId = tea.String(bandwidthPackageId)
 
-	resp, err := p.auth.NLB.AttachCommonBandwidthPackageToLoadBalancer(req)
+	var resp *nlb.AttachCommonBandwidthPackageToLoadBalancerResponse
+	err := retryOnThrottling("AttachCommonBandwidthPackageToLoadBalancer", func() error {
+		var err error
+		resp, err = p.auth.NLB.AttachCommonBandwidthPackageToLoadBalancer(req)
+		return err
+	})
 	if err != nil {
 		return util.SDKError("AttachCommonBandwidthPackageToLoadBalancer", err)
 	}
@@ -376,7 +447,12 @@ func (p *NLBProvider) DetachCommonBandwidthPackageFromLoadBalancer(ctx context.C
 	req.LoadBalancerId = tea.String(lbId)
 	req.BandwidthPackageId = tea.String(bandwidthPackageId)
 
-	resp, err := p.auth.NLB.DetachCommonBandwidthPackageFromLoadBalancer(req)
+	var resp *nlb.DetachCommonBandwidthPackageFromLoadBalancerResponse
+	err := retryOnThrottling("DetachCommonBandwidthPackageFromLoadBalancer", func() error {
+		var err error
+		resp, err = p.auth.NLB.DetachCommonBandwidthPackageFromLoadBalancer(req)
+		return err
+	})
 	if err != nil {
 		return util.SDKError("DetachCommonBandwidthPackageFromLoadBalancer", err)
 	}
@@ -405,7 +481,12 @@ func (p *NLBProvider) TagNLBResource(ctx context.Context, resourceId string, res
 		})
 	}
 
-	resp, err := p.auth.NLB.TagResources(req)
+	var resp *nlb.TagResourcesResponse
+	err := retryOnThrottling("TagResources", func() error {
+		var err error
+		resp, err = p.auth.NLB.TagResources(req)
+		return err
+	})
 	if err != nil {
 		return util.SDKError("TagResources", err)
 	}
@@ -421,7 +502,12 @@ func (p *NLBProvider) ListNLBTagResources(ctx context.Context, lbId string) ([]t
 	req.ResourceType = tea.String("loadbalancer")
 	req.ResourceId = []*string{tea.String(lbId)}
 
-	resp, err := p.auth.NLB.ListTagResources(req)
+	var resp *nlb.ListTagResourcesResponse
+	err := retryOnThrottling("ListTagResources", func() error {
+		var err error
+		resp, err = p.auth.NLB.ListTagResources(req)
+		return err
+	})
 	if err != nil {
 		return nil, fmt.Errorf("list nlb %s tag error: %s", lbId, util.SDKError("ListTagResources", err))
 	}
@@ -453,7 +539,12 @@ func (p *NLBProvider) findNLBByTag(mdl *nlbmodel.NetworkLoadBalancer) error {
 			},
 		)
 	}
-	resp, err := p.auth.NLB.ListLoadBalancers(req)
+	resp := &nlb.ListLoadBalancersResponse{}
+	err := retryOnThrottling("ListLoadBalancers", func() error {
+		var err error
+		resp, err = p.auth.NLB.ListLoadBalancers(req)
+		return err
+	})
 	if err != nil {
 		return fmt.Errorf("[%s] find nlb by tag error: %s", mdl.NamespacedName, util.SDKError("ListLoadBalancers", err))
 	}
@@ -507,7 +598,12 @@ func (p *NLBProvider) findNLBByName(mdl *nlbmodel.NetworkLoadBalancer) error {
 		mdl.NamespacedName, mdl.LoadBalancerAttribute.Name)
 	req := &nlb.ListLoadBalancersRequest{}
 	req.LoadBalancerNames = []*string{tea.String(mdl.LoadBalancerAttribute.Name)}
-	resp, err := p.auth.NLB.ListLoadBalancers(req)
+	var resp *nlb.ListLoadBalancersResponse
+	err := retryOnThrottling("ListLoadBalancers", func() error {
+		var err error
+		resp, err = p.auth.NLB.ListLoadBalancers(req)
+		return err
+	})
 	if err != nil {
 		return fmt.Errorf("[%s] find loadbalancer by name %s error: %s", mdl.NamespacedName,
 			mdl.LoadBalancerAttribute.Name, util.SDKError("ListLoadBalancers", err))
@@ -641,7 +737,11 @@ func (p *NLBProvider) waitJobFinish(api, jobId string, args ...time.Duration) er
 	_ = wait.PollImmediate(interval, timeout, func() (bool, error) {
 		req := &nlb.GetJobStatusRequest{}
 		req.JobId = tea.String(jobId)
-		resp, retErr = p.auth.NLB.GetJobStatus(req)
+		retErr := retryOnThrottling("GetJobStatus", func() error {
+			var err error
+			resp, err = p.auth.NLB.GetJobStatus(req)
+			return err
+		})
 		if retErr != nil {
 			retErr = util.SDKError(fmt.Sprintf("%s-GetJobStatus", api), retErr)
 			return false, retErr
@@ -678,7 +778,12 @@ func (p *NLBProvider) BatchWaitJobsFinish(ctx context.Context, api string, jobId
 		for _, j := range currentJobs {
 			req := &nlb.GetJobStatusRequest{}
 			req.JobId = tea.String(j)
-			resp, retErr := p.auth.NLB.GetJobStatus(req)
+			var resp *nlb.GetJobStatusResponse
+			retErr := retryOnThrottling("GetJobStatus", func() error {
+				var err error
+				resp, err = p.auth.NLB.GetJobStatus(req)
+				return err
+			})
 			if retErr != nil {
 				errs = append(errs, util.SDKError(fmt.Sprintf("%s-GetJobStatus", api), retErr))
 				continue
@@ -720,7 +825,11 @@ func (p *NLBProvider) waitNLBActive(lbId string) (*nlb.GetLoadBalancerAttributeR
 		req := &nlb.GetLoadBalancerAttributeRequest{}
 		req.LoadBalancerId = tea.String(lbId)
 
-		resp, retErr = p.auth.NLB.GetLoadBalancerAttribute(req)
+		retErr := retryOnThrottling("GetLoadBalancerAttribute", func() error {
+			var err error
+			resp, err = p.auth.NLB.GetLoadBalancerAttribute(req)
+			return err
+		})
 		if retErr != nil {
 			retErr = util.SDKError("GetLoadBalancerAttribute", retErr)
 			return false, retErr
@@ -797,7 +906,12 @@ func (p *NLBProvider) UntagNLBResources(ctx context.Context, resourceId string, 
 	req.ResourceType = tea.String(string(resourceType))
 	req.TagKey = tagKey
 
-	resp, err := p.auth.NLB.UntagResources(req)
+	var resp *nlb.UntagResourcesResponse
+	err := retryOnThrottling("UntagResources", func() error {
+		var err error
+		resp, err = p.auth.NLB.UntagResources(req)
+		return err
+	})
 	if err != nil {
 		return util.SDKError("UntagResources", err)
 	}
