@@ -3,7 +3,7 @@ package nlb
 import (
 	"context"
 	"fmt"
-	nlb "github.com/alibabacloud-go/nlb-20220430/v3/client"
+	nlb "github.com/alibabacloud-go/nlb-20220430/v4/client"
 	"github.com/alibabacloud-go/tea/tea"
 	nlbmodel "k8s.io/cloud-provider-alibaba-cloud/pkg/model/nlb"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/util"
