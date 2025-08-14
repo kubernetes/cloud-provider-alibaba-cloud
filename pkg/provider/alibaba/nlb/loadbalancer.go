@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	nlb "github.com/alibabacloud-go/nlb-20220430/v3/client"
+	nlb "github.com/alibabacloud-go/nlb-20220430/v4/client"
 	"github.com/alibabacloud-go/tea/tea"
 	"k8s.io/apimachinery/pkg/util/wait"
 	nlbmodel "k8s.io/cloud-provider-alibaba-cloud/pkg/model/nlb"
@@ -758,7 +758,6 @@ func (p *NLBProvider) waitJobFinish(api, jobId string, args ...time.Duration) er
 }
 
 func (p *NLBProvider) BatchWaitJobsFinish(ctx context.Context, api string, jobIds []string, args ...time.Duration) error {
-	// todo: use ListAsyncJobs when it ready
 	var interval, timeout time.Duration
 	if len(args) < 2 {
 		interval = DefaultRetryInterval
@@ -775,35 +774,42 @@ func (p *NLBProvider) BatchWaitJobsFinish(ctx context.Context, api string, jobId
 	err := wait.PollUntilContextTimeout(ctx, interval, timeout, false, func(ctx context.Context) (bool, error) {
 		klog.V(5).Infof("batch wait jobs %s ready, count=%d", api, len(currentJobs))
 		var newJobs []string
-		for _, j := range currentJobs {
-			req := &nlb.GetJobStatusRequest{}
-			req.JobId = tea.String(j)
-			var resp *nlb.GetJobStatusResponse
-			retErr := retryOnThrottling("GetJobStatus", func() error {
-				var err error
-				resp, err = p.auth.NLB.GetJobStatus(req)
-				return err
-			})
-			if retErr != nil {
-				errs = append(errs, util.SDKError(fmt.Sprintf("%s-GetJobStatus", api), retErr))
-				continue
-			}
-			if resp == nil || resp.Body == nil {
-				errs = append(errs, fmt.Errorf("OpenAPI %s GetJobStatus resp is nil, JobId: %s", api, j))
-				continue
-			}
-			if tea.StringValue(resp.Body.Status) == "Succeeded" {
-				klog.V(5).Infof("job %s succeeded", j)
-				continue
-			}
+		req := &nlb.ListAsynJobsRequest{}
+		req.JobIds = tea.StringSlice(currentJobs)
+		var resp *nlb.ListAsynJobsResponse
+		err := retryOnThrottling("LitAsynJobs", func() error {
+			var err error
+			resp, err = p.auth.NLB.ListAsynJobs(req)
+			return err
+		})
+		if err != nil {
+			return false, err
+		}
 
-			// job is unfinished, retry in next poll
-			newJobs = append(newJobs, j)
+		if resp.Body == nil {
+			return false, fmt.Errorf("OpenAPI %s ListAsynJobs resp is nil", api)
+		}
+
+		for _, job := range resp.Body.Jobs {
+			if job == nil {
+				continue
+			}
+			switch tea.StringValue(job.Status) {
+			case "Succeeded":
+				klog.V(5).Infof("job %s succeed", tea.StringValue(job.Id))
+			case "Failed":
+				klog.Warningf("job %s for API %s failed", tea.StringValue(job.Id), api)
+				errs = append(errs, fmt.Errorf("job %s for API %s failed", tea.StringValue(job.Id), api))
+			default:
+				klog.V(5).Infof("API: %s, Job %s, Status: %s", api, tea.StringValue(job.Id), tea.StringValue(job.Status))
+				newJobs = append(newJobs, tea.StringValue(job.Id))
+			}
 		}
 
 		if len(newJobs) == 0 {
 			return true, nil
 		}
+		currentJobs = newJobs
 		return false, nil
 	})
 

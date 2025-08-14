@@ -1,6 +1,7 @@
 package service
 
 import (
+	"bufio"
 	"bytes"
 	"crypto/md5"
 	"encoding/hex"
@@ -24,29 +25,87 @@ import (
 
 var defaultUserAgent = fmt.Sprintf("AlibabaCloud (%s; %s) Golang/%s Core/%s TeaDSL/1", runtime.GOOS, runtime.GOARCH, strings.Trim(runtime.Version(), "go"), "0.01")
 
+type ExtendsParameters struct {
+	Headers map[string]*string `json:"headers,omitempty" xml:"headers,omitempty"`
+	Queries map[string]*string `json:"queries,omitempty" xml:"queries,omitempty"`
+}
+
+func (s ExtendsParameters) String() string {
+	return tea.Prettify(s)
+}
+
+func (s ExtendsParameters) GoString() string {
+	return s.String()
+}
+
+func (s *ExtendsParameters) SetHeaders(v map[string]*string) *ExtendsParameters {
+	s.Headers = v
+	return s
+}
+
+func (s *ExtendsParameters) SetQueries(v map[string]*string) *ExtendsParameters {
+	s.Queries = v
+	return s
+}
+
 type RuntimeOptions struct {
-	Autoretry      *bool   `json:"autoretry" xml:"autoretry"`
-	IgnoreSSL      *bool   `json:"ignoreSSL" xml:"ignoreSSL"`
-	Key            *string `json:"key,omitempty" xml:"key,omitempty"`
-	Cert           *string `json:"cert,omitempty" xml:"cert,omitempty"`
-	Ca             *string `json:"ca,omitempty" xml:"ca,omitempty"`
-	MaxAttempts    *int    `json:"maxAttempts" xml:"maxAttempts"`
-	BackoffPolicy  *string `json:"backoffPolicy" xml:"backoffPolicy"`
-	BackoffPeriod  *int    `json:"backoffPeriod" xml:"backoffPeriod"`
-	ReadTimeout    *int    `json:"readTimeout" xml:"readTimeout"`
-	ConnectTimeout *int    `json:"connectTimeout" xml:"connectTimeout"`
-	LocalAddr      *string `json:"localAddr" xml:"localAddr"`
-	HttpProxy      *string `json:"httpProxy" xml:"httpProxy"`
-	HttpsProxy     *string `json:"httpsProxy" xml:"httpsProxy"`
-	NoProxy        *string `json:"noProxy" xml:"noProxy"`
-	MaxIdleConns   *int    `json:"maxIdleConns" xml:"maxIdleConns"`
-	Socks5Proxy    *string `json:"socks5Proxy" xml:"socks5Proxy"`
-	Socks5NetWork  *string `json:"socks5NetWork" xml:"socks5NetWork"`
-	KeepAlive      *bool   `json:"keepAlive" xml:"keepAlive"`
+	Autoretry         *bool              `json:"autoretry" xml:"autoretry"`
+	IgnoreSSL         *bool              `json:"ignoreSSL" xml:"ignoreSSL"`
+	Key               *string            `json:"key,omitempty" xml:"key,omitempty"`
+	Cert              *string            `json:"cert,omitempty" xml:"cert,omitempty"`
+	Ca                *string            `json:"ca,omitempty" xml:"ca,omitempty"`
+	MaxAttempts       *int               `json:"maxAttempts" xml:"maxAttempts"`
+	BackoffPolicy     *string            `json:"backoffPolicy" xml:"backoffPolicy"`
+	BackoffPeriod     *int               `json:"backoffPeriod" xml:"backoffPeriod"`
+	ReadTimeout       *int               `json:"readTimeout" xml:"readTimeout"`
+	ConnectTimeout    *int               `json:"connectTimeout" xml:"connectTimeout"`
+	LocalAddr         *string            `json:"localAddr" xml:"localAddr"`
+	HttpProxy         *string            `json:"httpProxy" xml:"httpProxy"`
+	HttpsProxy        *string            `json:"httpsProxy" xml:"httpsProxy"`
+	NoProxy           *string            `json:"noProxy" xml:"noProxy"`
+	MaxIdleConns      *int               `json:"maxIdleConns" xml:"maxIdleConns"`
+	Socks5Proxy       *string            `json:"socks5Proxy" xml:"socks5Proxy"`
+	Socks5NetWork     *string            `json:"socks5NetWork" xml:"socks5NetWork"`
+	KeepAlive         *bool              `json:"keepAlive" xml:"keepAlive"`
+	ExtendsParameters *ExtendsParameters `json:"extendsParameters,omitempty" xml:"extendsParameters,omitempty"`
 }
 
 var processStartTime int64 = time.Now().UnixNano() / 1e6
 var seqId int64 = 0
+
+type SSEEvent struct {
+	ID    *string
+	Event *string
+	Data  *string
+	Retry *int
+}
+
+func parseEvent(eventLines []string) (SSEEvent, error) {
+	var event SSEEvent
+
+	for _, line := range eventLines {
+		if strings.HasPrefix(line, "data:") {
+			event.Data = tea.String(tea.StringValue(event.Data) + strings.TrimPrefix(line, "data:") + "\n")
+		} else if strings.HasPrefix(line, "id:") {
+			id := strings.TrimPrefix(line, "id:")
+			event.ID = tea.String(strings.Trim(id, " "))
+		} else if strings.HasPrefix(line, "event:") {
+			eventName := strings.TrimPrefix(line, "event:")
+			event.Event = tea.String(strings.Trim(eventName, " "))
+		} else if strings.HasPrefix(line, "retry:") {
+			trimmedLine := strings.TrimPrefix(line, "retry:")
+			trimmedLine = strings.Trim(trimmedLine, " ")
+			retryValue, _err := strconv.Atoi(trimmedLine)
+			if _err != nil {
+				return event, fmt.Errorf("retry %v is not a int", trimmedLine)
+			}
+			event.Retry = tea.Int(retryValue)
+		}
+	}
+	data := strings.TrimRight(tea.StringValue(event.Data), "\n")
+	event.Data = tea.String(strings.Trim(data, " "))
+	return event, nil
+}
 
 func getGID() uint64 {
 	// https://blog.sgmansfield.com/2015/12/goroutine-ids/
@@ -156,6 +215,11 @@ func (s *RuntimeOptions) SetKeepAlive(v bool) *RuntimeOptions {
 	return s
 }
 
+func (s *RuntimeOptions) SetExtendsParameters(v *ExtendsParameters) *RuntimeOptions {
+	s.ExtendsParameters = v
+	return s
+}
+
 func ReadAsString(body io.Reader) (*string, error) {
 	byt, err := ioutil.ReadAll(body)
 	if err != nil {
@@ -220,11 +284,13 @@ func ToJSONString(a interface{}) *string {
 		}
 		return tea.String(string(byt))
 	}
-	byt, err := json.Marshal(a)
-	if err != nil {
+	byt := bytes.NewBuffer([]byte{})
+	jsonEncoder := json.NewEncoder(byt)
+	jsonEncoder.SetEscapeHTML(false)
+	if err := jsonEncoder.Encode(a); err != nil {
 		return nil
 	}
-	return tea.String(string(byt))
+	return tea.String(string(bytes.TrimSpace(byt.Bytes())))
 }
 
 func DefaultNumber(reaNum, defaultNum *int) *int {
@@ -523,4 +589,42 @@ func ToArray(in interface{}) []map[string]interface{} {
 		return nil
 	}
 	return tmp
+}
+
+func ReadAsSSE(body io.ReadCloser) (<-chan SSEEvent, <-chan error) {
+	eventChannel := make(chan SSEEvent)
+	errorChannel := make(chan error)
+
+	go func() {
+		defer body.Close()
+		defer close(eventChannel)
+
+		reader := bufio.NewReader(body)
+		var eventLines []string
+
+		for {
+			line, err := reader.ReadString('\n')
+			if err == io.EOF {
+				break
+			}
+			if err != nil {
+				errorChannel <- err
+			}
+
+			line = strings.TrimRight(line, "\n")
+			if line == "" {
+				if len(eventLines) > 0 {
+					event, err := parseEvent(eventLines)
+					if err != nil {
+						errorChannel <- err
+					}
+					eventChannel <- event
+					eventLines = []string{}
+				}
+				continue
+			}
+			eventLines = append(eventLines, line)
+		}
+	}()
+	return eventChannel, errorChannel
 }
