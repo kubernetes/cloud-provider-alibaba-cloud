@@ -40,9 +40,8 @@ const (
 )
 
 var apiThrottlingBackoff = wait.Backoff{
-	Steps:    10,
+	Steps:    30,
 	Duration: 1 * time.Second,
-	Jitter:   0.1,
 }
 
 func retryOnThrottling(api string, fn func() error) error {
