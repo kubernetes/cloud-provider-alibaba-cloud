@@ -340,9 +340,11 @@ func clientCfg() *sdk.Config {
 		scheme = "HTTP"
 	}
 	return &sdk.Config{
-		Timeout:   20 * time.Second,
-		Transport: http.DefaultTransport,
-		Scheme:    scheme,
+		AutoRetry:    true,
+		MaxRetryTime: 2,
+		Timeout:      20 * time.Second,
+		Transport:    http.DefaultTransport,
+		Scheme:       scheme,
 	}
 }
 

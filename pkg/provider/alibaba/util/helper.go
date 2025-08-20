@@ -70,6 +70,8 @@ func SDKError(api string, err error) error {
 	case *errors.ServerError:
 		return fmt.Errorf("[SDKError] API: %s, ErrorCode: %s, RequestId: %s, Message: %s",
 			api, err.ErrorCode(), err.RequestId(), err.Message())
+	case *errors.ClientError:
+		return err.OriginError()
 	default:
 		return err
 	}
