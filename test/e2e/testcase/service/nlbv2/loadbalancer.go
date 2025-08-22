@@ -2,6 +2,7 @@ package nlbv2
 
 import (
 	"context"
+	"fmt"
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
@@ -33,6 +34,122 @@ func RunLoadBalancerTestCases(f *framework.Framework) {
 				err = f.ExpectNetworkLoadBalancerEqual(svc)
 				gomega.Expect(err).To(gomega.BeNil())
 			})
+		})
+
+		ginkgo.Context("nlb zonemaps", func() {
+			ginkgo.It("create loadbalancer with private ipv4 address", func() {
+				zoneMapping, err := framework.ParseNLBZoneMappings(options.TestConfig.NLBZoneMaps)
+				gomega.Expect(err).To(gomega.BeNil())
+				ipv4Addr, err := f.FindFreeIPv4AddressFromVSwitch(context.TODO(), zoneMapping[0].VSwitchId)
+				gomega.Expect(err).To(gomega.BeNil())
+				zoneMapping[0].IPv4Addr = ipv4Addr.String()
+				var zoneMaps []string
+				for _, zm := range zoneMapping {
+					z := ""
+					if zm.IPv4Addr != "" {
+						z = fmt.Sprintf("%s:%s:%s", zm.ZoneId, zm.VSwitchId, zm.IPv4Addr)
+					} else {
+						z = fmt.Sprintf("%s:%s", zm.ZoneId, zm.VSwitchId)
+					}
+					zoneMaps = append(zoneMaps, z)
+				}
+
+				svc, err := f.Client.KubeClient.CreateNLBServiceByAnno(map[string]string{
+					annotation.Annotation(annotation.ZoneMaps): strings.Join(zoneMaps, ","),
+				})
+				gomega.Expect(err).To(gomega.BeNil())
+				err = f.ExpectNetworkLoadBalancerEqual(svc)
+				gomega.Expect(err).To(gomega.BeNil())
+			})
+
+			ginkgo.It("change loadbalancer private ipv4 address", func() {
+				zoneMapping, err := framework.ParseNLBZoneMappings(options.TestConfig.NLBZoneMaps)
+				gomega.Expect(err).To(gomega.BeNil())
+				ipv4Addr, err := f.FindFreeIPv4AddressFromVSwitch(context.TODO(), zoneMapping[0].VSwitchId)
+				gomega.Expect(err).To(gomega.BeNil())
+				zoneMapping[0].IPv4Addr = ipv4Addr.String()
+				var zoneMaps []string
+				for _, zm := range zoneMapping {
+					z := ""
+					if zm.IPv4Addr != "" {
+						z = fmt.Sprintf("%s:%s:%s", zm.ZoneId, zm.VSwitchId, zm.IPv4Addr)
+					} else {
+						z = fmt.Sprintf("%s:%s", zm.ZoneId, zm.VSwitchId)
+					}
+					zoneMaps = append(zoneMaps, z)
+				}
+
+				oldSvc, err := f.Client.KubeClient.CreateNLBServiceByAnno(map[string]string{
+					annotation.Annotation(annotation.ZoneMaps): options.TestConfig.NLBZoneMaps,
+				})
+				gomega.Expect(err).To(gomega.BeNil())
+				err = f.ExpectNetworkLoadBalancerEqual(oldSvc)
+				gomega.Expect(err).To(gomega.BeNil())
+
+				newSvc := oldSvc.DeepCopy()
+				newSvc.Annotations[annotation.Annotation(annotation.ZoneMaps)] = strings.Join(zoneMaps, ",")
+				newSvc, err = f.Client.KubeClient.PatchService(oldSvc, newSvc)
+				gomega.Expect(err).To(gomega.BeNil())
+
+				err = f.ExpectNetworkLoadBalancerEqual(newSvc)
+				gomega.Expect(err).NotTo(gomega.BeNil())
+			})
+
+			if options.TestConfig.EIPID != "" {
+				ginkgo.It("create loadbalancer with eip id", func() {
+					zoneMapping, err := framework.ParseNLBZoneMappings(options.TestConfig.NLBZoneMaps)
+					gomega.Expect(err).To(gomega.BeNil())
+					zoneMapping[0].AllocationId = options.TestConfig.EIPID
+					var zoneMaps []string
+					for _, zm := range zoneMapping {
+						z := ""
+						if zm.AllocationId != "" {
+							z = fmt.Sprintf("%s:%s::%s", zm.ZoneId, zm.VSwitchId, zm.AllocationId)
+						} else {
+							z = fmt.Sprintf("%s:%s", zm.ZoneId, zm.VSwitchId)
+						}
+						zoneMaps = append(zoneMaps, z)
+					}
+
+					svc, err := f.Client.KubeClient.CreateNLBServiceByAnno(map[string]string{
+						annotation.Annotation(annotation.ZoneMaps): strings.Join(zoneMaps, ","),
+					})
+					gomega.Expect(err).To(gomega.BeNil())
+					err = f.ExpectNetworkLoadBalancerEqual(svc)
+					gomega.Expect(err).To(gomega.BeNil())
+				})
+
+				ginkgo.It("change loadbalancer eip id", func() {
+					zoneMapping, err := framework.ParseNLBZoneMappings(options.TestConfig.NLBZoneMaps)
+					gomega.Expect(err).To(gomega.BeNil())
+					zoneMapping[0].AllocationId = options.TestConfig.EIPID
+					var zoneMaps []string
+					for _, zm := range zoneMapping {
+						z := ""
+						if zm.AllocationId != "" {
+							z = fmt.Sprintf("%s:%s::%s", zm.ZoneId, zm.VSwitchId, zm.AllocationId)
+						} else {
+							z = fmt.Sprintf("%s:%s", zm.ZoneId, zm.VSwitchId)
+						}
+						zoneMaps = append(zoneMaps, z)
+					}
+
+					oldSvc, err := f.Client.KubeClient.CreateNLBServiceByAnno(map[string]string{
+						annotation.Annotation(annotation.ZoneMaps): options.TestConfig.NLBZoneMaps,
+					})
+					gomega.Expect(err).To(gomega.BeNil())
+					err = f.ExpectNetworkLoadBalancerEqual(oldSvc)
+					gomega.Expect(err).To(gomega.BeNil())
+
+					newSvc := oldSvc.DeepCopy()
+					newSvc.Annotations[annotation.Annotation(annotation.ZoneMaps)] = strings.Join(zoneMaps, ",")
+					newSvc, err = f.Client.KubeClient.PatchService(oldSvc, newSvc)
+					gomega.Expect(err).To(gomega.BeNil())
+
+					err = f.ExpectNetworkLoadBalancerEqual(newSvc)
+					gomega.Expect(err).NotTo(gomega.BeNil())
+				})
+			}
 		})
 
 		ginkgo.Context("nlb address-type", func() {

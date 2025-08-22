@@ -559,12 +559,16 @@ func loadResponse(resp interface{}, lb *nlbmodel.NetworkLoadBalancer) error {
 		lb.LoadBalancerAttribute.BandwidthPackageId = resp.BandwidthPackageId
 
 		for _, z := range resp.ZoneMappings {
-			lb.LoadBalancerAttribute.ZoneMappings = append(lb.LoadBalancerAttribute.ZoneMappings,
-				nlbmodel.ZoneMapping{
-					ZoneId:    tea.StringValue(z.ZoneId),
-					VSwitchId: tea.StringValue(z.VSwitchId),
-				},
-			)
+			zm := nlbmodel.ZoneMapping{
+				ZoneId:    tea.StringValue(z.ZoneId),
+				VSwitchId: tea.StringValue(z.VSwitchId),
+			}
+			// By far, the OpenAPI will only return one address for each zone-mapping.
+			if len(z.LoadBalancerAddresses) != 0 {
+				zm.AllocationId = tea.StringValue(z.LoadBalancerAddresses[0].AllocationId)
+				zm.IPv4Addr = tea.StringValue(z.LoadBalancerAddresses[0].PrivateIPv4Address)
+			}
+			lb.LoadBalancerAttribute.ZoneMappings = append(lb.LoadBalancerAttribute.ZoneMappings, zm)
 		}
 
 		var tags []tag.Tag
@@ -590,12 +594,15 @@ func loadResponse(resp interface{}, lb *nlbmodel.NetworkLoadBalancer) error {
 		lb.LoadBalancerAttribute.BandwidthPackageId = resp.BandwidthPackageId
 
 		for _, z := range resp.ZoneMappings {
-			lb.LoadBalancerAttribute.ZoneMappings = append(lb.LoadBalancerAttribute.ZoneMappings,
-				nlbmodel.ZoneMapping{
-					ZoneId:    tea.StringValue(z.ZoneId),
-					VSwitchId: tea.StringValue(z.VSwitchId),
-				},
-			)
+			zm := nlbmodel.ZoneMapping{
+				ZoneId:    tea.StringValue(z.ZoneId),
+				VSwitchId: tea.StringValue(z.VSwitchId),
+			}
+			if len(z.LoadBalancerAddresses) != 0 {
+				zm.AllocationId = tea.StringValue(z.LoadBalancerAddresses[0].AllocationId)
+				zm.IPv4Addr = tea.StringValue(z.LoadBalancerAddresses[0].PrivateIPv4Address)
+			}
+			lb.LoadBalancerAttribute.ZoneMappings = append(lb.LoadBalancerAttribute.ZoneMappings, zm)
 		}
 
 		var tags []tag.Tag

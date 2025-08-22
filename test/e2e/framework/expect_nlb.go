@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/model/tag"
+	"net"
 	"strconv"
 	"strings"
 	"time"
@@ -174,7 +175,7 @@ func networkLoadBalancerAttrEqual(f *Framework, anno *annotation.AnnotationReque
 	}
 
 	if zoneMappings := anno.Get(annotation.ZoneMaps); zoneMappings != "" {
-		localMappings, err := parseZoneMappings(zoneMappings)
+		localMappings, err := ParseNLBZoneMappings(zoneMappings)
 		if err != nil {
 			return fmt.Errorf("parse nlb local zone maps error: %s", err)
 		}
@@ -182,6 +183,12 @@ func networkLoadBalancerAttrEqual(f *Framework, anno *annotation.AnnotationReque
 			found := false
 			for _, remote := range nlb.ZoneMappings {
 				if local.ZoneId == remote.ZoneId && local.VSwitchId == remote.VSwitchId {
+					if local.AllocationId != "" && local.AllocationId != remote.AllocationId {
+						continue
+					}
+					if local.IPv4Addr != "" && local.IPv4Addr != remote.IPv4Addr {
+						continue
+					}
 					found = true
 					break
 				}
@@ -444,7 +451,7 @@ func buildNLBRemoteModel(f *Framework, svc *v1.Service) (*nlbmodel.NetworkLoadBa
 	return builder.Instance(nlbv2.RemoteModel).Build(reqCtx)
 }
 
-func parseZoneMappings(zoneMaps string) ([]nlbmodel.ZoneMapping, error) {
+func ParseNLBZoneMappings(zoneMaps string) ([]nlbmodel.ZoneMapping, error) {
 	var ret []nlbmodel.ZoneMapping
 	attrs := strings.Split(zoneMaps, ",")
 	for _, attr := range attrs {
@@ -1151,4 +1158,52 @@ func serverGroupAttrEqual(reqCtx *svcCtx.RequestContext, remote *nlbmodel.Server
 	}
 
 	return nil
+}
+
+func (f *Framework) FindFreeIPv4AddressFromVSwitch(ctx context.Context, vswId string) (net.IP, error) {
+	cidrBlock, err := f.Client.CloudClient.DescribeVSwitchCIDRBlock(ctx, vswId)
+	if err != nil {
+		return nil, err
+	}
+	_, cidr, err := net.ParseCIDR(cidrBlock)
+	if err != nil {
+		return nil, err
+	}
+	if cidr == nil {
+		return nil, fmt.Errorf("parsed cidr is nil for block %s", cidrBlock)
+	}
+
+	last := make(net.IP, len(cidr.IP))
+	for i := range cidr.IP {
+		last[i] = cidr.IP[i] | ^cidr.Mask[i]
+	}
+
+	// find the last ipv4 address from the cidr block
+	found := false
+	for range 10 {
+		last = decIP(last)
+		c, err := f.Client.CloudClient.CheckCanAllocateVpcPrivateIpAddress(ctx, vswId, last.String())
+		if err != nil {
+			return nil, err
+		}
+		if c {
+			found = true
+			break
+		}
+	}
+	if !found {
+		return nil, fmt.Errorf("no free ipv4 address found in cidr block %s", cidrBlock)
+	}
+	klog.Infof("find free ipv4 address from vsw %s: %s", vswId, last.String())
+	return last, nil
+}
+
+func decIP(ip net.IP) net.IP {
+	for i := len(ip) - 1; i >= 0; i-- {
+		ip[i]--
+		if ip[i] != 0xff {
+			break
+		}
+	}
+	return ip
 }

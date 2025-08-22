@@ -460,3 +460,65 @@ func (r *VPCProvider) DescribeRouteTableList(ctx context.Context, vpcId string) 
 	}
 	return rtIds, nil
 }
+
+// DescribeEipIdByName used for e2etest
+func (r *VPCProvider) DescribeEipIdByName(ctx context.Context, name string) (string, error) {
+	req := vpc.CreateDescribeEipAddressesRequest()
+	req.EipName = name
+
+	resp, err := r.auth.VPC.DescribeEipAddresses(req)
+	if err != nil {
+		if strings.Contains(err.Error(), "NotFound") {
+			return "", nil
+		}
+		return "", err
+	}
+
+	if len(resp.EipAddresses.EipAddress) == 0 {
+		return "", nil
+	}
+
+	return resp.EipAddresses.EipAddress[0].AllocationId, nil
+}
+
+// AllocateEipAddress used for e2etest
+func (r *VPCProvider) AllocateEipAddress(ctx context.Context, name string) (string, error) {
+	req := vpc.CreateAllocateEipAddressRequest()
+	req.Name = name
+	resp, err := r.auth.VPC.AllocateEipAddress(req)
+	if err != nil {
+		return "", err
+	}
+	return resp.AllocationId, nil
+}
+
+// ReleaseEipAddress used for e2etest
+func (r *VPCProvider) ReleaseEipAddress(ctx context.Context, id string) error {
+	req := vpc.CreateReleaseEipAddressRequest()
+	req.AllocationId = id
+	_, err := r.auth.VPC.ReleaseEipAddress(req)
+	return err
+}
+
+// DescribeVSwitchCIDRBlock used for e2etest
+func (r *VPCProvider) DescribeVSwitchCIDRBlock(ctx context.Context, vswId string) (string, error) {
+	req := vpc.CreateDescribeVSwitchAttributesRequest()
+	req.VSwitchId = vswId
+	resp, err := r.auth.VPC.DescribeVSwitchAttributes(req)
+	if err != nil {
+		return "", err
+	}
+	return resp.CidrBlock, nil
+}
+
+// CheckCanAllocateVpcPrivateIpAddress used for e2etest
+func (r *VPCProvider) CheckCanAllocateVpcPrivateIpAddress(ctx context.Context, vswId string, ipAddress string) (bool, error) {
+	req := vpc.CreateCheckCanAllocateVpcPrivateIpAddressRequest()
+	req.VSwitchId = vswId
+	req.PrivateIpAddress = ipAddress
+	resp, err := r.auth.VPC.CheckCanAllocateVpcPrivateIpAddress(req)
+	if err != nil {
+		return false, err
+	}
+	return resp.CanAllocate, err
+}
