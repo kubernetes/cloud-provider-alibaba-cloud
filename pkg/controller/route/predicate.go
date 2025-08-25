@@ -16,7 +16,7 @@ type predicateForNodeEvent struct {
 func (sp *predicateForNodeEvent) Create(e event.CreateEvent) bool {
 	node, ok := e.Object.(*v1.Node)
 	if ok && node.Spec.PodCIDR == "" {
-		klog.V(5).Infof("node podCIDR is empty, ignore create event")
+		klog.V(5).Infof("node %s podCIDR is empty, ignore create event", node.Name)
 		return false
 	}
 

@@ -732,7 +732,7 @@ func (client *KubeClient) GetLatestNode() (*v1.Node, error) {
 
 	var ret v1.Node
 	for _, node := range nodeList.Items {
-		if helper.HasExcludeLabel(&node) {
+		if helper.IsExcludedNode(&node) {
 			continue
 		}
 		if _, exclude := node.Labels[helper.LabelNodeExcludeBalancer]; exclude {

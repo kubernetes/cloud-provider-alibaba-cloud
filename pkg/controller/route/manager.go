@@ -225,8 +225,8 @@ func containsRoute(outside *net.IPNet, insideRoute string) (containsEqual bool, 
 }
 
 func needSyncRoute(node *v1.Node) bool {
-	if helper.HasExcludeLabel(node) {
-		klog.Infof("node %s has exclude label, skip creating route", node.Name)
+	if helper.IsExcludedNode(node) {
+		klog.Infof("node %s has exclude label or type, skip creating route", node.Name)
 		return false
 	}
 
