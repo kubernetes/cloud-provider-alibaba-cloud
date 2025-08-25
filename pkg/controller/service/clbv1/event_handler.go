@@ -310,12 +310,11 @@ func (h *enqueueRequestForNodeEvent) enqueueManagedNode(queue workqueue.RateLimi
 		return
 	}
 
-	filterService := utilfeature.DefaultFeatureGate.Enabled(ctrlCfg.FilterServiceOnNodeChange)
 	for _, v := range svcs.Items {
 		if !helper.NeedCLB(&v) {
 			continue
 		}
-		if filterService && !h.checkServiceAffected(node, &v) {
+		if !h.checkServiceAffected(node, &v) {
 			continue
 		}
 		queue.Add(reconcile.Request{
@@ -332,6 +331,10 @@ func (h *enqueueRequestForNodeEvent) enqueueManagedNode(queue workqueue.RateLimi
 func (h *enqueueRequestForNodeEvent) checkServiceAffected(node *v1.Node, svc *v1.Service) bool {
 	if helper.IsENIBackendType(svc) {
 		return false
+	}
+
+	if !utilfeature.DefaultFeatureGate.Enabled(ctrlCfg.FilterServiceOnNodeChange) {
+		return true
 	}
 
 	if svc.Spec.ExternalTrafficPolicy == v1.ServiceExternalTrafficPolicyTypeCluster {
