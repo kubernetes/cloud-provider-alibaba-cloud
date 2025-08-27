@@ -4,12 +4,18 @@ import (
 	"errors"
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+	"time"
 )
 
 var _ error = &ReconcileNeedRequeue{}
 
+const (
+	defaultRequeueAfter = time.Second * 10
+)
+
 type ReconcileNeedRequeue struct {
 	reason string
+	after  time.Duration
 }
 
 func (r *ReconcileNeedRequeue) Error() string {
@@ -30,7 +36,11 @@ func HandleReconcileResult(request reconcile.Request, err error) (reconcile.Resu
 	var needRequeue *ReconcileNeedRequeue
 	if errors.As(err, &needRequeue) {
 		klog.Infof("[%s] requeue for next reconcile: %s", request, needRequeue.reason)
-		return reconcile.Result{Requeue: true}, nil
+		after := defaultRequeueAfter
+		if needRequeue.after > 0 {
+			after = needRequeue.after
+		}
+		return reconcile.Result{RequeueAfter: after}, nil
 	}
 
 	return reconcile.Result{}, err
