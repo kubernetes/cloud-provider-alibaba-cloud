@@ -37,8 +37,8 @@ var (
 		prometheus.HistogramOpts{
 			Name: "ccm_node_latencies_duration_milliseconds",
 			Help: "CCM node reconcile latency distribution in milliseconds for each verb.",
-			Buckets: []float64{10, 50, 100, 200, 300, 400, 500, 600, 700, 800, 900, 1000,
-				1500, 2000, 3000, 4000, 5000, 6000, 7000, 8000, 9000, 10000, 30000, 60000, 300000, 600000},
+			Buckets: []float64{500, 700, 1000, 1500, 2000, 3000, 4000, 5000, 7000, 8000, 9000, 10000,
+				30000, 60000, 100000, 150000, 200000, 300000, 600000, 700000, 800000},
 		},
 		[]string{"verb"},
 	)
@@ -48,8 +48,8 @@ var (
 		prometheus.HistogramOpts{
 			Name: "ccm_route_latencies_duration_milliseconds",
 			Help: "CCM route reconcile latency distribution in milliseconds for each verb.",
-			Buckets: []float64{10, 50, 100, 200, 300, 400, 500, 600, 700, 800, 900, 1000,
-				1500, 2000, 3000, 4000, 5000, 6000, 7000, 8000, 9000, 10000, 30000, 60000, 300000, 600000},
+			Buckets: []float64{500, 700, 1000, 1500, 2000, 3000, 4000, 5000, 7000, 8000, 9000, 10000,
+				30000, 60000, 100000, 150000, 200000, 300000, 600000, 700000, 800000},
 		},
 		[]string{"verb"},
 	)
@@ -58,8 +58,8 @@ var (
 		prometheus.HistogramOpts{
 			Name: "ccm_slb_latencies_duration_milliseconds",
 			Help: "CCM load balancer reconcile latency distribution in milliseconds for each verb.",
-			Buckets: []float64{10, 50, 100, 200, 300, 400, 500, 600, 700, 800, 900, 1000,
-				1500, 2000, 3000, 4000, 5000, 6000, 7000, 8000, 9000, 10000, 30000, 60000, 300000, 600000},
+			Buckets: []float64{500, 700, 1000, 1500, 2000, 3000, 4000, 5000, 7000, 8000, 9000, 10000,
+				30000, 60000, 100000, 150000, 200000, 300000, 600000, 700000, 800000},
 		},
 		[]string{"type", "verb"},
 	)

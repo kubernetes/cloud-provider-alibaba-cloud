@@ -264,6 +264,11 @@ func (m *ReconcileNode) doAddCloudNode(node *corev1.Node) error {
 
 // syncNode sync the nodeAddress & cloud node existence
 func (m *ReconcileNode) syncNode(nodes []corev1.Node, configCloudRoute bool) error {
+	start := time.Now()
+	defer func() {
+		metric.NodeLatency.WithLabelValues("reconcile").Observe(metric.MsSince(start))
+	}()
+
 	instances, err := m.cloud.ListInstances(context.TODO(), nodeids(nodes))
 	if err != nil {
 		return fmt.Errorf("[NodeAddress] list instances from api: %s", err.Error())
@@ -381,6 +386,8 @@ func (m *ReconcileNode) syncNode(nodes []corev1.Node, configCloudRoute bool) err
 			)
 		}
 	}
+
+	log.Info("sync node finished", "nodeLen", len(nodes), "elapsedTime", time.Now().Sub(start).Seconds())
 	return nil
 }
 
@@ -433,7 +440,6 @@ func (m *ReconcileNode) disableNetworkInterfaceSourceDestCheck(enis []eniInfo) (
 func (m *ReconcileNode) PeriodicalSync() {
 	// Start a loop to periodically update the node addresses obtained from the cloud
 	syncNode := func() {
-
 		nodes, err := NodeList(m.client)
 		if err != nil {
 			log.Error(err, "address sync error")

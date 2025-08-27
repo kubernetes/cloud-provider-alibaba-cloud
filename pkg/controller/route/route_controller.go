@@ -410,6 +410,9 @@ func (r *ReconcileRoute) reconcileForCluster() {
 
 func (r *ReconcileRoute) batchSyncCloudRoutes(ctx context.Context, reconcileID string, requests []reconcile.Request) error {
 	startTime := time.Now()
+	defer func() {
+		metric.RouteLatency.WithLabelValues("reconcile").Observe(metric.MsSince(startTime))
+	}()
 	var toAddedNodes []*corev1.Node
 	toAdd := map[string][]*model.Route{}
 	var toDelete []*model.Route
