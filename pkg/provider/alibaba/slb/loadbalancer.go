@@ -409,7 +409,7 @@ func loadResponse(resp interface{}, lb *model.LoadBalancer) {
 	lb.LoadBalancerAttribute.Address = v.FieldByName("Address").String()
 	lb.LoadBalancerAttribute.AddressType = model.AddressType(v.FieldByName("AddressType").String())
 	lb.LoadBalancerAttribute.AddressIPVersion = model.AddressIPVersionType(v.FieldByName("AddressIPVersion").String())
-	lb.LoadBalancerAttribute.NetworkType = v.FieldByName("NetworkType").String()
+	lb.LoadBalancerAttribute.NetworkType = model.NetworkType(v.FieldByName("NetworkType").String())
 	lb.LoadBalancerAttribute.VpcId = v.FieldByName("VpcId").String()
 	lb.LoadBalancerAttribute.VSwitchId = v.FieldByName("VSwitchId").String()
 	lb.LoadBalancerAttribute.Bandwidth = int(v.FieldByName("Bandwidth").Int())

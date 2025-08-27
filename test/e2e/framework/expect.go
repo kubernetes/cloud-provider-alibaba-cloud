@@ -248,8 +248,8 @@ func loadBalancerAttrEqual(f *Framework, anno *annotation.AnnotationRequest, svc
 			return fmt.Errorf("expected slb IPVersion %s, got %s", IPVersion, lb.AddressIPVersion)
 		}
 	}
-	if networkType := anno.Get(annotation.SLBNetworkType); networkType != "" {
-		if lb.NetworkType != networkType {
+	if networkType := anno.Get(annotation.NetworkType); networkType != "" {
+		if lb.NetworkType != model.NetworkType(networkType) {
 			return fmt.Errorf("expected slb networkType %s, got %s", networkType, lb.NetworkType)
 		}
 	}

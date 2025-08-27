@@ -131,6 +131,10 @@ func (mgr *LoadBalancerManager) Update(reqCtx *svcCtx.RequestContext, local, rem
 		local.LoadBalancerAttribute.ResourceGroupId != remote.LoadBalancerAttribute.ResourceGroupId {
 		errs = append(errs, fmt.Errorf("alicloud: can not change ResourceGroupId once created"))
 	}
+	if local.LoadBalancerAttribute.NetworkType != "" &&
+		local.LoadBalancerAttribute.NetworkType != remote.LoadBalancerAttribute.NetworkType {
+		errs = append(errs, fmt.Errorf("alicloud: can not change LoadBalancer network type once created"))
+	}
 	if local.LoadBalancerAttribute.Address != "" &&
 		local.LoadBalancerAttribute.Address != remote.LoadBalancerAttribute.Address {
 		errs = append(errs, fmt.Errorf("alicloud: can not change LoadBalancer address once created"))
@@ -256,6 +260,12 @@ func (mgr *LoadBalancerManager) BuildLocalModel(reqCtx *svcCtx.RequestContext, m
 	if reqCtx.Anno.Get(annotation.PreserveLBOnDelete) != "" {
 		mdl.LoadBalancerAttribute.PreserveOnDelete = true
 	}
+	if reqCtx.Anno.Get(annotation.NetworkType) != "" {
+		mdl.LoadBalancerAttribute.NetworkType = model.NetworkType(reqCtx.Anno.Get(annotation.NetworkType))
+		if mdl.LoadBalancerAttribute.NetworkType == model.ClassicNetworkType {
+			mdl.LoadBalancerAttribute.VSwitchId = ""
+		}
+	}
 	return nil
 }
 
@@ -363,7 +373,8 @@ func setModelDefaultValue(mgr *LoadBalancerManager, mdl *model.LoadBalancer, ann
 		mdl.LoadBalancerAttribute.LoadBalancerName = anno.GetDefaultLoadBalancerName()
 	}
 
-	if mdl.LoadBalancerAttribute.AddressType == model.IntranetAddressType {
+	if mdl.LoadBalancerAttribute.AddressType == model.IntranetAddressType &&
+		mdl.LoadBalancerAttribute.NetworkType != model.ClassicNetworkType {
 		vpcId, err := mgr.cloud.VpcID()
 		if err != nil {
 			return fmt.Errorf("get vpc id from metadata error: %s", err.Error())
@@ -375,6 +386,13 @@ func setModelDefaultValue(mgr *LoadBalancerManager, mdl *model.LoadBalancer, ann
 				return fmt.Errorf("get vsw id from metadata error: %s", err.Error())
 			}
 			mdl.LoadBalancerAttribute.VSwitchId = vswId
+		}
+	}
+
+	if mdl.LoadBalancerAttribute.AddressType == model.IntranetAddressType &&
+		mdl.LoadBalancerAttribute.NetworkType == model.ClassicNetworkType {
+		if mdl.LoadBalancerAttribute.VpcId == "" {
+			mdl.LoadBalancerAttribute.VpcId = ctrlcfg.CloudCFG.Global.VpcID
 		}
 	}
 
