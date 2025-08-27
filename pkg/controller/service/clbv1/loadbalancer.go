@@ -383,6 +383,10 @@ func setModelDefaultValue(mgr *LoadBalancerManager, mdl *model.LoadBalancer, ann
 		mdl.LoadBalancerAttribute.LoadBalancerSpec = model.LoadBalancerSpecType(anno.GetDefaultValue(annotation.Spec))
 	}
 
+	if mdl.LoadBalancerAttribute.InstanceChargeType.IsPayByCLCU() {
+		mdl.LoadBalancerAttribute.InstanceChargeType = model.PayByCLCU
+	}
+
 	if mdl.LoadBalancerAttribute.DeleteProtection == "" {
 		mdl.LoadBalancerAttribute.DeleteProtection = model.FlagType(anno.GetDefaultValue(annotation.DeleteProtection))
 	}
