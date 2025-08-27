@@ -771,11 +771,11 @@ func isNeedUpdate(reqCtx *svcCtx.RequestContext, local model.ListenerAttribute, 
 	}
 	if local.AclStatus == model.OnFlag &&
 		local.AclId != "" &&
-		remote.AclId != local.AclId {
+		!IsListenerACLIDsEqual(local, remote) {
 		needUpdate = true
 		update.AclId = local.AclId
 		updateDetail += fmt.Sprintf("lb AclId %v should be changed to %v;",
-			remote.AclId, local.AclId)
+			remote.AclIds, local.AclId)
 	}
 	if local.AclStatus == model.OnFlag &&
 		local.AclType != "" &&
@@ -1035,4 +1035,32 @@ func checkCertValidity(cloudClient prvd.Provider, oldCertId, newCertId string) e
 	}
 
 	return nil
+}
+
+func IsListenerACLIDsEqual(local, remote model.ListenerAttribute) bool {
+	var localIds, remoteIds []string
+	if local.AclId != "" {
+		localIds = strings.Split(local.AclId, ",")
+	}
+	if len(remote.AclIds) != 0 {
+		remoteIds = remote.AclIds
+	} else if remote.AclId != "" {
+		remoteIds = []string{remote.AclId}
+	}
+
+	if len(localIds) != len(remoteIds) {
+		return false
+	}
+
+	m := map[string]struct{}{}
+	for _, l := range localIds {
+		m[l] = struct{}{}
+	}
+
+	for _, r := range remoteIds {
+		if _, ok := m[r]; !ok {
+			return false
+		}
+	}
+	return true
 }

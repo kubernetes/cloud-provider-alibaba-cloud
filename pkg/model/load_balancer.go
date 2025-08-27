@@ -159,6 +159,7 @@ type ListenerAttribute struct {
 	XForwardedForSLBPort       FlagType
 	XForwardedForClientSrcPort FlagType
 	AclId                      string
+	AclIds                     []string
 	AclType                    string
 	AclStatus                  FlagType
 	ConnectionDrain            FlagType

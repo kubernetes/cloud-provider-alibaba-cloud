@@ -46,6 +46,7 @@ func (p SLBProvider) DescribeLoadBalancerListeners(ctx context.Context, lbId str
 			Scheduler:    lis.Scheduler,
 			VGroupId:     lis.VServerGroupId,
 			AclId:        lis.AclId,
+			AclIds:       lis.AclIds,
 			AclStatus:    model.FlagType(lis.AclStatus),
 			AclType:      lis.AclType,
 		}
