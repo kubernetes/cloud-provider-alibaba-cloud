@@ -624,7 +624,10 @@ func RunLoadBalancerTestCases(f *framework.Framework) {
 				})
 
 				ginkgo.It("change master zone & slave zone", func() {
-					oldSvc, err := f.Client.KubeClient.CreateServiceByAnno(nil)
+					oldSvc, err := f.Client.KubeClient.CreateServiceByAnno(map[string]string{
+						annotation.Annotation(annotation.MasterZoneID): options.TestConfig.MasterZoneID,
+						annotation.Annotation(annotation.SlaveZoneID):  options.TestConfig.SlaveZoneID,
+					})
 					gomega.Expect(err).To(gomega.BeNil())
 					err = f.ExpectLoadBalancerEqual(oldSvc)
 					gomega.Expect(err).To(gomega.BeNil())
