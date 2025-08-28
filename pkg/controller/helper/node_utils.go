@@ -34,6 +34,8 @@ const (
 	// LabelNodeExcludeNodeDeprecated specifies that the node should be exclude from CCM
 	LabelNodeExcludeNodeDeprecated = "service.beta.kubernetes.io/exclude-node"
 	LabelNodeExcludeNode           = "service.alibabacloud.com/exclude-node"
+
+	ProviderIdPrefixHybridNode = "ack-hybrid://"
 )
 
 func PatchM(mclient client.Client, target client.Object, getter func(runtime.Object) (client.Object, error), resource string,
@@ -224,11 +226,18 @@ func GetNodeCondition(node *v1.Node, conditionType v1.NodeConditionType) *v1.Nod
 	return nil
 }
 
-func HasExcludeLabel(node *v1.Node) bool {
+func IsExcludedNode(node *v1.Node) bool {
+	if node == nil {
+		return false
+	}
 	if _, exclude := node.Labels[LabelNodeExcludeNodeDeprecated]; exclude {
 		return true
 	}
 	if _, exclude := node.Labels[LabelNodeExcludeNode]; exclude {
+		return true
+	}
+	if strings.HasPrefix(node.Spec.ProviderID, ProviderIdPrefixHybridNode) {
+		klog.V(5).Infof("node %s is hybrid node type which should be excluded", node.Name)
 		return true
 	}
 	return false
@@ -279,7 +288,7 @@ func IsNodeExcludeFromLoadBalancer(node *v1.Node) bool {
 		return true
 	}
 
-	if HasExcludeLabel(node) {
+	if IsExcludedNode(node) {
 		return true
 	}
 	return false

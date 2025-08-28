@@ -297,7 +297,7 @@ func setFields(node *v1.Node, ins *prvd.NodeAttribute, cfgRoute bool, removeTain
 		klog.V(5).Infof("node %s, skip remove cloud taints", node.Name)
 	}
 
-	if cfgRoute && !helper.HasExcludeLabel(node) {
+	if cfgRoute && !helper.IsExcludedNode(node) {
 		modifiers = append(modifiers, setNetworkUnavailable)
 	}
 
@@ -374,7 +374,7 @@ func NodeList(kclient client.Client) (*v1.NodeList, error) {
 	}
 	var mnodes []v1.Node
 	for _, node := range nodes.Items {
-		if helper.HasExcludeLabel(&node) {
+		if helper.IsExcludedNode(&node) {
 			continue
 		}
 		if node.Spec.ProviderID == "" {

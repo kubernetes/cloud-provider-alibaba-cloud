@@ -778,7 +778,7 @@ func (mgr *VGroupManager) buildLocalBackends(reqCtx *svcCtx.RequestContext, cand
 		}
 
 		if helper.IsNodeExcludeFromLoadBalancer(node) {
-			reqCtx.Log.Info("node has exclude label which cannot be added to lb backend", "node", node.Name)
+			reqCtx.Log.Info("node has exclude label or has type which cannot be added to lb backend", "node", node.Name)
 			continue
 		}
 
@@ -837,7 +837,7 @@ func (mgr *VGroupManager) buildClusterBackends(reqCtx *svcCtx.RequestContext, ca
 	// 1. add ecs backends. add all cluster nodes.
 	for _, node := range candidates.Nodes {
 		if helper.IsNodeExcludeFromLoadBalancer(&node) {
-			reqCtx.Log.Info("node has exclude label which cannot be added to lb backend", "node", node.Name)
+			reqCtx.Log.Info("node has exclude label or has type which cannot be added to lb backend", "node", node.Name)
 			continue
 		}
 		_, id, err := helper.NodeFromProviderID(node.Spec.ProviderID)

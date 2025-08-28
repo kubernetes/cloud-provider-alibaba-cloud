@@ -523,8 +523,8 @@ func canNodeSkipEventHandler(node *v1.Node) bool {
 		return false
 	}
 
-	if helper.HasExcludeLabel(node) {
-		klog.V(5).Infof("node %s has exclude label, skip", node.Name)
+	if helper.IsExcludedNode(node) {
+		klog.V(5).Infof("node %s has exclude label or type, skip", node.Name)
 		return true
 	}
 	if helper.IsMasterNode(node) {

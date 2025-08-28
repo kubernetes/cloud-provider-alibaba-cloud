@@ -197,7 +197,7 @@ func (r *defaultEndpointResolver) ResolveLocalEndpoints(ctx context.Context, svc
 			continue
 		}
 
-		if helper.HasExcludeLabel(&node) {
+		if helper.IsExcludedNode(&node) {
 			continue
 		}
 
@@ -244,7 +244,7 @@ func (r *defaultEndpointResolver) ResolveClusterEndpoints(ctx context.Context, s
 
 	ecsEndpoints := make([]NodePortEndpoint, 0)
 	for _, node := range nodes {
-		if helper.HasExcludeLabel(&node) {
+		if helper.IsExcludedNode(&node) {
 			continue
 		}
 		_, id, err := helper.NodeFromProviderID(node.Spec.ProviderID)

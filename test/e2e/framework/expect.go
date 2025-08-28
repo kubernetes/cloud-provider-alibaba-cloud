@@ -1226,7 +1226,7 @@ func findNodeByNodeName(nodes []v1.Node, nodeName string) *v1.Node {
 }
 
 func isNodeExcludeFromLoadBalancer(node *v1.Node, anno *annotation.AnnotationRequest) bool {
-	if helper.HasExcludeLabel(node) {
+	if helper.IsExcludedNode(node) {
 		return true
 	}
 
