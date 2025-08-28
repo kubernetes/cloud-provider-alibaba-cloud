@@ -55,6 +55,7 @@ type E2EConfig struct {
 	NLBServerGroupID2             string `json:"NLBServerGroupID2"`
 	AclID                         string `json:"AclID"`
 	AclID2                        string `json:"AclID2"`
+	EIPID                         string `json:"EIPID"`
 }
 
 func (e *E2EConfig) BindFlags() {
@@ -91,6 +92,7 @@ func (e *E2EConfig) BindFlags() {
 	flag.StringVar(&e.NLBZoneMaps, "nlb-zone-maps", "", "nlb zone maps")
 	flag.StringVar(&e.SecurityGroupIDs, "security-group-ids", "", "security group ids used by nlb tests")
 	flag.StringVar(&e.Address, "address", "", "loadbalancer address")
+	flag.StringVar(&e.EIPID, "eip-id", "", "eip id")
 	flag.BoolVar(&e.IPv6, "ipv6", false, "ipv6")
 }
 

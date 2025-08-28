@@ -21,6 +21,7 @@ const (
 	SLBResource = "SLB"
 	NLBResource = "NLB"
 	ACLResource = "ACL"
+	EIPResource = "EIP"
 )
 
 type Framework struct {
@@ -106,7 +107,7 @@ func (f *Framework) CreateCloudResource() error {
 		return err
 	}
 
-	zoneMappings, err := parseZoneMappings(options.TestConfig.NLBZoneMaps)
+	zoneMappings, err := ParseNLBZoneMappings(options.TestConfig.NLBZoneMaps)
 	if err != nil {
 		return err
 	}
@@ -269,6 +270,22 @@ func (f *Framework) CreateCloudResource() error {
 		f.CreatedResource[aclId] = ACLResource
 	}
 
+	if options.TestConfig.EIPID == "" {
+		eipName := fmt.Sprintf("%s-eip-%s", options.TestConfig.ClusterId, "a")
+		eipId, err := f.Client.CloudClient.DescribeEipIdByName(context.TODO(), eipName)
+		if err != nil {
+			return fmt.Errorf("DescribeEipIdByName error: %s", err.Error())
+		}
+		if eipId == "" {
+			eipId, err := f.Client.CloudClient.AllocateEipAddress(context.TODO(), eipName)
+			if err != nil {
+				return fmt.Errorf("AllocateEipAddress error: %s", err.Error())
+			}
+			options.TestConfig.EIPID = eipId
+			f.CreatedResource[eipId] = EIPResource
+		}
+	}
+
 	klog.Infof("created resource: %s", util.PrettyJson(f.CreatedResource))
 	return nil
 }
@@ -310,6 +327,10 @@ func (f *Framework) CleanCloudResources() error {
 			}
 		case ACLResource:
 			if err := f.Client.CloudClient.DeleteAccessControlList(context.TODO(), key); err != nil {
+				return err
+			}
+		case EIPResource:
+			if err := f.Client.CloudClient.ReleaseEipAddress(context.TODO(), key); err != nil {
 				return err
 			}
 		}
