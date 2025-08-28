@@ -270,10 +270,10 @@ func (m *ModelApplier) applyListeners(reqCtx *svcCtx.RequestContext,
 
 	var errs []error
 	wg := sync.WaitGroup{}
+	taskCount := 0
 	mtx := sync.Mutex{}
 
 	beforeActions, actions, afterActions := buildActionsToUpdate(reqCtx, createActions, updateActions, deleteActions)
-
 	listenerMap := map[string][]listenerAction{}
 	for _, a := range actions {
 		switch a.ActionType {
@@ -284,16 +284,19 @@ func (m *ModelApplier) applyListeners(reqCtx *svcCtx.RequestContext,
 		}
 	}
 
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		retErrs := m.parallelDoListenerActions(reqCtx, beforeActions)
-		if len(retErrs) != 0 {
-			mtx.Lock()
-			errs = append(errs, retErrs...)
-			mtx.Unlock()
-		}
-	}()
+	if len(beforeActions) != 0 {
+		wg.Add(1)
+		taskCount++
+		go func() {
+			defer wg.Done()
+			retErrs := m.parallelDoListenerActions(reqCtx, beforeActions)
+			if len(retErrs) != 0 {
+				mtx.Lock()
+				errs = append(errs, retErrs...)
+				mtx.Unlock()
+			}
+		}()
+	}
 
 	for n := range serverGroupChannel {
 		reqCtx.Log.V(5).Info("receive server group apply result", "result", n)
@@ -316,6 +319,7 @@ func (m *ModelApplier) applyListeners(reqCtx *svcCtx.RequestContext,
 		}
 		delete(listenerMap, n.VGroupName)
 		wg.Add(1)
+		taskCount++
 		go func() {
 			defer wg.Done()
 			retErrs := m.parallelDoListenerActions(reqCtx, actions)
@@ -327,15 +331,18 @@ func (m *ModelApplier) applyListeners(reqCtx *svcCtx.RequestContext,
 		}()
 	}
 
+	reqCtx.Log.Info("wait for listener parallel tasks done", "taskCount", taskCount)
 	wg.Wait()
 
-	// do later actions
+	// after actions
 	// listeners with empty vgroup name, eg. forward to http
 	retErrs := m.parallelDoListenerActions(reqCtx, afterActions)
 	errs = append(errs, retErrs...)
 
 	if len(listenerMap) != 0 {
-		errs = append(errs, fmt.Errorf("there are unprocessed listeners in reconcile: %+v", listenerMap))
+		err := fmt.Errorf("there are unprocessed listeners in reconcile")
+		reqCtx.Log.Error(err, "apply listeners error", "listenerMap", listenerMap)
+		errs = append(errs, err)
 	}
 
 	return utilerrors.NewAggregate(errs)

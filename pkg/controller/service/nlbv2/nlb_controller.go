@@ -283,7 +283,6 @@ func (m *ReconcileNLB) reconcileLoadBalancerResources(req *svcCtx.RequestContext
 }
 
 func (m *ReconcileNLB) buildAndApplyModel(reqCtx *svcCtx.RequestContext) (*nlbmodel.NetworkLoadBalancer, []*nlbmodel.ServerGroup, error) {
-
 	// build local model
 	localModel, err := m.builder.BuildModel(reqCtx, LocalModel)
 	if err != nil {

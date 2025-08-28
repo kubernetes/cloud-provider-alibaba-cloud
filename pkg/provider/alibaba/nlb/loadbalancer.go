@@ -5,6 +5,8 @@ import (
 	"fmt"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/client-go/util/retry"
+	ctrlCfg "k8s.io/cloud-provider-alibaba-cloud/pkg/config"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/service/reconcile/parallel"
 	"strings"
 	"time"
 
@@ -43,6 +45,10 @@ var apiThrottlingBackoff = wait.Backoff{
 	Steps:    30,
 	Duration: 1 * time.Second,
 }
+
+const (
+	listAsynJobsMaxBatchSize = 20
+)
 
 func retryOnThrottling(api string, fn func() error) error {
 	return retry.OnError(apiThrottlingBackoff, util.IsThrottlingError, func() error {
@@ -773,23 +779,12 @@ func (p *NLBProvider) BatchWaitJobsFinish(ctx context.Context, api string, jobId
 	err := wait.PollUntilContextTimeout(ctx, interval, timeout, false, func(ctx context.Context) (bool, error) {
 		klog.V(5).Infof("batch wait jobs %s ready, count=%d", api, len(currentJobs))
 		var newJobs []string
-		req := &nlb.ListAsynJobsRequest{}
-		req.JobIds = tea.StringSlice(currentJobs)
-		var resp *nlb.ListAsynJobsResponse
-		err := retryOnThrottling("LitAsynJobs", func() error {
-			var err error
-			resp, err = p.auth.NLB.ListAsynJobs(req)
-			return err
-		})
+		jobs, err := p.listAsynJobs(ctx, currentJobs)
 		if err != nil {
 			return false, err
 		}
 
-		if resp.Body == nil {
-			return false, fmt.Errorf("OpenAPI %s ListAsynJobs resp is nil", api)
-		}
-
-		for _, job := range resp.Body.Jobs {
+		for _, job := range jobs {
 			if job == nil {
 				continue
 			}
@@ -819,6 +814,55 @@ func (p *NLBProvider) BatchWaitJobsFinish(ctx context.Context, api string, jobId
 		return utilerrors.NewAggregate(errs)
 	}
 	return nil
+}
+
+func (p *NLBProvider) listAsynJobs(ctx context.Context, jobIds []string) ([]*nlb.ListAsynJobsResponseBodyJobs, error) {
+	var pieces [][]string
+	begin := 0
+	for {
+		if begin >= len(jobIds) {
+			break
+		}
+
+		end := begin + listAsynJobsMaxBatchSize
+		if end > len(jobIds) {
+			end = len(jobIds)
+		}
+
+		pieces = append(pieces, jobIds[begin:end])
+		begin = end
+	}
+
+	resps := make([]*nlb.ListAsynJobsResponse, len(pieces))
+	errs := make([]error, len(pieces))
+	parallel.DoPiece(ctx, ctrlCfg.ControllerCFG.MaxConcurrentActions, len(pieces), func(i int) {
+		var resp *nlb.ListAsynJobsResponse
+		req := &nlb.ListAsynJobsRequest{}
+		req.JobIds = tea.StringSlice(pieces[i])
+		err := retryOnThrottling("ListAsynJobs", func() error {
+			var err error
+			resp, err = p.auth.NLB.ListAsynJobs(req)
+			return err
+		})
+		if err != nil {
+			errs[i] = util.SDKError("ListAsynJobs", err)
+			return
+		}
+		resps[i] = resp
+	})
+	if err := utilerrors.NewAggregate(errs); err != nil {
+		return nil, err
+	}
+	var ret []*nlb.ListAsynJobsResponseBodyJobs
+	for _, resp := range resps {
+		if resp == nil || resp.Body == nil {
+			klog.Warningf("OpenAPI ListAsynJobs resp is nil")
+			continue
+		}
+		ret = append(ret, resp.Body.Jobs...)
+	}
+
+	return ret, nil
 }
 
 func (p *NLBProvider) waitNLBActive(lbId string) (*nlb.GetLoadBalancerAttributeResponse, error) {

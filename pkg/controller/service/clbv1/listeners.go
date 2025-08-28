@@ -987,7 +987,6 @@ func isNeedUpdate(reqCtx *svcCtx.RequestContext, local model.ListenerAttribute, 
 	}
 
 	if needUpdate {
-		//reqCtx.Ctx = context.WithValue(reqCtx.Ctx, dryrun.ContextMessage, updateDetail)
 		reqCtx.Log.Info(fmt.Sprintf("update listener: %s [%d] changed, detail %s", local.Protocol, local.ListenerPort, updateDetail))
 	}
 	return needUpdate, updateDetail, update

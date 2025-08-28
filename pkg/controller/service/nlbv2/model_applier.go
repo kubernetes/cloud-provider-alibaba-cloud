@@ -343,38 +343,42 @@ func (m *ParallelizeModelApplier) applyServerGroups(reqCtx *svcCtx.RequestContex
 	return utilerrors.NewAggregate(errs)
 }
 
-func (m *ParallelizeModelApplier) applyListeners(reqCtx *svcCtx.RequestContext, actions []listenerAction, serverGroupChannel chan serverGroupCreateResult) error {
-	var nowActions []listenerAction
-	var waitActions []listenerAction
+func (m *ParallelizeModelApplier) applyListeners(reqCtx *svcCtx.RequestContext, listenerActions []listenerAction, serverGroupChannel chan serverGroupCreateResult) error {
+	var beforeActions []listenerAction
+	var actions []listenerAction
 	listenerMap := map[string][]listenerAction{}
-	for _, act := range actions {
+	for _, act := range listenerActions {
 		switch act.Action {
 		case listenerActionDelete:
-			nowActions = append(nowActions, act)
+			beforeActions = append(beforeActions, act)
 		default:
 			if act.Local.ServerGroupId == "" {
-				waitActions = append(waitActions, act)
+				actions = append(actions, act)
 				listenerMap[act.Local.ServerGroupName] = append(listenerMap[act.Local.ServerGroupName], act)
 			} else {
-				nowActions = append(nowActions, act)
+				beforeActions = append(beforeActions, act)
 			}
 		}
 	}
 
 	var errs []error
 	wg := sync.WaitGroup{}
+	taskCount := 0
 	mtx := sync.Mutex{}
 
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		retErrs := m.lisMgr.ParallelUpdateListeners(reqCtx, nowActions)
-		if len(retErrs) != 0 {
-			mtx.Lock()
-			errs = append(errs, retErrs...)
-			mtx.Unlock()
-		}
-	}()
+	if len(beforeActions) != 0 {
+		wg.Add(1)
+		taskCount++
+		go func() {
+			defer wg.Done()
+			retErrs := m.lisMgr.ParallelUpdateListeners(reqCtx, beforeActions)
+			if len(retErrs) != 0 {
+				mtx.Lock()
+				errs = append(errs, retErrs...)
+				mtx.Unlock()
+			}
+		}()
+	}
 
 	for n := range serverGroupChannel {
 		reqCtx.Log.V(5).Info("receive server group apply result", "result", n)
@@ -392,6 +396,7 @@ func (m *ParallelizeModelApplier) applyListeners(reqCtx *svcCtx.RequestContext, 
 		}
 		delete(listenerMap, n.ServerGroupName)
 		wg.Add(1)
+		taskCount++
 		go func() {
 			defer wg.Done()
 			retErrs := m.lisMgr.ParallelUpdateListeners(reqCtx, actions)
@@ -403,9 +408,12 @@ func (m *ParallelizeModelApplier) applyListeners(reqCtx *svcCtx.RequestContext, 
 		}()
 	}
 
+	reqCtx.Log.Info("wait for listener parallel tasks done", "taskCount", taskCount)
 	wg.Wait()
 	if len(listenerMap) != 0 {
-		errs = append(errs, fmt.Errorf("there are unprocessed listeners in reconciles: %+v", listenerMap))
+		err := fmt.Errorf("there are unprocessed listeners in reconcile")
+		reqCtx.Log.Error(err, "apply listeners error", "listenerMap", listenerMap)
+		errs = append(errs, err)
 	}
 	return utilerrors.NewAggregate(errs)
 }
