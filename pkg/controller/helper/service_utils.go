@@ -27,6 +27,7 @@ const (
 	BackendType       = "service.beta.kubernetes.io/backend-type"
 	LoadBalancerClass = "service.beta.kubernetes.io/class"
 	LoadBalancerType  = "service.beta.kubernetes.io/alibaba-cloud-loadbalancer-type"
+	TunnelType        = "service.beta.kubernetes.io/alibaba-cloud-loadbalancer-tunnel-type"
 )
 
 // load balancer class
@@ -99,6 +100,9 @@ func NeedCLB(service *v1.Service) bool {
 		return false
 	}
 	if feature.DefaultFeatureGate.Enabled(ctrlCfg.LoadBalancerTypeAnnotation) && service.Annotations[LoadBalancerType] != "" {
+		return false
+	}
+	if IsTunnelTypeService(service) {
 		return false
 	}
 	return service.Annotations[LoadBalancerClass] == ""
@@ -188,4 +192,14 @@ func IsServiceOwnIngress(service *v1.Service) bool {
 		return false
 	}
 	return true
+}
+
+func IsTunnelTypeService(svc *v1.Service) bool {
+	if svc.Annotations == nil {
+		return false
+	}
+	if _, ok := svc.Annotations[TunnelType]; ok {
+		return true
+	}
+	return false
 }
