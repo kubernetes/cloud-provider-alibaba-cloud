@@ -72,11 +72,13 @@ func (mgr *VGroupManager) BuildLocalModel(reqCtx *svcCtx.RequestContext, m *mode
 	}
 
 	var vgs []model.VServerGroup
+	errs := make([]error, len(reqCtx.Service.Spec.Ports))
 	containsPotentialReadyEndpoints := false
 	for _, port := range reqCtx.Service.Spec.Ports {
 		vg, cpr, err := mgr.buildVGroupForServicePort(reqCtx, port, candidates, m.LoadBalancerAttribute.IsUserManaged)
 		if err != nil {
-			return fmt.Errorf("build vgroup for port %d error: %s", port.Port, err.Error())
+			errs = append(errs, err)
+			continue
 		}
 		vgs = append(vgs, vg)
 		containsPotentialReadyEndpoints = containsPotentialReadyEndpoints || cpr
@@ -89,6 +91,7 @@ func (mgr *VGroupManager) BuildLocalModel(reqCtx *svcCtx.RequestContext, m *mode
 
 	m.VServerGroups = vgs
 	m.ContainsPotentialReadyEndpoints = containsPotentialReadyEndpoints
+
 	return nil
 }
 
@@ -160,19 +163,26 @@ func (mgr *VGroupManager) BuildRemoteModel(reqCtx *svcCtx.RequestContext, m *mod
 	return nil
 }
 
-func (mgr *VGroupManager) ParallelUpdateVServerGroup(reqCtx *svcCtx.RequestContext, actions []vGroupAction) []error {
+func (mgr *VGroupManager) ParallelUpdateVServerGroup(reqCtx *svcCtx.RequestContext, actions []vGroupAction, serverGroupChannel chan vGroupApplyResult) []error {
 	if len(actions) == 0 {
 		reqCtx.Log.Info("no action to do for vgroup")
 		return nil
 	}
 	errs := make([]error, len(actions))
 	reqCtx.Log.V(5).Info("update vgroups parallelly", "actionsCount", len(actions))
-	parallel.Parallelize(reqCtx.Ctx, ctrlCfg.ControllerCFG.MaxConcurrentActions, len(actions), func(i int) {
+	parallel.DoPiece(reqCtx.Ctx, ctrlCfg.ControllerCFG.MaxConcurrentActions, len(actions), func(i int) {
 		var err error
 		act := actions[i]
 		switch act.Action {
 		case vGroupActionCreateAndAddBackendServers:
 			err = mgr.CreateVServerGroupAndAddBackendServers(reqCtx, act.Local, act.LBId)
+			if serverGroupChannel != nil {
+				serverGroupChannel <- vGroupApplyResult{
+					VGroupName: act.Local.VGroupName,
+					VGroupID:   act.Local.VGroupId,
+					Err:        err,
+				}
+			}
 		case vGroupActionUpdate:
 			err = mgr.UpdateVServerGroup(reqCtx, *act.Local, *act.Remote)
 		case vGroupActionDelete:
@@ -265,7 +275,7 @@ func (mgr *VGroupManager) DescribeVServerGroups(reqCtx *svcCtx.RequestContext, l
 	}
 
 	errs := make([]error, len(vgs))
-	parallel.Parallelize(reqCtx.Ctx, ctrlCfg.ControllerCFG.MaxConcurrentActions, len(vgs), func(i int) {
+	parallel.DoPiece(reqCtx.Ctx, ctrlCfg.ControllerCFG.MaxConcurrentActions, len(vgs), func(i int) {
 		if isVGroupManagedByMyService(vgs[i], reqCtx.Service) || isReusedVGroup(reusedVgIDs, vgs[i].VGroupId) {
 			vs, err := mgr.cloud.DescribeVServerGroupAttribute(reqCtx.Ctx, vgs[i].VGroupId)
 			if err != nil {

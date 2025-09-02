@@ -199,19 +199,19 @@ func (mgr *ServerGroupManager) BuildRemoteModel(reqCtx *svcCtx.RequestContext, m
 	return nil
 }
 
-func (mgr *ServerGroupManager) ParallelUpdateServerGroups(reqCtx *svcCtx.RequestContext, actions []serverGroupAction) []error {
+func (mgr *ServerGroupManager) ParallelUpdateServerGroups(reqCtx *svcCtx.RequestContext, actions []serverGroupAction, sgChannel chan serverGroupApplyResult) []error {
 	if len(actions) == 0 {
 		reqCtx.Log.Info("no action to do for server group")
 		return nil
 	}
 	errs := make([]error, len(actions))
 	reqCtx.Log.V(5).Info("update server groups parallelly", "actionsCount", len(actions))
-	parallel.Parallelize(reqCtx.Ctx, ctrlCfg.ControllerCFG.MaxConcurrentActions, len(actions), func(i int) {
+	parallel.DoPiece(reqCtx.Ctx, ctrlCfg.ControllerCFG.MaxConcurrentActions, len(actions), func(i int) {
 		var err error
 		act := actions[i]
 		switch act.Action {
 		case serverGroupActionCreateAndAddBackendServers:
-			err = mgr.CreateServerGroupAndAddServers(reqCtx, act.Local)
+			err = mgr.CreateServerGroupAndAddServers(reqCtx, act.Local, sgChannel)
 		case serverGroupActionUpdate:
 			err = mgr.UpdateServerGroup(reqCtx, act.Local, act.Remote)
 		case serverGroupActionDelete:
@@ -222,8 +222,15 @@ func (mgr *ServerGroupManager) ParallelUpdateServerGroups(reqCtx *svcCtx.Request
 	return errs
 }
 
-func (mgr *ServerGroupManager) CreateServerGroupAndAddServers(reqCtx *svcCtx.RequestContext, local *nlbmodel.ServerGroup) error {
+func (mgr *ServerGroupManager) CreateServerGroupAndAddServers(reqCtx *svcCtx.RequestContext, local *nlbmodel.ServerGroup, sgChannel chan<- serverGroupApplyResult) error {
 	err := mgr.CreateServerGroup(reqCtx, local)
+	if sgChannel != nil {
+		sgChannel <- serverGroupApplyResult{
+			Err:             err,
+			ServerGroupID:   local.ServerGroupId,
+			ServerGroupName: local.ServerGroupName,
+		}
+	}
 	if err != nil {
 		return fmt.Errorf("EnsureServerGroupCreated error: %w", err)
 	}

@@ -293,13 +293,22 @@ func loadBalancerAttrEqual(f *Framework, anno *annotation.AnnotationRequest, svc
 }
 
 func tagsEqual(tagSvc string, tagSlb []tag.Tag) bool {
+	var filteredTagSlb []tag.Tag
+	for _, r := range tagSlb {
+		// filter system tags
+		if strings.HasPrefix(r.Key, "acs:") {
+			continue
+		}
+		filteredTagSlb = append(filteredTagSlb, r)
+	}
+
 	tags := strings.Split(tagSvc, ",")
-	if len(tags) != len(tagSlb) {
+	if len(tags) != len(filteredTagSlb) {
 		return false
 	}
 	for _, m := range tags {
 		found := false
-		for _, v := range tagSlb {
+		for _, v := range filteredTagSlb {
 			if m == fmt.Sprintf("%s=%s", v.Key, v.Value) {
 				found = true
 				break

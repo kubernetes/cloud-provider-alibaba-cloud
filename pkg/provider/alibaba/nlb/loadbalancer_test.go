@@ -3,8 +3,9 @@ package nlb
 import (
 	"fmt"
 	openapi "github.com/alibabacloud-go/darabonba-openapi/v2/client"
-	nlb "github.com/alibabacloud-go/nlb-20220430/v3/client"
+	nlb "github.com/alibabacloud-go/nlb-20220430/v4/client"
 	"github.com/alibabacloud-go/tea/tea"
+	"github.com/stretchr/testify/assert"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/util"
 	"testing"
@@ -159,4 +160,54 @@ func TestGetLoadBalancer(t *testing.T) {
 		retErr = nil
 		return true, nil
 	})
+}
+
+func TestRetryOnThrottling(t *testing.T) {
+	count := 0
+	err := retryOnThrottling("TestThrottling", func() error {
+		count++
+		return nil
+	})
+	assert.Equal(t, 1, count)
+	assert.Nil(t, err)
+
+	count = 0
+	tErr := &tea.SDKError{
+		Code:    tea.String("Throttling.User"),
+		Message: tea.String("Request was denied due to user flow control."),
+	}
+	err = retryOnThrottling("TestThrottling", func() error {
+		count++
+		return tErr
+	})
+	assert.NotEqual(t, 0, count)
+	assert.NotNil(t, err)
+	assert.ErrorIs(t, err, tErr)
+
+	count = 0
+	err = retryOnThrottling("TestThrottling", func() error {
+		count++
+		if count > 1 {
+			return nil
+		}
+		return &tea.SDKError{
+			Code:    tea.String("Throttling.User"),
+			Message: tea.String("Request was denied due to user flow control."),
+		}
+	})
+	assert.Equal(t, 2, count)
+	assert.Nil(t, err)
+
+	count = 0
+	nErr := &tea.SDKError{
+		Code:    tea.String("TestError"),
+		Message: tea.String("test error message"),
+	}
+	err = retryOnThrottling("TestThrottling", func() error {
+		count++
+		return nErr
+	})
+	assert.Equal(t, 1, count)
+	assert.NotNil(t, err)
+	assert.ErrorIs(t, err, nErr)
 }

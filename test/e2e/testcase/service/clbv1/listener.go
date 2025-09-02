@@ -968,8 +968,7 @@ func RunListenerTestCases(f *framework.Framework) {
 					newsvc, err = f.Client.KubeClient.PatchService(oldsvc, newsvc)
 					gomega.Expect(err).To(gomega.BeNil())
 					err = f.ExpectLoadBalancerEqual(newsvc)
-					// The listener forward relationship was not deleted, expected failure
-					gomega.Expect(err).NotTo(gomega.BeNil())
+					gomega.Expect(err).To(gomega.BeNil())
 				})
 				ginkgo.It("delete listener forward", func() {
 					oldsvc, err := f.Client.KubeClient.CreateServiceByAnno(map[string]string{

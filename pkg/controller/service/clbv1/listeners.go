@@ -363,12 +363,13 @@ func (t *tcp) Update(reqCtx *svcCtx.RequestContext, action UpdateAction) error {
 			return fmt.Errorf("start tcp listener %d error: %s", action.local.ListenerPort, err.Error())
 		}
 	}
-	needUpdate, update := isNeedUpdate(reqCtx, action.local, action.remote)
+	needUpdate, updateDetail, update := isNeedUpdate(reqCtx, action.local, action.remote)
 	if !needUpdate {
 		reqCtx.Log.Info(fmt.Sprintf("update listener: tcp [%d] did not change, skip", action.local.ListenerPort))
 		return nil
 	}
-	return t.mgr.cloud.SetLoadBalancerTCPListenerAttribute(reqCtx.Ctx, action.lbId, update)
+	ctx := context.WithValue(reqCtx.Ctx, dryrun.ContextMessage, updateDetail)
+	return t.mgr.cloud.SetLoadBalancerTCPListenerAttribute(ctx, action.lbId, update)
 }
 
 type udp struct {
@@ -392,12 +393,13 @@ func (t *udp) Update(reqCtx *svcCtx.RequestContext, action UpdateAction) error {
 			return fmt.Errorf("start udp listener %d error: %s", action.local.ListenerPort, err.Error())
 		}
 	}
-	needUpdate, update := isNeedUpdate(reqCtx, action.local, action.remote)
+	needUpdate, updateDetail, update := isNeedUpdate(reqCtx, action.local, action.remote)
 	if !needUpdate {
 		reqCtx.Log.Info(fmt.Sprintf("update listener: udp [%d] did not change, skip", action.local.ListenerPort))
 		return nil
 	}
-	return t.mgr.cloud.SetLoadBalancerUDPListenerAttribute(reqCtx.Ctx, action.lbId, update)
+	ctx := context.WithValue(reqCtx.Ctx, dryrun.ContextMessage, updateDetail)
+	return t.mgr.cloud.SetLoadBalancerUDPListenerAttribute(ctx, action.lbId, update)
 }
 
 type http struct {
@@ -458,12 +460,13 @@ func (t *http) Update(reqCtx *svcCtx.RequestContext, action UpdateAction) error 
 		return nil
 	}
 
-	needUpdate, update := isNeedUpdate(reqCtx, action.local, action.remote)
+	needUpdate, updateDetail, update := isNeedUpdate(reqCtx, action.local, action.remote)
 	if !needUpdate {
 		reqCtx.Log.Info(fmt.Sprintf("update listener: http [%d] did not change, skip", action.local.ListenerPort))
 		return nil
 	}
-	return t.mgr.cloud.SetLoadBalancerHTTPListenerAttribute(reqCtx.Ctx, action.lbId, update)
+	ctx := context.WithValue(reqCtx.Ctx, dryrun.ContextMessage, updateDetail)
+	return t.mgr.cloud.SetLoadBalancerHTTPListenerAttribute(ctx, action.lbId, update)
 
 }
 
@@ -489,7 +492,7 @@ func (t *https) Update(reqCtx *svcCtx.RequestContext, action UpdateAction) error
 			return fmt.Errorf("start https listener %d error: %s", action.local.ListenerPort, err.Error())
 		}
 	}
-	needUpdate, update := isNeedUpdate(reqCtx, action.local, action.remote)
+	needUpdate, updateDetail, update := isNeedUpdate(reqCtx, action.local, action.remote)
 	if !needUpdate {
 		reqCtx.Log.Info(fmt.Sprintf("update listener: https [%d] did not change, skip", action.local.ListenerPort))
 		return nil
@@ -502,7 +505,8 @@ func (t *https) Update(reqCtx *svcCtx.RequestContext, action UpdateAction) error
 		}
 	}
 
-	return t.mgr.cloud.SetLoadBalancerHTTPSListenerAttribute(reqCtx.Ctx, action.lbId, update)
+	ctx := context.WithValue(reqCtx.Ctx, dryrun.ContextMessage, updateDetail)
+	return t.mgr.cloud.SetLoadBalancerHTTPSListenerAttribute(ctx, action.lbId, update)
 }
 
 func forwardPort(port string, target int) (int, error) {
@@ -543,7 +547,7 @@ func buildActionsForListeners(reqCtx *svcCtx.RequestContext, local *model.LoadBa
 		if local.Listeners[i].VGroupId != "" {
 			continue
 		}
-		if err := findVServerGroup(remote.VServerGroups, &local.Listeners[i]); err != nil {
+		if err := findVServerGroup(local.VServerGroups, &local.Listeners[i]); err != nil {
 			return createActions, updateActions, deleteActions, fmt.Errorf("find vservergroup error: %s", err.Error())
 		}
 	}
@@ -685,7 +689,7 @@ func setDefaultValueForListener(n *model.ListenerAttribute) {
 	}
 }
 
-func isNeedUpdate(reqCtx *svcCtx.RequestContext, local model.ListenerAttribute, remote model.ListenerAttribute) (bool, model.ListenerAttribute) {
+func isNeedUpdate(reqCtx *svcCtx.RequestContext, local model.ListenerAttribute, remote model.ListenerAttribute) (bool, string, model.ListenerAttribute) {
 	update := deepcopy.Copy(remote).(model.ListenerAttribute)
 	needUpdate := false
 	updateDetail := ""
@@ -983,10 +987,9 @@ func isNeedUpdate(reqCtx *svcCtx.RequestContext, local model.ListenerAttribute, 
 	}
 
 	if needUpdate {
-		reqCtx.Ctx = context.WithValue(reqCtx.Ctx, dryrun.ContextMessage, updateDetail)
 		reqCtx.Log.Info(fmt.Sprintf("update listener: %s [%d] changed, detail %s", local.Protocol, local.ListenerPort, updateDetail))
 	}
-	return needUpdate, update
+	return needUpdate, updateDetail, update
 }
 
 func findVServerGroup(vgs []model.VServerGroup, port *model.ListenerAttribute) error {

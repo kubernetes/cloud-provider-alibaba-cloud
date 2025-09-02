@@ -3,7 +3,7 @@ package nlb
 import (
 	"context"
 	"fmt"
-	nlb "github.com/alibabacloud-go/nlb-20220430/v3/client"
+	nlb "github.com/alibabacloud-go/nlb-20220430/v4/client"
 	"github.com/alibabacloud-go/tea/tea"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	ctrlCfg "k8s.io/cloud-provider-alibaba-cloud/pkg/config"
@@ -80,7 +80,12 @@ func (p *NLBProvider) ListNLBServerGroups(ctx context.Context, tags []tag.Tag) (
 				Value: tea.String(t.Value),
 			})
 		}
-		resp, err := p.auth.NLB.ListServerGroups(req)
+		var resp *nlb.ListServerGroupsResponse
+		err := retryOnThrottling("ListServerGroups", func() error {
+			var err error
+			resp, err = p.auth.NLB.ListServerGroups(req)
+			return err
+		})
 		if err != nil {
 			return nil, util.SDKError("ListServerGroups", err)
 		}
@@ -99,7 +104,9 @@ func (p *NLBProvider) ListNLBServerGroups(ctx context.Context, tags []tag.Tag) (
 
 	var sgIds []string
 	for _, r := range remoteServerGroups {
-		sgIds = append(sgIds, tea.StringValue(r.ServerGroupId))
+		if tea.Int32Value(r.ServerCount) != 0 {
+			sgIds = append(sgIds, tea.StringValue(r.ServerGroupId))
+		}
 	}
 	serversMap, err := p.parallelListNLBServers(ctx, sgIds)
 	if err != nil {
@@ -124,7 +131,7 @@ func (p *NLBProvider) ListNLBServerGroups(ctx context.Context, tags []tag.Tag) (
 func (p *NLBProvider) parallelListNLBServers(ctx context.Context, sgId []string) (map[string][]nlbmodel.ServerGroupServer, error) {
 	servers := make([][]nlbmodel.ServerGroupServer, len(sgId))
 	errs := make([]error, len(sgId))
-	parallel.Parallelize(ctx, ctrlCfg.ControllerCFG.MaxConcurrentActions, len(sgId), func(i int) {
+	parallel.DoPiece(ctx, ctrlCfg.ControllerCFG.MaxConcurrentActions, len(sgId), func(i int) {
 		s, err := p.ListNLBServers(ctx, sgId[i])
 		if err != nil {
 			errs[i] = err
@@ -141,7 +148,12 @@ func (p *NLBProvider) parallelListNLBServers(ctx context.Context, sgId []string)
 func (p *NLBProvider) GetNLBServerGroup(ctx context.Context, sgId string) (*nlbmodel.ServerGroup, error) {
 	req := &nlb.ListServerGroupsRequest{}
 	req.ServerGroupIds = []*string{tea.String(sgId)}
-	resp, err := p.auth.NLB.ListServerGroups(req)
+	var resp *nlb.ListServerGroupsResponse
+	err := retryOnThrottling("ListServerGroups", func() error {
+		var err error
+		resp, err = p.auth.NLB.ListServerGroups(req)
+		return err
+	})
 	if err != nil {
 		return nil, util.SDKError("ListServerGroups", err)
 	}
@@ -161,6 +173,7 @@ func (p *NLBProvider) GetNLBServerGroup(ctx context.Context, sgId string) (*nlbm
 }
 
 func (p *NLBProvider) CreateNLBServerGroup(ctx context.Context, sg *nlbmodel.ServerGroup) error {
+	var jobId string
 	jobId, err := p.CreateNLBServerGroupAsync(ctx, sg)
 	if err != nil {
 		return err
@@ -216,7 +229,12 @@ func (p *NLBProvider) ListNLBServers(ctx context.Context, sgId string) ([]nlbmod
 		req.MaxResults = tea.Int32(100)
 		req.NextToken = tea.String(nextToken)
 
-		resp, err := p.auth.NLB.ListServerGroupServers(req)
+		var resp *nlb.ListServerGroupServersResponse
+		err := retryOnThrottling("ListServerGroupServers", func() error {
+			var err error
+			resp, err = p.auth.NLB.ListServerGroupServers(req)
+			return err
+		})
 		if err != nil {
 			return nil, util.SDKError("ListServerGroupServers", err)
 		}
@@ -320,7 +338,12 @@ func (p *NLBProvider) CreateNLBServerGroupAsync(ctx context.Context, sg *nlbmode
 		}
 	}
 
-	resp, err := p.auth.NLB.CreateServerGroup(req)
+	var resp *nlb.CreateServerGroupResponse
+	err := retryOnThrottling("CreateServerGroup", func() error {
+		var err error
+		resp, err = p.auth.NLB.CreateServerGroup(req)
+		return err
+	})
 	if err != nil {
 		return "", util.SDKError("CreateServerGroup", err)
 	}
@@ -336,7 +359,12 @@ func (p *NLBProvider) CreateNLBServerGroupAsync(ctx context.Context, sg *nlbmode
 func (p *NLBProvider) DeleteNLBServerGroupAsync(ctx context.Context, sgId string) (string, error) {
 	req := &nlb.DeleteServerGroupRequest{}
 	req.ServerGroupId = tea.String(sgId)
-	resp, err := p.auth.NLB.DeleteServerGroup(req)
+	var resp *nlb.DeleteServerGroupResponse
+	err := retryOnThrottling("DeleteServerGroup", func() error {
+		var err error
+		resp, err = p.auth.NLB.DeleteServerGroup(req)
+		return err
+	})
 	if err != nil {
 		return "", util.SDKError("DeleteServerGroup", err)
 	}
@@ -402,7 +430,12 @@ func (p *NLBProvider) UpdateNLBServerGroupAsync(ctx context.Context, sg *nlbmode
 		}
 	}
 
-	resp, err := p.auth.NLB.UpdateServerGroupAttribute(req)
+	var resp *nlb.UpdateServerGroupAttributeResponse
+	err := retryOnThrottling("UpdateServerGroupAttribute", func() error {
+		var err error
+		resp, err = p.auth.NLB.UpdateServerGroupAttribute(req)
+		return err
+	})
 	if err != nil {
 		return "", util.SDKError("UpdateServerGroupAttribute", err)
 	}
@@ -430,7 +463,12 @@ func (p *NLBProvider) AddNLBServersAsync(ctx context.Context, sgId string, backe
 		req.Servers = append(req.Servers, reqServer)
 	}
 
-	resp, err := p.auth.NLB.AddServersToServerGroup(req)
+	var resp *nlb.AddServersToServerGroupResponse
+	err := retryOnThrottling("AddServersToServerGroup", func() error {
+		var err error
+		resp, err = p.auth.NLB.AddServersToServerGroup(req)
+		return err
+	})
 	if err != nil {
 		return "", util.SDKError("AddServersToServerGroup", err)
 	}
@@ -457,7 +495,12 @@ func (p *NLBProvider) RemoveNLBServersAsync(ctx context.Context, sgId string, ba
 		req.Servers = append(req.Servers, reqServer)
 	}
 
-	resp, err := p.auth.NLB.RemoveServersFromServerGroup(req)
+	var resp *nlb.RemoveServersFromServerGroupResponse
+	err := retryOnThrottling("RemoveServersFromServerGroup", func() error {
+		var err error
+		resp, err = p.auth.NLB.RemoveServersFromServerGroup(req)
+		return err
+	})
 	if err != nil {
 		return "", util.SDKError("RemoveServersFromServerGroup", err)
 	}
@@ -487,7 +530,12 @@ func (p *NLBProvider) UpdateNLBServersAsync(ctx context.Context, sgId string, ba
 		req.Servers = append(req.Servers, reqServer)
 	}
 
-	resp, err := p.auth.NLB.UpdateServerGroupServersAttribute(req)
+	var resp *nlb.UpdateServerGroupServersAttributeResponse
+	err := retryOnThrottling("UpdateServerGroupServersAttribute", func() error {
+		var err error
+		resp, err = p.auth.NLB.UpdateServerGroupServersAttribute(req)
+		return err
+	})
 	if err != nil {
 		return "", util.SDKError("UpdateServerGroupServersAttribute", err)
 	}

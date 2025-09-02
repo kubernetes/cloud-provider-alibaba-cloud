@@ -25,6 +25,7 @@ const (
 	flagUseServiceAccountCredentials    = "use-service-account-credentials"
 	flagSkipDisableSourceDestCheck      = "skip-disable-source-dest-check"
 	flagNodeEventAggregationWaitSeconds = "node-event-aggregation-wait-seconds"
+	flagMaxThrottlingRetryTimes         = "max-throttling-retry-times"
 
 	flagDryRun                         = "dry-run"
 	flagServiceMaxConcurrentReconciles = "concurrent-service-syncs"
@@ -43,7 +44,8 @@ const (
 	defaultServerGroupBatchSize           = 40
 	defaultNetwork                        = "vpc"
 
-	defaultMaxConcurrentActions = 10
+	defaultMaxConcurrentActions    = 10
+	defaultMaxThrottlingRetryTimes = 10
 )
 
 var ControllerCFG = &ControllerConfig{
@@ -58,6 +60,7 @@ type ControllerConfig struct {
 	FeatureGates                    string
 	ServerGroupBatchSize            int
 	MaxConcurrentActions            int
+	MaxThrottlingRetryTimes         int
 	LogLevel                        int
 	DryRun                          bool
 	NetWork                         string
@@ -90,6 +93,7 @@ func (cfg *ControllerConfig) BindFlags(fs *pflag.FlagSet) {
 	fs.IntVar(&cfg.ServerGroupBatchSize, flagServerGroupBatchSize, defaultServerGroupBatchSize, "The batch size for syncing server group. The value range is 1-40")
 	fs.BoolVar(&cfg.AllowUntaggedCloud, "allow-untagged-cloud", false, "Allow the cluster to run without the cluster-id on cloud instances. This is a legacy mode of operation and a cluster-id will be required in the future.")
 	fs.IntVar(&cfg.MaxConcurrentActions, "max-concurrent-actions", defaultMaxConcurrentActions, "The max concurrent number of actions for listener and server group updates")
+	fs.IntVar(&cfg.MaxThrottlingRetryTimes, flagMaxThrottlingRetryTimes, defaultMaxThrottlingRetryTimes, "Max retry times for throttling errors in a row")
 	fs.BoolVar(&cfg.EnableIMDSv2, "enable-imdsv2", true, "Use IMDSv2 for metadata api.")
 	_ = fs.MarkDeprecated("allow-untagged-cloud", "This flag is deprecated and will be removed in a future release. A cluster-id will be required on cloud instances.")
 	fs.IntVar(&cfg.NodeReconcileBatchSize, "node-reconcile-batch-size", 100, "The batch size for syncing node status. The value range is 1-100")
@@ -123,6 +127,10 @@ func (cfg *ControllerConfig) Validate() error {
 
 	if cfg.MaxConcurrentActions <= 0 {
 		return fmt.Errorf("--max-concurrent-actions must be set to a positive integer")
+	}
+
+	if cfg.MaxThrottlingRetryTimes <= 0 {
+		return fmt.Errorf("--max-throttling-retry-times must be set to a positive integer")
 	}
 
 	return nil

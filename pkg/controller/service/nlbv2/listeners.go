@@ -412,12 +412,12 @@ func (mgr *ListenerManager) UpdateNLBListener(reqCtx *svcCtx.RequestContext, loc
 	}
 
 	if needUpdate {
-		reqCtx.Ctx = context.WithValue(reqCtx.Ctx, dryrun.ContextMessage, updateDetail)
+		ctx := context.WithValue(reqCtx.Ctx, dryrun.ContextMessage, updateDetail)
 		reqCtx.Log.Info(fmt.Sprintf("update listener: %s [%s] changed, detail %s", local.ListenerProtocol, local.PortString(), updateDetail))
 
 		var jobId string
 		err := helper.RetryOnErrorContains(errorListenerOperationConflict, func() error {
-			id, err := mgr.cloud.UpdateNLBListenerAsync(reqCtx.Ctx, update)
+			id, err := mgr.cloud.UpdateNLBListenerAsync(ctx, update)
 			if err != nil {
 				return err
 			}

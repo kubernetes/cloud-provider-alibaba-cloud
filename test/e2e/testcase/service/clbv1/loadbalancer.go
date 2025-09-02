@@ -207,7 +207,9 @@ func RunLoadBalancerTestCases(f *framework.Framework) {
 			}
 
 			ginkgo.It("reuse ccm created slb", func() {
-				_, err := f.Client.KubeClient.CreateServiceByAnno(nil)
+				_, err := f.Client.KubeClient.CreateServiceByAnno(map[string]string{
+					annotation.Annotation(annotation.LoadBalancerName): "ccm-created-lb",
+				})
 				gomega.Expect(err).To(gomega.BeNil())
 				svc, remote, err := f.FindLoadBalancer()
 				gomega.Expect(err).To(gomega.BeNil())
@@ -221,7 +223,7 @@ func RunLoadBalancerTestCases(f *framework.Framework) {
 					annotation.Annotation(annotation.AddressType):      string(model.InternetAddressType),
 					annotation.Annotation(annotation.LoadBalancerId):   remote.LoadBalancerAttribute.LoadBalancerId,
 					annotation.Annotation(annotation.OverrideListener): "true",
-					annotation.Annotation(annotation.Spec):             "slb.s2.small",
+					annotation.Annotation(annotation.LoadBalancerName): "ccm-reused-lb",
 				}
 				_, err = f.Client.KubeClient.PatchService(svc, newSvc)
 				gomega.Expect(err).To(gomega.BeNil())
@@ -624,7 +626,10 @@ func RunLoadBalancerTestCases(f *framework.Framework) {
 				})
 
 				ginkgo.It("change master zone & slave zone", func() {
-					oldSvc, err := f.Client.KubeClient.CreateServiceByAnno(nil)
+					oldSvc, err := f.Client.KubeClient.CreateServiceByAnno(map[string]string{
+						annotation.Annotation(annotation.MasterZoneID): options.TestConfig.MasterZoneID,
+						annotation.Annotation(annotation.SlaveZoneID):  options.TestConfig.SlaveZoneID,
+					})
 					gomega.Expect(err).To(gomega.BeNil())
 					err = f.ExpectLoadBalancerEqual(oldSvc)
 					gomega.Expect(err).To(gomega.BeNil())
