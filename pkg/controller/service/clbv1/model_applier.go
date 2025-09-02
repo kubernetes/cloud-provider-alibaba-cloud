@@ -16,7 +16,7 @@ import (
 	"sync"
 )
 
-type serverGroupApplyResult struct {
+type vGroupApplyResult struct {
 	VGroupName string
 	VGroupID   string
 	Err        error
@@ -85,9 +85,9 @@ func (m *ModelApplier) Apply(reqCtx *svcCtx.RequestContext, local *model.LoadBal
 			helper.TAGKEY, reqCtx.Anno.GetDefaultLoadBalancerName())
 	}
 
-	var sgChannel chan serverGroupApplyResult
+	var sgChannel chan vGroupApplyResult
 	if hashChangedOrDryRun {
-		sgChannel = make(chan serverGroupApplyResult, len(local.VServerGroups))
+		sgChannel = make(chan vGroupApplyResult, len(local.VServerGroups))
 	}
 
 	actions, err := buildVGroupCreateAndUpdateActions(reqCtx, local, remote)
@@ -243,7 +243,7 @@ func (m *ModelApplier) deleteLoadBalancer(reqCtx *svcCtx.RequestContext, local, 
 	return nil
 }
 
-func (m *ModelApplier) applyVGroups(reqCtx *svcCtx.RequestContext, actions []vGroupAction, serverGroupChannel chan serverGroupApplyResult) error {
+func (m *ModelApplier) applyVGroups(reqCtx *svcCtx.RequestContext, actions []vGroupAction, serverGroupChannel chan vGroupApplyResult) error {
 	if serverGroupChannel != nil {
 		defer close(serverGroupChannel)
 	}
@@ -266,7 +266,7 @@ type listenerAction struct {
 }
 
 func (m *ModelApplier) applyListeners(reqCtx *svcCtx.RequestContext,
-	createActions []CreateAction, updateActions []UpdateAction, deleteActions []DeleteAction, serverGroupChannel chan serverGroupApplyResult) error {
+	createActions []CreateAction, updateActions []UpdateAction, deleteActions []DeleteAction, serverGroupChannel chan vGroupApplyResult) error {
 
 	var errs []error
 	wg := sync.WaitGroup{}

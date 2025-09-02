@@ -41,17 +41,21 @@ const (
 	Provisioning = LoadBalancerStatus("Provisioning")
 )
 
-var apiThrottlingBackoff = wait.Backoff{
-	Steps:    30,
-	Duration: 1 * time.Second,
-}
-
 const (
-	listAsynJobsMaxBatchSize = 20
+	listAsynJobsMaxBatchSize       = 20
+	defaultAPIThrottlingRetryTimes = 10
 )
 
 func retryOnThrottling(api string, fn func() error) error {
-	return retry.OnError(apiThrottlingBackoff, util.IsThrottlingError, func() error {
+	backoff := wait.Backoff{
+		Steps:    ctrlCfg.ControllerCFG.MaxThrottlingRetryTimes,
+		Duration: 1 * time.Second,
+	}
+	if backoff.Steps <= 0 {
+		backoff.Steps = defaultAPIThrottlingRetryTimes
+	}
+
+	return retry.OnError(backoff, util.IsThrottlingError, func() error {
 		err := fn()
 		if util.IsThrottlingError(err) {
 			klog.Warningf("OpenAPI %s throttled in this try: %s", api, util.GetErrorMessage(err))

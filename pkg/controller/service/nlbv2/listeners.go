@@ -412,7 +412,6 @@ func (mgr *ListenerManager) UpdateNLBListener(reqCtx *svcCtx.RequestContext, loc
 	}
 
 	if needUpdate {
-		// fixme: test if it works
 		ctx := context.WithValue(reqCtx.Ctx, dryrun.ContextMessage, updateDetail)
 		reqCtx.Log.Info(fmt.Sprintf("update listener: %s [%s] changed, detail %s", local.ListenerProtocol, local.PortString(), updateDetail))
 

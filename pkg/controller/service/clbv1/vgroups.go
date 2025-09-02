@@ -163,7 +163,7 @@ func (mgr *VGroupManager) BuildRemoteModel(reqCtx *svcCtx.RequestContext, m *mod
 	return nil
 }
 
-func (mgr *VGroupManager) ParallelUpdateVServerGroup(reqCtx *svcCtx.RequestContext, actions []vGroupAction, serverGroupChannel chan serverGroupApplyResult) []error {
+func (mgr *VGroupManager) ParallelUpdateVServerGroup(reqCtx *svcCtx.RequestContext, actions []vGroupAction, serverGroupChannel chan vGroupApplyResult) []error {
 	if len(actions) == 0 {
 		reqCtx.Log.Info("no action to do for vgroup")
 		return nil
@@ -175,9 +175,9 @@ func (mgr *VGroupManager) ParallelUpdateVServerGroup(reqCtx *svcCtx.RequestConte
 		act := actions[i]
 		switch act.Action {
 		case vGroupActionCreateAndAddBackendServers:
-			err = mgr.CreateVServerGroupAndAddBackendServers(reqCtx, act.Local, act.LBId, serverGroupChannel)
+			err = mgr.CreateVServerGroupAndAddBackendServers(reqCtx, act.Local, act.LBId)
 			if serverGroupChannel != nil {
-				serverGroupChannel <- serverGroupApplyResult{
+				serverGroupChannel <- vGroupApplyResult{
 					VGroupName: act.Local.VGroupName,
 					VGroupID:   act.Local.VGroupId,
 					Err:        err,
@@ -193,7 +193,7 @@ func (mgr *VGroupManager) ParallelUpdateVServerGroup(reqCtx *svcCtx.RequestConte
 	return errs
 }
 
-func (mgr *VGroupManager) CreateVServerGroupAndAddBackendServers(reqCtx *svcCtx.RequestContext, local *model.VServerGroup, lbId string, sgChannel chan serverGroupApplyResult) error {
+func (mgr *VGroupManager) CreateVServerGroupAndAddBackendServers(reqCtx *svcCtx.RequestContext, local *model.VServerGroup, lbId string) error {
 	err := mgr.CreateVServerGroup(reqCtx, local, lbId)
 	if err != nil {
 		return err

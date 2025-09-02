@@ -24,10 +24,10 @@ func Do(fns ...func() error) error {
 	wg := sync.WaitGroup{}
 	for i, fn := range fns {
 		wg.Add(1)
-		go func(fn func() error) {
+		go func(i int, fn func() error) {
 			defer wg.Done()
 			errs[i] = fn()
-		}(fn)
+		}(i, fn)
 	}
 	wg.Wait()
 	return utilerrors.NewAggregate(errs)

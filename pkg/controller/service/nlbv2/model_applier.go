@@ -17,27 +17,27 @@ import (
 	"sync"
 )
 
-type serverGroupCreateResult struct {
+type serverGroupApplyResult struct {
 	ServerGroupName string
 	ServerGroupID   string
 	Err             error
 }
 
-type ParallelizeModelApplier struct {
+type ModelApplier struct {
 	nlbMgr *NLBManager
 	lisMgr *ListenerManager
 	sgMgr  *ServerGroupManager
 }
 
-func NewModelApplier(nlbMgr *NLBManager, lisMgr *ListenerManager, serverGroupManager *ServerGroupManager) *ParallelizeModelApplier {
-	return &ParallelizeModelApplier{
+func NewModelApplier(nlbMgr *NLBManager, lisMgr *ListenerManager, serverGroupManager *ServerGroupManager) *ModelApplier {
+	return &ModelApplier{
 		nlbMgr: nlbMgr,
 		lisMgr: lisMgr,
 		sgMgr:  serverGroupManager,
 	}
 }
 
-func (m *ParallelizeModelApplier) Apply(reqCtx *svcCtx.RequestContext, local *nlbmodel.NetworkLoadBalancer) (*nlbmodel.NetworkLoadBalancer, error) {
+func (m *ModelApplier) Apply(reqCtx *svcCtx.RequestContext, local *nlbmodel.NetworkLoadBalancer) (*nlbmodel.NetworkLoadBalancer, error) {
 	if local == nil {
 		return nil, fmt.Errorf("local or remote mdl is nil")
 	}
@@ -87,9 +87,9 @@ func (m *ParallelizeModelApplier) Apply(reqCtx *svcCtx.RequestContext, local *nl
 			helper.TAGKEY, reqCtx.Anno.GetDefaultLoadBalancerName())
 	}
 
-	var sgChannel chan serverGroupCreateResult
+	var sgChannel chan serverGroupApplyResult
 	if hashChangedOrDryRun {
-		sgChannel = make(chan serverGroupCreateResult, len(local.ServerGroups))
+		sgChannel = make(chan serverGroupApplyResult, len(local.ServerGroups))
 	}
 
 	actions, err := m.buildServerGroupCreateAndUpdateActions(reqCtx, local, remote)
@@ -130,7 +130,7 @@ func (m *ParallelizeModelApplier) Apply(reqCtx *svcCtx.RequestContext, local *nl
 	return remote, err
 }
 
-func (m *ParallelizeModelApplier) buildRemoteModel(reqCtx *svcCtx.RequestContext, local, remote *nlbmodel.NetworkLoadBalancer) error {
+func (m *ModelApplier) buildRemoteModel(reqCtx *svcCtx.RequestContext, local, remote *nlbmodel.NetworkLoadBalancer) error {
 	err := m.nlbMgr.BuildRemoteModel(reqCtx, remote)
 	if err != nil {
 		return fmt.Errorf("get nlb attribute from cloud error: %s", err.Error())
@@ -171,7 +171,7 @@ func (m *ParallelizeModelApplier) buildRemoteModel(reqCtx *svcCtx.RequestContext
 	return parallel.Do(tasks...)
 }
 
-func (m *ParallelizeModelApplier) applyLoadBalancer(reqCtx *svcCtx.RequestContext, local, remote *nlbmodel.NetworkLoadBalancer) error {
+func (m *ModelApplier) applyLoadBalancer(reqCtx *svcCtx.RequestContext, local, remote *nlbmodel.NetworkLoadBalancer) error {
 	// delete nlb
 	if helper.NeedDeleteLoadBalancer(reqCtx.Service) {
 		err := m.deleteLoadBalancer(reqCtx, local, remote)
@@ -221,7 +221,7 @@ func (m *ParallelizeModelApplier) applyLoadBalancer(reqCtx *svcCtx.RequestContex
 	return nil
 }
 
-func (m *ParallelizeModelApplier) deleteLoadBalancer(reqCtx *svcCtx.RequestContext, local, remote *nlbmodel.NetworkLoadBalancer) error {
+func (m *ModelApplier) deleteLoadBalancer(reqCtx *svcCtx.RequestContext, local, remote *nlbmodel.NetworkLoadBalancer) error {
 	if !local.LoadBalancerAttribute.IsUserManaged {
 		err := m.sgMgr.BuildRemoteModel(reqCtx, remote)
 		if err != nil {
@@ -257,7 +257,7 @@ func (m *ParallelizeModelApplier) deleteLoadBalancer(reqCtx *svcCtx.RequestConte
 	return nil
 }
 
-func (m *ParallelizeModelApplier) buildServerGroupCreateAndUpdateActions(reqCtx *svcCtx.RequestContext, local, remote *nlbmodel.NetworkLoadBalancer) ([]serverGroupAction, error) {
+func (m *ModelApplier) buildServerGroupCreateAndUpdateActions(reqCtx *svcCtx.RequestContext, local, remote *nlbmodel.NetworkLoadBalancer) ([]serverGroupAction, error) {
 	var actions []serverGroupAction
 	updatedServerGroups := map[string]bool{}
 
@@ -334,7 +334,7 @@ func (m *ParallelizeModelApplier) buildServerGroupCreateAndUpdateActions(reqCtx 
 	return actions, nil
 }
 
-func (m *ParallelizeModelApplier) applyServerGroups(reqCtx *svcCtx.RequestContext, actions []serverGroupAction, serverGroupChannel chan serverGroupCreateResult) error {
+func (m *ModelApplier) applyServerGroups(reqCtx *svcCtx.RequestContext, actions []serverGroupAction, serverGroupChannel chan serverGroupApplyResult) error {
 	if serverGroupChannel != nil {
 		defer close(serverGroupChannel)
 	}
@@ -343,7 +343,7 @@ func (m *ParallelizeModelApplier) applyServerGroups(reqCtx *svcCtx.RequestContex
 	return utilerrors.NewAggregate(errs)
 }
 
-func (m *ParallelizeModelApplier) applyListeners(reqCtx *svcCtx.RequestContext, listenerActions []listenerAction, serverGroupChannel chan serverGroupCreateResult) error {
+func (m *ModelApplier) applyListeners(reqCtx *svcCtx.RequestContext, listenerActions []listenerAction, serverGroupChannel chan serverGroupApplyResult) error {
 	var beforeActions []listenerAction
 	var actions []listenerAction
 	listenerMap := map[string][]listenerAction{}
@@ -484,7 +484,7 @@ func buildActionsForListeners(reqCtx *svcCtx.RequestContext, local, remote *nlbm
 	return actions, nil
 }
 
-func (m *ParallelizeModelApplier) cleanup(reqCtx *svcCtx.RequestContext, local, remote *nlbmodel.NetworkLoadBalancer) error {
+func (m *ModelApplier) cleanup(reqCtx *svcCtx.RequestContext, local, remote *nlbmodel.NetworkLoadBalancer) error {
 	var actions []serverGroupAction
 	// delete server groups
 	for _, r := range remote.ServerGroups {

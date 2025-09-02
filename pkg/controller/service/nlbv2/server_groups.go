@@ -199,7 +199,7 @@ func (mgr *ServerGroupManager) BuildRemoteModel(reqCtx *svcCtx.RequestContext, m
 	return nil
 }
 
-func (mgr *ServerGroupManager) ParallelUpdateServerGroups(reqCtx *svcCtx.RequestContext, actions []serverGroupAction, sgChannel chan serverGroupCreateResult) []error {
+func (mgr *ServerGroupManager) ParallelUpdateServerGroups(reqCtx *svcCtx.RequestContext, actions []serverGroupAction, sgChannel chan serverGroupApplyResult) []error {
 	if len(actions) == 0 {
 		reqCtx.Log.Info("no action to do for server group")
 		return nil
@@ -222,10 +222,10 @@ func (mgr *ServerGroupManager) ParallelUpdateServerGroups(reqCtx *svcCtx.Request
 	return errs
 }
 
-func (mgr *ServerGroupManager) CreateServerGroupAndAddServers(reqCtx *svcCtx.RequestContext, local *nlbmodel.ServerGroup, sgChannel chan<- serverGroupCreateResult) error {
+func (mgr *ServerGroupManager) CreateServerGroupAndAddServers(reqCtx *svcCtx.RequestContext, local *nlbmodel.ServerGroup, sgChannel chan<- serverGroupApplyResult) error {
 	err := mgr.CreateServerGroup(reqCtx, local)
 	if sgChannel != nil {
-		sgChannel <- serverGroupCreateResult{
+		sgChannel <- serverGroupApplyResult{
 			Err:             err,
 			ServerGroupID:   local.ServerGroupId,
 			ServerGroupName: local.ServerGroupName,
