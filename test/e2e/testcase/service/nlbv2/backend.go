@@ -94,6 +94,42 @@ func RunBackendTestCases(f *framework.Framework) {
 				gomega.Expect(err).To(gomega.BeNil())
 			})
 
+			ginkgo.It("udp", func() {
+				svc := testsvc.DeepCopy()
+				svc.Annotations[annotation.Annotation(annotation.HealthCheckFlag)] = string(model.OnFlag)
+				svc.Annotations[annotation.Annotation(annotation.HealthCheckType)] = "udp"
+				svc.Annotations[annotation.Annotation(annotation.HealthyThreshold)] = "4"
+				svc.Annotations[annotation.Annotation(annotation.UnhealthyThreshold)] = "4"
+				// udp health check interval should be greater than or equal to health check connect timeout
+				svc.Annotations[annotation.Annotation(annotation.HealthCheckConnectTimeout)] = "5"
+				svc.Annotations[annotation.Annotation(annotation.HealthCheckInterval)] = "5"
+				for i := range svc.Spec.Ports {
+					svc.Spec.Ports[i].Protocol = v1.ProtocolUDP
+				}
+				svc, err := f.Client.KubeClient.CreateService(svc)
+				gomega.Expect(err).To(gomega.BeNil())
+				err = f.ExpectNetworkLoadBalancerEqual(svc)
+				gomega.Expect(err).To(gomega.BeNil())
+
+			})
+
+			ginkgo.It("udp with tcp port", func() {
+				svc := testsvc.DeepCopy()
+				svc.Annotations[annotation.Annotation(annotation.HealthCheckFlag)] = string(model.OnFlag)
+				svc.Annotations[annotation.Annotation(annotation.HealthCheckType)] = "udp"
+				svc.Annotations[annotation.Annotation(annotation.HealthyThreshold)] = "4"
+				svc.Annotations[annotation.Annotation(annotation.UnhealthyThreshold)] = "4"
+				// udp health check interval should be greater than or equal to health check connect timeout
+				svc.Annotations[annotation.Annotation(annotation.HealthCheckConnectTimeout)] = "12"
+				svc.Annotations[annotation.Annotation(annotation.HealthCheckInterval)] = "5"
+				svc.Spec.Ports[0].Protocol = v1.ProtocolUDP
+				svc, err := f.Client.KubeClient.CreateService(svc)
+				gomega.Expect(err).To(gomega.BeNil())
+				err = f.ExpectNetworkLoadBalancerEqual(svc)
+				gomega.Expect(err).NotTo(gomega.BeNil())
+
+			})
+
 			ginkgo.It("health check: none -> tcp", func() {
 				oldsvc := testsvc.DeepCopy()
 				oldsvc, err := f.Client.KubeClient.CreateService(oldsvc)
@@ -104,7 +140,6 @@ func RunBackendTestCases(f *framework.Framework) {
 				newsvc := oldsvc.DeepCopy()
 				newsvc.Annotations[annotation.Annotation(annotation.HealthCheckFlag)] = string(model.OnFlag)
 				newsvc.Annotations[annotation.Annotation(annotation.HealthCheckType)] = "tcp"
-				newsvc.Annotations[annotation.Annotation(annotation.HealthCheckConnectTimeout)] = "12"
 				newsvc.Annotations[annotation.Annotation(annotation.HealthyThreshold)] = "4"
 				newsvc.Annotations[annotation.Annotation(annotation.UnhealthyThreshold)] = "4"
 				newsvc.Annotations[annotation.Annotation(annotation.HealthCheckInterval)] = "5"
@@ -133,6 +168,32 @@ func RunBackendTestCases(f *framework.Framework) {
 				newsvc, err = f.Client.KubeClient.PatchService(oldsvc, newsvc)
 				gomega.Expect(err).To(gomega.BeNil())
 				err = f.ExpectNetworkLoadBalancerEqual(newsvc)
+				gomega.Expect(err).To(gomega.BeNil())
+			})
+
+			ginkgo.It("flag on with listener port range", func() {
+				svc := testsvc.DeepCopy()
+				svc.Annotations[annotation.Annotation(annotation.HealthCheckFlag)] = string(model.OnFlag)
+				svc.Annotations[annotation.Annotation(annotation.ListenerPortRange)] = "40-53:53,60-80:80"
+
+				svc, err := f.Client.KubeClient.CreateService(svc)
+				gomega.Expect(err).To(gomega.BeNil())
+				err = f.ExpectNetworkLoadBalancerEqual(svc)
+				gomega.Expect(err).To(gomega.BeNil())
+			})
+
+			ginkgo.It("udp type with listener port range", func() {
+				svc := testsvc.DeepCopy()
+				svc.Annotations[annotation.Annotation(annotation.HealthCheckFlag)] = string(model.OnFlag)
+				svc.Annotations[annotation.Annotation(annotation.HealthCheckType)] = string(model.UDP)
+				svc.Annotations[annotation.Annotation(annotation.ListenerPortRange)] = "40-53:53,60-80:80"
+				for i := range svc.Spec.Ports {
+					svc.Spec.Ports[i].Protocol = v1.ProtocolUDP
+				}
+
+				svc, err := f.Client.KubeClient.CreateService(svc)
+				gomega.Expect(err).To(gomega.BeNil())
+				err = f.ExpectNetworkLoadBalancerEqual(svc)
 				gomega.Expect(err).To(gomega.BeNil())
 			})
 		})
