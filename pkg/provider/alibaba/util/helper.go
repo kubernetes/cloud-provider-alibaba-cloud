@@ -64,7 +64,7 @@ func SDKError(api string, err error) error {
 		if len(attr) < 2 {
 			return err
 		}
-		err.SetErrMsg(fmt.Sprintf("[SDKError] API: %s,StatusCode: %d, ErrorCode: %s, RequestId: %s, Message: %s",
+		err.SetErrMsg(fmt.Sprintf("[SDKError] API: %s, StatusCode: %d, ErrorCode: %s, RequestId: %s, Message: %s",
 			api, tea.IntValue(err.StatusCode), tea.StringValue(err.Code), attr[1], attr[0]))
 		return err
 	case *errors.ServerError:

@@ -1148,9 +1148,13 @@ func setServerGroupAttributeFromAnno(sg *nlbmodel.ServerGroup, anno *annotation.
 
 	// healthcheck
 	if anno.Get(annotation.HealthCheckFlag) != "" {
-		healthCheckConfig := &nlbmodel.HealthCheckConfig{
-			HealthCheckEnabled: tea.Bool(strings.EqualFold(anno.Get(annotation.HealthCheckFlag), string(model.OnFlag))),
+		var healthCheckConfig *nlbmodel.HealthCheckConfig
+		if sg.HealthCheckConfig != nil {
+			healthCheckConfig = sg.HealthCheckConfig
+		} else {
+			healthCheckConfig = &nlbmodel.HealthCheckConfig{}
 		}
+		healthCheckConfig.HealthCheckEnabled = tea.Bool(strings.EqualFold(anno.Get(annotation.HealthCheckFlag), string(model.OnFlag)))
 
 		if *healthCheckConfig.HealthCheckEnabled {
 			if anno.Get(annotation.HealthCheckType) != "" {
