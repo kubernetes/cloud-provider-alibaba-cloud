@@ -61,11 +61,11 @@ func (cc *CloudConfig) LoadCloudCFG() error {
 	if err != nil {
 		return fmt.Errorf("read cloud config error: %s ", err.Error())
 	}
-	err = yaml.Unmarshal(content, CloudCFG)
+	err = yaml.Unmarshal(content, cc)
 	if err != nil {
 		return err
 	}
-	CloudCFG.SetDefaultValue()
+	cc.SetDefaultValue()
 	return nil
 }
 
@@ -79,8 +79,8 @@ func (cc *CloudConfig) SetDefaultValue() {
 	if cc.Global.RouteMaxConcurrentReconciles == 0 {
 		cc.Global.RouteMaxConcurrentReconciles = DefaultRouteMaxConcurrentReconciles
 	}
-	CloudCFG.Global.ResourceGroupID = strings.TrimSpace(CloudCFG.Global.ResourceGroupID)
-	CloudCFG.Global.RouteTableIDS = strings.TrimSpace(CloudCFG.Global.RouteTableIDS)
+	cc.Global.ResourceGroupID = strings.TrimSpace(cc.Global.ResourceGroupID)
+	cc.Global.RouteTableIDS = strings.TrimSpace(cc.Global.RouteTableIDS)
 }
 
 func (cc *CloudConfig) GetKubernetesClusterTag() string {

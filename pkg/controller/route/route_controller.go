@@ -85,7 +85,6 @@ func Add(mgr manager.Manager, ctx *shared.SharedContext) error {
 
 // newReconciler returns a new reconcile.Reconciler
 func newReconciler(mgr manager.Manager, ctx *shared.SharedContext, requeue chan<- event.GenericEvent, rateLimiter workqueue.RateLimiter) *ReconcileRoute {
-
 	recon := &ReconcileRoute{
 		cloud:           ctx.Provider(),
 		client:          mgr.GetClient(),
@@ -109,7 +108,7 @@ type routeController struct {
 // Start function will not be called until the resource lock is acquired
 func (controller routeController) Start(ctx context.Context) error {
 	if controller.recon.configRoutes {
-		controller.recon.periodicalSync()
+		controller.recon.periodicalSync(ctx)
 		for i := range ctrlCfg.CloudCFG.Global.RouteMaxConcurrentReconciles {
 			go controller.recon.batchWorker(ctx, i)
 		}
@@ -142,7 +141,7 @@ type ReconcileRoute struct {
 }
 
 func (r *ReconcileRoute) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
-	// if do not need route, skip all node events
+	// if it's not needed to create routes, skip it
 	if !r.configRoutes {
 		return reconcile.Result{}, nil
 	}
@@ -212,45 +211,6 @@ outer:
 		log.Info("Successfully reconcile routes",
 			"nodes", names, "worker", idx,
 			"elapsedTime", time.Since(startTime).Seconds(), "reconcileID", reconcileID)
-	}
-}
-
-func (r *ReconcileRoute) syncCloudRoute(ctx context.Context, node *corev1.Node) error {
-	if !needSyncRoute(node) {
-		return nil
-	}
-
-	prvdId := node.Spec.ProviderID
-	if prvdId == "" {
-		klog.Warningf("node %s provider id is not exist, skip creating route", node.Name)
-		return nil
-	}
-
-	_, ipv4RouteCidr, err := getIPv4RouteForNode(node)
-	if err != nil || ipv4RouteCidr == "" {
-		klog.Warningf("node %s parse podCIDR %s error, skip creating route", node.Name, node.Spec.PodCIDR)
-		if err1 := r.updateNetworkingCondition(ctx, node, false); err1 != nil {
-			klog.Errorf("route, update network condition error: %v", err1)
-		}
-		return err
-	}
-
-	tables, err := getRouteTables(ctx, r.cloud)
-	if err != nil {
-		return err
-	}
-	var tablesErr []error
-	for _, table := range tables {
-		tablesErr = append(tablesErr, r.addRouteForNode(ctx, table, ipv4RouteCidr, prvdId, node, nil))
-	}
-	if utilerrors.NewAggregate(tablesErr) != nil {
-		err := r.updateNetworkingCondition(ctx, node, false)
-		if err != nil {
-			klog.Errorf("update network condition for node %s, error: %v", node.Name, err.Error())
-		}
-		return utilerrors.NewAggregate(tablesErr)
-	} else {
-		return r.updateNetworkingCondition(ctx, node, true)
 	}
 }
 
@@ -358,10 +318,10 @@ func (r *ReconcileRoute) updateNetworkingCondition(ctx context.Context, node *co
 	return err
 }
 
-func (r *ReconcileRoute) periodicalSync() {
+func (r *ReconcileRoute) periodicalSync(ctx context.Context) {
 	go func() {
 		time.Sleep(r.reconcilePeriod)
-		wait.Until(r.reconcileForCluster, r.reconcilePeriod, wait.NeverStop)
+		wait.Until(r.reconcileForCluster, r.reconcilePeriod, ctx.Done())
 	}()
 }
 

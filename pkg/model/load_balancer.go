@@ -13,7 +13,10 @@ import (
 
 type ListenerStatus string
 
-const Stopped = ListenerStatus("stopped")
+const (
+	Stopped = ListenerStatus("stopped")
+	Running = ListenerStatus("running")
+)
 
 type AddressType string
 

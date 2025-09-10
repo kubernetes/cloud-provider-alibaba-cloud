@@ -1,10 +1,11 @@
 package hash
 
 import (
+	"testing"
+
 	"github.com/stretchr/testify/assert"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"testing"
 )
 
 func TestHashObject(t *testing.T) {
@@ -59,9 +60,47 @@ func TestHashLabel(t *testing.T) {
 	}
 
 	arr := []interface{}{o.Status.Conditions, o.Labels, o.Spec.Unschedulable}
-	//fmt.Printf("%s\n\n\n",PrettyYaml(arr))
-	//fmt.Printf("%s\n\n\n",HashString(arr))
-	//fmt.Printf(HashObject(arr))
-
 	assert.Equal(t, HashObject(arr), "03e8cc3ccf0b0b0bff80371bb738d5e8fa755e9da3d022a7617ce612")
+}
+
+func TestHashString(t *testing.T) {
+	o := v1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Labels: map[string]string{
+				"key": "value",
+			},
+		},
+		Spec: v1.NodeSpec{
+			Unschedulable: false,
+		},
+		Status: v1.NodeStatus{
+			Conditions: []v1.NodeCondition{
+				{
+					Type:   "Ready",
+					Status: "True",
+					Reason: "OK",
+				},
+				{
+					Type:   "DiskFull",
+					Reason: "OK",
+				},
+			},
+		},
+	}
+
+	arr := []interface{}{o.Status.Conditions, o.Labels, o.Spec.Unschedulable}
+
+	expected := "- - reason: OK\n" +
+		"    status: \"True\"\n" +
+		"    type: Ready\n" +
+		"  - reason: OK\n" +
+		"    type: DiskFull\n" +
+		"- key: value\n"
+
+	assert.Equal(t, HashString(arr), expected)
+}
+
+func TestPrettyYaml_UnsupportedType(t *testing.T) {
+	result := PrettyYaml(make(chan int))
+	assert.Equal(t, "", result)
 }
