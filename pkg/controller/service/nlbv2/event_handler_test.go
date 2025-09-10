@@ -2,18 +2,22 @@ package nlbv2
 
 import (
 	"context"
+	"testing"
+	"time"
+
 	"github.com/alibabacloud-go/tea/tea"
 	"github.com/stretchr/testify/assert"
 	v1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/config"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/helper"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/service/reconcile/annotation"
 	"sigs.k8s.io/controller-runtime/pkg/event"
-	"testing"
-	"time"
 )
 
 func TestEnqueueRequestForServiceEvent(t *testing.T) {
@@ -306,4 +310,103 @@ func Test_nodeSpecChanged(t *testing.T) {
 
 	newN.Spec.Unschedulable = true
 	assert.Equal(t, nodeSpecChanged(oldN, newN), true)
+}
+
+func Test_checkServiceAffected(t *testing.T) {
+	defaultEnabled := feature.DefaultMutableFeatureGate.Enabled(config.FilterServiceOnNodeChange)
+	err := feature.DefaultMutableFeatureGate.SetFromMap(map[string]bool{
+		string(config.FilterServiceOnNodeChange): true,
+	})
+	assert.NoError(t, err)
+	defer func() {
+		err := feature.DefaultMutableFeatureGate.SetFromMap(map[string]bool{
+			string(config.FilterServiceOnNodeChange): defaultEnabled,
+		})
+		assert.NoError(t, err)
+	}()
+
+	kubeClient := getFakeKubeClient()
+	h := NewEnqueueRequestForNodeEvent(kubeClient, record.NewFakeRecorder(100))
+
+	node := &v1.Node{}
+	_ = kubeClient.Get(context.TODO(), types.NamespacedName{
+		Name: NodeName,
+	}, node)
+
+	tests := []struct {
+		name     string
+		node     *v1.Node
+		svc      *v1.Service
+		expected bool
+	}{
+		{
+			name: "ENI backend type",
+			node: node,
+			svc: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						annotation.BackendType: "eni",
+					},
+				},
+			},
+			expected: false,
+		},
+		{
+			name: "Cluster traffic policy",
+			node: node,
+			svc: &v1.Service{
+				Spec: v1.ServiceSpec{
+					ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeCluster,
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "Local traffic policy without annotations",
+			node: node,
+			svc: &v1.Service{
+				Spec: v1.ServiceSpec{
+					ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeLocal,
+				},
+			},
+			expected: false,
+		},
+		{
+			name: "Service with BackendLabel annotation",
+			node: node,
+			svc: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						annotation.Annotation(annotation.BackendLabel): "app=nginx",
+					},
+				},
+				Spec: v1.ServiceSpec{
+					ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeLocal,
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "Service with RemoveUnscheduled annotation",
+			node: node,
+			svc: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						annotation.Annotation(annotation.RemoveUnscheduled): "on",
+					},
+				},
+				Spec: v1.ServiceSpec{
+					ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeLocal,
+				},
+			},
+			expected: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := h.checkServiceAffected(tt.node, tt.svc)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
 }

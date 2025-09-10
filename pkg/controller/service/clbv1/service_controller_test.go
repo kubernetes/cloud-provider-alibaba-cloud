@@ -2,6 +2,10 @@ package clbv1
 
 import (
 	"context"
+	"testing"
+	"time"
+
+	"github.com/stretchr/testify/assert"
 	v1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -13,14 +17,13 @@ import (
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/helper"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/service/reconcile/annotation"
 	svcCtx "k8s.io/cloud-provider-alibaba-cloud/pkg/controller/service/reconcile/context"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/model"
 	prvd "k8s.io/cloud-provider-alibaba-cloud/pkg/provider"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/vmock"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/util"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
-	"testing"
-	"time"
 )
 
 var (
@@ -364,4 +367,286 @@ func TestDryRun(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
+}
+
+func TestUpdateReadinessCondition(t *testing.T) {
+	t.Run("successful update", func(t *testing.T) {
+		recon := getReconcileService()
+		svc := getDefaultService()
+		reqCtx := getReqCtx(svc)
+
+		pod := &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-pod-1",
+				Namespace: NS,
+			},
+		}
+		err := recon.kubeClient.Create(context.TODO(), pod)
+		assert.NoError(t, err)
+
+		vgroups := []model.VServerGroup{
+			{
+				InitialBackends: []model.BackendAttribute{
+					{
+						TargetRef: &v1.ObjectReference{
+							Namespace: NS,
+							Name:      "test-pod-1",
+						},
+					},
+				},
+			},
+		}
+
+		err = recon.updateReadinessCondition(reqCtx, vgroups)
+		assert.NoError(t, err)
+	})
+
+	t.Run("TargetRef is nil", func(t *testing.T) {
+		recon := getReconcileService()
+		svc := getDefaultService()
+		reqCtx := getReqCtx(svc)
+
+		vgroups := []model.VServerGroup{
+			{
+				InitialBackends: []model.BackendAttribute{
+					{
+						TargetRef: nil,
+					},
+				},
+			},
+		}
+
+		err := recon.updateReadinessCondition(reqCtx, vgroups)
+		assert.NoError(t, err)
+	})
+
+	t.Run("duplicate pod", func(t *testing.T) {
+		recon := getReconcileService()
+		svc := getDefaultService()
+		reqCtx := getReqCtx(svc)
+
+		pod := &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-pod-2",
+				Namespace: NS,
+			},
+		}
+		err := recon.kubeClient.Create(context.TODO(), pod)
+		assert.NoError(t, err)
+
+		vgroups := []model.VServerGroup{
+			{
+				InitialBackends: []model.BackendAttribute{
+					{
+						TargetRef: &v1.ObjectReference{
+							Namespace: NS,
+							Name:      "test-pod-2",
+						},
+					},
+					{
+						TargetRef: &v1.ObjectReference{
+							Namespace: NS,
+							Name:      "test-pod-2",
+						},
+					},
+				},
+			},
+		}
+
+		err = recon.updateReadinessCondition(reqCtx, vgroups)
+		assert.NoError(t, err)
+	})
+
+	t.Run("pod not found", func(t *testing.T) {
+		recon := getReconcileService()
+		svc := getDefaultService()
+		reqCtx := getReqCtx(svc)
+
+		vgroups := []model.VServerGroup{
+			{
+				InitialBackends: []model.BackendAttribute{
+					{
+						TargetRef: &v1.ObjectReference{
+							Namespace: NS,
+							Name:      "non-existent-pod",
+						},
+					},
+				},
+			},
+		}
+
+		err := recon.updateReadinessCondition(reqCtx, vgroups)
+		assert.NoError(t, err)
+	})
+
+	t.Run("multiple vgroups", func(t *testing.T) {
+		recon := getReconcileService()
+		svc := getDefaultService()
+		reqCtx := getReqCtx(svc)
+
+		pod1 := &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-pod-3",
+				Namespace: NS,
+			},
+		}
+		pod2 := &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-pod-4",
+				Namespace: NS,
+			},
+		}
+		err := recon.kubeClient.Create(context.TODO(), pod1)
+		assert.NoError(t, err)
+		err = recon.kubeClient.Create(context.TODO(), pod2)
+		assert.NoError(t, err)
+
+		vgroups := []model.VServerGroup{
+			{
+				InitialBackends: []model.BackendAttribute{
+					{
+						TargetRef: &v1.ObjectReference{
+							Namespace: NS,
+							Name:      "test-pod-3",
+						},
+					},
+				},
+			},
+			{
+				InitialBackends: []model.BackendAttribute{
+					{
+						TargetRef: &v1.ObjectReference{
+							Namespace: NS,
+							Name:      "test-pod-4",
+						},
+					},
+				},
+			},
+		}
+
+		err = recon.updateReadinessCondition(reqCtx, vgroups)
+		assert.NoError(t, err)
+	})
+
+	t.Run("empty vgroups", func(t *testing.T) {
+		recon := getReconcileService()
+		svc := getDefaultService()
+		reqCtx := getReqCtx(svc)
+
+		vgroups := []model.VServerGroup{}
+
+		err := recon.updateReadinessCondition(reqCtx, vgroups)
+		assert.NoError(t, err)
+	})
+
+	t.Run("InvalidBackends ConditionFalse path", func(t *testing.T) {
+		recon := getReconcileService()
+		svc := getDefaultService()
+		reqCtx := getReqCtx(svc)
+
+		pod := &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{Name: "invalid-backend-pod", Namespace: NS},
+		}
+		err := recon.kubeClient.Create(context.TODO(), pod)
+		assert.NoError(t, err)
+
+		vgroups := []model.VServerGroup{
+			{
+				InvalidBackends: []model.BackendAttribute{
+					{
+						TargetRef: &v1.ObjectReference{Namespace: NS, Name: "invalid-backend-pod"},
+					},
+				},
+			},
+		}
+		err = recon.updateReadinessCondition(reqCtx, vgroups)
+		assert.NoError(t, err)
+	})
+
+	t.Run("ENI Backends path", func(t *testing.T) {
+		recon := getReconcileService()
+		svc := getDefaultService()
+		svc.Annotations = map[string]string{helper.BackendType: model.ENIBackendType}
+		reqCtx := getReqCtx(svc)
+
+		pod := &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{Name: "eni-backend-pod", Namespace: NS},
+		}
+		err := recon.kubeClient.Create(context.TODO(), pod)
+		assert.NoError(t, err)
+
+		vgroups := []model.VServerGroup{
+			{
+				Backends: []model.BackendAttribute{
+					{TargetRef: &v1.ObjectReference{Namespace: NS, Name: "eni-backend-pod"}},
+				},
+			},
+		}
+		err = recon.updateReadinessCondition(reqCtx, vgroups)
+		assert.NoError(t, err)
+	})
+}
+
+func TestRemoveServiceStatus(t *testing.T) {
+	t.Run("no change when status already empty", func(t *testing.T) {
+		recon := getReconcileService()
+		svc := &v1.Service{}
+		err := recon.kubeClient.Get(context.TODO(), types.NamespacedName{Namespace: NS, Name: SvcName}, svc)
+		assert.NoError(t, err)
+		reqCtx := getReqCtx(svc)
+		err = recon.removeServiceStatus(reqCtx, svc)
+		assert.NoError(t, err)
+	})
+
+	t.Run("patch to clear status", func(t *testing.T) {
+		recon := getReconcileService()
+		svc := &v1.Service{}
+		err := recon.kubeClient.Get(context.TODO(), types.NamespacedName{Namespace: NS, Name: SvcName}, svc)
+		assert.NoError(t, err)
+		svc.Status.LoadBalancer = v1.LoadBalancerStatus{
+			Ingress: []v1.LoadBalancerIngress{{IP: "1.2.3.4"}},
+		}
+		err = recon.kubeClient.Status().Update(context.TODO(), svc)
+		assert.NoError(t, err)
+
+		reqCtx := getReqCtx(svc)
+		err = recon.removeServiceStatus(reqCtx, svc)
+		assert.NoError(t, err)
+
+		updated := &v1.Service{}
+		err = recon.kubeClient.Get(context.TODO(), types.NamespacedName{Namespace: NS, Name: SvcName}, updated)
+		assert.NoError(t, err)
+		assert.Empty(t, updated.Status.LoadBalancer.Ingress)
+	})
+}
+
+func TestRemoveServiceLabels(t *testing.T) {
+	t.Run("no op when no target labels", func(t *testing.T) {
+		recon := getReconcileService()
+		svc := &v1.Service{}
+		err := recon.kubeClient.Get(context.TODO(), types.NamespacedName{Namespace: NS, Name: SvcName}, svc)
+		assert.NoError(t, err)
+		err = recon.removeServiceLabels(svc)
+		assert.NoError(t, err)
+	})
+
+	t.Run("remove labels when present", func(t *testing.T) {
+		recon := getReconcileService()
+		svc := &v1.Service{}
+		err := recon.kubeClient.Get(context.TODO(), types.NamespacedName{Namespace: NS, Name: SvcName}, svc)
+		assert.NoError(t, err)
+		if svc.Labels == nil {
+			svc.Labels = make(map[string]string)
+		}
+		svc.Labels[helper.LabelServiceHash] = "hash1"
+		svc.Labels[helper.LabelLoadBalancerId] = "lb-1"
+		err = recon.kubeClient.Update(context.TODO(), svc)
+		assert.NoError(t, err)
+
+		svc2 := &v1.Service{}
+		err = recon.kubeClient.Get(context.TODO(), types.NamespacedName{Namespace: NS, Name: SvcName}, svc2)
+		assert.NoError(t, err)
+		err = recon.removeServiceLabels(svc2)
+		assert.NoError(t, err)
+	})
 }

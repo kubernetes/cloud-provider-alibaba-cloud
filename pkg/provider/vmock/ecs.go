@@ -2,10 +2,14 @@ package vmock
 
 import (
 	"context"
+	"fmt"
+	"strings"
+
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/model"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/base"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/util"
 )
 
 func NewMockECS(
@@ -33,10 +37,22 @@ const (
 )
 
 func (d *MockECS) ListInstances(ctx context.Context, ids []string) (map[string]*prvd.NodeAttribute, error) {
+	for _, id := range ids {
+		if strings.Contains(id, "list-instances-error") {
+			return nil, fmt.Errorf("mock list instances error")
+		}
+	}
 	mins := make(map[string]*prvd.NodeAttribute)
 	for _, id := range ids {
+		if strings.Contains(id, "not-exists") {
+			continue
+		}
+		_, node, err := util.NodeFromProviderID(id)
+		if err != nil {
+			return nil, err
+		}
 		mins[id] = &prvd.NodeAttribute{
-			InstanceID:   id,
+			InstanceID:   node,
 			InstanceType: InstanceType,
 			Addresses: []v1.NodeAddress{
 				{
@@ -51,6 +67,7 @@ func (d *MockECS) ListInstances(ctx context.Context, ids []string) (map[string]*
 			Tags: map[string]string{
 				tagKeyNodePoolID: NodePoolID,
 			},
+			PrimaryNetworkInterfaceID: fmt.Sprintf("eni-%s", node),
 		}
 	}
 	return mins, nil
@@ -61,6 +78,9 @@ func (d *MockECS) GetInstancesByIP(ctx context.Context, ips []string) (*prvd.Nod
 }
 
 func (d *MockECS) DescribeNetworkInterfaces(vpcId string, ips []string, ipVersionType model.AddressIPVersionType) (map[string]string, error) {
+	if vpcId == "vpc-describe-eni-error" {
+		return nil, fmt.Errorf("mock DescribeNetworkInterfaces error")
+	}
 	eniids := make(map[string]string)
 	for _, ip := range ips {
 		eniids[ip] = "eni-id"
@@ -82,5 +102,8 @@ func (d *MockECS) DescribeNetworkInterfacesByIDs(ids []string) ([]*prvd.EniAttri
 }
 
 func (d *MockECS) ModifyNetworkInterfaceSourceDestCheck(id string, enabled bool) error {
+	if strings.Contains(id, "error") {
+		return fmt.Errorf("error")
+	}
 	return nil
 }

@@ -2,7 +2,6 @@ package node
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"time"
 
@@ -88,7 +87,7 @@ func (controller nodeController) Start(ctx context.Context) error {
 	for i := range ctrlCfg.CloudCFG.Global.NodeMaxConcurrentReconciles {
 		go controller.recon.batchWorker(ctx, i)
 	}
-	controller.recon.PeriodicalSync()
+	controller.recon.PeriodicalSync(ctx)
 	return controller.c.Start(ctx)
 }
 
@@ -120,7 +119,7 @@ func (m *ReconcileNode) Reconcile(ctx context.Context, request reconcile.Request
 	err := m.client.Get(ctx, request.NamespacedName, node)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
-			log.Info("node not found, skip", node, request.Name)
+			log.Info("node not found, skip", "node", request.Name)
 			// Request object not found, cloud have been deleted
 			// after reconcile request.
 			// Owned objects are automatically garbage collected.
@@ -187,81 +186,6 @@ outer:
 		}
 		log.Info("Successfully initialized nodes", "nodes", names)
 	}
-}
-
-func (m *ReconcileNode) syncCloudNode(node *corev1.Node) error {
-	cloudTaint := findCloudTaint(node.Spec.Taints)
-	if cloudTaint == nil {
-		klog.V(5).Infof("node %s is registered without cloud taint. return ok", node.Name)
-		return nil
-	}
-
-	start := time.Now()
-	defer func() {
-		metric.NodeLatency.WithLabelValues("remove_taint").Observe(metric.MsSince(start))
-	}()
-
-	nodeRef := &corev1.ObjectReference{
-		Kind:      "Node",
-		Name:      node.Name,
-		UID:       types.UID(node.Name),
-		Namespace: "",
-	}
-
-	err := m.doAddCloudNode(node)
-	if err != nil {
-		m.record.Event(
-			nodeRef,
-			corev1.EventTypeWarning,
-			helper.FailedAddNode,
-			fmt.Sprintf("Error adding node: %s", helper.GetLogMessage(err)),
-		)
-		return fmt.Errorf("doAddCloudNode %s error: %s", node.Name, err.Error())
-	}
-	m.record.Event(nodeRef, corev1.EventTypeNormal, helper.InitializedNode, "Initialize node successfully")
-	log.Info("Successfully initialized node", "node", node.Name)
-	return nil
-}
-
-// This processes nodes that were added into the cluster, and cloud initialize them if appropriate
-func (m *ReconcileNode) doAddCloudNode(node *corev1.Node) error {
-	instance, err := findCloudECS(m.cloud, node)
-	if err != nil {
-		if errors.Is(err, ErrNotFound) {
-			log.Info("cloud instance not found", "node", node.Name)
-			return nil
-		}
-		log.Error(err, "fail to find ecs", "node", node.Name)
-		return fmt.Errorf("find ecs: %s", err.Error())
-	}
-
-	// If user provided an IP address, ensure that IP address is found
-	// in the cloud provider before removing the taint on the node
-	if nodeIP, ok := isProvidedAddrExist(node, instance.Addresses); ok && nodeIP == nil {
-		return fmt.Errorf("failed to get specified nodeIP in cloud provider")
-	}
-
-	initializer := func(_ context.Context) (done bool, err error) {
-		log.Info("try remove cloud taints", "node", node.Name)
-
-		diff := func(copy runtime.Object) (client.Object, error) {
-			nins := copy.(*corev1.Node)
-			setFields(nins, instance, m.configCloudRoute, true)
-			return nins, nil
-		}
-		err = helper.PatchM(m.client, node, diff, helper.PatchAll)
-		if err != nil {
-			log.Error(err, "fail to patch node", "node", node.Name)
-			return false, nil
-		}
-
-		log.Info("finished remove uninitialized cloud taints", "node", node.Name)
-		// After adding, call UpdateNodeAddress to set the CloudProvider provided IPAddresses
-		// So that users do not see any significant delay in IP addresses being filled into the node
-		_ = m.syncNode([]corev1.Node{*node}, false)
-		return true, nil
-	}
-	return wait.PollUntilContextTimeout(context.TODO(), 5*time.Second, 20*time.Second, true, initializer)
 }
 
 // syncNode sync the nodeAddress & cloud node existence
@@ -532,7 +456,7 @@ func (m *ReconcileNode) disableNetworkInterfaceSourceDestCheck(enis []eniInfo) (
 	return failed, nil
 }
 
-func (m *ReconcileNode) PeriodicalSync() {
+func (m *ReconcileNode) PeriodicalSync(ctx context.Context) {
 	// Start a loop to periodically update the node addresses obtained from the cloud
 	syncNode := func() {
 		nodes, err := NodeList(m.client, false)
@@ -552,5 +476,5 @@ func (m *ReconcileNode) PeriodicalSync() {
 		log.Info("sync node successfully", "length", len(nodes.Items))
 	}
 
-	go wait.Until(syncNode, m.statusFrequency, wait.NeverStop)
+	go wait.Until(syncNode, m.statusFrequency, ctx.Done())
 }

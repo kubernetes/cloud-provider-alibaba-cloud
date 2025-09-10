@@ -68,3 +68,99 @@ func TestFilterRemoteTags(t *testing.T) {
 		})
 	}
 }
+
+func TestDiffLoadBalancerTags(t *testing.T) {
+	tests := []struct {
+		name       string
+		local      []tag.Tag
+		remote     []tag.Tag
+		wantTag    []tag.Tag
+		wantUntag  []tag.Tag
+	}{
+		{
+			name: "add new tags",
+			local: []tag.Tag{
+				{Key: "key1", Value: "value1"},
+				{Key: "key2", Value: "value2"},
+			},
+			remote: []tag.Tag{},
+			wantTag: []tag.Tag{
+				{Key: "key1", Value: "value1"},
+				{Key: "key2", Value: "value2"},
+			},
+			wantUntag: []tag.Tag{},
+		},
+		{
+			name:  "remove tags",
+			local: []tag.Tag{},
+			remote: []tag.Tag{
+				{Key: "key1", Value: "value1"},
+				{Key: "key2", Value: "value2"},
+			},
+			wantTag: []tag.Tag{},
+			wantUntag: []tag.Tag{
+				{Key: "key1", Value: "value1"},
+				{Key: "key2", Value: "value2"},
+			},
+		},
+		{
+			name: "update existing tags",
+			local: []tag.Tag{
+				{Key: "key1", Value: "value1-new"},
+				{Key: "key2", Value: "value2"},
+			},
+			remote: []tag.Tag{
+				{Key: "key1", Value: "value1"},
+				{Key: "key2", Value: "value2"},
+				{Key: "key3", Value: "value3"},
+			},
+			wantTag: []tag.Tag{
+				{Key: "key1", Value: "value1-new"},
+			},
+			wantUntag: []tag.Tag{
+				{Key: "key3", Value: "value3"},
+			},
+		},
+		{
+			name: "no changes",
+			local: []tag.Tag{
+				{Key: "key1", Value: "value1"},
+				{Key: "key2", Value: "value2"},
+			},
+			remote: []tag.Tag{
+				{Key: "key1", Value: "value1"},
+				{Key: "key2", Value: "value2"},
+			},
+			wantTag:   []tag.Tag{},
+			wantUntag: []tag.Tag{},
+		},
+		{
+			name: "mixed operations",
+			local: []tag.Tag{
+				{Key: "key1", Value: "value1"}, // unchanged
+				{Key: "key2", Value: "value2-new"}, // updated
+				{Key: "key4", Value: "value4"}, // added
+			},
+			remote: []tag.Tag{
+				{Key: "key1", Value: "value1"}, // unchanged
+				{Key: "key2", Value: "value2"}, // updated
+				{Key: "key3", Value: "value3"}, // removed
+			},
+			wantTag: []tag.Tag{
+				{Key: "key2", Value: "value2-new"},
+				{Key: "key4", Value: "value4"},
+			},
+			wantUntag: []tag.Tag{
+				{Key: "key3", Value: "value3"},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gotTag, gotUntag := DiffLoadBalancerTags(tt.local, tt.remote)
+			assert.ElementsMatch(t, tt.wantTag, gotTag, "tag operations mismatch")
+			assert.ElementsMatch(t, tt.wantUntag, gotUntag, "untag operations mismatch")
+		})
+	}
+}

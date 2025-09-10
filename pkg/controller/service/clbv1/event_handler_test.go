@@ -2,19 +2,24 @@ package clbv1
 
 import (
 	"context"
+	"testing"
+	"time"
+
 	"github.com/stretchr/testify/assert"
 	v1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/client-go/tools/leaderelection/resourcelock"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/config"
 	helper "k8s.io/cloud-provider-alibaba-cloud/pkg/controller/helper"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/service/reconcile/annotation"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/event"
-	"testing"
-	"time"
 )
 
 func TestEnqueueRequestForServiceEvent(t *testing.T) {
@@ -79,6 +84,11 @@ func TestNeedAdd(t *testing.T) {
 	clusterIPSvc := svc.DeepCopy()
 	clusterIPSvc.Spec.Type = v1.ServiceTypeClusterIP
 	assert.Equal(t, needAdd(clusterIPSvc), false)
+
+	tunnelSvc := svc.DeepCopy()
+	tunnelSvc.Spec.Type = v1.ServiceTypeClusterIP
+	tunnelSvc.Annotations = map[string]string{helper.TunnelType: "tunnel"}
+	assert.Equal(t, needAdd(tunnelSvc), false)
 }
 
 func TestEnqueueRequestForEndpointEvent(t *testing.T) {
@@ -109,7 +119,36 @@ func TestIsEndpointProcessNeeded(t *testing.T) {
 	}, ep); err != nil {
 		t.Error(err)
 	}
-	assert.Equal(t, isEndpointProcessNeeded(ep, cl), true)
+	assert.True(t, isEndpointProcessNeeded(ep, cl))
+
+	assert.False(t, isEndpointProcessNeeded(nil, cl))
+
+	epLeader := &v1.Endpoints{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: NS,
+			Name:      SvcName,
+			Annotations: map[string]string{
+				resourcelock.LeaderElectionRecordAnnotationKey: "{}",
+			},
+		},
+	}
+	assert.False(t, isEndpointProcessNeeded(epLeader, cl))
+
+	epNoSvc := &v1.Endpoints{
+		ObjectMeta: metav1.ObjectMeta{Namespace: NS, Name: "no-such-svc"},
+	}
+	clNoSvc := fake.NewClientBuilder().WithRuntimeObjects(epNoSvc).Build()
+	assert.False(t, isEndpointProcessNeeded(epNoSvc, clNoSvc))
+
+	clusterIPSvc := &v1.Service{
+		ObjectMeta: metav1.ObjectMeta{Name: "clusterip-svc", Namespace: NS},
+		Spec:       v1.ServiceSpec{Type: v1.ServiceTypeClusterIP},
+	}
+	epClusterIP := &v1.Endpoints{
+		ObjectMeta: metav1.ObjectMeta{Name: "clusterip-svc", Namespace: NS},
+	}
+	clClusterIP := fake.NewClientBuilder().WithRuntimeObjects(clusterIPSvc, epClusterIP).Build()
+	assert.False(t, isEndpointProcessNeeded(epClusterIP, clClusterIP))
 }
 
 func TestEnqueueRequestForNodeEvent(t *testing.T) {
@@ -207,7 +246,38 @@ func TestIsEndpointSliceProcessNeeded(t *testing.T) {
 	}, es); err != nil {
 		t.Error(err)
 	}
-	assert.Equal(t, isEndpointSliceProcessNeeded(es, cl), true)
+	assert.True(t, isEndpointSliceProcessNeeded(es, cl))
+
+	assert.False(t, isEndpointSliceProcessNeeded(nil, cl))
+
+	esNoLabel := &discovery.EndpointSlice{
+		ObjectMeta: metav1.ObjectMeta{Name: "no-label", Namespace: NS, Labels: map[string]string{}},
+	}
+	assert.False(t, isEndpointSliceProcessNeeded(esNoLabel, cl))
+
+	esNoSvc := &discovery.EndpointSlice{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "no-such-svc-es",
+			Namespace: NS,
+			Labels:    map[string]string{discovery.LabelServiceName: "no-such-svc"},
+		},
+	}
+	clNoSvc := fake.NewClientBuilder().WithRuntimeObjects(esNoSvc).Build()
+	assert.False(t, isEndpointSliceProcessNeeded(esNoSvc, clNoSvc))
+
+	clusterIPSvc := &v1.Service{
+		ObjectMeta: metav1.ObjectMeta{Name: "clusterip-svc", Namespace: NS},
+		Spec:       v1.ServiceSpec{Type: v1.ServiceTypeClusterIP},
+	}
+	esClusterIP := &discovery.EndpointSlice{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "clusterip-svc-es",
+			Namespace: NS,
+			Labels:    map[string]string{discovery.LabelServiceName: "clusterip-svc"},
+		},
+	}
+	clClusterIP := fake.NewClientBuilder().WithRuntimeObjects(clusterIPSvc, esClusterIP).Build()
+	assert.False(t, isEndpointSliceProcessNeeded(esClusterIP, clClusterIP))
 }
 
 func TestIsEndpointSliceUpdateNeeded(t *testing.T) {
@@ -224,4 +294,143 @@ func TestIsEndpointSliceUpdateNeeded(t *testing.T) {
 	newES := oldES.DeepCopy()
 	newES.Ports[0].Port = &newPort
 	assert.Equal(t, isEndpointSliceUpdateNeeded(oldES, newES), true)
+}
+
+func TestCheckServiceAffected(t *testing.T) {
+	cl := getFakeKubeClient()
+	h := NewEnqueueRequestForNodeEvent(cl, record.NewFakeRecorder(100))
+	node := &v1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: NodeName,
+		},
+	}
+
+	t.Run("ENI backend type", func(t *testing.T) {
+		svc := getDefaultService()
+		svc.Annotations[helper.BackendType] = "eni"
+		result := h.checkServiceAffected(node, svc)
+		assert.False(t, result)
+	})
+
+	t.Run("feature gate disabled", func(t *testing.T) {
+		defaultEnabled := feature.DefaultMutableFeatureGate.Enabled(config.FilterServiceOnNodeChange)
+		err := feature.DefaultMutableFeatureGate.SetFromMap(map[string]bool{
+			string(config.FilterServiceOnNodeChange): false,
+		})
+		assert.NoError(t, err)
+		defer func() {
+			err := feature.DefaultMutableFeatureGate.SetFromMap(map[string]bool{
+				string(config.FilterServiceOnNodeChange): defaultEnabled,
+			})
+			assert.NoError(t, err)
+		}()
+
+		svc := getDefaultService()
+		result := h.checkServiceAffected(node, svc)
+		assert.True(t, result)
+	})
+
+	t.Run("cluster external traffic policy", func(t *testing.T) {
+		defaultEnabled := feature.DefaultMutableFeatureGate.Enabled(config.FilterServiceOnNodeChange)
+		err := feature.DefaultMutableFeatureGate.SetFromMap(map[string]bool{
+			string(config.FilterServiceOnNodeChange): true,
+		})
+		assert.NoError(t, err)
+		defer func() {
+			err := feature.DefaultMutableFeatureGate.SetFromMap(map[string]bool{
+				string(config.FilterServiceOnNodeChange): defaultEnabled,
+			})
+			assert.NoError(t, err)
+		}()
+
+		svc := getDefaultService()
+		svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyTypeCluster
+		result := h.checkServiceAffected(node, svc)
+		assert.True(t, result)
+	})
+
+	t.Run("with backend label annotation", func(t *testing.T) {
+		defaultEnabled := feature.DefaultMutableFeatureGate.Enabled(config.FilterServiceOnNodeChange)
+		err := feature.DefaultMutableFeatureGate.SetFromMap(map[string]bool{
+			string(config.FilterServiceOnNodeChange): true,
+		})
+		assert.NoError(t, err)
+		defer func() {
+			err := feature.DefaultMutableFeatureGate.SetFromMap(map[string]bool{
+				string(config.FilterServiceOnNodeChange): defaultEnabled,
+			})
+			assert.NoError(t, err)
+		}()
+
+		svc := getDefaultService()
+		svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyTypeLocal
+		svc.Annotations[annotation.Annotation(annotation.BackendLabel)] = "app=nginx"
+		result := h.checkServiceAffected(node, svc)
+		assert.True(t, result)
+	})
+
+	t.Run("with remove unscheduled annotation", func(t *testing.T) {
+		defaultEnabled := feature.DefaultMutableFeatureGate.Enabled(config.FilterServiceOnNodeChange)
+		err := feature.DefaultMutableFeatureGate.SetFromMap(map[string]bool{
+			string(config.FilterServiceOnNodeChange): true,
+		})
+		assert.NoError(t, err)
+		defer func() {
+			err := feature.DefaultMutableFeatureGate.SetFromMap(map[string]bool{
+				string(config.FilterServiceOnNodeChange): defaultEnabled,
+			})
+			assert.NoError(t, err)
+		}()
+
+		svc := getDefaultService()
+		svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyTypeLocal
+		svc.Annotations[annotation.Annotation(annotation.RemoveUnscheduled)] = "true"
+		result := h.checkServiceAffected(node, svc)
+		assert.True(t, result)
+	})
+
+	t.Run("not affected", func(t *testing.T) {
+		defaultEnabled := feature.DefaultMutableFeatureGate.Enabled(config.FilterServiceOnNodeChange)
+		err := feature.DefaultMutableFeatureGate.SetFromMap(map[string]bool{
+			string(config.FilterServiceOnNodeChange): true,
+		})
+		assert.NoError(t, err)
+		defer func() {
+			err := feature.DefaultMutableFeatureGate.SetFromMap(map[string]bool{
+				string(config.FilterServiceOnNodeChange): defaultEnabled,
+			})
+			assert.NoError(t, err)
+		}()
+
+		svc := getDefaultService()
+		svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyTypeLocal
+		result := h.checkServiceAffected(node, svc)
+		assert.False(t, result)
+	})
+}
+
+func TestCanNodeSkipEventHandler(t *testing.T) {
+	assert.False(t, canNodeSkipEventHandler(nil))
+	nodeNoLabels := &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "n"}}
+	nodeNoLabels.Labels = nil
+	assert.False(t, canNodeSkipEventHandler(nodeNoLabels))
+	assert.False(t, canNodeSkipEventHandler(&v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "n", Labels: map[string]string{}}}))
+
+	nodeExcluded := &v1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:   "excluded",
+			Labels: map[string]string{helper.LabelNodeExcludeNode: "true"},
+		},
+	}
+	assert.True(t, canNodeSkipEventHandler(nodeExcluded))
+
+	nodeMaster := &v1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "master",
+			Labels: map[string]string{
+				"node-role.kubernetes.io/master": "",
+			},
+		},
+	}
+	assert.True(t, canNodeSkipEventHandler(nodeMaster))
 }

@@ -35,7 +35,7 @@ func (sp *predicateForNodeEvent) Update(e event.UpdateEvent) bool {
 			klog.Infof("node changed: %s Pod CIDR Changed: %v - %v", oldNode.Name, oldNode.Spec.PodCIDR, newNode.Spec.PodCIDR)
 			return true
 		}
-		if !reflect.DeepEqual(oldNode.Spec.PodCIDRs, oldNode.Spec.PodCIDRs) {
+		if !reflect.DeepEqual(oldNode.Spec.PodCIDRs, newNode.Spec.PodCIDRs) {
 			klog.Infof("node changed: %s Pod CIDRs Changed: %v - %v", oldNode.Name, oldNode.Spec.PodCIDRs, newNode.Spec.PodCIDRs)
 			return true
 		}

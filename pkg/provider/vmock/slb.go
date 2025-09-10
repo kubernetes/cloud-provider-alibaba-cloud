@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
+	"time"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -455,7 +457,24 @@ func (m *MockCLB) ModifyVServerGroupBackendServers(ctx context.Context, vGroupId
 }
 
 func (m *MockCLB) DescribeServerCertificateById(ctx context.Context, serverCertificateId string) (*model.CertAttribute, error) {
-	return nil, nil
+	if strings.Contains(serverCertificateId, "not-found") {
+		return nil, nil
+	}
+
+	if strings.Contains(serverCertificateId, "expired") {
+		return &model.CertAttribute{
+			ServerCertificateId: serverCertificateId,
+			CreateTimeStamp:     time.Now().Add(-48 * time.Hour).UnixMilli(),
+			ExpireTimeStamp:     time.Now().Add(-24 * time.Hour).UnixMilli(),
+			CommonName:          "*.example.com",
+		}, nil
+	}
+	return &model.CertAttribute{
+		ServerCertificateId: serverCertificateId,
+		CreateTimeStamp:     time.Now().Add(-24 * time.Hour).UnixMilli(),
+		ExpireTimeStamp:     time.Now().Add(24 * time.Hour).UnixMilli(),
+		CommonName:          "*.example.com",
+	}, nil
 }
 
 func (m *MockCLB) DescribeDomainExtensions(ctx context.Context, lbId string, port int) ([]model.DomainExtension, error) {

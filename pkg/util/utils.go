@@ -35,7 +35,7 @@ func PrettyJson(object interface{}) string {
 }
 
 // ClusterVersionAtLeast Check kubernetes version whether higher than the specific version
-func ClusterVersionAtLeast(client *apiext.Clientset, min string) (bool, error) {
+func ClusterVersionAtLeast(client apiext.Interface, min string) (bool, error) {
 	serverVersion, err := client.Discovery().ServerVersion()
 	if err != nil {
 		return false, fmt.Errorf("get server version: %s", err.Error())
@@ -50,6 +50,7 @@ func ClusterVersionAtLeast(client *apiext.Clientset, min string) (bool, error) {
 	least, err := version.ParseGeneric(min)
 	if err != nil {
 		klog.Errorf("parse version %s error: %s", min, err.Error())
+		return false, fmt.Errorf("parse version %s error: %s", min, err.Error())
 	}
 
 	return runningVersion.AtLeast(least), nil

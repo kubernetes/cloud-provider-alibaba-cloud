@@ -17,15 +17,16 @@ import (
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/helper"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/service/reconcile/annotation"
 	svcCtx "k8s.io/cloud-provider-alibaba-cloud/pkg/controller/service/reconcile/context"
+	nlbmodel "k8s.io/cloud-provider-alibaba-cloud/pkg/model/nlb"
 	prvd "k8s.io/cloud-provider-alibaba-cloud/pkg/provider"
-	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/vmock"
-	"k8s.io/cloud-provider-alibaba-cloud/pkg/util"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"testing"
 	"time"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/vmock"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/util"
 )
 
 func getReconcileNLB() (*ReconcileNLB, error) {
@@ -341,4 +342,219 @@ func TestRateLimiter(t *testing.T) {
 		d := rateLimit.When(item)
 		t.Logf("ep duration %f", d.Seconds())
 	}
+}
+
+func TestUpdateReadinessCondition(t *testing.T) {
+	t.Run("successful update", func(t *testing.T) {
+		recon, err := getReconcileNLB()
+		assert.NoError(t, err)
+		svc := &v1.Service{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      ServiceName,
+				Namespace: v1.NamespaceDefault,
+			},
+		}
+		reqCtx := getReqCtx(svc)
+
+		pod := &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-pod-1",
+				Namespace: v1.NamespaceDefault,
+			},
+		}
+		err = recon.kubeClient.Create(context.TODO(), pod)
+		assert.NoError(t, err)
+
+		sgs := []*nlbmodel.ServerGroup{
+			{
+				InitialServers: []nlbmodel.ServerGroupServer{
+					{
+						TargetRef: &v1.ObjectReference{
+							Namespace: v1.NamespaceDefault,
+							Name:      "test-pod-1",
+						},
+					},
+				},
+			},
+		}
+
+		err = recon.updateReadinessCondition(reqCtx, sgs)
+		assert.NoError(t, err)
+	})
+
+	t.Run("TargetRef is nil", func(t *testing.T) {
+		recon, err := getReconcileNLB()
+		assert.NoError(t, err)
+		svc := &v1.Service{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      ServiceName,
+				Namespace: v1.NamespaceDefault,
+			},
+		}
+		reqCtx := getReqCtx(svc)
+
+		sgs := []*nlbmodel.ServerGroup{
+			{
+				InitialServers: []nlbmodel.ServerGroupServer{
+					{
+						TargetRef: nil,
+					},
+				},
+			},
+		}
+
+		err = recon.updateReadinessCondition(reqCtx, sgs)
+		assert.NoError(t, err)
+	})
+
+	t.Run("duplicate pod", func(t *testing.T) {
+		recon, err := getReconcileNLB()
+		assert.NoError(t, err)
+		svc := &v1.Service{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      ServiceName,
+				Namespace: v1.NamespaceDefault,
+			},
+		}
+		reqCtx := getReqCtx(svc)
+
+		pod := &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-pod-2",
+				Namespace: v1.NamespaceDefault,
+			},
+		}
+		err = recon.kubeClient.Create(context.TODO(), pod)
+		assert.NoError(t, err)
+
+		sgs := []*nlbmodel.ServerGroup{
+			{
+				InitialServers: []nlbmodel.ServerGroupServer{
+					{
+						TargetRef: &v1.ObjectReference{
+							Namespace: v1.NamespaceDefault,
+							Name:      "test-pod-2",
+						},
+					},
+					{
+						TargetRef: &v1.ObjectReference{
+							Namespace: v1.NamespaceDefault,
+							Name:      "test-pod-2",
+						},
+					},
+				},
+			},
+		}
+
+		err = recon.updateReadinessCondition(reqCtx, sgs)
+		assert.NoError(t, err)
+	})
+
+	t.Run("pod not found", func(t *testing.T) {
+		recon, err := getReconcileNLB()
+		assert.NoError(t, err)
+		svc := &v1.Service{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      ServiceName,
+				Namespace: v1.NamespaceDefault,
+			},
+		}
+		reqCtx := getReqCtx(svc)
+
+		sgs := []*nlbmodel.ServerGroup{
+			{
+				InitialServers: []nlbmodel.ServerGroupServer{
+					{
+						TargetRef: &v1.ObjectReference{
+							Namespace: v1.NamespaceDefault,
+							Name:      "non-existent-pod",
+						},
+					},
+				},
+			},
+		}
+
+		err = recon.updateReadinessCondition(reqCtx, sgs)
+		assert.NoError(t, err)
+	})
+
+	t.Run("multiple server groups", func(t *testing.T) {
+		recon, err := getReconcileNLB()
+		assert.NoError(t, err)
+		svc := &v1.Service{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      ServiceName,
+				Namespace: v1.NamespaceDefault,
+			},
+		}
+		reqCtx := getReqCtx(svc)
+
+		pod1 := &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-pod-3",
+				Namespace: v1.NamespaceDefault,
+			},
+		}
+		pod2 := &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-pod-4",
+				Namespace: v1.NamespaceDefault,
+			},
+		}
+		err = recon.kubeClient.Create(context.TODO(), pod1)
+		assert.NoError(t, err)
+		err = recon.kubeClient.Create(context.TODO(), pod2)
+		assert.NoError(t, err)
+
+		sgs := []*nlbmodel.ServerGroup{
+			{
+				InitialServers: []nlbmodel.ServerGroupServer{
+					{
+						TargetRef: &v1.ObjectReference{
+							Namespace: v1.NamespaceDefault,
+							Name:      "test-pod-3",
+						},
+					},
+				},
+			},
+			{
+				InitialServers: []nlbmodel.ServerGroupServer{
+					{
+						TargetRef: &v1.ObjectReference{
+							Namespace: v1.NamespaceDefault,
+							Name:      "test-pod-4",
+						},
+					},
+				},
+			},
+		}
+
+		err = recon.updateReadinessCondition(reqCtx, sgs)
+		assert.NoError(t, err)
+	})
+
+	t.Run("empty server groups", func(t *testing.T) {
+		recon, err := getReconcileNLB()
+		assert.NoError(t, err)
+		svc := &v1.Service{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      ServiceName,
+				Namespace: v1.NamespaceDefault,
+			},
+		}
+		reqCtx := getReqCtx(svc)
+
+		sgs := []*nlbmodel.ServerGroup{}
+
+		err = recon.updateReadinessCondition(reqCtx, sgs)
+		assert.NoError(t, err)
+	})
+}
+
+func TestNLBControllerFunctions(t *testing.T) {
+	t.Run("newReconciler function exists and can be called", func(t *testing.T) {
+		// Simply test that the function exists and signature is correct
+		// We can't fully test it without a real manager and context
+		assert.NotNil(t, newReconciler)
+	})
 }
