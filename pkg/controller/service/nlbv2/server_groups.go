@@ -2,12 +2,13 @@ package nlbv2
 
 import (
 	"fmt"
+	"strconv"
+	"strings"
+
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/service/reconcile/parallel"
-	"strconv"
-	"strings"
 
 	"github.com/alibabacloud-go/tea/tea"
 	"github.com/mohae/deepcopy"
@@ -864,6 +865,10 @@ func removeDuplicatedECS(backends []nlbmodel.ServerGroupServer) []nlbmodel.Serve
 	nodeMap := make(map[string]bool)
 	var uniqBackends []nlbmodel.ServerGroupServer
 	for _, backend := range backends {
+		if backend.ServerType != nlbmodel.EcsServerType {
+			uniqBackends = append(uniqBackends, backend)
+			continue
+		}
 		if _, ok := nodeMap[backend.ServerId]; ok {
 			continue
 		}
@@ -1016,10 +1021,16 @@ func podNumberAlgorithm(mode helper.TrafficPolicy, backends []nlbmodel.ServerGro
 	// LocalTrafficPolicy
 	ecsPods := make(map[string]int32)
 	for _, b := range backends {
-		ecsPods[b.ServerId] += 1
+		if b.ServerId != "" {
+			ecsPods[b.ServerId] += 1
+		}
 	}
 	for i := range backends {
-		backends[i].Weight = ecsPods[backends[i].ServerId]
+		if backends[i].ServerType != nlbmodel.EcsServerType {
+			backends[i].Weight = 1
+		} else {
+			backends[i].Weight = ecsPods[backends[i].ServerId]
+		}
 	}
 	return backends
 }
@@ -1059,10 +1070,16 @@ func podPercentAlgorithm(mode helper.TrafficPolicy, backends []nlbmodel.ServerGr
 	// LocalTrafficPolicy
 	ecsPods := make(map[string]int)
 	for _, b := range backends {
-		ecsPods[b.ServerId] += 1
+		if b.ServerId != "" {
+			ecsPods[b.ServerId] += 1
+		}
 	}
 	for i := range backends {
-		backends[i].Weight = int32(weight * ecsPods[backends[i].ServerId] / len(backends))
+		if backends[i].ServerType != nlbmodel.EcsServerType {
+			backends[i].Weight = int32(weight * 1 / len(backends))
+		} else {
+			backends[i].Weight = int32(weight * ecsPods[backends[i].ServerId] / len(backends))
+		}
 		if backends[i].Weight < 1 {
 			backends[i].Weight = 1
 		}
