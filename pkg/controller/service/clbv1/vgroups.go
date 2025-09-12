@@ -4,6 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net"
+	"strconv"
+	"strings"
+
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
@@ -16,9 +20,6 @@ import (
 	svcCtx "k8s.io/cloud-provider-alibaba-cloud/pkg/controller/service/reconcile/context"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/service/reconcile/parallel"
 	"k8s.io/klog/v2"
-	"net"
-	"strconv"
-	"strings"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/helper"
@@ -827,6 +828,10 @@ func removeDuplicatedECS(backends []model.BackendAttribute) []model.BackendAttri
 	nodeMap := make(map[string]bool)
 	var uniqBackends []model.BackendAttribute
 	for _, backend := range backends {
+		if backend.Type != model.ECSBackendType {
+			uniqBackends = append(uniqBackends, backend)
+			continue
+		}
 		if _, ok := nodeMap[backend.ServerId]; ok {
 			continue
 		}
@@ -834,7 +839,6 @@ func removeDuplicatedECS(backends []model.BackendAttribute) []model.BackendAttri
 		uniqBackends = append(uniqBackends, backend)
 	}
 	return uniqBackends
-
 }
 
 func (mgr *VGroupManager) buildClusterBackends(reqCtx *svcCtx.RequestContext, candidates *backend.EndpointWithENI,
@@ -937,10 +941,16 @@ func podNumberAlgorithm(mode helper.TrafficPolicy, backends []model.BackendAttri
 	// LocalTrafficPolicy
 	ecsPods := make(map[string]int)
 	for _, b := range backends {
-		ecsPods[b.ServerId] += 1
+		if b.ServerId != "" {
+			ecsPods[b.ServerId] += 1
+		}
 	}
 	for i := range backends {
-		backends[i].Weight = ecsPods[backends[i].ServerId]
+		if backends[i].Type != model.ECSBackendType {
+			backends[i].Weight = 1
+		} else {
+			backends[i].Weight = ecsPods[backends[i].ServerId]
+		}
 	}
 	return backends
 }
@@ -979,10 +989,17 @@ func podPercentAlgorithm(mode helper.TrafficPolicy, backends []model.BackendAttr
 	// LocalTrafficPolicy
 	ecsPods := make(map[string]int)
 	for _, b := range backends {
-		ecsPods[b.ServerId] += 1
+		if b.ServerId != "" {
+			ecsPods[b.ServerId] += 1
+		}
 	}
 	for i := range backends {
-		backends[i].Weight = weight * ecsPods[backends[i].ServerId] / len(backends)
+		if backends[i].Type != model.ECSBackendType {
+			backends[i].Weight = weight * 1 / len(backends)
+			continue
+		} else {
+			backends[i].Weight = weight * ecsPods[backends[i].ServerId] / len(backends)
+		}
 		if backends[i].Weight < 1 {
 			backends[i].Weight = 1
 		}
