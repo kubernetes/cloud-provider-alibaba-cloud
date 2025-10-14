@@ -2,6 +2,7 @@ package clbv1
 
 import (
 	"context"
+
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
@@ -333,9 +334,10 @@ func RunLoadBalancerTestCases(f *framework.Framework) {
 		ginkgo.Context("charge type", func() {
 			ginkgo.It("charge-type: paybybandwidth", func() {
 				oldSvc, err := f.Client.KubeClient.CreateServiceByAnno(map[string]string{
-					annotation.Annotation(annotation.AddressType): string(model.InternetAddressType),
-					annotation.Annotation(annotation.ChargeType):  string(model.PayByBandwidth),
-					annotation.Annotation(annotation.Bandwidth):   "5",
+					annotation.Annotation(annotation.InstanceChargeType): string(model.PayBySpec),
+					annotation.Annotation(annotation.AddressType):        string(model.InternetAddressType),
+					annotation.Annotation(annotation.ChargeType):         string(model.PayByBandwidth),
+					annotation.Annotation(annotation.Bandwidth):          "5",
 				})
 				gomega.Expect(err).To(gomega.BeNil())
 				err = f.ExpectLoadBalancerEqual(oldSvc)
@@ -352,8 +354,9 @@ func RunLoadBalancerTestCases(f *framework.Framework) {
 
 			ginkgo.It("charge-type: paybytraffic", func() {
 				svc, err := f.Client.KubeClient.CreateServiceByAnno(map[string]string{
-					annotation.Annotation(annotation.AddressType): string(model.InternetAddressType),
-					annotation.Annotation(annotation.ChargeType):  "paybytraffic",
+					annotation.Annotation(annotation.InstanceChargeType): string(model.PayBySpec),
+					annotation.Annotation(annotation.AddressType):        string(model.InternetAddressType),
+					annotation.Annotation(annotation.ChargeType):         "paybytraffic",
 				})
 
 				gomega.Expect(err).To(gomega.BeNil())
@@ -363,9 +366,10 @@ func RunLoadBalancerTestCases(f *framework.Framework) {
 
 			ginkgo.It("charge-type: paybybandwidth -> paybytraffic", func() {
 				oldSvc, err := f.Client.KubeClient.CreateServiceByAnno(map[string]string{
-					annotation.Annotation(annotation.AddressType): string(model.InternetAddressType),
-					annotation.Annotation(annotation.ChargeType):  string(model.PayByBandwidth),
-					annotation.Annotation(annotation.Bandwidth):   "5",
+					annotation.Annotation(annotation.InstanceChargeType): string(model.PayBySpec),
+					annotation.Annotation(annotation.AddressType):        string(model.InternetAddressType),
+					annotation.Annotation(annotation.ChargeType):         string(model.PayByBandwidth),
+					annotation.Annotation(annotation.Bandwidth):          "5",
 				})
 				gomega.Expect(err).To(gomega.BeNil())
 				err = f.ExpectLoadBalancerEqual(oldSvc)
@@ -383,8 +387,9 @@ func RunLoadBalancerTestCases(f *framework.Framework) {
 
 			ginkgo.It("charge-type: paybybandwidth; address-type: intranet", func() {
 				svc, err := f.Client.KubeClient.CreateServiceByAnno(map[string]string{
-					annotation.Annotation(annotation.AddressType): string(model.IntranetAddressType),
-					annotation.Annotation(annotation.ChargeType):  string(model.PayByBandwidth),
+					annotation.Annotation(annotation.InstanceChargeType): string(model.PayBySpec),
+					annotation.Annotation(annotation.AddressType):        string(model.IntranetAddressType),
+					annotation.Annotation(annotation.ChargeType):         string(model.PayByBandwidth),
 				})
 				gomega.Expect(err).To(gomega.BeNil())
 				err = f.ExpectLoadBalancerEqual(svc)
@@ -731,6 +736,7 @@ func RunLoadBalancerTestCases(f *framework.Framework) {
 		ginkgo.Context("annotation prefix", func() {
 			ginkgo.It("annotation prefix", func() {
 				_, err := f.Client.KubeClient.CreateServiceByAnno(map[string]string{
+					annotation.Annotation(annotation.InstanceChargeType):    string(model.PayBySpec),
 					annotation.Annotation(annotation.Spec):                  model.S1Small,
 					"service.beta.kubernetes.io/alicloud-loadbalancer-spec": "slb.s2.small",
 				})
