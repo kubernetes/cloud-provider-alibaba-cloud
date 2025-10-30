@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
+
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -13,6 +15,7 @@ import (
 	ctrlCfg "k8s.io/cloud-provider-alibaba-cloud/pkg/config"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/context/shared"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/helper"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/service/reconcile/parallel"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/util"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/util/metric"
@@ -23,7 +26,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
-	"time"
 )
 
 const (
@@ -268,10 +270,53 @@ func (m *ReconcileNode) syncNode(nodes []corev1.Node, configCloudRoute bool) err
 	defer func() {
 		metric.NodeLatency.WithLabelValues("reconcile").Observe(metric.MsSince(start))
 	}()
+	nodeMap := map[NodeType][]corev1.Node{}
+	for _, n := range nodes {
+		t, ok := getNodeType(&n)
+		if !ok {
+			log.Error(nil, "unrecognized node type, skip sync node", "node", n.Name)
+			continue
+		}
+		nodeMap[t] = append(nodeMap[t], n)
+	}
 
+	var tasks []func() error
+	for t, nodes := range nodeMap {
+		switch t {
+		case NodeTypeECS:
+			tasks = append(tasks, func() error {
+				if err := m.syncECSNodes(nodes, configCloudRoute); err != nil {
+					log.Error(err, "sync ecs nodes error", "nodeLen", len(nodes))
+					return err
+				}
+				return nil
+			})
+		case NodeTypeLingJun:
+			tasks = append(tasks, func() error {
+				if err := m.syncLingJunNodes(nodes, configCloudRoute); err != nil {
+					log.Error(err, "sync lingjun nodes error", "nodeLen", len(nodes))
+					return err
+				}
+				return nil
+			})
+		default:
+			var names []string
+			for _, n := range nodes {
+				names = append(names, n.Name)
+			}
+			log.Error(nil, "no processing function for node type, skip sync",
+				"names", names, "type", t)
+		}
+	}
+	err := parallel.Do(tasks...)
+	log.Info("sync node finished", "nodeLen", len(nodes), "elapsedTime", time.Now().Sub(start).Seconds())
+	return err
+}
+
+func (m *ReconcileNode) syncECSNodes(nodes []corev1.Node, configCloudRoute bool) error {
 	instances, err := m.cloud.ListInstances(context.TODO(), nodeids(nodes))
 	if err != nil {
-		return fmt.Errorf("[NodeAddress] list instances from api: %s", err.Error())
+		return fmt.Errorf("[NodeAddress] list ecs instances from api: %s", err.Error())
 	}
 
 	var toDisableSourceDestCheckIDs []eniInfo
@@ -338,6 +383,7 @@ func (m *ReconcileNode) syncNode(nodes []corev1.Node, configCloudRoute bool) err
 
 		if cloudNode == nil {
 			continue
+
 		}
 
 		cloudNode.Addresses = setHostnameAddress(node, cloudNode.Addresses)
@@ -387,7 +433,56 @@ func (m *ReconcileNode) syncNode(nodes []corev1.Node, configCloudRoute bool) err
 		}
 	}
 
-	log.Info("sync node finished", "nodeLen", len(nodes), "elapsedTime", time.Now().Sub(start).Seconds())
+	return nil
+}
+
+func (m *ReconcileNode) syncLingJunNodes(nodes []corev1.Node, configCloudRoute bool) error {
+	for i := range nodes {
+		node := &nodes[i]
+		nodeRef := &corev1.ObjectReference{
+			Kind:      "Node",
+			Name:      node.Name,
+			UID:       types.UID(node.Name),
+			Namespace: "",
+		}
+
+		if _, ok := node.Labels[LabelLingJunTianwenEnvironment]; ok {
+			log.V(5).Info("node is in tianwen environment, skip reconcile", "node", node.Name)
+			continue
+		}
+
+		condition := nodeConditionReady(m.client, node)
+		if condition != nil && condition.Status == corev1.ConditionUnknown {
+			n, err := m.cloud.DescribeLingJunNode(context.TODO(), node.Spec.ProviderID)
+			if err != nil {
+				log.Error(err, "describe lingjun node failed", "node", node.Name, "id", node.Spec.ProviderID)
+				continue
+			}
+			if n == nil {
+				log.Info("node is NotReady and cloud node can not found by prvdId, try to delete node from cluster",
+					"node", node.Name, "prvdId", node.Spec.ProviderID)
+				deleteNode(m, node)
+				continue
+			}
+		}
+
+		if findCloudTaint(node.Spec.Taints) != nil {
+			diff := func(copy runtime.Object) (client.Object, error) {
+				nins := copy.(*corev1.Node)
+				removeCloudTaints(nins)
+				return nins, nil
+			}
+
+			err := helper.PatchM(m.client, node, diff, helper.PatchAll)
+			if err != nil {
+				log.Error(err, "remove cloud taints error, wait for next retry", node.Name)
+				m.record.Event(
+					nodeRef, corev1.EventTypeWarning, helper.FailedSyncNode, err.Error(),
+				)
+			}
+		}
+	}
+
 	return nil
 }
 
@@ -440,7 +535,7 @@ func (m *ReconcileNode) disableNetworkInterfaceSourceDestCheck(enis []eniInfo) (
 func (m *ReconcileNode) PeriodicalSync() {
 	// Start a loop to periodically update the node addresses obtained from the cloud
 	syncNode := func() {
-		nodes, err := NodeList(m.client)
+		nodes, err := NodeList(m.client, false)
 		if err != nil {
 			log.Error(err, "address sync error")
 			return

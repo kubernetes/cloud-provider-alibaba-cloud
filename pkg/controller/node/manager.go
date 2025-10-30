@@ -18,6 +18,8 @@ package node
 import (
 	"context"
 	"fmt"
+	"time"
+
 	"github.com/pkg/errors"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -27,7 +29,6 @@ import (
 	"k8s.io/cloud-provider/api"
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"time"
 )
 
 const (
@@ -47,12 +48,41 @@ const (
 const (
 	ecsTagNodePoolID = "ack.alibabacloud.com/nodepool-id"
 
-	LabelNodePoolID         = "node.alibabacloud.com/nodepool-id"
-	LabelInstanceChargeType = "node.alibabacloud.com/instance-charge-type"
-	LabelSpotStrategy       = "node.alibabacloud.com/spot-strategy"
+	LabelNodePoolID                = "node.alibabacloud.com/nodepool-id"
+	LabelInstanceChargeType        = "node.alibabacloud.com/instance-charge-type"
+	LabelSpotStrategy              = "node.alibabacloud.com/spot-strategy"
+	LabelLingJunWorker             = "alibabacloud.com/lingjun-worker"
+	LabelLingJunNodeGroupID        = "alibabacloud.com/lingjun-nodegroup-id"
+	LabelLingJunTianwenEnvironment = "alibabacloud.com/lingjun-tianwen-environment"
+
+	LingJunOperationState
 )
 
 var ErrNotFound = errors.New("instance not found")
+
+type NodeType string
+
+const (
+	NodeTypeECS     = "ecs"
+	NodeTypeLingJun = "lingjun"
+)
+
+func getNodeType(node *v1.Node) (NodeType, bool) {
+	providerID := node.Spec.ProviderID
+	if providerID == "" {
+		return "", false
+	}
+
+	if _, _, err := helper.NodeFromProviderID(providerID); err == nil {
+		return NodeTypeECS, true
+	}
+
+	if v, ok := node.Labels[LabelLingJunWorker]; ok && v == "true" {
+		return NodeTypeLingJun, true
+	}
+
+	return "", false
+}
 
 type nodeModifier func(*v1.Node)
 
@@ -362,7 +392,7 @@ func excludeTaintFromList(taints []v1.Taint, toExclude v1.Taint) []v1.Taint {
 	return excluded
 }
 
-func NodeList(kclient client.Client) (*v1.NodeList, error) {
+func NodeList(kclient client.Client, ecsOnly bool) (*v1.NodeList, error) {
 	nodes := &v1.NodeList{}
 	err := kclient.List(context.TODO(), nodes, &client.ListOptions{
 		Raw: &metav1.ListOptions{
@@ -380,6 +410,12 @@ func NodeList(kclient client.Client) (*v1.NodeList, error) {
 		if node.Spec.ProviderID == "" {
 			klog.Warningf("ignore node[%s] without providerid", node.Name)
 			continue
+		}
+		if ecsOnly {
+			// for forward compatibility, unrecognized node type will be considered as ecs node
+			if t, ok := getNodeType(&node); ok && t != NodeTypeECS {
+				continue
+			}
 		}
 		mnodes = append(mnodes, node)
 	}
