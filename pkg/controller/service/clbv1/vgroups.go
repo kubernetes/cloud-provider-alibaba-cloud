@@ -20,6 +20,7 @@ import (
 	svcCtx "k8s.io/cloud-provider-alibaba-cloud/pkg/controller/service/reconcile/context"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/service/reconcile/parallel"
 	"k8s.io/klog/v2"
+	"k8s.io/utils/pointer"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/helper"
@@ -130,7 +131,12 @@ func (mgr *VGroupManager) updateVServerGroupENIBackendID(reqCtx *svcCtx.RequestC
 						}
 					}
 					if containsIP(vpcCIDRs, b.ServerIp) {
-						return fmt.Errorf("can not find eniid for ip %s in vpc %s", b.ServerIp, mgr.vpcId)
+						targetRef := "<nil>"
+						if b.TargetRef != nil {
+							targetRef = fmt.Sprintf("%s/%s", b.TargetRef.Namespace, b.TargetRef.Name)
+						}
+						return fmt.Errorf("can not find eniid for ip %s in vpc %s, target: %s, node: %s",
+							b.ServerIp, mgr.vpcId, targetRef, pointer.StringDeref(b.NodeName, "<nil>"))
 					} else {
 						skipIPs = append(skipIPs, b.ServerIp)
 						continue
