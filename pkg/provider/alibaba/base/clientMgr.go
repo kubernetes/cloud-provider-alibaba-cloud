@@ -18,14 +18,16 @@ package base
 
 import (
 	"fmt"
-	openapi "github.com/alibabacloud-go/darabonba-openapi/v2/client"
-	"github.com/alibabacloud-go/tea/tea"
-	"github.com/aliyun/alibaba-cloud-sdk-go/sdk/auth/credentials"
 	"net/http"
 	"net/url"
 	"os"
 	"strings"
 	"time"
+
+	openapi "github.com/alibabacloud-go/darabonba-openapi/v2/client"
+	"github.com/alibabacloud-go/tea/dara"
+	"github.com/alibabacloud-go/tea/tea"
+	"github.com/aliyun/alibaba-cloud-sdk-go/sdk/auth/credentials"
 
 	"github.com/aliyun/alibaba-cloud-sdk-go/sdk"
 	"github.com/aliyun/alibaba-cloud-sdk-go/services/alb"
@@ -38,6 +40,7 @@ import (
 	"github.com/aliyun/alibaba-cloud-sdk-go/services/vpc"
 	"k8s.io/klog/v2/klogr"
 
+	efloController "github.com/alibabacloud-go/eflo-controller-20221215/v2/client"
 	nlb "github.com/alibabacloud-go/nlb-20220430/v4/client"
 	"k8s.io/apimachinery/pkg/util/wait"
 	ctrlCfg "k8s.io/cloud-provider-alibaba-cloud/pkg/config"
@@ -71,6 +74,7 @@ type ClientMgr struct {
 	SLS  *sls.Client
 	CAS  *cas.Client
 	ESS  *ess.Client
+	EFLO *efloController.Client
 }
 
 // NewClientMgr return a new client manager
@@ -154,6 +158,11 @@ func NewClientMgr() (*ClientMgr, error) {
 		return nil, fmt.Errorf("initialize alibaba nlb client: %s", err.Error())
 	}
 
+	eflocli, err := efloController.NewClient(openapiCfg(region, credential, ctrlCfg.ControllerCFG.NetWork))
+	if err != nil {
+		return nil, fmt.Errorf("initialize alibaba eflo client: %s", err.Error())
+	}
+
 	auth := &ClientMgr{
 		Meta:   meta,
 		ECS:    ecli,
@@ -165,6 +174,7 @@ func NewClientMgr() (*ClientMgr, error) {
 		SLS:    slscli,
 		CAS:    cascli,
 		ESS:    esscli,
+		EFLO:   eflocli,
 		Region: region,
 		stop:   make(<-chan struct{}, 1),
 	}
@@ -280,10 +290,21 @@ func RefreshToken(mgr *ClientMgr, token *DefaultToken) error {
 	}
 
 	err = mgr.NLB.Init(openapiCfg(token.Region, credential, ctrlCfg.ControllerCFG.NetWork))
-
 	if err != nil {
 		return fmt.Errorf("init nlb sts token config: %s", err.Error())
 	}
+
+	err = mgr.EFLO.Init(openapiCfg(token.Region, credential, ctrlCfg.ControllerCFG.NetWork))
+	if err != nil {
+		return fmt.Errorf("init eflo controller sts token config: %s", err.Error())
+	}
+	// fix eflo endpoint
+	ep, err := mgr.EFLO.GetEndpoint(dara.String("eflo-controller"), dara.String(token.Region),
+		dara.String("regional"), dara.String(ctrlCfg.ControllerCFG.NetWork), nil, nil, nil)
+	if err != nil {
+		return fmt.Errorf("init eflo controller endpint config: %s", err.Error())
+	}
+	mgr.EFLO.Endpoint = ep
 
 	if ctrlCfg.ControllerCFG.NetWork == "vpc" {
 		setVPCEndpoint(mgr)
@@ -316,6 +337,9 @@ func setCustomizedEndpoint(mgr *ClientMgr) {
 	}
 	if nlbEndpoint, err := parseURL(os.Getenv("NLB_ENDPOINT")); err == nil && nlbEndpoint != "" {
 		mgr.NLB.Endpoint = tea.String(nlbEndpoint)
+	}
+	if efloControllerEndpoint, err := parseURL(os.Getenv("EFLO_CONTROLLER_ENDPOINT")); err == nil && efloControllerEndpoint != "" {
+		mgr.EFLO.Endpoint = tea.String(efloControllerEndpoint)
 	}
 }
 

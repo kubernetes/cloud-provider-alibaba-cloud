@@ -3,6 +3,9 @@ package route
 import (
 	"context"
 	"fmt"
+	"strings"
+	"time"
+
 	"github.com/google/uuid"
 	cmap "github.com/orcaman/concurrent-map"
 	"golang.org/x/time/rate"
@@ -31,8 +34,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
-	"strings"
-	"time"
 )
 
 var log = klogr.New().WithName("route-controller")
@@ -371,7 +372,7 @@ func (r *ReconcileRoute) reconcileForCluster() {
 		metric.RouteLatency.WithLabelValues("reconcile").Observe(metric.MsSince(start))
 	}()
 
-	nodes, err := node.NodeList(r.client)
+	nodes, err := node.NodeList(r.client, true)
 	if err != nil {
 		klog.Errorf("reconcile: error listing nodes: %v", err)
 		return

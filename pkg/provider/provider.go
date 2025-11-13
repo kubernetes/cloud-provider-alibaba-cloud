@@ -29,6 +29,7 @@ type Provider interface {
 	INLB
 	ISLS
 	ICAS
+	IEFLO
 }
 
 type RoleAuth struct {
@@ -263,4 +264,30 @@ type INLB interface {
 
 	// Jobs
 	BatchWaitJobsFinish(ctx context.Context, api string, jobIds []string, args ...time.Duration) error
+}
+
+// EFLONodeAttribute EFLO node attribute from cloud LingJun instance
+type EFLONodeAttribute struct {
+	NodeID          string
+	NodeGroupName   string
+	ClusterID       string
+	ClusterName     string
+	ZoneID          string
+	CreateTime      string
+	NodeGroupID     string
+	Hostname        string
+	ImageID         string
+	MachineType     string
+	SN              string
+	OperatingState  string
+	ExpiredTime     string
+	ImageName       string
+	ResourceGroupID string
+	NodeType        string
+	HyperNodeID     string
+}
+
+type IEFLO interface {
+	// DescribeLingJunNode will query LingJun node info from API. If node not exist, return nil.
+	DescribeLingJunNode(ctx context.Context, id string) (*EFLONodeAttribute, error)
 }

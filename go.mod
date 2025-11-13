@@ -6,9 +6,10 @@ toolchain go1.23.12
 
 require (
 	github.com/alibabacloud-go/cs-20151215/v3 v3.0.21
-	github.com/alibabacloud-go/darabonba-openapi/v2 v2.1.10
+	github.com/alibabacloud-go/darabonba-openapi/v2 v2.1.13
+	github.com/alibabacloud-go/eflo-controller-20221215/v2 v2.8.7
 	github.com/alibabacloud-go/nlb-20220430/v4 v4.1.0
-	github.com/alibabacloud-go/tea v1.3.10
+	github.com/alibabacloud-go/tea v1.3.13
 	github.com/aliyun/alibaba-cloud-sdk-go v1.63.99
 	github.com/aliyun/credentials-go v1.4.5
 	github.com/eapache/channels v1.1.0

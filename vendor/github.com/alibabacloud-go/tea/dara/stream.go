@@ -3,44 +3,63 @@ package dara
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"strings"
-	"fmt"
 )
 
-// 定义 Event 结构体
 type SSEEvent struct {
-	ID    *string
+	Id    *string
 	Event *string
 	Data  *string
 	Retry *int
 }
 
-// 解析单个事件
 func parseEvent(lines []string) *SSEEvent {
 	event := &SSEEvent{}
 	for _, line := range lines {
-		if strings.HasPrefix(line, "data: ") {
-			data := strings.TrimPrefix(line, "data: ") + "\n"
+		if strings.HasPrefix(line, "data:") {
+			var data string
+			if strings.HasPrefix(line, "data: ") {
+				data = strings.TrimPrefix(line, "data: ") + "\n"
+			} else {
+				data = strings.TrimPrefix(line, "data:") + "\n"
+			}
 			if event.Data == nil {
 				event.Data = new(string)
 			}
 			*event.Data += data
-		} else if strings.HasPrefix(line, "event: ") {
-			eventName := strings.TrimPrefix(line, "event: ")
+		} else if strings.HasPrefix(line, "event:") {
+			var eventName string
+			if strings.HasPrefix(line, "event: ") {
+				eventName = strings.TrimPrefix(line, "event: ")
+			} else {
+				eventName = strings.TrimPrefix(line, "event:")
+			}
 			event.Event = &eventName
-		} else if strings.HasPrefix(line, "id: ") {
-			id := strings.TrimPrefix(line, "id: ")
-			event.ID = &id
-		} else if strings.HasPrefix(line, "retry: ") {
+		} else if strings.HasPrefix(line, "id:") {
+			var id string
+			if strings.HasPrefix(line, "id: ") {
+				id = strings.TrimPrefix(line, "id: ")
+			} else {
+				id = strings.TrimPrefix(line, "id:")
+			}
+			event.Id = &id
+		} else if strings.HasPrefix(line, "retry:") {
+			var retryStr string
+			if strings.HasPrefix(line, "retry: ") {
+				retryStr = strings.TrimPrefix(line, "retry: ")
+			} else {
+				retryStr = strings.TrimPrefix(line, "retry:")
+			}
 			var retry int
-			fmt.Sscanf(strings.TrimPrefix(line, "retry: "), "%d", &retry)
+			fmt.Sscanf(retryStr, "%d", &retry)
 			event.Retry = &retry
 		}
 	}
-	// Remove last newline from data
 	if event.Data != nil {
 		data := strings.TrimRight(*event.Data, "\n")
 		event.Data = &data
@@ -132,6 +151,65 @@ func ReadAsSSE(body io.ReadCloser, eventChannel chan *SSEEvent, errorChannel cha
 			eventLines = append(eventLines, line)
 		}
 	}()
+}
 
-	return
+func ReadAsSSEWithContext(ctx context.Context, body io.ReadCloser, eventChannel chan *SSEEvent, errorChannel chan error) {
+
+	go func() {
+		defer func() {
+			body.Close()
+			close(eventChannel)
+		}()
+
+		reader := bufio.NewReader(body)
+		var eventLines []string
+
+		for {
+			select {
+			case <-ctx.Done():
+				errorChannel <- ctx.Err()
+				return
+			default:
+			}
+
+			line, err := reader.ReadString('\n')
+			if err != nil {
+				if err == io.EOF {
+					// Handle the end of the stream and possibly pending event
+					if len(eventLines) > 0 {
+						event := parseEvent(eventLines)
+						select {
+						case eventChannel <- event:
+						case <-ctx.Done():
+							errorChannel <- ctx.Err()
+							return
+						}
+					}
+					errorChannel <- nil
+					return
+				}
+				errorChannel <- err
+				return
+			}
+
+			line = strings.TrimRight(line, "\n")
+
+			if line == "" {
+				// End of an SSE event
+				if len(eventLines) > 0 {
+					event := parseEvent(eventLines)
+					select {
+					case eventChannel <- event:
+					case <-ctx.Done():
+						errorChannel <- ctx.Err()
+						return
+					}
+					eventLines = []string{} // Reset for the next event
+				}
+				continue
+			}
+
+			eventLines = append(eventLines, line)
+		}
+	}()
 }

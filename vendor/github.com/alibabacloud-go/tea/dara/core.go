@@ -94,6 +94,7 @@ type RuntimeObject struct {
 	IgnoreSSL         *bool                  `json:"ignoreSSL" xml:"ignoreSSL"`
 	ReadTimeout       *int                   `json:"readTimeout" xml:"readTimeout"`
 	ConnectTimeout    *int                   `json:"connectTimeout" xml:"connectTimeout"`
+	IdleTimeout       *int                   `json:"idleTimeout" xml:"idleTimeout"`
 	LocalAddr         *string                `json:"localAddr" xml:"localAddr"`
 	HttpProxy         *string                `json:"httpProxy" xml:"httpProxy"`
 	HttpsProxy        *string                `json:"httpsProxy" xml:"httpsProxy"`
@@ -114,7 +115,7 @@ type RuntimeObject struct {
 
 func (r *RuntimeObject) getClientTag(domain string) string {
 	return strconv.FormatBool(BoolValue(r.IgnoreSSL)) + strconv.Itoa(IntValue(r.ReadTimeout)) +
-		strconv.Itoa(IntValue(r.ConnectTimeout)) + StringValue(r.LocalAddr) + StringValue(r.HttpProxy) +
+		strconv.Itoa(IntValue(r.ConnectTimeout)) + strconv.Itoa(IntValue(r.IdleTimeout)) + StringValue(r.LocalAddr) + StringValue(r.HttpProxy) +
 		StringValue(r.HttpsProxy) + StringValue(r.NoProxy) + StringValue(r.Socks5Proxy) + StringValue(r.Socks5NetWork) + domain
 }
 
@@ -128,6 +129,7 @@ func NewRuntimeObject(runtime map[string]interface{}) *RuntimeObject {
 		IgnoreSSL:      TransInterfaceToBool(runtime["ignoreSSL"]),
 		ReadTimeout:    TransInterfaceToInt(runtime["readTimeout"]),
 		ConnectTimeout: TransInterfaceToInt(runtime["connectTimeout"]),
+		IdleTimeout:    TransInterfaceToInt(runtime["idleTimeout"]),
 		LocalAddr:      TransInterfaceToString(runtime["localAddr"]),
 		HttpProxy:      TransInterfaceToString(runtime["httpProxy"]),
 		HttpsProxy:     TransInterfaceToString(runtime["httpsProxy"]),
@@ -182,6 +184,39 @@ func Convert(in interface{}, out interface{}) error {
 	decoder.UseNumber()
 	err := decoder.Decode(&out)
 	return err
+}
+
+// ConvertChan converts the source data to the target type and sends it to the specified channel.
+// @param src - source data
+// @param destChan - target channel
+// @return error - error during the conversion process
+func ConvertChan(src interface{}, destChan interface{}) error {
+	destChanValue := reflect.ValueOf(destChan)
+	if destChanValue.Kind() != reflect.Chan {
+		return fmt.Errorf("destChan must be a channel")
+	}
+
+	if destChanValue.Type().ChanDir() == reflect.SendDir {
+		return fmt.Errorf("destChan must be a receive or bidirectional channel")
+	}
+
+	elemType := destChanValue.Type().Elem()
+
+	destValue := reflect.New(elemType).Interface()
+
+	err := Convert(src, destValue)
+	if err != nil {
+		return err
+	}
+	destValueElem := reflect.ValueOf(destValue).Elem()
+
+	defer func() {
+		if r := recover(); r != nil {
+		}
+	}()
+
+	destChanValue.TrySend(destValueElem)
+	return nil
 }
 
 // Recover is used to format error
@@ -539,6 +574,9 @@ func getHttpTransport(req *Request, runtime *RuntimeObject) (*http.Transport, er
 	if runtime.MaxIdleConns != nil && *runtime.MaxIdleConns > 0 {
 		trans.MaxIdleConns = IntValue(runtime.MaxIdleConns)
 		trans.MaxIdleConnsPerHost = IntValue(runtime.MaxIdleConns)
+	}
+	if runtime.IdleTimeout != nil && *runtime.IdleTimeout > 0 {
+		trans.IdleConnTimeout = time.Duration(IntValue(runtime.IdleTimeout)) * time.Millisecond
 	}
 	return trans, nil
 }

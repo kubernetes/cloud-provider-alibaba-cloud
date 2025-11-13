@@ -3,6 +3,10 @@ package node
 import (
 	"context"
 	"fmt"
+	"testing"
+	"time"
+
+	"github.com/stretchr/testify/assert"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -13,7 +17,6 @@ import (
 	"k8s.io/cloud-provider/api"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
-	"testing"
 )
 
 var (
@@ -71,6 +74,203 @@ func TestSyncCloudNode(t *testing.T) {
 				t.Errorf("node internal ip address not equal, expect %s, got %s", vmock.InstanceIP, addr.Address)
 			}
 		}
+	}
+}
+
+func TestSyncLingJunNodes(t *testing.T) {
+	cases := []struct {
+		node                v1.Node
+		delete              bool
+		removeUninitialized bool
+	}{
+		{
+			node: v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "lingjun-node-ready",
+					Labels: map[string]string{
+						LabelLingJunWorker:      "true",
+						LabelLingJunNodeGroupID: "node-group-id",
+					},
+				},
+				Spec: v1.NodeSpec{
+					ProviderID: "e01-test-1",
+				},
+				Status: v1.NodeStatus{
+					Conditions: []v1.NodeCondition{
+						{
+							Type:   v1.NodeReady,
+							Status: v1.ConditionTrue,
+						},
+					},
+				},
+			},
+			delete: false,
+		},
+		{
+			node: v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "lingjun-node-uninitialized",
+					Labels: map[string]string{
+						LabelLingJunWorker:      "true",
+						LabelLingJunNodeGroupID: "node-group-id",
+					},
+				},
+				Spec: v1.NodeSpec{
+					ProviderID: "e01-test-2",
+					Taints: []v1.Taint{
+						{
+							Key:   api.TaintExternalCloudProvider,
+							Value: "true",
+						},
+					},
+				},
+				Status: v1.NodeStatus{
+					Conditions: []v1.NodeCondition{
+						{
+							Type:   v1.NodeReady,
+							Status: v1.ConditionTrue,
+						},
+					},
+				},
+			},
+			delete:              false,
+			removeUninitialized: true,
+		},
+		{
+			node: v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "lingjun-node-unknown",
+					Labels: map[string]string{
+						LabelLingJunWorker:      "true",
+						LabelLingJunNodeGroupID: "node-group-id",
+					},
+				},
+				Spec: v1.NodeSpec{
+					ProviderID: "e01-test-3",
+				},
+				Status: v1.NodeStatus{
+					Conditions: []v1.NodeCondition{
+						{
+							Type:   v1.NodeReady,
+							Status: v1.ConditionUnknown,
+						},
+					},
+				},
+			},
+			delete: false,
+		},
+		{
+			node: v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "lingjun-node-unknown-notfound",
+					Labels: map[string]string{
+						LabelLingJunWorker:      "true",
+						LabelLingJunNodeGroupID: "node-group-id",
+					},
+				},
+				Spec: v1.NodeSpec{
+					ProviderID: "e01-test-notfound",
+				},
+				Status: v1.NodeStatus{
+					Conditions: []v1.NodeCondition{
+						{
+							Type:   v1.NodeReady,
+							Status: v1.ConditionUnknown,
+						},
+					},
+				},
+			},
+			delete: true,
+		},
+		{
+			node: v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "lingjun-node-unknown-notfound-tianwen",
+					Labels: map[string]string{
+						LabelLingJunWorker:             "true",
+						LabelLingJunNodeGroupID:        "node-group-id-2",
+						LabelLingJunTianwenEnvironment: "tianwen-123",
+					},
+				},
+				Spec: v1.NodeSpec{
+					ProviderID: "e01-test-notfound",
+				},
+				Status: v1.NodeStatus{
+					Conditions: []v1.NodeCondition{
+						{
+							Type:   v1.NodeReady,
+							Status: v1.ConditionUnknown,
+						},
+					},
+				},
+			},
+			delete: false,
+		},
+		{
+			node: v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "lingjun-node-unknown-different-nodegroup",
+					Labels: map[string]string{
+						LabelLingJunWorker:      "true",
+						LabelLingJunNodeGroupID: "node-group-id-2",
+					},
+				},
+				Spec: v1.NodeSpec{
+					ProviderID: "e01-test",
+				},
+				Status: v1.NodeStatus{
+					Conditions: []v1.NodeCondition{
+						{
+							Type:   v1.NodeReady,
+							Status: v1.ConditionUnknown,
+						},
+					},
+				},
+			},
+			delete: false,
+		},
+	}
+
+	client := fake.NewClientBuilder().Build()
+	for _, c := range cases {
+		err := client.Create(context.Background(), &c.node)
+		assert.NoError(t, err)
+	}
+
+	list, err := NodeList(client, false)
+	assert.NoError(t, err)
+
+	recon := getReconcileNode()
+	recon.client = client
+	err = recon.syncLingJunNodes(list.Items, false)
+	assert.NoError(t, err)
+
+	// wait for nodes to be deleted
+	time.Sleep(1 * time.Second)
+
+	list, err = NodeList(client, false)
+	assert.NoError(t, err)
+
+	for _, c := range cases {
+		t.Run(c.node.Name, func(t *testing.T) {
+			var node *v1.Node
+			for _, n := range list.Items {
+				if c.node.Name == n.Name {
+					node = &n
+					break
+				}
+			}
+			if c.delete {
+				assert.Nil(t, node)
+			} else {
+				assert.NotNil(t, node)
+				if node != nil {
+					if c.removeUninitialized {
+						assert.Nil(t, findCloudTaint(node.Spec.Taints))
+					}
+				}
+			}
+		})
 	}
 }
 
