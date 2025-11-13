@@ -9,6 +9,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/service/reconcile/parallel"
+	"k8s.io/utils/pointer"
 
 	"github.com/alibabacloud-go/tea/tea"
 	"github.com/mohae/deepcopy"
@@ -144,7 +145,12 @@ func (mgr *ServerGroupManager) updateServerGroupENIBackendID(reqCtx *svcCtx.Requ
 			if sg.Servers[i].ServerType == nlbmodel.EniServerType {
 				eniid, ok := result[sg.Servers[i].ServerIp]
 				if !ok {
-					return fmt.Errorf("can not find eniid for ip %s in vpc %s", sg.Servers[i].ServerIp, mgr.vpcId)
+					targetRef := "<nil>"
+					if sg.Servers[i].TargetRef != nil {
+						targetRef = fmt.Sprintf("%s/%s", sg.Servers[i].TargetRef.Namespace, sg.Servers[i].TargetRef.Name)
+					}
+					return fmt.Errorf("can not find eniid for ip %s in vpc %s, target: %s, node: %s",
+						sg.Servers[i].ServerIp, mgr.vpcId, targetRef, pointer.StringDeref(sg.Servers[i].NodeName, "<nil>"))
 				}
 				sg.Servers[i].ServerId = eniid
 			}
