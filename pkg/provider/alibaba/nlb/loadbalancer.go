@@ -3,12 +3,13 @@ package nlb
 import (
 	"context"
 	"fmt"
+	"strings"
+	"time"
+
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/client-go/util/retry"
 	ctrlCfg "k8s.io/cloud-provider-alibaba-cloud/pkg/config"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/service/reconcile/parallel"
-	"strings"
-	"time"
 
 	nlb "github.com/alibabacloud-go/nlb-20220430/v4/client"
 	"github.com/alibabacloud-go/tea/tea"
@@ -746,7 +747,7 @@ func (p *NLBProvider) waitJobFinish(api, jobId string, args ...time.Duration) er
 	_ = wait.PollImmediate(interval, timeout, func() (bool, error) {
 		req := &nlb.GetJobStatusRequest{}
 		req.JobId = tea.String(jobId)
-		retErr := retryOnThrottling("GetJobStatus", func() error {
+		retErr = retryOnThrottling("GetJobStatus", func() error {
 			var err error
 			resp, err = p.auth.NLB.GetJobStatus(req)
 			return err
@@ -878,7 +879,7 @@ func (p *NLBProvider) waitNLBActive(lbId string) (*nlb.GetLoadBalancerAttributeR
 		req := &nlb.GetLoadBalancerAttributeRequest{}
 		req.LoadBalancerId = tea.String(lbId)
 
-		retErr := retryOnThrottling("GetLoadBalancerAttribute", func() error {
+		retErr = retryOnThrottling("GetLoadBalancerAttribute", func() error {
 			var err error
 			resp, err = p.auth.NLB.GetLoadBalancerAttribute(req)
 			return err
