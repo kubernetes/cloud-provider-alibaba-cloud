@@ -2,14 +2,15 @@ package nlb
 
 import (
 	"fmt"
+	"testing"
+	"time"
+
 	openapi "github.com/alibabacloud-go/darabonba-openapi/v2/client"
 	nlb "github.com/alibabacloud-go/nlb-20220430/v4/client"
 	"github.com/alibabacloud-go/tea/tea"
 	"github.com/stretchr/testify/assert"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/util"
-	"testing"
-	"time"
 )
 
 func NewNLBClient() (*nlb.Client, error) {
@@ -53,7 +54,7 @@ func TestCreateLoadBalancer(t *testing.T) {
 
 	resp, err := client.CreateLoadBalancer(request)
 	if err != nil {
-		t.Fatalf(err.Error())
+		t.Fatal(err.Error())
 	}
 	t.Logf("resp: %+v", resp)
 
@@ -70,7 +71,7 @@ func TestDeleteLoadBalancer(t *testing.T) {
 	}
 	resp, err := client.DeleteLoadBalancer(req)
 	if err != nil {
-		t.Fatalf(err.Error())
+		t.Fatal(err.Error())
 	}
 	t.Logf("resp: %+v", resp)
 }

@@ -34,7 +34,7 @@ func TestNewLBProvider_CreateSLB(t *testing.T) {
 
 	resp, err := client.CreateLoadBalancer(request)
 	if err != nil {
-		t.Fatalf(err.Error())
+		t.Fatal(err.Error())
 	}
 	t.Logf("success(%d)! loadBalancerId = %s\n", resp.GetHttpStatus(), resp.LoadBalancerId)
 }
@@ -55,13 +55,13 @@ func TestProviderSLB_DeleteSLB(t *testing.T) {
 		req.DeleteProtection = "off"
 		_, err := client.SetLoadBalancerDeleteProtection(req)
 		if err != nil {
-			t.Fatalf(err.Error())
+			t.Fatal(err.Error())
 		}
 
 		request := slb.CreateDeleteLoadBalancerRequest()
 		request.LoadBalancerId = id
 		if _, err = client.DeleteLoadBalancer(request); err != nil {
-			t.Fatalf(err.Error())
+			t.Fatal(err.Error())
 		}
 	}
 }
@@ -92,7 +92,7 @@ func TestProviderSLB_DescribeVServerGroups(t *testing.T) {
 	req.LoadBalancerId = "lb-xxxx"
 	resp, err := client.DescribeVServerGroups(req)
 	if err != nil {
-		t.Fatalf(err.Error())
+		t.Fatal(err.Error())
 	}
 	var vgs []model.VServerGroup
 	for _, v := range resp.VServerGroups.VServerGroup {
@@ -101,19 +101,19 @@ func TestProviderSLB_DescribeVServerGroups(t *testing.T) {
 		req.VServerGroupId = v.VServerGroupId
 		resp, err := client.DescribeVServerGroupAttribute(req)
 		if err != nil {
-			t.Fatalf(err.Error())
+			t.Fatal(err.Error())
 		}
 		vg := setVServerGroupFromResponse(resp)
 
 		namedKey, err := model.LoadVGroupNamedKey(vg.VGroupName)
 		if err != nil {
-			t.Fatalf(err.Error())
+			t.Fatal(err.Error())
 		}
 		vg.NamedKey = namedKey
 		vgs = append(vgs, vg)
 	}
 	jsonStr, _ := json.Marshal(vgs)
-	t.Logf(string(jsonStr))
+	t.Log(string(jsonStr))
 }
 
 func TestSLBProvider_TagCLBResource(t *testing.T) {
