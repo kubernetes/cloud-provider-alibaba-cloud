@@ -2,7 +2,13 @@ package route
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"net"
+	"strings"
+	"sync"
+	"time"
+
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -11,11 +17,7 @@ import (
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/model"
 	prvd "k8s.io/cloud-provider-alibaba-cloud/pkg/provider"
 	"k8s.io/klog/v2"
-	"net"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
-	"strings"
-	"sync"
-	"time"
 )
 
 var (
@@ -335,7 +337,7 @@ func (r *ReconcileRoute) batchDeleteRoutes(ctx context.Context, reconcileID stri
 			continue
 		}
 
-		log.Error(fmt.Errorf(s.FailedMessage),
+		log.Error(errors.New(s.FailedMessage),
 			"error delete route entry, requeue",
 			"node", s.Route.NodeReference.Name, "route", s.Route.Name,
 			"message", s.FailedMessage, "code", s.FailedCode, "reconcileID", reconcileID)
