@@ -3,6 +3,8 @@ package nlbv2
 import (
 	"context"
 	"fmt"
+	"sync"
+
 	v1 "k8s.io/api/core/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	ctrlCfg "k8s.io/cloud-provider-alibaba-cloud/pkg/config"
@@ -14,7 +16,6 @@ import (
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/base"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/dryrun"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/util"
-	"sync"
 )
 
 type serverGroupApplyResult struct {
@@ -79,14 +80,6 @@ func (m *ModelApplier) Apply(reqCtx *svcCtx.RequestContext, local *nlbmodel.Netw
 		})
 	}
 
-	if remote.LoadBalancerAttribute.LoadBalancerId == "" {
-		if helper.NeedDeleteLoadBalancer(reqCtx.Service) {
-			return remote, nil
-		}
-		return remote, fmt.Errorf("alicloud: can not find loadbalancer by tag [%s:%s]",
-			helper.TAGKEY, reqCtx.Anno.GetDefaultLoadBalancerName())
-	}
-
 	var sgChannel chan serverGroupApplyResult
 	if hashChangedOrDryRun {
 		sgChannel = make(chan serverGroupApplyResult, len(local.ServerGroups))
@@ -101,7 +94,7 @@ func (m *ModelApplier) Apply(reqCtx *svcCtx.RequestContext, local *nlbmodel.Netw
 		return m.applyServerGroups(reqCtx, actions, sgChannel)
 	})
 
-	if hashChangedOrDryRun {
+	if remote.LoadBalancerAttribute.LoadBalancerId != "" && hashChangedOrDryRun {
 		if local.LoadBalancerAttribute.IsUserManaged && !reqCtx.Anno.IsForceOverride() {
 			reqCtx.Log.Info("listener override is false, skip reconcile listeners")
 		} else {
@@ -113,6 +106,9 @@ func (m *ModelApplier) Apply(reqCtx *svcCtx.RequestContext, local *nlbmodel.Netw
 				return m.applyListeners(reqCtx, actions, sgChannel)
 			})
 		}
+	} else if remote.LoadBalancerAttribute.LoadBalancerId == "" && !helper.NeedDeleteLoadBalancer(reqCtx.Service) {
+		return remote, fmt.Errorf("alicloud: can not find loadbalancer by tag [%s:%s]",
+			helper.TAGKEY, reqCtx.Anno.GetDefaultLoadBalancerName())
 	}
 
 	err = parallel.Do(tasks...)
