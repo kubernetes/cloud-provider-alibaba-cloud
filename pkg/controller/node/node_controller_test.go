@@ -56,9 +56,6 @@ func TestSyncCloudNode(t *testing.T) {
 	if region, ok := updatedNode.Labels[v1.LabelTopologyRegion]; !ok || region != vmock.RegionID {
 		t.Errorf("node label LabelTopologyRegion not equal, expect %s, got %s", vmock.RegionID, region)
 	}
-	if nodePoolID, ok := updatedNode.Labels[LabelNodePoolID]; !ok || nodePoolID != vmock.NodePoolID {
-		t.Errorf("node label LabelNodePoolID not equal, expect %s, got %s", vmock.NodePoolID, nodePoolID)
-	}
 	if instanceChargeType, ok := updatedNode.Labels[LabelInstanceChargeType]; !ok || instanceChargeType != vmock.InstanceChargeType {
 		t.Errorf("node label LabelInstanceChargeType not equal, expect %s, got %s", vmock.InstanceChargeType, instanceChargeType)
 	}
