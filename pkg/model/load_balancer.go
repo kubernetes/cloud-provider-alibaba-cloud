@@ -3,11 +3,12 @@ package model
 import (
 	"encoding/json"
 	"fmt"
+	"strconv"
+	"strings"
+
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/model/tag"
-	"strconv"
-	"strings"
 )
 
 type ListenerStatus string
@@ -325,4 +326,14 @@ func LoadVGroupNamedKey(key string) (*VGroupNamedKey, error) {
 		ServiceName: metas[2],
 		VGroupPort:  metas[1],
 		Prefix:      DEFAULT_PREFIX}, nil
+}
+
+func ParseFlagType(flag string) (FlagType, error) {
+	if strings.EqualFold(flag, string(OnFlag)) {
+		return OnFlag, nil
+	}
+	if strings.EqualFold(flag, string(OffFlag)) {
+		return OffFlag, nil
+	}
+	return "", fmt.Errorf("invalid flag %q, should be \"on\" or \"off\"", flag)
 }

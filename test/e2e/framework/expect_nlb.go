@@ -3,11 +3,12 @@ package framework
 import (
 	"context"
 	"fmt"
-	"k8s.io/cloud-provider-alibaba-cloud/pkg/model/tag"
 	"net"
 	"strconv"
 	"strings"
 	"time"
+
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/model/tag"
 
 	"github.com/alibabacloud-go/tea/tea"
 	v1 "k8s.io/api/core/v1"
@@ -265,6 +266,14 @@ func networkLoadBalancerAttrEqual(f *Framework, anno *annotation.AnnotationReque
 			return fmt.Errorf("expected nlb security group ids %v, got %v", ids, nlb.SecurityGroupIds)
 		}
 	}
+
+	if enabled := anno.Get(annotation.CrossZoneEnabled); enabled != "" {
+		enabled := strings.EqualFold(enabled, string(model.OnFlag))
+		if enabled != tea.BoolValue(nlb.CrossZoneEnabled) {
+			return fmt.Errorf("expected nlb cross zone enabled %t, got %t", enabled, tea.BoolValue(nlb.CrossZoneEnabled))
+		}
+	}
+
 	return nil
 }
 

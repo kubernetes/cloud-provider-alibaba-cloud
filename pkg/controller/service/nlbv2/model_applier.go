@@ -198,7 +198,8 @@ func (m *ModelApplier) applyLoadBalancer(reqCtx *svcCtx.RequestContext, local, r
 		// need update nlb security groups
 		// or ipv6 address type
 		if len(local.LoadBalancerAttribute.SecurityGroupIds) != 0 ||
-			local.LoadBalancerAttribute.IPv6AddressType != "" {
+			local.LoadBalancerAttribute.IPv6AddressType != "" ||
+			local.LoadBalancerAttribute.CrossZoneEnabled != nil {
 			err := m.nlbMgr.Update(reqCtx, local, remote)
 			if err != nil {
 				return err

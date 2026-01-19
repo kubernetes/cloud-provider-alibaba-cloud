@@ -111,6 +111,7 @@ const (
 	SecurityGroupIds   = AnnotationLoadBalancerPrefix + "security-group-ids"
 	BandwidthPackageId = AnnotationLoadBalancerPrefix + "bandwidth-package-id"
 	IPv6AddressType    = AnnotationLoadBalancerPrefix + "ipv6-address-type"
+	CrossZoneEnabled   = AnnotationLoadBalancerPrefix + "cross-zone-enabled"
 
 	CaCertID = AnnotationLoadBalancerPrefix + "cacert-id" // CertID cert id
 	CaCert   = AnnotationLoadBalancerPrefix + "cacert"    // CaCert enable ca

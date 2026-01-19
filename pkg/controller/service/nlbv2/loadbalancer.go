@@ -2,8 +2,12 @@ package nlbv2
 
 import (
 	"fmt"
+
 	"github.com/aliyun/credentials-go/credentials/utils"
+	"github.com/mohae/deepcopy"
 	cmap "github.com/orcaman/concurrent-map"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/model"
+
 	"strings"
 
 	"github.com/alibabacloud-go/tea/tea"
@@ -71,6 +75,14 @@ func (mgr *NLBManager) BuildLocalModel(reqCtx *svcCtx.RequestContext, mdl *nlbmo
 
 	if reqCtx.Anno.Get(annotation.PreserveLBOnDelete) != "" {
 		mdl.LoadBalancerAttribute.PreserveOnDelete = true
+	}
+
+	if enabled := reqCtx.Anno.Get(annotation.CrossZoneEnabled); enabled != "" {
+		f, err := model.ParseFlagType(enabled)
+		if err != nil {
+			return fmt.Errorf("ParameterInvalid, cross zone enabled flag error: %s", err.Error())
+		}
+		mdl.LoadBalancerAttribute.CrossZoneEnabled = tea.Bool(f == model.OnFlag)
 	}
 
 	return nil
@@ -149,7 +161,11 @@ func (mgr *NLBManager) Delete(reqCtx *svcCtx.RequestContext, mdl *nlbmodel.Netwo
 func (mgr *NLBManager) Update(reqCtx *svcCtx.RequestContext, local, remote *nlbmodel.NetworkLoadBalancer) error {
 	local.LoadBalancerAttribute.LoadBalancerId = remote.LoadBalancerAttribute.LoadBalancerId
 	reqCtx.Log.Info(fmt.Sprintf("found nlb [%s], try to update load balancer attribute", remote.LoadBalancerAttribute.LoadBalancerId))
-	errs := []error{}
+	needUpdateAttribute := false
+	update := &nlbmodel.NetworkLoadBalancer{
+		LoadBalancerAttribute: deepcopy.Copy(local.LoadBalancerAttribute).(*nlbmodel.LoadBalancerAttribute),
+	}
+	var errs []error
 
 	// immutable attributes
 	if local.LoadBalancerAttribute.AddressIpVersion != "" &&
@@ -237,7 +253,16 @@ func (mgr *NLBManager) Update(reqCtx *svcCtx.RequestContext, local, remote *nlbm
 		local.LoadBalancerAttribute.Name != remote.LoadBalancerAttribute.Name {
 		reqCtx.Log.Info(fmt.Sprintf("name changed from [%s] to [%s]",
 			remote.LoadBalancerAttribute.Name, local.LoadBalancerAttribute.Name))
-		errs = append(errs, mgr.cloud.UpdateNLB(reqCtx.Ctx, local))
+		update.LoadBalancerAttribute.Name = local.LoadBalancerAttribute.Name
+		needUpdateAttribute = true
+	}
+
+	if local.LoadBalancerAttribute.CrossZoneEnabled != nil &&
+		tea.BoolValue(local.LoadBalancerAttribute.CrossZoneEnabled) != tea.BoolValue(remote.LoadBalancerAttribute.CrossZoneEnabled) {
+		reqCtx.Log.Info(fmt.Sprintf("CrossZoneEnabled changed from [%t] to [%t]",
+			tea.BoolValue(remote.LoadBalancerAttribute.CrossZoneEnabled), tea.BoolValue(local.LoadBalancerAttribute.CrossZoneEnabled)))
+		update.LoadBalancerAttribute.CrossZoneEnabled = local.LoadBalancerAttribute.CrossZoneEnabled
+		needUpdateAttribute = true
 	}
 
 	if err := updateBandwidthPackageId(mgr, reqCtx, local, remote); err != nil {
@@ -247,6 +272,12 @@ func (mgr *NLBManager) Update(reqCtx *svcCtx.RequestContext, local, remote *nlbm
 	if len(local.LoadBalancerAttribute.Tags) != 0 {
 		if err := mgr.updateLoadBalancerTags(reqCtx, local, remote); err != nil {
 			errs = append(errs, err)
+		}
+	}
+
+	if needUpdateAttribute {
+		if err := mgr.cloud.UpdateNLB(reqCtx.Ctx, update); err != nil {
+			errs = append(errs, fmt.Errorf("UpdateNLBAttribute error: %s", err.Error()))
 		}
 	}
 
