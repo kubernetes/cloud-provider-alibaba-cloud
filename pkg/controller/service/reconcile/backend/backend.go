@@ -3,6 +3,8 @@ package backend
 import (
 	"context"
 	"fmt"
+	"strings"
+
 	v1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -16,9 +18,7 @@ import (
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/model"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/util"
 	"k8s.io/klog/v2"
-	"reflect"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"strings"
 )
 
 func NewEndpointWithENI(reqCtx *svcCtx.RequestContext, kubeClient client.Client) (*EndpointWithENI, error) {
@@ -259,24 +259,13 @@ const (
 	MaxBackendNum = 39
 )
 
-type Func func([]interface{}) error
+type Func[T any] func([]T) error
 
 // Batch batch process `object` m with func `func`
 // for general purpose
-func Batch(m interface{}, batchSize int, f Func) error {
+func Batch[T any](target []T, batchSize int, f Func[T]) error {
 	if batchSize <= 0 {
 		batchSize = MaxBackendNum
-	}
-	v := reflect.ValueOf(m)
-	if v.Kind() != reflect.Slice {
-		return fmt.Errorf("non-slice type for %v", m)
-	}
-
-	// need to convert interface to []interface
-	// see https://github.com/golang/go/wiki/InterfaceSlice
-	target := make([]interface{}, v.Len())
-	for i := 0; i < v.Len(); i++ {
-		target[i] = v.Index(i).Interface()
 	}
 	total := len(target)
 	klog.Infof("batch process ,total length %d", total)

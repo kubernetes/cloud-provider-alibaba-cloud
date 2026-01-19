@@ -158,24 +158,25 @@ type ListenerAttribute struct {
 	ServerGroupName string
 	ServicePort     *v1.ServicePort
 
-	ListenerProtocol      string
-	ListenerPort          int32
-	ListenerDescription   string
-	ServerGroupId         string
-	LoadBalancerId        string
-	IdleTimeout           int32 // 1-900
-	SecurityPolicyId      string
-	CertificateIds        []string // tcpssl
-	CaCertificateIds      []string
-	CaEnabled             *bool
-	ProxyProtocolEnabled  *bool
-	ProxyProtocolV2Config ProxyProtocolV2Config
-	SecSensorEnabled      *bool
-	AlpnEnabled           *bool
-	AlpnPolicy            string
-	StartPort             int32  //0-65535
-	EndPort               int32  //0-65535
-	Cps                   *int32 //0-1000000
+	ListenerProtocol         string
+	ListenerPort             int32
+	ListenerDescription      string
+	ServerGroupId            string
+	LoadBalancerId           string
+	IdleTimeout              int32 // 1-900
+	SecurityPolicyId         string
+	CertificateIds           []string // tcpssl
+	CaCertificateIds         []string
+	AdditionalCertificateIds []string
+	CaEnabled                *bool
+	ProxyProtocolEnabled     *bool
+	ProxyProtocolV2Config    ProxyProtocolV2Config
+	SecSensorEnabled         *bool
+	AlpnEnabled              *bool
+	AlpnPolicy               string
+	StartPort                int32  //0-65535
+	EndPort                  int32  //0-65535
+	Cps                      *int32 //0-1000000
 
 	// auto-generated parameters
 	ListenerId string
@@ -187,6 +188,13 @@ func (a *ListenerAttribute) PortString() string {
 		return fmt.Sprintf("%d", a.ListenerPort)
 	}
 	return fmt.Sprintf("%d-%d", a.StartPort, a.EndPort)
+}
+
+type ListenerCertificate struct {
+	Id        string
+	IsDefault bool
+	Type      string
+	Status    string
 }
 
 type ServerGroup struct {

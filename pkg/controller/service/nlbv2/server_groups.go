@@ -485,13 +485,8 @@ func (mgr *ServerGroupManager) BatchAddServers(reqCtx *svcCtx.RequestContext, sg
 	add []nlbmodel.ServerGroupServer) error {
 	reqCtx.Log.Info(fmt.Sprintf("reconcile server group: [%s] backend add [%+v]", sg.ServerGroupId, add))
 	return reconbackend.Batch(add, ctrlCfg.ControllerCFG.ServerGroupBatchSize,
-		func(list []interface{}) error {
-			var batchAdds []nlbmodel.ServerGroupServer
-			for _, item := range list {
-				item, _ := item.(nlbmodel.ServerGroupServer)
-				batchAdds = append(batchAdds, item)
-			}
-			return mgr.cloud.AddNLBServers(reqCtx.Ctx, sg.ServerGroupId, batchAdds)
+		func(adds []nlbmodel.ServerGroupServer) error {
+			return mgr.cloud.AddNLBServers(reqCtx.Ctx, sg.ServerGroupId, adds)
 		})
 
 }
@@ -500,13 +495,8 @@ func (mgr *ServerGroupManager) BatchRemoveServers(reqCtx *svcCtx.RequestContext,
 	del []nlbmodel.ServerGroupServer) error {
 	reqCtx.Log.Info(fmt.Sprintf("reconcile server group: [%s] backend del [%+v]", sg.ServerGroupId, del))
 	return reconbackend.Batch(del, ctrlCfg.ControllerCFG.ServerGroupBatchSize,
-		func(list []interface{}) error {
-			var batchDels []nlbmodel.ServerGroupServer
-			for _, item := range list {
-				item, _ := item.(nlbmodel.ServerGroupServer)
-				batchDels = append(batchDels, item)
-			}
-			return mgr.cloud.RemoveNLBServers(reqCtx.Ctx, sg.ServerGroupId, batchDels)
+		func(dels []nlbmodel.ServerGroupServer) error {
+			return mgr.cloud.RemoveNLBServers(reqCtx.Ctx, sg.ServerGroupId, dels)
 		})
 
 }
@@ -515,13 +505,8 @@ func (mgr *ServerGroupManager) BatchUpdateServers(reqCtx *svcCtx.RequestContext,
 	update []nlbmodel.ServerGroupServer) error {
 	reqCtx.Log.Info(fmt.Sprintf("reconcile server group: [%s] backend update [%+v]", sg.ServerGroupId, update))
 	return reconbackend.Batch(update, ctrlCfg.ControllerCFG.ServerGroupBatchSize,
-		func(list []interface{}) error {
-			var batchUpdates []nlbmodel.ServerGroupServer
-			for _, item := range list {
-				item, _ := item.(nlbmodel.ServerGroupServer)
-				batchUpdates = append(batchUpdates, item)
-			}
-			return mgr.cloud.UpdateNLBServers(reqCtx.Ctx, sg.ServerGroupId, batchUpdates)
+		func(updates []nlbmodel.ServerGroupServer) error {
+			return mgr.cloud.UpdateNLBServers(reqCtx.Ctx, sg.ServerGroupId, updates)
 		})
 }
 

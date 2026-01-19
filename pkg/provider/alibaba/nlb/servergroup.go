@@ -3,6 +3,8 @@ package nlb
 import (
 	"context"
 	"fmt"
+	"time"
+
 	nlb "github.com/alibabacloud-go/nlb-20220430/v4/client"
 	"github.com/alibabacloud-go/tea/tea"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
@@ -12,7 +14,6 @@ import (
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/model/tag"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/util"
 	"k8s.io/klog/v2"
-	"time"
 )
 
 func (p *NLBProvider) toLocalServerGroup(ctx context.Context, remote *nlb.ListServerGroupsResponseBodyServerGroups, servers []nlbmodel.ServerGroupServer) (*nlbmodel.ServerGroup, error) {
@@ -178,7 +179,7 @@ func (p *NLBProvider) CreateNLBServerGroup(ctx context.Context, sg *nlbmodel.Ser
 	if err != nil {
 		return err
 	}
-	return p.waitJobFinish("CreateServerGroup", jobId, 1200*time.Millisecond, DefaultRetryTimeout)
+	return p.WaitJobFinish("CreateServerGroup", jobId, 1200*time.Millisecond, DefaultRetryTimeout)
 }
 
 func (p *NLBProvider) DeleteNLBServerGroup(ctx context.Context, sgId string) error {
@@ -199,7 +200,7 @@ func (p *NLBProvider) AddNLBServers(ctx context.Context, sgId string, backends [
 	if err != nil {
 		return err
 	}
-	return p.waitJobFinish("AddServersToServerGroup", jobId, 1200*time.Millisecond, DefaultRetryTimeout)
+	return p.WaitJobFinish("AddServersToServerGroup", jobId, 1200*time.Millisecond, DefaultRetryTimeout)
 }
 
 func (p *NLBProvider) RemoveNLBServers(ctx context.Context, sgId string, backends []nlbmodel.ServerGroupServer,
@@ -208,7 +209,7 @@ func (p *NLBProvider) RemoveNLBServers(ctx context.Context, sgId string, backend
 	if err != nil {
 		return err
 	}
-	return p.waitJobFinish("RemoveServersFromServerGroup", jobId, 1200*time.Millisecond, DefaultRetryTimeout)
+	return p.WaitJobFinish("RemoveServersFromServerGroup", jobId, 1200*time.Millisecond, DefaultRetryTimeout)
 }
 
 func (p *NLBProvider) UpdateNLBServers(ctx context.Context, sgId string, backends []nlbmodel.ServerGroupServer,
@@ -217,7 +218,7 @@ func (p *NLBProvider) UpdateNLBServers(ctx context.Context, sgId string, backend
 	if err != nil {
 		return err
 	}
-	return p.waitJobFinish("UpdateServerGroupServersAttribute", jobId, 1200*time.Millisecond, DefaultRetryTimeout)
+	return p.WaitJobFinish("UpdateServerGroupServersAttribute", jobId, 1200*time.Millisecond, DefaultRetryTimeout)
 }
 
 func (p *NLBProvider) ListNLBServers(ctx context.Context, sgId string) ([]nlbmodel.ServerGroupServer, error) {

@@ -403,3 +403,27 @@ func (m MockNLB) UpdateNLBIPv6AddressType(ctx context.Context, mdl *nlbmodel.Net
 func (m MockNLB) BatchWaitJobsFinish(ctx context.Context, api string, jobIds []string, args ...time.Duration) error {
 	return nil
 }
+
+func (m MockNLB) WaitJobFinish(api, jobId string, args ...time.Duration) error {
+	return nil
+}
+
+func (m MockNLB) ListNLBListenerCertificates(ctx context.Context, listenerId string) ([]nlbmodel.ListenerCertificate, error) {
+	// todo: data
+	return []nlbmodel.ListenerCertificate{
+		{
+			Id:        "cert-id",
+			IsDefault: true,
+			Status:    "Associated",
+			Type:      "Server",
+		},
+	}, nil
+}
+
+func (m MockNLB) AssociateAdditionalCertificatesWithNLBListener(ctx context.Context, listenerId string, certIds []string) error {
+	return nil
+}
+
+func (m MockNLB) DisassociateAdditionalCertificatesWithNLBListener(ctx context.Context, listenerId string, certIds []string) error {
+	return nil
+}

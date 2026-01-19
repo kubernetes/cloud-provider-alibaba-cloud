@@ -379,6 +379,56 @@ func RunListenerTestCases(f *framework.Framework) {
 						gomega.Expect(err).To(gomega.BeNil())
 					})
 				}
+				ginkgo.It("additional certs: NLBCertID with additional NLBCertID2", func() {
+					svc, err := f.Client.KubeClient.CreateNLBServiceByAnno(map[string]string{
+						annotation.Annotation(annotation.ZoneMaps):          options.TestConfig.NLBZoneMaps,
+						annotation.Annotation(annotation.ProtocolPort):      "tcpssl:443",
+						annotation.Annotation(annotation.CertID):            options.TestConfig.NLBCertID,
+						annotation.Annotation(annotation.LoadBalancerId):    options.TestConfig.InternetNetworkLoadBalancerID,
+						annotation.Annotation(annotation.OverrideListener):  "true",
+						annotation.Annotation(annotation.AdditionalCertIds): options.TestConfig.NLBCertID2,
+					})
+					gomega.Expect(err).To(gomega.BeNil())
+					err = f.ExpectNetworkLoadBalancerEqual(svc)
+					gomega.Expect(err).To(gomega.BeNil())
+				})
+				ginkgo.It("additional certs: none to additional NLBCertID2", func() {
+					oldsvc, err := f.Client.KubeClient.CreateNLBServiceByAnno(map[string]string{
+						annotation.Annotation(annotation.ZoneMaps):         options.TestConfig.NLBZoneMaps,
+						annotation.Annotation(annotation.ProtocolPort):     "tcpssl:443",
+						annotation.Annotation(annotation.CertID):           options.TestConfig.NLBCertID,
+						annotation.Annotation(annotation.LoadBalancerId):   options.TestConfig.InternetNetworkLoadBalancerID,
+						annotation.Annotation(annotation.OverrideListener): "true",
+					})
+					gomega.Expect(err).To(gomega.BeNil())
+					err = f.ExpectNetworkLoadBalancerEqual(oldsvc)
+					gomega.Expect(err).To(gomega.BeNil())
+					newsvc := oldsvc.DeepCopy()
+					newsvc.Annotations[annotation.Annotation(annotation.AdditionalCertIds)] = options.TestConfig.NLBCertID2
+					newsvc, err = f.Client.KubeClient.PatchService(oldsvc, newsvc)
+					gomega.Expect(err).To(gomega.BeNil())
+					err = f.ExpectNetworkLoadBalancerEqual(newsvc)
+					gomega.Expect(err).To(gomega.BeNil())
+				})
+				ginkgo.It("additional certs: additional NLBCertID2 to none", func() {
+					oldsvc, err := f.Client.KubeClient.CreateNLBServiceByAnno(map[string]string{
+						annotation.Annotation(annotation.ZoneMaps):          options.TestConfig.NLBZoneMaps,
+						annotation.Annotation(annotation.ProtocolPort):      "tcpssl:443",
+						annotation.Annotation(annotation.CertID):            options.TestConfig.NLBCertID,
+						annotation.Annotation(annotation.LoadBalancerId):    options.TestConfig.InternetNetworkLoadBalancerID,
+						annotation.Annotation(annotation.OverrideListener):  "true",
+						annotation.Annotation(annotation.AdditionalCertIds): options.TestConfig.NLBCertID2,
+					})
+					gomega.Expect(err).To(gomega.BeNil())
+					err = f.ExpectNetworkLoadBalancerEqual(oldsvc)
+					gomega.Expect(err).To(gomega.BeNil())
+					newsvc := oldsvc.DeepCopy()
+					newsvc.Annotations[annotation.Annotation(annotation.AdditionalCertIds)] = ""
+					newsvc, err = f.Client.KubeClient.PatchService(oldsvc, newsvc)
+					gomega.Expect(err).To(gomega.BeNil())
+					err = f.ExpectNetworkLoadBalancerEqual(newsvc)
+					gomega.Expect(err).To(gomega.BeNil())
+				})
 			})
 
 			ginkgo.Context("tcpssl alpn", func() {

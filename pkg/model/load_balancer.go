@@ -135,6 +135,12 @@ type LoadBalancerAttribute struct {
 	ModificationProtectionReason string
 }
 
+type DomainExtension struct {
+	DomainExtensionId   string
+	Domain              string
+	ServerCertificateId string
+}
+
 type ListenerAttribute struct {
 	IsUserManaged bool
 	NamedKey      *ListenerNamedKey
@@ -187,6 +193,7 @@ type ListenerAttribute struct {
 	HealthCheckURI             string   // tcp & http & https
 	HealthCheckHttpCode        string   // tcp & http & https
 	HealthCheckMethod          string   // http & https
+	DomainExtensions           []DomainExtension
 
 	// The following parameters can be set to the default value.
 	// Use the pointer type to distinguish. If the user does not set the param, the param is nil

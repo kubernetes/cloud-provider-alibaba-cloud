@@ -457,3 +457,19 @@ func (m *MockCLB) ModifyVServerGroupBackendServers(ctx context.Context, vGroupId
 func (m *MockCLB) DescribeServerCertificateById(ctx context.Context, serverCertificateId string) (*model.CertAttribute, error) {
 	return nil, nil
 }
+
+func (m *MockCLB) DescribeDomainExtensions(ctx context.Context, lbId string, port int) ([]model.DomainExtension, error) {
+	return nil, nil
+}
+
+func (m *MockCLB) CreateDomainExtension(ctx context.Context, lbId string, port int, domain string, certId string) error {
+	return nil
+}
+
+func (m *MockCLB) DeleteDomainExtension(ctx context.Context, id string) error {
+	return nil
+}
+
+func (m *MockCLB) SetDomainExtensionAttribute(ctx context.Context, id string, certId string) error {
+	return nil
+}

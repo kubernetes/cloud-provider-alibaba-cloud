@@ -1,16 +1,16 @@
 package backend
 
 import (
-	"github.com/stretchr/testify/assert"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestBatch(t *testing.T) {
 	sum := 0
-	addFunc := func(a []interface{}) error {
+	addFunc := func(a []int) error {
 		for _, num := range a {
-			i, _ := num.(int)
-			sum += i
+			sum += num
 		}
 		return nil
 	}

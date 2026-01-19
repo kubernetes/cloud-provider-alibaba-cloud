@@ -850,6 +850,16 @@ func httpsEqual(reqCtx *svcCtx.RequestContext, local v1.ServicePort, remote mode
 			return fmt.Errorf("expected slb tls %d, got %d", tls, remote.TLSCipherPolicy)
 		}
 	}
+	if reqCtx.Anno.Has(annotation.DomainExtensions) {
+		exts, err := parseDomainExtensionsAnnotation(reqCtx.Anno.Get(annotation.DomainExtensions))
+		if err != nil {
+			return err
+		}
+		if !domainExtensionsEqual(remote.DomainExtensions, exts) {
+			return fmt.Errorf("expected slb domain extensions %+v, got %+v", exts, remote.DomainExtensions)
+		}
+		return nil
+	}
 	return nil
 }
 
@@ -1569,4 +1579,44 @@ func buildRemoteModel(f *Framework, svc *v1.Service) (*model.LoadBalancer, error
 		Anno:    annotation.NewAnnotationRequest(svc),
 	}
 	return builder.Instance(clbv1.RemoteModel).Build(reqCtx)
+}
+
+func parseDomainExtensionsAnnotation(anno string) ([]model.DomainExtension, error) {
+	if anno == "" {
+		return []model.DomainExtension{}, nil
+	}
+	// domain1:certId1,domain2:certId2
+	var ret []model.DomainExtension
+	exts := strings.Split(anno, ",")
+	for _, ext := range exts {
+		ext = strings.TrimSpace(ext)
+		splits := strings.Split(ext, ":")
+		if len(splits) != 2 {
+			return nil, fmt.Errorf("invalid domain extension %s", ext)
+		}
+		ret = append(ret, model.DomainExtension{
+			Domain:              splits[0],
+			ServerCertificateId: splits[1],
+		})
+	}
+	return ret, nil
+}
+
+func domainExtensionsEqual(a, b []model.DomainExtension) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		found := false
+		for j := range b {
+			if a[i].Domain == b[j].Domain && a[i].ServerCertificateId == b[j].ServerCertificateId {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return false
+		}
+	}
+	return true
 }
