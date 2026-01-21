@@ -2,9 +2,13 @@ package clbv1
 
 import (
 	"fmt"
+	"strconv"
+	"strings"
+
 	"github.com/aliyun/credentials-go/credentials/utils"
 	cmap "github.com/orcaman/concurrent-map"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/apimachinery/pkg/util/rand"
 	ctrlcfg "k8s.io/cloud-provider-alibaba-cloud/pkg/config"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/helper"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/service/reconcile/annotation"
@@ -13,7 +17,6 @@ import (
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/model/tag"
 	prvd "k8s.io/cloud-provider-alibaba-cloud/pkg/provider"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/util"
-	"strconv"
 )
 
 const MaxLBTagNum = 10
@@ -66,6 +69,16 @@ func (mgr *LoadBalancerManager) Create(reqCtx *svcCtx.RequestContext, local *mod
 	}
 
 	err := mgr.cloud.CreateLoadBalancer(reqCtx.Ctx, local, clientToken)
+	// try to find another available vswitch id if vswitch id is not specified
+	if err != nil &&
+		reqCtx.Anno.Get(annotation.VswitchId) == "" && strings.Contains(err.Error(), "VSwitchAvailableIpNotExist") {
+		reqCtx.Log.Error(err,
+			"vswitch is unavailable, try to find another available vswitch id", "vswitchId", local.LoadBalancerAttribute.VSwitchId)
+		if err := mgr.setAvailableVswitchID(reqCtx, local); err != nil {
+			return fmt.Errorf("get available vswitch id error: %s", err.Error())
+		}
+		err = mgr.cloud.CreateLoadBalancer(reqCtx.Ctx, local, clientToken)
+	}
 	if err != nil {
 		return fmt.Errorf("create slb error: %s", err.Error())
 	}
@@ -381,7 +394,7 @@ func setModelDefaultValue(mgr *LoadBalancerManager, mdl *model.LoadBalancer, ann
 		}
 		mdl.LoadBalancerAttribute.VpcId = vpcId
 		if mdl.LoadBalancerAttribute.VSwitchId == "" {
-			vswId, err := mgr.cloud.VswitchID()
+			vswId, err := mgr.RandomVswitchID()
 			if err != nil {
 				return fmt.Errorf("get vsw id from metadata error: %s", err.Error())
 			}
@@ -475,4 +488,39 @@ func (mgr *LoadBalancerManager) updateInstanceChargeTypeAndInstanceSpec(reqCtx *
 		}
 	}
 	return nil
+}
+
+func (mgr *LoadBalancerManager) RandomVswitchID() (string, error) {
+	vswids, err := mgr.cloud.VswitchIDs()
+	if err != nil {
+		return "", err
+	}
+	if len(vswids) == 0 {
+		return "", fmt.Errorf("no vswitches found")
+	}
+	return vswids[rand.Intn(len(vswids))], nil
+}
+
+func (mgr *LoadBalancerManager) setAvailableVswitchID(reqCtx *svcCtx.RequestContext, local *model.LoadBalancer) error {
+	vswids, err := mgr.cloud.VswitchIDs()
+	if err != nil {
+		return err
+	}
+
+	for _, v := range vswids {
+		if v == local.LoadBalancerAttribute.VSwitchId {
+			continue
+		}
+		vsw, err := mgr.cloud.DescribeVswitchByID(reqCtx.Ctx, v)
+		if err != nil {
+			reqCtx.Log.Error(err, "describe vswitch error", "vswId", v)
+			continue
+		}
+		if vsw.AvailableIpAddressCount != 0 {
+			reqCtx.Log.Info("found available vsw", "vswId", vsw.VSwitchId, "availableCount", vsw.AvailableIpAddressCount)
+			local.LoadBalancerAttribute.VSwitchId = vsw.VSwitchId
+			return nil
+		}
+	}
+	return fmt.Errorf("no available vsw found")
 }

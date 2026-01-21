@@ -2,6 +2,7 @@ package vmock
 
 import (
 	"fmt"
+
 	prvd "k8s.io/cloud-provider-alibaba-cloud/pkg/provider"
 )
 
@@ -86,6 +87,10 @@ func (m *MockMetaData) VswitchCIDRBlock() (string, error) {
 
 func (m *MockMetaData) VswitchID() (string, error) {
 	return "", fmt.Errorf("unimplemented")
+}
+
+func (m *MockMetaData) VswitchIDs() ([]string, error) {
+	return nil, fmt.Errorf("unimplemented")
 }
 
 func (m *MockMetaData) EIPv4() (string, error) {
