@@ -3,8 +3,9 @@ package framework
 import (
 	"context"
 	"fmt"
-	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/service/reconcile/annotation"
 	"strings"
+
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/service/reconcile/annotation"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/model"
@@ -22,6 +23,10 @@ const (
 	NLBResource = "NLB"
 	ACLResource = "ACL"
 	EIPResource = "EIP"
+)
+
+const (
+	TestAnnotationIgnoreBackends = "test-ignore-backends"
 )
 
 type Framework struct {

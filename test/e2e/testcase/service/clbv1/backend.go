@@ -4,9 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"time"
+
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/helper"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/service/reconcile/annotation"
-	"time"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
@@ -737,6 +738,37 @@ func RunBackendTestCases(f *framework.Framework) {
 				err = f.ExpectLoadBalancerEqual(svc)
 				gomega.Expect(err).To(gomega.BeNil())
 			})
+		})
+
+		ginkgo.Context("invalid backend", func() {
+			if options.TestConfig.Network == options.Terway {
+				ginkgo.It("not found eni id", func() {
+					pods, err := f.Client.KubeClient.GetDeploymentPods()
+					gomega.Expect(err).To(gomega.BeNil())
+					gomega.Expect(pods).NotTo(gomega.BeEmpty())
+					var ips []string
+					for _, p := range pods {
+						ips = append(ips, p.Status.PodIP)
+					}
+					vsw, err := f.Client.CloudClient.VswitchID()
+					gomega.Expect(err).To(gomega.BeNil())
+					ip, err := f.FindFreeIPv4AddressFromVSwitch(context.TODO(), vsw)
+					gomega.Expect(err).To(gomega.BeNil())
+					ips = append(ips, ip.String())
+
+					svc, err := f.Client.KubeClient.CreateServiceWithoutSelector(map[string]string{
+						annotation.Annotation(framework.TestAnnotationIgnoreBackends): ip.String(),
+					})
+					gomega.Expect(err).To(gomega.BeNil())
+					_, err = f.Client.KubeClient.CreateEndpointsWithIPs(svc, ips)
+					gomega.Expect(err).To(gomega.BeNil())
+
+					err = f.ExpectLoadBalancerEqual(svc)
+					gomega.Expect(err).To(gomega.BeNil())
+					err = f.ExpectLoadBalancerEvent(svc, helper.SkipSyncBackends, ip.String())
+					gomega.Expect(err).To(gomega.BeNil())
+				})
+			}
 		})
 	})
 }

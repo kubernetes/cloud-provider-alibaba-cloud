@@ -3,11 +3,12 @@ package framework
 import (
 	"context"
 	"fmt"
-	"k8s.io/cloud-provider-alibaba-cloud/pkg/model/tag"
 	"net"
 	"strconv"
 	"strings"
 	"time"
+
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/model/tag"
 
 	"github.com/alibabacloud-go/tea/tea"
 	v1 "k8s.io/api/core/v1"
@@ -550,6 +551,10 @@ func isNLBBackendEqual(f *Framework, reqCtx *svcCtx.RequestContext, sg *nlbmodel
 		}
 	}
 	for _, l := range backends {
+		if l.Invalid {
+			klog.Infof("skip compare invalid backend %q", l.ServerIp)
+			continue
+		}
 		found := false
 		for _, r := range sg.Servers {
 			if isServerEqual(l, r) {
@@ -754,7 +759,9 @@ func buildServerGroupENIBackends(f *Framework, anno *annotation.AnnotationReques
 		for i := range ret {
 			eniid, ok := result[ret[i].ServerIp]
 			if !ok {
-				return nil, fmt.Errorf("can not find eniid for ip %s in vpc %s", ret[i].ServerIp, options.TestConfig.VPCID)
+				klog.Info(fmt.Errorf("can not find eniid for ip %s in vpc %s", ret[i].ServerIp, options.TestConfig.VPCID))
+				ret[i].Invalid = true
+				continue
 			}
 			ret[i].ServerId = eniid
 			ret[i].ServerType = nlbmodel.EniServerType

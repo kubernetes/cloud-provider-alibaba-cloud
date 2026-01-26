@@ -364,6 +364,10 @@ func (m *ReconcileService) reconcileLoadBalancerResources(req *svcCtx.RequestCon
 		return err
 	}
 
+	if hasInvalidBackendInVServerGroups(vservers) {
+		return fmt.Errorf("has invalid backend in vservergroups")
+	}
+
 	m.record.Event(req.Service, v1.EventTypeNormal, helper.SucceedSyncLB,
 		fmt.Sprintf("Ensured load balancer [%s]", lb.LoadBalancerAttribute.LoadBalancerId))
 
@@ -596,45 +600,91 @@ func (m *ReconcileService) setEIPAsExternalIP(ctx context.Context, lbId string) 
 func (m *ReconcileService) updateReadinessCondition(reqCtx *svcCtx.RequestContext, vgroups []model.VServerGroup) error {
 	var errs []error
 	cond := helper.BuildReadinessGatePodConditionTypeWithPrefix(helper.TargetHealthPodConditionServiceTypePrefix, reqCtx.Service.Name)
-	a := map[string]bool{}
+	updated := map[string]bool{}
+
 	for _, vg := range vgroups {
-		for _, b := range vg.InitialBackends {
+		for _, b := range vg.InvalidBackends {
 			if b.TargetRef == nil {
 				reqCtx.Log.Info("backend TargetRef is nil, skip update readiness gates")
 				continue
 			}
 			key := types.NamespacedName{Namespace: b.TargetRef.Namespace, Name: b.TargetRef.Name}
-			if _, ok := a[key.String()]; ok {
+			if _, ok := updated[key.String()]; ok {
 				continue
 			}
 
-			pod := &v1.Pod{}
-			err := m.kubeClient.Get(reqCtx.Ctx, key, pod)
+			err := m.updateReadinessConditionForPodKey(reqCtx, key, cond, v1.ConditionFalse,
+				helper.ConditionReasonInvalidServer, helper.ConditionMessageInvalidServer)
 			if err != nil {
-				// Pod may be deleted at this time,
-				// and there is no need to update readiness condition for it.
-				if apierrors.IsNotFound(err) {
-					reqCtx.Log.Info("pod not found while updating readiness condition, skip", "pod", key.String())
-					continue
-				}
 				errs = append(errs, err)
 				continue
 			}
 
-			err = helper.UpdateReadinessConditionForPod(reqCtx.Ctx, m.kubeClient, pod, cond,
+			updated[key.String()] = true
+		}
+
+		backends := vg.Backends
+		if !helper.IsENIBackendType(reqCtx.Service) {
+			backends = vg.InitialBackends
+		}
+
+		for _, b := range backends {
+			if b.TargetRef == nil {
+				reqCtx.Log.Info("backend TargetRef is nil, skip update readiness gates")
+				continue
+			}
+			key := types.NamespacedName{Namespace: b.TargetRef.Namespace, Name: b.TargetRef.Name}
+			if _, ok := updated[key.String()]; ok {
+				continue
+			}
+
+			err := m.updateReadinessConditionForPodKey(reqCtx, key, cond, v1.ConditionTrue,
 				helper.ConditionReasonServerRegistered, helper.ConditionMessageServerRegistered)
 			if err != nil {
-				// Pod may be deleted at this time,
-				// and there is no need to update readiness condition for it.
-				if apierrors.IsNotFound(err) {
-					reqCtx.Log.Info("pod not found while updating readiness condition, skip", "pod", key.String())
-					continue
-				}
 				errs = append(errs, err)
 				continue
 			}
-			a[key.String()] = true
+
+			updated[key.String()] = true
 		}
+
 	}
 	return utilerrors.NewAggregate(errs)
+}
+
+func (m *ReconcileService) updateReadinessConditionForPodKey(reqCtx *svcCtx.RequestContext, key types.NamespacedName,
+	cond v1.PodConditionType, status v1.ConditionStatus, reason, message string) error {
+	pod := &v1.Pod{}
+	err := m.kubeClient.Get(reqCtx.Ctx, key, pod)
+	if err != nil {
+		// Pod may be deleted at this time,
+		// and there is no need to update readiness condition for it.
+		if apierrors.IsNotFound(err) {
+			reqCtx.Log.Info("pod not found while updating readiness condition, skip", "pod", key.String())
+			return nil
+		}
+		return err
+	}
+
+	err = helper.UpdateReadinessConditionForPod(reqCtx.Ctx, m.kubeClient, pod, cond, status, reason, message)
+	if err != nil {
+		// Pod may be deleted at this time,
+		// and there is no need to update readiness condition for it.
+		if apierrors.IsNotFound(err) {
+			reqCtx.Log.Info("pod not found while updating readiness condition, skip", "pod", key.String())
+			return nil
+		}
+		return err
+	}
+
+	return nil
+}
+
+func hasInvalidBackendInVServerGroups(vsgs []model.VServerGroup) bool {
+	for _, v := range vsgs {
+		if len(v.InvalidBackends) != 0 {
+			return true
+		}
+	}
+	return false
 }

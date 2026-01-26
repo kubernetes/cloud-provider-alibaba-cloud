@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
@@ -15,19 +16,17 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	ctrlCfg "k8s.io/cloud-provider-alibaba-cloud/pkg/config"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/helper"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/service/reconcile/annotation"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/service/reconcile/backend"
 	svcCtx "k8s.io/cloud-provider-alibaba-cloud/pkg/controller/service/reconcile/context"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/service/reconcile/parallel"
-	"k8s.io/klog/v2"
-	"k8s.io/utils/pointer"
-
-	v1 "k8s.io/api/core/v1"
-	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/helper"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/model"
 	prvd "k8s.io/cloud-provider-alibaba-cloud/pkg/provider"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/base"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/util"
+	"k8s.io/klog/v2"
+	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -118,7 +117,7 @@ func (mgr *VGroupManager) updateVServerGroupENIBackendID(reqCtx *svcCtx.RequestC
 
 	var vpcCIDRs []*net.IPNet
 	for i := range vgs {
-		var filteredBackends []model.BackendAttribute
+		var filteredBackends, invalidBackends []model.BackendAttribute
 		var skipIPs []string
 		for _, b := range vgs[i].Backends {
 			if b.Type == model.ENIBackendType {
@@ -132,11 +131,14 @@ func (mgr *VGroupManager) updateVServerGroupENIBackendID(reqCtx *svcCtx.RequestC
 					}
 					if containsIP(vpcCIDRs, b.ServerIp) {
 						targetRef := "<nil>"
+						nodeName := pointer.StringDeref(b.NodeName, "<nil>")
 						if b.TargetRef != nil {
 							targetRef = fmt.Sprintf("%s/%s", b.TargetRef.Namespace, b.TargetRef.Name)
 						}
-						return fmt.Errorf("can not find eniid for ip %s in vpc %s, target: %s, node: %s",
-							b.ServerIp, mgr.vpcId, targetRef, pointer.StringDeref(b.NodeName, "<nil>"))
+						reqCtx.Log.Error(nil,
+							fmt.Sprintf("can not find eniid for ip %s in vpc %s, target: %s, node: %s", b.ServerIp, mgr.vpcId, targetRef, nodeName),
+							"ip", b.ServerIp, "vpc", mgr.vpcId, "target", targetRef, "node", nodeName)
+						b.Invalid = true
 					} else {
 						skipIPs = append(skipIPs, b.ServerIp)
 						continue
@@ -144,9 +146,14 @@ func (mgr *VGroupManager) updateVServerGroupENIBackendID(reqCtx *svcCtx.RequestC
 				}
 				b.ServerId = eniid
 			}
-			filteredBackends = append(filteredBackends, b)
+			if !b.Invalid {
+				filteredBackends = append(filteredBackends, b)
+			} else {
+				invalidBackends = append(invalidBackends, b)
+			}
 		}
 		vgs[i].Backends = filteredBackends
+		vgs[i].InvalidBackends = invalidBackends
 		if len(skipIPs) > 0 {
 			reqCtx.Log.Info(fmt.Sprintf("warning: filter pods by vpc cidr %+v, podIPs=%+v", vpcCIDRs, skipIPs))
 			reqCtx.Recorder.Event(
@@ -155,6 +162,17 @@ func (mgr *VGroupManager) updateVServerGroupENIBackendID(reqCtx *svcCtx.RequestC
 				helper.SkipSyncBackends,
 				fmt.Sprintf("Not sync pods [%s] whose ip is not in vpc cidrs", strings.Join(skipIPs, ",")),
 			)
+		}
+		if len(invalidBackends) > 0 {
+			var invalidIps []string
+			for _, b := range invalidBackends {
+				invalidIps = append(invalidIps, b.ServerIp)
+			}
+			reqCtx.Recorder.Event(
+				reqCtx.Service,
+				v1.EventTypeWarning,
+				helper.SkipSyncBackends,
+				fmt.Sprintf("Not sync pods [%s] whose eni is invalid", strings.Join(invalidIps, ",")))
 		}
 	}
 
@@ -247,6 +265,18 @@ func (mgr *VGroupManager) UpdateVServerGroup(reqCtx *svcCtx.RequestContext, loca
 				errs = append(errs, err)
 			}
 		}
+	}
+
+	if len(local.InvalidBackends) != 0 {
+		var ips []string
+		for _, b := range local.InvalidBackends {
+			ips = append(ips, b.ServerIp)
+		}
+		reqCtx.Recorder.Event(reqCtx.Service, v1.EventTypeWarning, helper.SkipSyncBackends,
+			fmt.Sprintf("Skip delete and update backends to vgroup %s due to invalid backends: %s",
+				remote.VGroupName, strings.Join(ips, ",")),
+		)
+		return utilerrors.NewAggregate(errs)
 	}
 
 	if len(del) > 0 {
@@ -382,6 +412,7 @@ func diff(remote, local model.VServerGroup) (
 			deletions = append(deletions, r)
 		}
 	}
+
 	for _, l := range local.Backends {
 		found := false
 		for _, r := range remote.Backends {

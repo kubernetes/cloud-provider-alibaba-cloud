@@ -4,6 +4,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
+	"regexp"
+	"slices"
+	"strconv"
+	"strings"
+	"time"
+
 	"github.com/alibabacloud-go/tea/tea"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -24,10 +31,6 @@ import (
 	"k8s.io/cloud-provider-alibaba-cloud/test/e2e/options"
 	"k8s.io/cloud-provider/api"
 	"k8s.io/klog/v2"
-	"os"
-	"strconv"
-	"strings"
-	"time"
 )
 
 func (f *Framework) ExpectLoadBalancerEqual(svc *v1.Service) error {
@@ -129,6 +132,27 @@ func (f *Framework) ExpectLoadBalancerDeleted(svc *v1.Service) error {
 			return false, nil
 		}
 		return true, nil
+	})
+}
+
+func (f *Framework) ExpectLoadBalancerEvent(svc *v1.Service, reason, messageRegexp string) error {
+	re, err := regexp.Compile(messageRegexp)
+	if err != nil {
+		return err
+	}
+	return wait.PollImmediate(5*time.Second, 30*time.Second, func() (done bool, err error) {
+		klog.Infof("[%s/%s] try to find event reason %s, message regexp %q", svc.Namespace, svc.Name, reason, messageRegexp)
+		events, err := f.Client.KubeClient.ListServiceEvents(svc, reason)
+		if err != nil {
+			return false, err
+		}
+		for _, ev := range events {
+			if re.MatchString(ev.Message) {
+				klog.Infof("[%s/%s] found event reason %s, message %s", svc.Namespace, svc.Name, ev.Reason, ev.Message)
+				return true, nil
+			}
+		}
+		return false, nil
 	})
 }
 
@@ -975,6 +999,11 @@ func isBackendEqual(client *client.KubeClient, reqCtx *svcCtx.RequestContext, vg
 		return false, err
 	}
 
+	var ignoreBackends []string
+	if backends := reqCtx.Anno.Get(TestAnnotationIgnoreBackends); backends != "" {
+		ignoreBackends = strings.Split(backends, ",")
+	}
+
 	var backends []model.BackendAttribute
 	switch policy {
 	case helper.ENITrafficPolicy:
@@ -994,6 +1023,10 @@ func isBackendEqual(client *client.KubeClient, reqCtx *svcCtx.RequestContext, vg
 		}
 	}
 	for _, l := range backends {
+		if slices.Contains(ignoreBackends, l.ServerIp) {
+			klog.Infof("skip compare ignored backend %q", l.ServerIp)
+			continue
+		}
 		found := false
 		for _, r := range vg.Backends {
 			if policy == helper.ENITrafficPolicy {

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -21,6 +22,8 @@ const (
 const (
 	ConditionReasonServerRegistered  = "ServerRegistered"
 	ConditionMessageServerRegistered = "The backend has been added to the server group"
+	ConditionReasonInvalidServer     = "ServerInvalidServer"
+	ConditionMessageInvalidServer    = "The backend failed to add to the server group because of the server is invalid"
 )
 
 // BuildTargetHealthPodConditionType constructs the condition type for TargetHealth pod condition.
@@ -69,17 +72,16 @@ func UpdatePodCondition(pod *corev1.Pod, condition corev1.PodCondition) {
 	pod.Status.Conditions = append(pod.Status.Conditions, condition)
 }
 
-func UpdateReadinessConditionForPod(ctx context.Context, kubeClient client.Client, pod *corev1.Pod, cond corev1.PodConditionType, reason, message string) error {
+func UpdateReadinessConditionForPod(ctx context.Context, kubeClient client.Client, pod *corev1.Pod,
+	cond corev1.PodConditionType, status corev1.ConditionStatus, reason, message string) error {
 	if !IsPodHasReadinessGate(pod, string(cond)) {
 		return nil
 	}
 
-	targetHealthCondStatus := corev1.ConditionTrue
-
 	existedCond := GetPodCondition(pod, cond)
 	// we skip patch pod if it matches current computed status/reason/message.
 	if existedCond != nil &&
-		existedCond.Status == targetHealthCondStatus &&
+		existedCond.Status == status &&
 		existedCond.Reason == reason &&
 		existedCond.Message == message {
 		return nil
@@ -87,11 +89,11 @@ func UpdateReadinessConditionForPod(ctx context.Context, kubeClient client.Clien
 
 	newTargetHealthCond := corev1.PodCondition{
 		Type:    cond,
-		Status:  targetHealthCondStatus,
+		Status:  status,
 		Reason:  reason,
 		Message: message,
 	}
-	if existedCond == nil || existedCond.Status != targetHealthCondStatus {
+	if existedCond == nil || existedCond.Status != status {
 		newTargetHealthCond.LastTransitionTime = metav1.Now()
 	}
 

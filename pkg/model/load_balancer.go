@@ -3,11 +3,12 @@ package model
 import (
 	"encoding/json"
 	"fmt"
+	"strconv"
+	"strings"
+
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/model/tag"
-	"strconv"
-	"strings"
 )
 
 type ListenerStatus string
@@ -203,6 +204,7 @@ type VServerGroup struct {
 	VGroupName                      string
 	VGroupWeight                    *int
 	Backends                        []BackendAttribute
+	InvalidBackends                 []BackendAttribute
 	InitialBackends                 []BackendAttribute
 	ContainsPotentialReadyEndpoints bool
 	IgnoreWeightUpdate              bool
@@ -231,6 +233,9 @@ type BackendAttribute struct {
 	Port        int    `json:"port"`
 	Type        string `json:"type"`
 	TargetRef   *v1.ObjectReference
+
+	// Invalid represents that the backend is un
+	Invalid bool
 }
 
 type CertAttribute struct {
