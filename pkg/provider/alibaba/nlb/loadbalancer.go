@@ -6,14 +6,13 @@ import (
 	"strings"
 	"time"
 
+	nlb "github.com/alibabacloud-go/nlb-20220430/v4/client"
+	"github.com/alibabacloud-go/tea/tea"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/util/retry"
 	ctrlCfg "k8s.io/cloud-provider-alibaba-cloud/pkg/config"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/service/reconcile/parallel"
-
-	nlb "github.com/alibabacloud-go/nlb-20220430/v4/client"
-	"github.com/alibabacloud-go/tea/tea"
-	"k8s.io/apimachinery/pkg/util/wait"
 	nlbmodel "k8s.io/cloud-provider-alibaba-cloud/pkg/model/nlb"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/model/tag"
 	prvd "k8s.io/cloud-provider-alibaba-cloud/pkg/provider"
@@ -217,6 +216,9 @@ func (p *NLBProvider) UpdateNLB(ctx context.Context, mdl *nlbmodel.NetworkLoadBa
 	req.LoadBalancerId = tea.String(mdl.LoadBalancerAttribute.LoadBalancerId)
 	if mdl.LoadBalancerAttribute.Name != "" {
 		req.LoadBalancerName = tea.String(mdl.LoadBalancerAttribute.Name)
+	}
+	if mdl.LoadBalancerAttribute.CrossZoneEnabled != nil {
+		req.CrossZoneEnabled = mdl.LoadBalancerAttribute.CrossZoneEnabled
 	}
 	var resp *nlb.UpdateLoadBalancerAttributeResponse
 	err := retryOnThrottling("UpdateLoadBalancerAttribute", func() error {
@@ -663,6 +665,7 @@ func loadResponse(resp interface{}, lb *nlbmodel.NetworkLoadBalancer) error {
 		lb.LoadBalancerAttribute.DNSName = tea.StringValue(resp.DNSName)
 		lb.LoadBalancerAttribute.SecurityGroupIds = tea.StringSliceValue(resp.SecurityGroupIds)
 		lb.LoadBalancerAttribute.BandwidthPackageId = resp.BandwidthPackageId
+		lb.LoadBalancerAttribute.CrossZoneEnabled = resp.CrossZoneEnabled
 
 		for _, z := range resp.ZoneMappings {
 			zm := nlbmodel.ZoneMapping{
@@ -698,6 +701,7 @@ func loadResponse(resp interface{}, lb *nlbmodel.NetworkLoadBalancer) error {
 		lb.LoadBalancerAttribute.DNSName = tea.StringValue(resp.DNSName)
 		lb.LoadBalancerAttribute.SecurityGroupIds = tea.StringSliceValue(resp.SecurityGroupIds)
 		lb.LoadBalancerAttribute.BandwidthPackageId = resp.BandwidthPackageId
+		lb.LoadBalancerAttribute.CrossZoneEnabled = resp.CrossZoneEnabled
 
 		for _, z := range resp.ZoneMappings {
 			zm := nlbmodel.ZoneMapping{

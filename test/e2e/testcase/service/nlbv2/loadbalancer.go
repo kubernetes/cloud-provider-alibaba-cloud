@@ -3,6 +3,8 @@ package nlbv2
 import (
 	"context"
 	"fmt"
+	"strings"
+
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
@@ -12,7 +14,6 @@ import (
 	nlbmodel "k8s.io/cloud-provider-alibaba-cloud/pkg/model/nlb"
 	"k8s.io/cloud-provider-alibaba-cloud/test/e2e/framework"
 	"k8s.io/cloud-provider-alibaba-cloud/test/e2e/options"
-	"strings"
 )
 
 func RunLoadBalancerTestCases(f *framework.Framework) {
@@ -384,6 +385,41 @@ func RunLoadBalancerTestCases(f *framework.Framework) {
 			//})
 		})
 
+		ginkgo.Context("nlb cross zone", func() {
+			ginkgo.It("off", func() {
+				svc, err := f.Client.KubeClient.CreateNLBServiceByAnno(map[string]string{
+					annotation.Annotation(annotation.ZoneMaps):         options.TestConfig.NLBZoneMaps,
+					annotation.Annotation(annotation.CrossZoneEnabled): "off",
+				})
+				gomega.Expect(err).To(gomega.BeNil())
+				err = f.ExpectNetworkLoadBalancerEqual(svc)
+				gomega.Expect(err).To(gomega.BeNil())
+			})
+			ginkgo.It("on -> off", func() {
+				oldsvc, err := f.Client.KubeClient.CreateNLBServiceByAnno(map[string]string{
+					annotation.Annotation(annotation.ZoneMaps):         options.TestConfig.NLBZoneMaps,
+					annotation.Annotation(annotation.CrossZoneEnabled): "on",
+				})
+				gomega.Expect(err).To(gomega.BeNil())
+				err = f.ExpectNetworkLoadBalancerEqual(oldsvc)
+				gomega.Expect(err).To(gomega.BeNil())
+				newsvc := oldsvc.DeepCopy()
+				newsvc.Annotations[annotation.Annotation(annotation.CrossZoneEnabled)] = "off"
+				newsvc, err = f.Client.KubeClient.PatchService(oldsvc, newsvc)
+				gomega.Expect(err).To(gomega.BeNil())
+				err = f.ExpectNetworkLoadBalancerEqual(newsvc)
+				gomega.Expect(err).To(gomega.BeNil())
+			})
+			ginkgo.It("invalid flag value", func() {
+				svc, err := f.Client.KubeClient.CreateNLBServiceByAnno(map[string]string{
+					annotation.Annotation(annotation.ZoneMaps):         options.TestConfig.NLBZoneMaps,
+					annotation.Annotation(annotation.CrossZoneEnabled): "true",
+				})
+				gomega.Expect(err).To(gomega.BeNil())
+				err = f.ExpectNetworkLoadBalancerEqual(svc)
+				gomega.Expect(err).NotTo(gomega.BeNil())
+			})
+		})
 	})
 
 	ginkgo.Context("nlb name", func() {

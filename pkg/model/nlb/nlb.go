@@ -124,6 +124,7 @@ type LoadBalancerAttribute struct {
 	Tags                         []tag.Tag
 	SecurityGroupIds             []string
 	BandwidthPackageId           *string
+	CrossZoneEnabled             *bool
 	DeletionProtectionConfig     *DeletionProtectionConfig
 	ModificationProtectionConfig *ModificationProtectionConfig
 	PreserveOnDelete             bool
