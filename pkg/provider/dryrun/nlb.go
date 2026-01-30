@@ -223,3 +223,23 @@ func (*DryRunNLB) BatchWaitJobsFinish(ctx context.Context, api string, jobIds []
 	//TODO implement me
 	panic("implement me")
 }
+
+func (d DryRunNLB) ListNLBListenerCertificates(ctx context.Context, listenerId string) ([]nlbmodel.ListenerCertificate, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (d DryRunNLB) AssociateAdditionalCertificatesWithNLBListener(ctx context.Context, listenerId string, certIds []string) error {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (d DryRunNLB) DisassociateAdditionalCertificatesWithNLBListener(ctx context.Context, listenerId string, certIds []string) error {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (d DryRunNLB) WaitJobFinish(api, jobId string, args ...time.Duration) error {
+	//TODO implement me
+	panic("implement me")
+}

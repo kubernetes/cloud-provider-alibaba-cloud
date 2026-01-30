@@ -96,6 +96,7 @@ const (
 	RequestTimeout             = AnnotationLoadBalancerPrefix + "request-timeout"              // RequestTimeout request timeout for L7
 	EstablishedTimeout         = AnnotationLoadBalancerPrefix + "established-timeout"          // EstablishedTimeout connection established time out for TCP
 	ProxyProtocol              = AnnotationLoadBalancerPrefix + "proxy-protocol"
+	DomainExtensions           = AnnotationLoadBalancerPrefix + "domain-extensions"
 
 	// VServerBackend Attribute
 	BackendLabel      = AnnotationLoadBalancerPrefix + "backend-label"              // BackendLabel backend labels
@@ -128,6 +129,7 @@ const (
 	AlpnPolicy  = AnnotationLoadBalancerPrefix + "alpn-policy"
 
 	ListenerPortRange = AnnotationLoadBalancerPrefix + "listener-port-range"
+	AdditionalCertIds = AnnotationLoadBalancerPrefix + "additional-cert-ids"
 )
 
 var DefaultValue = map[string]string{

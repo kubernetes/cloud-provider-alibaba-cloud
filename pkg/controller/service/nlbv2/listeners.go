@@ -3,12 +3,20 @@ package nlbv2
 import (
 	"context"
 	"fmt"
+	"strconv"
+	"strings"
+	"time"
+
 	"github.com/alibabacloud-go/tea/tea"
 	"github.com/mohae/deepcopy"
 	v1 "k8s.io/api/core/v1"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	ctrlCfg "k8s.io/cloud-provider-alibaba-cloud/pkg/config"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/helper"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/service/reconcile/annotation"
+	reconbackend "k8s.io/cloud-provider-alibaba-cloud/pkg/controller/service/reconcile/backend"
 	svcCtx "k8s.io/cloud-provider-alibaba-cloud/pkg/controller/service/reconcile/context"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/service/reconcile/parallel"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/model"
 	nlbmodel "k8s.io/cloud-provider-alibaba-cloud/pkg/model/nlb"
 	prvd "k8s.io/cloud-provider-alibaba-cloud/pkg/provider"
@@ -17,13 +25,12 @@ import (
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/dryrun"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/util"
 	"k8s.io/klog/v2"
-	"strconv"
-	"strings"
-	"time"
 )
 
 const (
 	errorListenerOperationConflict = "Conflict.Lock"
+
+	listenerMaxAssociateCertificateCount = 15
 )
 
 func NewListenerManager(cloud prvd.Provider) *ListenerManager {
@@ -117,6 +124,12 @@ func (mgr *ListenerManager) BuildRemoteModel(reqCtx *svcCtx.RequestContext, mdl 
 	listeners, err := mgr.ListListeners(reqCtx, mdl.LoadBalancerAttribute.LoadBalancerId)
 	if err != nil {
 		return fmt.Errorf("DescribeNLBListeners error:%s", err.Error())
+	}
+	if reqCtx.Anno.Has(annotation.AdditionalCertIds) {
+		err = mgr.SetListenerAdditionalCertificates(reqCtx, listeners)
+		if err != nil {
+			return fmt.Errorf("SetListenerAdditionalCertificates error:%s", err.Error())
+		}
 	}
 	mdl.Listeners = listeners
 	return nil
@@ -227,6 +240,10 @@ func (mgr *ListenerManager) buildListenerFromServicePort(reqCtx *svcCtx.RequestC
 		if reqCtx.Anno.Get(annotation.AlpnPolicy) != "" {
 			listener.AlpnPolicy = reqCtx.Anno.Get(annotation.AlpnPolicy)
 		}
+
+		if reqCtx.Anno.Get(annotation.AdditionalCertIds) != "" {
+			listener.AdditionalCertificateIds = strings.Split(reqCtx.Anno.Get(annotation.AdditionalCertIds), ",")
+		}
 	}
 
 	return listener, nil
@@ -237,15 +254,18 @@ func (mgr *ListenerManager) ParallelUpdateListeners(reqCtx *svcCtx.RequestContex
 		reqCtx.Log.Info("no action to do for listeners")
 		return nil
 	}
-
 	var jobIds []string
 	var errs []error
 	for _, a := range actions {
-		id := ""
+		var id string
 		var err error
 		switch a.Action {
 		case listenerActionCreate:
-			id, err = mgr.CreateListener(reqCtx, a.LBId, a.Local)
+			if needUpdateAfterListenerCreated(a.Local) {
+				err = mgr.CreateAndUpdateListener(reqCtx, a.LBId, a.Local)
+			} else {
+				id, err = mgr.CreateListener(reqCtx, a.LBId, a.Local)
+			}
 			if err != nil {
 				klog.Errorf("error create listener [%s]: %s", a.Local.PortString(), err)
 				errs = append(errs, fmt.Errorf("EnsureListenerUpdated error: %w", err))
@@ -266,7 +286,6 @@ func (mgr *ListenerManager) ParallelUpdateListeners(reqCtx *svcCtx.RequestContex
 				continue
 			}
 		}
-
 		if id != "" {
 			jobIds = append(jobIds, id)
 		}
@@ -283,7 +302,18 @@ func (mgr *ListenerManager) ParallelUpdateListeners(reqCtx *svcCtx.RequestContex
 
 func (mgr *ListenerManager) ListListeners(reqCtx *svcCtx.RequestContext, lbId string,
 ) ([]*nlbmodel.ListenerAttribute, error) {
-	return mgr.cloud.ListNLBListeners(reqCtx.Ctx, lbId)
+	listeners, err := mgr.cloud.ListNLBListeners(reqCtx.Ctx, lbId)
+	if err != nil {
+		return nil, err
+	}
+	if !reqCtx.Anno.Has(annotation.AdditionalCertIds) {
+		return listeners, nil
+	}
+	err = mgr.SetListenerAdditionalCertificates(reqCtx, listeners)
+	if err != nil {
+		return nil, err
+	}
+	return listeners, nil
 }
 
 func (mgr *ListenerManager) CreateListener(reqCtx *svcCtx.RequestContext, lbId string, local *nlbmodel.ListenerAttribute) (string, error) {
@@ -299,6 +329,25 @@ func (mgr *ListenerManager) CreateListener(reqCtx *svcCtx.RequestContext, lbId s
 	return jobId, err
 }
 
+func (mgr *ListenerManager) CreateAndUpdateListener(reqCtx *svcCtx.RequestContext, lbId string, local *nlbmodel.ListenerAttribute) error {
+	err := helper.RetryOnErrorContains(errorListenerOperationConflict, func() error {
+		return mgr.cloud.CreateNLBListener(reqCtx.Ctx, lbId, local)
+	})
+	if err != nil {
+		return err
+	}
+	if local.ListenerId == "" {
+		return fmt.Errorf("listener id is empty")
+	}
+	if len(local.AdditionalCertificateIds) != 0 {
+		err = mgr.BatchAssociateAdditionalCertificates(reqCtx.Ctx, local.ListenerId, local.AdditionalCertificateIds)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func (mgr *ListenerManager) UpdateNLBListener(reqCtx *svcCtx.RequestContext, local, remote *nlbmodel.ListenerAttribute) (string, error) {
 	if remote.ListenerStatus == nlbmodel.StoppedListenerStatus {
 		if err := mgr.cloud.StartNLBListener(reqCtx.Ctx, remote.ListenerId); err != nil {
@@ -307,58 +356,60 @@ func (mgr *ListenerManager) UpdateNLBListener(reqCtx *svcCtx.RequestContext, loc
 	}
 
 	update := deepcopy.Copy(remote).(*nlbmodel.ListenerAttribute)
-	needUpdate := false
+	needUpdateListenerAttribute := false
+	needUpdateAdditionalCertificates := false
+
 	updateDetail := ""
 
 	if remote.ListenerDescription != local.ListenerDescription {
-		needUpdate = true
+		needUpdateListenerAttribute = true
 		update.ListenerDescription = local.ListenerDescription
 		updateDetail += fmt.Sprintf("ListenerDescription %v should be changed to %v;",
 			remote.ListenerDescription, local.ListenerDescription)
 	}
 	if remote.ServerGroupId != local.ServerGroupId {
-		needUpdate = true
+		needUpdateListenerAttribute = true
 		update.ServerGroupId = local.ServerGroupId
 		updateDetail += fmt.Sprintf("ServerGroupId %v should be changed to %v;",
 			remote.ServerGroupId, local.ServerGroupId)
 	}
 	if local.ProxyProtocolEnabled != nil &&
 		tea.BoolValue(remote.ProxyProtocolEnabled) != tea.BoolValue(local.ProxyProtocolEnabled) {
-		needUpdate = true
+		needUpdateListenerAttribute = true
 		update.ProxyProtocolEnabled = local.ProxyProtocolEnabled
 		updateDetail += fmt.Sprintf("ProxyProtocolEnabled %v should be changed to %v;",
 			tea.BoolValue(remote.ProxyProtocolEnabled), tea.BoolValue(local.ProxyProtocolEnabled))
 	}
 	if local.ProxyProtocolV2Config.PrivateLinkEpIdEnabled != nil &&
 		(remote.ProxyProtocolV2Config.PrivateLinkEpIdEnabled == nil || tea.BoolValue(remote.ProxyProtocolV2Config.PrivateLinkEpIdEnabled) != tea.BoolValue(local.ProxyProtocolV2Config.PrivateLinkEpIdEnabled)) {
-		needUpdate = true
+		needUpdateListenerAttribute = true
 		update.ProxyProtocolV2Config.PrivateLinkEpIdEnabled = local.ProxyProtocolV2Config.PrivateLinkEpIdEnabled
 		updateDetail += fmt.Sprintf("PrivateLinkEpIdEnabled %v should be changed to %v;",
 			tea.BoolValue(remote.ProxyProtocolV2Config.PrivateLinkEpIdEnabled), tea.BoolValue(local.ProxyProtocolV2Config.PrivateLinkEpIdEnabled))
 	}
 	if local.ProxyProtocolV2Config.PrivateLinkEpsIdEnabled != nil &&
 		(remote.ProxyProtocolV2Config.PrivateLinkEpsIdEnabled == nil || tea.BoolValue(remote.ProxyProtocolV2Config.PrivateLinkEpsIdEnabled) != tea.BoolValue(local.ProxyProtocolV2Config.PrivateLinkEpsIdEnabled)) {
-		needUpdate = true
+		needUpdateListenerAttribute = true
 		update.ProxyProtocolV2Config.PrivateLinkEpsIdEnabled = local.ProxyProtocolV2Config.PrivateLinkEpsIdEnabled
 		updateDetail += fmt.Sprintf("PrivateLinkEpsIdEnabled %v should be changed to %v;",
 			tea.BoolValue(remote.ProxyProtocolV2Config.PrivateLinkEpsIdEnabled), tea.BoolValue(local.ProxyProtocolV2Config.PrivateLinkEpsIdEnabled))
 	}
 	if local.ProxyProtocolV2Config.VpcIdEnabled != nil &&
 		(remote.ProxyProtocolV2Config.VpcIdEnabled == nil || tea.BoolValue(remote.ProxyProtocolV2Config.VpcIdEnabled) != tea.BoolValue(local.ProxyProtocolV2Config.VpcIdEnabled)) {
-		needUpdate = true
+		needUpdateListenerAttribute = true
 		update.ProxyProtocolV2Config.VpcIdEnabled = local.ProxyProtocolV2Config.VpcIdEnabled
 		updateDetail += fmt.Sprintf("VpcIdEnabled %v should be changed to %v;",
 			tea.BoolValue(remote.ProxyProtocolV2Config.VpcIdEnabled), tea.BoolValue(local.ProxyProtocolV2Config.VpcIdEnabled))
 	}
 	// idle timeout
 	if local.IdleTimeout != 0 && remote.IdleTimeout != local.IdleTimeout {
-		needUpdate = true
+		needUpdateListenerAttribute = true
 		update.IdleTimeout = local.IdleTimeout
 		updateDetail += fmt.Sprintf("IdleTimeout %v should be changed to %v;",
 			remote.IdleTimeout, local.IdleTimeout)
 	}
 	if local.Cps != nil && tea.Int32Value(local.Cps) != tea.Int32Value(remote.Cps) {
-		needUpdate = true
+		needUpdateListenerAttribute = true
 		update.Cps = local.Cps
 		updateDetail += fmt.Sprintf("Cps %v should be changed to %v;", tea.Int32Value(remote.Cps), tea.Int32Value(local.Cps))
 	}
@@ -368,7 +419,7 @@ func (mgr *ListenerManager) UpdateNLBListener(reqCtx *svcCtx.RequestContext, loc
 		// certId
 		if len(local.CertificateIds) != 0 &&
 			!util.IsStringSliceEqual(local.CertificateIds, remote.CertificateIds) {
-			needUpdate = true
+			needUpdateListenerAttribute = true
 			update.CertificateIds = local.CertificateIds
 			updateDetail += fmt.Sprintf("CertificateIds %v should be changed to %v;",
 				remote.CertificateIds, local.CertificateIds)
@@ -376,59 +427,132 @@ func (mgr *ListenerManager) UpdateNLBListener(reqCtx *svcCtx.RequestContext, loc
 		// cacertId
 		if len(local.CaCertificateIds) != 0 &&
 			!util.IsStringSliceEqual(local.CaCertificateIds, remote.CaCertificateIds) {
-			needUpdate = true
+			needUpdateListenerAttribute = true
 			update.CaCertificateIds = local.CaCertificateIds
 			updateDetail += fmt.Sprintf("CaCertificateIds %v should be changed to %v;",
 				remote.CaCertificateIds, local.CaCertificateIds)
 		}
+		// additional certs
+		if reqCtx.Anno.Has(annotation.AdditionalCertIds) &&
+			!util.IsStringSliceEqual(local.AdditionalCertificateIds, remote.AdditionalCertificateIds) {
+			needUpdateAdditionalCertificates = true
+			update.AdditionalCertificateIds = local.AdditionalCertificateIds
+			updateDetail += fmt.Sprintf("AdditionalCertificateIds %v should be changed to %v;",
+				remote.AdditionalCertificateIds, local.AdditionalCertificateIds)
+		}
 		if local.CaEnabled != nil &&
 			tea.BoolValue(local.CaEnabled) != tea.BoolValue(remote.CaEnabled) {
-			needUpdate = true
+			needUpdateListenerAttribute = true
 			update.CaEnabled = local.CaEnabled
 			updateDetail += fmt.Sprintf("CaEnabled %v should be changed to %v;", tea.BoolValue(remote.CaEnabled),
 				tea.BoolValue(local.CaEnabled))
 		}
 		if local.SecurityPolicyId != "" &&
 			local.SecurityPolicyId != remote.SecurityPolicyId {
-			needUpdate = true
+			needUpdateListenerAttribute = true
 			update.SecurityPolicyId = local.SecurityPolicyId
 			updateDetail += fmt.Sprintf("SecurityPolicyId %v should be changed to %v;",
 				remote.SecurityPolicyId, local.SecurityPolicyId)
 		}
 		if local.AlpnEnabled != nil &&
 			*local.AlpnEnabled != tea.BoolValue(remote.AlpnEnabled) {
-			needUpdate = true
+			needUpdateListenerAttribute = true
 			update.AlpnEnabled = local.AlpnEnabled
 			updateDetail += fmt.Sprintf("AlpnEnabled %v should be changed to %v;", tea.BoolValue(remote.AlpnEnabled),
 				tea.BoolValue(local.AlpnEnabled))
 		}
 		if tea.BoolValue(local.AlpnEnabled) && local.AlpnPolicy != "" &&
 			local.AlpnPolicy != remote.AlpnPolicy {
-			needUpdate = true
+			needUpdateListenerAttribute = true
 			update.AlpnPolicy = local.AlpnPolicy
 			updateDetail += fmt.Sprintf("AlpnPolicy %v should be changed to %v;",
 				remote.AlpnPolicy, local.AlpnPolicy)
 		}
 	}
 
-	if needUpdate {
-		ctx := context.WithValue(reqCtx.Ctx, dryrun.ContextMessage, updateDetail)
+	var id string
+	var errs []error
+	if needUpdateListenerAttribute || needUpdateAdditionalCertificates {
 		reqCtx.Log.Info(fmt.Sprintf("update listener: %s [%s] changed, detail %s", local.ListenerProtocol, local.PortString(), updateDetail))
-
-		var jobId string
+	} else {
+		reqCtx.Log.Info(fmt.Sprintf("update listener: %s [%s] not changed, skip", local.ListenerProtocol, local.PortString()))
+	}
+	if needUpdateAdditionalCertificates {
+		ctx := context.WithValue(reqCtx.Ctx, dryrun.ContextMessage, updateDetail)
 		err := helper.RetryOnErrorContains(errorListenerOperationConflict, func() error {
-			id, err := mgr.cloud.UpdateNLBListenerAsync(ctx, update)
+			err := mgr.updateListenerAdditionalCertificates(ctx, local, remote)
 			if err != nil {
 				return err
 			}
-			jobId = id
 			return nil
 		})
-		return jobId, err
+		if err != nil {
+			errs = append(errs, err)
+		}
 	}
 
-	reqCtx.Log.Info(fmt.Sprintf("update listener: %s [%s] not changed, skip", local.ListenerProtocol, local.PortString()))
-	return "", nil
+	if needUpdateListenerAttribute {
+		ctx := context.WithValue(reqCtx.Ctx, dryrun.ContextMessage, updateDetail)
+		err := helper.RetryOnErrorContains(errorListenerOperationConflict, func() error {
+			var err error
+			id, err = mgr.cloud.UpdateNLBListenerAsync(ctx, update)
+			if err != nil {
+				return err
+			}
+			return nil
+		})
+		if err != nil {
+			errs = append(errs, err)
+		}
+	}
+
+	return id, utilerrors.NewAggregate(errs)
+}
+
+func (mgr *ListenerManager) updateListenerAdditionalCertificates(ctx context.Context, local, remote *nlbmodel.ListenerAttribute) error {
+	var toAdd, toDelete []string
+	for i := range local.AdditionalCertificateIds {
+		found := false
+		for j := range remote.AdditionalCertificateIds {
+			if local.AdditionalCertificateIds[i] == remote.AdditionalCertificateIds[j] {
+				found = true
+				break
+			}
+		}
+		if !found {
+			toAdd = append(toAdd, local.AdditionalCertificateIds[i])
+		}
+	}
+	for i := range remote.AdditionalCertificateIds {
+		found := false
+		for j := range local.AdditionalCertificateIds {
+			if remote.AdditionalCertificateIds[i] == local.AdditionalCertificateIds[j] {
+				found = true
+				break
+			}
+		}
+		if !found {
+			toDelete = append(toDelete, remote.AdditionalCertificateIds[i])
+		}
+	}
+
+	var errs []error
+
+	if len(toAdd) != 0 {
+		err := mgr.BatchAssociateAdditionalCertificates(ctx, remote.ListenerId, toAdd)
+		if err != nil {
+			errs = append(errs, fmt.Errorf("error associate additional certs: %s", err.Error()))
+		}
+	}
+
+	if len(toDelete) != 0 {
+		err := mgr.BatchDisassociateAdditionalCertificates(ctx, remote.ListenerId, toDelete)
+		if err != nil {
+			errs = append(errs, fmt.Errorf("error disassociate additional certs: %s", err.Error()))
+		}
+	}
+
+	return utilerrors.NewAggregate(errs)
 }
 
 func (mgr *ListenerManager) DeleteListener(reqCtx *svcCtx.RequestContext, lisId string) (string, error) {
@@ -442,6 +566,55 @@ func (mgr *ListenerManager) DeleteListener(reqCtx *svcCtx.RequestContext, lisId 
 		return nil
 	})
 	return jobId, err
+}
+
+func (mgr *ListenerManager) SetListenerAdditionalCertificates(reqCtx *svcCtx.RequestContext, listeners []*nlbmodel.ListenerAttribute) error {
+	var toList []*nlbmodel.ListenerAttribute
+	for _, l := range listeners {
+		if l.ListenerProtocol != nlbmodel.TCPSSL {
+			continue
+		}
+		toList = append(toList, l)
+	}
+
+	errs := make([]error, len(toList))
+	parallel.DoPiece(reqCtx.Ctx, ctrlCfg.ControllerCFG.MaxConcurrentActions, len(toList), func(i int) {
+		certs, err := mgr.cloud.ListNLBListenerCertificates(reqCtx.Ctx, toList[i].ListenerId)
+		if err != nil {
+			errs[i] = err
+			return
+		}
+		var additionalCertIds []string
+		for _, c := range certs {
+			if c.IsDefault {
+				continue
+			}
+			additionalCertIds = append(additionalCertIds, c.Id)
+		}
+		toList[i].AdditionalCertificateIds = additionalCertIds
+	})
+	return utilerrors.NewAggregate(errs)
+}
+
+func (mgr *ListenerManager) BatchAssociateAdditionalCertificates(ctx context.Context, listenerId string, certIds []string) error {
+	return reconbackend.Batch(certIds, listenerMaxAssociateCertificateCount,
+		func(ids []string) error {
+			return mgr.cloud.AssociateAdditionalCertificatesWithNLBListener(ctx, listenerId, ids)
+		})
+}
+
+func (mgr *ListenerManager) BatchDisassociateAdditionalCertificates(ctx context.Context, listenerId string, certIds []string) error {
+	return reconbackend.Batch(certIds, listenerMaxAssociateCertificateCount,
+		func(ids []string) error {
+			return mgr.cloud.DisassociateAdditionalCertificatesWithNLBListener(ctx, listenerId, ids)
+		})
+}
+
+func needUpdateAfterListenerCreated(lis *nlbmodel.ListenerAttribute) bool {
+	if len(lis.AdditionalCertificateIds) != 0 {
+		return true
+	}
+	return false
 }
 
 func nlbListenerProtocol(annotation string, port v1.ServicePort) (string, error) {
@@ -459,7 +632,7 @@ func nlbListenerProtocol(annotation string, port v1.ServicePort) (string, error)
 			strings.ToUpper(pp[0]) != nlbmodel.UDP &&
 			strings.ToUpper(pp[0]) != nlbmodel.TCPSSL {
 			return "", fmt.Errorf("port protocol"+
-				" format must be either [TCP|UDP|TCPSSL], protocol not supported wit [%s]\n", pp[0])
+				" format must be either [TCP|UDP|TCPSSL], protocol not supported with [%s]\n", pp[0])
 		}
 
 		if pp[1] == fmt.Sprintf("%d", port.Port) {

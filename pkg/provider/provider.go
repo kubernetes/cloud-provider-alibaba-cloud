@@ -162,6 +162,12 @@ type ILoadBalancer interface {
 
 	// Cert
 	DescribeServerCertificateById(ctx context.Context, serverCertificateId string) (*model.CertAttribute, error)
+
+	// Domain Extension
+	DescribeDomainExtensions(ctx context.Context, lbId string, port int) ([]model.DomainExtension, error)
+	CreateDomainExtension(ctx context.Context, lbId string, port int, domain string, certId string) error
+	DeleteDomainExtension(ctx context.Context, id string) error
+	SetDomainExtensionAttribute(ctx context.Context, id string, certId string) error
 }
 
 type IPrivateZone interface {
@@ -264,8 +270,14 @@ type INLB interface {
 	UpdateNLBListenerAsync(ctx context.Context, lis *nlbmodel.ListenerAttribute) (string, error)
 	DeleteNLBListenerAsync(ctx context.Context, listenerId string) (string, error)
 
+	// Certificates
+	ListNLBListenerCertificates(ctx context.Context, listenerId string) ([]nlbmodel.ListenerCertificate, error)
+	AssociateAdditionalCertificatesWithNLBListener(ctx context.Context, listenerId string, certIds []string) error
+	DisassociateAdditionalCertificatesWithNLBListener(ctx context.Context, listenerId string, certIds []string) error
+
 	// Jobs
 	BatchWaitJobsFinish(ctx context.Context, api string, jobIds []string, args ...time.Duration) error
+	WaitJobFinish(api, jobId string, args ...time.Duration) error
 }
 
 // EFLONodeAttribute EFLO node attribute from cloud LingJun instance

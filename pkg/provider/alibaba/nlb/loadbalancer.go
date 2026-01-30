@@ -64,6 +64,31 @@ func retryOnThrottling(api string, fn func() error) error {
 	})
 }
 
+func retryOnThrottlingT[R any, T any](api string, f func(request *R) (*T, error), req *R) (*T, error) {
+	backoff := wait.Backoff{
+		Steps:    ctrlCfg.ControllerCFG.MaxThrottlingRetryTimes,
+		Duration: 1 * time.Second,
+	}
+	if backoff.Steps <= 0 {
+		backoff.Steps = defaultAPIThrottlingRetryTimes
+	}
+
+	var resp *T
+	err := retry.OnError(backoff, util.IsThrottlingError, func() error {
+		var err error
+		resp, err = f(req)
+		if util.IsThrottlingError(err) {
+			klog.Warningf("OpenAPI %s throttled in this try: %s", api, util.GetErrorMessage(err))
+		}
+		return err
+	})
+
+	if err != nil {
+		return nil, err
+	}
+	return resp, err
+}
+
 func (p *NLBProvider) FindNLB(ctx context.Context, mdl *nlbmodel.NetworkLoadBalancer) error {
 	// 1. find by nlb id
 	if mdl.LoadBalancerAttribute.LoadBalancerId != "" {
@@ -208,7 +233,7 @@ func (p *NLBProvider) DeleteNLB(ctx context.Context, mdl *nlbmodel.NetworkLoadBa
 	}
 	klog.V(5).Infof("RequestId: %s, API: %s", tea.StringValue(resp.Body.RequestId), "DeleteLoadBalancer")
 
-	return p.waitJobFinish("DeleteLoadBalancer", tea.StringValue(resp.Body.JobId), 20*time.Second, 3*time.Minute)
+	return p.WaitJobFinish("DeleteLoadBalancer", tea.StringValue(resp.Body.JobId), 20*time.Second, 3*time.Minute)
 }
 
 func (p *NLBProvider) UpdateNLB(ctx context.Context, mdl *nlbmodel.NetworkLoadBalancer) error {
@@ -365,7 +390,7 @@ func (p *NLBProvider) UpdateNLBSecurityGroupIds(ctx context.Context, mdl *nlbmod
 		}
 		klog.V(5).Infof("RequestId: %s, API: %s", tea.StringValue(resp.Body.RequestId), "LoadBalancerLeaveSecurityGroup")
 
-		err = p.waitJobFinish("LoadBalancerLeaveSecurityGroup", tea.StringValue(resp.Body.JobId))
+		err = p.WaitJobFinish("LoadBalancerLeaveSecurityGroup", tea.StringValue(resp.Body.JobId))
 		if err != nil {
 			return err
 		}
@@ -389,7 +414,7 @@ func (p *NLBProvider) UpdateNLBSecurityGroupIds(ctx context.Context, mdl *nlbmod
 		}
 		klog.V(5).Infof("RequestId: %s, API: %s", tea.StringValue(resp.Body.RequestId), "LoadBalancerJoinSecurityGroup")
 
-		err = p.waitJobFinish("LoadBalancerJoinSecurityGroup", tea.StringValue(resp.Body.JobId))
+		err = p.WaitJobFinish("LoadBalancerJoinSecurityGroup", tea.StringValue(resp.Body.JobId))
 		if err != nil {
 			return err
 		}
@@ -473,7 +498,7 @@ func (p *NLBProvider) DetachCommonBandwidthPackageFromLoadBalancer(ctx context.C
 	}
 
 	klog.V(5).Infof("RequestId: %s, API: %s", tea.StringValue(resp.Body.RequestId), "DetachCommonBandwidthPackageFromLoadBalancer")
-	err = p.waitJobFinish("DetachCommonBandwidthPackageFromLoadBalancer", tea.StringValue(resp.Body.JobId))
+	err = p.WaitJobFinish("DetachCommonBandwidthPackageFromLoadBalancer", tea.StringValue(resp.Body.JobId))
 	if err != nil {
 		return err
 	}
@@ -735,7 +760,7 @@ const (
 	DefaultRetryTimeout  = 30 * time.Second
 )
 
-func (p *NLBProvider) waitJobFinish(api, jobId string, args ...time.Duration) error {
+func (p *NLBProvider) WaitJobFinish(api, jobId string, args ...time.Duration) error {
 	var interval, timeout time.Duration
 	if len(args) < 2 {
 		interval = DefaultRetryInterval

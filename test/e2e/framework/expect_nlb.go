@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/model/tag"
 
 	"github.com/alibabacloud-go/tea/tea"
@@ -688,6 +689,17 @@ func nlbTCPSSLEqual(reqCtx *svcCtx.RequestContext, local v1.ServicePort, remote 
 		}
 	}
 
+	if reqCtx.Anno.Has(annotation.AdditionalCertIds) {
+		var localIds []string
+		if reqCtx.Anno.Get(annotation.AdditionalCertIds) != "" {
+			localIds = strings.Split(reqCtx.Anno.Get(annotation.AdditionalCertIds), ",")
+		}
+		remoteIds := remote.AdditionalCertificateIds
+		if !isAdditionalCertificateIdsEqual(localIds, remoteIds) {
+			return fmt.Errorf("expected nlb additional cert ids %v, got %v", localIds, remoteIds)
+		}
+	}
+
 	return nil
 }
 
@@ -1221,4 +1233,16 @@ func decIP(ip net.IP) net.IP {
 		}
 	}
 	return ip
+}
+
+func isAdditionalCertificateIdsEqual(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	if len(a) == 0 {
+		return true
+	}
+	aSet := sets.Set[string]{}
+	aSet.Insert(a...)
+	return aSet.HasAll(b...)
 }

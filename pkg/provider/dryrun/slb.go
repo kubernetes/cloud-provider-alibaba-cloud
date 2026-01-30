@@ -284,6 +284,34 @@ func (m *DryRunSLB) DescribeServerCertificateById(ctx context.Context, serverCer
 	return m.slb.DescribeServerCertificateById(ctx, serverCertificateId)
 }
 
+func (m *DryRunSLB) DescribeDomainExtensions(ctx context.Context, lbId string, port int) ([]model.DomainExtension, error) {
+	return m.slb.DescribeDomainExtensions(ctx, lbId, port)
+}
+
+func (m *DryRunSLB) CreateDomainExtension(ctx context.Context, lbId string, port int, domain string, certId string) error {
+	mtype := "CreateDomainExtension"
+	svc := getService(ctx)
+	AddEvent(SLB, fmt.Sprintf("%s/%d", util.Key(svc), port), lbId,
+		"CreateDomainExtension", ERROR, "")
+	return hintError(mtype, fmt.Sprintf("loadbalancer %s listener %d domain extension %s should be created", lbId, port, domain))
+}
+
+func (m *DryRunSLB) DeleteDomainExtension(ctx context.Context, id string) error {
+	mtype := "DeleteDomainExtension"
+	svc := getService(ctx)
+	AddEvent(SLB, fmt.Sprintf("%s/%s", util.Key(svc), id), id,
+		"DeleteDomainExtension", ERROR, "")
+	return hintError(mtype, fmt.Sprintf("domain extension %s should be deleted", id))
+}
+
+func (m *DryRunSLB) SetDomainExtensionAttribute(ctx context.Context, id string, certId string) error {
+	mtype := "SetDomainExtensionAttribute"
+	svc := getService(ctx)
+	AddEvent(SLB, fmt.Sprintf("%s/%s", util.Key(svc), id), id,
+		"SetDomainExtensionAttribute", ERROR, "")
+	return hintError(mtype, fmt.Sprintf("domain extension %s should be set", id))
+}
+
 func getTagString(tags []tag.Tag) string {
 	var ret []string
 	for _, t := range tags {

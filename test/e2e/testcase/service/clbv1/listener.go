@@ -811,6 +811,51 @@ func RunListenerTestCases(f *framework.Framework) {
 						err = f.ExpectLoadBalancerEqual(newsvc)
 						gomega.Expect(err).To(gomega.BeNil())
 					})
+
+					ginkgo.It("domain extensions: certID with extension certID2", func() {
+						svc, err := f.Client.KubeClient.CreateServiceByAnno(map[string]string{
+							annotation.Annotation(annotation.ProtocolPort):     "https:443",
+							annotation.Annotation(annotation.CertID):           options.TestConfig.CertID,
+							annotation.Annotation(annotation.DomainExtensions): fmt.Sprintf("*.example.com:%s", options.TestConfig.CertID2),
+						})
+						gomega.Expect(err).To(gomega.BeNil())
+						err = f.ExpectLoadBalancerEqual(svc)
+						gomega.Expect(err).To(gomega.BeNil())
+					})
+
+					ginkgo.It("domain extensions: extension certID2 domain A -> extension certID2 domain B", func() {
+						oldsvc, err := f.Client.KubeClient.CreateServiceByAnno(map[string]string{
+							annotation.Annotation(annotation.ProtocolPort):     "https:443",
+							annotation.Annotation(annotation.CertID):           options.TestConfig.CertID,
+							annotation.Annotation(annotation.DomainExtensions): fmt.Sprintf("*.example.com:%s", options.TestConfig.CertID2),
+						})
+						gomega.Expect(err).To(gomega.BeNil())
+						err = f.ExpectLoadBalancerEqual(oldsvc)
+						gomega.Expect(err).To(gomega.BeNil())
+						newsvc := oldsvc.DeepCopy()
+						newsvc.Annotations[annotation.Annotation(annotation.DomainExtensions)] = fmt.Sprintf("*.example2.com:%s", options.TestConfig.CertID2)
+						newsvc, err = f.Client.KubeClient.PatchService(oldsvc, newsvc)
+						gomega.Expect(err).To(gomega.BeNil())
+						err = f.ExpectLoadBalancerEqual(newsvc)
+						gomega.Expect(err).To(gomega.BeNil())
+					})
+
+					ginkgo.It("domain extensions: extension certID2 -> none", func() {
+						oldsvc, err := f.Client.KubeClient.CreateServiceByAnno(map[string]string{
+							annotation.Annotation(annotation.ProtocolPort):     "https:443",
+							annotation.Annotation(annotation.CertID):           options.TestConfig.CertID,
+							annotation.Annotation(annotation.DomainExtensions): fmt.Sprintf("*.example.com:%s", options.TestConfig.CertID2),
+						})
+						gomega.Expect(err).To(gomega.BeNil())
+						err = f.ExpectLoadBalancerEqual(oldsvc)
+						gomega.Expect(err).To(gomega.BeNil())
+						newsvc := oldsvc.DeepCopy()
+						newsvc.Annotations[annotation.Annotation(annotation.DomainExtensions)] = ""
+						newsvc, err = f.Client.KubeClient.PatchService(oldsvc, newsvc)
+						gomega.Expect(err).To(gomega.BeNil())
+						err = f.ExpectLoadBalancerEqual(newsvc)
+						gomega.Expect(err).To(gomega.BeNil())
+					})
 				}
 				ginkgo.It("cert-id: no certID", func() {
 					svc, err := f.Client.KubeClient.CreateServiceByAnno(map[string]string{

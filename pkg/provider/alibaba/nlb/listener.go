@@ -3,12 +3,13 @@ package nlb
 import (
 	"context"
 	"fmt"
+	"strconv"
+
 	nlb "github.com/alibabacloud-go/nlb-20220430/v4/client"
 	"github.com/alibabacloud-go/tea/tea"
 	nlbmodel "k8s.io/cloud-provider-alibaba-cloud/pkg/model/nlb"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/util"
 	"k8s.io/klog/v2"
-	"strconv"
 )
 
 func (p *NLBProvider) ListNLBListeners(ctx context.Context, lbId string) ([]*nlbmodel.ListenerAttribute, error) {
@@ -111,13 +112,19 @@ func (p *NLBProvider) ListNLBListeners(ctx context.Context, lbId string) ([]*nlb
 }
 
 func (p *NLBProvider) CreateNLBListener(ctx context.Context, lbId string, lis *nlbmodel.ListenerAttribute) error {
-	_, err := p.CreateNLBListenerAsync(ctx, lbId, lis)
-	return err
+	jobId, err := p.CreateNLBListenerAsync(ctx, lbId, lis)
+	if err != nil {
+		return err
+	}
+	return p.WaitJobFinish("CreateListener", jobId)
 }
 
 func (p *NLBProvider) UpdateNLBListener(ctx context.Context, lis *nlbmodel.ListenerAttribute) error {
-	_, err := p.UpdateNLBListenerAsync(ctx, lis)
-	return err
+	jobId, err := p.UpdateNLBListenerAsync(ctx, lis)
+	if err != nil {
+		return err
+	}
+	return p.WaitJobFinish("UpdateListener", jobId)
 }
 
 func (p *NLBProvider) DeleteNLBListener(ctx context.Context, listenerId string) error {
@@ -125,7 +132,7 @@ func (p *NLBProvider) DeleteNLBListener(ctx context.Context, listenerId string) 
 	if err != nil {
 		return err
 	}
-	return p.waitJobFinish("DeleteListener", jobId)
+	return p.WaitJobFinish("DeleteListener", jobId)
 }
 
 func (p *NLBProvider) StartNLBListener(ctx context.Context, listenerId string) error {
@@ -205,6 +212,7 @@ func (p *NLBProvider) CreateNLBListenerAsync(ctx context.Context, lbId string, l
 		return "", fmt.Errorf("OpenAPI CreateListener resp is nil")
 	}
 	klog.V(5).Infof("RequestId: %s, API: %s", tea.StringValue(resp.Body.RequestId), "CreateListener")
+	lis.ListenerId = tea.StringValue(resp.Body.ListenerId)
 	return tea.StringValue(resp.Body.JobId), nil
 }
 

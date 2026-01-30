@@ -3,17 +3,22 @@ package clbv1
 import (
 	"context"
 	"fmt"
+	"time"
+
 	"github.com/alibabacloud-go/tea/tea"
 	"github.com/mohae/deepcopy"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	ctrlCfg "k8s.io/cloud-provider-alibaba-cloud/pkg/config"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/helper"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/service/reconcile/annotation"
 	svcCtx "k8s.io/cloud-provider-alibaba-cloud/pkg/controller/service/reconcile/context"
-	"time"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/service/reconcile/parallel"
+
+	"strconv"
+	"strings"
 
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/dryrun"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/util"
-	"strconv"
-	"strings"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -96,7 +101,39 @@ func (mgr *ListenerManager) Update(reqCtx *svcCtx.RequestContext, action UpdateA
 
 // Describe Describe all listeners at once
 func (mgr *ListenerManager) Describe(reqCtx *svcCtx.RequestContext, lbId string) ([]model.ListenerAttribute, error) {
-	return mgr.cloud.DescribeLoadBalancerListeners(reqCtx.Ctx, lbId)
+	listeners, err := mgr.cloud.DescribeLoadBalancerListeners(reqCtx.Ctx, lbId)
+	if err != nil {
+		return nil, err
+	}
+	if reqCtx.Anno.Get(annotation.DomainExtensions) != "" {
+		err = mgr.SetListenerDomainExtensions(reqCtx, lbId, listeners)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return listeners, nil
+}
+
+func (mgr *ListenerManager) SetListenerDomainExtensions(reqCtx *svcCtx.RequestContext, lbId string, listeners []model.ListenerAttribute) error {
+	var toDescribe []*model.ListenerAttribute
+	for i := range listeners {
+		if listeners[i].Protocol != model.HTTPS {
+			continue
+		}
+		toDescribe = append(toDescribe, &listeners[i])
+	}
+
+	errs := make([]error, len(toDescribe))
+	parallel.DoPiece(reqCtx.Ctx, ctrlCfg.ControllerCFG.MaxConcurrentActions, len(toDescribe), func(i int) {
+		reqCtx.Log.Info(fmt.Sprintf("describe listener %d domain extensions", toDescribe[i].ListenerPort))
+		exts, err := mgr.cloud.DescribeDomainExtensions(reqCtx.Ctx, lbId, toDescribe[i].ListenerPort)
+		if err != nil {
+			errs[i] = err
+			return
+		}
+		toDescribe[i].DomainExtensions = exts
+	})
+	return utilerrors.NewAggregate(errs)
 }
 
 func (mgr *ListenerManager) BuildLocalModel(reqCtx *svcCtx.RequestContext, mdl *model.LoadBalancer) error {
@@ -339,6 +376,14 @@ func (mgr *ListenerManager) buildListenerFromServicePort(reqCtx *svcCtx.RequestC
 		listener.HealthCheckSwitch = model.FlagType(reqCtx.Anno.Get(annotation.HealthCheckSwitch))
 	}
 
+	if reqCtx.Anno.Get(annotation.DomainExtensions) != "" {
+		exts, err := parseDomainExtensionsAnnotation(reqCtx.Anno.Get(annotation.DomainExtensions))
+		if err != nil {
+			return listener, fmt.Errorf("parse DomainExtensions error: %s", err.Error())
+		}
+		listener.DomainExtensions = exts
+	}
+
 	return listener, nil
 }
 
@@ -481,6 +526,15 @@ func (t *https) Create(reqCtx *svcCtx.RequestContext, action CreateAction) error
 		return fmt.Errorf("create https listener %d error: %s", action.listener.ListenerPort, err.Error())
 	}
 	reqCtx.Log.Info(fmt.Sprintf("create listener https [%d]", action.listener.ListenerPort))
+	if len(action.listener.DomainExtensions) != 0 {
+		for _, domain := range action.listener.DomainExtensions {
+			err := t.mgr.cloud.CreateDomainExtension(reqCtx.Ctx, action.lbId, action.listener.ListenerPort,
+				domain.Domain, domain.ServerCertificateId)
+			if err != nil {
+				return fmt.Errorf("create https listener %d domain extension %s error: %s", action.listener.ListenerPort, domain, err.Error())
+			}
+		}
+	}
 	return t.mgr.cloud.StartLoadBalancerListener(reqCtx.Ctx, action.lbId, action.listener.ListenerPort, action.listener.Protocol)
 
 }
@@ -492,6 +546,14 @@ func (t *https) Update(reqCtx *svcCtx.RequestContext, action UpdateAction) error
 			return fmt.Errorf("start https listener %d error: %s", action.local.ListenerPort, err.Error())
 		}
 	}
+
+	if reqCtx.Anno.Has(annotation.DomainExtensions) {
+		err := t.updateDomainExtensions(reqCtx, action.lbId, action.local, action.remote)
+		if err != nil {
+			return err
+		}
+	}
+
 	needUpdate, updateDetail, update := isNeedUpdate(reqCtx, action.local, action.remote)
 	if !needUpdate {
 		reqCtx.Log.Info(fmt.Sprintf("update listener: https [%d] did not change, skip", action.local.ListenerPort))
@@ -507,6 +569,50 @@ func (t *https) Update(reqCtx *svcCtx.RequestContext, action UpdateAction) error
 
 	ctx := context.WithValue(reqCtx.Ctx, dryrun.ContextMessage, updateDetail)
 	return t.mgr.cloud.SetLoadBalancerHTTPSListenerAttribute(ctx, action.lbId, update)
+}
+
+func (t *https) updateDomainExtensions(reqCtx *svcCtx.RequestContext, lbId string, local, remote model.ListenerAttribute) error {
+	toAdd, toDelete, toUpdate := diffDomainExtensions(local.DomainExtensions, remote.DomainExtensions)
+	if len(toAdd) != 0 || len(toDelete) != 0 || len(toUpdate) != 0 {
+		reqCtx.Log.Info(fmt.Sprintf("update listener: https [%d] domain extensions changed, need update", local.ListenerPort),
+			"toAdd", toAdd, "toDelete", toDelete, "toUpdate", toUpdate)
+	}
+
+	var errs []error
+	if len(toUpdate) != 0 {
+		for _, domain := range toUpdate {
+			err := t.mgr.cloud.SetDomainExtensionAttribute(reqCtx.Ctx, domain.DomainExtensionId, domain.ServerCertificateId)
+			if err != nil {
+				reqCtx.Log.Error(err, fmt.Sprintf("update https listener %d domain extension %s error: %s", local.ListenerPort, domain.DomainExtensionId, err.Error()))
+				errs = append(errs, err)
+			}
+		}
+	}
+	if len(toAdd) != 0 {
+		for _, domain := range toAdd {
+			err := t.mgr.cloud.CreateDomainExtension(reqCtx.Ctx, lbId, local.ListenerPort,
+				domain.Domain, domain.ServerCertificateId)
+			if err != nil {
+				reqCtx.Log.Error(err, fmt.Sprintf("add https listener %d domain extension %s error: %s", local.ListenerPort, domain, err.Error()))
+				errs = append(errs, err)
+			}
+		}
+	}
+	if len(toDelete) != 0 {
+		for _, domain := range toDelete {
+			if domain.DomainExtensionId == "" {
+				reqCtx.Log.Error(nil, fmt.Sprintf("https listener %d domain extension %s has no id, skip delete", local.ListenerPort, domain))
+				continue
+			}
+			err := t.mgr.cloud.DeleteDomainExtension(reqCtx.Ctx, domain.DomainExtensionId)
+			if err != nil {
+				reqCtx.Log.Error(err, fmt.Sprintf("delete https listener %d domain extension %s error: %s", local.ListenerPort, domain, err.Error()))
+				errs = append(errs, err)
+			}
+		}
+	}
+
+	return utilerrors.NewAggregate(errs)
 }
 
 func forwardPort(port string, target int) (int, error) {
@@ -1066,4 +1172,59 @@ func IsListenerACLIDsEqual(local, remote model.ListenerAttribute) bool {
 		}
 	}
 	return true
+}
+
+func parseDomainExtensionsAnnotation(anno string) ([]model.DomainExtension, error) {
+	if anno == "" {
+		return []model.DomainExtension{}, nil
+	}
+
+	// domain1:certId1,domain2:certId2
+	var ret []model.DomainExtension
+	exts := strings.Split(anno, ",")
+	for _, ext := range exts {
+		ext = strings.TrimSpace(ext)
+		splits := strings.Split(ext, ":")
+		if len(splits) != 2 {
+			return nil, fmt.Errorf("invalid domain extension %s", ext)
+		}
+		ret = append(ret, model.DomainExtension{
+			Domain:              splits[0],
+			ServerCertificateId: splits[1],
+		})
+	}
+	return ret, nil
+}
+
+func diffDomainExtensions(local, remote []model.DomainExtension) ([]model.DomainExtension, []model.DomainExtension, []model.DomainExtension) {
+	var toAdd, toDelete, toUpdate []model.DomainExtension
+	for _, l := range local {
+		found := false
+		for _, r := range remote {
+			if l.Domain == r.Domain {
+				found = true
+				if l.ServerCertificateId != r.ServerCertificateId {
+					l.ServerCertificateId = r.ServerCertificateId
+					toUpdate = append(toUpdate, l)
+				}
+				break
+			}
+		}
+		if !found {
+			toAdd = append(toAdd, l)
+		}
+	}
+	for _, r := range remote {
+		found := false
+		for _, l := range local {
+			if l.Domain == r.Domain {
+				found = true
+				break
+			}
+		}
+		if !found {
+			toDelete = append(toDelete, r)
+		}
+	}
+	return toAdd, toDelete, toUpdate
 }
