@@ -2,6 +2,8 @@ package clbv1
 
 import (
 	"fmt"
+	"sync"
+
 	v1 "k8s.io/api/core/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	ctrlcfg "k8s.io/cloud-provider-alibaba-cloud/pkg/config"
@@ -13,7 +15,6 @@ import (
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/model/tag"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/util"
 	"k8s.io/klog/v2"
-	"sync"
 )
 
 type vGroupApplyResult struct {

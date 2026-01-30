@@ -207,6 +207,7 @@ type ServerGroup struct {
 	PreserveClientIpEnabled *bool
 	HealthCheckConfig       *HealthCheckConfig
 	Servers                 []ServerGroupServer
+	InvalidServers          []ServerGroupServer
 	InitialServers          []ServerGroupServer
 	Tags                    []tag.Tag
 	AnyPortEnabled          bool
@@ -242,6 +243,7 @@ type ServerGroupServer struct {
 	Status        string
 
 	TargetRef *v1.ObjectReference
+	Invalid   bool
 }
 
 type ZoneMapping struct {

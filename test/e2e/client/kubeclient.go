@@ -4,9 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/alibabacloud-go/tea/tea"
 	"strings"
 	"time"
+
+	"github.com/alibabacloud-go/tea/tea"
 
 	appv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
@@ -313,6 +314,32 @@ func (client *KubeClient) CreateEndpointsWithNotExistNode() (*v1.Endpoints, erro
 		},
 	}
 	return client.CoreV1().Endpoints(Namespace).Create(context.TODO(), ep, metav1.CreateOptions{})
+}
+
+func (client *KubeClient) CreateEndpointsWithIPs(svc *v1.Service, ips []string) (*v1.Endpoints, error) {
+	subset := v1.EndpointSubset{}
+	for _, p := range svc.Spec.Ports {
+		subset.Ports = append(subset.Ports, v1.EndpointPort{
+			Name:     p.Name,
+			Port:     p.Port,
+			Protocol: p.Protocol,
+		})
+	}
+	for _, i := range ips {
+		subset.Addresses = append(subset.Addresses, v1.EndpointAddress{
+			IP: i,
+		})
+	}
+
+	ep := &v1.Endpoints{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      svc.Name,
+			Namespace: svc.Namespace,
+		},
+		Subsets: []v1.EndpointSubset{subset},
+	}
+
+	return client.CoreV1().Endpoints(svc.Namespace).Create(context.TODO(), ep, metav1.CreateOptions{})
 }
 
 // deployment
@@ -773,4 +800,28 @@ func (client *KubeClient) PatchNode(oldNode, newNode *v1.Node) (*v1.Node, error)
 	}
 	return client.CoreV1().Nodes().Patch(context.TODO(), oldNode.Name,
 		types.StrategicMergePatchType, patchBytes, metav1.PatchOptions{})
+}
+
+func (client *KubeClient) GetDeploymentPods() ([]v1.Pod, error) {
+	podList, err := client.CoreV1().Pods(Namespace).List(context.TODO(), metav1.ListOptions{
+		LabelSelector: "run=nginx",
+	})
+	if err != nil {
+		return nil, err
+	}
+	return podList.Items, nil
+}
+
+func (client *KubeClient) ListServiceEvents(svc *v1.Service, reason string) ([]v1.Event, error) {
+	selector := fmt.Sprintf("involvedObject.name=%s", svc.Name)
+	if reason != "" {
+		selector += fmt.Sprintf(",reason=%s", reason)
+	}
+	eventList, err := client.CoreV1().Events(Namespace).List(context.TODO(), metav1.ListOptions{
+		FieldSelector: selector,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return eventList.Items, nil
 }

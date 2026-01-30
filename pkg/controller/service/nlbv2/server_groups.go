@@ -141,22 +141,44 @@ func (mgr *ServerGroupManager) updateServerGroupENIBackendID(reqCtx *svcCtx.Requ
 	}
 
 	for _, sg := range sgs {
-		for i := range sg.Servers {
-			if sg.Servers[i].ServerType == nlbmodel.EniServerType {
-				eniid, ok := result[sg.Servers[i].ServerIp]
+		var servers, invalidServers []nlbmodel.ServerGroupServer
+		for _, s := range sg.Servers {
+			if s.ServerType == nlbmodel.EniServerType {
+				eniid, ok := result[s.ServerIp]
 				if !ok {
 					targetRef := "<nil>"
-					if sg.Servers[i].TargetRef != nil {
-						targetRef = fmt.Sprintf("%s/%s", sg.Servers[i].TargetRef.Namespace, sg.Servers[i].TargetRef.Name)
+					if s.TargetRef != nil {
+						targetRef = fmt.Sprintf("%s/%s", s.TargetRef.Namespace, s.TargetRef.Name)
 					}
-					return fmt.Errorf("can not find eniid for ip %s in vpc %s, target: %s, node: %s",
-						sg.Servers[i].ServerIp, mgr.vpcId, targetRef, pointer.StringDeref(sg.Servers[i].NodeName, "<nil>"))
+					nodeName := pointer.StringDeref(s.NodeName, "<nil>")
+					reqCtx.Log.Error(nil,
+						fmt.Sprintf("can not find eniid for ip %s in vpc %s, target: %s, node: %s", s.ServerIp, mgr.vpcId, targetRef, nodeName),
+						"ip", s.ServerId, "vpc", mgr.vpcId, "target", targetRef, "node", nodeName)
+					s.Invalid = true
 				}
-				sg.Servers[i].ServerId = eniid
+				s.ServerId = eniid
+			}
+			if !s.Invalid {
+				servers = append(servers, s)
+			} else {
+				invalidServers = append(invalidServers, s)
 			}
 		}
+		sg.Servers = servers
+		sg.InvalidServers = invalidServers
+		if len(invalidServers) > 0 {
+			var invalidIps []string
+			for _, s := range invalidServers {
+				invalidIps = append(invalidIps, s.ServerIp)
+			}
+			reqCtx.Recorder.Event(
+				reqCtx.Service,
+				v1.EventTypeWarning,
+				helper.SkipSyncBackends,
+				fmt.Sprintf("Not sync pods whose eni is invalid: %s", strings.Join(invalidIps, ",")),
+			)
+		}
 	}
-
 	return nil
 }
 
@@ -432,6 +454,19 @@ func (mgr *ServerGroupManager) updateServerGroupServers(reqCtx *svcCtx.RequestCo
 			errs = append(errs, err)
 		}
 	}
+
+	if len(local.InvalidServers) != 0 {
+		var ips []string
+		for _, b := range local.InvalidServers {
+			ips = append(ips, b.ServerIp)
+		}
+		reqCtx.Recorder.Event(reqCtx.Service, v1.EventTypeWarning, helper.SkipSyncBackends,
+			fmt.Sprintf("Skip delete and update servers to servergroup %s due to invalid servers: %s",
+				remote.ServerGroupName, strings.Join(ips, ",")),
+		)
+		return utilerrors.NewAggregate(errs)
+	}
+
 	if len(del) > 0 {
 		if err := mgr.BatchRemoveServers(reqCtx, remote, del); err != nil {
 			errs = append(errs, err)
