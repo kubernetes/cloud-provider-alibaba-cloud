@@ -3,6 +3,10 @@ package vpc
 import (
 	"context"
 	"fmt"
+	"net"
+	"strings"
+	"time"
+
 	"github.com/aliyun/alibaba-cloud-sdk-go/sdk/requests"
 	"github.com/aliyun/alibaba-cloud-sdk-go/services/vpc"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/model"
@@ -10,9 +14,6 @@ import (
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/base"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/util"
 	"k8s.io/klog/v2"
-	"net"
-	"strings"
-	"time"
 )
 
 type AssociatedInstanceType string
@@ -395,6 +396,22 @@ func (r *VPCProvider) DescribeVpcCIDRBlock(ctx context.Context, vpcId string, ip
 	}
 
 	return cidrs, err
+}
+
+func (r *VPCProvider) DescribeVswitchByID(ctx context.Context, vswId string) (vpc.VSwitch, error) {
+	req := vpc.CreateDescribeVSwitchesRequest()
+	req.VSwitchId = vswId
+
+	resp, err := r.auth.VPC.DescribeVSwitches(req)
+	if err != nil {
+		return vpc.VSwitch{}, err
+	}
+	klog.V(5).Infof("RequestId: %s, API: %s, vswId: %s",
+		resp.RequestId, "DescribeVSwitches", vswId)
+	if len(resp.VSwitches.VSwitch) == 0 {
+		return vpc.VSwitch{}, fmt.Errorf("vsw %s not found", vswId)
+	}
+	return resp.VSwitches.VSwitch[0], nil
 }
 
 // DescribeVSwitches used for e2etest

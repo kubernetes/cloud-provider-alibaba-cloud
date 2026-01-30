@@ -2,12 +2,13 @@ package vmock
 
 import (
 	"context"
+	"net"
+
 	servicesvpc "github.com/aliyun/alibaba-cloud-sdk-go/services/vpc"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/model"
 	prvd "k8s.io/cloud-provider-alibaba-cloud/pkg/provider"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/base"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/vpc"
-	"net"
 )
 
 func NewMockVPC(
@@ -15,6 +16,8 @@ func NewMockVPC(
 ) *MockVPC {
 	return &MockVPC{auth: auth}
 }
+
+var _ prvd.IVPC = &MockVPC{}
 
 type MockVPC struct {
 	auth *base.ClientMgr
@@ -63,6 +66,10 @@ func (m *MockVPC) DescribeEipAddresses(ctx context.Context, instanceType string,
 }
 
 func (m *MockVPC) DescribeVSwitches(ctx context.Context, vpcID string) ([]servicesvpc.VSwitch, error) {
+	panic("implement me")
+}
+
+func (m *MockVPC) DescribeVswitchByID(ctx context.Context, vswId string) (servicesvpc.VSwitch, error) {
 	panic("implement me")
 }
 

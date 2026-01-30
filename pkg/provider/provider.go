@@ -62,6 +62,7 @@ type IMetaData interface {
 	RoleName() (string, error)
 	RamRoleToken(role string) (RoleAuth, error)
 	VswitchID() (string, error)
+	VswitchIDs() ([]string, error)
 	// values from cloud config file
 	ClusterID() string
 }
@@ -113,6 +114,7 @@ type IVPC interface {
 	ListRouteTables(ctx context.Context, vpcID string) ([]string, error)
 	DescribeEipAddresses(ctx context.Context, instanceType string, instanceId string) ([]string, error)
 	DescribeVSwitches(ctx context.Context, vpcID string) ([]vpc.VSwitch, error)
+	DescribeVswitchByID(ctx context.Context, vswId string) (vpc.VSwitch, error)
 	DescribeVpcCIDRBlock(ctx context.Context, vpcId string, ipVersion model.AddressIPVersionType) ([]*net.IPNet, error)
 }
 

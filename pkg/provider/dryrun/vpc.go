@@ -3,11 +3,12 @@ package dryrun
 import (
 	"context"
 	"fmt"
+	"net"
+
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/model"
 	prvd "k8s.io/cloud-provider-alibaba-cloud/pkg/provider"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/base"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/vpc"
-	"net"
 
 	servicesvpc "github.com/aliyun/alibaba-cloud-sdk-go/services/vpc"
 )
@@ -18,6 +19,8 @@ func NewDryRunVPC(
 ) *DryRunVPC {
 	return &DryRunVPC{auth: auth, vpc: vpc}
 }
+
+var _ prvd.IVPC = &DryRunVPC{}
 
 type DryRunVPC struct {
 	auth        *base.ClientMgr
@@ -58,6 +61,10 @@ func (m *DryRunVPC) ListRouteTables(ctx context.Context, vpcID string) ([]string
 
 func (m *DryRunVPC) DescribeEipAddresses(ctx context.Context, instanceType string, instanceId string) ([]string, error) {
 	return m.vpc.DescribeEipAddresses(ctx, instanceType, instanceId)
+}
+
+func (m *DryRunVPC) DescribeVswitchByID(ctx context.Context, vswId string) (servicesvpc.VSwitch, error) {
+	return m.vpc.DescribeVswitchByID(ctx, vswId)
 }
 
 func (m *DryRunVPC) DescribeVSwitches(ctx context.Context, vpcID string) ([]servicesvpc.VSwitch, error) {

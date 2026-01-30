@@ -222,6 +222,14 @@ func (m *BaseMetaData) VswitchID() (string, error) {
 	return vswithcid.result[0], err
 }
 
+func (m *BaseMetaData) VswitchIDs() ([]string, error) {
+	vsw, err := m.VswitchID()
+	if err != nil {
+		return nil, err
+	}
+	return []string{vsw}, nil
+}
+
 func (m *BaseMetaData) EIPv4() (string, error) {
 	var eip ResultList
 	err := m.New().Resource(EIPV4).Do(&eip)
@@ -570,25 +578,42 @@ func (m *CfgMetaData) VswitchCIDRBlock() (string, error) {
 
 // zone1:vswitchid1,zone2:vswitch2
 func (m *CfgMetaData) VswitchID() (string, error) {
+	vswids, err := m.VswitchIDs()
+	if err != nil {
+		return "", err
+	}
+
+	if len(vswids) > 0 {
+		klog.Infof("use vsw %s as default", ctrlCfg.CloudCFG.Global.VswitchID)
+		return vswids[0], nil
+	}
+
+	return ctrlCfg.CloudCFG.Global.VswitchID, nil
+}
+
+func (m *CfgMetaData) VswitchIDs() ([]string, error) {
 	if ctrlCfg.CloudCFG.Global.VswitchID == "" {
 		// get vswitch id from meta server
-		return m.base.VswitchID()
+		return m.base.VswitchIDs()
 	}
 
 	vsws := strings.Split(ctrlCfg.CloudCFG.Global.VswitchID, ",")
 	if len(vsws) == 0 {
 		klog.Infof("parse vswitchid error, use vsw %s as default", ctrlCfg.CloudCFG.Global.VswitchID)
-		return ctrlCfg.CloudCFG.Global.VswitchID, nil
+		return []string{ctrlCfg.CloudCFG.Global.VswitchID}, nil
 	}
 
-	attr := strings.Split(vsws[0], ":")
-	if len(attr) == 2 {
-		klog.Infof("use vsw %s as default from %s", attr[1], ctrlCfg.CloudCFG.Global.VswitchID)
-		return attr[1], nil
+	var vswids []string
+	for _, v := range vsws {
+		attr := strings.Split(v, ":")
+		if len(attr) != 2 {
+			klog.Infof("malformed vsw id %q, skip", v)
+			continue
+		}
+		vswids = append(vswids, attr[1])
 	}
 
-	klog.Infof("use vsw %s as default", ctrlCfg.CloudCFG.Global.VswitchID)
-	return ctrlCfg.CloudCFG.Global.VswitchID, nil
+	return vswids, nil
 }
 
 func (m *CfgMetaData) EIPv4() (string, error) {
