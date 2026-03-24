@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
+
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -11,7 +13,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"strings"
 )
 
 const (
@@ -23,15 +24,14 @@ const (
 const (
 	LabelNodeRoleMaster = "node-role.kubernetes.io/master"
 	LabelNodeTypeVK     = "virtual-kubelet"
-	// LabelNodeExcludeBalancer specifies that the node should be
-	// exclude from loadbalancers created by a cloud provider.
-	LabelNodeExcludeBalancerDeprecated = "alpha.service-controller.kubernetes.io/exclude-balancer"
+	// LabelNodeExcludeBalancer specifies that the node should be excluded from loadbalancers created by a cloud provider.
 	LabelNodeExcludeBalancer           = v1.LabelNodeExcludeBalancers
+	LabelNodeExcludeBalancerDeprecated = "alpha.service-controller.kubernetes.io/exclude-balancer"
 	// ToBeDeletedTaint is a taint used by the CLuster Autoscaler before marking a node for deletion.
 	// Details in https://github.com/kubernetes/cloud-provider/blob/5bb9b27442bcb2613a9ca4046c89109de4435824/controllers/service/controller.go#L58
 	ToBeDeletedTaint = "ToBeDeletedByClusterAutoscaler"
 
-	// LabelNodeExcludeNodeDeprecated specifies that the node should be exclude from CCM
+	// LabelNodeExcludeNodeDeprecated specifies that the node should be excluded from CCM
 	LabelNodeExcludeNodeDeprecated = "service.beta.kubernetes.io/exclude-node"
 	LabelNodeExcludeNode           = "service.alibabacloud.com/exclude-node"
 

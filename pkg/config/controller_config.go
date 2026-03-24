@@ -117,7 +117,7 @@ func (cfg *ControllerConfig) Validate() error {
 		cfg.RouteReconciliationPeriod.Duration = 1 * time.Minute
 	}
 
-	if cfg.NodeReconcileBatchSize == 0 {
+	if cfg.NodeReconcileBatchSize <= 0 {
 		cfg.NodeReconcileBatchSize = 100
 	}
 

@@ -2,6 +2,7 @@ package vmock
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/alibabacloud-go/tea/tea"
@@ -262,7 +263,6 @@ func (m MockNLB) ListNLBServerGroups(ctx context.Context, tags []tag.Tag) ([]*nl
 }
 
 func (m MockNLB) GetNLBServerGroup(ctx context.Context, sgId string) (*nlbmodel.ServerGroup, error) {
-	// fixme: fixme
 	if sgId == "rsp-tcpssl-443" {
 		return &nlbmodel.ServerGroup{
 			ServerGroupId: "rsp-tcpssl-443",
@@ -281,6 +281,40 @@ func (m MockNLB) GetNLBServerGroup(ctx context.Context, sgId string) (*nlbmodel.
 				},
 			},
 		}, nil
+	}
+	if sgId == "sg-user-managed-id" {
+		return &nlbmodel.ServerGroup{
+			ServerGroupId: "sg-user-managed-id",
+			IsUserManaged: true,
+			Servers: []nlbmodel.ServerGroupServer{
+				{
+					ServerId:   "ecs-id-1",
+					ServerType: "Ecs",
+					Port:       80,
+					Weight:     100,
+				},
+			},
+		}, nil
+	}
+	if sgId == "sg-not-user-managed-id" {
+		return &nlbmodel.ServerGroup{
+			ServerGroupId: "sg-not-user-managed-id",
+			IsUserManaged: false,
+			Servers: []nlbmodel.ServerGroupServer{
+				{
+					ServerId:   "ecs-id-1",
+					ServerType: "Ecs",
+					Port:       80,
+					Weight:     100,
+				},
+			},
+		}, nil
+	}
+	if sgId == "sg-error-id" {
+		return nil, fmt.Errorf("mock error: cannot find server group")
+	}
+	if sgId == "sg-not-found-id" {
+		return nil, nil
 	}
 	return nil, nil
 }

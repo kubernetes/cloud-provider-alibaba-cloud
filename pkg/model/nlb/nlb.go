@@ -105,7 +105,7 @@ type NetworkLoadBalancer struct {
 }
 
 func (l *NetworkLoadBalancer) GetLoadBalancerId() string {
-	if l == nil {
+	if l == nil || l.LoadBalancerAttribute == nil {
 		return ""
 	}
 	return l.LoadBalancerAttribute.LoadBalancerId

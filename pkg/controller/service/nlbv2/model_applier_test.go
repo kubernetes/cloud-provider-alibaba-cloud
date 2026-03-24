@@ -2,15 +2,20 @@ package nlbv2
 
 import (
 	"context"
+	"testing"
+
 	"github.com/stretchr/testify/assert"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	ctrlCfg "k8s.io/cloud-provider-alibaba-cloud/pkg/config"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/helper"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/service/reconcile/annotation"
+	nlbmodel "k8s.io/cloud-provider-alibaba-cloud/pkg/model/nlb"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/model/tag"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/vmock"
-	"testing"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/util"
 )
 
 func TestModelApplier_Apply_CreateNLB(t *testing.T) {
@@ -267,4 +272,152 @@ func TestModelApplier_Apply_VServerGroup(t *testing.T) {
 	assert.Equal(t, nil, err)
 	_, err = recon.applier.Apply(reqCtx, localModel)
 	assert.Equal(t, nil, err)
+}
+
+func TestIsNLBReusable(t *testing.T) {
+	tests := []struct {
+		name     string
+		service  *v1.Service
+		tags     []tag.Tag
+		dnsName  string
+		expected bool
+		reason   string
+	}{
+		{
+			name: "reusable with no tags",
+			service: &v1.Service{
+				Status: v1.ServiceStatus{
+					LoadBalancer: v1.LoadBalancerStatus{},
+				},
+			},
+			tags:     []tag.Tag{},
+			dnsName:  "test-dns",
+			expected: true,
+			reason:   "",
+		},
+		{
+			name: "not reusable with TAGKEY tag",
+			service: &v1.Service{
+				Status: v1.ServiceStatus{
+					LoadBalancer: v1.LoadBalancerStatus{},
+				},
+			},
+			tags: []tag.Tag{
+				{
+					Key:   helper.TAGKEY,
+					Value: "cluster-id",
+				},
+			},
+			dnsName:  "test-dns",
+			expected: false,
+			reason:   "can not reuse loadbalancer created by kubernetes.",
+		},
+		{
+			name: "not reusable with ClusterTagKey tag",
+			service: &v1.Service{
+				Status: v1.ServiceStatus{
+					LoadBalancer: v1.LoadBalancerStatus{},
+				},
+			},
+			tags: []tag.Tag{
+				{
+					Key:   util.ClusterTagKey,
+					Value: "cluster-id",
+				},
+			},
+			dnsName:  "test-dns",
+			expected: false,
+			reason:   "can not reuse loadbalancer created by kubernetes.",
+		},
+		{
+			name: "reusable with matching dnsName",
+			service: &v1.Service{
+				Status: v1.ServiceStatus{
+					LoadBalancer: v1.LoadBalancerStatus{
+						Ingress: []v1.LoadBalancerIngress{
+							{
+								Hostname: "test-dns",
+							},
+						},
+					},
+				},
+			},
+			tags:     []tag.Tag{},
+			dnsName:  "test-dns",
+			expected: true,
+			reason:   "",
+		},
+		{
+			name: "not reusable with different dnsName",
+			service: &v1.Service{
+				Status: v1.ServiceStatus{
+					LoadBalancer: v1.LoadBalancerStatus{
+						Ingress: []v1.LoadBalancerIngress{
+							{
+								Hostname: "other-dns",
+							},
+						},
+					},
+				},
+			},
+			tags:     []tag.Tag{},
+			dnsName:  "test-dns",
+			expected: false,
+			reason:   "service has been associated with dnsname",
+		},
+		{
+			name: "reusable with multiple ingress matching dnsName",
+			service: &v1.Service{
+				Status: v1.ServiceStatus{
+					LoadBalancer: v1.LoadBalancerStatus{
+						Ingress: []v1.LoadBalancerIngress{
+							{
+								Hostname: "other-dns",
+							},
+							{
+								Hostname: "test-dns",
+							},
+						},
+					},
+				},
+			},
+			tags:     []tag.Tag{},
+			dnsName:  "test-dns",
+			expected: true,
+			reason:   "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			reusable, reason := isNLBReusable(tt.service, tt.tags, tt.dnsName)
+			assert.Equal(t, tt.expected, reusable)
+			if tt.reason != "" {
+				assert.Contains(t, reason, tt.reason)
+			}
+		})
+	}
+}
+
+func TestIsListenerPortMatch(t *testing.T) {
+	t.Run("ListenerPort match", func(t *testing.T) {
+		l := &nlbmodel.ListenerAttribute{ListenerPort: 80}
+		r := &nlbmodel.ListenerAttribute{ListenerPort: 80}
+		assert.True(t, isListenerPortMatch(l, r))
+	})
+	t.Run("ListenerPort mismatch", func(t *testing.T) {
+		l := &nlbmodel.ListenerAttribute{ListenerPort: 80}
+		r := &nlbmodel.ListenerAttribute{ListenerPort: 443}
+		assert.False(t, isListenerPortMatch(l, r))
+	})
+	t.Run("StartPort EndPort match", func(t *testing.T) {
+		l := &nlbmodel.ListenerAttribute{StartPort: 1000, EndPort: 2000}
+		r := &nlbmodel.ListenerAttribute{StartPort: 1000, EndPort: 2000}
+		assert.True(t, isListenerPortMatch(l, r))
+	})
+	t.Run("StartPort EndPort mismatch", func(t *testing.T) {
+		l := &nlbmodel.ListenerAttribute{StartPort: 1000, EndPort: 2000}
+		r := &nlbmodel.ListenerAttribute{StartPort: 1000, EndPort: 3000}
+		assert.False(t, isListenerPortMatch(l, r))
+	})
 }
