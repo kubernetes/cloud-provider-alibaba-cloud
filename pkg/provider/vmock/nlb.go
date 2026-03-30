@@ -392,7 +392,11 @@ func (m MockNLB) StartNLBListener(ctx context.Context, listenerId string) error 
 	return nil
 }
 
-func (m MockNLB) UpdateNLBSecurityGroupIds(ctx context.Context, mdl *nlbmodel.NetworkLoadBalancer, added, removed []string) error {
+func (m MockNLB) NLBJoinSecurityGroup(ctx context.Context, lbId string, sgIds []string) error {
+	return nil
+}
+
+func (m MockNLB) NLBLeaveSecurityGroup(ctx context.Context, lbId string, sgIds []string) error {
 	return nil
 }
 

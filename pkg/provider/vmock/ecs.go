@@ -2,8 +2,11 @@ package vmock
 
 import (
 	"context"
+
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/model"
+	ecsmodel "k8s.io/cloud-provider-alibaba-cloud/pkg/model/ecs"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/model/tag"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/base"
 )
@@ -82,5 +85,52 @@ func (d *MockECS) DescribeNetworkInterfacesByIDs(ids []string) ([]*prvd.EniAttri
 }
 
 func (d *MockECS) ModifyNetworkInterfaceSourceDestCheck(id string, enabled bool) error {
+	return nil
+}
+
+func (d *MockECS) AuthorizeSecurityGroup(ctx context.Context, sgId string, permissions []ecsmodel.SecurityGroupPermission) error {
+	return nil
+}
+
+func (d *MockECS) DescribeSecurityGroupAttribute(ctx context.Context, sgId string) (ecsmodel.SecurityGroup, error) {
+	return ecsmodel.SecurityGroup{
+		Name:        "mock-sg-name",
+		Type:        "normal",
+		Permissions: []ecsmodel.SecurityGroupPermission{},
+	}, nil
+}
+
+func (d *MockECS) DeleteSecurityGroup(ctx context.Context, sgId string) error {
+	return nil
+}
+
+func (d *MockECS) DescribeSecurityGroups(ctx context.Context, tags []tag.Tag) ([]ecsmodel.SecurityGroup, error) {
+	return []ecsmodel.SecurityGroup{
+		{
+			Name: "mock-sg-1",
+			Type: "normal",
+			Tags: tags,
+		},
+		{
+			Name: "mock-sg-2",
+			Type: "enterprise",
+			Tags: tags,
+		},
+	}, nil
+}
+
+func (d *MockECS) RevokeSecurityGroup(ctx context.Context, sgId string, permissions []ecsmodel.SecurityGroupPermission) error {
+	return nil
+}
+
+func (d *MockECS) ModifySecurityGroupAttribute(ctx context.Context, sgId string, sg *ecsmodel.SecurityGroup) error {
+	return nil
+}
+
+func (d *MockECS) CreateSecurityGroup(ctx context.Context, sg ecsmodel.SecurityGroup) error {
+	return nil
+}
+
+func (d *MockECS) ModifySecurityGroupRule(ctx context.Context, sgId string, permission ecsmodel.SecurityGroupPermission) error {
 	return nil
 }

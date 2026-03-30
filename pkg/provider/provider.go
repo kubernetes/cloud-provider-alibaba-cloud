@@ -10,6 +10,7 @@ import (
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/ingress/reconcile/tracking"
 
 	albmodel "k8s.io/cloud-provider-alibaba-cloud/pkg/model/alb"
+	ecsmodel "k8s.io/cloud-provider-alibaba-cloud/pkg/model/ecs"
 	nlbmodel "k8s.io/cloud-provider-alibaba-cloud/pkg/model/nlb"
 
 	"github.com/aliyun/alibaba-cloud-sdk-go/services/alb"
@@ -95,6 +96,14 @@ type IInstance interface {
 	DescribeNetworkInterfaces(vpcId string, ips []string, ipVersionType model.AddressIPVersionType) (map[string]string, error)
 	DescribeNetworkInterfacesByIDs(ids []string) ([]*EniAttribute, error)
 	ModifyNetworkInterfaceSourceDestCheck(id string, enabled bool) error
+	CreateSecurityGroup(ctx context.Context, sg ecsmodel.SecurityGroup) error
+	DescribeSecurityGroups(ctx context.Context, tag []tag.Tag) ([]ecsmodel.SecurityGroup, error)
+	DescribeSecurityGroupAttribute(ctx context.Context, sgId string) (ecsmodel.SecurityGroup, error)
+	DeleteSecurityGroup(ctx context.Context, sgId string) error
+	AuthorizeSecurityGroup(ctx context.Context, sgId string, permissions []ecsmodel.SecurityGroupPermission) error
+	RevokeSecurityGroup(ctx context.Context, sgId string, permissions []ecsmodel.SecurityGroupPermission) error
+	ModifySecurityGroupAttribute(ctx context.Context, sgId string, sg *ecsmodel.SecurityGroup) error
+	ModifySecurityGroupRule(ctx context.Context, sgId string, permission ecsmodel.SecurityGroupPermission) error
 }
 
 type RouteUpdateStatus struct {
@@ -238,7 +247,8 @@ type INLB interface {
 	UpdateNLB(ctx context.Context, mdl *nlbmodel.NetworkLoadBalancer) error
 	UpdateNLBAddressType(ctx context.Context, mdl *nlbmodel.NetworkLoadBalancer) error
 	UpdateNLBZones(ctx context.Context, mdl *nlbmodel.NetworkLoadBalancer) error
-	UpdateNLBSecurityGroupIds(ctx context.Context, mdl *nlbmodel.NetworkLoadBalancer, added, removed []string) error
+	NLBJoinSecurityGroup(ctx context.Context, lbId string, sgIds []string) error
+	NLBLeaveSecurityGroup(ctx context.Context, lbId string, sgIds []string) error
 	UpdateLoadBalancerProtection(ctx context.Context, lbId string, delCfg *nlbmodel.DeletionProtectionConfig, modCfg *nlbmodel.ModificationProtectionConfig) error
 	AttachCommonBandwidthPackageToLoadBalancer(ctx context.Context, lbId string, bandwidthPackageId string) error
 	DetachCommonBandwidthPackageFromLoadBalancer(ctx context.Context, lbId string, bandwidthPackageId string) error

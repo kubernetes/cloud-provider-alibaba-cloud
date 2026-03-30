@@ -9,6 +9,8 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/util/sets"
+	ctrlCfg "k8s.io/cloud-provider-alibaba-cloud/pkg/config"
+	ecsmodel "k8s.io/cloud-provider-alibaba-cloud/pkg/model/ecs"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/model/tag"
 
 	"github.com/alibabacloud-go/tea/tea"
@@ -265,6 +267,26 @@ func networkLoadBalancerAttrEqual(f *Framework, anno *annotation.AnnotationReque
 		}
 		if !util.IsStringSliceEqual(ids, nlb.SecurityGroupIds) {
 			return fmt.Errorf("expected nlb security group ids %v, got %v", ids, nlb.SecurityGroupIds)
+		}
+	}
+
+	// Verify associated security group is bound on the NLB when LoadBalancerSourceRanges are set
+	if len(svc.Spec.LoadBalancerSourceRanges) != 0 {
+		sgId := svc.Labels[helper.LabelSecurityGroupId]
+		if sgId == "" {
+			return fmt.Errorf("expected label %s to be set when LoadBalancerSourceRanges are non-empty",
+				helper.LabelSecurityGroupId)
+		}
+		found := false
+		for _, id := range nlb.SecurityGroupIds {
+			if id == sgId {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return fmt.Errorf("associated security group %s not found in NLB security group ids %v",
+				sgId, nlb.SecurityGroupIds)
 		}
 	}
 
@@ -1245,4 +1267,151 @@ func isAdditionalCertificateIdsEqual(a, b []string) bool {
 	aSet := sets.Set[string]{}
 	aSet.Insert(a...)
 	return aSet.HasAll(b...)
+}
+
+// FindNLBAssociatedSecurityGroup finds the security group associated with the NLB service
+// created by the loadBalancerSourceRanges feature.
+func (f *Framework) FindNLBAssociatedSecurityGroup(svc *v1.Service) (*ecsmodel.SecurityGroup, error) {
+	anno := annotation.NewAnnotationRequest(svc)
+	tags := []tag.Tag{
+		{
+			Key:   helper.TAGKEY,
+			Value: anno.GetDefaultLoadBalancerName(),
+		},
+	}
+	sgs, err := f.Client.CloudClient.DescribeSecurityGroups(context.TODO(), tags)
+	if err != nil {
+		return nil, err
+	}
+	if len(sgs) == 0 {
+		return nil, nil
+	}
+	if len(sgs) > 1 {
+		return nil, fmt.Errorf("expect 1 associated security group, got %d", len(sgs))
+	}
+	sg, err := f.Client.CloudClient.DescribeSecurityGroupAttribute(context.TODO(), sgs[0].ID)
+	if err != nil {
+		return nil, err
+	}
+	return &sg, nil
+}
+
+// ExpectNLBSourceRangesSecurityGroupEqual waits for and verifies that the security group
+// associated with the NLB service has the correct rules for the given source ranges.
+func (f *Framework) ExpectNLBSourceRangesSecurityGroupEqual(sourceRanges []string) error {
+	var retErr error
+	_ = wait.PollImmediate(10*time.Second, 3*time.Minute, func() (bool, error) {
+		svc, err := f.Client.KubeClient.GetService()
+		sg, err := f.FindNLBAssociatedSecurityGroup(svc)
+		if err != nil {
+			retErr = fmt.Errorf("find associated security group: %w", err)
+			return false, nil
+		}
+		if sg == nil {
+			retErr = fmt.Errorf("associated security group not found for service %s/%s", svc.Namespace, svc.Name)
+			return false, nil
+		}
+		if svc.Labels[helper.LabelSecurityGroupId] != sg.ID {
+			retErr = fmt.Errorf("expected security group label id %q, got %q", sg.ID, svc.Labels[helper.LabelSecurityGroupId])
+			return false, nil
+		}
+		if err := nlbSourceRangesSecurityGroupPermissionsEqual(svc, sg, sourceRanges); err != nil {
+			retErr = err
+			return false, nil
+		}
+		retErr = nil
+		return true, nil
+	})
+	return retErr
+}
+
+// ExpectNLBSourceRangesSecurityGroupDeleted waits for the associated security group to be
+// deleted and the LabelSecurityGroupId label to be removed from the service.
+func (f *Framework) ExpectNLBSourceRangesSecurityGroupDeleted(svc *v1.Service) error {
+	var retErr error
+	_ = wait.PollImmediate(10*time.Second, 3*time.Minute, func() (bool, error) {
+		sg, err := f.FindNLBAssociatedSecurityGroup(svc)
+		if err != nil {
+			retErr = fmt.Errorf("find associated security group: %w", err)
+			return false, nil
+		}
+		if sg != nil {
+			retErr = fmt.Errorf("expected associated security group to be deleted, but still exists: %s", sg.ID)
+			return false, nil
+		}
+		currentSvc, err := f.Client.KubeClient.GetService()
+		if err != nil {
+			retErr = fmt.Errorf("get service: %w", err)
+			return false, nil
+		}
+		if _, ok := currentSvc.Labels[helper.LabelSecurityGroupId]; ok {
+			retErr = fmt.Errorf("expected label %s to be removed, but still set to %q",
+				helper.LabelSecurityGroupId, currentSvc.Labels[helper.LabelSecurityGroupId])
+			return false, nil
+		}
+		retErr = nil
+		return true, nil
+	})
+	return retErr
+}
+
+// ExpectNLBExistsByID verifies that the NLB with the given ID still exists in the cloud.
+// Used to confirm preserve-on-delete behavior.
+func (f *Framework) ExpectNLBExistsByID(lbId string) error {
+	mdl := &nlbmodel.NetworkLoadBalancer{
+		LoadBalancerAttribute: &nlbmodel.LoadBalancerAttribute{
+			LoadBalancerId: lbId,
+		},
+	}
+	if err := f.Client.CloudClient.FindNLB(context.TODO(), mdl); err != nil {
+		return fmt.Errorf("find nlb %s: %w", lbId, err)
+	}
+	if mdl.LoadBalancerAttribute.LoadBalancerId == "" {
+		return fmt.Errorf("nlb %s was unexpectedly deleted", lbId)
+	}
+	return nil
+}
+
+// WaitForServiceDeleted polls until the service no longer exists in Kubernetes.
+func (f *Framework) WaitForServiceDeleted() error {
+	return wait.PollImmediate(5*time.Second, 2*time.Minute, func() (bool, error) {
+		_, err := f.Client.KubeClient.GetService()
+		if errors.IsNotFound(err) {
+			return true, nil
+		}
+		return false, nil
+	})
+}
+
+func nlbSourceRangesSecurityGroupPermissionsEqual(svc *v1.Service, sg *ecsmodel.SecurityGroup, sourceRanges []string) error {
+	expectedDesc := fmt.Sprintf("k8s.%s.%s.%s", svc.Namespace, svc.Name, ctrlCfg.CloudCFG.Global.ClusterID)
+
+	for _, cidr := range sourceRanges {
+		found := false
+		for _, perm := range sg.Permissions {
+			if perm.SourceCidrIp == cidr && strings.EqualFold(perm.Policy, "accept") {
+				found = true
+				if perm.Description != expectedDesc {
+					return fmt.Errorf("accept rule for %s: expected description %q, got %q", cidr, expectedDesc, perm.Description)
+				}
+				break
+			}
+		}
+		if !found {
+			return fmt.Errorf("accept rule for CIDR %s not found in security group %s", cidr, sg.ID)
+		}
+	}
+
+	dropFound := false
+	for _, perm := range sg.Permissions {
+		if perm.SourceCidrIp == "0.0.0.0/0" && strings.EqualFold(perm.Policy, "drop") {
+			dropFound = true
+			break
+		}
+	}
+	if !dropFound {
+		return fmt.Errorf("default drop rule for 0.0.0.0/0 not found in security group %s", sg.ID)
+	}
+
+	return nil
 }

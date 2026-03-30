@@ -9,6 +9,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/model"
+	ecsmodel "k8s.io/cloud-provider-alibaba-cloud/pkg/model/ecs"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/model/tag"
 )
 
@@ -102,6 +103,8 @@ type NetworkLoadBalancer struct {
 	Listeners                       []*ListenerAttribute
 	ServerGroups                    []*ServerGroup
 	ContainsPotentialReadyEndpoints bool
+	// AssociatedSecurityGroup is only for remote model
+	AssociatedSecurityGroup *ecsmodel.SecurityGroup
 }
 
 func (l *NetworkLoadBalancer) GetLoadBalancerId() string {
@@ -128,6 +131,9 @@ type LoadBalancerAttribute struct {
 	DeletionProtectionConfig     *DeletionProtectionConfig
 	ModificationProtectionConfig *ModificationProtectionConfig
 	PreserveOnDelete             bool
+	// SourceRanges and SourceRangesSecurityGroupId are only for local model
+	SourceRanges                []string
+	SourceRangesSecurityGroupId string
 
 	// auto-generated parameters
 	LoadBalancerId             string

@@ -5,9 +5,12 @@ import (
 	"encoding/json"
 	"fmt"
 
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/klog/v2"
 	"strings"
+
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	ecsmodel "k8s.io/cloud-provider-alibaba-cloud/pkg/model/ecs"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/model/tag"
+	"k8s.io/klog/v2"
 
 	v1 "k8s.io/api/core/v1"
 	ctrlCfg "k8s.io/cloud-provider-alibaba-cloud/pkg/config"
@@ -35,6 +38,267 @@ var _ prvd.IInstance = &ECSProvider{}
 
 type ECSProvider struct {
 	auth *base.ClientMgr
+}
+
+func (e *ECSProvider) AuthorizeSecurityGroup(ctx context.Context, sgId string, permissions []ecsmodel.SecurityGroupPermission) error {
+	if len(permissions) == 0 {
+		return nil
+	}
+
+	req := ecs.CreateAuthorizeSecurityGroupRequest()
+	req.SecurityGroupId = sgId
+	ecstPerms := make([]ecs.AuthorizeSecurityGroupPermissions, 0, len(permissions))
+	for _, perm := range permissions {
+		ecstPerms = append(ecstPerms, ecs.AuthorizeSecurityGroupPermissions{
+			Policy:                  perm.Policy,
+			Priority:                perm.Priority,
+			IpProtocol:              perm.IpProtocol,
+			SourceCidrIp:            perm.SourceCidrIp,
+			Ipv6SourceCidrIp:        perm.Ipv6SourceCidrIp,
+			SourceGroupId:           perm.SourceGroupId,
+			SourcePrefixListId:      perm.SourcePrefixListId,
+			PortRange:               perm.PortRange,
+			DestCidrIp:              perm.DestCidrIp,
+			Ipv6DestCidrIp:          perm.Ipv6DestCidrIp,
+			SourcePortRange:         perm.SourcePortRange,
+			SourceGroupOwnerAccount: perm.SourceGroupOwnerAccount,
+			NicType:                 perm.NicType,
+			Description:             perm.Description,
+		})
+	}
+	req.Permissions = &ecstPerms
+
+	resp, err := e.auth.ECS.AuthorizeSecurityGroup(req)
+	if err != nil {
+		klog.Errorf("calling AuthorizeSecurityGroup: securityGroupId=%s, message=[%s].", req.SecurityGroupId, err.Error())
+		return err
+	}
+	klog.V(5).Infof("RequestId: %s, API: %s, securityGroupId: %s", resp.RequestId, "AuthorizeSecurityGroup", req.SecurityGroupId)
+	return nil
+}
+
+func (e *ECSProvider) DescribeSecurityGroupAttribute(ctx context.Context, sgId string) (ecsmodel.SecurityGroup, error) {
+	req := ecs.CreateDescribeSecurityGroupAttributeRequest()
+	req.SecurityGroupId = sgId
+
+	resp, err := e.auth.ECS.DescribeSecurityGroupAttribute(req)
+	if err != nil {
+		klog.Errorf("calling DescribeSecurityGroupAttribute: securityGroupId=%s, message=[%s].", sgId, err.Error())
+		return ecsmodel.SecurityGroup{}, err
+	}
+	klog.V(5).Infof("RequestId: %s, API: %s, securityGroupId: %s", resp.RequestId, "DescribeSecurityGroupAttribute", sgId)
+
+	var permissions []ecsmodel.SecurityGroupPermission
+	for _, perm := range resp.Permissions.Permission {
+		permissions = append(permissions, ecsmodel.SecurityGroupPermission{
+			SourceGroupId:           perm.SourceGroupId,
+			Policy:                  perm.Policy,
+			Description:             perm.Description,
+			DestPrefixListName:      perm.DestPrefixListName,
+			Direction:               perm.Direction,
+			SourceCidrIp:            perm.SourceCidrIp,
+			SourcePrefixListName:    perm.SourcePrefixListName,
+			DestCidrIp:              perm.DestCidrIp,
+			Ipv6DestCidrIp:          perm.Ipv6DestCidrIp,
+			SourcePortRange:         perm.SourcePortRange,
+			Priority:                perm.Priority,
+			CreateTime:              perm.CreateTime,
+			Ipv6SourceCidrIp:        perm.Ipv6SourceCidrIp,
+			NicType:                 perm.NicType,
+			DestGroupId:             perm.DestGroupId,
+			SourceGroupName:         perm.SourceGroupName,
+			PortRange:               perm.PortRange,
+			DestGroupOwnerAccount:   perm.DestGroupOwnerAccount,
+			DestPrefixListId:        perm.DestPrefixListId,
+			IpProtocol:              perm.IpProtocol,
+			SecurityGroupRuleId:     perm.SecurityGroupRuleId,
+			DestGroupName:           perm.DestGroupName,
+			SourceGroupOwnerAccount: perm.SourceGroupOwnerAccount,
+			SourcePrefixListId:      perm.SourcePrefixListId,
+		})
+	}
+
+	return ecsmodel.SecurityGroup{
+		Name:              resp.SecurityGroupName,
+		ID:                resp.SecurityGroupId,
+		InnerAccessPolicy: resp.InnerAccessPolicy,
+		Description:       resp.Description,
+		Permissions:       permissions,
+	}, nil
+}
+
+func (e *ECSProvider) DeleteSecurityGroup(ctx context.Context, sgId string) error {
+	req := ecs.CreateDeleteSecurityGroupRequest()
+	req.SecurityGroupId = sgId
+
+	resp, err := e.auth.ECS.DeleteSecurityGroup(req)
+	if err != nil {
+		klog.Errorf("calling DeleteSecurityGroup: securityGroupId=%s, message=[%s].", sgId, err.Error())
+		return err
+	}
+	klog.V(5).Infof("RequestId: %s, API: %s, securityGroupId: %s", resp.RequestId, "DeleteSecurityGroup", sgId)
+	return nil
+}
+
+func (e *ECSProvider) DescribeSecurityGroups(ctx context.Context, tags []tag.Tag) ([]ecsmodel.SecurityGroup, error) {
+	req := ecs.CreateDescribeSecurityGroupsRequest()
+
+	if len(tags) > 0 {
+		ecstags := make([]ecs.DescribeSecurityGroupsTag, 0, len(tags))
+		for _, t := range tags {
+			ecstags = append(ecstags, ecs.DescribeSecurityGroupsTag{
+				Key:   t.Key,
+				Value: t.Value,
+			})
+		}
+		req.Tag = &ecstags
+	}
+
+	var result []ecsmodel.SecurityGroup
+	for {
+		resp, err := e.auth.ECS.DescribeSecurityGroups(req)
+		if err != nil {
+			klog.Errorf("calling DescribeSecurityGroups: message=[%s].", err.Error())
+			return nil, err
+		}
+		klog.V(5).Infof("RequestId: %s, API: %s", resp.RequestId, "DescribeSecurityGroups")
+
+		for _, sg := range resp.SecurityGroups.SecurityGroup {
+			result = append(result, ecsmodel.SecurityGroup{
+				ID:   sg.SecurityGroupId,
+				Name: sg.SecurityGroupName,
+				Type: sg.SecurityGroupType,
+				Tags: convertSecurityGroupTags(sg.Tags),
+			})
+		}
+
+		if resp.NextToken == "" {
+			break
+		}
+		req.NextToken = resp.NextToken
+	}
+
+	return result, nil
+}
+
+func convertSecurityGroupTags(tags ecs.TagsInDescribeSecurityGroups) []tag.Tag {
+	var result []tag.Tag
+	for _, t := range tags.Tag {
+		result = append(result, tag.Tag{
+			Key:   t.Key,
+			Value: t.Value,
+		})
+	}
+	return result
+}
+
+func (e *ECSProvider) CreateSecurityGroup(ctx context.Context, sg ecsmodel.SecurityGroup) error {
+	req := ecs.CreateCreateSecurityGroupRequest()
+	req.VpcId = sg.VpcID
+	req.SecurityGroupName = sg.Name
+	req.SecurityGroupType = sg.Type
+	req.Description = sg.Description
+	req.ResourceGroupId = sg.ResourceGroupID
+
+	if len(sg.Tags) > 0 {
+		ecstags := make([]ecs.CreateSecurityGroupTag, 0, len(sg.Tags))
+		for _, t := range sg.Tags {
+			ecstags = append(ecstags, ecs.CreateSecurityGroupTag{
+				Key:   t.Key,
+				Value: t.Value,
+			})
+		}
+		req.Tag = &ecstags
+	}
+
+	resp, err := e.auth.ECS.CreateSecurityGroup(req)
+	if err != nil {
+		klog.Errorf("calling CreateSecurityGroup: securityGroupName=%s, message=[%s].", sg.Name, err.Error())
+		return err
+	}
+	klog.V(5).Infof("RequestId: %s, API: %s, securityGroupId: %s", resp.RequestId, "CreateSecurityGroup", resp.SecurityGroupId)
+	return nil
+}
+
+func (e *ECSProvider) RevokeSecurityGroup(ctx context.Context, sgId string, permissions []ecsmodel.SecurityGroupPermission) error {
+	if len(permissions) == 0 {
+		return nil
+	}
+
+	req := ecs.CreateRevokeSecurityGroupRequest()
+	req.SecurityGroupId = sgId
+
+	ecstPerms := make([]ecs.RevokeSecurityGroupPermissions, 0, len(permissions))
+	for _, perm := range permissions {
+		ecstPerms = append(ecstPerms, ecs.RevokeSecurityGroupPermissions{
+			Policy:                  perm.Policy,
+			Priority:                perm.Priority,
+			IpProtocol:              perm.IpProtocol,
+			SourceCidrIp:            perm.SourceCidrIp,
+			Ipv6SourceCidrIp:        perm.Ipv6SourceCidrIp,
+			SourceGroupId:           perm.SourceGroupId,
+			SourcePrefixListId:      perm.SourcePrefixListId,
+			PortRange:               perm.PortRange,
+			DestCidrIp:              perm.DestCidrIp,
+			Ipv6DestCidrIp:          perm.Ipv6DestCidrIp,
+			SourcePortRange:         perm.SourcePortRange,
+			SourceGroupOwnerAccount: perm.SourceGroupOwnerAccount,
+			NicType:                 perm.NicType,
+			Description:             perm.Description,
+		})
+	}
+	req.Permissions = &ecstPerms
+
+	resp, err := e.auth.ECS.RevokeSecurityGroup(req)
+	if err != nil {
+		klog.Errorf("calling RevokeSecurityGroup: securityGroupId=%s, message=[%s].", req.SecurityGroupId, err.Error())
+		return err
+	}
+	klog.V(5).Infof("RequestId: %s, API: %s, securityGroupId: %s", resp.RequestId, "RevokeSecurityGroup", req.SecurityGroupId)
+	return nil
+}
+
+func (e *ECSProvider) ModifySecurityGroupAttribute(ctx context.Context, sgId string, sg *ecsmodel.SecurityGroup) error {
+	req := ecs.CreateModifySecurityGroupAttributeRequest()
+	req.SecurityGroupId = sgId
+	req.SecurityGroupName = sg.Name
+	req.Description = sg.Description
+
+	resp, err := e.auth.ECS.ModifySecurityGroupAttribute(req)
+	if err != nil {
+		klog.Errorf("calling ModifySecurityGroupAttribute: securityGroupId=%s, message=[%s].", sgId, err.Error())
+		return err
+	}
+	klog.V(5).Infof("RequestId: %s, API: %s, securityGroupId: %s", resp.RequestId, "ModifySecurityGroupAttribute", sgId)
+	return nil
+}
+
+func (e *ECSProvider) ModifySecurityGroupRule(ctx context.Context, sgId string, permission ecsmodel.SecurityGroupPermission) error {
+	req := ecs.CreateModifySecurityGroupRuleRequest()
+	req.SecurityGroupId = sgId
+	req.SecurityGroupRuleId = permission.SecurityGroupRuleId
+	req.Policy = permission.Policy
+	req.Description = permission.Description
+	req.Priority = permission.Priority
+	req.IpProtocol = permission.IpProtocol
+	req.PortRange = permission.PortRange
+	req.SourcePortRange = permission.SourcePortRange
+	req.SourceCidrIp = permission.SourceCidrIp
+	req.Ipv6SourceCidrIp = permission.Ipv6SourceCidrIp
+	req.DestCidrIp = permission.DestCidrIp
+	req.Ipv6DestCidrIp = permission.Ipv6DestCidrIp
+	req.SourceGroupId = permission.SourceGroupId
+	req.SourceGroupOwnerAccount = permission.SourceGroupOwnerAccount
+	req.NicType = permission.NicType
+	req.SourcePrefixListId = permission.SourcePrefixListId
+
+	resp, err := e.auth.ECS.ModifySecurityGroupRule(req)
+	if err != nil {
+		klog.Errorf("calling ModifySecurityGroupRule: securityGroupId=%s, message=[%s].", sgId, err.Error())
+		return err
+	}
+	klog.V(5).Infof("RequestId: %s, API: %s, securityGroupId: %s", resp.RequestId, "ModifySecurityGroupRule", sgId)
+	return nil
 }
 
 func (e *ECSProvider) ListInstances(ctx context.Context, ids []string) (map[string]*prvd.NodeAttribute, error) {

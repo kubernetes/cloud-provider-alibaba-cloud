@@ -39,17 +39,22 @@ func (d DryRunNLB) CreateNLBListenerAsync(ctx context.Context, lbId string, lis 
 	panic("implement me")
 }
 
-func (d DryRunNLB) UpdateNLBSecurityGroupIds(ctx context.Context, mdl *nlbmodel.NetworkLoadBalancer, added, removed []string) error {
-	//TODO implement me
-	panic("implement me")
-}
-
 func (d DryRunNLB) TagNLBResource(ctx context.Context, resourceId string, resourceType nlbmodel.TagResourceType, tags []tag.Tag) error {
 	//TODO implement me
 	panic("implement me")
 }
 
 func (d DryRunNLB) UntagNLBResources(ctx context.Context, resourceId string, resourceType nlbmodel.TagResourceType, tagKey []*string) error {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (d DryRunNLB) NLBJoinSecurityGroup(ctx context.Context, lbId string, sgIds []string) error {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (d DryRunNLB) NLBLeaveSecurityGroup(ctx context.Context, lbId string, sgIds []string) error {
 	//TODO implement me
 	panic("implement me")
 }

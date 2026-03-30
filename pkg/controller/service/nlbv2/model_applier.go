@@ -66,18 +66,36 @@ func (m *ModelApplier) Apply(reqCtx *svcCtx.RequestContext, local *nlbmodel.Netw
 	}
 
 	var tasks []func() error
+	var errs []error
 	if hashChangedOrDryRun {
-		err := m.applyLoadBalancer(reqCtx, local, remote)
+		err := m.prepareLoadBalancer(reqCtx, local, remote)
 		if err != nil {
 			return remote, fmt.Errorf("update nlb attribute error: %s", err.Error())
 		}
 
-		tasks = append(tasks, func() error {
-			if err := m.nlbMgr.Update(reqCtx, local, remote); err != nil {
-				return fmt.Errorf("update nlb attribute error: %s", err.Error())
+		if !helper.NeedDeleteLoadBalancer(reqCtx.Service) {
+			tasks = append(tasks, func() error {
+				if err := m.nlbMgr.Update(reqCtx, local, remote); err != nil {
+					return fmt.Errorf("update nlb attribute error: %s", err.Error())
+				}
+				return nil
+			})
+		}
+
+		if needFindAssociatedSecurityGroup(reqCtx.Service, local, remote) {
+			err := m.prepareAssociatedSecurityGroup(reqCtx, local, remote)
+			if err != nil {
+				reqCtx.Log.Error(err, "parepare source ranges error")
+				errs = append(errs, fmt.Errorf("update source ranges error: %s", err.Error()))
+			} else if local.LoadBalancerAttribute.SourceRangesSecurityGroupId != "" {
+				tasks = append(tasks, func() error {
+					if err := m.nlbMgr.UpdateAssociatedSecurityGroup(reqCtx, local, remote); err != nil {
+						return fmt.Errorf("update associated security group error: %s", err.Error())
+					}
+					return nil
+				})
 			}
-			return nil
-		})
+		}
 	}
 
 	var sgChannel chan serverGroupApplyResult
@@ -167,7 +185,7 @@ func (m *ModelApplier) buildRemoteModel(reqCtx *svcCtx.RequestContext, local, re
 	return parallel.Do(tasks...)
 }
 
-func (m *ModelApplier) applyLoadBalancer(reqCtx *svcCtx.RequestContext, local, remote *nlbmodel.NetworkLoadBalancer) error {
+func (m *ModelApplier) prepareLoadBalancer(reqCtx *svcCtx.RequestContext, local, remote *nlbmodel.NetworkLoadBalancer) error {
 	// delete nlb
 	if helper.NeedDeleteLoadBalancer(reqCtx.Service) {
 		err := m.deleteLoadBalancer(reqCtx, local, remote)
@@ -481,9 +499,37 @@ func buildActionsForListeners(reqCtx *svcCtx.RequestContext, local, remote *nlbm
 	return actions, nil
 }
 
+func (m *ModelApplier) prepareAssociatedSecurityGroup(reqCtx *svcCtx.RequestContext, local, remote *nlbmodel.NetworkLoadBalancer) error {
+	if !needFindAssociatedSecurityGroup(reqCtx.Service, local, remote) {
+		return nil
+	}
+	sg, err := m.nlbMgr.FindAssociatedSecurityGroup(reqCtx)
+	if err != nil {
+		return err
+	}
+	needCreateSecurityGroup := len(local.LoadBalancerAttribute.SourceRanges) != 0
+	if sg == nil && needCreateSecurityGroup {
+		err = m.nlbMgr.CreateAssociatedSecurityGroup(reqCtx, local)
+		if err != nil {
+			return err
+		}
+		sg, err = m.nlbMgr.FindAssociatedSecurityGroup(reqCtx)
+		if err != nil {
+			return err
+		}
+	}
+	if sg != nil {
+		remote.AssociatedSecurityGroup = sg
+		if len(local.LoadBalancerAttribute.SourceRanges) != 0 {
+			local.LoadBalancerAttribute.SourceRangesSecurityGroupId = remote.AssociatedSecurityGroup.ID
+		}
+	}
+	return nil
+}
+
 func (m *ModelApplier) cleanup(reqCtx *svcCtx.RequestContext, local, remote *nlbmodel.NetworkLoadBalancer) error {
-	var actions []serverGroupAction
 	// delete server groups
+	var actions []serverGroupAction
 	for _, r := range remote.ServerGroups {
 		found := false
 		for _, l := range local.ServerGroups {
@@ -529,8 +575,23 @@ func (m *ModelApplier) cleanup(reqCtx *svcCtx.RequestContext, local, remote *nlb
 			})
 		}
 	}
-
 	errs := m.sgMgr.ParallelUpdateServerGroups(reqCtx, actions, nil)
+
+	// delete associated security group
+	if len(local.LoadBalancerAttribute.SourceRanges) == 0 && remote.AssociatedSecurityGroup != nil {
+		if !local.LoadBalancerAttribute.PreserveOnDelete || !helper.NeedDeleteLoadBalancer(reqCtx.Service) {
+			reqCtx.Log.Info(fmt.Sprintf("delete associated security group [%s]",
+				remote.AssociatedSecurityGroup.ID))
+			err := m.nlbMgr.DeleteAssociatedSecurityGroup(reqCtx, remote)
+			if err != nil {
+				errs = append(errs, err)
+			} else {
+				remote.AssociatedSecurityGroup = nil
+			}
+		}
+		// Since there is no OpenAPI of security group to untag security group tags, we do nothing here
+	}
+
 	return utilerrors.NewAggregate(errs)
 }
 
@@ -575,4 +636,20 @@ func isListenerPortMatch(l, r *nlbmodel.ListenerAttribute) bool {
 		return l.ListenerPort == r.ListenerPort
 	}
 	return l.StartPort == r.StartPort && l.EndPort == r.EndPort
+}
+
+func needFindAssociatedSecurityGroup(service *v1.Service, local, remote *nlbmodel.NetworkLoadBalancer) bool {
+	if local.LoadBalancerAttribute.IsUserManaged {
+		return false
+	}
+	if len(local.LoadBalancerAttribute.SourceRanges) != 0 {
+		return true
+	}
+	if len(remote.LoadBalancerAttribute.SecurityGroupIds) != 0 {
+		return true
+	}
+	if service.Labels[helper.LabelSecurityGroupId] != "" {
+		return true
+	}
+	return false
 }
