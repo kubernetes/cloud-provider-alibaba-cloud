@@ -23,6 +23,8 @@ type iCreateServerGroupRequest interface {
 	GetDryRun() *bool
 	SetHealthCheckConfig(v *CreateServerGroupRequestHealthCheckConfig) *CreateServerGroupRequest
 	GetHealthCheckConfig() *CreateServerGroupRequestHealthCheckConfig
+	SetIpVersionAffinityMode(v string) *CreateServerGroupRequest
+	GetIpVersionAffinityMode() *string
 	SetPreserveClientIpEnabled(v bool) *CreateServerGroupRequest
 	GetPreserveClientIpEnabled() *bool
 	SetProtocol(v string) *CreateServerGroupRequest
@@ -101,7 +103,8 @@ type CreateServerGroupRequest struct {
 	// true
 	DryRun *bool `json:"DryRun,omitempty" xml:"DryRun,omitempty"`
 	// The configurations of health checks.
-	HealthCheckConfig *CreateServerGroupRequestHealthCheckConfig `json:"HealthCheckConfig,omitempty" xml:"HealthCheckConfig,omitempty" type:"Struct"`
+	HealthCheckConfig     *CreateServerGroupRequestHealthCheckConfig `json:"HealthCheckConfig,omitempty" xml:"HealthCheckConfig,omitempty" type:"Struct"`
+	IpVersionAffinityMode *string                                    `json:"IpVersionAffinityMode,omitempty" xml:"IpVersionAffinityMode,omitempty"`
 	// Specifies whether to enable client IP preservation. Valid values:
 	//
 	// 	- **true*	- (default)
@@ -244,6 +247,10 @@ func (s *CreateServerGroupRequest) GetHealthCheckConfig() *CreateServerGroupRequ
 	return s.HealthCheckConfig
 }
 
+func (s *CreateServerGroupRequest) GetIpVersionAffinityMode() *string {
+	return s.IpVersionAffinityMode
+}
+
 func (s *CreateServerGroupRequest) GetPreserveClientIpEnabled() *bool {
 	return s.PreserveClientIpEnabled
 }
@@ -315,6 +322,11 @@ func (s *CreateServerGroupRequest) SetHealthCheckConfig(v *CreateServerGroupRequ
 	return s
 }
 
+func (s *CreateServerGroupRequest) SetIpVersionAffinityMode(v string) *CreateServerGroupRequest {
+	s.IpVersionAffinityMode = &v
+	return s
+}
+
 func (s *CreateServerGroupRequest) SetPreserveClientIpEnabled(v bool) *CreateServerGroupRequest {
 	s.PreserveClientIpEnabled = &v
 	return s
@@ -361,7 +373,21 @@ func (s *CreateServerGroupRequest) SetVpcId(v string) *CreateServerGroupRequest 
 }
 
 func (s *CreateServerGroupRequest) Validate() error {
-	return dara.Validate(s)
+	if s.HealthCheckConfig != nil {
+		if err := s.HealthCheckConfig.Validate(); err != nil {
+			return err
+		}
+	}
+	if s.Tag != nil {
+		for _, item := range s.Tag {
+			if item != nil {
+				if err := item.Validate(); err != nil {
+					return err
+				}
+			}
+		}
+	}
+	return nil
 }
 
 type CreateServerGroupRequestHealthCheckConfig struct {

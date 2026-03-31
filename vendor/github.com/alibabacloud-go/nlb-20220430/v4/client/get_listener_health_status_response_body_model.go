@@ -108,7 +108,16 @@ func (s *GetListenerHealthStatusResponseBody) SetTotalCount(v int32) *GetListene
 }
 
 func (s *GetListenerHealthStatusResponseBody) Validate() error {
-	return dara.Validate(s)
+	if s.ListenerHealthStatus != nil {
+		for _, item := range s.ListenerHealthStatus {
+			if item != nil {
+				if err := item.Validate(); err != nil {
+					return err
+				}
+			}
+		}
+	}
+	return nil
 }
 
 type GetListenerHealthStatusResponseBodyListenerHealthStatus struct {
@@ -179,7 +188,16 @@ func (s *GetListenerHealthStatusResponseBodyListenerHealthStatus) SetServerGroup
 }
 
 func (s *GetListenerHealthStatusResponseBodyListenerHealthStatus) Validate() error {
-	return dara.Validate(s)
+	if s.ServerGroupInfos != nil {
+		for _, item := range s.ServerGroupInfos {
+			if item != nil {
+				if err := item.Validate(); err != nil {
+					return err
+				}
+			}
+		}
+	}
+	return nil
 }
 
 type GetListenerHealthStatusResponseBodyListenerHealthStatusServerGroupInfos struct {
@@ -239,7 +257,16 @@ func (s *GetListenerHealthStatusResponseBodyListenerHealthStatusServerGroupInfos
 }
 
 func (s *GetListenerHealthStatusResponseBodyListenerHealthStatusServerGroupInfos) Validate() error {
-	return dara.Validate(s)
+	if s.NonNormalServers != nil {
+		for _, item := range s.NonNormalServers {
+			if item != nil {
+				if err := item.Validate(); err != nil {
+					return err
+				}
+			}
+		}
+	}
+	return nil
 }
 
 type GetListenerHealthStatusResponseBodyListenerHealthStatusServerGroupInfosNonNormalServers struct {
@@ -331,7 +358,12 @@ func (s *GetListenerHealthStatusResponseBodyListenerHealthStatusServerGroupInfos
 }
 
 func (s *GetListenerHealthStatusResponseBodyListenerHealthStatusServerGroupInfosNonNormalServers) Validate() error {
-	return dara.Validate(s)
+	if s.Reason != nil {
+		if err := s.Reason.Validate(); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 type GetListenerHealthStatusResponseBodyListenerHealthStatusServerGroupInfosNonNormalServersReason struct {

@@ -108,7 +108,16 @@ func (s *ListServerGroupServersResponseBody) SetTotalCount(v int32) *ListServerG
 }
 
 func (s *ListServerGroupServersResponseBody) Validate() error {
-	return dara.Validate(s)
+	if s.Servers != nil {
+		for _, item := range s.Servers {
+			if item != nil {
+				if err := item.Validate(); err != nil {
+					return err
+				}
+			}
+		}
+	}
+	return nil
 }
 
 type ListServerGroupServersResponseBodyServers struct {

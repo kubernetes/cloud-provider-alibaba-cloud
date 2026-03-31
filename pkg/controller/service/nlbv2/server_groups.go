@@ -5,6 +5,7 @@ import (
 	"strconv"
 	"strings"
 
+	discovery "k8s.io/api/discovery/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -87,6 +88,13 @@ func (mgr *ServerGroupManager) BuildLocalModel(reqCtx *svcCtx.RequestContext, md
 		}
 		if candidates.AddressIPVersion == model.IPv6 {
 			sg.AddressIPVersion = string(model.DualStack)
+			// IPv6-only backends, should not enable affinity
+			sg.IpVersionAffinityMode = nlbmodel.IPVersionAffinityModeNonAffinity
+
+		}
+		if candidates.AddressIPVersion == model.DualStack {
+			sg.AddressIPVersion = string(model.DualStack)
+			sg.IpVersionAffinityMode = nlbmodel.IPVersionAffinityModeAffinity
 		}
 
 		if lis.ListenerPort != 0 {
@@ -111,7 +119,7 @@ func (mgr *ServerGroupManager) BuildLocalModel(reqCtx *svcCtx.RequestContext, md
 		containsPotentialReadyBackends = containsPotentialReadyBackends || cpr
 	}
 
-	err = mgr.updateServerGroupENIBackendID(reqCtx, sgs, candidates.AddressIPVersion)
+	err = mgr.updateServerGroupENIBackendID(reqCtx, sgs)
 	if err != nil {
 		return err
 	}
@@ -121,23 +129,39 @@ func (mgr *ServerGroupManager) BuildLocalModel(reqCtx *svcCtx.RequestContext, md
 	return nil
 }
 
-func (mgr *ServerGroupManager) updateServerGroupENIBackendID(reqCtx *svcCtx.RequestContext, sgs []*nlbmodel.ServerGroup, ipVersion model.AddressIPVersionType) error {
-	eniIPs := sets.Set[string]{}
+func (mgr *ServerGroupManager) updateServerGroupENIBackendID(reqCtx *svcCtx.RequestContext, sgs []*nlbmodel.ServerGroup) error {
+	v4EniIPs := sets.Set[string]{}
+	v6EniIPs := sets.Set[string]{}
 	for _, sg := range sgs {
 		for _, s := range sg.Servers {
 			if s.ServerType == nlbmodel.EniServerType {
-				eniIPs.Insert(s.ServerIp)
+				if s.IPVersion == model.IPv6 {
+					v6EniIPs.Insert(s.ServerIp)
+				} else {
+					v4EniIPs.Insert(s.ServerIp)
+				}
 			}
 		}
 	}
 
-	ips := eniIPs.UnsortedList()
-	if len(ips) == 0 {
-		return nil
-	}
-	result, err := mgr.cloud.DescribeNetworkInterfaces(mgr.vpcId, ips, ipVersion)
-	if err != nil {
-		return fmt.Errorf("call DescribeNetworkInterfaces: %s", err.Error())
+	result := make(map[string]string, v4EniIPs.Len()+v6EniIPs.Len())
+	for _, ipSet := range []struct {
+		set sets.Set[string]
+		ver model.AddressIPVersionType
+	}{
+		{v4EniIPs, model.IPv4},
+		{v6EniIPs, model.IPv6},
+	} {
+		if len(ipSet.set) == 0 {
+			continue
+		}
+		r, err := mgr.cloud.DescribeNetworkInterfaces(mgr.vpcId, ipSet.set.UnsortedList(), ipSet.ver)
+		if err != nil {
+			return fmt.Errorf("call DescribeNetworkInterfaces: %w", err)
+		}
+		for ip, eni := range r {
+			result[ip] = eni
+		}
 	}
 
 	for _, sg := range sgs {
@@ -325,6 +349,15 @@ func (mgr *ServerGroupManager) UpdateServerGroup(reqCtx *svcCtx.RequestContext, 
 			update.PreserveClientIpEnabled = local.PreserveClientIpEnabled
 			updateDetail += fmt.Sprintf("PreserveClientIpEnabled %v should be changed to %v;",
 				tea.BoolValue(remote.PreserveClientIpEnabled), tea.BoolValue(local.PreserveClientIpEnabled))
+		}
+		if strings.EqualFold(local.AddressIPVersion, string(model.DualStack)) {
+			if local.IpVersionAffinityMode != "" &&
+				!strings.EqualFold(local.IpVersionAffinityMode, remote.IpVersionAffinityMode) {
+				needUpdate = true
+				update.IpVersionAffinityMode = local.IpVersionAffinityMode
+				updateDetail += fmt.Sprintf("IpVersionAffinityMode %v should be changed to %v;",
+					remote.IpVersionAffinityMode, local.IpVersionAffinityMode)
+			}
 		}
 		// health check
 		if local.HealthCheckConfig != nil {
@@ -633,6 +666,7 @@ func (mgr *ServerGroupManager) setBackendsFromEndpoints(reqCtx *svcCtx.RequestCo
 				Port:        getBackendPort(backendPort, sg.AnyPortEnabled),
 				Description: sg.ServerGroupName,
 				TargetRef:   addr.TargetRef,
+				IPVersion:   model.IPv4,
 			})
 		}
 
@@ -674,6 +708,7 @@ func (mgr *ServerGroupManager) setBackendsFromEndpoints(reqCtx *svcCtx.RequestCo
 				Port:        getBackendPort(backendPort, sg.AnyPortEnabled),
 				Description: sg.ServerGroupName,
 				TargetRef:   addr.TargetRef,
+				IPVersion:   model.IPv4,
 			})
 		}
 	}
@@ -735,6 +770,7 @@ func (mgr *ServerGroupManager) setBackendsFromEndpointSlices(reqCtx *svcCtx.Requ
 						Port:        getBackendPort(backendPort, sg.AnyPortEnabled),
 						Description: sg.ServerGroupName,
 						TargetRef:   ep.TargetRef,
+						IPVersion:   addressTypeToIPVersionType(es.AddressType),
 					})
 					continue
 				}
@@ -780,6 +816,7 @@ func (mgr *ServerGroupManager) setBackendsFromEndpointSlices(reqCtx *svcCtx.Requ
 					Port:        getBackendPort(backendPort, sg.AnyPortEnabled),
 					Description: sg.ServerGroupName,
 					TargetRef:   ep.TargetRef,
+					IPVersion: addressTypeToIPVersionType(es.AddressType),
 				})
 			}
 		}
@@ -1360,4 +1397,16 @@ func isServerManagedByMyService(reqCtx *svcCtx.RequestContext, remote nlbmodel.S
 	return namedKey.ServiceName == reqCtx.Service.Name &&
 		namedKey.Namespace == reqCtx.Service.Namespace &&
 		namedKey.CID == base.CLUSTER_ID
+}
+
+func addressTypeToIPVersionType(t discovery.AddressType) model.AddressIPVersionType {
+	switch t {
+	case discovery.AddressTypeIPv4:
+		return model.IPv4
+	case discovery.AddressTypeIPv6:
+		return model.IPv6
+	default:
+		// Default IPv4 for unhandled address type, eg. FQDN
+		return model.IPv4
+	}
 }

@@ -242,8 +242,6 @@ type CreateListenerRequest struct {
 	//
 	// >  	- If you set **ListenerProtocol*	- to **TCPSSL**, you can associate the listener with server groups whose backend protocol is **TCP*	- and have **client IP preservation disabled**. You cannot associate the listener with server groups whose backend protocol is **TCP*	- and have **client IP preservation enabled*	- or server groups whose backend protocol is **UDP*	- or **TCP_UDP**.
 	//
-	// This parameter is required.
-	//
 	// example:
 	//
 	// sgp-ppdpc14gdm3x4o****
@@ -479,7 +477,21 @@ func (s *CreateListenerRequest) SetTag(v []*CreateListenerRequestTag) *CreateLis
 }
 
 func (s *CreateListenerRequest) Validate() error {
-	return dara.Validate(s)
+	if s.ProxyProtocolV2Config != nil {
+		if err := s.ProxyProtocolV2Config.Validate(); err != nil {
+			return err
+		}
+	}
+	if s.Tag != nil {
+		for _, item := range s.Tag {
+			if item != nil {
+				if err := item.Validate(); err != nil {
+					return err
+				}
+			}
+		}
+	}
+	return nil
 }
 
 type CreateListenerRequestProxyProtocolV2Config struct {

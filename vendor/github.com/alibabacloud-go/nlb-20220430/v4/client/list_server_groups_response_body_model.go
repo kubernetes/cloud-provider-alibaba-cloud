@@ -108,7 +108,16 @@ func (s *ListServerGroupsResponseBody) SetTotalCount(v int32) *ListServerGroupsR
 }
 
 func (s *ListServerGroupsResponseBody) Validate() error {
-	return dara.Validate(s)
+	if s.ServerGroups != nil {
+		for _, item := range s.ServerGroups {
+			if item != nil {
+				if err := item.Validate(); err != nil {
+					return err
+				}
+			}
+		}
+	}
+	return nil
 }
 
 type ListServerGroupsResponseBodyServerGroups struct {
@@ -155,7 +164,8 @@ type ListServerGroupsResponseBodyServerGroups struct {
 	// 200
 	ConnectionDrainTimeout *int32 `json:"ConnectionDrainTimeout,omitempty" xml:"ConnectionDrainTimeout,omitempty"`
 	// The configurations of health checks.
-	HealthCheck *ListServerGroupsResponseBodyServerGroupsHealthCheck `json:"HealthCheck,omitempty" xml:"HealthCheck,omitempty" type:"Struct"`
+	HealthCheck           *ListServerGroupsResponseBodyServerGroupsHealthCheck `json:"HealthCheck,omitempty" xml:"HealthCheck,omitempty" type:"Struct"`
+	IpVersionAffinityMode *string                                              `json:"IpVersionAffinityMode,omitempty" xml:"IpVersionAffinityMode,omitempty"`
 	// Indicates whether client IP preservation is enabled. Valid values:
 	//
 	// 	- **true**
@@ -286,6 +296,10 @@ func (s *ListServerGroupsResponseBodyServerGroups) GetHealthCheck() *ListServerG
 	return s.HealthCheck
 }
 
+func (s *ListServerGroupsResponseBodyServerGroups) GetIpVersionAffinityMode() *string {
+	return s.IpVersionAffinityMode
+}
+
 func (s *ListServerGroupsResponseBodyServerGroups) GetPreserveClientIpEnabled() *bool {
 	return s.PreserveClientIpEnabled
 }
@@ -368,6 +382,11 @@ func (s *ListServerGroupsResponseBodyServerGroups) SetHealthCheck(v *ListServerG
 	return s
 }
 
+func (s *ListServerGroupsResponseBodyServerGroups) SetIpVersionAffinityMode(v string) *ListServerGroupsResponseBodyServerGroups {
+	s.IpVersionAffinityMode = &v
+	return s
+}
+
 func (s *ListServerGroupsResponseBodyServerGroups) SetPreserveClientIpEnabled(v bool) *ListServerGroupsResponseBodyServerGroups {
 	s.PreserveClientIpEnabled = &v
 	return s
@@ -434,7 +453,21 @@ func (s *ListServerGroupsResponseBodyServerGroups) SetVpcId(v string) *ListServe
 }
 
 func (s *ListServerGroupsResponseBodyServerGroups) Validate() error {
-	return dara.Validate(s)
+	if s.HealthCheck != nil {
+		if err := s.HealthCheck.Validate(); err != nil {
+			return err
+		}
+	}
+	if s.Tags != nil {
+		for _, item := range s.Tags {
+			if item != nil {
+				if err := item.Validate(); err != nil {
+					return err
+				}
+			}
+		}
+	}
+	return nil
 }
 
 type ListServerGroupsResponseBodyServerGroupsHealthCheck struct {

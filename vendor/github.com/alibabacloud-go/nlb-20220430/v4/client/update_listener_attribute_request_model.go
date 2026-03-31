@@ -378,7 +378,12 @@ func (s *UpdateListenerAttributeRequest) SetServerGroupId(v string) *UpdateListe
 }
 
 func (s *UpdateListenerAttributeRequest) Validate() error {
-	return dara.Validate(s)
+	if s.ProxyProtocolV2Config != nil {
+		if err := s.ProxyProtocolV2Config.Validate(); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 type UpdateListenerAttributeRequestProxyProtocolV2Config struct {
