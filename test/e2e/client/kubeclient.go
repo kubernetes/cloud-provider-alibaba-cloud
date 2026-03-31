@@ -8,9 +8,9 @@ import (
 	"time"
 
 	"github.com/alibabacloud-go/tea/tea"
-
 	appv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
+	discovery "k8s.io/api/discovery/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -69,6 +69,7 @@ func (client *KubeClient) DefaultService() *v1.Service {
 }
 
 func (client *KubeClient) DefaultNLBService() *v1.Service {
+	ipFamilyPolicy := v1.IPFamilyPolicyPreferDualStack
 	return &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      Service,
@@ -93,6 +94,7 @@ func (client *KubeClient) DefaultNLBService() *v1.Service {
 			SessionAffinity:   v1.ServiceAffinityNone,
 			Selector:          map[string]string{"run": "nginx"},
 			LoadBalancerClass: tea.String(helper.NLBClass),
+			IPFamilyPolicy:    &ipFamilyPolicy,
 		},
 	}
 }
@@ -262,6 +264,16 @@ func (client *KubeClient) GetService() (*v1.Service, error) {
 
 func (client *KubeClient) GetEndpoint() (*v1.Endpoints, error) {
 	return client.CoreV1().Endpoints(Namespace).Get(context.TODO(), Service, metav1.GetOptions{})
+}
+
+func (client *KubeClient) GetEndpointSlices() ([]discovery.EndpointSlice, error) {
+	list, err := client.DiscoveryV1().EndpointSlices(Namespace).List(context.TODO(), metav1.ListOptions{
+		LabelSelector: "kubernetes.io/service-name=" + Service,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return list.Items, nil
 }
 
 func (client *KubeClient) CreateEndpointsWithoutNodeName() (*v1.Endpoints, error) {

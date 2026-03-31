@@ -816,7 +816,7 @@ func (mgr *ServerGroupManager) setBackendsFromEndpointSlices(reqCtx *svcCtx.Requ
 					Port:        getBackendPort(backendPort, sg.AnyPortEnabled),
 					Description: sg.ServerGroupName,
 					TargetRef:   ep.TargetRef,
-					IPVersion: addressTypeToIPVersionType(es.AddressType),
+					IPVersion:   addressTypeToIPVersionType(es.AddressType),
 				})
 			}
 		}
