@@ -210,6 +210,7 @@ type VServerGroup struct {
 	VGroupId                        string
 	VGroupName                      string
 	VGroupWeight                    *int
+	VGroupDefaultWeight             *int
 	Backends                        []BackendAttribute
 	InvalidBackends                 []BackendAttribute
 	InitialBackends                 []BackendAttribute

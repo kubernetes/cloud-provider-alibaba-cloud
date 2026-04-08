@@ -10,6 +10,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/model/tag"
+	"k8s.io/utils/pointer"
 
 	"github.com/alibabacloud-go/tea/tea"
 	v1 "k8s.io/api/core/v1"
@@ -371,9 +372,10 @@ func nlbVsgAttrEqual(f *Framework, reqCtx *svcCtx.RequestContext, remote *nlbmod
 	}
 	for _, port := range reqCtx.Service.Spec.Ports {
 		var (
-			groupId string
-			err     error
-			weight  *int
+			groupId       string
+			err           error
+			weight        *int
+			defaultWeight *int
 		)
 		proto, err := nlbListenerProtocol(reqCtx.Anno.Get(annotation.ProtocolPort), port)
 		if err != nil {
@@ -400,6 +402,14 @@ func nlbVsgAttrEqual(f *Framework, reqCtx *svcCtx.RequestContext, remote *nlbmod
 			}
 		}
 
+		if defaultWeightAnno := reqCtx.Anno.Get(annotation.DefaultWeight); defaultWeightAnno != "" {
+			w, err := strconv.Atoi(defaultWeightAnno)
+			if err != nil {
+				return fmt.Errorf("parse vgroup default weight annotation %s error: %s", defaultWeightAnno, err.Error())
+			}
+			defaultWeight = &w
+		}
+
 		found := false
 		for _, sg := range remote.ServerGroups {
 			if sg.ServerGroupName == name {
@@ -420,6 +430,7 @@ func nlbVsgAttrEqual(f *Framework, reqCtx *svcCtx.RequestContext, remote *nlbmod
 				sg.ServicePort = &port
 				sg.ServicePort.Protocol = v1.Protocol(proto)
 				sg.Weight = weight
+				sg.DefaultWeight = defaultWeight
 				if isOverride(reqCtx.Anno) && !isNLBServerGroupUsedByPort(sg, remote.Listeners, portRange) {
 					return fmt.Errorf("port %d do not use vgroup id: %s", port.Port, sg.ServerGroupId)
 				}
@@ -790,7 +801,7 @@ func buildServerGroupENIBackends(f *Framework, anno *annotation.AnnotationReques
 			}
 		}
 	}
-	return setServerGroupWeightBackends(helper.ENITrafficPolicy, ret, sg.Weight), nil
+	return setServerGroupWeightBackends(helper.ENITrafficPolicy, ret, sg.Weight, sg.DefaultWeight), nil
 }
 
 func buildServerGroupLocalBackends(anno *annotation.AnnotationRequest, ep *v1.Endpoints, nodes []v1.Node, sg *nlbmodel.ServerGroup) ([]nlbmodel.ServerGroupServer, error) {
@@ -841,7 +852,7 @@ func buildServerGroupLocalBackends(anno *annotation.AnnotationRequest, ep *v1.En
 		return nil, fmt.Errorf("build eci backends error: %s", err.Error())
 	}
 
-	return setServerGroupWeightBackends(helper.LocalTrafficPolicy, append(ret, eciBackends...), sg.Weight), nil
+	return setServerGroupWeightBackends(helper.LocalTrafficPolicy, append(ret, eciBackends...), sg.Weight, sg.DefaultWeight), nil
 }
 
 func buildServerGroupECIBackends(ep *v1.Endpoints, nodes []v1.Node, sg *nlbmodel.ServerGroup) ([]nlbmodel.ServerGroupServer, error) {
@@ -917,22 +928,23 @@ func buildServerGroupClusterBackends(anno *annotation.AnnotationRequest, ep *v1.
 	if err != nil {
 		return nil, fmt.Errorf("build eci backends error: %s", err.Error())
 	}
-	return setServerGroupWeightBackends(helper.ClusterTrafficPolicy, append(ret, eciBackends...), sg.Weight), nil
+	return setServerGroupWeightBackends(helper.ClusterTrafficPolicy, append(ret, eciBackends...), sg.Weight, sg.DefaultWeight), nil
 }
 
-func setServerGroupWeightBackends(mode helper.TrafficPolicy, backends []nlbmodel.ServerGroupServer, weight *int) []nlbmodel.ServerGroupServer {
+func setServerGroupWeightBackends(mode helper.TrafficPolicy, backends []nlbmodel.ServerGroupServer, weight *int, defaultWeight *int) []nlbmodel.ServerGroupServer {
 	// use default
 	if weight == nil {
-		return nlbPodNumberAlgorithm(mode, backends)
+		defaultWeight := pointer.IntDeref(defaultWeight, clbv1.DefaultServerWeight)
+		return nlbPodNumberAlgorithm(mode, backends, defaultWeight)
 	}
 
 	return nlbPodPercentAlgorithm(mode, backends, *weight)
 }
 
-func nlbPodNumberAlgorithm(mode helper.TrafficPolicy, backends []nlbmodel.ServerGroupServer) []nlbmodel.ServerGroupServer {
+func nlbPodNumberAlgorithm(mode helper.TrafficPolicy, backends []nlbmodel.ServerGroupServer, defaultWeight int) []nlbmodel.ServerGroupServer {
 	if mode == helper.ENITrafficPolicy || mode == helper.ClusterTrafficPolicy {
 		for i := range backends {
-			backends[i].Weight = clbv1.DefaultServerWeight
+			backends[i].Weight = int32(defaultWeight)
 		}
 		return backends
 	}

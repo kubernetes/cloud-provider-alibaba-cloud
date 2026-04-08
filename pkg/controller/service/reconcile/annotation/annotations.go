@@ -104,6 +104,7 @@ const (
 	BackendIPVersion  = AnnotationLoadBalancerPrefix + "backend-ip-version"         // BackendIPVersion backend ip version
 	RemoveUnscheduled = AnnotationLoadBalancerPrefix + "remove-unscheduled-backend" // RemoveUnscheduled remove unscheduled node from backends
 	VGroupWeight      = AnnotationLoadBalancerPrefix + "weight"                     // Weight total weight of the load balancer
+	DefaultWeight     = AnnotationLoadBalancerPrefix + "default-weight"             // Default Weight of the servers
 )
 
 // network load balancer
