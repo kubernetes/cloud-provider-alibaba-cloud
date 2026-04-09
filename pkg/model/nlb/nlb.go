@@ -213,6 +213,7 @@ type ServerGroup struct {
 	NamedKey      *SGNamedKey
 	ServicePort   *v1.ServicePort
 	Weight        *int
+	DefaultWeight *int
 
 	VPCId                   string
 	ServerGroupName         string

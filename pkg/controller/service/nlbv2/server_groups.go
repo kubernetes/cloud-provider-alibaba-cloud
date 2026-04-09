@@ -843,7 +843,7 @@ func (mgr *ServerGroupManager) buildENIBackends(reqCtx *svcCtx.RequestContext, c
 		return backends, err
 	}
 
-	return setWeightBackends(helper.ENITrafficPolicy, backends, sg.Weight), nil
+	return setWeightBackends(helper.ENITrafficPolicy, backends, sg.Weight, sg.DefaultWeight), nil
 }
 
 func (mgr *ServerGroupManager) buildLocalBackends(reqCtx *svcCtx.RequestContext, candidates *reconbackend.EndpointWithENI, initBackends []nlbmodel.ServerGroupServer,
@@ -918,7 +918,7 @@ func (mgr *ServerGroupManager) buildLocalBackends(reqCtx *svcCtx.RequestContext,
 	backends := append(ecsBackends, eciBackends...)
 
 	// 3. set weight
-	backends = setWeightBackends(helper.LocalTrafficPolicy, backends, sg.Weight)
+	backends = setWeightBackends(helper.LocalTrafficPolicy, backends, sg.Weight, sg.DefaultWeight)
 
 	// 4. remove duplicated ecs
 	return removeDuplicatedECS(backends), nil
@@ -1014,7 +1014,7 @@ func (mgr *ServerGroupManager) buildClusterBackends(
 
 	backends := append(ecsBackends, eciBackends...)
 
-	return setWeightBackends(helper.ClusterTrafficPolicy, backends, sg.Weight), nil
+	return setWeightBackends(helper.ClusterTrafficPolicy, backends, sg.Weight, sg.DefaultWeight), nil
 }
 
 func (mgr *ServerGroupManager) CleanupServerGroupTags(reqCtx *svcCtx.RequestContext, r *nlbmodel.ServerGroup) error {
@@ -1055,10 +1055,11 @@ func updateENIBackends(mgr *ServerGroupManager, backends []nlbmodel.ServerGroupS
 	return backends, nil
 }
 
-func setWeightBackends(mode helper.TrafficPolicy, backends []nlbmodel.ServerGroupServer, weight *int) []nlbmodel.ServerGroupServer {
+func setWeightBackends(mode helper.TrafficPolicy, backends []nlbmodel.ServerGroupServer, weight *int, defaultWeight *int) []nlbmodel.ServerGroupServer {
 	// use default
 	if weight == nil {
-		return podNumberAlgorithm(mode, backends)
+		defaultWeight := pointer.IntDeref(defaultWeight, DefaultServerWeight)
+		return podNumberAlgorithm(mode, backends, defaultWeight)
 	}
 
 	return podPercentAlgorithm(mode, backends, *weight)
@@ -1073,10 +1074,10 @@ func setWeightBackends(mode helper.TrafficPolicy, backends []nlbmodel.ServerGrou
 	ENIMode:      podWeight = 1
 	LocalMode:    node_weight = nodePodNum
 */
-func podNumberAlgorithm(mode helper.TrafficPolicy, backends []nlbmodel.ServerGroupServer) []nlbmodel.ServerGroupServer {
+func podNumberAlgorithm(mode helper.TrafficPolicy, backends []nlbmodel.ServerGroupServer, defaultWeight int) []nlbmodel.ServerGroupServer {
 	if mode == helper.ENITrafficPolicy || mode == helper.ClusterTrafficPolicy {
 		for i := range backends {
-			backends[i].Weight = DefaultServerWeight
+			backends[i].Weight = int32(defaultWeight)
 		}
 		return backends
 	}
@@ -1290,6 +1291,18 @@ func setServerGroupAttributeFromAnno(sg *nlbmodel.ServerGroup, anno *annotation.
 			}
 		}
 		sg.HealthCheckConfig = healthCheckConfig
+	}
+
+	if anno.Get(annotation.DefaultWeight) != "" {
+		w, err := strconv.Atoi(anno.Get(annotation.DefaultWeight))
+		if err != nil {
+			return fmt.Errorf("default weight parse error: [%s]", err.Error())
+		}
+		if w < 0 || w > 100 {
+			return fmt.Errorf("default weight must be integer in range [0,100] , got [%s]",
+				anno.Get(annotation.DefaultWeight))
+		}
+		sg.DefaultWeight = &w
 	}
 
 	if strings.EqualFold(anno.Get(annotation.IgnoreWeightUpdate), string(model.OnFlag)) {

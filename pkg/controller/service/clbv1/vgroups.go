@@ -533,6 +533,15 @@ func (mgr *VGroupManager) buildVGroupForServicePort(reqCtx *svcCtx.RequestContex
 		vg.IgnoreWeightUpdate = true
 	}
 
+	if reqCtx.Anno.Get(annotation.DefaultWeight) != "" {
+		w, err := strconv.Atoi(reqCtx.Anno.Get(annotation.DefaultWeight))
+		if err != nil || w < 0 || w > 100 {
+			return vg, false, fmt.Errorf("default weight must be integer in range [0,100] , got [%s]",
+				reqCtx.Anno.Get(annotation.DefaultWeight))
+		}
+		vg.VGroupDefaultWeight = &w
+	}
+
 	// build backends
 	var (
 		backends []model.BackendAttribute
@@ -795,7 +804,7 @@ func (mgr *VGroupManager) buildENIBackends(reqCtx *svcCtx.RequestContext, candid
 		return backends, err
 	}
 
-	return setWeightBackends(helper.ENITrafficPolicy, backends, vgroup.VGroupWeight), nil
+	return setWeightBackends(helper.ENITrafficPolicy, backends, vgroup.VGroupWeight, vgroup.VGroupDefaultWeight), nil
 }
 
 func (mgr *VGroupManager) buildLocalBackends(reqCtx *svcCtx.RequestContext, candidates *backend.EndpointWithENI,
@@ -855,7 +864,7 @@ func (mgr *VGroupManager) buildLocalBackends(reqCtx *svcCtx.RequestContext, cand
 	backends := append(ecsBackends, eciBackends...)
 
 	// 3. set weight
-	backends = setWeightBackends(helper.LocalTrafficPolicy, backends, vgroup.VGroupWeight)
+	backends = setWeightBackends(helper.LocalTrafficPolicy, backends, vgroup.VGroupWeight, vgroup.VGroupDefaultWeight)
 
 	// 4. remove duplicated ecs
 	return removeDuplicatedECS(backends), nil
@@ -937,7 +946,7 @@ func (mgr *VGroupManager) buildClusterBackends(reqCtx *svcCtx.RequestContext, ca
 
 	backends := append(ecsBackends, eciBackends...)
 
-	return setWeightBackends(helper.ClusterTrafficPolicy, backends, vgroup.VGroupWeight), nil
+	return setWeightBackends(helper.ClusterTrafficPolicy, backends, vgroup.VGroupWeight, vgroup.VGroupDefaultWeight), nil
 }
 
 func updateENIBackends(reqCtx *svcCtx.RequestContext, mgr *VGroupManager, backends []model.BackendAttribute, ipVersion model.AddressIPVersionType) ([]model.BackendAttribute, error) {
@@ -949,10 +958,11 @@ func updateENIBackends(reqCtx *svcCtx.RequestContext, mgr *VGroupManager, backen
 	return backends, nil
 }
 
-func setWeightBackends(mode helper.TrafficPolicy, backends []model.BackendAttribute, weight *int) []model.BackendAttribute {
+func setWeightBackends(mode helper.TrafficPolicy, backends []model.BackendAttribute, weight *int, defaultWeight *int) []model.BackendAttribute {
 	// use default
 	if weight == nil {
-		return podNumberAlgorithm(mode, backends)
+		defaultWeight := pointer.IntDeref(defaultWeight, DefaultServerWeight)
+		return podNumberAlgorithm(mode, backends, defaultWeight)
 	}
 
 	return podPercentAlgorithm(mode, backends, *weight)
@@ -967,10 +977,10 @@ func setWeightBackends(mode helper.TrafficPolicy, backends []model.BackendAttrib
 	ENIMode:      podWeight = 1
 	LocalMode:    node_weight = nodePodNum
 */
-func podNumberAlgorithm(mode helper.TrafficPolicy, backends []model.BackendAttribute) []model.BackendAttribute {
+func podNumberAlgorithm(mode helper.TrafficPolicy, backends []model.BackendAttribute, defaultWeight int) []model.BackendAttribute {
 	if mode == helper.ENITrafficPolicy || mode == helper.ClusterTrafficPolicy {
 		for i := range backends {
-			backends[i].Weight = DefaultServerWeight
+			backends[i].Weight = defaultWeight
 		}
 		return backends
 	}

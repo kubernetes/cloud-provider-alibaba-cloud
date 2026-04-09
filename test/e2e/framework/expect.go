@@ -915,6 +915,13 @@ func vsgAttrEqual(f *Framework, reqCtx *svcCtx.RequestContext, remote *model.Loa
 					}
 					vg.VGroupWeight = &w
 				}
+				if defaultWeight := reqCtx.Anno.Get(annotation.DefaultWeight); defaultWeight != "" {
+					w, err := strconv.Atoi(defaultWeight)
+					if err != nil {
+						return fmt.Errorf("parse default weight err")
+					}
+					vg.VGroupDefaultWeight = &w
+				}
 				equal, err := isBackendEqual(f.Client.KubeClient, reqCtx, vg)
 				if err != nil || !equal {
 					return fmt.Errorf("port %d and vgroup %s do not have equal backends, error: %v",
@@ -1098,7 +1105,7 @@ func buildENIBackends(anno *annotation.AnnotationRequest, ep *v1.Endpoints, vg m
 			})
 		}
 	}
-	return setWeightBackends(helper.ENITrafficPolicy, ret, vg.VGroupWeight), nil
+	return setWeightBackends(helper.ENITrafficPolicy, ret, vg.VGroupWeight, vg.VGroupDefaultWeight), nil
 }
 
 func buildLocalBackends(anno *annotation.AnnotationRequest, ep *v1.Endpoints, nodes []v1.Node, vg model.VServerGroup) ([]model.BackendAttribute, error) {
@@ -1134,7 +1141,7 @@ func buildLocalBackends(anno *annotation.AnnotationRequest, ep *v1.Endpoints, no
 		return nil, fmt.Errorf("build eci backends error: %s", err.Error())
 	}
 
-	return setWeightBackends(helper.LocalTrafficPolicy, append(ret, eciBackends...), vg.VGroupWeight), nil
+	return setWeightBackends(helper.LocalTrafficPolicy, append(ret, eciBackends...), vg.VGroupWeight, vg.VGroupDefaultWeight), nil
 }
 
 func buildClusterBackends(anno *annotation.AnnotationRequest, ep *v1.Endpoints, nodes []v1.Node, vg model.VServerGroup) ([]model.BackendAttribute, error) {
@@ -1159,7 +1166,7 @@ func buildClusterBackends(anno *annotation.AnnotationRequest, ep *v1.Endpoints, 
 	if err != nil {
 		return nil, fmt.Errorf("build eci backends error: %s", err.Error())
 	}
-	return setWeightBackends(helper.ClusterTrafficPolicy, append(ret, eciBackends...), vg.VGroupWeight), nil
+	return setWeightBackends(helper.ClusterTrafficPolicy, append(ret, eciBackends...), vg.VGroupWeight, vg.VGroupDefaultWeight), nil
 }
 
 func buildECIBackends(ep *v1.Endpoints, nodes []v1.Node, vg model.VServerGroup) ([]model.BackendAttribute, error) {
@@ -1190,19 +1197,20 @@ func buildECIBackends(ep *v1.Endpoints, nodes []v1.Node, vg model.VServerGroup) 
 	return ret, nil
 }
 
-func setWeightBackends(mode helper.TrafficPolicy, backends []model.BackendAttribute, weight *int) []model.BackendAttribute {
+func setWeightBackends(mode helper.TrafficPolicy, backends []model.BackendAttribute, weight *int, defaultWeight *int) []model.BackendAttribute {
 	// use default
 	if weight == nil {
-		return podNumberAlgorithm(mode, backends)
+		defaultWeight := pointer.IntDeref(defaultWeight, clbv1.DefaultServerWeight)
+		return podNumberAlgorithm(mode, backends, defaultWeight)
 	}
 
 	return podPercentAlgorithm(mode, backends, *weight)
 }
 
-func podNumberAlgorithm(mode helper.TrafficPolicy, backends []model.BackendAttribute) []model.BackendAttribute {
+func podNumberAlgorithm(mode helper.TrafficPolicy, backends []model.BackendAttribute, defaultWeight int) []model.BackendAttribute {
 	if mode == helper.ENITrafficPolicy || mode == helper.ClusterTrafficPolicy {
 		for i := range backends {
-			backends[i].Weight = clbv1.DefaultServerWeight
+			backends[i].Weight = defaultWeight
 		}
 		return backends
 	}

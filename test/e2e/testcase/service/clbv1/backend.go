@@ -654,6 +654,85 @@ func RunBackendTestCases(f *framework.Framework) {
 
 		})
 
+		ginkgo.Context("default-weight", func() {
+			ginkgo.It("cluster mode: default-weight: 50", func() {
+				oldSvc, err := f.Client.KubeClient.CreateServiceByAnno(map[string]string{
+					annotation.Annotation(annotation.DefaultWeight):    "50",
+					annotation.Annotation(annotation.OverrideListener): "false",
+					annotation.BackendType:                             model.ECSBackendType,
+				})
+				gomega.Expect(err).To(gomega.BeNil())
+				err = f.ExpectLoadBalancerEqual(oldSvc)
+				gomega.Expect(err).To(gomega.BeNil())
+			})
+			ginkgo.It("cluster mode: default-weight: 50 -> 80", func() {
+				oldSvc, err := f.Client.KubeClient.CreateServiceByAnno(map[string]string{
+					annotation.Annotation(annotation.DefaultWeight):    "50",
+					annotation.Annotation(annotation.OverrideListener): "false",
+					annotation.BackendType:                             model.ECSBackendType,
+				})
+				gomega.Expect(err).To(gomega.BeNil())
+				err = f.ExpectLoadBalancerEqual(oldSvc)
+				gomega.Expect(err).To(gomega.BeNil())
+
+				newSvc := oldSvc.DeepCopy()
+				newSvc.Annotations[annotation.Annotation(annotation.DefaultWeight)] = "80"
+				newSvc, err = f.Client.KubeClient.PatchService(oldSvc, newSvc)
+				gomega.Expect(err).To(gomega.BeNil())
+				err = f.ExpectLoadBalancerEqual(newSvc)
+				gomega.Expect(err).To(gomega.BeNil())
+			})
+			ginkgo.It("local mode: default-weight: 50 -> 80", func() {
+				svc := f.Client.KubeClient.DefaultService()
+				svc.Annotations = map[string]string{
+					annotation.Annotation(annotation.DefaultWeight):    "50",
+					annotation.Annotation(annotation.OverrideListener): "false",
+					annotation.BackendType:                             model.ECSBackendType,
+				}
+				svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyTypeLocal
+				oldSvc, err := f.Client.KubeClient.CreateService(svc)
+				gomega.Expect(err).To(gomega.BeNil())
+				err = f.ExpectLoadBalancerEqual(oldSvc)
+				gomega.Expect(err).To(gomega.BeNil())
+
+				newSvc := oldSvc.DeepCopy()
+				newSvc.Annotations[annotation.Annotation(annotation.DefaultWeight)] = "80"
+				newSvc, err = f.Client.KubeClient.PatchService(oldSvc, newSvc)
+				gomega.Expect(err).To(gomega.BeNil())
+				err = f.ExpectLoadBalancerEqual(newSvc)
+				gomega.Expect(err).To(gomega.BeNil())
+			})
+			if options.TestConfig.Network == options.Terway {
+				ginkgo.It("eni mode: default-weight: 50", func() {
+					oldSvc, err := f.Client.KubeClient.CreateServiceByAnno(map[string]string{
+						annotation.Annotation(annotation.OverrideListener): "false",
+						annotation.Annotation(annotation.DefaultWeight):    "50",
+						annotation.BackendType:                             model.ENIBackendType,
+					})
+					gomega.Expect(err).To(gomega.BeNil())
+					err = f.ExpectLoadBalancerEqual(oldSvc)
+					gomega.Expect(err).To(gomega.BeNil())
+				})
+			}
+			ginkgo.It("cluster mode: default-weight: 100 -> remove annotation", func() {
+				oldSvc, err := f.Client.KubeClient.CreateServiceByAnno(map[string]string{
+					annotation.Annotation(annotation.DefaultWeight):    "100",
+					annotation.Annotation(annotation.OverrideListener): "false",
+					annotation.BackendType:                             model.ECSBackendType,
+				})
+				gomega.Expect(err).To(gomega.BeNil())
+				err = f.ExpectLoadBalancerEqual(oldSvc)
+				gomega.Expect(err).To(gomega.BeNil())
+
+				newSvc := oldSvc.DeepCopy()
+				delete(newSvc.Annotations, annotation.Annotation(annotation.DefaultWeight))
+				newSvc, err = f.Client.KubeClient.PatchService(oldSvc, newSvc)
+				gomega.Expect(err).To(gomega.BeNil())
+				err = f.ExpectLoadBalancerEqual(newSvc)
+				gomega.Expect(err).To(gomega.BeNil())
+			})
+		})
+
 		ginkgo.Context("named port", func() {
 			ginkgo.It("named http port", func() {
 				svc := f.Client.KubeClient.DefaultService()
