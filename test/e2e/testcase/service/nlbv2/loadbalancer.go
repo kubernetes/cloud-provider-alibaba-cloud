@@ -894,4 +894,228 @@ func RunLoadBalancerTestCases(f *framework.Framework) {
 			}
 		})
 	}
+
+	ginkgo.Context("nlb source ranges", func() {
+		ginkgo.AfterEach(func() {
+			svc, _ := f.Client.KubeClient.GetService()
+			err := f.AfterEach()
+			gomega.Expect(err).To(gomega.BeNil())
+
+			if svc != nil {
+				sg, err := f.FindNLBAssociatedSecurityGroup(svc)
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(sg).To(gomega.BeNil())
+			}
+		})
+
+		ginkgo.It("create service with loadBalancerSourceRanges", func() {
+			svc := f.Client.KubeClient.DefaultNLBService()
+			svc.Annotations = map[string]string{
+				annotation.Annotation(annotation.ZoneMaps): options.TestConfig.NLBZoneMaps,
+			}
+			svc.Spec.LoadBalancerSourceRanges = []string{"192.168.0.0/16", "10.0.0.0/8"}
+			svc, err := f.Client.KubeClient.CreateService(svc)
+			gomega.Expect(err).To(gomega.BeNil())
+
+			err = f.ExpectNetworkLoadBalancerEqual(svc)
+			gomega.Expect(err).To(gomega.BeNil())
+
+			svc, err = f.Client.KubeClient.GetService()
+			gomega.Expect(err).To(gomega.BeNil())
+
+			err = f.ExpectNLBSourceRangesSecurityGroupEqual([]string{"192.168.0.0/16", "10.0.0.0/8"})
+			gomega.Expect(err).To(gomega.BeNil())
+		})
+
+		ginkgo.It("update loadBalancerSourceRanges", func() {
+			svc := f.Client.KubeClient.DefaultNLBService()
+			svc.Annotations = map[string]string{
+				annotation.Annotation(annotation.ZoneMaps): options.TestConfig.NLBZoneMaps,
+			}
+			svc.Spec.LoadBalancerSourceRanges = []string{"192.168.0.0/16", "10.0.0.0/8"}
+			svc, err := f.Client.KubeClient.CreateService(svc)
+			gomega.Expect(err).To(gomega.BeNil())
+
+			err = f.ExpectNetworkLoadBalancerEqual(svc)
+			gomega.Expect(err).To(gomega.BeNil())
+
+			svc, err = f.Client.KubeClient.GetService()
+			gomega.Expect(err).To(gomega.BeNil())
+
+			err = f.ExpectNLBSourceRangesSecurityGroupEqual([]string{"192.168.0.0/16", "10.0.0.0/8"})
+			gomega.Expect(err).To(gomega.BeNil())
+
+			newSvc := svc.DeepCopy()
+			newSvc.Spec.LoadBalancerSourceRanges = []string{"192.168.0.0/16", "172.16.0.0/12"}
+			newSvc, err = f.Client.KubeClient.PatchService(svc, newSvc)
+			gomega.Expect(err).To(gomega.BeNil())
+
+			err = f.ExpectNLBSourceRangesSecurityGroupEqual([]string{"192.168.0.0/16", "172.16.0.0/12"})
+			gomega.Expect(err).To(gomega.BeNil())
+		})
+
+		ginkgo.It("add loadBalancerSourceRanges to existing service", func() {
+			svc, err := f.Client.KubeClient.CreateNLBServiceByAnno(map[string]string{
+				annotation.Annotation(annotation.ZoneMaps): options.TestConfig.NLBZoneMaps,
+			})
+			gomega.Expect(err).To(gomega.BeNil())
+
+			err = f.ExpectNetworkLoadBalancerEqual(svc)
+			gomega.Expect(err).To(gomega.BeNil())
+
+			svc, err = f.Client.KubeClient.GetService()
+			gomega.Expect(err).To(gomega.BeNil())
+
+			newSvc := svc.DeepCopy()
+			newSvc.Spec.LoadBalancerSourceRanges = []string{"10.0.0.0/8"}
+			newSvc, err = f.Client.KubeClient.PatchService(svc, newSvc)
+			gomega.Expect(err).To(gomega.BeNil())
+
+			err = f.ExpectNLBSourceRangesSecurityGroupEqual([]string{"10.0.0.0/8"})
+			gomega.Expect(err).To(gomega.BeNil())
+		})
+
+		ginkgo.It("remove loadBalancerSourceRanges", func() {
+			svc := f.Client.KubeClient.DefaultNLBService()
+			svc.Annotations = map[string]string{
+				annotation.Annotation(annotation.ZoneMaps): options.TestConfig.NLBZoneMaps,
+			}
+			svc.Spec.LoadBalancerSourceRanges = []string{"192.168.0.0/16", "10.0.0.0/8"}
+			svc, err := f.Client.KubeClient.CreateService(svc)
+			gomega.Expect(err).To(gomega.BeNil())
+
+			err = f.ExpectNetworkLoadBalancerEqual(svc)
+			gomega.Expect(err).To(gomega.BeNil())
+
+			svc, err = f.Client.KubeClient.GetService()
+			gomega.Expect(err).To(gomega.BeNil())
+
+			err = f.ExpectNLBSourceRangesSecurityGroupEqual([]string{"192.168.0.0/16", "10.0.0.0/8"})
+			gomega.Expect(err).To(gomega.BeNil())
+
+			// Clear source ranges: SG should be deleted and LabelSecurityGroupId label removed
+			newSvc := svc.DeepCopy()
+			newSvc.Spec.LoadBalancerSourceRanges = nil
+			newSvc, err = f.Client.KubeClient.PatchService(svc, newSvc)
+			gomega.Expect(err).To(gomega.BeNil())
+
+			err = f.ExpectNLBSourceRangesSecurityGroupDeleted(newSvc)
+			gomega.Expect(err).To(gomega.BeNil())
+		})
+
+		ginkgo.It("delete service with loadBalancerSourceRanges", func() {
+			svc := f.Client.KubeClient.DefaultNLBService()
+			svc.Annotations = map[string]string{
+				annotation.Annotation(annotation.ZoneMaps): options.TestConfig.NLBZoneMaps,
+			}
+			svc.Spec.LoadBalancerSourceRanges = []string{"192.168.0.0/16"}
+			svc, err := f.Client.KubeClient.CreateService(svc)
+			gomega.Expect(err).To(gomega.BeNil())
+
+			err = f.ExpectNetworkLoadBalancerEqual(svc)
+			gomega.Expect(err).To(gomega.BeNil())
+
+			svc, err = f.Client.KubeClient.GetService()
+			gomega.Expect(err).To(gomega.BeNil())
+
+			err = f.ExpectNLBSourceRangesSecurityGroupEqual([]string{"192.168.0.0/16"})
+			gomega.Expect(err).To(gomega.BeNil())
+
+			sg, err := f.FindNLBAssociatedSecurityGroup(svc)
+			gomega.Expect(err).To(gomega.BeNil())
+			gomega.Expect(sg).NotTo(gomega.BeNil())
+			sgId := sg.ID
+
+			err = f.Client.KubeClient.DeleteService()
+			gomega.Expect(err).To(gomega.BeNil())
+
+			// NLB should be deleted along with the service
+			err = f.ExpectNetworkLoadBalancerDeleted(svc)
+			gomega.Expect(err).To(gomega.BeNil())
+
+			_ = f.Client.CloudClient.DeleteSecurityGroup(context.TODO(), sgId)
+		})
+
+		ginkgo.It("preserve-on-delete with loadBalancerSourceRanges", func() {
+			svc := f.Client.KubeClient.DefaultNLBService()
+			svc.Annotations = map[string]string{
+				annotation.Annotation(annotation.ZoneMaps):           options.TestConfig.NLBZoneMaps,
+				annotation.Annotation(annotation.PreserveLBOnDelete): "true",
+			}
+			svc.Spec.LoadBalancerSourceRanges = []string{"192.168.0.0/16"}
+			svc, err := f.Client.KubeClient.CreateService(svc)
+			gomega.Expect(err).To(gomega.BeNil())
+
+			err = f.ExpectNetworkLoadBalancerEqual(svc)
+			gomega.Expect(err).To(gomega.BeNil())
+
+			svc, remote, err := f.FindNetworkLoadBalancer()
+			gomega.Expect(err).To(gomega.BeNil())
+
+			err = f.ExpectNLBSourceRangesSecurityGroupEqual([]string{"192.168.0.0/16"})
+			gomega.Expect(err).To(gomega.BeNil())
+
+			lbId := remote.LoadBalancerAttribute.LoadBalancerId
+			sg, err := f.FindNLBAssociatedSecurityGroup(svc)
+			gomega.Expect(err).To(gomega.BeNil())
+			gomega.Expect(sg).NotTo(gomega.BeNil())
+			sgId := sg.ID
+
+			err = f.Client.KubeClient.DeleteService()
+			gomega.Expect(err).To(gomega.BeNil())
+
+			// Wait for the service to be fully removed from Kubernetes
+			err = f.WaitForServiceDeleted()
+			gomega.Expect(err).To(gomega.BeNil())
+
+			// NLB should still exist (preserved)
+			err = f.ExpectNLBExistsByID(lbId)
+			gomega.Expect(err).To(gomega.BeNil())
+
+			// SG should still exist
+			sg, err = f.FindNLBAssociatedSecurityGroup(svc)
+			gomega.Expect(err).To(gomega.BeNil())
+			gomega.Expect(sg).NotTo(gomega.BeNil())
+			gomega.Expect(sg.ID).To(gomega.Equal(sgId))
+
+			_ = f.DeleteNetworkLoadBalancer(lbId)
+			_ = f.Client.CloudClient.DeleteSecurityGroup(context.TODO(), sgId)
+		})
+
+		ginkgo.It("reuse security group on source ranges update", func() {
+			svc := f.Client.KubeClient.DefaultNLBService()
+			svc.Annotations = map[string]string{
+				annotation.Annotation(annotation.ZoneMaps): options.TestConfig.NLBZoneMaps,
+			}
+			svc.Spec.LoadBalancerSourceRanges = []string{"192.168.0.0/16"}
+			svc, err := f.Client.KubeClient.CreateService(svc)
+			gomega.Expect(err).To(gomega.BeNil())
+
+			err = f.ExpectNetworkLoadBalancerEqual(svc)
+			gomega.Expect(err).To(gomega.BeNil())
+
+			svc, _, err = f.FindNetworkLoadBalancer()
+			gomega.Expect(err).To(gomega.BeNil())
+
+			err = f.ExpectNLBSourceRangesSecurityGroupEqual([]string{"192.168.0.0/16"})
+			gomega.Expect(err).To(gomega.BeNil())
+
+			svc, err = f.Client.KubeClient.GetService()
+			gomega.Expect(err).To(gomega.BeNil())
+			sgIdBefore := svc.Labels[helper.LabelSecurityGroupId]
+			gomega.Expect(sgIdBefore).NotTo(gomega.BeEmpty())
+
+			newSvc := svc.DeepCopy()
+			newSvc.Spec.LoadBalancerSourceRanges = []string{"10.0.0.0/8"}
+			newSvc, err = f.Client.KubeClient.PatchService(svc, newSvc)
+			gomega.Expect(err).To(gomega.BeNil())
+
+			err = f.ExpectNLBSourceRangesSecurityGroupEqual([]string{"10.0.0.0/8"})
+			gomega.Expect(err).To(gomega.BeNil())
+
+			currentSvc, err := f.Client.KubeClient.GetService()
+			gomega.Expect(err).To(gomega.BeNil())
+			gomega.Expect(currentSvc.Labels[helper.LabelSecurityGroupId]).To(gomega.Equal(sgIdBefore))
+		})
+	})
 }

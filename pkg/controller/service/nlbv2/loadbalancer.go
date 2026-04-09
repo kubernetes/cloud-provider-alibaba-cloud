@@ -3,12 +3,14 @@ package nlbv2
 import (
 	"fmt"
 
+	"strings"
+
 	"github.com/aliyun/credentials-go/credentials/utils"
 	"github.com/mohae/deepcopy"
 	cmap "github.com/orcaman/concurrent-map"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/model"
-
-	"strings"
+	ecsmodel "k8s.io/cloud-provider-alibaba-cloud/pkg/model/ecs"
 
 	"github.com/alibabacloud-go/tea/tea"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
@@ -20,6 +22,11 @@ import (
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/model/tag"
 	prvd "k8s.io/cloud-provider-alibaba-cloud/pkg/provider"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/util"
+)
+
+const (
+	errorCodeConflict                       = "Conflict"
+	errorJoinSecurityGroupQuotaInsufficient = "QuotaInsufficient"
 )
 
 func NewNLBManager(cloud prvd.Provider) *NLBManager {
@@ -83,6 +90,15 @@ func (mgr *NLBManager) BuildLocalModel(reqCtx *svcCtx.RequestContext, mdl *nlbmo
 			return fmt.Errorf("ParameterInvalid, cross zone enabled flag error: %s", err.Error())
 		}
 		mdl.LoadBalancerAttribute.CrossZoneEnabled = tea.Bool(f == model.OnFlag)
+	}
+
+	if len(reqCtx.Service.Spec.LoadBalancerSourceRanges) != 0 {
+		if !mdl.LoadBalancerAttribute.IsUserManaged {
+			mdl.LoadBalancerAttribute.SourceRanges = reqCtx.Service.Spec.LoadBalancerSourceRanges
+		} else {
+			reqCtx.Recorder.Eventf(reqCtx.Service, v1.EventTypeWarning, helper.FeatureNotSupported,
+				"LoadBalancerSourceRanges is not supported for user-managed LB.")
+		}
 	}
 
 	return nil
@@ -211,31 +227,35 @@ func (mgr *NLBManager) Update(reqCtx *svcCtx.RequestContext, local, remote *nlbm
 		}
 	}
 
-	if local.LoadBalancerAttribute.SecurityGroupIds != nil &&
-		!util.IsStringSliceEqual(local.LoadBalancerAttribute.SecurityGroupIds, remote.LoadBalancerAttribute.SecurityGroupIds) {
+	localSecurityGroupIds := local.LoadBalancerAttribute.SecurityGroupIds
+	if local.LoadBalancerAttribute.SourceRangesSecurityGroupId != "" {
+		localSecurityGroupIds = append(localSecurityGroupIds, local.LoadBalancerAttribute.SourceRangesSecurityGroupId)
+	}
+	if (local.LoadBalancerAttribute.SecurityGroupIds != nil || remote.AssociatedSecurityGroup != nil || len(localSecurityGroupIds) != 0) &&
+		!util.IsStringSliceEqual(localSecurityGroupIds, remote.LoadBalancerAttribute.SecurityGroupIds) {
 		reqCtx.Log.Info(fmt.Sprintf("SecurityGroupIds changed from %v to %v",
-			remote.LoadBalancerAttribute.SecurityGroupIds, local.LoadBalancerAttribute.SecurityGroupIds))
+			remote.LoadBalancerAttribute.SecurityGroupIds, localSecurityGroupIds))
 		// get difference
-		var added, removed []string
+		var add, remove []string
 		newMap := map[string]struct{}{}
 		oldMap := map[string]struct{}{}
-		for _, i := range local.LoadBalancerAttribute.SecurityGroupIds {
+		for _, i := range localSecurityGroupIds {
 			newMap[i] = struct{}{}
 		}
 		for _, i := range remote.LoadBalancerAttribute.SecurityGroupIds {
 			oldMap[i] = struct{}{}
 			if _, ok := newMap[i]; !ok {
-				removed = append(removed, i)
+				remove = append(remove, i)
 			}
 		}
-		for _, i := range local.LoadBalancerAttribute.SecurityGroupIds {
+		for _, i := range localSecurityGroupIds {
 			if _, ok := oldMap[i]; !ok {
-				added = append(added, i)
+				add = append(add, i)
 			}
 		}
 
-		reqCtx.Log.Info(fmt.Sprintf("security groups added %v, removed %v", added, removed))
-		if err := mgr.cloud.UpdateNLBSecurityGroupIds(reqCtx.Ctx, local, added, removed); err != nil {
+		reqCtx.Log.Info(fmt.Sprintf("security groups add %v, remove %v", add, remove))
+		if err := mgr.UpdateSecurityGroupIds(reqCtx, local, add, remove); err != nil {
 			errs = append(errs, fmt.Errorf("update security group ids error: %s", err.Error()))
 		}
 	}
@@ -351,6 +371,196 @@ func (mgr *NLBManager) CleanupLoadBalancerTags(reqCtx *svcCtx.RequestContext, re
 	return mgr.cloud.UntagNLBResources(reqCtx.Ctx, remote.LoadBalancerAttribute.LoadBalancerId, nlbmodel.LoadBalancerTagType, removedTags)
 }
 
+func (mgr *NLBManager) UpdateSecurityGroupIds(reqCtx *svcCtx.RequestContext, mdl *nlbmodel.NetworkLoadBalancer, join, leave []string) error {
+	retryAdd := false
+	var errs []error
+	if len(join) != 0 {
+		err := helper.RetryOnErrorContains(errorCodeConflict, func() error {
+			return mgr.cloud.NLBJoinSecurityGroup(reqCtx.Ctx, mdl.LoadBalancerAttribute.LoadBalancerId, join)
+		})
+		if err != nil {
+			if strings.Contains(err.Error(), errorJoinSecurityGroupQuotaInsufficient) {
+				retryAdd = true
+			} else {
+				errs = append(errs, err)
+			}
+		}
+	}
+	if len(leave) != 0 {
+		err := mgr.cloud.NLBLeaveSecurityGroup(reqCtx.Ctx, mdl.LoadBalancerAttribute.LoadBalancerId, leave)
+		if err != nil {
+			errs = append(errs, err)
+		}
+	}
+	if retryAdd {
+		err := helper.RetryOnErrorContains(errorCodeConflict, func() error {
+			return mgr.cloud.NLBJoinSecurityGroup(reqCtx.Ctx, mdl.LoadBalancerAttribute.LoadBalancerId, join)
+		})
+		if err != nil {
+			errs = append(errs, err)
+		}
+	}
+	return utilerrors.NewAggregate(errs)
+}
+
+func (mgr *NLBManager) FindAssociatedSecurityGroup(reqCtx *svcCtx.RequestContext) (*ecsmodel.SecurityGroup, error) {
+	tags := []tag.Tag{
+		{
+			Key:   helper.TAGKEY,
+			Value: reqCtx.Anno.GetDefaultLoadBalancerName(),
+		},
+	}
+
+	sgs, err := mgr.cloud.DescribeSecurityGroups(reqCtx.Ctx, tags)
+	if err != nil {
+		return &ecsmodel.SecurityGroup{}, err
+	}
+
+	if len(sgs) == 0 {
+		return nil, nil
+	}
+	if len(sgs) > 1 {
+		return nil, fmt.Errorf("find associated security group error: expect 1, got %d", len(sgs))
+	}
+	if sgs[0].ID == "" {
+		return nil, fmt.Errorf("find associated security group error: sg id is empty")
+	}
+	sg, err := mgr.cloud.DescribeSecurityGroupAttribute(reqCtx.Ctx, sgs[0].ID)
+	if err != nil {
+		return nil, err
+	}
+
+	return &sg, nil
+}
+
+func (mgr *NLBManager) CreateAssociatedSecurityGroup(reqCtx *svcCtx.RequestContext, mdl *nlbmodel.NetworkLoadBalancer) error {
+	tags := []tag.Tag{
+		{
+			Key:   helper.TAGKEY,
+			Value: reqCtx.Anno.GetDefaultLoadBalancerName(),
+		},
+		{
+			Key:   util.ClusterTagKey,
+			Value: ctrlCfg.CloudCFG.Global.ClusterID,
+		},
+	}
+
+	vpcId := ctrlCfg.CloudCFG.Global.VpcID
+	if mdl.LoadBalancerAttribute.VpcId != "" {
+		vpcId = mdl.LoadBalancerAttribute.VpcId
+	}
+	rgId := ctrlCfg.CloudCFG.Global.ResourceGroupID
+	if mdl.LoadBalancerAttribute.ResourceGroupId != "" {
+		rgId = mdl.LoadBalancerAttribute.ResourceGroupId
+	}
+
+	sg := ecsmodel.SecurityGroup{
+		Name:            fmt.Sprintf("k8s-nlb-%s", reqCtx.Anno.GetDefaultLoadBalancerName()),
+		Description:     getSecurityGroupRuleDescription(reqCtx.Service),
+		Type:            ecsmodel.SecurityGroupTypeEnterprise,
+		VpcID:           vpcId,
+		ResourceGroupID: rgId,
+		Permissions:     buildSecurityGroupPermissionsFromSourceRanges(reqCtx, mdl.LoadBalancerAttribute.SourceRanges),
+		Tags:            tags,
+	}
+
+	if err := mgr.cloud.CreateSecurityGroup(reqCtx.Ctx, sg); err != nil {
+		return fmt.Errorf("error to create security group for nlb, svc [%s], err: %w",
+			util.Key(reqCtx.Anno.Service), err)
+	}
+
+	return nil
+}
+
+func (mgr *NLBManager) UpdateAssociatedSecurityGroup(reqCtx *svcCtx.RequestContext, local, remote *nlbmodel.NetworkLoadBalancer) error {
+	var errs []error
+	if local.LoadBalancerAttribute.SourceRangesSecurityGroupId == "" || remote.AssociatedSecurityGroup == nil {
+		return nil
+	}
+
+	needUpdate := false
+	update := deepcopy.Copy(remote.AssociatedSecurityGroup).(*ecsmodel.SecurityGroup)
+	desc := getSecurityGroupRuleDescription(reqCtx.Service)
+	if update.Description != desc {
+		needUpdate = true
+		update.Description = desc
+	}
+	if update.Name != getSecurityGroupName(reqCtx) {
+		needUpdate = true
+		update.Name = getSecurityGroupName(reqCtx)
+	}
+
+	if needUpdate {
+		if err := mgr.cloud.ModifySecurityGroupAttribute(reqCtx.Ctx, update.ID, update); err != nil {
+			errs = append(errs, err)
+		}
+	}
+
+	if err := mgr.updateAssociatedSecurityGroupRules(reqCtx, local, remote); err != nil {
+		errs = append(errs, err)
+	}
+
+	return utilerrors.NewAggregate(errs)
+}
+
+func (mgr *NLBManager) DeleteAssociatedSecurityGroup(reqCtx *svcCtx.RequestContext, remote *nlbmodel.NetworkLoadBalancer) error {
+	if remote.AssociatedSecurityGroup == nil || remote.AssociatedSecurityGroup.ID == "" {
+		return nil
+	}
+	if err := mgr.cloud.DeleteSecurityGroup(reqCtx.Ctx, remote.AssociatedSecurityGroup.ID); err != nil {
+		return fmt.Errorf("error to delete associated security group, sgId: %s, svc: %s, err: %w",
+			remote.AssociatedSecurityGroup.ID, remote.NamespacedName, err)
+	}
+	return nil
+}
+
+func (mgr *NLBManager) updateAssociatedSecurityGroupRules(reqCtx *svcCtx.RequestContext, local, remote *nlbmodel.NetworkLoadBalancer) error {
+	if local.LoadBalancerAttribute.SourceRangesSecurityGroupId == "" || remote.AssociatedSecurityGroup == nil {
+		return nil
+	}
+
+	localGroups := buildSecurityGroupPermissionsFromSourceRanges(reqCtx, local.LoadBalancerAttribute.SourceRanges)
+	toAdd, toDelete, toUpdate := diffAssociatedSecurityGroupPermissions(reqCtx, localGroups, remote.AssociatedSecurityGroup.Permissions)
+
+	if len(toAdd) != 0 || len(toDelete) != 0 || len(toUpdate) != 0 {
+		reqCtx.Log.Info("security group rules changed, need to update", "toAdd", toAdd, "toDelete", toDelete, "toUpdate", toUpdate)
+	}
+	retryAdd := false
+	var errs []error
+	if len(toAdd) != 0 {
+		err := mgr.cloud.AuthorizeSecurityGroup(reqCtx.Ctx, local.LoadBalancerAttribute.SourceRangesSecurityGroupId, toAdd)
+		if err != nil {
+			if strings.Contains(err.Error(), "AuthorizationLimitExceed") {
+				// quota exceeded, retry after delete
+				retryAdd = true
+			} else {
+				errs = append(errs, err)
+			}
+		}
+	}
+	if len(toUpdate) != 0 {
+		for _, u := range toUpdate {
+			err := mgr.cloud.ModifySecurityGroupRule(reqCtx.Ctx, local.LoadBalancerAttribute.SourceRangesSecurityGroupId, u)
+			if err != nil {
+				errs = append(errs, err)
+			}
+		}
+	}
+	if len(toDelete) != 0 {
+		err := mgr.cloud.RevokeSecurityGroup(reqCtx.Ctx, local.LoadBalancerAttribute.SourceRangesSecurityGroupId, toDelete)
+		if err != nil {
+			errs = append(errs, err)
+		}
+	}
+	if retryAdd {
+		err := mgr.cloud.AuthorizeSecurityGroup(reqCtx.Ctx, local.LoadBalancerAttribute.SourceRangesSecurityGroupId, toAdd)
+		if err != nil {
+			errs = append(errs, err)
+		}
+	}
+	return utilerrors.NewAggregate(errs)
+}
+
 func updateBandwidthPackageId(mgr *NLBManager, reqCtx *svcCtx.RequestContext, local, remote *nlbmodel.NetworkLoadBalancer) error {
 	// local not set, return
 	if local.LoadBalancerAttribute.BandwidthPackageId == nil {
@@ -453,4 +663,78 @@ func parseZoneMappings(zoneMaps string) ([]nlbmodel.ZoneMapping, error) {
 		return nil, fmt.Errorf("ZoneMapping format error, expect [zone-a:vsw-id-1,zone-b:vsw-id-2], got %s", zoneMaps)
 	}
 	return ret, nil
+}
+
+func buildSecurityGroupPermissionsFromSourceRanges(reqCtx *svcCtx.RequestContext, sourceRanges []string) []ecsmodel.SecurityGroupPermission {
+	var permissions []ecsmodel.SecurityGroupPermission
+	description := getSecurityGroupRuleDescription(reqCtx.Service)
+	for _, sourceRange := range sourceRanges {
+		permissions = append(permissions, ecsmodel.SecurityGroupPermission{
+			Policy:       ecsmodel.SecurityGroupPolicyAccept,
+			SourceCidrIp: sourceRange,
+			Priority:     "1",
+			IpProtocol:   ecsmodel.SecurityGroupIpProtocolAll,
+			PortRange:    "-1/-1",
+			Description:  description,
+		})
+	}
+	// add default drop policy
+	permissions = append(permissions, ecsmodel.SecurityGroupPermission{
+		Policy:       ecsmodel.SecurityGroupPolicyDrop,
+		SourceCidrIp: "0.0.0.0/0",
+		Priority:     "100",
+		IpProtocol:   ecsmodel.SecurityGroupIpProtocolAll,
+		PortRange:    "-1/-1",
+		Description:  description,
+	})
+
+	return permissions
+}
+
+func diffAssociatedSecurityGroupPermissions(reqCtx *svcCtx.RequestContext, local, remote []ecsmodel.SecurityGroupPermission) ([]ecsmodel.SecurityGroupPermission, []ecsmodel.SecurityGroupPermission, []ecsmodel.SecurityGroupPermission) {
+	var toAdd, toDelete, toUpdate []ecsmodel.SecurityGroupPermission
+	for _, l := range local {
+		found := false
+		for _, r := range remote {
+			if l.SourceCidrIp == r.SourceCidrIp && strings.EqualFold(l.Policy, r.Policy) {
+				found = true
+				if l.Description != r.Description ||
+					l.Priority != r.Priority ||
+					!strings.EqualFold(l.IpProtocol, r.IpProtocol) ||
+					l.PortRange != r.PortRange {
+					l.SecurityGroupRuleId = r.SecurityGroupRuleId
+					toUpdate = append(toUpdate, l)
+				}
+				break
+			}
+		}
+		if !found {
+			toAdd = append(toAdd, l)
+		}
+	}
+	desc := getSecurityGroupRuleDescription(reqCtx.Service)
+	for _, r := range remote {
+		found := false
+		if r.Description != desc {
+			reqCtx.Log.Info("security group rule is not managed by cluster, skip", "rule", r.SecurityGroupRuleId)
+			continue
+		}
+		for _, l := range local {
+			if r.SourceCidrIp == l.SourceCidrIp && strings.EqualFold(r.Policy, l.Policy) {
+				found = true
+				break
+			}
+		}
+		if !found {
+			toDelete = append(toDelete, r)
+		}
+	}
+	return toAdd, toDelete, toUpdate
+}
+
+func getSecurityGroupName(reqCtx *svcCtx.RequestContext) string {
+	return fmt.Sprintf("k8s-nlb-%s", reqCtx.Anno.GetDefaultLoadBalancerName())
+}
+func getSecurityGroupRuleDescription(svc *v1.Service) string {
+	return fmt.Sprintf("k8s.%s.%s.%s", svc.Namespace, svc.Name, ctrlCfg.CloudCFG.Global.ClusterID)
 }

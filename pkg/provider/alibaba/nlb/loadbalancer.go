@@ -370,36 +370,63 @@ func (p *NLBProvider) UpdateNLBZones(ctx context.Context, mdl *nlbmodel.NetworkL
 	return nil
 }
 
-func (p *NLBProvider) UpdateNLBSecurityGroupIds(ctx context.Context, mdl *nlbmodel.NetworkLoadBalancer, added, removed []string) error {
-	// leave first, then join
-	if len(removed) != 0 {
-		req := &nlb.LoadBalancerLeaveSecurityGroupRequest{}
-		req.LoadBalancerId = tea.String(mdl.LoadBalancerAttribute.LoadBalancerId)
-		req.SecurityGroupIds = tea.StringSlice(removed)
-		var resp *nlb.LoadBalancerLeaveSecurityGroupResponse
-		err := retryOnThrottling("LoadBalancerLeaveSecurityGroup", func() error {
-			var err error
-			resp, err = p.auth.NLB.LoadBalancerLeaveSecurityGroup(req)
-			return err
-		})
-		if err != nil {
-			return util.SDKError("LoadBalancerLeaveSecurityGroup", err)
-		}
-		if resp == nil || resp.Body == nil {
-			return fmt.Errorf("OpenAPI LoadBalancerLeaveSecurityGroup resp is nil")
-		}
-		klog.V(5).Infof("RequestId: %s, API: %s", tea.StringValue(resp.Body.RequestId), "LoadBalancerLeaveSecurityGroup")
-
-		err = p.WaitJobFinish("LoadBalancerLeaveSecurityGroup", tea.StringValue(resp.Body.JobId))
-		if err != nil {
-			return err
-		}
+func (p *NLBProvider) NLBJoinSecurityGroup(ctx context.Context, lbId string, sgIds []string) error {
+	req := &nlb.LoadBalancerJoinSecurityGroupRequest{}
+	req.LoadBalancerId = tea.String(lbId)
+	req.SecurityGroupIds = tea.StringSlice(sgIds)
+	var resp *nlb.LoadBalancerJoinSecurityGroupResponse
+	err := retryOnThrottling("LoadBalancerJoinSecurityGroup", func() error {
+		var err error
+		resp, err = p.auth.NLB.LoadBalancerJoinSecurityGroup(req)
+		return err
+	})
+	if err != nil {
+		return util.SDKError("LoadBalancerJoinSecurityGroup", err)
 	}
+	if resp == nil || resp.Body == nil {
+		return fmt.Errorf("OpenAPI LoadBalancerJoinSecurityGroup resp is nil")
+	}
+	klog.V(5).Infof("RequestId: %s, API: %s", tea.StringValue(resp.Body.RequestId), "LoadBalancerJoinSecurityGroup")
 
-	if len(added) != 0 {
+	err = p.WaitJobFinish("LoadBalancerJoinSecurityGroup", tea.StringValue(resp.Body.JobId))
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (p *NLBProvider) NLBLeaveSecurityGroup(ctx context.Context, lbId string, sgIds []string) error {
+	req := &nlb.LoadBalancerLeaveSecurityGroupRequest{}
+	req.LoadBalancerId = tea.String(lbId)
+	req.SecurityGroupIds = tea.StringSlice(sgIds)
+	var resp *nlb.LoadBalancerLeaveSecurityGroupResponse
+	err := retryOnThrottling("LoadBalancerLeaveSecurityGroup", func() error {
+		var err error
+		resp, err = p.auth.NLB.LoadBalancerLeaveSecurityGroup(req)
+		return err
+	})
+	if err != nil {
+		return util.SDKError("LoadBalancerLeaveSecurityGroup", err)
+	}
+	if resp == nil || resp.Body == nil {
+		return fmt.Errorf("OpenAPI LoadBalancerLeaveSecurityGroup resp is nil")
+	}
+	klog.V(5).Infof("RequestId: %s, API: %s", tea.StringValue(resp.Body.RequestId), "LoadBalancerLeaveSecurityGroup")
+
+	err = p.WaitJobFinish("LoadBalancerLeaveSecurityGroup", tea.StringValue(resp.Body.JobId))
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (p *NLBProvider) UpdateNLBSecurityGroupIds(ctx context.Context, mdl *nlbmodel.NetworkLoadBalancer, add, remove []string) error {
+	retryAdd := false
+	var errs []error
+	join := func(add []string) error {
 		req := &nlb.LoadBalancerJoinSecurityGroupRequest{}
 		req.LoadBalancerId = tea.String(mdl.LoadBalancerAttribute.LoadBalancerId)
-		req.SecurityGroupIds = tea.StringSlice(added)
+		req.SecurityGroupIds = tea.StringSlice(add)
 		var resp *nlb.LoadBalancerJoinSecurityGroupResponse
 		err := retryOnThrottling("LoadBalancerJoinSecurityGroup", func() error {
 			var err error
@@ -418,9 +445,56 @@ func (p *NLBProvider) UpdateNLBSecurityGroupIds(ctx context.Context, mdl *nlbmod
 		if err != nil {
 			return err
 		}
+		return nil
+	}
+	leave := func(remove []string) error {
+		req := &nlb.LoadBalancerLeaveSecurityGroupRequest{}
+		req.LoadBalancerId = tea.String(mdl.LoadBalancerAttribute.LoadBalancerId)
+		req.SecurityGroupIds = tea.StringSlice(remove)
+		var resp *nlb.LoadBalancerLeaveSecurityGroupResponse
+		err := retryOnThrottling("LoadBalancerLeaveSecurityGroup", func() error {
+			var err error
+			resp, err = p.auth.NLB.LoadBalancerLeaveSecurityGroup(req)
+			return err
+		})
+		if err != nil {
+			return util.SDKError("LoadBalancerLeaveSecurityGroup", err)
+		}
+		if resp == nil || resp.Body == nil {
+			return fmt.Errorf("OpenAPI LoadBalancerLeaveSecurityGroup resp is nil")
+		}
+		klog.V(5).Infof("RequestId: %s, API: %s", tea.StringValue(resp.Body.RequestId), "LoadBalancerLeaveSecurityGroup")
+
+		err = p.WaitJobFinish("LoadBalancerLeaveSecurityGroup", tea.StringValue(resp.Body.JobId))
+		if err != nil {
+			return err
+		}
+		return nil
 	}
 
-	return nil
+	if len(add) != 0 {
+		err := join(add)
+		if err != nil {
+			if strings.Contains(err.Error(), "QuotaInsufficient") {
+				retryAdd = true
+			} else {
+				errs = append(errs, err)
+			}
+		}
+	}
+	if len(remove) != 0 {
+		err := leave(remove)
+		if err != nil {
+			errs = append(errs, err)
+		}
+	}
+	if retryAdd {
+		err := join(add)
+		if err != nil {
+			errs = append(errs, err)
+		}
+	}
+	return utilerrors.NewAggregate(errs)
 }
 
 func (p *NLBProvider) UpdateLoadBalancerProtection(ctx context.Context, lbId string,

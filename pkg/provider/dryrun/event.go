@@ -18,6 +18,7 @@ const (
 	FAIL    = "Fail"
 	SUCCESS = "Success"
 	SLB     = "ccmSLB"
+	NLB     = "ccmNLB"
 	VPC     = "ccmVPC"
 	ECS     = "ccmECS"
 	PVTZ    = "ccmPVTZ"

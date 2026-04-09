@@ -2,6 +2,7 @@ package helper
 
 import (
 	"fmt"
+
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/util/feature"
@@ -10,10 +11,11 @@ import (
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/model"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/util/hash"
 
-	"k8s.io/klog/v2"
 	"os"
 	"strings"
 	"time"
+
+	"k8s.io/klog/v2"
 )
 
 // Finalizer
@@ -35,8 +37,9 @@ const NLBClass = "alibabacloud.com/nlb"
 
 // label
 const (
-	LabelServiceHash    = "service.beta.kubernetes.io/hash"
-	LabelLoadBalancerId = "service.k8s.alibaba/loadbalancer-id"
+	LabelServiceHash     = "service.beta.kubernetes.io/hash"
+	LabelLoadBalancerId  = "service.k8s.alibaba/loadbalancer-id"
+	LabelSecurityGroupId = "service.k8s.alibaba/security-group-id"
 )
 
 const (
@@ -126,6 +129,9 @@ func GetServiceHash(svc *v1.Service) string {
 	// ServiceSpec
 	op = append(op, svc.Spec.Ports, svc.Spec.Type, svc.Spec.ExternalTrafficPolicy, svc.Spec.LoadBalancerClass)
 	op = append(op, svc.Annotations, svc.DeletionTimestamp)
+	if len(svc.Spec.LoadBalancerSourceRanges) != 0 {
+		op = append(op, svc.Spec.LoadBalancerSourceRanges)
+	}
 	return hash.HashObject(op)
 }
 

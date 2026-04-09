@@ -1,11 +1,12 @@
 package helper
 
 import (
+	"testing"
+
 	"github.com/stretchr/testify/assert"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	"testing"
 )
 
 func TestIsServiceHashChanged(t *testing.T) {
@@ -32,6 +33,11 @@ func TestIsServiceHashChanged(t *testing.T) {
 	svcNewAttrChanged.Spec.PublishNotReadyAddresses = true
 	hash = GetServiceHash(svcNewAttrChanged)
 	assert.Equal(t, baseHash, hash)
+
+	svcLoadBalancerSourceRangesAdded := base.DeepCopy()
+	svcLoadBalancerSourceRangesAdded.Spec.LoadBalancerSourceRanges = []string{"10.0.0.0/8"}
+	hash = GetServiceHash(svcLoadBalancerSourceRangesAdded)
+	assert.NotEqual(t, baseHash, hash)
 }
 
 func getDefaultService() *v1.Service {

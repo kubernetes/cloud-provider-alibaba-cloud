@@ -2,9 +2,10 @@ package helper
 
 import (
 	"errors"
-	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"regexp"
 	"strings"
+
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 )
 
 // ServiceEventReason
@@ -26,6 +27,7 @@ const (
 	SpecChanged               = "ServiceSpecChanged"
 	DeleteTimestampChanged    = "DeleteTimestampChanged"
 	PreservedOnDelete         = "PreservedOnDelete"
+	FeatureNotSupported       = "FeatureNotSupported"
 )
 
 // NodeEventReason

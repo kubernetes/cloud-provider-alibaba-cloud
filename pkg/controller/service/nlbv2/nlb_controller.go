@@ -260,7 +260,7 @@ func (m *ReconcileNLB) reconcileLoadBalancerResources(req *svcCtx.RequestContext
 		return err
 	}
 
-	if err := m.addServiceLabels(req.Service, lb.GetLoadBalancerId()); err != nil {
+	if err := m.updateServiceLabels(req.Service, lb); err != nil {
 		m.record.Event(req.Service, v1.EventTypeWarning, helper.FailedAddHash,
 			fmt.Sprintf("Error adding service hash: %s", err.Error()))
 		return err
@@ -429,18 +429,38 @@ func (m *ReconcileNLB) removeServiceStatus(reqCtx *svcCtx.RequestContext, svc *v
 
 }
 
-func (m *ReconcileNLB) addServiceLabels(svc *v1.Service, lbId string) error {
+func (m *ReconcileNLB) updateServiceLabels(svc *v1.Service, lb *nlbmodel.NetworkLoadBalancer) error {
+	if lb == nil {
+		return nil
+	}
 	updated := svc.DeepCopy()
+	needUpdate := false
 	if updated.Labels == nil {
 		updated.Labels = make(map[string]string)
 	}
 	serviceHash := helper.GetServiceHash(svc)
-	updated.Labels[helper.LabelServiceHash] = serviceHash
-	if lbId != "" {
-		updated.Labels[helper.LabelLoadBalancerId] = lbId
+	hashChanged := updated.Labels[helper.LabelServiceHash] != serviceHash
+	if hashChanged {
+		updated.Labels[helper.LabelServiceHash] = serviceHash
+		needUpdate = true
 	}
-	if err := m.kubeClient.Status().Patch(context.Background(), updated, client.MergeFrom(svc)); err != nil {
-		return fmt.Errorf("%s failed to add service hash:, error: %s", util.Key(svc), err.Error())
+	if lb.GetLoadBalancerId() != "" {
+		updated.Labels[helper.LabelLoadBalancerId] = lb.GetLoadBalancerId()
+		needUpdate = true
+	}
+	if hashChanged {
+		if lb.AssociatedSecurityGroup != nil && lb.AssociatedSecurityGroup.ID != "" {
+			updated.Labels[helper.LabelSecurityGroupId] = lb.AssociatedSecurityGroup.ID
+			needUpdate = true
+		} else if _, ok := svc.Labels[helper.LabelSecurityGroupId]; ok {
+			delete(updated.Labels, helper.LabelSecurityGroupId)
+			needUpdate = true
+		}
+	}
+	if needUpdate {
+		if err := m.kubeClient.Status().Patch(context.Background(), updated, client.MergeFrom(svc)); err != nil {
+			return fmt.Errorf("%s failed to add service hash:, error: %s", util.Key(svc), err.Error())
+		}
 	}
 	return nil
 }
@@ -454,6 +474,10 @@ func (m *ReconcileNLB) removeServiceLabels(svc *v1.Service) error {
 	}
 	if _, ok := updated.Labels[helper.LabelLoadBalancerId]; ok {
 		delete(updated.Labels, helper.LabelLoadBalancerId)
+		needUpdate = true
+	}
+	if _, ok := updated.Labels[helper.LabelSecurityGroupId]; ok {
+		delete(updated.Labels, helper.LabelSecurityGroupId)
 		needUpdate = true
 	}
 	if needUpdate {
