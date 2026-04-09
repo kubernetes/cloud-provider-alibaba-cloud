@@ -1077,6 +1077,72 @@ func RunBackendTestCases(f *framework.Framework) {
 			})
 		})
 
+		if options.TestConfig.IPv6 {
+			ginkgo.Context("backend-ip-version", func() {
+				ginkgo.It("backend-ip-version: ipv6", func() {
+					svc, err := f.Client.KubeClient.CreateNLBServiceByAnno(map[string]string{
+						annotation.Annotation(annotation.ZoneMaps):         options.TestConfig.NLBZoneMaps,
+						annotation.Annotation(annotation.IPVersion):        string(model.DualStack),
+						annotation.Annotation(annotation.IPv6AddressType):  string(model.InternetAddressType),
+						annotation.Annotation(annotation.BackendIPVersion): string(model.IPv6),
+					})
+					gomega.Expect(err).To(gomega.BeNil())
+					err = f.ExpectNetworkLoadBalancerEqual(svc)
+					gomega.Expect(err).To(gomega.BeNil())
+				})
+
+				ginkgo.It("backend-ip-version: dualstack", func() {
+					svc, err := f.Client.KubeClient.CreateNLBServiceByAnno(map[string]string{
+						annotation.Annotation(annotation.ZoneMaps):         options.TestConfig.NLBZoneMaps,
+						annotation.Annotation(annotation.IPVersion):        string(model.DualStack),
+						annotation.Annotation(annotation.IPv6AddressType):  string(model.InternetAddressType),
+						annotation.Annotation(annotation.BackendIPVersion): string(model.DualStack),
+					})
+					gomega.Expect(err).To(gomega.BeNil())
+					err = f.ExpectNetworkLoadBalancerEqual(svc)
+					gomega.Expect(err).To(gomega.BeNil())
+				})
+
+				ginkgo.It("backend-ip-version: ipv6 -> dualstack", func() {
+					oldSvc, err := f.Client.KubeClient.CreateNLBServiceByAnno(map[string]string{
+						annotation.Annotation(annotation.ZoneMaps):         options.TestConfig.NLBZoneMaps,
+						annotation.Annotation(annotation.IPVersion):        string(model.DualStack),
+						annotation.Annotation(annotation.IPv6AddressType):  string(model.InternetAddressType),
+						annotation.Annotation(annotation.BackendIPVersion): string(model.IPv6),
+					})
+					gomega.Expect(err).To(gomega.BeNil())
+					err = f.ExpectNetworkLoadBalancerEqual(oldSvc)
+					gomega.Expect(err).To(gomega.BeNil())
+
+					newSvc := oldSvc.DeepCopy()
+					newSvc.Annotations[annotation.Annotation(annotation.BackendIPVersion)] = string(model.DualStack)
+					newSvc, err = f.Client.KubeClient.PatchService(oldSvc, newSvc)
+					gomega.Expect(err).To(gomega.BeNil())
+					err = f.ExpectNetworkLoadBalancerEqual(newSvc)
+					gomega.Expect(err).To(gomega.BeNil())
+				})
+
+				ginkgo.It("backend-ip-version: dualstack -> ipv6", func() {
+					oldSvc, err := f.Client.KubeClient.CreateNLBServiceByAnno(map[string]string{
+						annotation.Annotation(annotation.ZoneMaps):         options.TestConfig.NLBZoneMaps,
+						annotation.Annotation(annotation.IPVersion):        string(model.DualStack),
+						annotation.Annotation(annotation.IPv6AddressType):  string(model.InternetAddressType),
+						annotation.Annotation(annotation.BackendIPVersion): string(model.DualStack),
+					})
+					gomega.Expect(err).To(gomega.BeNil())
+					err = f.ExpectNetworkLoadBalancerEqual(oldSvc)
+					gomega.Expect(err).To(gomega.BeNil())
+
+					newSvc := oldSvc.DeepCopy()
+					newSvc.Annotations[annotation.Annotation(annotation.BackendIPVersion)] = string(model.IPv6)
+					newSvc, err = f.Client.KubeClient.PatchService(oldSvc, newSvc)
+					gomega.Expect(err).To(gomega.BeNil())
+					err = f.ExpectNetworkLoadBalancerEqual(newSvc)
+					gomega.Expect(err).To(gomega.BeNil())
+				})
+			})
+		}
+
 		ginkgo.Context("invalid backends", func() {
 			if options.TestConfig.Network == options.Terway {
 				ginkgo.It("not found eni id", func() {

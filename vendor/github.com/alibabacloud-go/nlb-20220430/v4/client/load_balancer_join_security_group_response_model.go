@@ -59,5 +59,10 @@ func (s *LoadBalancerJoinSecurityGroupResponse) SetBody(v *LoadBalancerJoinSecur
 }
 
 func (s *LoadBalancerJoinSecurityGroupResponse) Validate() error {
-	return dara.Validate(s)
+	if s.Body != nil {
+		if err := s.Body.Validate(); err != nil {
+			return err
+		}
+	}
+	return nil
 }

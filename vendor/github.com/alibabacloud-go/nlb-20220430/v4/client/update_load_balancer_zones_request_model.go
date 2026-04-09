@@ -118,7 +118,16 @@ func (s *UpdateLoadBalancerZonesRequest) SetZoneMappings(v []*UpdateLoadBalancer
 }
 
 func (s *UpdateLoadBalancerZonesRequest) Validate() error {
-	return dara.Validate(s)
+	if s.ZoneMappings != nil {
+		for _, item := range s.ZoneMappings {
+			if item != nil {
+				if err := item.Validate(); err != nil {
+					return err
+				}
+			}
+		}
+	}
+	return nil
 }
 
 type UpdateLoadBalancerZonesRequestZoneMappings struct {

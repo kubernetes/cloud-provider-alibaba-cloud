@@ -108,7 +108,16 @@ func (s *ListLoadBalancersResponseBody) SetTotalCount(v int32) *ListLoadBalancer
 }
 
 func (s *ListLoadBalancersResponseBody) Validate() error {
-	return dara.Validate(s)
+	if s.LoadBalancers != nil {
+		for _, item := range s.LoadBalancers {
+			if item != nil {
+				if err := item.Validate(); err != nil {
+					return err
+				}
+			}
+		}
+	}
+	return nil
 }
 
 type ListLoadBalancersResponseBodyLoadBalancers struct {
@@ -457,7 +466,49 @@ func (s *ListLoadBalancersResponseBodyLoadBalancers) SetZoneMappings(v []*ListLo
 }
 
 func (s *ListLoadBalancersResponseBodyLoadBalancers) Validate() error {
-	return dara.Validate(s)
+	if s.DeletionProtectionConfig != nil {
+		if err := s.DeletionProtectionConfig.Validate(); err != nil {
+			return err
+		}
+	}
+	if s.LoadBalancerBillingConfig != nil {
+		if err := s.LoadBalancerBillingConfig.Validate(); err != nil {
+			return err
+		}
+	}
+	if s.ModificationProtectionConfig != nil {
+		if err := s.ModificationProtectionConfig.Validate(); err != nil {
+			return err
+		}
+	}
+	if s.OperationLocks != nil {
+		for _, item := range s.OperationLocks {
+			if item != nil {
+				if err := item.Validate(); err != nil {
+					return err
+				}
+			}
+		}
+	}
+	if s.Tags != nil {
+		for _, item := range s.Tags {
+			if item != nil {
+				if err := item.Validate(); err != nil {
+					return err
+				}
+			}
+		}
+	}
+	if s.ZoneMappings != nil {
+		for _, item := range s.ZoneMappings {
+			if item != nil {
+				if err := item.Validate(); err != nil {
+					return err
+				}
+			}
+		}
+	}
+	return nil
 }
 
 type ListLoadBalancersResponseBodyLoadBalancersDeletionProtectionConfig struct {
@@ -798,7 +849,16 @@ func (s *ListLoadBalancersResponseBodyLoadBalancersZoneMappings) SetZoneId(v str
 }
 
 func (s *ListLoadBalancersResponseBodyLoadBalancersZoneMappings) Validate() error {
-	return dara.Validate(s)
+	if s.LoadBalancerAddresses != nil {
+		for _, item := range s.LoadBalancerAddresses {
+			if item != nil {
+				if err := item.Validate(); err != nil {
+					return err
+				}
+			}
+		}
+	}
+	return nil
 }
 
 type ListLoadBalancersResponseBodyLoadBalancersZoneMappingsLoadBalancerAddresses struct {

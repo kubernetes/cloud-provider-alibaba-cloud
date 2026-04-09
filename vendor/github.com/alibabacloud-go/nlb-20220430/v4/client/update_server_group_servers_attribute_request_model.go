@@ -118,7 +118,16 @@ func (s *UpdateServerGroupServersAttributeRequest) SetServers(v []*UpdateServerG
 }
 
 func (s *UpdateServerGroupServersAttributeRequest) Validate() error {
-	return dara.Validate(s)
+	if s.Servers != nil {
+		for _, item := range s.Servers {
+			if item != nil {
+				if err := item.Validate(); err != nil {
+					return err
+				}
+			}
+		}
+	}
+	return nil
 }
 
 type UpdateServerGroupServersAttributeRequestServers struct {

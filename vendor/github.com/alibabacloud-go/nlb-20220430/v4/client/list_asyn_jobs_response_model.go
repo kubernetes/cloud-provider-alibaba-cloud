@@ -59,5 +59,10 @@ func (s *ListAsynJobsResponse) SetBody(v *ListAsynJobsResponseBody) *ListAsynJob
 }
 
 func (s *ListAsynJobsResponse) Validate() error {
-	return dara.Validate(s)
+	if s.Body != nil {
+		if err := s.Body.Validate(); err != nil {
+			return err
+		}
+	}
+	return nil
 }

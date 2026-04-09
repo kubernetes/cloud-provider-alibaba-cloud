@@ -118,7 +118,16 @@ func (s *RemoveServersFromServerGroupRequest) SetServers(v []*RemoveServersFromS
 }
 
 func (s *RemoveServersFromServerGroupRequest) Validate() error {
-	return dara.Validate(s)
+	if s.Servers != nil {
+		for _, item := range s.Servers {
+			if item != nil {
+				if err := item.Validate(); err != nil {
+					return err
+				}
+			}
+		}
+	}
+	return nil
 }
 
 type RemoveServersFromServerGroupRequestServers struct {

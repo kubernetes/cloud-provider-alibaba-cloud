@@ -95,6 +95,11 @@ const ConsoleProtection = ModificationProtectionType("ConsoleProtection")
 const NonProtection = ModificationProtectionType("NonProtection")
 const ModificationProtectionReason = "managed.by.ack"
 
+const (
+	IPVersionAffinityModeAffinity    = "Affinity"
+	IPVersionAffinityModeNonAffinity = "NonAffinity"
+)
+
 // NetworkLoadBalancer represents a AlibabaCloud NetworkLoadBalancer.
 type NetworkLoadBalancer struct {
 	NamespacedName                  types.NamespacedName
@@ -208,6 +213,7 @@ type ServerGroup struct {
 	ServerGroupType         ServerGroupType
 	ResourceGroupId         string
 	AddressIPVersion        string
+	IpVersionAffinityMode   string
 	Protocol                string
 	ConnectionDrainEnabled  *bool
 	ConnectionDrainTimeout  int32 // 10-900
@@ -249,6 +255,7 @@ type ServerGroupServer struct {
 	Weight        int32
 	ZoneId        string
 	Status        string
+	IPVersion     model.AddressIPVersionType
 
 	TargetRef *v1.ObjectReference
 	Invalid   bool

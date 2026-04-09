@@ -19,6 +19,8 @@ type iUpdateServerGroupAttributeRequest interface {
 	GetDryRun() *bool
 	SetHealthCheckConfig(v *UpdateServerGroupAttributeRequestHealthCheckConfig) *UpdateServerGroupAttributeRequest
 	GetHealthCheckConfig() *UpdateServerGroupAttributeRequestHealthCheckConfig
+	SetIpVersionAffinityMode(v string) *UpdateServerGroupAttributeRequest
+	GetIpVersionAffinityMode() *string
 	SetPreserveClientIpEnabled(v bool) *UpdateServerGroupAttributeRequest
 	GetPreserveClientIpEnabled() *bool
 	SetRegionId(v string) *UpdateServerGroupAttributeRequest
@@ -69,7 +71,8 @@ type UpdateServerGroupAttributeRequest struct {
 	// false
 	DryRun *bool `json:"DryRun,omitempty" xml:"DryRun,omitempty"`
 	// Health check configurations.
-	HealthCheckConfig *UpdateServerGroupAttributeRequestHealthCheckConfig `json:"HealthCheckConfig,omitempty" xml:"HealthCheckConfig,omitempty" type:"Struct"`
+	HealthCheckConfig     *UpdateServerGroupAttributeRequestHealthCheckConfig `json:"HealthCheckConfig,omitempty" xml:"HealthCheckConfig,omitempty" type:"Struct"`
+	IpVersionAffinityMode *string                                             `json:"IpVersionAffinityMode,omitempty" xml:"IpVersionAffinityMode,omitempty"`
 	// Specifies whether to enable client IP preservation. Valid values:
 	//
 	// 	- **true**
@@ -156,6 +159,10 @@ func (s *UpdateServerGroupAttributeRequest) GetHealthCheckConfig() *UpdateServer
 	return s.HealthCheckConfig
 }
 
+func (s *UpdateServerGroupAttributeRequest) GetIpVersionAffinityMode() *string {
+	return s.IpVersionAffinityMode
+}
+
 func (s *UpdateServerGroupAttributeRequest) GetPreserveClientIpEnabled() *bool {
 	return s.PreserveClientIpEnabled
 }
@@ -201,6 +208,11 @@ func (s *UpdateServerGroupAttributeRequest) SetHealthCheckConfig(v *UpdateServer
 	return s
 }
 
+func (s *UpdateServerGroupAttributeRequest) SetIpVersionAffinityMode(v string) *UpdateServerGroupAttributeRequest {
+	s.IpVersionAffinityMode = &v
+	return s
+}
+
 func (s *UpdateServerGroupAttributeRequest) SetPreserveClientIpEnabled(v bool) *UpdateServerGroupAttributeRequest {
 	s.PreserveClientIpEnabled = &v
 	return s
@@ -227,7 +239,12 @@ func (s *UpdateServerGroupAttributeRequest) SetServerGroupName(v string) *Update
 }
 
 func (s *UpdateServerGroupAttributeRequest) Validate() error {
-	return dara.Validate(s)
+	if s.HealthCheckConfig != nil {
+		if err := s.HealthCheckConfig.Validate(); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 type UpdateServerGroupAttributeRequestHealthCheckConfig struct {

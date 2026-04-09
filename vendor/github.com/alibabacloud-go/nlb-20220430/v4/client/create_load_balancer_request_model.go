@@ -289,7 +289,40 @@ func (s *CreateLoadBalancerRequest) SetZoneMappings(v []*CreateLoadBalancerReque
 }
 
 func (s *CreateLoadBalancerRequest) Validate() error {
-	return dara.Validate(s)
+	if s.DeletionProtectionConfig != nil {
+		if err := s.DeletionProtectionConfig.Validate(); err != nil {
+			return err
+		}
+	}
+	if s.LoadBalancerBillingConfig != nil {
+		if err := s.LoadBalancerBillingConfig.Validate(); err != nil {
+			return err
+		}
+	}
+	if s.ModificationProtectionConfig != nil {
+		if err := s.ModificationProtectionConfig.Validate(); err != nil {
+			return err
+		}
+	}
+	if s.Tag != nil {
+		for _, item := range s.Tag {
+			if item != nil {
+				if err := item.Validate(); err != nil {
+					return err
+				}
+			}
+		}
+	}
+	if s.ZoneMappings != nil {
+		for _, item := range s.ZoneMappings {
+			if item != nil {
+				if err := item.Validate(); err != nil {
+					return err
+				}
+			}
+		}
+	}
+	return nil
 }
 
 type CreateLoadBalancerRequestDeletionProtectionConfig struct {

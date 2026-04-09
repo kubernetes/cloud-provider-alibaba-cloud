@@ -13,7 +13,7 @@ import (
 
 	"github.com/alibabacloud-go/tea/tea"
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	discovery "k8s.io/api/discovery/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/helper"
@@ -528,12 +528,10 @@ func isNLBServerGroupUsedByPort(sg *nlbmodel.ServerGroup, listeners []*nlbmodel.
 
 func isNLBBackendEqual(f *Framework, reqCtx *svcCtx.RequestContext, sg *nlbmodel.ServerGroup) (bool, error) {
 	policy := getTrafficPolicy(reqCtx)
-	endpoints, err := f.Client.KubeClient.GetEndpoint()
+
+	endpointSlices, err := f.Client.KubeClient.GetEndpointSlices()
 	if err != nil {
-		if !errors.IsNotFound(err) {
-			return false, err
-		}
-		klog.Infof("endpoint is nil")
+		return false, fmt.Errorf("get endpoint slices: %w", err)
 	}
 
 	nodes, err := f.Client.KubeClient.ListNodes()
@@ -544,17 +542,18 @@ func isNLBBackendEqual(f *Framework, reqCtx *svcCtx.RequestContext, sg *nlbmodel
 	var backends []nlbmodel.ServerGroupServer
 	switch policy {
 	case helper.ENITrafficPolicy:
-		backends, err = buildServerGroupENIBackends(f, reqCtx.Anno, endpoints, sg, model.IPv4)
+		ipVersion := getENIBackendIPVersion(reqCtx)
+		backends, err = buildServerGroupENIBackends(f, endpointSlices, sg, ipVersion)
 		if err != nil {
 			return false, err
 		}
 	case helper.LocalTrafficPolicy:
-		backends, err = buildServerGroupLocalBackends(reqCtx.Anno, endpoints, nodes, sg)
+		backends, err = buildServerGroupLocalBackends(f, reqCtx.Anno, endpointSlices, nodes, sg)
 		if err != nil {
 			return false, err
 		}
 	case helper.ClusterTrafficPolicy:
-		backends, err = buildServerGroupClusterBackends(reqCtx.Anno, endpoints, nodes, sg)
+		backends, err = buildServerGroupClusterBackends(f, reqCtx.Anno, endpointSlices, nodes, sg)
 		if err != nil {
 			return false, err
 		}
@@ -744,30 +743,99 @@ func getAnyPortServerGroupName(svc *v1.Service, protocol string, startPort, endP
 	return namedKey.Key()
 }
 
-func buildServerGroupENIBackends(f *Framework, anno *annotation.AnnotationRequest, ep *v1.Endpoints, sg *nlbmodel.ServerGroup, ipVersion model.AddressIPVersionType) ([]nlbmodel.ServerGroupServer, error) {
-	var ret []nlbmodel.ServerGroupServer
-	for _, subset := range ep.Subsets {
-		backendPort := getBackendPort(*sg.ServicePort, subset)
-		if backendPort == 0 {
+func getENIBackendIPVersion(reqCtx *svcCtx.RequestContext) model.AddressIPVersionType {
+	if !helper.NeedNLB(reqCtx.Service) {
+		return model.IPv4
+	}
+	if !strings.EqualFold(reqCtx.Anno.Get(annotation.IPVersion), string(model.DualStack)) {
+		return model.IPv4
+	}
+	backendIPVersion := reqCtx.Anno.Get(annotation.BackendIPVersion)
+	if strings.EqualFold(backendIPVersion, string(model.DualStack)) {
+		return model.DualStack
+	}
+	if strings.EqualFold(backendIPVersion, string(model.IPv6)) {
+		return model.IPv6
+	}
+	return model.IPv4
+}
+
+func lookupENIsByIPVersion(f *Framework, servers []nlbmodel.ServerGroupServer, ipVersion model.AddressIPVersionType) (map[string]string, error) {
+	if ipVersion != model.DualStack {
+		var ips []string
+		for _, s := range servers {
+			ips = append(ips, s.ServerIp)
+		}
+		if len(ips) == 0 {
+			return make(map[string]string), nil
+		}
+		return f.Client.CloudClient.DescribeNetworkInterfaces(options.TestConfig.VPCID, ips, ipVersion)
+	}
+
+	// DualStack: separate by IP family and call DescribeNetworkInterfaces for each
+	var v4IPs, v6IPs []string
+	for _, s := range servers {
+		if ip := net.ParseIP(s.ServerIp); ip != nil && ip.To4() == nil {
+			v6IPs = append(v6IPs, s.ServerIp)
+		} else {
+			v4IPs = append(v4IPs, s.ServerIp)
+		}
+	}
+
+	result := make(map[string]string)
+	for _, pair := range []struct {
+		ips []string
+		ver model.AddressIPVersionType
+	}{
+		{v4IPs, model.IPv4},
+		{v6IPs, model.IPv6},
+	} {
+		if len(pair.ips) == 0 {
 			continue
 		}
-		for _, address := range subset.Addresses {
-			ret = append(ret, nlbmodel.ServerGroupServer{
-				Description: sg.ServerGroupName,
-				ServerIp:    address.IP,
-				Port:        int32(backendPort),
-			})
+		r, err := f.Client.CloudClient.DescribeNetworkInterfaces(options.TestConfig.VPCID, pair.ips, pair.ver)
+		if err != nil {
+			return nil, fmt.Errorf("call DescribeNetworkInterfaces: %w", err)
+		}
+		for ip, eni := range r {
+			result[ip] = eni
+		}
+	}
+	return result, nil
+}
+
+func buildServerGroupENIBackends(f *Framework, eps []discovery.EndpointSlice, sg *nlbmodel.ServerGroup, ipVersion model.AddressIPVersionType) ([]nlbmodel.ServerGroupServer, error) {
+	var ret []nlbmodel.ServerGroupServer
+	for _, es := range eps {
+		backendPort := getBackendProtFromEndpointSlice(*sg.ServicePort, es.Ports)
+		for _, ep := range es.Endpoints {
+			if ep.TargetRef == nil || ep.TargetRef.Kind != "Pod" {
+				continue
+			}
+			for _, addr := range ep.Addresses {
+				if ipVersion == model.IPv6 {
+					parsed := net.ParseIP(addr)
+					if parsed == nil || parsed.To4() != nil {
+						continue
+					}
+				} else if ipVersion == model.IPv4 {
+					parsed := net.ParseIP(addr)
+					if parsed == nil || parsed.To4() == nil {
+						continue
+					}
+				}
+				ret = append(ret, nlbmodel.ServerGroupServer{
+					Description: sg.ServerGroupName,
+					ServerIp:    addr,
+					Port:        int32(backendPort),
+				})
+			}
 		}
 	}
 
-	var ips []string
-	for _, b := range ret {
-		ips = append(ips, b.ServerIp)
-	}
-
-	result, err := f.Client.CloudClient.DescribeNetworkInterfaces(options.TestConfig.VPCID, ips, ipVersion)
+	result, err := lookupENIsByIPVersion(f, ret, ipVersion)
 	if err != nil {
-		return nil, fmt.Errorf("call DescribeNetworkInterfaces: %s", err.Error())
+		return nil, err
 	}
 
 	if sg.ServerGroupType == nlbmodel.IpServerGroupType {
@@ -793,14 +861,17 @@ func buildServerGroupENIBackends(f *Framework, anno *annotation.AnnotationReques
 	return setServerGroupWeightBackends(helper.ENITrafficPolicy, ret, sg.Weight), nil
 }
 
-func buildServerGroupLocalBackends(anno *annotation.AnnotationRequest, ep *v1.Endpoints, nodes []v1.Node, sg *nlbmodel.ServerGroup) ([]nlbmodel.ServerGroupServer, error) {
+func buildServerGroupLocalBackends(f *Framework, anno *annotation.AnnotationRequest, eps []discovery.EndpointSlice, nodes []v1.Node, sg *nlbmodel.ServerGroup) ([]nlbmodel.ServerGroupServer, error) {
 	var ret []nlbmodel.ServerGroupServer
-	for _, subset := range ep.Subsets {
-		for _, addr := range subset.Addresses {
-			if addr.NodeName == nil {
-				return nil, fmt.Errorf("%s node name is nil", addr.IP)
+	for _, es := range eps {
+		for _, ep := range es.Endpoints {
+			if ep.TargetRef == nil || ep.TargetRef.Kind != "Pod" {
+				continue
 			}
-			node := findNodeByNodeName(nodes, *addr.NodeName)
+			if ep.NodeName == nil || *ep.NodeName == "" {
+				continue
+			}
+			node := findNodeByNodeName(nodes, *ep.NodeName)
 			if node == nil {
 				continue
 			}
@@ -832,11 +903,10 @@ func buildServerGroupLocalBackends(anno *annotation.AnnotationRequest, ep *v1.En
 					ServerType:  nlbmodel.EcsServerType,
 				})
 			}
-
 		}
 	}
 
-	eciBackends, err := buildServerGroupECIBackends(ep, nodes, sg)
+	eciBackends, err := buildServerGroupECIBackendsFromSlices(eps, nodes, sg)
 	if err != nil {
 		return nil, fmt.Errorf("build eci backends error: %s", err.Error())
 	}
@@ -844,34 +914,47 @@ func buildServerGroupLocalBackends(anno *annotation.AnnotationRequest, ep *v1.En
 	return setServerGroupWeightBackends(helper.LocalTrafficPolicy, append(ret, eciBackends...), sg.Weight), nil
 }
 
-func buildServerGroupECIBackends(ep *v1.Endpoints, nodes []v1.Node, sg *nlbmodel.ServerGroup) ([]nlbmodel.ServerGroupServer, error) {
+func buildServerGroupECIBackendsFromSlices(eps []discovery.EndpointSlice, nodes []v1.Node, sg *nlbmodel.ServerGroup) ([]nlbmodel.ServerGroupServer, error) {
 	var ret []nlbmodel.ServerGroupServer
-	for _, subset := range ep.Subsets {
-		for _, addr := range subset.Addresses {
-			if addr.NodeName == nil {
-				return nil, fmt.Errorf("%s node name is nil", addr.IP)
+	for _, es := range eps {
+		for _, ep := range es.Endpoints {
+			if ep.TargetRef == nil || ep.TargetRef.Kind != "Pod" {
+				continue
 			}
-			node := findNodeByNodeName(nodes, *addr.NodeName)
+			if ep.NodeName == nil || *ep.NodeName == "" {
+				continue
+			}
+			node := findNodeByNodeName(nodes, *ep.NodeName)
 			if node == nil {
 				continue
 			}
 			if isVKNode(*node) {
-				backendPort := getBackendPort(*sg.ServicePort, subset)
+				port := int32(0)
+				for _, p := range es.Ports {
+					if p.Port != nil {
+						port = *p.Port
+						break
+					}
+				}
 				if sg.ServerGroupType == nlbmodel.IpServerGroupType {
-					ret = append(ret, nlbmodel.ServerGroupServer{
-						Description: sg.ServerGroupName,
-						ServerId:    addr.IP,
-						ServerIp:    addr.IP,
-						Port:        int32(backendPort),
-						ServerType:  nlbmodel.IpServerType,
-					})
+					for _, addr := range ep.Addresses {
+						ret = append(ret, nlbmodel.ServerGroupServer{
+							Description: sg.ServerGroupName,
+							ServerId:    addr,
+							ServerIp:    addr,
+							Port:        port,
+							ServerType:  nlbmodel.IpServerType,
+						})
+					}
 				} else {
-					ret = append(ret, nlbmodel.ServerGroupServer{
-						Description: sg.ServerGroupName,
-						ServerIp:    addr.IP,
-						Port:        int32(backendPort),
-						ServerType:  model.ENIBackendType,
-					})
+					for _, addr := range ep.Addresses {
+						ret = append(ret, nlbmodel.ServerGroupServer{
+							Description: sg.ServerGroupName,
+							ServerIp:    addr,
+							Port:        port,
+							ServerType:  model.ENIBackendType,
+						})
+					}
 				}
 			}
 		}
@@ -879,7 +962,7 @@ func buildServerGroupECIBackends(ep *v1.Endpoints, nodes []v1.Node, sg *nlbmodel
 	return ret, nil
 }
 
-func buildServerGroupClusterBackends(anno *annotation.AnnotationRequest, ep *v1.Endpoints, nodes []v1.Node, sg *nlbmodel.ServerGroup) ([]nlbmodel.ServerGroupServer, error) {
+func buildServerGroupClusterBackends(f *Framework, anno *annotation.AnnotationRequest, eps []discovery.EndpointSlice, nodes []v1.Node, sg *nlbmodel.ServerGroup) ([]nlbmodel.ServerGroupServer, error) {
 	var ret []nlbmodel.ServerGroupServer
 	for _, n := range nodes {
 		if isNodeExcludeFromLoadBalancer(&n, anno) {
@@ -910,10 +993,9 @@ func buildServerGroupClusterBackends(anno *annotation.AnnotationRequest, ep *v1.
 				Port:        sg.ServicePort.NodePort,
 			})
 		}
-
 	}
 
-	eciBackends, err := buildServerGroupECIBackends(ep, nodes, sg)
+	eciBackends, err := buildServerGroupECIBackendsFromSlices(eps, nodes, sg)
 	if err != nil {
 		return nil, fmt.Errorf("build eci backends error: %s", err.Error())
 	}
@@ -1181,6 +1263,20 @@ func serverGroupAttrEqual(reqCtx *svcCtx.RequestContext, remote *nlbmodel.Server
 	if healCheckMethod := reqCtx.Anno.Get(annotation.HealthCheckMethod); healCheckMethod != "" {
 		if remote.HealthCheckConfig == nil || healCheckMethod != remote.HealthCheckConfig.HttpCheckMethod {
 			return fmt.Errorf("expected health check method %s, got %+v", healCheckMethod, remote.HealthCheckConfig)
+		}
+	}
+
+	if backendIPVersion := reqCtx.Anno.Get(annotation.BackendIPVersion); backendIPVersion != "" {
+		if helper.NeedNLB(reqCtx.Service) && strings.EqualFold(reqCtx.Anno.Get(annotation.IPVersion), string(model.DualStack)) {
+			var expectedMode string
+			if strings.EqualFold(backendIPVersion, string(model.IPv6)) {
+				expectedMode = nlbmodel.IPVersionAffinityModeNonAffinity
+			} else if strings.EqualFold(backendIPVersion, string(model.DualStack)) {
+				expectedMode = nlbmodel.IPVersionAffinityModeAffinity
+			}
+			if expectedMode != "" && !strings.EqualFold(expectedMode, remote.IpVersionAffinityMode) {
+				return fmt.Errorf("expected server group IpVersionAffinityMode %s, got %s", expectedMode, remote.IpVersionAffinityMode)
+			}
 		}
 	}
 

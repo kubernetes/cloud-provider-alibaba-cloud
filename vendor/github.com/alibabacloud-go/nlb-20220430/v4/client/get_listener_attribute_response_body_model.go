@@ -474,7 +474,21 @@ func (s *GetListenerAttributeResponseBody) SetTags(v []*GetListenerAttributeResp
 }
 
 func (s *GetListenerAttributeResponseBody) Validate() error {
-	return dara.Validate(s)
+	if s.ProxyProtocolV2Config != nil {
+		if err := s.ProxyProtocolV2Config.Validate(); err != nil {
+			return err
+		}
+	}
+	if s.Tags != nil {
+		for _, item := range s.Tags {
+			if item != nil {
+				if err := item.Validate(); err != nil {
+					return err
+				}
+			}
+		}
+	}
+	return nil
 }
 
 type GetListenerAttributeResponseBodyProxyProtocolV2Config struct {

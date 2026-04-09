@@ -59,5 +59,10 @@ func (s *UpdateLoadBalancerAttributeResponse) SetBody(v *UpdateLoadBalancerAttri
 }
 
 func (s *UpdateLoadBalancerAttributeResponse) Validate() error {
-	return dara.Validate(s)
+	if s.Body != nil {
+		if err := s.Body.Validate(); err != nil {
+			return err
+		}
+	}
+	return nil
 }

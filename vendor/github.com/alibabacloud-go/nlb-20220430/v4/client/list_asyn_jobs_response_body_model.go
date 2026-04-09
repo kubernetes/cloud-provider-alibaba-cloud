@@ -70,7 +70,16 @@ func (s *ListAsynJobsResponseBody) SetTotalCount(v string) *ListAsynJobsResponse
 }
 
 func (s *ListAsynJobsResponseBody) Validate() error {
-	return dara.Validate(s)
+	if s.Jobs != nil {
+		for _, item := range s.Jobs {
+			if item != nil {
+				if err := item.Validate(); err != nil {
+					return err
+				}
+			}
+		}
+	}
+	return nil
 }
 
 type ListAsynJobsResponseBodyJobs struct {

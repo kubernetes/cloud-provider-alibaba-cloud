@@ -242,8 +242,6 @@ type CreateListenerShrinkRequest struct {
 	//
 	// >  	- If you set **ListenerProtocol*	- to **TCPSSL**, you can associate the listener with server groups whose backend protocol is **TCP*	- and have **client IP preservation disabled**. You cannot associate the listener with server groups whose backend protocol is **TCP*	- and have **client IP preservation enabled*	- or server groups whose backend protocol is **UDP*	- or **TCP_UDP**.
 	//
-	// This parameter is required.
-	//
 	// example:
 	//
 	// sgp-ppdpc14gdm3x4o****
@@ -479,7 +477,16 @@ func (s *CreateListenerShrinkRequest) SetTag(v []*CreateListenerShrinkRequestTag
 }
 
 func (s *CreateListenerShrinkRequest) Validate() error {
-	return dara.Validate(s)
+	if s.Tag != nil {
+		for _, item := range s.Tag {
+			if item != nil {
+				if err := item.Validate(); err != nil {
+					return err
+				}
+			}
+		}
+	}
+	return nil
 }
 
 type CreateListenerShrinkRequestTag struct {

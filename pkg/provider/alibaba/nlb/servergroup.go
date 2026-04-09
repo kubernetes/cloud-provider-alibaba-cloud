@@ -23,6 +23,7 @@ func (p *NLBProvider) toLocalServerGroup(ctx context.Context, remote *nlb.ListSe
 		ServerGroupType:         nlbmodel.ServerGroupType(tea.StringValue(remote.ServerGroupType)),
 		ServerGroupName:         tea.StringValue(remote.ServerGroupName),
 		AddressIPVersion:        tea.StringValue(remote.AddressIPVersion),
+		IpVersionAffinityMode:   tea.StringValue(remote.IpVersionAffinityMode),
 		Scheduler:               tea.StringValue(remote.Scheduler),
 		Protocol:                tea.StringValue(remote.Protocol),
 		ConnectionDrainEnabled:  remote.ConnectionDrainEnabled,
@@ -283,6 +284,9 @@ func (p *NLBProvider) CreateNLBServerGroupAsync(ctx context.Context, sg *nlbmode
 	if sg.AddressIPVersion != "" {
 		req.AddressIPVersion = tea.String(sg.AddressIPVersion)
 	}
+	if sg.IpVersionAffinityMode != "" {
+		req.IpVersionAffinityMode = tea.String(sg.IpVersionAffinityMode)
+	}
 	if sg.ConnectionDrainEnabled != nil {
 		req.ConnectionDrainEnabled = sg.ConnectionDrainEnabled
 		req.ConnectionDrainTimeout = tea.Int32(sg.ConnectionDrainTimeout)
@@ -390,6 +394,9 @@ func (p *NLBProvider) UpdateNLBServerGroupAsync(ctx context.Context, sg *nlbmode
 	}
 	if sg.Scheduler != "" {
 		req.Scheduler = tea.String(sg.Scheduler)
+	}
+	if sg.IpVersionAffinityMode != "" {
+		req.IpVersionAffinityMode = tea.String(sg.IpVersionAffinityMode)
 	}
 	req.PreserveClientIpEnabled = sg.PreserveClientIpEnabled
 	if sg.HealthCheckConfig != nil {

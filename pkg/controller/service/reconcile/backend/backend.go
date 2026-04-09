@@ -88,7 +88,9 @@ func (e *EndpointWithENI) setTrafficPolicy(reqCtx *svcCtx.RequestContext) {
 
 func (e *EndpointWithENI) setAddressIpVersion(reqCtx *svcCtx.RequestContext) {
 	e.AddressIPVersion = model.IPv4
-	if reqCtx.Anno.Get(annotation.BackendIPVersion) != string(model.IPv6) {
+	backendIPVersion := reqCtx.Anno.Get(annotation.BackendIPVersion)
+	if !strings.EqualFold(backendIPVersion, string(model.IPv6)) &&
+		!strings.EqualFold(backendIPVersion, string(model.DualStack)) {
 		return
 	}
 	// Only EndpointSlice support dual stack.
@@ -102,9 +104,17 @@ func (e *EndpointWithENI) setAddressIpVersion(reqCtx *svcCtx.RequestContext) {
 	if helper.NeedNLB(reqCtx.Service) {
 		c = model.DualStack
 	}
-	if strings.EqualFold(reqCtx.Anno.Get(annotation.IPVersion), string(c)) {
+	if !strings.EqualFold(reqCtx.Anno.Get(annotation.IPVersion), string(c)) {
+		return
+	}
+
+	if strings.EqualFold(backendIPVersion, string(model.IPv6)) {
 		reqCtx.Log.Info("backend address ip version is ipv6")
 		e.AddressIPVersion = model.IPv6
+	} else if helper.NeedNLB(reqCtx.Service) && strings.EqualFold(backendIPVersion, string(model.DualStack)) {
+		// Only NLB supports dual stack backend ip version
+		reqCtx.Log.Info("backend address ip version is dualstack")
+		e.AddressIPVersion = model.DualStack
 	}
 	return
 }
@@ -237,6 +247,10 @@ func getEndpointByEndpointSlice(reqCtx *svcCtx.RequestContext, kubeClient client
 	}, client.InNamespace(reqCtx.Service.Namespace))
 	if err != nil {
 		return nil, err
+	}
+
+	if ipVersion == model.DualStack {
+		return epsList.Items, nil
 	}
 
 	addressType := discovery.AddressTypeIPv4

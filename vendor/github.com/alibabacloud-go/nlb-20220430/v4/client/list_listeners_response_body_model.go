@@ -108,7 +108,16 @@ func (s *ListListenersResponseBody) SetTotalCount(v int32) *ListListenersRespons
 }
 
 func (s *ListListenersResponseBody) Validate() error {
-	return dara.Validate(s)
+	if s.Listeners != nil {
+		for _, item := range s.Listeners {
+			if item != nil {
+				if err := item.Validate(); err != nil {
+					return err
+				}
+			}
+		}
+	}
+	return nil
 }
 
 type ListListenersResponseBodyListeners struct {
@@ -502,7 +511,21 @@ func (s *ListListenersResponseBodyListeners) SetTags(v []*ListListenersResponseB
 }
 
 func (s *ListListenersResponseBodyListeners) Validate() error {
-	return dara.Validate(s)
+	if s.ProxyProtocolV2Config != nil {
+		if err := s.ProxyProtocolV2Config.Validate(); err != nil {
+			return err
+		}
+	}
+	if s.Tags != nil {
+		for _, item := range s.Tags {
+			if item != nil {
+				if err := item.Validate(); err != nil {
+					return err
+				}
+			}
+		}
+	}
+	return nil
 }
 
 type ListListenersResponseBodyListenersProxyProtocolV2Config struct {

@@ -13,6 +13,7 @@ import (
 
 	"github.com/alibabacloud-go/tea/tea"
 	v1 "k8s.io/api/core/v1"
+	discovery "k8s.io/api/discovery/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -31,6 +32,7 @@ import (
 	"k8s.io/cloud-provider-alibaba-cloud/test/e2e/options"
 	"k8s.io/cloud-provider/api"
 	"k8s.io/klog/v2"
+	"k8s.io/utils/pointer"
 )
 
 func (f *Framework) ExpectLoadBalancerEqual(svc *v1.Service) error {
@@ -1262,6 +1264,19 @@ func getBackendPort(port v1.ServicePort, subset v1.EndpointSubset) int {
 	for _, p := range subset.Ports {
 		if p.Name == port.Name {
 			return int(p.Port)
+		}
+	}
+	return 0
+}
+
+func getBackendProtFromEndpointSlice(port v1.ServicePort, ep []discovery.EndpointPort) int {
+	if port.TargetPort.Type == intstr.Int {
+		return port.TargetPort.IntValue()
+	}
+
+	for _, p := range ep {
+		if pointer.StringDeref(p.Name, "") == port.Name {
+			return int(pointer.Int32Deref(p.Port, 0))
 		}
 	}
 	return 0
