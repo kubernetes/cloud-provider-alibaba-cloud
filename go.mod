@@ -1,8 +1,8 @@
 module k8s.io/cloud-provider-alibaba-cloud
 
-go 1.24.0
+go 1.25.0
 
-toolchain go1.24.10
+toolchain go1.25.9
 
 require (
 	github.com/alibabacloud-go/cs-20151215/v3 v3.0.21

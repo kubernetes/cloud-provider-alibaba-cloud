@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	ctrlCfg "k8s.io/cloud-provider-alibaba-cloud/pkg/config"
 	ecsmodel "k8s.io/cloud-provider-alibaba-cloud/pkg/model/ecs"
@@ -897,6 +898,9 @@ func buildServerGroupENIBackends(f *Framework, eps []discovery.EndpointSlice, sg
 func buildServerGroupLocalBackends(f *Framework, anno *annotation.AnnotationRequest, eps []discovery.EndpointSlice, nodes []v1.Node, sg *nlbmodel.ServerGroup) ([]nlbmodel.ServerGroupServer, error) {
 	var ret []nlbmodel.ServerGroupServer
 	for _, es := range eps {
+		if es.AddressType != discovery.AddressTypeIPv4 {
+			continue
+		}
 		for _, ep := range es.Endpoints {
 			if ep.TargetRef == nil || ep.TargetRef.Kind != "Pod" {
 				continue
@@ -950,6 +954,9 @@ func buildServerGroupLocalBackends(f *Framework, anno *annotation.AnnotationRequ
 func buildServerGroupECIBackendsFromSlices(eps []discovery.EndpointSlice, nodes []v1.Node, sg *nlbmodel.ServerGroup) ([]nlbmodel.ServerGroupServer, error) {
 	var ret []nlbmodel.ServerGroupServer
 	for _, es := range eps {
+		if es.AddressType != discovery.AddressTypeIPv4 {
+			continue
+		}
 		for _, ep := range es.Endpoints {
 			if ep.TargetRef == nil || ep.TargetRef.Kind != "Pod" {
 				continue
