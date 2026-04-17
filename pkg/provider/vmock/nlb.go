@@ -71,8 +71,7 @@ func (m MockNLB) TagNLBResource(ctx context.Context, resourceId string, resource
 }
 
 func (m MockNLB) UntagNLBResources(ctx context.Context, resourceId string, resourceType nlbmodel.TagResourceType, tagKey []*string) error {
-	//TODO implement me
-	panic("implement me")
+	return nil
 }
 
 func (m MockNLB) ListNLBTagResources(ctx context.Context, lbId string) ([]tag.Tag, error) {
@@ -408,7 +407,7 @@ func (m MockNLB) BatchWaitJobsFinish(ctx context.Context, api string, jobIds []s
 	return nil
 }
 
-func (m MockNLB) WaitJobFinish(api, jobId string, args ...time.Duration) error {
+func (m MockNLB) WaitJobFinish(ctx context.Context, api, jobId string, args ...time.Duration) error {
 	return nil
 }
 

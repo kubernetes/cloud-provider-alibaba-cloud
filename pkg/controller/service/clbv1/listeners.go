@@ -17,8 +17,8 @@ import (
 	"strconv"
 	"strings"
 
-	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/dryrun"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/util"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/util/dryrun"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"

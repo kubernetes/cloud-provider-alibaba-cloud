@@ -287,7 +287,7 @@ type INLB interface {
 
 	// Jobs
 	BatchWaitJobsFinish(ctx context.Context, api string, jobIds []string, args ...time.Duration) error
-	WaitJobFinish(api, jobId string, args ...time.Duration) error
+	WaitJobFinish(ctx context.Context, api, jobId string, args ...time.Duration) error
 }
 
 // EFLONodeAttribute EFLO node attribute from cloud LingJun instance

@@ -180,7 +180,7 @@ func (p *NLBProvider) CreateNLBServerGroup(ctx context.Context, sg *nlbmodel.Ser
 	if err != nil {
 		return err
 	}
-	return p.WaitJobFinish("CreateServerGroup", jobId, 1200*time.Millisecond, DefaultRetryTimeout)
+	return p.WaitJobFinish(ctx, "CreateServerGroup", jobId, 1200*time.Millisecond, DefaultRetryTimeout)
 }
 
 func (p *NLBProvider) DeleteNLBServerGroup(ctx context.Context, sgId string) error {
@@ -201,7 +201,7 @@ func (p *NLBProvider) AddNLBServers(ctx context.Context, sgId string, backends [
 	if err != nil {
 		return err
 	}
-	return p.WaitJobFinish("AddServersToServerGroup", jobId, 1200*time.Millisecond, DefaultRetryTimeout)
+	return p.WaitJobFinish(ctx, "AddServersToServerGroup", jobId, 1200*time.Millisecond, DefaultRetryTimeout)
 }
 
 func (p *NLBProvider) RemoveNLBServers(ctx context.Context, sgId string, backends []nlbmodel.ServerGroupServer,
@@ -210,7 +210,7 @@ func (p *NLBProvider) RemoveNLBServers(ctx context.Context, sgId string, backend
 	if err != nil {
 		return err
 	}
-	return p.WaitJobFinish("RemoveServersFromServerGroup", jobId, 1200*time.Millisecond, DefaultRetryTimeout)
+	return p.WaitJobFinish(ctx, "RemoveServersFromServerGroup", jobId, 1200*time.Millisecond, DefaultRetryTimeout)
 }
 
 func (p *NLBProvider) UpdateNLBServers(ctx context.Context, sgId string, backends []nlbmodel.ServerGroupServer,
@@ -219,7 +219,7 @@ func (p *NLBProvider) UpdateNLBServers(ctx context.Context, sgId string, backend
 	if err != nil {
 		return err
 	}
-	return p.WaitJobFinish("UpdateServerGroupServersAttribute", jobId, 1200*time.Millisecond, DefaultRetryTimeout)
+	return p.WaitJobFinish(ctx, "UpdateServerGroupServersAttribute", jobId, 1200*time.Millisecond, DefaultRetryTimeout)
 }
 
 func (p *NLBProvider) ListNLBServers(ctx context.Context, sgId string) ([]nlbmodel.ServerGroupServer, error) {

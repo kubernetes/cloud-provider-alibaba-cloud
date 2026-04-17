@@ -11,7 +11,7 @@ import (
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/service/reconcile/backend"
 	svcCtx "k8s.io/cloud-provider-alibaba-cloud/pkg/controller/service/reconcile/context"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/model"
-	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/dryrun"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/util/dryrun"
 	"k8s.io/klog/v2/klogr"
 )
 

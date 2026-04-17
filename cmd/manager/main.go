@@ -14,6 +14,7 @@ import (
 	prvd "k8s.io/cloud-provider-alibaba-cloud/pkg/provider"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/dryrun"
+	utildryrun "k8s.io/cloud-provider-alibaba-cloud/pkg/util/dryrun"
 	"k8s.io/cloud-provider-alibaba-cloud/version"
 	"k8s.io/klog/v2/klogr"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
@@ -96,6 +97,18 @@ func main() {
 	}); err != nil {
 		log.Error(err, "failed to add default health check: %w", err.Error())
 		os.Exit(1)
+	}
+
+	if ctrlCfg.ControllerCFG.DryRun {
+		go func() {
+			<-utildryrun.Done()
+			log.Info("ccm initial process finished.")
+			err := utildryrun.ResultEvent(mgr.GetClient(), utildryrun.SUCCESS, "ccm initial process finished")
+			if err != nil {
+				log.Error(err, "write precheck event failed")
+			}
+			os.Exit(0)
+		}()
 	}
 
 	if err := mgr.Start(signals.SetupSignalHandler()); err != nil {

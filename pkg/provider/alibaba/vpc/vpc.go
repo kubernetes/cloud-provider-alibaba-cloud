@@ -226,8 +226,7 @@ func (r *VPCProvider) DeleteRoutes(ctx context.Context, table string, routes []*
 		return nil, err
 	}
 
-	// TODO: V(5)
-	klog.Infof("RequestId: %s, API: %s, table: %s, elapsedTime: %f", resp.RequestId, "DeleteRouteEntries", table, time.Since(s).Seconds())
+	klog.V(5).Infof("RequestId: %s, API: %s, table: %s, elapsedTime: %f", resp.RequestId, "DeleteRouteEntries", table, time.Since(s).Seconds())
 
 	var statuses []prvd.RouteUpdateStatus
 	for _, r := range routes {

@@ -5,12 +5,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"os"
 	"strings"
 	"time"
 
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/util/dryrun"
 
 	"github.com/go-logr/logr"
 	"golang.org/x/time/rate"
@@ -42,11 +42,13 @@ import (
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/helper"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/model"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/vpc"
-	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/dryrun"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/util"
 )
 
 func Add(mgr manager.Manager, ctx *shared.SharedContext) error {
+	if ctrlCfg.ControllerCFG.DryRun {
+		dryrun.RegisterDryRun(dryrun.SLB)
+	}
 	r, err := newReconciler(mgr, ctx)
 	if err != nil {
 		return err
@@ -116,6 +118,10 @@ func add(mgr manager.Manager, r *ReconcileService) error {
 		return fmt.Errorf("watch resource svc error: %s", err.Error())
 	}
 
+	if ctrlCfg.ControllerCFG.DryRun {
+		return mgr.Add(&serviceController{c: c, recon: r})
+	}
+
 	if utilfeature.DefaultFeatureGate.Enabled(ctrlCfg.EndpointSlice) {
 		// watch endpointslice
 		if err := c.Watch(source.Kind(mgr.GetCache(), &discovery.EndpointSlice{}),
@@ -169,12 +175,8 @@ func (m *ReconcileService) reconcile(c context.Context, request reconcile.Reques
 			initial.Store(request.String(), 1)
 			util.ServiceLog.Info("DryRun: reconcile finished", "service", request.NamespacedName.String())
 			if mapfull() {
-				util.ServiceLog.Info("ccm initial process finished.")
-				err := dryrun.ResultEvent(m.kubeClient, dryrun.SUCCESS, "ccm initial process finished")
-				if err != nil {
-					util.ServiceLog.Error(err, "write precheck event failed", "service", request.NamespacedName.String())
-				}
-				os.Exit(0)
+				util.ServiceLog.Info("ccm slb dryrun process finished")
+				dryrun.Finish(dryrun.SLB)
 			}
 			err = nil
 		}
