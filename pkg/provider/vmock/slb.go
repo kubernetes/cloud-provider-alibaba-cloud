@@ -11,7 +11,7 @@ import (
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/model/tag"
 	prvd "k8s.io/cloud-provider-alibaba-cloud/pkg/provider"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/base"
-	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/dryrun"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/util/dryrun"
 	"k8s.io/klog/v2"
 )
 

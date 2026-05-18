@@ -1,4 +1,4 @@
-package clbv1
+package nlbv2
 
 import (
 	"context"
@@ -30,9 +30,9 @@ func initMap(client client.Client) {
 		length++
 		initial.Store(util.NamespacedName(&m).String(), 0)
 	}
-	util.ServiceLog.Info("ccm initial process finished.", "length", length)
+	util.NLBLog.Info("ccm initial process finished.", "length", length)
 	if length == 0 {
-		dryrun.Finish(dryrun.SLB)
+		dryrun.Finish(dryrun.NLB)
 	}
 }
 
@@ -52,6 +52,6 @@ func mapfull() bool {
 			return true
 		},
 	)
-	util.ServiceLog.Info("Reconcile process", "total", total, "unsync", unsync)
+	util.NLBLog.Info("Reconcile process", "total", total, "unsync", unsync)
 	return unsync == 0
 }

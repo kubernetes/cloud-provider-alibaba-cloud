@@ -61,7 +61,7 @@ func (p *NLBProvider) AssociateAdditionalCertificatesWithNLBListener(ctx context
 	klog.V(5).Infof("RequestId: %s, API: %s", tea.StringValue(resp.Body.RequestId), "AssociateAdditionalCertificatesWithListener")
 	jobId := tea.StringValue(resp.Body.JobId)
 	if jobId != "" {
-		return p.WaitJobFinish("AssociateAdditionalCertificatesWithListener", jobId)
+		return p.WaitJobFinish(nil, "AssociateAdditionalCertificatesWithListener", jobId)
 	}
 
 	return nil
@@ -81,7 +81,7 @@ func (p *NLBProvider) DisassociateAdditionalCertificatesWithNLBListener(ctx cont
 
 	jobId := tea.StringValue(resp.Body.JobId)
 	if jobId != "" {
-		return p.WaitJobFinish("DisassociateAdditionalCertificatesWithListener", jobId)
+		return p.WaitJobFinish(nil, "DisassociateAdditionalCertificatesWithListener", jobId)
 	}
 	return nil
 }

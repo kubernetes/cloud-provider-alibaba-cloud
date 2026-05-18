@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/util"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/util/dryrun"
 	"k8s.io/klog/v2"
 
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/model"
@@ -26,6 +27,15 @@ type DryRunECS struct {
 	auth *base.ClientMgr
 	ecs  *ecs.ECSProvider
 }
+
+const (
+	MTypeAuthorizeSecurityGroup       = "AuthorizeSecurityGroup"
+	MTypeDeleteSecurityGroup          = "DeleteSecurityGroup"
+	MTypeRevokeSecurityGroup          = "RevokeSecurityGroup"
+	MTypeModifySecurityGroupAttribute = "ModifySecurityGroupAttribute"
+	MTypeCreateSecurityGroup          = "CreateSecurityGroup"
+	MTypeModifySecurityGroupRule      = "ModifySecurityGroupRule"
+)
 
 var _ prvd.IInstance = &DryRunECS{}
 
@@ -51,9 +61,9 @@ func (d *DryRunECS) ModifyNetworkInterfaceSourceDestCheck(id string, enabled boo
 }
 
 func (d *DryRunECS) AuthorizeSecurityGroup(ctx context.Context, sgId string, permissions []ecsmodel.SecurityGroupPermission) error {
-	mtype := "AuthorizeSecurityGroup"
+	mtype := MTypeAuthorizeSecurityGroup
 	svc := getService(ctx)
-	AddEvent(NLB, util.Key(svc), "", "AuthorizeSecurityGroup", ERROR, "")
+	dryrun.AddEvent(dryrun.NLB, util.Key(svc), "", CodeAuthorizeSecurityGroup, dryrun.ERROR, "")
 	return hintError(mtype, fmt.Sprintf("need to authorize security group %s", sgId))
 }
 
@@ -62,9 +72,9 @@ func (d *DryRunECS) DescribeSecurityGroupAttribute(ctx context.Context, sgId str
 }
 
 func (d *DryRunECS) DeleteSecurityGroup(ctx context.Context, sgId string) error {
-	mtype := "DeleteSecurityGroup"
+	mtype := MTypeDeleteSecurityGroup
 	svc := getService(ctx)
-	AddEvent(NLB, util.Key(svc), "", "DeleteSecurityGroup", ERROR, "")
+	dryrun.AddEvent(dryrun.NLB, util.Key(svc), "", CodeDeleteSecurityGroup, dryrun.ERROR, "")
 	return hintError(mtype, fmt.Sprintf("need to delete security group %s", sgId))
 }
 
@@ -73,29 +83,29 @@ func (d *DryRunECS) DescribeSecurityGroups(ctx context.Context, tags []tag.Tag) 
 }
 
 func (d *DryRunECS) RevokeSecurityGroup(ctx context.Context, sgId string, permissions []ecsmodel.SecurityGroupPermission) error {
-	mtype := "RevokeSecurityGroup"
+	mtype := MTypeRevokeSecurityGroup
 	svc := getService(ctx)
-	AddEvent(NLB, util.Key(svc), "", "RevokeSecurityGroup", ERROR, "")
+	dryrun.AddEvent(dryrun.NLB, util.Key(svc), "", CodeRevokeSecurityGroup, dryrun.ERROR, "")
 	return hintError(mtype, fmt.Sprintf("need to revoke security group %s", sgId))
 }
 
 func (d *DryRunECS) ModifySecurityGroupAttribute(ctx context.Context, sgId string, sg *ecsmodel.SecurityGroup) error {
-	mtype := "ModifySecurityGroupAttribute"
+	mtype := MTypeModifySecurityGroupAttribute
 	svc := getService(ctx)
-	AddEvent(NLB, util.Key(svc), "", "ModifySecurityGroupAttribute", ERROR, "")
+	dryrun.AddEvent(dryrun.NLB, util.Key(svc), "", CodeModifySecurityGroupAttribute, dryrun.ERROR, "")
 	return hintError(mtype, fmt.Sprintf("need to modify security group attribute %s", sgId))
 }
 
 func (d *DryRunECS) CreateSecurityGroup(ctx context.Context, sg ecsmodel.SecurityGroup) error {
-	mtype := "CreateSecurityGroup"
+	mtype := MTypeCreateSecurityGroup
 	svc := getService(ctx)
-	AddEvent(NLB, util.Key(svc), "", "CreateSecurityGroup", ERROR, "")
+	dryrun.AddEvent(dryrun.NLB, util.Key(svc), "", CodeCreateSecurityGroup, dryrun.ERROR, "")
 	return hintError(mtype, fmt.Sprintf("need to create security group %s", sg.Name))
 }
 
 func (d *DryRunECS) ModifySecurityGroupRule(ctx context.Context, sgId string, permission ecsmodel.SecurityGroupPermission) error {
-	mtype := "ModifySecurityGroupRule"
+	mtype := MTypeModifySecurityGroupRule
 	svc := getService(ctx)
-	AddEvent(NLB, util.Key(svc), "", "ModifySecurityGroupRule", ERROR, "")
+	dryrun.AddEvent(dryrun.NLB, util.Key(svc), "", CodeModifySecurityGroupRule, dryrun.ERROR, "")
 	return hintError(mtype, fmt.Sprintf("need to modify security group rule %s", sgId))
 }

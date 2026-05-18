@@ -27,8 +27,8 @@ import (
 	svcCtx "k8s.io/cloud-provider-alibaba-cloud/pkg/controller/service/reconcile/context"
 	nlbmodel "k8s.io/cloud-provider-alibaba-cloud/pkg/model/nlb"
 	prvd "k8s.io/cloud-provider-alibaba-cloud/pkg/provider"
-	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/dryrun"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/util"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/util/dryrun"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/util/metric"
 	"k8s.io/klog/v2"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
@@ -41,6 +41,9 @@ import (
 )
 
 func Add(mgr manager.Manager, ctx *shared.SharedContext) error {
+	if ctrlCfg.ControllerCFG.DryRun {
+		dryrun.RegisterDryRun(dryrun.NLB)
+	}
 	reconciler, err := newReconciler(mgr, ctx)
 	if err != nil {
 		return fmt.Errorf("new nlb reconciler error: %s", err.Error())
@@ -75,6 +78,9 @@ type nlbController struct {
 }
 
 func (n nlbController) Start(ctx context.Context) error {
+	if ctrlCfg.ControllerCFG.DryRun {
+		initMap(n.recon.kubeClient)
+	}
 	return n.c.Start(ctx)
 }
 
@@ -102,6 +108,10 @@ func add(mgr manager.Manager, r *ReconcileNLB) error {
 	if err := c.Watch(source.Kind(mgr.GetCache(), &v1.Service{}),
 		NewEnqueueRequestForServiceEvent(mgr.GetEventRecorderFor("nlb-controller"))); err != nil {
 		return fmt.Errorf("watch resource svc error: %s", err.Error())
+	}
+
+	if ctrlCfg.ControllerCFG.DryRun {
+		return mgr.Add(&nlbController{c: c, recon: r})
 	}
 
 	if utilfeature.DefaultFeatureGate.Enabled(ctrlCfg.EndpointSlice) {
@@ -148,15 +158,27 @@ func (m *ReconcileNLB) Reconcile(ctx context.Context, request reconcile.Request)
 	return util.HandleReconcileResult(request, m.reconcile(ctx, request))
 }
 
-func (m *ReconcileNLB) reconcile(c context.Context, request reconcile.Request) error {
+func (m *ReconcileNLB) reconcile(c context.Context, request reconcile.Request) (err error) {
 	startTime := time.Now()
+
+	defer func() {
+		if ctrlCfg.ControllerCFG.DryRun {
+			initial.Store(request.String(), 1)
+			util.NLBLog.Info("DryRun: reconcile finished", "service", request.NamespacedName.String())
+			if mapfull() {
+				util.NLBLog.Info("ccm nlb dryrun process finished")
+				dryrun.Finish(dryrun.NLB)
+			}
+			err = nil
+		}
+	}()
 
 	reconcileID := controller.ReconcileIDFromContext(c)
 	nlbLog := util.NLBLog.WithValues("service", request.NamespacedName.String(), "reconcileID", reconcileID)
 	nlbLog.Info("starting reconcile service")
 
 	svc := &v1.Service{}
-	err := m.kubeClient.Get(context.Background(), request.NamespacedName, svc)
+	err = m.kubeClient.Get(context.Background(), request.NamespacedName, svc)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			m.logger.Info("service not found, skip", "service", request.NamespacedName)
@@ -239,7 +261,6 @@ func (m *ReconcileNLB) cleanupLoadBalancerResources(reqCtx *svcCtx.RequestContex
 }
 
 func (m *ReconcileNLB) reconcileLoadBalancerResources(req *svcCtx.RequestContext) error {
-
 	if err := m.finalizerManager.AddFinalizers(req.Ctx, req.Service, helper.NLBFinalizer); err != nil {
 		m.record.Event(req.Service, v1.EventTypeWarning, helper.FailedAddFinalizer,
 			fmt.Sprintf("Error adding finalizer: %s", err.Error()))

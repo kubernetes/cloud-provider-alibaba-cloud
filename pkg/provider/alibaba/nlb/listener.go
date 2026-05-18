@@ -116,7 +116,7 @@ func (p *NLBProvider) CreateNLBListener(ctx context.Context, lbId string, lis *n
 	if err != nil {
 		return err
 	}
-	return p.WaitJobFinish("CreateListener", jobId)
+	return p.WaitJobFinish(nil, "CreateListener", jobId)
 }
 
 func (p *NLBProvider) UpdateNLBListener(ctx context.Context, lis *nlbmodel.ListenerAttribute) error {
@@ -124,7 +124,7 @@ func (p *NLBProvider) UpdateNLBListener(ctx context.Context, lis *nlbmodel.Liste
 	if err != nil {
 		return err
 	}
-	return p.WaitJobFinish("UpdateListener", jobId)
+	return p.WaitJobFinish(nil, "UpdateListener", jobId)
 }
 
 func (p *NLBProvider) DeleteNLBListener(ctx context.Context, listenerId string) error {
@@ -132,7 +132,7 @@ func (p *NLBProvider) DeleteNLBListener(ctx context.Context, listenerId string) 
 	if err != nil {
 		return err
 	}
-	return p.WaitJobFinish("DeleteListener", jobId)
+	return p.WaitJobFinish(nil, "DeleteListener", jobId)
 }
 
 func (p *NLBProvider) StartNLBListener(ctx context.Context, listenerId string) error {

@@ -7,12 +7,14 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/helper"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/model"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/model/tag"
 	prvd "k8s.io/cloud-provider-alibaba-cloud/pkg/provider"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/base"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/slb"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/util"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/util/dryrun"
 )
 
 func NewDryRunSLB(
@@ -28,14 +30,44 @@ type DryRunSLB struct {
 	slb  *slb.SLBProvider
 }
 
+const (
+	MTypeCreateLoadBalancer                    = "CreateLoadBalancer"
+	MTypeDeleteLoadBalancer                    = "DeleteLoadBalancer"
+	MTypeModifyLoadBalancerInstanceSpec        = "ModifyLoadBalancerInstanceSpec"
+	MTypeSetLoadBalancerDeleteProtection       = "SetLoadBalancerDeleteProtection"
+	MTypeSetLoadBalancerName                   = "SetLoadBalancerName"
+	MTypeModifyLoadBalancerInternetSpec        = "ModifyLoadBalancerInternetSpec"
+	MTypeSetLoadBalancerModificationProtection = "SetLoadBalancerModificationProtection"
+	MTypeModifyLoadBalancerInstanceChargeType  = "ModifyLoadBalancerInstanceChargeType"
+	MTypeStartLoadBalancerListener             = "StartLoadBalancerListener"
+	MTypeStopLoadBalancerListener              = "StopLoadBalancerListener"
+	MTypeDeleteLoadBalancerListener            = "DeleteLoadBalancerListener"
+	MTypeCreateLoadBalancerTCPListener         = "CreateLoadBalancerTCPListener"
+	MTypeSetLoadBalancerTCPListenerAttribute   = "SetLoadBalancerTCPListenerAttribute"
+	MTypeCreateLoadBalancerUDPListener         = "CreateLoadBalancerUDPListener"
+	MTypeSetLoadBalancerUDPListenerAttribute   = "SetLoadBalancerUDPListenerAttribute"
+	MTypeCreateLoadBalancerHTTPListener        = "CreateLoadBalancerHTTPListener"
+	MTypeSetLoadBalancerHTTPListenerAttribute  = "SetLoadBalancerHTTPListenerAttribute"
+	MTypeCreateLoadBalancerHTTPSListener       = "CreateLoadBalancerHTTPSListener"
+	MTypeSetLoadBalancerHTTPSListenerAttribute = "SetLoadBalancerHTTPSListenerAttribute"
+	MTypeCreateVServerGroup                    = "CreateVServerGroup"
+	MTypeDeleteVServerGroup                    = "DeleteVServerGroup"
+	MTypeAddVServerGroupBackendServers         = "AddVServerGroupBackendServers"
+	MTypeRemoveVServerGroupBackendServers      = "RemoveVServerGroupBackendServers"
+	MTypeModifyVServerGroupBackendServers      = "ModifyVServerGroupBackendServers"
+	MTypeCreateDomainExtension                 = "CreateDomainExtension"
+	MTypeDeleteDomainExtension                 = "DeleteDomainExtension"
+	MTypeSetDomainExtensionAttribute           = "SetDomainExtensionAttribute"
+)
+
 func (m *DryRunSLB) FindLoadBalancer(ctx context.Context, mdl *model.LoadBalancer) error {
 	return m.slb.FindLoadBalancer(ctx, mdl)
 }
 
 func (m *DryRunSLB) CreateLoadBalancer(ctx context.Context, mdl *model.LoadBalancer, clientToken string) error {
-	mtype := "CreateLoadBalancer"
+	mtype := MTypeCreateLoadBalancer
 	svc := getService(ctx)
-	AddEvent(SLB, util.Key(svc), "", "CreateSLB", ERROR, "")
+	dryrun.AddEvent(dryrun.SLB, util.Key(svc), "", CodeCreateSLB, dryrun.ERROR, "")
 	return hintError(mtype, "need to create loadbalancer")
 }
 
@@ -44,69 +76,73 @@ func (m *DryRunSLB) DescribeLoadBalancer(ctx context.Context, mdl *model.LoadBal
 }
 
 func (m *DryRunSLB) DeleteLoadBalancer(ctx context.Context, mdl *model.LoadBalancer) error {
-	mtype := "DeleteLoadBalancer"
+	mtype := MTypeDeleteLoadBalancer
 	svc := getService(ctx)
-	AddEvent(SLB, util.Key(svc), mdl.LoadBalancerAttribute.LoadBalancerId, "DeleteSLB", ERROR, "")
+	dryrun.AddEvent(dryrun.SLB, util.Key(svc), mdl.LoadBalancerAttribute.LoadBalancerId, CodeDeleteSLB, dryrun.ERROR, "")
 	return hintError(mtype,
 		fmt.Sprintf("loadbalancer %s should be deleted", mdl.LoadBalancerAttribute.LoadBalancerId))
 }
 
 func (m *DryRunSLB) ModifyLoadBalancerInstanceSpec(ctx context.Context, lbId string, spec string) error {
-	mtype := "ModifyLoadBalancerInstanceSpec"
+	mtype := MTypeModifyLoadBalancerInstanceSpec
 	svc := getService(ctx)
-	AddEvent(SLB, util.Key(svc), lbId, "ModifySLBSpec", ERROR, "")
+	dryrun.AddEvent(dryrun.SLB, util.Key(svc), lbId, CodeModifySLBSpec, dryrun.ERROR, "")
 	return hintError(mtype, fmt.Sprintf("loadbalancer %s spec should be %s", lbId, spec))
 }
 
 func (m *DryRunSLB) SetLoadBalancerDeleteProtection(ctx context.Context, lbId string, flag string) error {
-	mtype := "SetLoadBalancerDeleteProtection"
+	mtype := MTypeSetLoadBalancerDeleteProtection
 	svc := getService(ctx)
-	AddEvent(SLB, util.Key(svc), lbId, "SetSLBDeleteProtection", ERROR, "")
+	dryrun.AddEvent(dryrun.SLB, util.Key(svc), lbId, CodeSetSLBDeleteProtection, dryrun.ERROR, "")
 	return hintError(mtype, fmt.Sprintf("loadbalancer %s DeleteProtection should be %s", lbId, flag))
 }
 
 func (m *DryRunSLB) SetLoadBalancerName(ctx context.Context, lbId string, name string) error {
-	mtype := "SetLoadBalancerName"
+	mtype := MTypeSetLoadBalancerName
 	svc := getService(ctx)
-	AddEvent(SLB, util.Key(svc), lbId, "SetSLBName", ERROR, "")
+	dryrun.AddEvent(dryrun.SLB, util.Key(svc), lbId, CodeSetSLBName, dryrun.ERROR, "")
 	return hintError(mtype, fmt.Sprintf("loadbalancer %s name should be %s", lbId, name))
 }
 
 func (m *DryRunSLB) ModifyLoadBalancerInternetSpec(ctx context.Context, lbId string, chargeType string, bandwidth int) error {
-	mtype := "ModifyLoadBalancerInternetSpec"
+	mtype := MTypeModifyLoadBalancerInternetSpec
 	svc := getService(ctx)
-	AddEvent(SLB, util.Key(svc), lbId, "ModifyInternetSpec", ERROR, "")
+	dryrun.AddEvent(dryrun.SLB, util.Key(svc), lbId, CodeModifyInternetSpec, dryrun.ERROR, "")
 	return hintError(mtype, fmt.Sprintf("loadbalancer %s chargeType should be %s, bandwidth %d",
 		lbId, chargeType, bandwidth))
 }
 
 func (m *DryRunSLB) SetLoadBalancerModificationProtection(ctx context.Context, lbId string, flag string) error {
-	mtype := "SetLoadBalancerModificationProtection"
+	mtype := MTypeSetLoadBalancerModificationProtection
 	svc := getService(ctx)
-	AddEvent(SLB, util.Key(svc), lbId, "SetSLBModificationProtection", ERROR, "")
+	dryrun.AddEvent(dryrun.SLB, util.Key(svc), lbId, CodeSetSLBModificationProtection, dryrun.ERROR, "")
 	return hintError(mtype, fmt.Sprintf("loadbalancer %s ModificationProtection should be %s", lbId, flag))
 }
 
 func (m *DryRunSLB) ModifyLoadBalancerInstanceChargeType(ctx context.Context, lbId string, instanceChargeType string, spec string) error {
-	mtype := "ModifyLoadBalancerInstanceChargeType"
+	mtype := MTypeModifyLoadBalancerInstanceChargeType
 	svc := getService(ctx)
-	AddEvent(SLB, util.Key(svc), lbId, "ModifyLoadBalancerInstanceChargeType", ERROR, "")
+	dryrun.AddEvent(dryrun.SLB, util.Key(svc), lbId, CodeModifyLoadBalancerInstanceChargeType, dryrun.ERROR, "")
 	return hintError(mtype, fmt.Sprintf("loadbalancer %s ModifyLoadBalancerInstanceChargeType should be %s with spec [%s]", lbId, instanceChargeType, spec))
 }
 
 // Tag
 func (m *DryRunSLB) TagCLBResource(ctx context.Context, resourceId string, tags []tag.Tag) error {
-	mtype := "UntagResources"
+	if len(tags) == 1 && tags[0].Key == helper.REUSEKEY {
+		// for older version compatibility, do not check reuse tag
+		return nil
+	}
+	mtype := MTypeUntagResources
 	svc := getService(ctx)
-	AddEvent(SLB, util.Key(svc), "", "TagSLB", ERROR, "")
+	dryrun.AddEvent(dryrun.SLB, util.Key(svc), "", CodeTagSLB, dryrun.ERROR, "")
 	return hintError(mtype,
 		fmt.Sprintf("loadbalancer %s tags %q should be added", resourceId, getTagString(tags)))
 }
 
 func (m *DryRunSLB) UntagResources(ctx context.Context, lbId string, tagKey *[]string) error {
-	mtype := "UntagResources"
+	mtype := MTypeUntagResources
 	svc := getService(ctx)
-	AddEvent(SLB, util.Key(svc), "", "UntagSLB", ERROR, "")
+	dryrun.AddEvent(dryrun.SLB, util.Key(svc), "", CodeUntagSLB, dryrun.ERROR, "")
 	tagString := strings.Join(*tagKey, ",")
 	return hintError(mtype,
 		fmt.Sprintf("loadbalancer %s tags %q should be deleted", lbId, tagString))
@@ -122,100 +158,100 @@ func (m *DryRunSLB) DescribeLoadBalancerListeners(ctx context.Context, lbId stri
 }
 
 func (m *DryRunSLB) StartLoadBalancerListener(ctx context.Context, lbId string, port int, proto string) error {
-	mtype := "StartLoadBalancerListener"
+	mtype := MTypeStartLoadBalancerListener
 	svc := getService(ctx)
-	AddEvent(SLB, fmt.Sprintf("%s/%d", util.Key(svc), port), lbId, "StartListener",
-		ERROR, "")
+	dryrun.AddEvent(dryrun.SLB, fmt.Sprintf("%s/%d", util.Key(svc), port), lbId, CodeStartListener,
+		dryrun.ERROR, "")
 	return hintError(mtype, fmt.Sprintf("loadbalancer %s listener %d should be running", lbId, port))
 }
 
 func (m *DryRunSLB) StopLoadBalancerListener(ctx context.Context, lbId string, port int, proto string) error {
-	mtype := "StopLoadBalancerListener"
+	mtype := MTypeStopLoadBalancerListener
 	svc := getService(ctx)
-	AddEvent(SLB, fmt.Sprintf("%s/%d", util.Key(svc), port), lbId, "StopListener",
-		ERROR, "")
+	dryrun.AddEvent(dryrun.SLB, fmt.Sprintf("%s/%d", util.Key(svc), port), lbId, CodeStopListener,
+		dryrun.ERROR, "")
 	return hintError(mtype, fmt.Sprintf("loadbalancer %s listener %d should be stopped", lbId, port))
 }
 
 func (m *DryRunSLB) DeleteLoadBalancerListener(ctx context.Context, lbId string, port int, proto string) error {
-	mtype := "DeleteLoadBalancerListener"
+	mtype := MTypeDeleteLoadBalancerListener
 	svc := getService(ctx)
-	AddEvent(SLB, fmt.Sprintf("%s/%d", util.Key(svc), port), lbId, "DeleteListener", ERROR, "")
+	dryrun.AddEvent(dryrun.SLB, fmt.Sprintf("%s/%d", util.Key(svc), port), lbId, CodeDeleteListener, dryrun.ERROR, "")
 	return hintError(mtype, fmt.Sprintf("loadbalancer %s listener %d should be deleted", lbId, port))
 }
 
 func (m *DryRunSLB) CreateLoadBalancerTCPListener(ctx context.Context, lbId string, listener model.ListenerAttribute) error {
-	mtype := "CreateLoadBalancerTCPListener"
+	mtype := MTypeCreateLoadBalancerTCPListener
 	svc := getService(ctx)
-	AddEvent(SLB, fmt.Sprintf("%s/%d", util.Key(svc), listener.ListenerPort), lbId,
-		"CreateListener", ERROR, "")
+	dryrun.AddEvent(dryrun.SLB, fmt.Sprintf("%s/%d", util.Key(svc), listener.ListenerPort), lbId,
+		CodeCreateListener, dryrun.ERROR, "")
 	return hintError(mtype, fmt.Sprintf("loadbalancer %s listener %d should be created",
 		lbId, listener.ListenerPort))
 }
 
 func (m *DryRunSLB) SetLoadBalancerTCPListenerAttribute(ctx context.Context, lbId string, listener model.ListenerAttribute) error {
-	mtype := "SetLoadBalancerTCPListenerAttribute"
+	mtype := MTypeSetLoadBalancerTCPListenerAttribute
 	svc := getService(ctx)
 	reason := getDryRunMsg(ctx)
-	AddEvent(SLB, fmt.Sprintf("%s/%d", util.Key(svc), listener.ListenerPort), lbId,
-		"UpdateListener", ERROR, reason)
+	dryrun.AddEvent(dryrun.SLB, fmt.Sprintf("%s/%d", util.Key(svc), listener.ListenerPort), lbId,
+		CodeUpdateListener, dryrun.ERROR, reason)
 	return hintError(mtype, fmt.Sprintf("loadbalancer %s listener %d should be updated, %s",
 		lbId, listener.ListenerPort, reason))
 }
 
 func (m *DryRunSLB) CreateLoadBalancerUDPListener(ctx context.Context, lbId string, listener model.ListenerAttribute) error {
-	mtype := "CreateLoadBalancerUDPListener"
+	mtype := MTypeCreateLoadBalancerUDPListener
 	svc := getService(ctx)
-	AddEvent(SLB, fmt.Sprintf("%s/%d", util.Key(svc), listener.ListenerPort), lbId,
-		"CreateListener", ERROR, "")
+	dryrun.AddEvent(dryrun.SLB, fmt.Sprintf("%s/%d", util.Key(svc), listener.ListenerPort), lbId,
+		CodeCreateListener, dryrun.ERROR, "")
 	return hintError(mtype, fmt.Sprintf("loadbalancer %s listener %d should be created",
 		lbId, listener.ListenerPort))
 }
 
 func (m *DryRunSLB) SetLoadBalancerUDPListenerAttribute(ctx context.Context, lbId string, listener model.ListenerAttribute) error {
-	mtype := "SetLoadBalancerUDPListenerAttribute"
+	mtype := MTypeSetLoadBalancerUDPListenerAttribute
 	svc := getService(ctx)
 	reason := getDryRunMsg(ctx)
-	AddEvent(SLB, fmt.Sprintf("%s/%d", util.Key(svc), listener.ListenerPort), lbId,
-		"UpdateListener", ERROR, reason)
+	dryrun.AddEvent(dryrun.SLB, fmt.Sprintf("%s/%d", util.Key(svc), listener.ListenerPort), lbId,
+		CodeUpdateListener, dryrun.ERROR, reason)
 	return hintError(mtype, fmt.Sprintf("loadbalancer %s listener %d should be updated, %s",
 		lbId, listener.ListenerPort, reason))
 }
 
 func (m *DryRunSLB) CreateLoadBalancerHTTPListener(ctx context.Context, lbId string, listener model.ListenerAttribute) error {
-	mtype := "CreateLoadBalancerHTTPListener"
+	mtype := MTypeCreateLoadBalancerHTTPListener
 	svc := getService(ctx)
-	AddEvent(SLB, fmt.Sprintf("%s/%d", util.Key(svc), listener.ListenerPort), lbId,
-		"CreateListener", ERROR, "")
+	dryrun.AddEvent(dryrun.SLB, fmt.Sprintf("%s/%d", util.Key(svc), listener.ListenerPort), lbId,
+		CodeCreateListener, dryrun.ERROR, "")
 	return hintError(mtype, fmt.Sprintf("loadbalancer %s listener %d should be created",
 		lbId, listener.ListenerPort))
 }
 
 func (m *DryRunSLB) SetLoadBalancerHTTPListenerAttribute(ctx context.Context, lbId string, listener model.ListenerAttribute) error {
-	mtype := "SetLoadBalancerHTTPListenerAttribute"
+	mtype := MTypeSetLoadBalancerHTTPListenerAttribute
 	svc := getService(ctx)
 	reason := getDryRunMsg(ctx)
-	AddEvent(SLB, fmt.Sprintf("%s/%d", util.Key(svc), listener.ListenerPort), lbId,
-		"UpdateListener", ERROR, reason)
+	dryrun.AddEvent(dryrun.SLB, fmt.Sprintf("%s/%d", util.Key(svc), listener.ListenerPort), lbId,
+		CodeUpdateListener, dryrun.ERROR, reason)
 	return hintError(mtype, fmt.Sprintf("loadbalancer %s listener %d should be updated, %s",
 		lbId, listener.ListenerPort, reason))
 }
 
 func (m *DryRunSLB) CreateLoadBalancerHTTPSListener(ctx context.Context, lbId string, listener model.ListenerAttribute) error {
-	mtype := "CreateLoadBalancerHTTPSListener"
+	mtype := MTypeCreateLoadBalancerHTTPSListener
 	svc := getService(ctx)
-	AddEvent(SLB, fmt.Sprintf("%s/%d", util.Key(svc), listener.ListenerPort), lbId, "CreateListener",
-		ERROR, "")
+	dryrun.AddEvent(dryrun.SLB, fmt.Sprintf("%s/%d", util.Key(svc), listener.ListenerPort), lbId, CodeCreateListener,
+		dryrun.ERROR, "")
 	return hintError(mtype, fmt.Sprintf("loadbalancer %s listener %d should be created",
 		lbId, listener.ListenerPort))
 }
 
 func (m *DryRunSLB) SetLoadBalancerHTTPSListenerAttribute(ctx context.Context, lbId string, listener model.ListenerAttribute) error {
-	mtype := "SetLoadBalancerHTTPSListenerAttribute"
+	mtype := MTypeSetLoadBalancerHTTPSListenerAttribute
 	svc := getService(ctx)
 	reason := getDryRunMsg(ctx)
-	AddEvent(SLB, fmt.Sprintf("%s/%d", util.Key(svc), listener.ListenerPort), lbId,
-		"UpdateListener", ERROR, reason)
+	dryrun.AddEvent(dryrun.SLB, fmt.Sprintf("%s/%d", util.Key(svc), listener.ListenerPort), lbId,
+		CodeUpdateListener, dryrun.ERROR, reason)
 	return hintError(mtype, fmt.Sprintf("loadbalancer %s listener %d should be updated, %s",
 		lbId, listener.ListenerPort, reason))
 }
@@ -226,10 +262,10 @@ func (m *DryRunSLB) DescribeVServerGroups(ctx context.Context, lbId string) ([]m
 }
 
 func (m *DryRunSLB) CreateVServerGroup(ctx context.Context, vg *model.VServerGroup, lbId string) error {
-	mtype := "CreateVServerGroup"
+	mtype := MTypeCreateVServerGroup
 	svc := getService(ctx)
-	AddEvent(SLB, fmt.Sprintf("%s/%s", util.Key(svc), vg.VGroupName), lbId,
-		"CreateVgroup", ERROR, "")
+	dryrun.AddEvent(dryrun.SLB, fmt.Sprintf("%s/%s", util.Key(svc), vg.VGroupName), lbId,
+		CodeCreateVgroup, dryrun.ERROR, "")
 	return hintError(mtype, fmt.Sprintf("loadbalancer %s vgroup %s should be created", lbId, vg.VGroupName))
 }
 
@@ -238,30 +274,30 @@ func (m *DryRunSLB) DescribeVServerGroupAttribute(ctx context.Context, vGroupId 
 }
 
 func (m *DryRunSLB) DeleteVServerGroup(ctx context.Context, vGroupId string) error {
-	mtype := "DeleteVServerGroup"
+	mtype := MTypeDeleteVServerGroup
 	svc := getService(ctx)
 	lbId := getSlb(ctx)
-	AddEvent(SLB, fmt.Sprintf("%s/%s", util.Key(svc), vGroupId), lbId,
-		"DeleteVgroup", ERROR, "")
+	dryrun.AddEvent(dryrun.SLB, fmt.Sprintf("%s/%s", util.Key(svc), vGroupId), lbId,
+		CodeDeleteVgroup, dryrun.ERROR, "")
 	return hintError(mtype, fmt.Sprintf("loadbalancer %s vgroup %s should be deleted", lbId, vGroupId))
 }
 
 func (m *DryRunSLB) AddVServerGroupBackendServers(ctx context.Context, vGroupId string, backends string) error {
-	mtype := "AddVServerGroupBackendServers"
+	mtype := MTypeAddVServerGroupBackendServers
 	svc := getService(ctx)
 	lbId := getSlb(ctx)
-	AddEvent(SLB, fmt.Sprintf("%s/%s", util.Key(svc), vGroupId), lbId,
-		"AddVServerGroupBackendServers", ERROR, "")
+	dryrun.AddEvent(dryrun.SLB, fmt.Sprintf("%s/%s", util.Key(svc), vGroupId), lbId,
+		CodeAddVServerGroupBackendServers, dryrun.ERROR, "")
 	return hintError(mtype, fmt.Sprintf("loadbalancer %s vgroup %s backends %s should be added",
 		lbId, vGroupId, backends))
 }
 
 func (m *DryRunSLB) RemoveVServerGroupBackendServers(ctx context.Context, vGroupId string, backends string) error {
-	mtype := "RemoveVServerGroupBackendServers"
+	mtype := MTypeRemoveVServerGroupBackendServers
 	svc := getService(ctx)
 	lbId := getSlb(ctx)
-	AddEvent(SLB, fmt.Sprintf("%s/%s", util.Key(svc), vGroupId), lbId,
-		"RemoveVgroup", ERROR, "")
+	dryrun.AddEvent(dryrun.SLB, fmt.Sprintf("%s/%s", util.Key(svc), vGroupId), lbId,
+		CodeRemoveVgroup, dryrun.ERROR, "")
 	return hintError(mtype, fmt.Sprintf("loadbalancer %s vgroup %s backends %s should be deleted",
 		lbId, vGroupId, backends))
 }
@@ -272,11 +308,11 @@ func (m *DryRunSLB) SetVServerGroupAttribute(ctx context.Context, vGroupId strin
 }
 
 func (m *DryRunSLB) ModifyVServerGroupBackendServers(ctx context.Context, vGroupId string, old string, new string) error {
-	mtype := "ModifyVServerGroupBackendServers"
+	mtype := MTypeModifyVServerGroupBackendServers
 	svc := getService(ctx)
 	lbId := getSlb(ctx)
-	AddEvent(SLB, fmt.Sprintf("%s/VGroupID/%s", util.Key(svc), vGroupId), lbId,
-		"ModifyVgroup", ERROR, "")
+	dryrun.AddEvent(dryrun.SLB, fmt.Sprintf("%s/VGroupID/%s", util.Key(svc), vGroupId), lbId,
+		CodeModifyVgroup, dryrun.ERROR, "")
 	return hintError(mtype, fmt.Sprintf("loadbalancer %s vgroup %s backends should be %s", lbId, vGroupId, new))
 }
 
@@ -289,26 +325,26 @@ func (m *DryRunSLB) DescribeDomainExtensions(ctx context.Context, lbId string, p
 }
 
 func (m *DryRunSLB) CreateDomainExtension(ctx context.Context, lbId string, port int, domain string, certId string) error {
-	mtype := "CreateDomainExtension"
+	mtype := MTypeCreateDomainExtension
 	svc := getService(ctx)
-	AddEvent(SLB, fmt.Sprintf("%s/%d", util.Key(svc), port), lbId,
-		"CreateDomainExtension", ERROR, "")
+	dryrun.AddEvent(dryrun.SLB, fmt.Sprintf("%s/%d", util.Key(svc), port), lbId,
+		CodeCreateDomainExtension, dryrun.ERROR, "")
 	return hintError(mtype, fmt.Sprintf("loadbalancer %s listener %d domain extension %s should be created", lbId, port, domain))
 }
 
 func (m *DryRunSLB) DeleteDomainExtension(ctx context.Context, id string) error {
-	mtype := "DeleteDomainExtension"
+	mtype := MTypeDeleteDomainExtension
 	svc := getService(ctx)
-	AddEvent(SLB, fmt.Sprintf("%s/%s", util.Key(svc), id), id,
-		"DeleteDomainExtension", ERROR, "")
+	dryrun.AddEvent(dryrun.SLB, fmt.Sprintf("%s/%s", util.Key(svc), id), id,
+		CodeDeleteDomainExtension, dryrun.ERROR, "")
 	return hintError(mtype, fmt.Sprintf("domain extension %s should be deleted", id))
 }
 
 func (m *DryRunSLB) SetDomainExtensionAttribute(ctx context.Context, id string, certId string) error {
-	mtype := "SetDomainExtensionAttribute"
+	mtype := MTypeSetDomainExtensionAttribute
 	svc := getService(ctx)
-	AddEvent(SLB, fmt.Sprintf("%s/%s", util.Key(svc), id), id,
-		"SetDomainExtensionAttribute", ERROR, "")
+	dryrun.AddEvent(dryrun.SLB, fmt.Sprintf("%s/%s", util.Key(svc), id), id,
+		CodeSetDomainExtensionAttribute, dryrun.ERROR, "")
 	return hintError(mtype, fmt.Sprintf("domain extension %s should be set", id))
 }
 
@@ -321,7 +357,7 @@ func getTagString(tags []tag.Tag) string {
 }
 
 func getService(ctx context.Context) *v1.Service {
-	isvc := ctx.Value(ContextService)
+	isvc := ctx.Value(dryrun.ContextService)
 	if isvc == nil {
 		return unknown()
 	}
@@ -333,7 +369,7 @@ func getService(ctx context.Context) *v1.Service {
 }
 
 func getSlb(ctx context.Context) string {
-	islb := ctx.Value(ContextSLB)
+	islb := ctx.Value(dryrun.ContextSLB)
 	if islb == nil {
 		return ""
 	}
@@ -354,7 +390,7 @@ func unknown() *v1.Service {
 }
 
 func getDryRunMsg(ctx context.Context) string {
-	isMsg := ctx.Value(ContextMessage)
+	isMsg := ctx.Value(dryrun.ContextMessage)
 	if isMsg == nil {
 		return ""
 	}
