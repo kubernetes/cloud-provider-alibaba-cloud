@@ -261,7 +261,7 @@ func setFields(node *v1.Node, ins *prvd.NodeAttribute, cfgRoute bool, removeTain
 
 	if ins.Region != "" {
 		klog.V(5).Infof(
-			"node %s,Adding node label from cloud provider: %s=%s, %s=%s",
+			"node %s, Adding node label from cloud provider: %s=%s, %s=%s",
 			node.Name,
 			v1.LabelZoneRegion, ins.Region,
 			v1.LabelTopologyRegion, ins.Region,
@@ -276,7 +276,7 @@ func setFields(node *v1.Node, ins *prvd.NodeAttribute, cfgRoute bool, removeTain
 	if node.Spec.ProviderID == "" && ins.InstanceID != "" {
 		prvdId := fmt.Sprintf("%s.%s", ins.Region, ins.InstanceID)
 		klog.V(5).Infof(
-			"node %s,Adding provider id from cloud provider: %s",
+			"node %s, Adding provider id from cloud provider: %s",
 			node.Name,
 			prvdId,
 		)

@@ -12,8 +12,10 @@ import (
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/helper"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/service/reconcile/annotation"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/model"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/model/tag"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/alibaba/base"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/vmock"
+	"k8s.io/cloud-provider-alibaba-cloud/pkg/util"
 	"reflect"
 	"testing"
 	"time"
@@ -656,4 +658,306 @@ func TestBuildActionsToUpdate(t *testing.T) {
 			assert.Equal(t, true, compareListenerActions(after, c.after))
 		})
 	}
+}
+
+func TestIsLoadBalancerReusable(t *testing.T) {
+	svc := getDefaultService()
+	reqCtx := getReqCtx(svc)
+
+	t.Run("reusable - no special tags", func(t *testing.T) {
+		tags := []tag.Tag{
+			{Key: "env", Value: "test"},
+		}
+		ok, reason := isLoadBalancerReusable(reqCtx, tags, "192.168.0.1")
+		assert.True(t, ok)
+		assert.Empty(t, reason)
+	})
+
+	t.Run("not reusable - has kubernetes tag", func(t *testing.T) {
+		tags := []tag.Tag{
+			{Key: helper.TAGKEY, Value: "test"},
+		}
+		ok, reason := isLoadBalancerReusable(reqCtx, tags, "192.168.0.1")
+		assert.False(t, ok)
+		assert.Contains(t, reason, "can not reuse loadbalancer created by kubernetes")
+	})
+
+	t.Run("not reusable - has ack.aliyun.com tag", func(t *testing.T) {
+		tags := []tag.Tag{
+			{Key: util.ClusterTagKey, Value: "test"},
+		}
+		ok, reason := isLoadBalancerReusable(reqCtx, tags, "192.168.0.1")
+		assert.False(t, ok)
+		assert.Contains(t, reason, "can not reuse loadbalancer created by kubernetes")
+	})
+
+	t.Run("reusable - with eip", func(t *testing.T) {
+		svc := getDefaultService()
+		svc.Annotations[annotation.Annotation(annotation.ExternalIPType)] = "eip"
+		reqCtx := getReqCtx(svc)
+		tags := []tag.Tag{}
+		ok, reason := isLoadBalancerReusable(reqCtx, tags, "192.168.0.1")
+		assert.True(t, ok)
+		assert.Empty(t, reason)
+	})
+
+	t.Run("not reusable - ip mismatch", func(t *testing.T) {
+		svc := getDefaultService()
+		svc.Status.LoadBalancer.Ingress = []v1.LoadBalancerIngress{
+			{IP: "10.0.0.1"},
+		}
+		reqCtx := getReqCtx(svc)
+		tags := []tag.Tag{}
+		ok, reason := isLoadBalancerReusable(reqCtx, tags, "192.168.0.1")
+		assert.False(t, ok)
+		assert.Contains(t, reason, "cannot be bound to ip")
+	})
+
+	t.Run("reusable - ip match", func(t *testing.T) {
+		svc := getDefaultService()
+		svc.Status.LoadBalancer.Ingress = []v1.LoadBalancerIngress{
+			{IP: "192.168.0.1"},
+		}
+		reqCtx := getReqCtx(svc)
+		tags := []tag.Tag{}
+		ok, reason := isLoadBalancerReusable(reqCtx, tags, "192.168.0.1")
+		assert.True(t, ok)
+		assert.Empty(t, reason)
+	})
+
+	t.Run("reusable - hostname", func(t *testing.T) {
+		svc := getDefaultService()
+		svc.Status.LoadBalancer.Ingress = []v1.LoadBalancerIngress{
+			{Hostname: "test.example.com"},
+		}
+		reqCtx := getReqCtx(svc)
+		tags := []tag.Tag{}
+		ok, reason := isLoadBalancerReusable(reqCtx, tags, "192.168.0.1")
+		assert.True(t, ok)
+		assert.Empty(t, reason)
+	})
+}
+
+func TestHasDeleteActionToPort(t *testing.T) {
+	t.Run("has delete action", func(t *testing.T) {
+		actions := []DeleteAction{
+			{listener: model.ListenerAttribute{ListenerPort: 80}},
+			{listener: model.ListenerAttribute{ListenerPort: 443}},
+		}
+		result := hasDeleteActionToPort(80, actions)
+		assert.True(t, result)
+	})
+
+	t.Run("no delete action", func(t *testing.T) {
+		actions := []DeleteAction{
+			{listener: model.ListenerAttribute{ListenerPort: 443}},
+		}
+		result := hasDeleteActionToPort(80, actions)
+		assert.False(t, result)
+	})
+
+	t.Run("empty actions", func(t *testing.T) {
+		actions := []DeleteAction{}
+		result := hasDeleteActionToPort(80, actions)
+		assert.False(t, result)
+	})
+}
+
+func TestHasDeleteActionForwardedTo(t *testing.T) {
+	t.Run("has forward delete action", func(t *testing.T) {
+		action := DeleteAction{
+			listener: model.ListenerAttribute{ListenerPort: 80},
+		}
+		actions := []DeleteAction{
+			{
+				listener: model.ListenerAttribute{
+					ListenerPort:    8080,
+					ListenerForward: model.OnFlag,
+					ForwardPort:     80,
+				},
+			},
+		}
+		result := hasDeleteActionForwardedTo(action, actions)
+		assert.True(t, result)
+	})
+
+	t.Run("no forward delete action", func(t *testing.T) {
+		action := DeleteAction{
+			listener: model.ListenerAttribute{ListenerPort: 80},
+		}
+		actions := []DeleteAction{
+			{
+				listener: model.ListenerAttribute{
+					ListenerPort:    8080,
+					ListenerForward: model.OnFlag,
+					ForwardPort:     443,
+				},
+			},
+		}
+		result := hasDeleteActionForwardedTo(action, actions)
+		assert.False(t, result)
+	})
+
+	t.Run("forward flag off", func(t *testing.T) {
+		action := DeleteAction{
+			listener: model.ListenerAttribute{ListenerPort: 80},
+		}
+		actions := []DeleteAction{
+			{
+				listener: model.ListenerAttribute{
+					ListenerPort:    8080,
+					ListenerForward: model.OffFlag,
+					ForwardPort:     80,
+				},
+			},
+		}
+		result := hasDeleteActionForwardedTo(action, actions)
+		assert.False(t, result)
+	})
+}
+
+func TestBuildVGroupCreateAndUpdateActions(t *testing.T) {
+	reqCtx := getReqCtx(getDefaultService())
+
+	t.Run("create new vgroup", func(t *testing.T) {
+		local := &model.LoadBalancer{
+			VServerGroups: []model.VServerGroup{
+				{VGroupName: "vgroup-1"},
+			},
+		}
+		remote := &model.LoadBalancer{
+			LoadBalancerAttribute: model.LoadBalancerAttribute{LoadBalancerId: "lb-1"},
+			VServerGroups:         []model.VServerGroup{},
+		}
+		actions, err := buildVGroupCreateAndUpdateActions(reqCtx, local, remote)
+		assert.NoError(t, err)
+		assert.Equal(t, 1, len(actions))
+		assert.Equal(t, vGroupActionCreateAndAddBackendServers, actions[0].Action)
+	})
+
+	t.Run("update existing vgroup", func(t *testing.T) {
+		local := &model.LoadBalancer{
+			VServerGroups: []model.VServerGroup{
+				{
+					VGroupId:   "vsg-1",
+					VGroupName: "vgroup-1",
+					Backends:   []model.BackendAttribute{{ServerId: "ecs-1", Port: 80}},
+				},
+			},
+		}
+		remote := &model.LoadBalancer{
+			LoadBalancerAttribute: model.LoadBalancerAttribute{LoadBalancerId: "lb-1"},
+			VServerGroups: []model.VServerGroup{
+				{
+					VGroupId:   "vsg-1",
+					VGroupName: "vgroup-1",
+					Backends:   []model.BackendAttribute{{ServerId: "ecs-2", Port: 80}},
+				},
+			},
+		}
+		actions, err := buildVGroupCreateAndUpdateActions(reqCtx, local, remote)
+		assert.NoError(t, err)
+		assert.Equal(t, 1, len(actions))
+		assert.Equal(t, vGroupActionUpdate, actions[0].Action)
+	})
+
+	t.Run("no change", func(t *testing.T) {
+		local := &model.LoadBalancer{
+			VServerGroups: []model.VServerGroup{
+				{
+					VGroupId:   "vsg-1",
+					VGroupName: "vgroup-1",
+					Backends:   []model.BackendAttribute{{ServerId: "ecs-1", Port: 80}},
+				},
+			},
+		}
+		remote := &model.LoadBalancer{
+			LoadBalancerAttribute: model.LoadBalancerAttribute{LoadBalancerId: "lb-1"},
+			VServerGroups: []model.VServerGroup{
+				{
+					VGroupId:   "vsg-1",
+					VGroupName: "vgroup-1",
+					Backends:   []model.BackendAttribute{{ServerId: "ecs-1", Port: 80}},
+				},
+			},
+		}
+		actions, err := buildVGroupCreateAndUpdateActions(reqCtx, local, remote)
+		assert.NoError(t, err)
+		assert.Equal(t, 0, len(actions))
+	})
+
+	t.Run("reuse vgroup by id", func(t *testing.T) {
+		local := &model.LoadBalancer{
+			VServerGroups: []model.VServerGroup{
+				{
+					VGroupId:   "vsg-1",
+					VGroupName: "vgroup-new",
+					Backends:   []model.BackendAttribute{{ServerId: "ecs-1", Port: 80}},
+				},
+			},
+		}
+		remote := &model.LoadBalancer{
+			LoadBalancerAttribute: model.LoadBalancerAttribute{LoadBalancerId: "lb-1"},
+			VServerGroups: []model.VServerGroup{
+				{
+					VGroupId:   "vsg-1",
+					VGroupName: "vgroup-old",
+					Backends:   []model.BackendAttribute{{ServerId: "ecs-2", Port: 80}},
+				},
+			},
+		}
+		actions, err := buildVGroupCreateAndUpdateActions(reqCtx, local, remote)
+		assert.NoError(t, err)
+		assert.Equal(t, 1, len(actions))
+		assert.Equal(t, vGroupActionUpdate, actions[0].Action)
+	})
+}
+
+// TestModelApplier_Apply_ErrorCases tests error cases for Apply function
+func TestModelApplier_Apply_ErrorCases(t *testing.T) {
+	vgm, err := getTestVGroupManager()
+	if err != nil {
+		t.Error(err)
+	}
+	applier := NewModelApplier(NewLoadBalancerManager(getMockCloudProvider()),
+		NewListenerManager(getMockCloudProvider()), vgm)
+
+	svc := getDefaultService()
+	reqCtx := getReqCtx(svc)
+
+	t.Run("nil local model", func(t *testing.T) {
+		_, err := applier.Apply(reqCtx, nil)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "local model is nil")
+	})
+
+	t.Run("namespaced name mismatch", func(t *testing.T) {
+		localModel := &model.LoadBalancer{
+			NamespacedName: types.NamespacedName{
+				Name:      "other-service",
+				Namespace: "default",
+			},
+		}
+		_, err := applier.Apply(reqCtx, localModel)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "not match")
+	})
+
+	t.Run("preserve on delete", func(t *testing.T) {
+		localModel := &model.LoadBalancer{
+			NamespacedName: types.NamespacedName{
+				Name:      SvcName,
+				Namespace: NS,
+			},
+			LoadBalancerAttribute: model.LoadBalancerAttribute{
+				PreserveOnDelete: true,
+			},
+		}
+		svc.Annotations[annotation.LoadBalancerId] = vmock.ExistLBID
+		reqCtx := getReqCtx(svc)
+		remote, err := applier.Apply(reqCtx, localModel)
+		// Should not error, but should record an event
+		assert.NoError(t, err)
+		assert.NotNil(t, remote)
+	})
 }

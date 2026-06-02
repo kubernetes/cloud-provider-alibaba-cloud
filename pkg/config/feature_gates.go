@@ -31,7 +31,7 @@ func init() {
 	runtime.Must(utilfeature.DefaultMutableFeatureGate.Add(CloudProviderFeatureGates))
 }
 
-func BindFeatureGates(client *apiext.Clientset, features string) error {
+func BindFeatureGates(client apiext.Interface, features string) error {
 	m := make(map[string]bool)
 	for _, s := range strings.Split(features, ",") {
 		if len(s) == 0 {
