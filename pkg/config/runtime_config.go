@@ -1,12 +1,15 @@
 package config
 
 import (
+	"time"
+
 	"github.com/spf13/pflag"
 	v1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1"
+	toolscache "k8s.io/client-go/tools/cache"
+	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
-	"time"
 )
 
 const (
@@ -83,6 +86,16 @@ func (c *RuntimeConfig) BindFlags(fs *pflag.FlagSet) {
 
 func BuildRuntimeOptions(rtCfg RuntimeConfig) manager.Options {
 	return manager.Options{
+		Cache: cache.Options{
+			ByObject: map[client.Object]cache.ByObject{
+				&v1.Node{}: {
+					Transform: stripNodeFields(),
+				},
+				&v1.Pod{}: {
+					Transform: stripPodFields(),
+				},
+			},
+		},
 		ClientDisableCacheFor: []client.Object{
 			&v1.Node{},
 			&v1.Service{},
@@ -99,5 +112,37 @@ func BuildRuntimeOptions(rtCfg RuntimeConfig) manager.Options {
 		LeaseDuration:              &rtCfg.LeaderElectLeaseDuration,
 		RenewDeadline:              &rtCfg.LeaderElectRenewDeadline,
 		RetryPeriod:                &rtCfg.LeaderElectRetryPeriod,
+	}
+}
+
+func stripNodeFields() toolscache.TransformFunc {
+	return func(obj interface{}) (interface{}, error) {
+		node, ok := obj.(*v1.Node)
+		if !ok {
+			return obj, nil
+		}
+		node.Status.Images = nil
+		node.ManagedFields = nil
+		return node, nil
+	}
+}
+
+func stripPodFields() toolscache.TransformFunc {
+	return func(obj interface{}) (interface{}, error) {
+		pod, ok := obj.(*v1.Pod)
+		if !ok {
+			return obj, nil
+		}
+		pod.ManagedFields = nil
+		for i := range pod.Spec.Containers {
+			pod.Spec.Containers[i].Env = nil
+			pod.Spec.Containers[i].VolumeMounts = nil
+		}
+		for i := range pod.Spec.InitContainers {
+			pod.Spec.InitContainers[i].Env = nil
+			pod.Spec.InitContainers[i].VolumeMounts = nil
+		}
+		pod.Spec.Volumes = nil
+		return pod, nil
 	}
 }
