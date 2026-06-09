@@ -6,13 +6,17 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"github.com/go-cmd/cmd"
-	ctrlCfg "k8s.io/cloud-provider-alibaba-cloud/pkg/config"
-	prvd "k8s.io/cloud-provider-alibaba-cloud/pkg/provider"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/go-cmd/cmd"
+
+	aliCredentials "github.com/aliyun/credentials-go/credentials"
+	"github.com/aliyun/credentials-go/credentials/providers"
+	ctrlCfg "k8s.io/cloud-provider-alibaba-cloud/pkg/config"
+	prvd "k8s.io/cloud-provider-alibaba-cloud/pkg/provider"
 )
 
 const (
@@ -200,6 +204,51 @@ func LoadAK() (string, string, error) {
 		}
 	}
 	return keyId, keySecret, nil
+}
+
+// RRSAToken implements TokenAuth using RRSA (OIDC-based AssumeRoleWithOIDC)
+type RRSAToken struct {
+	Region   string
+	provider *providers.OIDCCredentialsProvider
+}
+
+func NewRRSAToken(region string) (*RRSAToken, error) {
+	builder := providers.NewOIDCCredentialsProviderBuilder().
+		WithStsRegionId(region).
+		WithRoleSessionName("alibaba-cloud-ccm")
+
+	if ctrlCfg.ControllerCFG.NetWork == "vpc" {
+		builder = builder.WithEnableVpc(true)
+	}
+
+	provider, err := builder.Build()
+	if err != nil {
+		return nil, fmt.Errorf("build OIDC credentials provider: %w", err)
+	}
+
+	return &RRSAToken{
+		Region:   region,
+		provider: provider,
+	}, nil
+}
+
+func (f *RRSAToken) NextToken() (*DefaultToken, error) {
+	creds, err := f.provider.GetCredentials()
+	if err != nil {
+		return nil, fmt.Errorf("get RRSA credentials: %w", err)
+	}
+	return &DefaultToken{
+		Region:          f.Region,
+		AccessKeyId:     creds.AccessKeyId,
+		AccessKeySecret: creds.AccessKeySecret,
+		SecurityToken:   creds.SecurityToken,
+	}, nil
+}
+
+func isRRSAEnabled() bool {
+	return os.Getenv(aliCredentials.ENVOIDCProviderArn) != "" &&
+		os.Getenv(aliCredentials.ENVOIDCTokenFile) != "" &&
+		os.Getenv(aliCredentials.ENVRoleArn) != ""
 }
 
 func PKCS5UnPadding(origData []byte) []byte {

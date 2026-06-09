@@ -221,7 +221,7 @@ func (mgr *ClientMgr) Start(
 }
 
 func (mgr *ClientMgr) GetTokenAuth() TokenAuth {
-	// priority: AddonToken > ServiceToken > AKMode > RamRoleToken
+	// priority: AddonToken > ServiceToken > AKMode > RRSAToken > RamRoleToken
 	if _, err := os.Stat(AddonTokenFilePath); err == nil {
 		log.Info("use addon token mode to get token")
 		return &AddonToken{Region: mgr.Region}
@@ -240,6 +240,16 @@ func (mgr *ClientMgr) GetTokenAuth() TokenAuth {
 	if os.Getenv(AccessKeyID) != "" && os.Getenv(AccessKeySecret) != "" {
 		log.Info("use ak mode to get token")
 		return &AkAuthToken{Region: mgr.Region}
+	}
+
+	if isRRSAEnabled() {
+		log.Info("use RRSA (OIDC) mode to get token")
+		rrsaToken, err := NewRRSAToken(mgr.Region)
+		if err != nil {
+			log.Error(err, "failed to initialize RRSA token provider, falling back to ram role")
+		} else {
+			return rrsaToken
+		}
 	}
 
 	log.Info("use ram role mode to get token")
