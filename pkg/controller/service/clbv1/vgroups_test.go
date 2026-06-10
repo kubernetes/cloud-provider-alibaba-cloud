@@ -685,6 +685,310 @@ func TestSetBackendsFromEndpointSlices(t *testing.T) {
 		assert.Equal(t, 0, len(backends))
 	})
 
+	t.Run("graceful-shutdown: terminating+serving kept in ENI mode", func(t *testing.T) {
+		terminating := true
+		serving := true
+		nodeName := "node-1"
+		portName := "http"
+		port := int32(8080)
+		protocol := v1.ProtocolTCP
+		svcWithAnno := &v1.Service{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test",
+				Namespace: "default",
+				Annotations: map[string]string{
+					annotation.Annotation(annotation.GracefulShutdown): "true",
+				},
+			},
+		}
+		reqCtxWithAnno := &svcCtx.RequestContext{
+			Ctx:     context.TODO(),
+			Service: svcWithAnno,
+			Anno:    annotation.NewAnnotationRequest(svcWithAnno),
+			Log:     klogr.New(),
+		}
+		candidates := &backend.EndpointWithENI{
+			TrafficPolicy: helper.ENITrafficPolicy,
+			EndpointSlices: []discovery.EndpointSlice{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-slice",
+						Namespace: "default",
+					},
+					Endpoints: []discovery.Endpoint{
+						{
+							Addresses: []string{"10.0.0.10"},
+							Conditions: discovery.EndpointConditions{
+								Terminating: &terminating,
+								Serving:     &serving,
+							},
+							NodeName: &nodeName,
+						},
+					},
+					Ports: []discovery.EndpointPort{
+						{
+							Name:     &portName,
+							Port:     &port,
+							Protocol: &protocol,
+						},
+					},
+				},
+			},
+		}
+		vgroup := model.VServerGroup{
+			VGroupName: "test-vgroup",
+			ServicePort: v1.ServicePort{
+				Port:       80,
+				TargetPort: intstr.FromInt(8080),
+				Name:       "http",
+			},
+		}
+		backends, containsPotential, err := mgr.setBackendsFromEndpointSlices(reqCtxWithAnno, candidates, vgroup)
+		assert.NoError(t, err)
+		assert.False(t, containsPotential)
+		assert.Equal(t, 1, len(backends))
+		assert.Equal(t, "10.0.0.10", backends[0].ServerIp)
+		assert.True(t, backends[0].Terminating)
+	})
+
+	t.Run("graceful-shutdown: ignored when ignore-weight-update is on", func(t *testing.T) {
+		terminating := true
+		serving := true
+		nodeName := "node-1"
+		portName := "http"
+		port := int32(8080)
+		protocol := v1.ProtocolTCP
+		svcWithAnno := &v1.Service{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test",
+				Namespace: "default",
+				Annotations: map[string]string{
+					annotation.Annotation(annotation.GracefulShutdown):   "true",
+					annotation.Annotation(annotation.IgnoreWeightUpdate): string(model.OnFlag),
+				},
+			},
+		}
+		reqCtxWithAnno := &svcCtx.RequestContext{
+			Ctx:     context.TODO(),
+			Service: svcWithAnno,
+			Anno:    annotation.NewAnnotationRequest(svcWithAnno),
+			Log:     klogr.New(),
+		}
+		candidates := &backend.EndpointWithENI{
+			TrafficPolicy: helper.ENITrafficPolicy,
+			EndpointSlices: []discovery.EndpointSlice{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-slice",
+						Namespace: "default",
+					},
+					Endpoints: []discovery.Endpoint{
+						{
+							Addresses: []string{"10.0.0.14"},
+							Conditions: discovery.EndpointConditions{
+								Terminating: &terminating,
+								Serving:     &serving,
+							},
+							NodeName: &nodeName,
+						},
+					},
+					Ports: []discovery.EndpointPort{
+						{
+							Name:     &portName,
+							Port:     &port,
+							Protocol: &protocol,
+						},
+					},
+				},
+			},
+		}
+		vgroup := model.VServerGroup{
+			VGroupName: "test-vgroup",
+			ServicePort: v1.ServicePort{
+				Port:       80,
+				TargetPort: intstr.FromInt(8080),
+				Name:       "http",
+			},
+		}
+		backends, _, err := mgr.setBackendsFromEndpointSlices(reqCtxWithAnno, candidates, vgroup)
+		assert.NoError(t, err)
+		assert.Equal(t, 0, len(backends))
+	})
+
+	t.Run("graceful-shutdown: terminating+not-serving removed", func(t *testing.T) {
+		terminating := true
+		serving := false
+		nodeName := "node-1"
+		portName := "http"
+		port := int32(8080)
+		protocol := v1.ProtocolTCP
+		svcWithAnno := &v1.Service{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test",
+				Namespace: "default",
+				Annotations: map[string]string{
+					annotation.Annotation(annotation.GracefulShutdown): "true",
+				},
+			},
+		}
+		reqCtxWithAnno := &svcCtx.RequestContext{
+			Ctx:     context.TODO(),
+			Service: svcWithAnno,
+			Anno:    annotation.NewAnnotationRequest(svcWithAnno),
+			Log:     klogr.New(),
+		}
+		candidates := &backend.EndpointWithENI{
+			TrafficPolicy: helper.ENITrafficPolicy,
+			EndpointSlices: []discovery.EndpointSlice{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-slice",
+						Namespace: "default",
+					},
+					Endpoints: []discovery.Endpoint{
+						{
+							Addresses: []string{"10.0.0.11"},
+							Conditions: discovery.EndpointConditions{
+								Terminating: &terminating,
+								Serving:     &serving,
+							},
+							NodeName: &nodeName,
+						},
+					},
+					Ports: []discovery.EndpointPort{
+						{
+							Name:     &portName,
+							Port:     &port,
+							Protocol: &protocol,
+						},
+					},
+				},
+			},
+		}
+		vgroup := model.VServerGroup{
+			VGroupName: "test-vgroup",
+			ServicePort: v1.ServicePort{
+				Port:       80,
+				TargetPort: intstr.FromInt(8080),
+				Name:       "http",
+			},
+		}
+		backends, _, err := mgr.setBackendsFromEndpointSlices(reqCtxWithAnno, candidates, vgroup)
+		assert.NoError(t, err)
+		assert.Equal(t, 0, len(backends))
+	})
+
+	t.Run("graceful-shutdown: terminating ignored without annotation", func(t *testing.T) {
+		terminating := true
+		serving := true
+		nodeName := "node-1"
+		portName := "http"
+		port := int32(8080)
+		protocol := v1.ProtocolTCP
+		candidates := &backend.EndpointWithENI{
+			TrafficPolicy: helper.ENITrafficPolicy,
+			EndpointSlices: []discovery.EndpointSlice{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-slice",
+						Namespace: "default",
+					},
+					Endpoints: []discovery.Endpoint{
+						{
+							Addresses: []string{"10.0.0.12"},
+							Conditions: discovery.EndpointConditions{
+								Terminating: &terminating,
+								Serving:     &serving,
+							},
+							NodeName: &nodeName,
+						},
+					},
+					Ports: []discovery.EndpointPort{
+						{
+							Name:     &portName,
+							Port:     &port,
+							Protocol: &protocol,
+						},
+					},
+				},
+			},
+		}
+		vgroup := model.VServerGroup{
+			VGroupName: "test-vgroup",
+			ServicePort: v1.ServicePort{
+				Port:       80,
+				TargetPort: intstr.FromInt(8080),
+				Name:       "http",
+			},
+		}
+		backends, _, err := mgr.setBackendsFromEndpointSlices(reqCtx, candidates, vgroup)
+		assert.NoError(t, err)
+		assert.Equal(t, 0, len(backends))
+	})
+
+	t.Run("graceful-shutdown: terminating ignored in non-ENI mode", func(t *testing.T) {
+		terminating := true
+		serving := true
+		nodeName := "node-1"
+		portName := "http"
+		port := int32(8080)
+		protocol := v1.ProtocolTCP
+		svcWithAnno := &v1.Service{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test",
+				Namespace: "default",
+				Annotations: map[string]string{
+					annotation.Annotation(annotation.GracefulShutdown): "true",
+				},
+			},
+		}
+		reqCtxWithAnno := &svcCtx.RequestContext{
+			Ctx:     context.TODO(),
+			Service: svcWithAnno,
+			Anno:    annotation.NewAnnotationRequest(svcWithAnno),
+			Log:     klogr.New(),
+		}
+		candidates := &backend.EndpointWithENI{
+			TrafficPolicy: helper.LocalTrafficPolicy,
+			EndpointSlices: []discovery.EndpointSlice{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-slice",
+						Namespace: "default",
+					},
+					Endpoints: []discovery.Endpoint{
+						{
+							Addresses: []string{"10.0.0.13"},
+							Conditions: discovery.EndpointConditions{
+								Terminating: &terminating,
+								Serving:     &serving,
+							},
+							NodeName: &nodeName,
+						},
+					},
+					Ports: []discovery.EndpointPort{
+						{
+							Name:     &portName,
+							Port:     &port,
+							Protocol: &protocol,
+						},
+					},
+				},
+			},
+		}
+		vgroup := model.VServerGroup{
+			VGroupName: "test-vgroup",
+			ServicePort: v1.ServicePort{
+				Port:       80,
+				TargetPort: intstr.FromInt(8080),
+				Name:       "http",
+			},
+		}
+		backends, _, err := mgr.setBackendsFromEndpointSlices(reqCtxWithAnno, candidates, vgroup)
+		assert.NoError(t, err)
+		assert.Equal(t, 0, len(backends))
+	})
+
 	t.Run("duplicate endpoint addresses", func(t *testing.T) {
 		ready := true
 		nodeName := "node-1"

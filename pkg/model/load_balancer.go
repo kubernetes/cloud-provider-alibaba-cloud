@@ -246,7 +246,8 @@ type BackendAttribute struct {
 	TargetRef   *v1.ObjectReference
 
 	// Invalid represents that the backend is un
-	Invalid bool
+	Invalid     bool
+	Terminating bool
 }
 
 type CertAttribute struct {

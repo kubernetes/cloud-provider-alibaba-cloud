@@ -851,3 +851,57 @@ func RunBackendTestCases(f *framework.Framework) {
 		})
 	})
 }
+
+func RunGracefulShutdownTestCases(f *framework.Framework) {
+	if options.TestConfig.Network != options.Terway {
+		return
+	}
+
+	ginkgo.Describe("clb service controller: graceful-shutdown", func() {
+		ginkgo.AfterEach(func() {
+			ginkgo.By("delete service")
+			err := f.AfterEach()
+			gomega.Expect(err).To(gomega.BeNil())
+		})
+
+		ginkgo.It("terminating pod weight should be 0", func() {
+			ginkgo.By("creating dedicated deployment with preStop hook")
+			err := f.Client.KubeClient.CreateGracefulShutdownDeployment()
+			gomega.Expect(err).To(gomega.BeNil())
+			defer func() {
+				_ = f.Client.KubeClient.DeleteGracefulShutdownDeployment()
+			}()
+
+			rawSvc := f.Client.KubeClient.DefaultService()
+			rawSvc.Spec.Selector = map[string]string{"run": "nginx-graceful"}
+			rawSvc.Annotations = map[string]string{
+				annotation.BackendType:                             model.ENIBackendType,
+				annotation.Annotation(annotation.GracefulShutdown): "true",
+			}
+			svc, err := f.Client.KubeClient.CreateService(rawSvc)
+			gomega.Expect(err).To(gomega.BeNil())
+
+			err = f.ExpectLoadBalancerEqual(svc)
+			gomega.Expect(err).To(gomega.BeNil())
+
+			pods, err := f.Client.KubeClient.GetGracefulShutdownPods()
+			gomega.Expect(err).To(gomega.BeNil())
+			gomega.Expect(len(pods)).To(gomega.BeNumerically(">=", 1))
+
+			targetPod := pods[0]
+			targetIP := targetPod.Status.PodIP
+			ginkgo.By(fmt.Sprintf("deleting pod %s (ip: %s)", targetPod.Name, targetIP))
+
+			err = f.Client.KubeClient.DeletePod(targetPod.Name)
+			gomega.Expect(err).To(gomega.BeNil())
+
+			ginkgo.By("waiting for backend weight=0")
+			err = f.WaitForBackendWeight(svc, targetIP, 0)
+			gomega.Expect(err).To(gomega.BeNil())
+
+			ginkgo.By("waiting for backend removal after termination")
+			err = f.WaitForBackendRemoved(svc, targetIP)
+			gomega.Expect(err).To(gomega.BeNil())
+		})
+	})
+}

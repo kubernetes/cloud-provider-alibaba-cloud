@@ -28,6 +28,7 @@ const (
 	DeleteTimestampChanged    = "DeleteTimestampChanged"
 	PreservedOnDelete         = "PreservedOnDelete"
 	FeatureNotSupported       = "FeatureNotSupported"
+	GracefulShutdownDisabled  = "GracefulShutdownDisabled"
 )
 
 // NodeEventReason

@@ -824,6 +824,117 @@ func (client *KubeClient) GetDeploymentPods() ([]v1.Pod, error) {
 	return podList.Items, nil
 }
 
+func (client *KubeClient) DeletePod(name string) error {
+	return client.CoreV1().Pods(Namespace).Delete(context.TODO(), name, metav1.DeleteOptions{})
+}
+
+func (client *KubeClient) CreateGracefulShutdownDeployment() error {
+	var replica int32 = 3
+	var gracePeriod int64 = 60
+	name := "nginx-graceful"
+	deploy := &appv1.Deployment{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: Namespace,
+			Labels:    map[string]string{"run": name},
+		},
+		Spec: appv1.DeploymentSpec{
+			Selector: &metav1.LabelSelector{
+				MatchLabels: map[string]string{"run": name},
+			},
+			Replicas: &replica,
+			Template: v1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{"run": name},
+				},
+				Spec: v1.PodSpec{
+					TerminationGracePeriodSeconds: &gracePeriod,
+					Containers: []v1.Container{
+						{
+							Name:            "nginx",
+							Image:           "registry.cn-hangzhou.aliyuncs.com/acs-sample/nginx:latest",
+							ImagePullPolicy: "Always",
+							Ports: []v1.ContainerPort{
+								{Name: "http", ContainerPort: 80, Protocol: v1.ProtocolTCP},
+								{Name: "https", ContainerPort: 443, Protocol: v1.ProtocolTCP},
+							},
+							Lifecycle: &v1.Lifecycle{
+								PreStop: &v1.LifecycleHandler{
+									Exec: &v1.ExecAction{Command: []string{"sleep", "30"}},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	_, err := client.AppsV1().Deployments(Namespace).Create(context.Background(), deploy, metav1.CreateOptions{})
+	if err != nil {
+		if !apierrors.IsAlreadyExists(err) {
+			return fmt.Errorf("create %s error: %s", name, err.Error())
+		}
+		if err := client.DeleteGracefulShutdownDeployment(); err != nil {
+			return fmt.Errorf("delete existing %s error: %s", name, err.Error())
+		}
+		_, err = client.AppsV1().Deployments(Namespace).Create(context.Background(), deploy, metav1.CreateOptions{})
+		if err != nil {
+			return fmt.Errorf("create %s error: %s", name, err.Error())
+		}
+	}
+	return wait.Poll(5*time.Second, 2*time.Minute, func() (done bool, err error) {
+		pods, err := client.CoreV1().Pods(Namespace).List(context.Background(), metav1.ListOptions{LabelSelector: "run=" + name})
+		if err != nil {
+			return false, nil
+		}
+		if len(pods.Items) != int(replica) {
+			return false, nil
+		}
+		for _, pod := range pods.Items {
+			if pod.Status.Phase != v1.PodRunning {
+				return false, nil
+			}
+		}
+		return true, nil
+	})
+}
+
+func (client *KubeClient) DeleteGracefulShutdownDeployment() error {
+	name := "nginx-graceful"
+	propagation := metav1.DeletePropagationForeground
+	err := client.AppsV1().Deployments(Namespace).Delete(context.TODO(), name, metav1.DeleteOptions{
+		PropagationPolicy: &propagation,
+	})
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			return nil
+		}
+		return err
+	}
+
+	return wait.PollImmediate(5*time.Second, 2*time.Minute, func() (done bool, err error) {
+		_, err = client.AppsV1().Deployments(Namespace).Get(context.TODO(), name, metav1.GetOptions{})
+		if err != nil {
+			if apierrors.IsNotFound(err) {
+				return true, nil
+			}
+			return false, err
+		}
+		return false, nil
+	})
+}
+
+func (client *KubeClient) GetGracefulShutdownPods() ([]v1.Pod, error) {
+	podList, err := client.CoreV1().Pods(Namespace).List(context.TODO(), metav1.ListOptions{
+		LabelSelector: "run=nginx-graceful",
+	})
+	if err != nil {
+		return nil, err
+	}
+	return podList.Items, nil
+}
+
 func (client *KubeClient) ListServiceEvents(svc *v1.Service, reason string) ([]v1.Event, error) {
 	selector := fmt.Sprintf("involvedObject.name=%s", svc.Name)
 	if reason != "" {

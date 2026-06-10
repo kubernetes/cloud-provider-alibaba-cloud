@@ -1643,3 +1643,65 @@ func domainExtensionsEqual(a, b []model.DomainExtension) bool {
 	}
 	return true
 }
+
+func (f *Framework) WaitForBackendWeight(svc *v1.Service, serverIp string, expectedWeight int) error {
+	var retErr error
+	_ = wait.PollImmediate(5*time.Second, 60*time.Second, func() (done bool, err error) {
+		remote, err := buildRemoteModel(f, svc)
+		if err != nil {
+			retErr = fmt.Errorf("build remote model: %s", err.Error())
+			return false, nil
+		}
+		port := svc.Spec.Ports[0]
+		name := getVGroupName(svc, port)
+		for _, vg := range remote.VServerGroups {
+			if vg.VGroupName != name {
+				continue
+			}
+			for _, b := range vg.Backends {
+				if b.ServerIp == serverIp {
+					if b.Weight == expectedWeight {
+						retErr = nil
+						return true, nil
+					}
+					retErr = fmt.Errorf("backend %s weight: expect %d, got %d", serverIp, expectedWeight, b.Weight)
+					return false, nil
+				}
+			}
+			retErr = fmt.Errorf("backend %s not found in vgroup %s", serverIp, vg.VGroupId)
+			return false, nil
+		}
+		retErr = fmt.Errorf("vgroup %s not found", name)
+		return false, nil
+	})
+	return retErr
+}
+
+func (f *Framework) WaitForBackendRemoved(svc *v1.Service, serverIp string) error {
+	var retErr error
+	_ = wait.PollImmediate(5*time.Second, 120*time.Second, func() (done bool, err error) {
+		remote, err := buildRemoteModel(f, svc)
+		if err != nil {
+			retErr = fmt.Errorf("build remote model: %s", err.Error())
+			return false, nil
+		}
+		port := svc.Spec.Ports[0]
+		name := getVGroupName(svc, port)
+		for _, vg := range remote.VServerGroups {
+			if vg.VGroupName != name {
+				continue
+			}
+			for _, b := range vg.Backends {
+				if b.ServerIp == serverIp {
+					retErr = fmt.Errorf("backend %s still present with weight %d", serverIp, b.Weight)
+					return false, nil
+				}
+			}
+			retErr = nil
+			return true, nil
+		}
+		retErr = nil
+		return true, nil
+	})
+	return retErr
+}

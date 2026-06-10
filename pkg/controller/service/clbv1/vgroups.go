@@ -705,6 +705,8 @@ func (mgr *VGroupManager) setBackendsFromEndpointSlices(reqCtx *svcCtx.RequestCo
 		return nil, false, nil
 	}
 
+	gracefulShutdownEnabled := backend.IsGracefulShutdownEnabled(reqCtx, candidates.TrafficPolicy)
+
 	for _, es := range candidates.EndpointSlices {
 		var backendPort int
 		if vgroup.ServicePort.TargetPort.Type == intstr.Int {
@@ -726,9 +728,11 @@ func (mgr *VGroupManager) setBackendsFromEndpointSlices(reqCtx *svcCtx.RequestCo
 		}
 
 		for _, ep := range es.Endpoints {
-			// ignore terminating pods
-			if ep.Conditions.Terminating != nil && *ep.Conditions.Terminating {
-				continue
+			isTerminating := ep.Conditions.Terminating != nil && *ep.Conditions.Terminating
+			if isTerminating {
+				if !gracefulShutdownEnabled || ep.Conditions.Serving == nil || !*ep.Conditions.Serving {
+					continue
+				}
 			}
 
 			for _, addr := range ep.Addresses {
@@ -736,7 +740,7 @@ func (mgr *VGroupManager) setBackendsFromEndpointSlices(reqCtx *svcCtx.RequestCo
 					continue
 				}
 
-				if ep.Conditions.Ready != nil && *ep.Conditions.Ready {
+				if isTerminating || (ep.Conditions.Ready != nil && *ep.Conditions.Ready) {
 					endpointMap[addr] = true
 					backends = append(backends, model.BackendAttribute{
 						NodeName: ep.NodeName,
@@ -746,6 +750,7 @@ func (mgr *VGroupManager) setBackendsFromEndpointSlices(reqCtx *svcCtx.RequestCo
 						Port:        backendPort,
 						Description: vgroup.VGroupName,
 						TargetRef:   ep.TargetRef,
+						Terminating: isTerminating,
 					})
 					continue
 				}
@@ -962,11 +967,17 @@ func setWeightBackends(mode helper.TrafficPolicy, backends []model.BackendAttrib
 	// use default
 	if weight == nil {
 		defaultWeight := pointer.IntDeref(defaultWeight, DefaultServerWeight)
-		return podNumberAlgorithm(mode, backends, defaultWeight)
+		backends = podNumberAlgorithm(mode, backends, defaultWeight)
+	} else {
+		backends = podPercentAlgorithm(mode, backends, *weight)
 	}
 
-	return podPercentAlgorithm(mode, backends, *weight)
-
+	for i := range backends {
+		if backends[i].Terminating {
+			backends[i].Weight = 0
+		}
+	}
+	return backends
 }
 
 // weight algorithm
