@@ -10,12 +10,12 @@ import (
 )
 
 type predicateForNodeEvent struct {
-	predicate.Funcs
+	predicate.TypedFuncs[*v1.Node]
 }
 
-func (sp *predicateForNodeEvent) Create(e event.CreateEvent) bool {
-	node, ok := e.Object.(*v1.Node)
-	if ok && node.Spec.PodCIDR == "" {
+func (sp *predicateForNodeEvent) Create(e event.TypedCreateEvent[*v1.Node]) bool {
+	node := e.Object
+	if node.Spec.PodCIDR == "" {
 		klog.V(5).Infof("node %s podCIDR is empty, ignore create event", node.Name)
 		return false
 	}
@@ -23,23 +23,20 @@ func (sp *predicateForNodeEvent) Create(e event.CreateEvent) bool {
 	return true
 }
 
-func (sp *predicateForNodeEvent) Update(e event.UpdateEvent) bool {
-	oldNode, ok1 := e.ObjectOld.(*v1.Node)
-	newNode, ok2 := e.ObjectNew.(*v1.Node)
-	if ok1 && ok2 {
-		if oldNode.UID != newNode.UID {
-			klog.Infof("node changed: %s UIDChanged: %v - %v", oldNode.Name, oldNode.UID, newNode.UID)
-			return true
-		}
-		if oldNode.Spec.PodCIDR != newNode.Spec.PodCIDR {
-			klog.Infof("node changed: %s Pod CIDR Changed: %v - %v", oldNode.Name, oldNode.Spec.PodCIDR, newNode.Spec.PodCIDR)
-			return true
-		}
-		if !reflect.DeepEqual(oldNode.Spec.PodCIDRs, newNode.Spec.PodCIDRs) {
-			klog.Infof("node changed: %s Pod CIDRs Changed: %v - %v", oldNode.Name, oldNode.Spec.PodCIDRs, newNode.Spec.PodCIDRs)
-			return true
-		}
-		return false
+func (sp *predicateForNodeEvent) Update(e event.TypedUpdateEvent[*v1.Node]) bool {
+	oldNode := e.ObjectOld
+	newNode := e.ObjectNew
+	if oldNode.UID != newNode.UID {
+		klog.Infof("node changed: %s UIDChanged: %v - %v", oldNode.Name, oldNode.UID, newNode.UID)
+		return true
 	}
-	return true
+	if oldNode.Spec.PodCIDR != newNode.Spec.PodCIDR {
+		klog.Infof("node changed: %s Pod CIDR Changed: %v - %v", oldNode.Name, oldNode.Spec.PodCIDR, newNode.Spec.PodCIDR)
+		return true
+	}
+	if !reflect.DeepEqual(oldNode.Spec.PodCIDRs, newNode.Spec.PodCIDRs) {
+		klog.Infof("node changed: %s Pod CIDRs Changed: %v - %v", oldNode.Name, oldNode.Spec.PodCIDRs, newNode.Spec.PodCIDRs)
+		return true
+	}
+	return false
 }

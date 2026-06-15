@@ -39,11 +39,11 @@ import (
 var log = klogr.New().WithName("route-controller")
 
 func Add(mgr manager.Manager, ctx *shared.SharedContext) error {
-	requeueChan := make(chan event.GenericEvent, ctrlCfg.ControllerCFG.RouteReconcileBatchSize*ctrlCfg.CloudCFG.Global.RouteMaxConcurrentReconciles)
-	rateLimiter := workqueue.NewMaxOfRateLimiter(
-		workqueue.NewItemExponentialFailureRateLimiter(5*time.Second, 300*time.Second),
+	requeueChan := make(chan event.TypedGenericEvent[*corev1.Node], ctrlCfg.ControllerCFG.RouteReconcileBatchSize*ctrlCfg.CloudCFG.Global.RouteMaxConcurrentReconciles)
+	rateLimiter := workqueue.NewTypedMaxOfRateLimiter[reconcile.Request](
+		workqueue.NewTypedItemExponentialFailureRateLimiter[reconcile.Request](5*time.Second, 300*time.Second),
 		// 10 qps, 100 bucket size.  This is only for retry speed, and it's only the overall factor (not per item)
-		&workqueue.BucketRateLimiter{Limiter: rate.NewLimiter(rate.Limit(10), 100)},
+		&workqueue.TypedBucketRateLimiter[reconcile.Request]{Limiter: rate.NewLimiter(rate.Limit(10), 100)},
 	)
 
 	r := newReconciler(mgr, ctx, requeueChan, rateLimiter)
@@ -67,16 +67,13 @@ func Add(mgr manager.Manager, ctx *shared.SharedContext) error {
 	}
 	// Watch for changes to primary resource AutoRepair
 	if err := c.Watch(
-		source.Kind(mgr.GetCache(), &corev1.Node{}),
-		enqueueRequest,
-		&predicateForNodeEvent{},
+		source.Kind[*corev1.Node](mgr.GetCache(), &corev1.Node{}, enqueueRequest, &predicateForNodeEvent{}),
 	); err != nil {
 		return err
 	}
 
 	if err := c.Watch(
-		&source.Channel{Source: requeueChan},
-		enqueueRequest); err != nil {
+		source.Channel(requeueChan, enqueueRequest)); err != nil {
 		return err
 	}
 
@@ -84,7 +81,7 @@ func Add(mgr manager.Manager, ctx *shared.SharedContext) error {
 }
 
 // newReconciler returns a new reconcile.Reconciler
-func newReconciler(mgr manager.Manager, ctx *shared.SharedContext, requeue chan<- event.GenericEvent, rateLimiter workqueue.RateLimiter) *ReconcileRoute {
+func newReconciler(mgr manager.Manager, ctx *shared.SharedContext, requeue chan<- event.TypedGenericEvent[*corev1.Node], rateLimiter workqueue.TypedRateLimiter[reconcile.Request]) *ReconcileRoute {
 	recon := &ReconcileRoute{
 		cloud:           ctx.Provider(),
 		client:          mgr.GetClient(),
@@ -134,10 +131,10 @@ type ReconcileRoute struct {
 	//record event recorder
 	record record.EventRecorder
 
-	requeueChan chan<- event.GenericEvent
+	requeueChan chan<- event.TypedGenericEvent[*corev1.Node]
 	requestChan chan reconcile.Request
 
-	rateLimiter workqueue.RateLimiter
+	rateLimiter workqueue.TypedRateLimiter[reconcile.Request]
 }
 
 func (r *ReconcileRoute) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
@@ -418,7 +415,7 @@ func (r *ReconcileRoute) batchSyncCloudRoutes(ctx context.Context, reconcileID s
 
 		if _, _, err := util.NodeFromProviderID(n.Spec.ProviderID); err != nil {
 			log.Error(err, "invalid providerID, requeue", "node", n.Name, "providerID", n.Spec.ProviderID, "reconcileID", reconcileID)
-			r.requeueChan <- event.GenericEvent{Object: n}
+			r.requeueChan <- event.TypedGenericEvent[*corev1.Node]{Object: n}
 			continue
 
 		}
@@ -430,7 +427,7 @@ func (r *ReconcileRoute) batchSyncCloudRoutes(ctx context.Context, reconcileID s
 			if err1 := r.updateNetworkingCondition(ctx, n, false); err1 != nil {
 				klog.Errorf("route, update network condition error: %v", err1)
 			}
-			r.requeueChan <- event.GenericEvent{Object: n}
+			r.requeueChan <- event.TypedGenericEvent[*corev1.Node]{Object: n}
 			continue
 		}
 
@@ -537,7 +534,7 @@ func (r *ReconcileRoute) batchSyncCloudRoutes(ctx context.Context, reconcileID s
 func (r *ReconcileRoute) requeueNode(n *corev1.Node) {
 	// if the channel is full, drop the event to prevent blocking
 	select {
-	case r.requeueChan <- event.GenericEvent{Object: n}:
+	case r.requeueChan <- event.TypedGenericEvent[*corev1.Node]{Object: n}:
 		break
 	default:
 		log.Info("requeue channel is full, drop the request", "node", n.Name)

@@ -1141,7 +1141,7 @@ func genericNLBServerEqual(reqCtx *svcCtx.RequestContext, local v1.ServicePort, 
 	if cps := reqCtx.Anno.Get(annotation.Cps); cps != "" {
 		cps, err := strconv.Atoi(cps)
 		if err != nil {
-			return fmt.Errorf("cps %s parse error: %s", cps, err.Error())
+			return fmt.Errorf("cps %d parse error: %s", cps, err.Error())
 		}
 
 		if remote.Cps == nil || int32(cps) != *remote.Cps {

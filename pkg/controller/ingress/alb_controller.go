@@ -133,11 +133,11 @@ type albconfigReconciler struct {
 func (g *albconfigReconciler) setupWatches(_ context.Context, c controller.Controller, mgr manager.Manager) error {
 	g.acEventChan = make(chan event.GenericEvent)
 	acEventHandler := NewEnqueueRequestsForAlbconfigEvent(g.k8sClient, g.eventRecorder, g.logger)
-	if err := c.Watch(&source.Channel{Source: g.acEventChan}, acEventHandler); err != nil {
+	if err := c.Watch(source.Channel(g.acEventChan, acEventHandler)); err != nil {
 		return err
 	}
 
-	if err := c.Watch(source.Kind(mgr.GetCache(), &v1.AlbConfig{}), acEventHandler); err != nil {
+	if err := c.Watch(source.Kind[client.Object](mgr.GetCache(), &v1.AlbConfig{}, acEventHandler)); err != nil {
 		return err
 	}
 

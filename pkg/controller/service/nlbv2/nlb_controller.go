@@ -31,7 +31,6 @@ import (
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/util/dryrun"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/util/metric"
 	"k8s.io/klog/v2"
-	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
@@ -85,10 +84,10 @@ func (n nlbController) Start(ctx context.Context) error {
 }
 
 func add(mgr manager.Manager, r *ReconcileNLB) error {
-	rateLimit := workqueue.NewMaxOfRateLimiter(
-		workqueue.NewItemExponentialFailureRateLimiter(5*time.Second, 300*time.Second),
+	rateLimit := workqueue.NewTypedMaxOfRateLimiter[reconcile.Request](
+		workqueue.NewTypedItemExponentialFailureRateLimiter[reconcile.Request](5*time.Second, 300*time.Second),
 		// 10 qps, 100 bucket size.  This is only for retry speed and its only the overall factor (not per item)
-		&workqueue.BucketRateLimiter{Limiter: rate.NewLimiter(rate.Limit(10), 100)},
+		&workqueue.TypedBucketRateLimiter[reconcile.Request]{Limiter: rate.NewLimiter(rate.Limit(10), 100)},
 	)
 	recoverPanic := true
 	// Create a new controller
@@ -105,8 +104,8 @@ func add(mgr manager.Manager, r *ReconcileNLB) error {
 		return err
 	}
 
-	if err := c.Watch(source.Kind(mgr.GetCache(), &v1.Service{}),
-		NewEnqueueRequestForServiceEvent(mgr.GetEventRecorderFor("nlb-controller"))); err != nil {
+	if err := c.Watch(source.Kind[*v1.Service](mgr.GetCache(), &v1.Service{},
+		NewEnqueueRequestForServiceEvent(mgr.GetEventRecorderFor("nlb-controller")))); err != nil {
 		return fmt.Errorf("watch resource svc error: %s", err.Error())
 	}
 
@@ -116,20 +115,20 @@ func add(mgr manager.Manager, r *ReconcileNLB) error {
 
 	if utilfeature.DefaultFeatureGate.Enabled(ctrlCfg.EndpointSlice) {
 		// watch endpointslice
-		if err := c.Watch(source.Kind(mgr.GetCache(), &discovery.EndpointSlice{}),
-			NewEnqueueRequestForEndpointSliceEvent(mgr.GetClient(), mgr.GetEventRecorderFor("service-controller"))); err != nil {
+		if err := c.Watch(source.Kind[*discovery.EndpointSlice](mgr.GetCache(), &discovery.EndpointSlice{},
+			NewEnqueueRequestForEndpointSliceEvent(mgr.GetClient(), mgr.GetEventRecorderFor("service-controller")))); err != nil {
 			return fmt.Errorf("watch resource endpointslice error: %s", err.Error())
 		}
 	} else {
 		// watch endpoints
-		if err := c.Watch(source.Kind(mgr.GetCache(), &v1.Endpoints{}),
-			NewEnqueueRequestForEndpointEvent(mgr.GetClient(), mgr.GetEventRecorderFor("service-controller"))); err != nil {
+		if err := c.Watch(source.Kind[*v1.Endpoints](mgr.GetCache(), &v1.Endpoints{},
+			NewEnqueueRequestForEndpointEvent(mgr.GetClient(), mgr.GetEventRecorderFor("service-controller")))); err != nil {
 			return fmt.Errorf("watch resource endpoint error: %s", err.Error())
 		}
 	}
 
-	if err := c.Watch(source.Kind(mgr.GetCache(), &v1.Node{}),
-		NewEnqueueRequestForNodeEvent(mgr.GetClient(), mgr.GetEventRecorderFor("nlb-controller"))); err != nil {
+	if err := c.Watch(source.Kind[*v1.Node](mgr.GetCache(), &v1.Node{},
+		NewEnqueueRequestForNodeEvent(mgr.GetClient(), mgr.GetEventRecorderFor("nlb-controller")))); err != nil {
 		return fmt.Errorf("watch resource node error: %s", err.Error())
 	}
 
@@ -345,7 +344,7 @@ func (m *ReconcileNLB) updateServiceStatus(reqCtx *svcCtx.RequestContext, svc *v
 
 	// Write the state if changed
 	// TODO: Be careful here ... what if there were other changes to the service?
-	if !v1helper.LoadBalancerStatusEqual(preStatus, newStatus) {
+	if !loadBalancerStatusEqual(preStatus, newStatus) {
 		util.ServiceLog.Info(fmt.Sprintf("status: [%v] [%v]", preStatus, newStatus))
 		var retErr error
 		_ = helper.Retry(
@@ -402,7 +401,7 @@ func (m *ReconcileNLB) removeServiceStatus(reqCtx *svcCtx.RequestContext, svc *v
 
 	// Write the state if changed
 	// TODO: Be careful here ... what if there were other changes to the service?
-	if !v1helper.LoadBalancerStatusEqual(preStatus, newStatus) {
+	if !loadBalancerStatusEqual(preStatus, newStatus) {
 		util.ServiceLog.Info(fmt.Sprintf("status: [%v] [%v]", preStatus, newStatus))
 		return helper.Retry(
 			&wait.Backoff{
@@ -479,7 +478,7 @@ func (m *ReconcileNLB) updateServiceLabels(svc *v1.Service, lb *nlbmodel.Network
 		}
 	}
 	if needUpdate {
-		if err := m.kubeClient.Status().Patch(context.Background(), updated, client.MergeFrom(svc)); err != nil {
+		if err := m.kubeClient.Patch(context.Background(), updated, client.MergeFrom(svc)); err != nil {
 			return fmt.Errorf("%s failed to add service hash:, error: %s", util.Key(svc), err.Error())
 		}
 	}
@@ -502,7 +501,7 @@ func (m *ReconcileNLB) removeServiceLabels(svc *v1.Service) error {
 		needUpdate = true
 	}
 	if needUpdate {
-		if err := m.kubeClient.Status().Patch(context.Background(), updated, client.MergeFrom(svc)); err != nil {
+		if err := m.kubeClient.Patch(context.Background(), updated, client.MergeFrom(svc)); err != nil {
 			return fmt.Errorf("%s failed to remove service hash:, error: %s", util.Key(svc), err.Error())
 		}
 	}

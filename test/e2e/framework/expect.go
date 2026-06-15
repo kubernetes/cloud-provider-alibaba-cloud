@@ -849,7 +849,7 @@ func httpsEqual(reqCtx *svcCtx.RequestContext, local v1.ServicePort, remote mode
 	}
 	if tls := reqCtx.Anno.Get(annotation.TLSCipherPolicy); tls != "" {
 		if remote.TLSCipherPolicy != tls {
-			return fmt.Errorf("expected slb tls %d, got %d", tls, remote.TLSCipherPolicy)
+			return fmt.Errorf("expected slb tls %s, got %s", tls, remote.TLSCipherPolicy)
 		}
 	}
 	if reqCtx.Anno.Has(annotation.DomainExtensions) {

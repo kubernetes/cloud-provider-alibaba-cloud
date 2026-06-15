@@ -332,10 +332,10 @@ func getReqCtx(svc *v1.Service) *svcCtx.RequestContext {
 }
 
 func TestRateLimiter(t *testing.T) {
-	rateLimit := workqueue.NewMaxOfRateLimiter(
-		workqueue.NewItemExponentialFailureRateLimiter(5*time.Second, 300*time.Second),
+	rateLimit := workqueue.NewTypedMaxOfRateLimiter[string](
+		workqueue.NewTypedItemExponentialFailureRateLimiter[string](5*time.Second, 300*time.Second),
 		// 10 qps, 100 bucket size.  This is only for retry speed and its only the overall factor (not per item)
-		&workqueue.BucketRateLimiter{Limiter: rate.NewLimiter(rate.Limit(10), 100)},
+		&workqueue.TypedBucketRateLimiter[string]{Limiter: rate.NewLimiter(rate.Limit(10), 100)},
 	)
 	item := "test"
 
@@ -620,7 +620,9 @@ func TestReconcileNLB_RemoveServiceLabels(t *testing.T) {
 	updated := &v1.Service{}
 	err = cl.Get(context.TODO(), types.NamespacedName{Name: svc.Name, Namespace: svc.Namespace}, updated)
 	assert.NoError(t, err)
-	assert.NotNil(t, updated.Labels)
+	assert.NotContains(t, updated.Labels, helper.LabelServiceHash)
+	assert.NotContains(t, updated.Labels, helper.LabelLoadBalancerId)
+	assert.NotContains(t, updated.Labels, helper.LabelSecurityGroupId)
 }
 
 func TestReconcileNLB_ReconcileLoadBalancerResources(t *testing.T) {

@@ -9,13 +9,14 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/util/workqueue"
 	"sigs.k8s.io/controller-runtime/pkg/event"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
 func TestEnqueueRequestForNodeEvent_Update(t *testing.T) {
 	handler := NewEnqueueRequestForNodeEvent()
 	assert.NotNil(t, handler)
 
-	queue := workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter())
+	queue := workqueue.NewTypedRateLimitingQueue(workqueue.DefaultTypedControllerRateLimiter[reconcile.Request]())
 	defer queue.ShutDown()
 
 	oldNode := &v1.Node{
@@ -30,7 +31,7 @@ func TestEnqueueRequestForNodeEvent_Update(t *testing.T) {
 		},
 	}
 
-	updateEvent := event.UpdateEvent{
+	updateEvent := event.TypedUpdateEvent[*v1.Node]{
 		ObjectOld: oldNode,
 		ObjectNew: newNode,
 	}
@@ -46,7 +47,7 @@ func TestEnqueueRequestForNodeEvent_Delete(t *testing.T) {
 	handler := NewEnqueueRequestForNodeEvent()
 	assert.NotNil(t, handler)
 
-	queue := workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter())
+	queue := workqueue.NewTypedRateLimitingQueue(workqueue.DefaultTypedControllerRateLimiter[reconcile.Request]())
 	defer queue.ShutDown()
 
 	node := &v1.Node{
@@ -55,7 +56,7 @@ func TestEnqueueRequestForNodeEvent_Delete(t *testing.T) {
 		},
 	}
 
-	deleteEvent := event.DeleteEvent{
+	deleteEvent := event.TypedDeleteEvent[*v1.Node]{
 		Object: node,
 	}
 
@@ -70,7 +71,7 @@ func TestEnqueueRequestForNodeEvent_Generic(t *testing.T) {
 	handler := NewEnqueueRequestForNodeEvent()
 	assert.NotNil(t, handler)
 
-	queue := workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter())
+	queue := workqueue.NewTypedRateLimitingQueue(workqueue.DefaultTypedControllerRateLimiter[reconcile.Request]())
 	defer queue.ShutDown()
 
 	node := &v1.Node{
@@ -79,7 +80,7 @@ func TestEnqueueRequestForNodeEvent_Generic(t *testing.T) {
 		},
 	}
 
-	genericEvent := event.GenericEvent{
+	genericEvent := event.TypedGenericEvent[*v1.Node]{
 		Object: node,
 	}
 
@@ -153,10 +154,10 @@ func TestEnqueueRequestForNodeEvent_Create(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			handler := NewEnqueueRequestForNodeEvent()
-			queue := workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter())
+			queue := workqueue.NewTypedRateLimitingQueue(workqueue.DefaultTypedControllerRateLimiter[reconcile.Request]())
 			defer queue.ShutDown()
 
-			createEvent := event.CreateEvent{
+			createEvent := event.TypedCreateEvent[*v1.Node]{
 				Object: tt.node,
 			}
 

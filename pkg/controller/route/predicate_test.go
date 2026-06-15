@@ -22,7 +22,7 @@ func TestPredicateForNodeEvent_Create(t *testing.T) {
 			},
 		}
 
-		createEvent := event.CreateEvent{
+		createEvent := event.TypedCreateEvent[*corev1.Node]{
 			Object: node,
 		}
 
@@ -40,7 +40,7 @@ func TestPredicateForNodeEvent_Create(t *testing.T) {
 			},
 		}
 
-		createEvent := event.CreateEvent{
+		createEvent := event.TypedCreateEvent[*corev1.Node]{
 			Object: node,
 		}
 
@@ -48,21 +48,6 @@ func TestPredicateForNodeEvent_Create(t *testing.T) {
 		assert.True(t, result, "Expected Create to return true for node with valid PodCIDR")
 	})
 
-	t.Run("non-node object", func(t *testing.T) {
-		pod := &corev1.Pod{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "test-pod",
-				Namespace: "default",
-			},
-		}
-
-		createEvent := event.CreateEvent{
-			Object: pod,
-		}
-
-		result := predicate.Create(createEvent)
-		assert.True(t, result, "Expected Create to return true for non-node objects")
-	})
 }
 
 func TestPredicateForNodeEvent_Update(t *testing.T) {
@@ -89,7 +74,7 @@ func TestPredicateForNodeEvent_Update(t *testing.T) {
 			},
 		}
 
-		updateEvent := event.UpdateEvent{
+		updateEvent := event.TypedUpdateEvent[*corev1.Node]{
 			ObjectOld: oldNode,
 			ObjectNew: newNode,
 		}
@@ -119,7 +104,7 @@ func TestPredicateForNodeEvent_Update(t *testing.T) {
 			},
 		}
 
-		updateEvent := event.UpdateEvent{
+		updateEvent := event.TypedUpdateEvent[*corev1.Node]{
 			ObjectOld: oldNode,
 			ObjectNew: newNode,
 		}
@@ -151,7 +136,7 @@ func TestPredicateForNodeEvent_Update(t *testing.T) {
 			},
 		}
 
-		updateEvent := event.UpdateEvent{
+		updateEvent := event.TypedUpdateEvent[*corev1.Node]{
 			ObjectOld: oldNode,
 			ObjectNew: newNode,
 		}
@@ -172,7 +157,7 @@ func TestPredicateForNodeEvent_Update(t *testing.T) {
 			},
 		}
 
-		updateEvent := event.UpdateEvent{
+		updateEvent := event.TypedUpdateEvent[*corev1.Node]{
 			ObjectOld: node,
 			ObjectNew: node,
 		}
@@ -181,27 +166,4 @@ func TestPredicateForNodeEvent_Update(t *testing.T) {
 		assert.False(t, result, "Expected Update to return false when node is unchanged")
 	})
 
-	t.Run("non-node objects", func(t *testing.T) {
-		oldPod := &corev1.Pod{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "old-pod",
-				Namespace: "default",
-			},
-		}
-
-		newPod := &corev1.Pod{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "new-pod",
-				Namespace: "default",
-			},
-		}
-
-		updateEvent := event.UpdateEvent{
-			ObjectOld: oldPod,
-			ObjectNew: newPod,
-		}
-
-		result := predicate.Update(updateEvent)
-		assert.True(t, result, "Expected Update to return true for non-node objects")
-	})
 }

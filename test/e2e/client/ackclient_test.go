@@ -29,9 +29,9 @@ func TestACKClient_DescribeClusterDetail(t *testing.T) {
 
 	resp, err := client.DescribeClusterDetail("<your-cluster-id>")
 	if err != nil {
-		t.Fatalf(err.Error())
+		t.Fatal(err)
 	}
-	t.Logf(*resp.State)
+	t.Log(*resp.State)
 
 }
 func TestACKClient_ScaleOutCluster(t *testing.T) {
@@ -42,7 +42,7 @@ func TestACKClient_ScaleOutCluster(t *testing.T) {
 
 	err = client.ScaleOutCluster("<your-cluster-id>", 1)
 	if err != nil {
-		t.Fatalf(err.Error())
+		t.Fatal(err)
 	}
 }
 
@@ -54,7 +54,7 @@ func TestACKClient_DeleteClusterNodes(t *testing.T) {
 
 	err = client.DeleteClusterNodes("<your-cluster-id>", "<your-node-name>")
 	if err != nil {
-		t.Fatalf(err.Error())
+		t.Fatal(err)
 	}
 }
 
@@ -66,7 +66,7 @@ func TestACKClient_DescribeClusterAddonsVersion(t *testing.T) {
 
 	addon, err := client.DescribeClusterAddonsUpgradeStatus("<your-cluster-id>", "terway-eniip")
 	if err != nil {
-		t.Fatalf(err.Error())
+		t.Fatal(err)
 	}
 	t.Logf("%v", addon)
 }
@@ -83,7 +83,7 @@ func TestNewACKClient_ModifyClusterConfiguration(t *testing.T) {
 	err = client.ModifyClusterConfiguration("<your-cluster-id>", "cloud-controller-manager",
 		configs)
 	if err != nil {
-		t.Fatalf(err.Error())
+		t.Fatal(err)
 	}
 
 }

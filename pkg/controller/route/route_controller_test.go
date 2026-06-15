@@ -539,7 +539,7 @@ func TestReconcileRoute_BatchWorker(t *testing.T) {
 
 func TestRequeueNode(t *testing.T) {
 	t.Run("requeue sent", func(t *testing.T) {
-		requeueCh := make(chan event.GenericEvent, 2)
+		requeueCh := make(chan event.TypedGenericEvent[*v1.Node], 2)
 		r := &ReconcileRoute{
 			cloud:       getMockCloudProvider(),
 			client:      getFakeKubeClient(),
@@ -557,7 +557,7 @@ func TestRequeueNode(t *testing.T) {
 	})
 
 	t.Run("requeue channel full", func(t *testing.T) {
-		requeueCh := make(chan event.GenericEvent, 1)
+		requeueCh := make(chan event.TypedGenericEvent[*v1.Node], 1)
 		r := &ReconcileRoute{
 			cloud:       getMockCloudProvider(),
 			client:      getFakeKubeClient(),
@@ -566,7 +566,7 @@ func TestRequeueNode(t *testing.T) {
 			requeueChan: requeueCh,
 			requestChan: make(chan reconcile.Request, 10),
 		}
-		requeueCh <- event.GenericEvent{Object: &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "blocking"}}}
+		requeueCh <- event.TypedGenericEvent[*v1.Node]{Object: &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "blocking"}}}
 		n := &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "dropped"}}
 		r.requeueNode(n)
 		ev := <-requeueCh
@@ -578,7 +578,7 @@ func TestRequeueNode(t *testing.T) {
 
 func getReconcileRoute() *ReconcileRoute {
 	eventRecord := record.NewFakeRecorder(100)
-	requeueCh := make(chan event.GenericEvent, 10)
+	requeueCh := make(chan event.TypedGenericEvent[*v1.Node], 10)
 	recon := &ReconcileRoute{
 		cloud:        getMockCloudProvider(),
 		client:       getFakeKubeClient(),
@@ -586,9 +586,9 @@ func getReconcileRoute() *ReconcileRoute {
 		nodeCache:    cmap.New(),
 		configRoutes: true,
 		requeueChan:  requeueCh,
-		rateLimiter: workqueue.NewMaxOfRateLimiter(
-			workqueue.NewItemExponentialFailureRateLimiter(5*time.Second, 300*time.Second),
-			&workqueue.BucketRateLimiter{Limiter: rate.NewLimiter(rate.Limit(10), 100)},
+		rateLimiter: workqueue.NewTypedMaxOfRateLimiter[reconcile.Request](
+			workqueue.NewTypedItemExponentialFailureRateLimiter[reconcile.Request](5*time.Second, 300*time.Second),
+			&workqueue.TypedBucketRateLimiter[reconcile.Request]{Limiter: rate.NewLimiter(rate.Limit(10), 100)},
 		),
 		requestChan: make(chan reconcile.Request, 10),
 	}
@@ -604,7 +604,7 @@ func getMockCloudProvider() prvd.Provider {
 
 func getReconcileRouteWithCloud(cloud prvd.Provider) *ReconcileRoute {
 	eventRecord := record.NewFakeRecorder(100)
-	requeueCh := make(chan event.GenericEvent, 10)
+	requeueCh := make(chan event.TypedGenericEvent[*v1.Node], 10)
 	return &ReconcileRoute{
 		cloud:        cloud,
 		client:       getFakeKubeClient(),
@@ -612,9 +612,9 @@ func getReconcileRouteWithCloud(cloud prvd.Provider) *ReconcileRoute {
 		nodeCache:    cmap.New(),
 		configRoutes: true,
 		requeueChan:  requeueCh,
-		rateLimiter: workqueue.NewMaxOfRateLimiter(
-			workqueue.NewItemExponentialFailureRateLimiter(5*time.Second, 300*time.Second),
-			&workqueue.BucketRateLimiter{Limiter: rate.NewLimiter(rate.Limit(10), 100)},
+		rateLimiter: workqueue.NewTypedMaxOfRateLimiter[reconcile.Request](
+			workqueue.NewTypedItemExponentialFailureRateLimiter[reconcile.Request](5*time.Second, 300*time.Second),
+			&workqueue.TypedBucketRateLimiter[reconcile.Request]{Limiter: rate.NewLimiter(rate.Limit(10), 100)},
 		),
 		requestChan: make(chan reconcile.Request, 10),
 	}

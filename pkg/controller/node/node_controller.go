@@ -52,8 +52,7 @@ func Add(mgr manager.Manager, ctx *shared.SharedContext) error {
 	enqueueRequest := NewEnqueueRequestForNodeEvent()
 	// Watch for changes to primary resource AutoRepair
 	if err := c.Watch(
-		source.Kind(mgr.GetCache(), &corev1.Node{}),
-		enqueueRequest,
+		source.Kind[*corev1.Node](mgr.GetCache(), &corev1.Node{}, enqueueRequest),
 	); err != nil {
 		return err
 	}
