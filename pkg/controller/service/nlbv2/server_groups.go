@@ -447,6 +447,13 @@ func (mgr *ServerGroupManager) UpdateServerGroup(reqCtx *svcCtx.RequestContext, 
 				updateDetail += fmt.Sprintf("HealthCheckHttpCode %v should be changed to %v;",
 					remoteHC.HealthCheckHttpCode, localHC.HealthCheckHttpCode)
 			}
+			if localHC.HealthCheckHttpVersion != "" &&
+				!strings.EqualFold(localHC.HealthCheckHttpVersion, remoteHC.HealthCheckHttpVersion) {
+				needUpdate = true
+				update.HealthCheckConfig.HealthCheckHttpVersion = localHC.HealthCheckHttpVersion
+				updateDetail += fmt.Sprintf("HealthCheckHttpVersion %v should be changed to %v;",
+					remoteHC.HealthCheckHttpVersion, localHC.HealthCheckHttpVersion)
+			}
 
 		}
 	update:
@@ -1286,6 +1293,7 @@ func setServerGroupAttributeFromAnno(sg *nlbmodel.ServerGroup, anno *annotation.
 			healthCheckConfig.HealthCheckDomain = anno.Get(annotation.HealthCheckDomain)
 			healthCheckConfig.HealthCheckUrl = anno.Get(annotation.HealthCheckURI)
 			healthCheckConfig.HttpCheckMethod = anno.Get(annotation.HealthCheckMethod)
+			healthCheckConfig.HealthCheckHttpVersion = anno.Get(annotation.HealthCheckHttpVersion)
 			if anno.Get(annotation.HealthCheckHTTPCode) != "" {
 				healthCheckConfig.HealthCheckHttpCode = strings.Split(anno.Get(annotation.HealthCheckHTTPCode), ",")
 			}

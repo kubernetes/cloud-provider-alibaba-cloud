@@ -84,6 +84,7 @@ const (
 	HealthCheckDomain          = AnnotationLoadBalancerPrefix + "health-check-domain"          // HealthCheckDomain health check domain
 	HealthCheckHTTPCode        = AnnotationLoadBalancerPrefix + "health-check-httpcode"        // HealthCheckHTTPCode health check http code
 	HealthCheckMethod          = AnnotationLoadBalancerPrefix + "health-check-method"          // HealthCheckMethod health check method for L7
+	HealthCheckHttpVersion     = AnnotationLoadBalancerPrefix + "health-check-http-version"    // HealthCheckHttpVersion health check http protocol version, HTTP1.0 or HTTP1.1
 	SessionStick               = AnnotationLoadBalancerPrefix + "sticky-session"               // SessionStick sticky session
 	SessionStickType           = AnnotationLoadBalancerPrefix + "sticky-session-type"          // SessionStickType session sticky type
 	CookieTimeout              = AnnotationLoadBalancerPrefix + "cookie-timeout"               // CookieTimeout cookie timeout
