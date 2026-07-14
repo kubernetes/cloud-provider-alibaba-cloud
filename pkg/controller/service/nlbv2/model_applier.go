@@ -434,6 +434,11 @@ func (m *ModelApplier) applyListeners(reqCtx *svcCtx.RequestContext, listenerAct
 }
 
 func buildActionsForListeners(reqCtx *svcCtx.RequestContext, local, remote *nlbmodel.NetworkLoadBalancer) ([]listenerAction, error) {
+	if local.LoadBalancerAttribute.PreserveOnDelete && helper.NeedDeleteLoadBalancer(reqCtx.Service) {
+		reqCtx.Log.Info("load balancer is preserved, skip reconcile listeners during cleanup")
+		return nil, nil
+	}
+
 	var actions []listenerAction
 
 	// associate listener and vGroup
