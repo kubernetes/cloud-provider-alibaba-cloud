@@ -309,16 +309,38 @@ func (m *ModelApplier) buildServerGroupCreateAndUpdateActions(reqCtx *svcCtx.Req
 
 		// update
 		if found {
-			// if server group type changed, need to recreate
-			if local.ServerGroups[i].ServerGroupType != "" &&
-				local.ServerGroups[i].ServerGroupType != old.ServerGroupType {
+			serverGroupTypeChanged := local.ServerGroups[i].ServerGroupType != "" &&
+				local.ServerGroups[i].ServerGroupType != old.ServerGroupType
+			localAddressIPVersion := nlbmodel.GetAddressIpVersion(local.ServerGroups[i].AddressIPVersion)
+			if localAddressIPVersion == "" {
+				localAddressIPVersion = nlbmodel.IPv4
+			}
+			oldAddressIPVersion := nlbmodel.GetAddressIpVersion(old.AddressIPVersion)
+			if oldAddressIPVersion == "" {
+				oldAddressIPVersion = nlbmodel.IPv4
+			}
+			addressIPVersionChanged := localAddressIPVersion != oldAddressIPVersion
+
+			// immutable attributes changed, need to recreate
+			if serverGroupTypeChanged || addressIPVersionChanged {
 				if local.ServerGroups[i].IsUserManaged {
-					return nil, fmt.Errorf("ServerGroupType of user managed server group %s should be [%s], but [%s]",
-						local.ServerGroups[i].ServerGroupId, local.ServerGroups[i].ServerGroupType, old.ServerGroupType)
+					if serverGroupTypeChanged {
+						return nil, fmt.Errorf("ServerGroupType of user managed server group %s should be [%s], but [%s]",
+							local.ServerGroups[i].ServerGroupId, local.ServerGroups[i].ServerGroupType, old.ServerGroupType)
+					}
+					return nil, fmt.Errorf("AddressIPVersion of user managed server group %s should be [%s], but [%s]",
+						local.ServerGroups[i].ServerGroupId, localAddressIPVersion, oldAddressIPVersion)
 				}
-				reqCtx.Log.Info(fmt.Sprintf("ServerGroupType changed [%s] - [%s], need to recreate server group",
-					old.ServerGroupType, local.ServerGroups[i].ServerGroupType),
-					"sgId", old.ServerGroupId, "sgName", old.ServerGroupName)
+				if serverGroupTypeChanged {
+					reqCtx.Log.Info(fmt.Sprintf("ServerGroupType changed [%s] - [%s], need to recreate server group",
+						old.ServerGroupType, local.ServerGroups[i].ServerGroupType),
+						"sgId", old.ServerGroupId, "sgName", old.ServerGroupName)
+				}
+				if addressIPVersionChanged {
+					reqCtx.Log.Info(fmt.Sprintf("AddressIPVersion changed [%s] - [%s], need to recreate server group",
+						oldAddressIPVersion, localAddressIPVersion),
+						"sgId", old.ServerGroupId, "sgName", old.ServerGroupName)
+				}
 				found = false
 			} else {
 				actions = append(actions, serverGroupAction{
