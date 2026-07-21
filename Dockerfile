@@ -5,7 +5,7 @@ ARG TARGETOS
 ARG TARGETARCH
 RUN make cloud-controller-manager
 
-FROM registry.cn-hangzhou.aliyuncs.com/acs/alpine:3.18-update
+FROM registry.cn-hangzhou.aliyuncs.com/acs/alpine:3.23-update
 RUN apk add --no-cache --update bash ca-certificates
 COPY --from=builder /build/bin/cloud-controller-manager /cloud-controller-manager
 
