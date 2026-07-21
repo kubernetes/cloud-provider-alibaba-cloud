@@ -44,6 +44,7 @@ func (p *NLBProvider) toLocalServerGroup(ctx context.Context, remote *nlb.ListSe
 			HealthCheckDomain:         tea.StringValue(remote.HealthCheck.HealthCheckDomain),
 			HealthCheckUrl:            tea.StringValue(remote.HealthCheck.HealthCheckUrl),
 			HttpCheckMethod:           tea.StringValue(remote.HealthCheck.HttpCheckMethod),
+			HealthCheckHttpVersion:    tea.StringValue(remote.HealthCheck.HealthCheckHttpVersion),
 		}
 		if len(remote.HealthCheck.HealthCheckHttpCode) != 0 {
 			for _, code := range remote.HealthCheck.HealthCheckHttpCode {
@@ -335,6 +336,9 @@ func (p *NLBProvider) CreateNLBServerGroupAsync(ctx context.Context, sg *nlbmode
 		if sg.HealthCheckConfig.HttpCheckMethod != "" {
 			req.HealthCheckConfig.HttpCheckMethod = tea.String(sg.HealthCheckConfig.HttpCheckMethod)
 		}
+		if sg.HealthCheckConfig.HealthCheckHttpVersion != "" {
+			req.HealthCheckConfig.HealthCheckHttpVersion = tea.String(sg.HealthCheckConfig.HealthCheckHttpVersion)
+		}
 		if len(sg.HealthCheckConfig.HealthCheckHttpCode) != 0 {
 			for _, code := range sg.HealthCheckConfig.HealthCheckHttpCode {
 				req.HealthCheckConfig.HealthCheckHttpCode = append(req.HealthCheckConfig.HealthCheckHttpCode,
@@ -429,6 +433,9 @@ func (p *NLBProvider) UpdateNLBServerGroupAsync(ctx context.Context, sg *nlbmode
 		}
 		if sg.HealthCheckConfig.HttpCheckMethod != "" {
 			req.HealthCheckConfig.HttpCheckMethod = tea.String(sg.HealthCheckConfig.HttpCheckMethod)
+		}
+		if sg.HealthCheckConfig.HealthCheckHttpVersion != "" {
+			req.HealthCheckConfig.HealthCheckHttpVersion = tea.String(sg.HealthCheckConfig.HealthCheckHttpVersion)
 		}
 		if len(sg.HealthCheckConfig.HealthCheckHttpCode) != 0 {
 			for _, code := range sg.HealthCheckConfig.HealthCheckHttpCode {

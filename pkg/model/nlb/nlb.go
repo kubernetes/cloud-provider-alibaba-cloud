@@ -288,6 +288,7 @@ type HealthCheckConfig struct {
 	HealthCheckUrl            string
 	HealthCheckHttpCode       []string
 	HttpCheckMethod           string
+	HealthCheckHttpVersion    string
 }
 
 type NamedKey struct {
