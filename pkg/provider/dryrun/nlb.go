@@ -3,6 +3,7 @@ package dryrun
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	nlbmodel "k8s.io/cloud-provider-alibaba-cloud/pkg/model/nlb"
@@ -31,7 +32,6 @@ const (
 	MTypeDeleteListener                                 = "DeleteListener"
 	MTypeUpdateListener                                 = "UpdateListener"
 	MTypeCreateListener                                 = "CreateListener"
-	MTypeUpdateNLBSecurityGroupIds                      = "UpdateSecurityGroupIds"
 	MTypeTagResource                                    = "TagResource"
 	MTypeCreateNLB                                      = "CreateNLB"
 	MTypeDeleteNLB                                      = "DeleteNLB"
@@ -54,6 +54,8 @@ const (
 	MTypeAssociateAdditionalCertificatesWithListener    = "AssociateAdditionalCertificatesWithListener"
 	MTypeDisassociateAdditionalCertificatesWithListener = "DisassociateAdditionalCertificatesWithListener"
 	MTypeWaitJobFinish                                  = "WaitJobFinish"
+	MTypeJoinSecurityGroup                              = "JoinSecurityGroup"
+	MTypeLeaveSecurityGroup                             = "LeaveSecurityGroup"
 )
 
 func (d DryRunNLB) DeleteNLBListenerAsync(ctx context.Context, listenerId string) (string, error) {
@@ -77,13 +79,6 @@ func (d DryRunNLB) CreateNLBListenerAsync(ctx context.Context, lbId string, lis 
 	return "", hintError(mtype, fmt.Sprintf("listener for lb %s should be created", lbId))
 }
 
-func (d DryRunNLB) UpdateNLBSecurityGroupIds(ctx context.Context, mdl *nlbmodel.NetworkLoadBalancer, added, removed []string) error {
-	mtype := MTypeUpdateNLBSecurityGroupIds
-	svc := getService(ctx)
-	dryrun.AddEvent(dryrun.NLB, util.Key(svc), mdl.LoadBalancerAttribute.LoadBalancerId, CodeUpdateSecurityGroupIds, dryrun.ERROR, "")
-	return hintError(mtype, fmt.Sprintf("nlb %s security groups should be updated, added: %v, removed: %v", mdl.LoadBalancerAttribute.LoadBalancerId, added, removed))
-}
-
 func (d DryRunNLB) TagNLBResource(ctx context.Context, resourceId string, resourceType nlbmodel.TagResourceType, tags []tag.Tag) error {
 	mtype := MTypeTagResource
 	svc := getService(ctx)
@@ -99,13 +94,17 @@ func (d DryRunNLB) UntagNLBResources(ctx context.Context, resourceId string, res
 }
 
 func (d DryRunNLB) NLBJoinSecurityGroup(ctx context.Context, lbId string, sgIds []string) error {
-	//TODO implement me
-	panic("implement me")
+	mtype := MTypeJoinSecurityGroup
+	svc := getService(ctx)
+	dryrun.AddEvent(dryrun.NLB, util.Key(svc), lbId, CodeUpdateSecurityGroupIds, dryrun.ERROR, "")
+	return hintError(mtype, fmt.Sprintf("security groups [%s] should be joined", strings.Join(sgIds, ",")))
 }
 
 func (d DryRunNLB) NLBLeaveSecurityGroup(ctx context.Context, lbId string, sgIds []string) error {
-	//TODO implement me
-	panic("implement me")
+	mtype := MTypeLeaveSecurityGroup
+	svc := getService(ctx)
+	dryrun.AddEvent(dryrun.NLB, util.Key(svc), lbId, CodeUpdateSecurityGroupIds, dryrun.ERROR, "")
+	return hintError(mtype, fmt.Sprintf("security groups [%s] should be left", strings.Join(sgIds, ",")))
 }
 
 func (d DryRunNLB) ListNLBTagResources(ctx context.Context, lbId string) ([]tag.Tag, error) {
