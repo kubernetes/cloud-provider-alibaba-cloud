@@ -275,6 +275,115 @@ func TestModelApplier_Apply_VServerGroup(t *testing.T) {
 	assert.Equal(t, nil, err)
 }
 
+func TestModelApplier_BuildServerGroupCreateAndUpdateActions(t *testing.T) {
+	tests := []struct {
+		name                   string
+		localServerGroupType   nlbmodel.ServerGroupType
+		remoteServerGroupType  nlbmodel.ServerGroupType
+		localAddressIPVersion  string
+		remoteAddressIPVersion string
+		userManaged            bool
+		wantAction             serverGroupActionType
+		wantError              string
+	}{
+		{
+			name:                   "empty local address IP version equals remote IPv4",
+			localServerGroupType:   nlbmodel.IpServerGroupType,
+			remoteServerGroupType:  nlbmodel.IpServerGroupType,
+			remoteAddressIPVersion: nlbmodel.IPv4,
+			wantAction:             serverGroupActionUpdate,
+		},
+		{
+			name:                  "local IPv4 equals empty remote address IP version",
+			localServerGroupType:  nlbmodel.IpServerGroupType,
+			remoteServerGroupType: nlbmodel.IpServerGroupType,
+			localAddressIPVersion: nlbmodel.IPv4,
+			wantAction:            serverGroupActionUpdate,
+		},
+		{
+			name:                   "IPv4 to DualStack recreates server group",
+			localServerGroupType:   nlbmodel.IpServerGroupType,
+			remoteServerGroupType:  nlbmodel.IpServerGroupType,
+			localAddressIPVersion:  nlbmodel.DualStack,
+			remoteAddressIPVersion: nlbmodel.IPv4,
+			wantAction:             serverGroupActionCreateAndAddBackendServers,
+		},
+		{
+			name:                   "DualStack to default IPv4 recreates server group",
+			localServerGroupType:   nlbmodel.IpServerGroupType,
+			remoteServerGroupType:  nlbmodel.IpServerGroupType,
+			remoteAddressIPVersion: nlbmodel.DualStack,
+			wantAction:             serverGroupActionCreateAndAddBackendServers,
+		},
+		{
+			name:                   "address IP version comparison ignores case",
+			localServerGroupType:   nlbmodel.IpServerGroupType,
+			remoteServerGroupType:  nlbmodel.IpServerGroupType,
+			localAddressIPVersion:  "dualstack",
+			remoteAddressIPVersion: nlbmodel.DualStack,
+			wantAction:             serverGroupActionUpdate,
+		},
+		{
+			name:                   "server group type change still recreates server group",
+			localServerGroupType:   nlbmodel.IpServerGroupType,
+			remoteServerGroupType:  nlbmodel.InstanceServerGroupType,
+			localAddressIPVersion:  nlbmodel.IPv4,
+			remoteAddressIPVersion: nlbmodel.IPv4,
+			wantAction:             serverGroupActionCreateAndAddBackendServers,
+		},
+		{
+			name:                   "user managed address IP version mismatch returns error",
+			localServerGroupType:   nlbmodel.IpServerGroupType,
+			remoteServerGroupType:  nlbmodel.IpServerGroupType,
+			localAddressIPVersion:  nlbmodel.DualStack,
+			remoteAddressIPVersion: nlbmodel.IPv4,
+			userManaged:            true,
+			wantError:              "AddressIPVersion of user managed server group sg-id should be [DualStack], but [ipv4]",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			local := &nlbmodel.NetworkLoadBalancer{
+				LoadBalancerAttribute: &nlbmodel.LoadBalancerAttribute{},
+				ServerGroups: []*nlbmodel.ServerGroup{
+					{
+						IsUserManaged:    tt.userManaged,
+						ServerGroupId:    "sg-id",
+						ServerGroupName:  "sg-name",
+						ServerGroupType:  tt.localServerGroupType,
+						AddressIPVersion: tt.localAddressIPVersion,
+					},
+				},
+			}
+			remote := &nlbmodel.NetworkLoadBalancer{
+				LoadBalancerAttribute: &nlbmodel.LoadBalancerAttribute{},
+				ServerGroups: []*nlbmodel.ServerGroup{
+					{
+						ServerGroupId:    "sg-id",
+						ServerGroupName:  "sg-name",
+						ServerGroupType:  tt.remoteServerGroupType,
+						AddressIPVersion: tt.remoteAddressIPVersion,
+					},
+				},
+			}
+
+			actions, err := (&ModelApplier{}).buildServerGroupCreateAndUpdateActions(
+				getReqCtx(&v1.Service{}), local, remote)
+			if tt.wantError != "" {
+				assert.EqualError(t, err, tt.wantError)
+				assert.Nil(t, actions)
+				return
+			}
+
+			assert.NoError(t, err)
+			if assert.Len(t, actions, 1) {
+				assert.Equal(t, tt.wantAction, actions[0].Action)
+			}
+		})
+	}
+}
+
 func TestIsNLBReusable(t *testing.T) {
 	tests := []struct {
 		name     string
