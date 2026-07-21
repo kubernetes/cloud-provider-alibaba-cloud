@@ -304,3 +304,20 @@ func Batch[T any](target []T, batchSize int, f Func[T]) error {
 
 	return utilerrors.NewAggregate(errs)
 }
+
+func IsGracefulShutdownEnabled(reqCtx *svcCtx.RequestContext, trafficPolicy helper.TrafficPolicy) bool {
+	if trafficPolicy != helper.ENITrafficPolicy {
+		return false
+	}
+	if reqCtx.Anno.Get(annotation.GracefulShutdown) != "true" {
+		return false
+	}
+	if strings.EqualFold(reqCtx.Anno.Get(annotation.IgnoreWeightUpdate), string(model.OnFlag)) {
+		if reqCtx.Recorder != nil {
+			reqCtx.Recorder.Event(reqCtx.Service, v1.EventTypeWarning, helper.GracefulShutdownDisabled,
+				"Disable graceful-shutdown because ignore-weight-update is enabled")
+		}
+		return false
+	}
+	return true
+}

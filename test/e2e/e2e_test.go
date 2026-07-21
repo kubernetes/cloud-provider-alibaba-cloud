@@ -73,6 +73,7 @@ func AddControllerTests(f *framework.Framework) {
 				clbv1.RunLoadBalancerTestCases(f)
 				clbv1.RunListenerTestCases(f)
 				clbv1.RunBackendTestCases(f)
+				clbv1.RunGracefulShutdownTestCases(f)
 			})
 
 			if options.TestConfig.NLBZoneMaps != "" {
@@ -80,6 +81,7 @@ func AddControllerTests(f *framework.Framework) {
 					nlbv2.RunLoadBalancerTestCases(f)
 					nlbv2.RunListenerTestCases(f)
 					nlbv2.RunBackendTestCases(f)
+					nlbv2.RunGracefulShutdownTestCases(f)
 				})
 			} else {
 				klog.Warningf("NLBZoneMaps is empty, skip NLB service tests")

@@ -264,8 +264,9 @@ type ServerGroupServer struct {
 	Status        string
 	IPVersion     model.AddressIPVersionType
 
-	TargetRef *v1.ObjectReference
-	Invalid   bool
+	TargetRef   *v1.ObjectReference
+	Invalid     bool
+	Terminating bool
 }
 
 type ZoneMapping struct {

@@ -1530,3 +1530,51 @@ func nlbSourceRangesSecurityGroupPermissionsEqual(svc *v1.Service, sg *ecsmodel.
 
 	return nil
 }
+
+func (f *Framework) WaitForNLBBackendWeight(svc *v1.Service, serverIp string, expectedWeight int32) error {
+	var retErr error
+	_ = wait.PollImmediate(5*time.Second, 60*time.Second, func() (done bool, err error) {
+		remote, err := buildNLBRemoteModel(f, svc)
+		if err != nil {
+			retErr = fmt.Errorf("build nlb remote model: %s", err.Error())
+			return false, nil
+		}
+		for _, sg := range remote.ServerGroups {
+			for _, b := range sg.Servers {
+				if b.ServerIp == serverIp {
+					if b.Weight == expectedWeight {
+						retErr = nil
+						return true, nil
+					}
+					retErr = fmt.Errorf("nlb backend %s weight: expect %d, got %d", serverIp, expectedWeight, b.Weight)
+					return false, nil
+				}
+			}
+		}
+		retErr = fmt.Errorf("nlb backend %s not found", serverIp)
+		return false, nil
+	})
+	return retErr
+}
+
+func (f *Framework) WaitForNLBBackendRemoved(svc *v1.Service, serverIp string) error {
+	var retErr error
+	_ = wait.PollImmediate(5*time.Second, 120*time.Second, func() (done bool, err error) {
+		remote, err := buildNLBRemoteModel(f, svc)
+		if err != nil {
+			retErr = fmt.Errorf("build nlb remote model: %s", err.Error())
+			return false, nil
+		}
+		for _, sg := range remote.ServerGroups {
+			for _, b := range sg.Servers {
+				if b.ServerIp == serverIp {
+					retErr = fmt.Errorf("nlb backend %s still present with weight %d", serverIp, b.Weight)
+					return false, nil
+				}
+			}
+		}
+		retErr = nil
+		return true, nil
+	})
+	return retErr
+}

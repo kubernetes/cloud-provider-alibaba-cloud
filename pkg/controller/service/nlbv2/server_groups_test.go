@@ -2803,6 +2803,261 @@ func TestServerGroupManager_SetBackendsFromEndpointSlices(t *testing.T) {
 			tt.validate(t, backends, containsPotentialReady)
 		})
 	}
+
+	// graceful-shutdown tests require ENI traffic policy and annotation, so run separately
+	t.Run("graceful-shutdown: terminating+serving kept in ENI mode", func(t *testing.T) {
+		terminating := true
+		serving := true
+		svcWithAnno := &v1.Service{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: v1.NamespaceDefault,
+				Name:      "test-svc",
+				Annotations: map[string]string{
+					annotation.Annotation(annotation.GracefulShutdown): "true",
+				},
+			},
+		}
+		reqCtxWithAnno := &svcCtx.RequestContext{
+			Ctx:     context.TODO(),
+			Service: svcWithAnno,
+			Anno:    annotation.NewAnnotationRequest(svcWithAnno),
+			Log:     util.NLBLog.WithValues("service", util.Key(svcWithAnno)),
+		}
+		candidates := &reconbackend.EndpointWithENI{
+			TrafficPolicy:    helper.ENITrafficPolicy,
+			AddressIPVersion: model.IPv4,
+			EndpointSlices: []discovery.EndpointSlice{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-svc-1",
+						Namespace: v1.NamespaceDefault,
+					},
+					Endpoints: []discovery.Endpoint{
+						{
+							Addresses: []string{"10.0.0.10"},
+							Conditions: discovery.EndpointConditions{
+								Terminating: &terminating,
+								Serving:     &serving,
+							},
+							NodeName: &nodeName,
+						},
+					},
+					Ports: []discovery.EndpointPort{
+						{Name: &portName, Port: &port, Protocol: &protocol},
+					},
+					AddressType: discovery.AddressTypeIPv4,
+				},
+			},
+		}
+		sg := nlbmodel.ServerGroup{
+			ServicePort:     &v1.ServicePort{Name: "tcp", Port: 80, TargetPort: intstr.FromInt(8080)},
+			ServerGroupName: "test-sg",
+		}
+		backends, containsPotentialReady, err := mgr.setBackendsFromEndpointSlices(reqCtxWithAnno, candidates, sg)
+		assert.NoError(t, err)
+		assert.False(t, containsPotentialReady)
+		assert.Equal(t, 1, len(backends))
+		assert.Equal(t, "10.0.0.10", backends[0].ServerIp)
+		assert.True(t, backends[0].Terminating)
+	})
+
+	t.Run("graceful-shutdown: ignored when ignore-weight-update is on", func(t *testing.T) {
+		terminating := true
+		serving := true
+		svcWithAnno := &v1.Service{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: v1.NamespaceDefault,
+				Name:      "test-svc",
+				Annotations: map[string]string{
+					annotation.Annotation(annotation.GracefulShutdown):   "true",
+					annotation.Annotation(annotation.IgnoreWeightUpdate): string(model.OnFlag),
+				},
+			},
+		}
+		reqCtxWithAnno := &svcCtx.RequestContext{
+			Ctx:     context.TODO(),
+			Service: svcWithAnno,
+			Anno:    annotation.NewAnnotationRequest(svcWithAnno),
+			Log:     util.NLBLog.WithValues("service", util.Key(svcWithAnno)),
+		}
+		candidates := &reconbackend.EndpointWithENI{
+			TrafficPolicy:    helper.ENITrafficPolicy,
+			AddressIPVersion: model.IPv4,
+			EndpointSlices: []discovery.EndpointSlice{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-svc-1",
+						Namespace: v1.NamespaceDefault,
+					},
+					Endpoints: []discovery.Endpoint{
+						{
+							Addresses: []string{"10.0.0.14"},
+							Conditions: discovery.EndpointConditions{
+								Terminating: &terminating,
+								Serving:     &serving,
+							},
+							NodeName: &nodeName,
+						},
+					},
+					Ports: []discovery.EndpointPort{
+						{Name: &portName, Port: &port, Protocol: &protocol},
+					},
+					AddressType: discovery.AddressTypeIPv4,
+				},
+			},
+		}
+		sg := nlbmodel.ServerGroup{
+			ServicePort:     &v1.ServicePort{Name: "tcp", Port: 80, TargetPort: intstr.FromInt(8080)},
+			ServerGroupName: "test-sg",
+		}
+		backends, _, err := mgr.setBackendsFromEndpointSlices(reqCtxWithAnno, candidates, sg)
+		assert.NoError(t, err)
+		assert.Equal(t, 0, len(backends))
+	})
+
+	t.Run("graceful-shutdown: terminating+not-serving removed", func(t *testing.T) {
+		terminating := true
+		serving := false
+		svcWithAnno := &v1.Service{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: v1.NamespaceDefault,
+				Name:      "test-svc",
+				Annotations: map[string]string{
+					annotation.Annotation(annotation.GracefulShutdown): "true",
+				},
+			},
+		}
+		reqCtxWithAnno := &svcCtx.RequestContext{
+			Ctx:     context.TODO(),
+			Service: svcWithAnno,
+			Anno:    annotation.NewAnnotationRequest(svcWithAnno),
+			Log:     util.NLBLog.WithValues("service", util.Key(svcWithAnno)),
+		}
+		candidates := &reconbackend.EndpointWithENI{
+			TrafficPolicy:    helper.ENITrafficPolicy,
+			AddressIPVersion: model.IPv4,
+			EndpointSlices: []discovery.EndpointSlice{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-svc-1",
+						Namespace: v1.NamespaceDefault,
+					},
+					Endpoints: []discovery.Endpoint{
+						{
+							Addresses: []string{"10.0.0.11"},
+							Conditions: discovery.EndpointConditions{
+								Terminating: &terminating,
+								Serving:     &serving,
+							},
+							NodeName: &nodeName,
+						},
+					},
+					Ports: []discovery.EndpointPort{
+						{Name: &portName, Port: &port, Protocol: &protocol},
+					},
+					AddressType: discovery.AddressTypeIPv4,
+				},
+			},
+		}
+		sg := nlbmodel.ServerGroup{
+			ServicePort:     &v1.ServicePort{Name: "tcp", Port: 80, TargetPort: intstr.FromInt(8080)},
+			ServerGroupName: "test-sg",
+		}
+		backends, _, err := mgr.setBackendsFromEndpointSlices(reqCtxWithAnno, candidates, sg)
+		assert.NoError(t, err)
+		assert.Equal(t, 0, len(backends))
+	})
+
+	t.Run("graceful-shutdown: terminating ignored without annotation", func(t *testing.T) {
+		terminating := true
+		serving := true
+		candidates := &reconbackend.EndpointWithENI{
+			TrafficPolicy:    helper.ENITrafficPolicy,
+			AddressIPVersion: model.IPv4,
+			EndpointSlices: []discovery.EndpointSlice{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-svc-1",
+						Namespace: v1.NamespaceDefault,
+					},
+					Endpoints: []discovery.Endpoint{
+						{
+							Addresses: []string{"10.0.0.12"},
+							Conditions: discovery.EndpointConditions{
+								Terminating: &terminating,
+								Serving:     &serving,
+							},
+							NodeName: &nodeName,
+						},
+					},
+					Ports: []discovery.EndpointPort{
+						{Name: &portName, Port: &port, Protocol: &protocol},
+					},
+					AddressType: discovery.AddressTypeIPv4,
+				},
+			},
+		}
+		sg := nlbmodel.ServerGroup{
+			ServicePort:     &v1.ServicePort{Name: "tcp", Port: 80, TargetPort: intstr.FromInt(8080)},
+			ServerGroupName: "test-sg",
+		}
+		backends, _, err := mgr.setBackendsFromEndpointSlices(reqCtx, candidates, sg)
+		assert.NoError(t, err)
+		assert.Equal(t, 0, len(backends))
+	})
+
+	t.Run("graceful-shutdown: terminating ignored in non-ENI mode", func(t *testing.T) {
+		terminating := true
+		serving := true
+		svcWithAnno := &v1.Service{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: v1.NamespaceDefault,
+				Name:      "test-svc",
+				Annotations: map[string]string{
+					annotation.Annotation(annotation.GracefulShutdown): "true",
+				},
+			},
+		}
+		reqCtxWithAnno := &svcCtx.RequestContext{
+			Ctx:     context.TODO(),
+			Service: svcWithAnno,
+			Anno:    annotation.NewAnnotationRequest(svcWithAnno),
+			Log:     util.NLBLog.WithValues("service", util.Key(svcWithAnno)),
+		}
+		candidates := &reconbackend.EndpointWithENI{
+			TrafficPolicy:    helper.LocalTrafficPolicy,
+			AddressIPVersion: model.IPv4,
+			EndpointSlices: []discovery.EndpointSlice{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-svc-1",
+						Namespace: v1.NamespaceDefault,
+					},
+					Endpoints: []discovery.Endpoint{
+						{
+							Addresses: []string{"10.0.0.13"},
+							Conditions: discovery.EndpointConditions{
+								Terminating: &terminating,
+								Serving:     &serving,
+							},
+							NodeName: &nodeName,
+						},
+					},
+					Ports: []discovery.EndpointPort{
+						{Name: &portName, Port: &port, Protocol: &protocol},
+					},
+					AddressType: discovery.AddressTypeIPv4,
+				},
+			},
+		}
+		sg := nlbmodel.ServerGroup{
+			ServicePort:     &v1.ServicePort{Name: "tcp", Port: 80, TargetPort: intstr.FromInt(8080)},
+			ServerGroupName: "test-sg",
+		}
+		backends, _, err := mgr.setBackendsFromEndpointSlices(reqCtxWithAnno, candidates, sg)
+		assert.NoError(t, err)
+		assert.Equal(t, 0, len(backends))
+	})
 }
 
 func TestServerGroupManager_BuildENIBackends(t *testing.T) {

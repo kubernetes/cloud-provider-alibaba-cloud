@@ -44,6 +44,7 @@ const (
 	ConnectionDrain        = AnnotationLoadBalancerPrefix + "connection-drain"         // ConnectionDrain connection drain
 	ConnectionDrainTimeout = AnnotationLoadBalancerPrefix + "connection-drain-timeout" // ConnectionDrainTimeout connection drain timeout
 	IgnoreWeightUpdate     = AnnotationLoadBalancerPrefix + "ignore-weight-update"
+	GracefulShutdown       = AnnotationLoadBalancerPrefix + "graceful-shutdown"
 
 	PreserveLBOnDelete = AnnotationLoadBalancerPrefix + "preserve-lb-on-delete"
 )
