@@ -6,6 +6,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -395,6 +396,69 @@ func TestIsNLBReusable(t *testing.T) {
 			if tt.reason != "" {
 				assert.Contains(t, reason, tt.reason)
 			}
+		})
+	}
+}
+
+func TestBuildActionsForListenersPreserveOnDelete(t *testing.T) {
+	deletionTimestamp := metav1.Now()
+	tests := []struct {
+		name           string
+		service        *v1.Service
+		preserve       bool
+		localListeners []*nlbmodel.ListenerAttribute
+		wantActions    []listenerActionType
+	}{
+		{
+			name: "preserve deleting service",
+			service: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{DeletionTimestamp: &deletionTimestamp},
+				Spec:       v1.ServiceSpec{Type: v1.ServiceTypeLoadBalancer},
+			},
+			preserve: true,
+		},
+		{
+			name: "delete non-preserved service listener",
+			service: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{DeletionTimestamp: &deletionTimestamp},
+				Spec:       v1.ServiceSpec{Type: v1.ServiceTypeLoadBalancer},
+			},
+			wantActions: []listenerActionType{listenerActionDelete},
+		},
+		{
+			name: "reconcile preserved service normally",
+			service: &v1.Service{
+				Spec: v1.ServiceSpec{Type: v1.ServiceTypeLoadBalancer},
+			},
+			preserve: true,
+			localListeners: []*nlbmodel.ListenerAttribute{
+				{ListenerProtocol: nlbmodel.TCP, ListenerPort: 80, ServerGroupId: "sg-id"},
+			},
+			wantActions: []listenerActionType{listenerActionUpdate},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			local := &nlbmodel.NetworkLoadBalancer{
+				LoadBalancerAttribute: &nlbmodel.LoadBalancerAttribute{PreserveOnDelete: tt.preserve},
+				Listeners:             tt.localListeners,
+			}
+			remote := &nlbmodel.NetworkLoadBalancer{
+				LoadBalancerAttribute: &nlbmodel.LoadBalancerAttribute{LoadBalancerId: "nlb-id"},
+				Listeners: []*nlbmodel.ListenerAttribute{
+					{ListenerId: "listener-id", ListenerProtocol: nlbmodel.TCP, ListenerPort: 80},
+				},
+			}
+
+			actions, err := buildActionsForListeners(getReqCtx(tt.service), local, remote)
+			assert.NoError(t, err)
+
+			var gotActions []listenerActionType
+			for _, action := range actions {
+				gotActions = append(gotActions, action.Action)
+			}
+			assert.Equal(t, tt.wantActions, gotActions)
 		})
 	}
 }
