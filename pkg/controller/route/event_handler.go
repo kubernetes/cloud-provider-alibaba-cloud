@@ -11,49 +11,45 @@ import (
 )
 
 type enqueueRequestForNodeEvent struct {
-	rateLimiter workqueue.RateLimiter
+	rateLimiter workqueue.TypedRateLimiter[reconcile.Request]
 }
 
-var _ handler.EventHandler = (*enqueueRequestForNodeEvent)(nil)
+var _ handler.TypedEventHandler[*corev1.Node, reconcile.Request] = (*enqueueRequestForNodeEvent)(nil)
 
-func (h *enqueueRequestForNodeEvent) Create(_ context.Context, e event.CreateEvent, queue workqueue.RateLimitingInterface) {
-	if n, ok := e.Object.(*corev1.Node); ok {
-		queue.Add(reconcile.Request{
-			NamespacedName: types.NamespacedName{
-				Name: n.Name,
-			},
-		})
-	}
+func (h *enqueueRequestForNodeEvent) Create(_ context.Context, e event.TypedCreateEvent[*corev1.Node], queue workqueue.TypedRateLimitingInterface[reconcile.Request]) {
+	n := e.Object
+	queue.Add(reconcile.Request{
+		NamespacedName: types.NamespacedName{
+			Name: n.Name,
+		},
+	})
 }
 
-func (h *enqueueRequestForNodeEvent) Update(_ context.Context, e event.UpdateEvent, queue workqueue.RateLimitingInterface) {
-	if n, ok := e.ObjectNew.(*corev1.Node); ok {
-		queue.Add(reconcile.Request{
-			NamespacedName: types.NamespacedName{
-				Name: n.Name,
-			},
-		})
-	}
+func (h *enqueueRequestForNodeEvent) Update(_ context.Context, e event.TypedUpdateEvent[*corev1.Node], queue workqueue.TypedRateLimitingInterface[reconcile.Request]) {
+	n := e.ObjectNew
+	queue.Add(reconcile.Request{
+		NamespacedName: types.NamespacedName{
+			Name: n.Name,
+		},
+	})
 }
 
-func (h *enqueueRequestForNodeEvent) Delete(_ context.Context, e event.DeleteEvent, queue workqueue.RateLimitingInterface) {
-	if n, ok := e.Object.(*corev1.Node); ok {
-		queue.Add(reconcile.Request{
-			NamespacedName: types.NamespacedName{
-				Name: n.Name,
-			},
-		})
-	}
+func (h *enqueueRequestForNodeEvent) Delete(_ context.Context, e event.TypedDeleteEvent[*corev1.Node], queue workqueue.TypedRateLimitingInterface[reconcile.Request]) {
+	n := e.Object
+	queue.Add(reconcile.Request{
+		NamespacedName: types.NamespacedName{
+			Name: n.Name,
+		},
+	})
 }
 
-func (h *enqueueRequestForNodeEvent) Generic(_ context.Context, e event.GenericEvent, queue workqueue.RateLimitingInterface) {
-	if n, ok := e.Object.(*corev1.Node); ok {
-		r := reconcile.Request{
-			NamespacedName: types.NamespacedName{
-				Name: n.Name,
-			},
-		}
-		queue.AddAfter(r, h.rateLimiter.When(r))
-		log.Info("enqueue: route requeue", "node", n.Name, "queueLen", queue.Len())
+func (h *enqueueRequestForNodeEvent) Generic(_ context.Context, e event.TypedGenericEvent[*corev1.Node], queue workqueue.TypedRateLimitingInterface[reconcile.Request]) {
+	n := e.Object
+	r := reconcile.Request{
+		NamespacedName: types.NamespacedName{
+			Name: n.Name,
+		},
 	}
+	queue.AddAfter(r, h.rateLimiter.When(r))
+	log.Info("enqueue: route requeue", "node", n.Name, "queueLen", queue.Len())
 }

@@ -31,7 +31,7 @@ type enqueueRequestsForAlbconfigEvent struct {
 	logger        logr.Logger
 }
 
-func (h *enqueueRequestsForAlbconfigEvent) Create(_ context.Context, e event.CreateEvent, queue workqueue.RateLimitingInterface) {
+func (h *enqueueRequestsForAlbconfigEvent) Create(_ context.Context, e event.CreateEvent, queue workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 	albconfig, ok := e.Object.(*v1.AlbConfig)
 	if ok {
 		h.logger.Info("controller: albconfig Create event", "albconfig", util.NamespacedName(albconfig).String())
@@ -39,7 +39,7 @@ func (h *enqueueRequestsForAlbconfigEvent) Create(_ context.Context, e event.Cre
 	}
 }
 
-func (h *enqueueRequestsForAlbconfigEvent) Update(_ context.Context, e event.UpdateEvent, queue workqueue.RateLimitingInterface) {
+func (h *enqueueRequestsForAlbconfigEvent) Update(_ context.Context, e event.UpdateEvent, queue workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 	albconfigOld := e.ObjectOld.(*v1.AlbConfig)
 	albconfigNew := e.ObjectNew.(*v1.AlbConfig)
 
@@ -53,10 +53,10 @@ func (h *enqueueRequestsForAlbconfigEvent) Update(_ context.Context, e event.Upd
 	h.enqueueAlbconfig(queue, albconfigNew)
 }
 
-func (h *enqueueRequestsForAlbconfigEvent) Delete(_ context.Context, e event.DeleteEvent, queue workqueue.RateLimitingInterface) {
+func (h *enqueueRequestsForAlbconfigEvent) Delete(_ context.Context, e event.DeleteEvent, queue workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 }
 
-func (h *enqueueRequestsForAlbconfigEvent) Generic(_ context.Context, e event.GenericEvent, queue workqueue.RateLimitingInterface) {
+func (h *enqueueRequestsForAlbconfigEvent) Generic(_ context.Context, e event.GenericEvent, queue workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 	albconfig, ok := e.Object.(*v1.AlbConfig)
 	if ok {
 		h.logger.Info("controller: albconfig Generic event", "albconfig", util.NamespacedName(albconfig).String())
@@ -64,7 +64,7 @@ func (h *enqueueRequestsForAlbconfigEvent) Generic(_ context.Context, e event.Ge
 	}
 }
 
-func (h *enqueueRequestsForAlbconfigEvent) enqueueAlbconfig(queue workqueue.RateLimitingInterface, albconfig *v1.AlbConfig) {
+func (h *enqueueRequestsForAlbconfigEvent) enqueueAlbconfig(queue workqueue.TypedRateLimitingInterface[reconcile.Request], albconfig *v1.AlbConfig) {
 	queue.Add(reconcile.Request{
 		NamespacedName: util.NamespacedName(albconfig),
 	})

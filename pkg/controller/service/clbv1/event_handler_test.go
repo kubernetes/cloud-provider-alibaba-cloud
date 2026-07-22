@@ -20,22 +20,23 @@ import (
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/service/reconcile/annotation"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/event"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
 func TestEnqueueRequestForServiceEvent(t *testing.T) {
 	h := NewEnqueueRequestForServiceEvent(record.NewFakeRecorder(100))
-	queue := workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter())
+	queue := workqueue.NewTypedRateLimitingQueue(workqueue.DefaultTypedControllerRateLimiter[reconcile.Request]())
 	svc := getDefaultService()
 	svc.Annotations[annotation.Annotation(annotation.Spec)] = "slb.s1.small"
 	ctx := context.TODO()
 	// create event
-	h.Create(ctx, event.CreateEvent{Object: svc}, queue)
+	h.Create(ctx, event.TypedCreateEvent[*v1.Service]{Object: svc}, queue)
 	// delete event
-	h.Delete(ctx, event.DeleteEvent{Object: svc}, queue)
+	h.Delete(ctx, event.TypedDeleteEvent[*v1.Service]{Object: svc}, queue)
 	// update event
 	newSvc := svc.DeepCopy()
 	newSvc.Annotations[annotation.Annotation(annotation.Spec)] = "slb.s2.small"
-	h.Update(ctx, event.UpdateEvent{ObjectOld: svc, ObjectNew: newSvc}, queue)
+	h.Update(ctx, event.TypedUpdateEvent[*v1.Service]{ObjectOld: svc, ObjectNew: newSvc}, queue)
 
 }
 
@@ -94,7 +95,7 @@ func TestNeedAdd(t *testing.T) {
 func TestEnqueueRequestForEndpointEvent(t *testing.T) {
 	cl := getFakeKubeClient()
 	h := NewEnqueueRequestForEndpointEvent(cl, record.NewFakeRecorder(100))
-	queue := workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter())
+	queue := workqueue.NewTypedRateLimitingQueue(workqueue.DefaultTypedControllerRateLimiter[reconcile.Request]())
 
 	ep := &v1.Endpoints{}
 	if err := cl.Get(context.TODO(), types.NamespacedName{
@@ -105,9 +106,9 @@ func TestEnqueueRequestForEndpointEvent(t *testing.T) {
 	}
 	ctx := context.TODO()
 
-	h.Create(ctx, event.CreateEvent{Object: ep}, queue)
-	h.Delete(ctx, event.DeleteEvent{Object: ep}, queue)
-	h.Update(ctx, event.UpdateEvent{ObjectOld: ep, ObjectNew: ep}, queue)
+	h.Create(ctx, event.TypedCreateEvent[*v1.Endpoints]{Object: ep}, queue)
+	h.Delete(ctx, event.TypedDeleteEvent[*v1.Endpoints]{Object: ep}, queue)
+	h.Update(ctx, event.TypedUpdateEvent[*v1.Endpoints]{ObjectOld: ep, ObjectNew: ep}, queue)
 }
 
 func TestIsEndpointProcessNeeded(t *testing.T) {
@@ -154,7 +155,7 @@ func TestIsEndpointProcessNeeded(t *testing.T) {
 func TestEnqueueRequestForNodeEvent(t *testing.T) {
 	cl := getFakeKubeClient()
 	h := NewEnqueueRequestForNodeEvent(cl, record.NewFakeRecorder(100))
-	queue := workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter())
+	queue := workqueue.NewTypedRateLimitingQueue(workqueue.DefaultTypedControllerRateLimiter[reconcile.Request]())
 
 	node := &v1.Node{}
 	if err := cl.Get(context.TODO(), types.NamespacedName{
@@ -164,12 +165,12 @@ func TestEnqueueRequestForNodeEvent(t *testing.T) {
 	}
 	ctx := context.TODO()
 
-	h.Create(ctx, event.CreateEvent{Object: node}, queue)
-	h.Delete(ctx, event.DeleteEvent{Object: node}, queue)
+	h.Create(ctx, event.TypedCreateEvent[*v1.Node]{Object: node}, queue)
+	h.Delete(ctx, event.TypedDeleteEvent[*v1.Node]{Object: node}, queue)
 
 	newN := node.DeepCopy()
 	newN.Spec.Unschedulable = true
-	h.Update(ctx, event.UpdateEvent{ObjectOld: node, ObjectNew: newN}, queue)
+	h.Update(ctx, event.TypedUpdateEvent[*v1.Node]{ObjectOld: node, ObjectNew: newN}, queue)
 }
 
 func TestNodeSpecChanged(t *testing.T) {
@@ -221,7 +222,7 @@ func TestNodeSpecChanged(t *testing.T) {
 func TestEnqueueRequestForEndpointSliceEvent(t *testing.T) {
 	cl := getFakeKubeClient()
 	h := NewEnqueueRequestForEndpointSliceEvent(cl, record.NewFakeRecorder(100))
-	queue := workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter())
+	queue := workqueue.NewTypedRateLimitingQueue(workqueue.DefaultTypedControllerRateLimiter[reconcile.Request]())
 
 	es := &discovery.EndpointSlice{}
 	if err := cl.Get(context.TODO(), types.NamespacedName{
@@ -232,9 +233,9 @@ func TestEnqueueRequestForEndpointSliceEvent(t *testing.T) {
 	}
 	ctx := context.TODO()
 
-	h.Create(ctx, event.CreateEvent{Object: es}, queue)
-	h.Delete(ctx, event.DeleteEvent{Object: es}, queue)
-	h.Update(ctx, event.UpdateEvent{ObjectOld: es, ObjectNew: es}, queue)
+	h.Create(ctx, event.TypedCreateEvent[*discovery.EndpointSlice]{Object: es}, queue)
+	h.Delete(ctx, event.TypedDeleteEvent[*discovery.EndpointSlice]{Object: es}, queue)
+	h.Update(ctx, event.TypedUpdateEvent[*discovery.EndpointSlice]{ObjectOld: es, ObjectNew: es}, queue)
 }
 
 func TestIsEndpointSliceProcessNeeded(t *testing.T) {
@@ -437,7 +438,7 @@ func TestCanNodeSkipEventHandler(t *testing.T) {
 
 func TestEventHandlerNoopBranches(t *testing.T) {
 	ctx := context.TODO()
-	queue := workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter())
+	queue := workqueue.NewTypedRateLimitingQueue(workqueue.DefaultTypedControllerRateLimiter[reconcile.Request]())
 	defer queue.ShutDown()
 
 	cl := getFakeKubeClient()
@@ -465,11 +466,11 @@ func TestEventHandlerNoopBranches(t *testing.T) {
 		},
 	}
 
-	svcHandler.Delete(ctx, event.DeleteEvent{Object: svc}, queue)
-	svcHandler.Generic(ctx, event.GenericEvent{Object: svc}, queue)
-	epHandler.Generic(ctx, event.GenericEvent{Object: ep}, queue)
-	nodeHandler.Generic(ctx, event.GenericEvent{Object: node}, queue)
-	esHandler.Generic(ctx, event.GenericEvent{Object: es}, queue)
+	svcHandler.Delete(ctx, event.TypedDeleteEvent[*v1.Service]{Object: svc}, queue)
+	svcHandler.Generic(ctx, event.TypedGenericEvent[*v1.Service]{Object: svc}, queue)
+	epHandler.Generic(ctx, event.TypedGenericEvent[*v1.Endpoints]{Object: ep}, queue)
+	nodeHandler.Generic(ctx, event.TypedGenericEvent[*v1.Node]{Object: node}, queue)
+	esHandler.Generic(ctx, event.TypedGenericEvent[*discovery.EndpointSlice]{Object: es}, queue)
 
 	assert.Equal(t, 0, queue.Len())
 }

@@ -32,36 +32,36 @@ type enqueueRequestForServiceEvent struct {
 	eventRecorder record.EventRecorder
 }
 
-var _ handler.EventHandler = (*enqueueRequestForServiceEvent)(nil)
+var _ handler.TypedEventHandler[*v1.Service, reconcile.Request] = (*enqueueRequestForServiceEvent)(nil)
 
-func (h *enqueueRequestForServiceEvent) Create(_ context.Context, e event.CreateEvent, queue workqueue.RateLimitingInterface) {
-	svc, ok := e.Object.(*v1.Service)
-	if ok && needAdd(svc) {
+func (h *enqueueRequestForServiceEvent) Create(_ context.Context, e event.TypedCreateEvent[*v1.Service], queue workqueue.TypedRateLimitingInterface[reconcile.Request]) {
+	svc := e.Object
+	if needAdd(svc) {
 		util.NLBLog.Info("controller: service create event", "service", util.Key(svc))
 		h.enqueueManagedService(queue, svc)
 	}
 }
 
-func (h *enqueueRequestForServiceEvent) Update(_ context.Context, e event.UpdateEvent, queue workqueue.RateLimitingInterface) {
-	oldSvc, ok1 := e.ObjectOld.(*v1.Service)
-	newSvc, ok2 := e.ObjectNew.(*v1.Service)
+func (h *enqueueRequestForServiceEvent) Update(_ context.Context, e event.TypedUpdateEvent[*v1.Service], queue workqueue.TypedRateLimitingInterface[reconcile.Request]) {
+	oldSvc := e.ObjectOld
+	newSvc := e.ObjectNew
 
-	if ok1 && ok2 && needUpdate(oldSvc, newSvc, h.eventRecorder) {
+	if needUpdate(oldSvc, newSvc, h.eventRecorder) {
 		util.NLBLog.Info("controller: service update event", "service", util.Key(oldSvc))
 		h.enqueueManagedService(queue, newSvc)
 	}
 }
 
-func (h *enqueueRequestForServiceEvent) Delete(_ context.Context, e event.DeleteEvent, queue workqueue.RateLimitingInterface) {
+func (h *enqueueRequestForServiceEvent) Delete(_ context.Context, e event.TypedDeleteEvent[*v1.Service], queue workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 	// Services have the finalizer. When a service is deleted, it will update the deletionTimestamp of the service.
 	// Since a delete event has changed to an update event, it is safe to ignore it.
 }
 
-func (h *enqueueRequestForServiceEvent) Generic(_ context.Context, e event.GenericEvent, queue workqueue.RateLimitingInterface) {
+func (h *enqueueRequestForServiceEvent) Generic(_ context.Context, e event.TypedGenericEvent[*v1.Service], queue workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 	// unknown type event, ignore
 }
 
-func (h *enqueueRequestForServiceEvent) enqueueManagedService(queue workqueue.RateLimitingInterface, service *v1.Service) {
+func (h *enqueueRequestForServiceEvent) enqueueManagedService(queue workqueue.TypedRateLimitingInterface[reconcile.Request], service *v1.Service) {
 	queue.Add(reconcile.Request{
 		NamespacedName: types.NamespacedName{
 			Namespace: service.Namespace,
@@ -161,21 +161,21 @@ type enqueueRequestForEndpointEvent struct {
 	eventRecorder record.EventRecorder
 }
 
-var _ handler.EventHandler = (*enqueueRequestForEndpointEvent)(nil)
+var _ handler.TypedEventHandler[*v1.Endpoints, reconcile.Request] = (*enqueueRequestForEndpointEvent)(nil)
 
-func (h *enqueueRequestForEndpointEvent) Create(_ context.Context, e event.CreateEvent, queue workqueue.RateLimitingInterface) {
-	ep, ok := e.Object.(*v1.Endpoints)
-	if ok && isEndpointProcessNeeded(ep, h.client) {
+func (h *enqueueRequestForEndpointEvent) Create(_ context.Context, e event.TypedCreateEvent[*v1.Endpoints], queue workqueue.TypedRateLimitingInterface[reconcile.Request]) {
+	ep := e.Object
+	if isEndpointProcessNeeded(ep, h.client) {
 		util.NLBLog.Info("controller: endpoint create event", "endpoint", util.Key(ep))
 		h.enqueueManagedEndpoint(queue, ep)
 	}
 }
 
-func (h *enqueueRequestForEndpointEvent) Update(_ context.Context, e event.UpdateEvent, queue workqueue.RateLimitingInterface) {
-	ep1, ok1 := e.ObjectOld.(*v1.Endpoints)
-	ep2, ok2 := e.ObjectNew.(*v1.Endpoints)
+func (h *enqueueRequestForEndpointEvent) Update(_ context.Context, e event.TypedUpdateEvent[*v1.Endpoints], queue workqueue.TypedRateLimitingInterface[reconcile.Request]) {
+	ep1 := e.ObjectOld
+	ep2 := e.ObjectNew
 
-	if ok1 && ok2 && isEndpointProcessNeeded(ep1, h.client) &&
+	if isEndpointProcessNeeded(ep1, h.client) &&
 		!reflect.DeepEqual(ep1.Subsets, ep2.Subsets) {
 		util.NLBLog.Info("controller: endpoint update event", "endpoint", util.Key(ep1))
 		util.NLBLog.Info(fmt.Sprintf("endpoints before [%s], afeter [%s]",
@@ -184,19 +184,19 @@ func (h *enqueueRequestForEndpointEvent) Update(_ context.Context, e event.Updat
 	}
 }
 
-func (h *enqueueRequestForEndpointEvent) Delete(_ context.Context, e event.DeleteEvent, queue workqueue.RateLimitingInterface) {
-	ep, ok := e.Object.(*v1.Endpoints)
-	if ok && isEndpointProcessNeeded(ep, h.client) {
+func (h *enqueueRequestForEndpointEvent) Delete(_ context.Context, e event.TypedDeleteEvent[*v1.Endpoints], queue workqueue.TypedRateLimitingInterface[reconcile.Request]) {
+	ep := e.Object
+	if isEndpointProcessNeeded(ep, h.client) {
 		util.NLBLog.Info("controller: endpoint delete event", "endpoint", util.Key(ep))
 		h.enqueueManagedEndpoint(queue, ep)
 	}
 }
 
-func (h *enqueueRequestForEndpointEvent) Generic(_ context.Context, e event.GenericEvent, queue workqueue.RateLimitingInterface) {
+func (h *enqueueRequestForEndpointEvent) Generic(_ context.Context, e event.TypedGenericEvent[*v1.Endpoints], queue workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 	// unknown event, ignore
 }
 
-func (h *enqueueRequestForEndpointEvent) enqueueManagedEndpoint(queue workqueue.RateLimitingInterface, endpoint *v1.Endpoints) {
+func (h *enqueueRequestForEndpointEvent) enqueueManagedEndpoint(queue workqueue.TypedRateLimitingInterface[reconcile.Request], endpoint *v1.Endpoints) {
 	queue.Add(reconcile.Request{
 		NamespacedName: types.NamespacedName{
 			Namespace: endpoint.Namespace,
@@ -253,46 +253,44 @@ type enqueueRequestForNodeEvent struct {
 	eventRecorder record.EventRecorder
 }
 
-var _ handler.EventHandler = (*enqueueRequestForNodeEvent)(nil)
+var _ handler.TypedEventHandler[*v1.Node, reconcile.Request] = (*enqueueRequestForNodeEvent)(nil)
 
-func (h *enqueueRequestForNodeEvent) Create(_ context.Context, e event.CreateEvent, queue workqueue.RateLimitingInterface) {
-	node, ok := e.Object.(*v1.Node)
-	if ok && !canNodeSkipEventHandler(node) {
+func (h *enqueueRequestForNodeEvent) Create(_ context.Context, e event.TypedCreateEvent[*v1.Node], queue workqueue.TypedRateLimitingInterface[reconcile.Request]) {
+	node := e.Object
+	if !canNodeSkipEventHandler(node) {
 		util.NLBLog.Info("controller: node create event", "node", node.Name)
 		h.enqueueManagedNode(queue, node)
 	}
 }
 
-func (h *enqueueRequestForNodeEvent) Update(_ context.Context, e event.UpdateEvent, queue workqueue.RateLimitingInterface) {
-	oldNode, ok1 := e.ObjectOld.(*v1.Node)
-	newNode, ok2 := e.ObjectNew.(*v1.Node)
+func (h *enqueueRequestForNodeEvent) Update(_ context.Context, e event.TypedUpdateEvent[*v1.Node], queue workqueue.TypedRateLimitingInterface[reconcile.Request]) {
+	oldNode := e.ObjectOld
+	newNode := e.ObjectNew
 
-	if ok1 && ok2 {
-		if canNodeSkipEventHandler(oldNode) && canNodeSkipEventHandler(newNode) {
-			return
-		}
+	if canNodeSkipEventHandler(oldNode) && canNodeSkipEventHandler(newNode) {
+		return
+	}
 
-		//if node label and schedulable condition changed, need to reconcile svc
-		if nodeSpecChanged(oldNode, newNode) {
-			util.NLBLog.Info("controller: node update event", "node", oldNode.Name)
-			h.enqueueManagedNode(queue, newNode)
-		}
+	//if node label and schedulable condition changed, need to reconcile svc
+	if nodeSpecChanged(oldNode, newNode) {
+		util.NLBLog.Info("controller: node update event", "node", oldNode.Name)
+		h.enqueueManagedNode(queue, newNode)
 	}
 }
 
-func (h *enqueueRequestForNodeEvent) Delete(_ context.Context, e event.DeleteEvent, queue workqueue.RateLimitingInterface) {
-	node, ok := e.Object.(*v1.Node)
-	if ok && !canNodeSkipEventHandler(node) {
+func (h *enqueueRequestForNodeEvent) Delete(_ context.Context, e event.TypedDeleteEvent[*v1.Node], queue workqueue.TypedRateLimitingInterface[reconcile.Request]) {
+	node := e.Object
+	if !canNodeSkipEventHandler(node) {
 		util.NLBLog.Info("controller: node delete event", "node", node.Name)
 		h.enqueueManagedNode(queue, node)
 	}
 }
 
-func (h *enqueueRequestForNodeEvent) Generic(_ context.Context, e event.GenericEvent, queue workqueue.RateLimitingInterface) {
+func (h *enqueueRequestForNodeEvent) Generic(_ context.Context, e event.TypedGenericEvent[*v1.Node], queue workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 	// unknown event, ignore
 }
 
-func (h *enqueueRequestForNodeEvent) enqueueManagedNode(queue workqueue.RateLimitingInterface, node *v1.Node) {
+func (h *enqueueRequestForNodeEvent) enqueueManagedNode(queue workqueue.TypedRateLimitingInterface[reconcile.Request], node *v1.Node) {
 
 	// node change would cause all service object reconcile
 	svcs := v1.ServiceList{}
@@ -365,21 +363,21 @@ type enqueueRequestForEndpointSliceEvent struct {
 	eventRecorder record.EventRecorder
 }
 
-var _ handler.EventHandler = (*enqueueRequestForEndpointSliceEvent)(nil)
+var _ handler.TypedEventHandler[*discovery.EndpointSlice, reconcile.Request] = (*enqueueRequestForEndpointSliceEvent)(nil)
 
-func (h *enqueueRequestForEndpointSliceEvent) Create(_ context.Context, e event.CreateEvent, queue workqueue.RateLimitingInterface) {
-	es, ok := e.Object.(*discovery.EndpointSlice)
-	if ok && isEndpointSliceProcessNeeded(es, h.client) {
+func (h *enqueueRequestForEndpointSliceEvent) Create(_ context.Context, e event.TypedCreateEvent[*discovery.EndpointSlice], queue workqueue.TypedRateLimitingInterface[reconcile.Request]) {
+	es := e.Object
+	if isEndpointSliceProcessNeeded(es, h.client) {
 		util.NLBLog.Info("controller: endpointslice create event", "endpointslice", util.Key(es))
 		h.enqueueManagedEndpointSlice(queue, es)
 	}
 }
 
-func (h *enqueueRequestForEndpointSliceEvent) Update(_ context.Context, e event.UpdateEvent, queue workqueue.RateLimitingInterface) {
-	es1, ok1 := e.ObjectOld.(*discovery.EndpointSlice)
-	es2, ok2 := e.ObjectNew.(*discovery.EndpointSlice)
+func (h *enqueueRequestForEndpointSliceEvent) Update(_ context.Context, e event.TypedUpdateEvent[*discovery.EndpointSlice], queue workqueue.TypedRateLimitingInterface[reconcile.Request]) {
+	es1 := e.ObjectOld
+	es2 := e.ObjectNew
 
-	if ok1 && ok2 && isEndpointSliceProcessNeeded(es1, h.client) &&
+	if isEndpointSliceProcessNeeded(es1, h.client) &&
 		isEndpointSliceUpdateNeeded(es1, es2) {
 		util.NLBLog.Info("controller: endpointslice update event", "endpointslice", util.Key(es1))
 		util.NLBLog.Info(fmt.Sprintf("endpoints before [%s], afeter [%s]",
@@ -388,19 +386,19 @@ func (h *enqueueRequestForEndpointSliceEvent) Update(_ context.Context, e event.
 	}
 }
 
-func (h *enqueueRequestForEndpointSliceEvent) Delete(_ context.Context, e event.DeleteEvent, queue workqueue.RateLimitingInterface) {
-	es, ok := e.Object.(*discovery.EndpointSlice)
-	if ok && isEndpointSliceProcessNeeded(es, h.client) {
+func (h *enqueueRequestForEndpointSliceEvent) Delete(_ context.Context, e event.TypedDeleteEvent[*discovery.EndpointSlice], queue workqueue.TypedRateLimitingInterface[reconcile.Request]) {
+	es := e.Object
+	if isEndpointSliceProcessNeeded(es, h.client) {
 		util.NLBLog.Info("controller: endpointslice delete event", "endpointslice", util.Key(es))
 		h.enqueueManagedEndpointSlice(queue, es)
 	}
 }
 
-func (h *enqueueRequestForEndpointSliceEvent) Generic(_ context.Context, e event.GenericEvent, queue workqueue.RateLimitingInterface) {
+func (h *enqueueRequestForEndpointSliceEvent) Generic(_ context.Context, e event.TypedGenericEvent[*discovery.EndpointSlice], queue workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 	// unknown event, ignore
 }
 
-func (h *enqueueRequestForEndpointSliceEvent) enqueueManagedEndpointSlice(queue workqueue.RateLimitingInterface, endpointSlice *discovery.EndpointSlice) {
+func (h *enqueueRequestForEndpointSliceEvent) enqueueManagedEndpointSlice(queue workqueue.TypedRateLimitingInterface[reconcile.Request], endpointSlice *discovery.EndpointSlice) {
 	serviceName, ok := endpointSlice.Labels[discovery.LabelServiceName]
 	if !ok {
 		return

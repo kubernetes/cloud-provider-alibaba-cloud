@@ -10,6 +10,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
+	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 )
 
 const (
@@ -96,13 +97,19 @@ func BuildRuntimeOptions(rtCfg RuntimeConfig) manager.Options {
 				},
 			},
 		},
-		ClientDisableCacheFor: []client.Object{
-			&v1.Node{},
-			&v1.Service{},
-			&v1.Endpoints{},
-			&discovery.EndpointSlice{},
+		Client: client.Options{
+			Cache: &client.CacheOptions{
+				DisableFor: []client.Object{
+					&v1.Node{},
+					&v1.Service{},
+					&v1.Endpoints{},
+					&discovery.EndpointSlice{},
+				},
+			},
 		},
-		MetricsBindAddress:         rtCfg.MetricsBindAddress,
+		Metrics: metricsserver.Options{
+			BindAddress: rtCfg.MetricsBindAddress,
+		},
 		HealthProbeBindAddress:     rtCfg.HealthProbeBindAddress,
 		PprofBindAddress:           rtCfg.PprofBindAddress,
 		LeaderElection:             rtCfg.LeaderElect,

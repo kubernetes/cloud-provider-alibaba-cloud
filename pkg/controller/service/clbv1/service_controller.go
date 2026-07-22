@@ -29,7 +29,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/record"
-	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
@@ -92,10 +91,10 @@ func (svcC serviceController) Start(ctx context.Context) error {
 
 // add adds a new Controller to mgr with r as the reconcile.Reconciler
 func add(mgr manager.Manager, r *ReconcileService) error {
-	rateLimit := workqueue.NewMaxOfRateLimiter(
-		workqueue.NewItemExponentialFailureRateLimiter(5*time.Second, 300*time.Second),
+	rateLimit := workqueue.NewTypedMaxOfRateLimiter[reconcile.Request](
+		workqueue.NewTypedItemExponentialFailureRateLimiter[reconcile.Request](5*time.Second, 300*time.Second),
 		// 10 qps, 100 bucket size.  This is only for retry speed and its only the overall factor (not per item)
-		&workqueue.BucketRateLimiter{Limiter: rate.NewLimiter(rate.Limit(10), 100)},
+		&workqueue.TypedBucketRateLimiter[reconcile.Request]{Limiter: rate.NewLimiter(rate.Limit(10), 100)},
 	)
 
 	recoverPanic := true
@@ -113,8 +112,8 @@ func add(mgr manager.Manager, r *ReconcileService) error {
 		return err
 	}
 
-	if err := c.Watch(source.Kind(mgr.GetCache(), &v1.Service{}),
-		NewEnqueueRequestForServiceEvent(mgr.GetEventRecorderFor("service-controller"))); err != nil {
+	if err := c.Watch(source.Kind[*v1.Service](mgr.GetCache(), &v1.Service{},
+		NewEnqueueRequestForServiceEvent(mgr.GetEventRecorderFor("service-controller")))); err != nil {
 		return fmt.Errorf("watch resource svc error: %s", err.Error())
 	}
 
@@ -124,20 +123,20 @@ func add(mgr manager.Manager, r *ReconcileService) error {
 
 	if utilfeature.DefaultFeatureGate.Enabled(ctrlCfg.EndpointSlice) {
 		// watch endpointslice
-		if err := c.Watch(source.Kind(mgr.GetCache(), &discovery.EndpointSlice{}),
-			NewEnqueueRequestForEndpointSliceEvent(mgr.GetClient(), mgr.GetEventRecorderFor("service-controller"))); err != nil {
+		if err := c.Watch(source.Kind[*discovery.EndpointSlice](mgr.GetCache(), &discovery.EndpointSlice{},
+			NewEnqueueRequestForEndpointSliceEvent(mgr.GetClient(), mgr.GetEventRecorderFor("service-controller")))); err != nil {
 			return fmt.Errorf("watch resource endpointslice error: %s", err.Error())
 		}
 	} else {
 		// watch endpoints
-		if err := c.Watch(source.Kind(mgr.GetCache(), &v1.Endpoints{}),
-			NewEnqueueRequestForEndpointEvent(mgr.GetClient(), mgr.GetEventRecorderFor("service-controller"))); err != nil {
+		if err := c.Watch(source.Kind[*v1.Endpoints](mgr.GetCache(), &v1.Endpoints{},
+			NewEnqueueRequestForEndpointEvent(mgr.GetClient(), mgr.GetEventRecorderFor("service-controller")))); err != nil {
 			return fmt.Errorf("watch resource endpoint error: %s", err.Error())
 		}
 	}
 
-	if err := c.Watch(source.Kind(mgr.GetCache(), &v1.Node{}),
-		NewEnqueueRequestForNodeEvent(mgr.GetClient(), mgr.GetEventRecorderFor("service-controller"))); err != nil {
+	if err := c.Watch(source.Kind[*v1.Node](mgr.GetCache(), &v1.Node{},
+		NewEnqueueRequestForNodeEvent(mgr.GetClient(), mgr.GetEventRecorderFor("service-controller")))); err != nil {
 		return fmt.Errorf("watch resource node error: %s", err.Error())
 	}
 	return mgr.Add(&serviceController{c: c, recon: r})
@@ -436,7 +435,7 @@ func (m *ReconcileService) updateServiceStatus(reqCtx *svcCtx.RequestContext, sv
 
 	// Write the state if changed
 	// TODO: Be careful here ... what if there were other changes to the service?
-	if !v1helper.LoadBalancerStatusEqual(preStatus, newStatus) {
+	if !loadBalancerStatusEqual(preStatus, newStatus) {
 		util.ServiceLog.Info(fmt.Sprintf("status: [%v] [%v]", preStatus, newStatus))
 		var retErr error
 		_ = helper.Retry(
@@ -493,7 +492,7 @@ func (m *ReconcileService) removeServiceStatus(reqCtx *svcCtx.RequestContext, sv
 
 	// Write the state if changed
 	// TODO: Be careful here ... what if there were other changes to the service?
-	if !v1helper.LoadBalancerStatusEqual(preStatus, newStatus) {
+	if !loadBalancerStatusEqual(preStatus, newStatus) {
 		util.ServiceLog.Info(fmt.Sprintf("status: [%v] [%v]", preStatus, newStatus))
 		return helper.Retry(
 			&wait.Backoff{

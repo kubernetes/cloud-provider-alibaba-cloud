@@ -18,11 +18,12 @@ import (
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/helper"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/service/reconcile/annotation"
 	"sigs.k8s.io/controller-runtime/pkg/event"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
 func TestEnqueueRequestForServiceEvent(t *testing.T) {
 	h := NewEnqueueRequestForServiceEvent(record.NewFakeRecorder(100))
-	queue := workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter())
+	queue := workqueue.NewTypedRateLimitingQueue(workqueue.DefaultTypedControllerRateLimiter[reconcile.Request]())
 
 	services := make(map[string]*v1.Service)
 	ctx := context.TODO()
@@ -34,23 +35,23 @@ func TestEnqueueRequestForServiceEvent(t *testing.T) {
 	}
 
 	// create event
-	h.Create(ctx, event.CreateEvent{Object: services[ServiceName]}, queue)
+	h.Create(ctx, event.TypedCreateEvent[*v1.Service]{Object: services[ServiceName]}, queue)
 	assert.Equal(t, 1, queue.Len())
 	for queue.Len() > 0 {
 		item, _ := queue.Get()
 		queue.Done(item)
 	}
 
-	h.Create(ctx, event.CreateEvent{Object: services["clb"]}, queue)
+	h.Create(ctx, event.TypedCreateEvent[*v1.Service]{Object: services["clb"]}, queue)
 	assert.Equal(t, 0, queue.Len())
 
-	h.Create(ctx, event.CreateEvent{Object: services["nodePort"]}, queue)
+	h.Create(ctx, event.TypedCreateEvent[*v1.Service]{Object: services["nodePort"]}, queue)
 	assert.Equal(t, 0, queue.Len())
 
 	// update event
 	nlbNew := services[ServiceName].DeepCopy()
 	nlbNew.Spec.Ports[0].Port = 81
-	h.Update(ctx, event.UpdateEvent{ObjectOld: services[ServiceName], ObjectNew: nlbNew}, queue)
+	h.Update(ctx, event.TypedUpdateEvent[*v1.Service]{ObjectOld: services[ServiceName], ObjectNew: nlbNew}, queue)
 	assert.Equal(t, 1, queue.Len())
 	for queue.Len() > 0 {
 		item, _ := queue.Get()
@@ -59,22 +60,22 @@ func TestEnqueueRequestForServiceEvent(t *testing.T) {
 
 	clbNew := services["clb"].DeepCopy()
 	clbNew.Spec.Ports[0].Port = 81
-	h.Update(ctx, event.UpdateEvent{ObjectOld: services["clb"], ObjectNew: clbNew}, queue)
+	h.Update(ctx, event.TypedUpdateEvent[*v1.Service]{ObjectOld: services["clb"], ObjectNew: clbNew}, queue)
 	assert.Equal(t, 0, queue.Len())
 
 	nodePortNew := services["nodePort"].DeepCopy()
 	nodePortNew.Spec.Ports[0].Port = 81
-	h.Update(ctx, event.UpdateEvent{ObjectOld: services["nodePort"], ObjectNew: nodePortNew}, queue)
+	h.Update(ctx, event.TypedUpdateEvent[*v1.Service]{ObjectOld: services["nodePort"], ObjectNew: nodePortNew}, queue)
 	assert.Equal(t, 0, queue.Len())
 
-	h.Update(ctx, event.UpdateEvent{ObjectOld: services["nodePort"], ObjectNew: services[ServiceName]}, queue)
+	h.Update(ctx, event.TypedUpdateEvent[*v1.Service]{ObjectOld: services["nodePort"], ObjectNew: services[ServiceName]}, queue)
 	assert.Equal(t, 1, queue.Len())
 	for queue.Len() > 0 {
 		item, _ := queue.Get()
 		queue.Done(item)
 	}
 
-	h.Update(ctx, event.UpdateEvent{ObjectOld: services[ServiceName], ObjectNew: services["nodePort"]}, queue)
+	h.Update(ctx, event.TypedUpdateEvent[*v1.Service]{ObjectOld: services[ServiceName], ObjectNew: services["nodePort"]}, queue)
 	assert.Equal(t, 1, queue.Len())
 	for queue.Len() > 0 {
 		item, _ := queue.Get()
@@ -83,7 +84,7 @@ func TestEnqueueRequestForServiceEvent(t *testing.T) {
 
 	nlbDel := services[ServiceName].DeepCopy()
 	nlbDel.DeletionTimestamp = &metav1.Time{Time: time.Now()}
-	h.Update(ctx, event.UpdateEvent{ObjectOld: services[ServiceName], ObjectNew: nlbDel}, queue)
+	h.Update(ctx, event.TypedUpdateEvent[*v1.Service]{ObjectOld: services[ServiceName], ObjectNew: nlbDel}, queue)
 	assert.Equal(t, 1, queue.Len())
 	for queue.Len() > 0 {
 		item, _ := queue.Get()
@@ -94,7 +95,7 @@ func TestEnqueueRequestForServiceEvent(t *testing.T) {
 func TestNewEnqueueRequestForEndpointEvent(t *testing.T) {
 	kubeClient := getFakeKubeClient()
 	h := NewEnqueueRequestForEndpointEvent(kubeClient, record.NewFakeRecorder(100))
-	queue := workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter())
+	queue := workqueue.NewTypedRateLimitingQueue(workqueue.DefaultTypedControllerRateLimiter[reconcile.Request]())
 
 	ep := &v1.Endpoints{}
 	_ = kubeClient.Get(context.TODO(), types.NamespacedName{
@@ -104,7 +105,7 @@ func TestNewEnqueueRequestForEndpointEvent(t *testing.T) {
 
 	ctx := context.TODO()
 
-	h.Create(ctx, event.CreateEvent{Object: ep}, queue)
+	h.Create(ctx, event.TypedCreateEvent[*v1.Endpoints]{Object: ep}, queue)
 	assert.Equal(t, 1, queue.Len())
 	for queue.Len() > 0 {
 		item, _ := queue.Get()
@@ -129,14 +130,14 @@ func TestNewEnqueueRequestForEndpointEvent(t *testing.T) {
 			},
 		},
 	}
-	h.Update(ctx, event.UpdateEvent{ObjectOld: ep, ObjectNew: epNew}, queue)
+	h.Update(ctx, event.TypedUpdateEvent[*v1.Endpoints]{ObjectOld: ep, ObjectNew: epNew}, queue)
 	assert.Equal(t, 1, queue.Len())
 	for queue.Len() > 0 {
 		item, _ := queue.Get()
 		queue.Done(item)
 	}
 
-	h.Delete(ctx, event.DeleteEvent{Object: ep}, queue)
+	h.Delete(ctx, event.TypedDeleteEvent[*v1.Endpoints]{Object: ep}, queue)
 	assert.Equal(t, 1, queue.Len())
 	for queue.Len() > 0 {
 		item, _ := queue.Get()
@@ -147,7 +148,7 @@ func TestNewEnqueueRequestForEndpointEvent(t *testing.T) {
 func TestNewEnqueueRequestForEndpointSliceEvent(t *testing.T) {
 	kubeClient := getFakeKubeClient()
 	h := NewEnqueueRequestForEndpointSliceEvent(kubeClient, record.NewFakeRecorder(100))
-	queue := workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter())
+	queue := workqueue.NewTypedRateLimitingQueue(workqueue.DefaultTypedControllerRateLimiter[reconcile.Request]())
 
 	es := &discovery.EndpointSlice{}
 	_ = kubeClient.Get(context.TODO(), types.NamespacedName{
@@ -157,7 +158,7 @@ func TestNewEnqueueRequestForEndpointSliceEvent(t *testing.T) {
 
 	ctx := context.TODO()
 
-	h.Create(ctx, event.CreateEvent{Object: es}, queue)
+	h.Create(ctx, event.TypedCreateEvent[*discovery.EndpointSlice]{Object: es}, queue)
 	assert.Equal(t, 1, queue.Len())
 	for queue.Len() > 0 {
 		item, _ := queue.Get()
@@ -167,14 +168,14 @@ func TestNewEnqueueRequestForEndpointSliceEvent(t *testing.T) {
 	esNew := es.DeepCopy()
 	esNew.Endpoints[0].Addresses = []string{"10.96.0.16"}
 
-	h.Update(ctx, event.UpdateEvent{ObjectOld: es, ObjectNew: esNew}, queue)
+	h.Update(ctx, event.TypedUpdateEvent[*discovery.EndpointSlice]{ObjectOld: es, ObjectNew: esNew}, queue)
 	assert.Equal(t, 1, queue.Len())
 	for queue.Len() > 0 {
 		item, _ := queue.Get()
 		queue.Done(item)
 	}
 
-	h.Delete(ctx, event.DeleteEvent{Object: es}, queue)
+	h.Delete(ctx, event.TypedDeleteEvent[*discovery.EndpointSlice]{Object: es}, queue)
 	assert.Equal(t, 1, queue.Len())
 	for queue.Len() > 0 {
 		item, _ := queue.Get()
@@ -185,7 +186,7 @@ func TestNewEnqueueRequestForEndpointSliceEvent(t *testing.T) {
 func TestNewEnqueueRequestForNodeEvent(t *testing.T) {
 	kubeClient := getFakeKubeClient()
 	h := NewEnqueueRequestForNodeEvent(kubeClient, record.NewFakeRecorder(100))
-	queue := workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter())
+	queue := workqueue.NewTypedRateLimitingQueue(workqueue.DefaultTypedControllerRateLimiter[reconcile.Request]())
 
 	node := &v1.Node{}
 	_ = kubeClient.Get(context.TODO(), types.NamespacedName{
@@ -193,14 +194,14 @@ func TestNewEnqueueRequestForNodeEvent(t *testing.T) {
 	}, node)
 
 	ctx := context.TODO()
-	h.Create(ctx, event.CreateEvent{Object: node}, queue)
+	h.Create(ctx, event.TypedCreateEvent[*v1.Node]{Object: node}, queue)
 	assert.Equal(t, 2, queue.Len())
 	for queue.Len() > 0 {
 		item, _ := queue.Get()
 		queue.Done(item)
 	}
 
-	h.Delete(ctx, event.DeleteEvent{Object: node}, queue)
+	h.Delete(ctx, event.TypedDeleteEvent[*v1.Node]{Object: node}, queue)
 	assert.Equal(t, 2, queue.Len())
 	for queue.Len() > 0 {
 		item, _ := queue.Get()
@@ -209,7 +210,7 @@ func TestNewEnqueueRequestForNodeEvent(t *testing.T) {
 
 	newN := node.DeepCopy()
 	newN.Spec.Unschedulable = true
-	h.Update(ctx, event.UpdateEvent{ObjectOld: node, ObjectNew: newN}, queue)
+	h.Update(ctx, event.TypedUpdateEvent[*v1.Node]{ObjectOld: node, ObjectNew: newN}, queue)
 	assert.Equal(t, 2, queue.Len())
 	for queue.Len() > 0 {
 		item, _ := queue.Get()
@@ -413,7 +414,7 @@ func Test_checkServiceAffected(t *testing.T) {
 
 func TestEventHandlerNoopBranches(t *testing.T) {
 	ctx := context.TODO()
-	queue := workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter())
+	queue := workqueue.NewTypedRateLimitingQueue(workqueue.DefaultTypedControllerRateLimiter[reconcile.Request]())
 	defer queue.ShutDown()
 
 	kubeClient := getFakeKubeClient()
@@ -449,11 +450,11 @@ func TestEventHandlerNoopBranches(t *testing.T) {
 		},
 	}
 
-	svcHandler.Delete(ctx, event.DeleteEvent{Object: svc}, queue)
-	svcHandler.Generic(ctx, event.GenericEvent{Object: svc}, queue)
-	epHandler.Generic(ctx, event.GenericEvent{Object: ep}, queue)
-	nodeHandler.Generic(ctx, event.GenericEvent{Object: node}, queue)
-	esHandler.Generic(ctx, event.GenericEvent{Object: es}, queue)
+	svcHandler.Delete(ctx, event.TypedDeleteEvent[*v1.Service]{Object: svc}, queue)
+	svcHandler.Generic(ctx, event.TypedGenericEvent[*v1.Service]{Object: svc}, queue)
+	epHandler.Generic(ctx, event.TypedGenericEvent[*v1.Endpoints]{Object: ep}, queue)
+	nodeHandler.Generic(ctx, event.TypedGenericEvent[*v1.Node]{Object: node}, queue)
+	esHandler.Generic(ctx, event.TypedGenericEvent[*discovery.EndpointSlice]{Object: es}, queue)
 
 	assert.Equal(t, 0, queue.Len())
 }

@@ -15,7 +15,7 @@ import (
 
 func TestEnqueueRequestForNodeEvent_Create(t *testing.T) {
 	// Create a rate limiter
-	rateLimiter := workqueue.DefaultControllerRateLimiter()
+	rateLimiter := workqueue.DefaultTypedControllerRateLimiter[reconcile.Request]()
 
 	// Create the event handler
 	handler := &enqueueRequestForNodeEvent{
@@ -30,10 +30,10 @@ func TestEnqueueRequestForNodeEvent_Create(t *testing.T) {
 	}
 
 	// Create a fake queue
-	queue := workqueue.NewRateLimitingQueue(rateLimiter)
+	queue := workqueue.NewTypedRateLimitingQueue(rateLimiter)
 
 	// Create an event
-	createEvent := event.CreateEvent{
+	createEvent := event.TypedCreateEvent[*corev1.Node]{
 		Object: node,
 	}
 
@@ -48,9 +48,7 @@ func TestEnqueueRequestForNodeEvent_Create(t *testing.T) {
 	assert.False(t, shutdown)
 
 	// Verify the item is a reconcile.Request with correct name
-	request, ok := item.(reconcile.Request)
-	assert.True(t, ok)
-	assert.Equal(t, "test-node", request.Name)
+	assert.Equal(t, "test-node", item.Name)
 
 	// Done with the item
 	queue.Done(item)
@@ -58,7 +56,7 @@ func TestEnqueueRequestForNodeEvent_Create(t *testing.T) {
 
 func TestEnqueueRequestForNodeEvent_Update(t *testing.T) {
 	// Create a rate limiter
-	rateLimiter := workqueue.DefaultControllerRateLimiter()
+	rateLimiter := workqueue.DefaultTypedControllerRateLimiter[reconcile.Request]()
 
 	// Create the event handler
 	handler := &enqueueRequestForNodeEvent{
@@ -79,10 +77,10 @@ func TestEnqueueRequestForNodeEvent_Update(t *testing.T) {
 	}
 
 	// Create a fake queue
-	queue := workqueue.NewRateLimitingQueue(rateLimiter)
+	queue := workqueue.NewTypedRateLimitingQueue(rateLimiter)
 
 	// Create an update event
-	updateEvent := event.UpdateEvent{
+	updateEvent := event.TypedUpdateEvent[*corev1.Node]{
 		ObjectOld: oldNode,
 		ObjectNew: newNode,
 	}
@@ -98,9 +96,7 @@ func TestEnqueueRequestForNodeEvent_Update(t *testing.T) {
 	assert.False(t, shutdown)
 
 	// Verify the item is a reconcile.Request with correct name (should be new node name)
-	request, ok := item.(reconcile.Request)
-	assert.True(t, ok)
-	assert.Equal(t, "new-node", request.Name)
+	assert.Equal(t, "new-node", item.Name)
 
 	// Done with the item
 	queue.Done(item)
@@ -108,7 +104,7 @@ func TestEnqueueRequestForNodeEvent_Update(t *testing.T) {
 
 func TestEnqueueRequestForNodeEvent_Delete(t *testing.T) {
 	// Create a rate limiter
-	rateLimiter := workqueue.DefaultControllerRateLimiter()
+	rateLimiter := workqueue.DefaultTypedControllerRateLimiter[reconcile.Request]()
 
 	// Create the event handler
 	handler := &enqueueRequestForNodeEvent{
@@ -123,10 +119,10 @@ func TestEnqueueRequestForNodeEvent_Delete(t *testing.T) {
 	}
 
 	// Create a fake queue
-	queue := workqueue.NewRateLimitingQueue(rateLimiter)
+	queue := workqueue.NewTypedRateLimitingQueue(rateLimiter)
 
 	// Create a delete event
-	deleteEvent := event.DeleteEvent{
+	deleteEvent := event.TypedDeleteEvent[*corev1.Node]{
 		Object: node,
 	}
 
@@ -141,9 +137,7 @@ func TestEnqueueRequestForNodeEvent_Delete(t *testing.T) {
 	assert.False(t, shutdown)
 
 	// Verify the item is a reconcile.Request with correct name
-	request, ok := item.(reconcile.Request)
-	assert.True(t, ok)
-	assert.Equal(t, "deleted-node", request.Name)
+	assert.Equal(t, "deleted-node", item.Name)
 
 	// Done with the item
 	queue.Done(item)
@@ -151,7 +145,7 @@ func TestEnqueueRequestForNodeEvent_Delete(t *testing.T) {
 
 func TestEnqueueRequestForNodeEvent_Generic(t *testing.T) {
 	// Create a rate limiter
-	rateLimiter := workqueue.DefaultControllerRateLimiter()
+	rateLimiter := workqueue.DefaultTypedControllerRateLimiter[reconcile.Request]()
 
 	// Create the event handler
 	handler := &enqueueRequestForNodeEvent{
@@ -166,10 +160,10 @@ func TestEnqueueRequestForNodeEvent_Generic(t *testing.T) {
 	}
 
 	// Create a fake queue
-	queue := workqueue.NewRateLimitingQueue(rateLimiter)
+	queue := workqueue.NewTypedRateLimitingQueue(rateLimiter)
 
 	// Create a generic event
-	genericEvent := event.GenericEvent{
+	genericEvent := event.TypedGenericEvent[*corev1.Node]{
 		Object: node,
 	}
 
@@ -187,92 +181,8 @@ func TestEnqueueRequestForNodeEvent_Generic(t *testing.T) {
 	assert.False(t, shutdown)
 
 	// Verify the item is a reconcile.Request with correct name
-	request, ok := item.(reconcile.Request)
-	assert.True(t, ok)
-	assert.Equal(t, "generic-node", request.Name)
+	assert.Equal(t, "generic-node", item.Name)
 
 	// Done with the item
 	queue.Done(item)
-}
-
-func TestEnqueueRequestForNodeEvent_NonNodeObjects(t *testing.T) {
-	// Create a rate limiter
-	rateLimiter := workqueue.DefaultControllerRateLimiter()
-
-	// Create the event handler
-	handler := &enqueueRequestForNodeEvent{
-		rateLimiter: rateLimiter,
-	}
-
-	// Create a fake queue
-	queue := workqueue.NewRateLimitingQueue(rateLimiter)
-
-	// Test with non-Node object in Create event
-	pod := &corev1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "test-pod",
-			Namespace: "default",
-		},
-	}
-
-	createEvent := event.CreateEvent{
-		Object: pod,
-	}
-
-	// Call the Create method with non-Node object
-	handler.Create(context.TODO(), createEvent, queue)
-
-	// Verify the queue is empty
-	assert.Equal(t, 0, queue.Len())
-
-	// Test with non-Node object in Update event
-	oldPod := &corev1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "old-pod",
-			Namespace: "default",
-		},
-	}
-
-	newPod := &corev1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "new-pod",
-			Namespace: "default",
-		},
-	}
-
-	updateEvent := event.UpdateEvent{
-		ObjectOld: oldPod,
-		ObjectNew: newPod,
-	}
-
-	// Call the Update method with non-Node object
-	handler.Update(context.TODO(), updateEvent, queue)
-
-	// Verify the queue is still empty
-	assert.Equal(t, 0, queue.Len())
-
-	// Test with non-Node object in Delete event
-	deleteEvent := event.DeleteEvent{
-		Object: pod,
-	}
-
-	// Call the Delete method with non-Node object
-	handler.Delete(context.TODO(), deleteEvent, queue)
-
-	// Verify the queue is still empty
-	assert.Equal(t, 0, queue.Len())
-
-	// Test with non-Node object in Generic event
-	genericEvent := event.GenericEvent{
-		Object: pod,
-	}
-
-	// Call the Generic method with non-Node object
-	handler.Generic(context.TODO(), genericEvent, queue)
-
-	// Need to wait a bit for the AddAfter to process
-	time.Sleep(100 * time.Millisecond)
-
-	// Verify the queue is still empty
-	assert.Equal(t, 0, queue.Len())
 }

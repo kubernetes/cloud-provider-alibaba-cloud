@@ -18,6 +18,7 @@ import (
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/model"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/vmock"
 	"sigs.k8s.io/controller-runtime/pkg/event"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
 func TestGetRouteTables(t *testing.T) {
@@ -592,9 +593,9 @@ func TestBatchDeleteRoutes(t *testing.T) {
 		IMetaData: vmock.NewMockMetaData("vpc-single-route-table"),
 	}
 	eventRecord := record.NewFakeRecorder(100)
-	rateLimiter := workqueue.NewItemExponentialFailureRateLimiter(5*time.Millisecond, 10*time.Second)
+	rateLimiter := workqueue.NewTypedItemExponentialFailureRateLimiter[reconcile.Request](5*time.Millisecond, 10*time.Second)
 	nodeCache := cmap.New()
-	requeueChan := make(chan event.GenericEvent, 10)
+	requeueChan := make(chan event.TypedGenericEvent[*v1.Node], 10)
 
 	recon := &ReconcileRoute{
 		cloud:       cloud,

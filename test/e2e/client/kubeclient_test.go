@@ -23,7 +23,7 @@ func TestKubeClient_GetLatestNode(t *testing.T) {
 	}
 	node, err := client.GetLatestNode()
 	if err != nil {
-		t.Fatalf(err.Error())
+		t.Fatal(err)
 	}
 	t.Logf("node name: %s", node.Name)
 }
@@ -35,7 +35,7 @@ func TestKubeClient_PatchNodeStatus(t *testing.T) {
 	}
 	oldNode, err := client.GetLatestNode()
 	if err != nil {
-		t.Fatalf(err.Error())
+		t.Fatal(err)
 	}
 	newNode := oldNode.DeepCopy()
 	for index, value := range newNode.Status.Addresses {
@@ -46,7 +46,7 @@ func TestKubeClient_PatchNodeStatus(t *testing.T) {
 
 	updated, err := client.PatchNodeStatus(oldNode, newNode)
 	if err != nil {
-		t.Fatalf(err.Error())
+		t.Fatal(err)
 	}
 	t.Logf("updated address: %s", updated.Status.Addresses)
 }
