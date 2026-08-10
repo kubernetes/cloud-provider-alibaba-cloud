@@ -113,7 +113,10 @@ func (mgr *ServerGroupManager) BuildLocalModel(reqCtx *svcCtx.RequestContext, md
 		}
 		cpr, err := mgr.setServerGroupServers(reqCtx, sg, candidates, mdl.LoadBalancerAttribute.IsUserManaged)
 		if err != nil {
-			return fmt.Errorf("set ServerGroup for port %d error: %s", lis.ServicePort.Port, err.Error())
+			message := fmt.Sprintf("skip server group for port %d: %s", lis.ServicePort.Port, err.Error())
+			reqCtx.Log.Error(err, message)
+			reqCtx.Recorder.Event(reqCtx.Service, v1.EventTypeWarning, helper.SkipSyncBackends, message)
+			continue
 		}
 		sgs = append(sgs, sg)
 		containsPotentialReadyBackends = containsPotentialReadyBackends || cpr
@@ -191,18 +194,17 @@ func (mgr *ServerGroupManager) updateServerGroupENIBackendID(reqCtx *svcCtx.Requ
 		sg.Servers = servers
 		sg.InvalidServers = invalidServers
 		if len(invalidServers) > 0 {
-			var invalidIps []string
+			invalidIPs := make([]string, 0, len(invalidServers))
 			for _, s := range invalidServers {
-				invalidIps = append(invalidIps, s.ServerIp)
+				invalidIPs = append(invalidIPs, s.ServerIp)
 			}
-			reqCtx.Recorder.Event(
-				reqCtx.Service,
-				v1.EventTypeWarning,
-				helper.SkipSyncBackends,
-				fmt.Sprintf("Not sync pods whose eni is invalid: %s", strings.Join(invalidIps, ",")),
-			)
+			message := fmt.Sprintf(
+				"skip NLB server group %s because backend IPs [%s] cannot be resolved to ENIs; if these are Terway IP Prefix addresses, explicitly set annotation %s=Ip; CCM cannot select the server group type automatically for Services spanning nodes with different Terway IPAM modes",
+				sg.ServerGroupName, strings.Join(invalidIPs, ","), annotation.Annotation(annotation.ServerGroupType))
+			reqCtx.Recorder.Event(reqCtx.Service, v1.EventTypeWarning, helper.SkipSyncBackends, message)
 		}
 	}
+
 	return nil
 }
 

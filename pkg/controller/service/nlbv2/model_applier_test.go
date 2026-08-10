@@ -10,6 +10,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/client-go/tools/record"
 	ctrlCfg "k8s.io/cloud-provider-alibaba-cloud/pkg/config"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/helper"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/service/reconcile/annotation"
@@ -593,4 +594,58 @@ func TestIsListenerPortMatch(t *testing.T) {
 		r := &nlbmodel.ListenerAttribute{StartPort: 1000, EndPort: 3000}
 		assert.False(t, isListenerPortMatch(l, r))
 	})
+}
+
+func TestBuildActionsSkipProblemServerGroups(t *testing.T) {
+	reqCtx := getReqCtx(newSvcWithAnnotations(nil))
+	reqCtx.Recorder = record.NewFakeRecorder(10)
+	local := &nlbmodel.NetworkLoadBalancer{
+		LoadBalancerAttribute: &nlbmodel.LoadBalancerAttribute{},
+		Listeners: []*nlbmodel.ListenerAttribute{
+			{ListenerPort: 80, ListenerProtocol: nlbmodel.TCP, ServerGroupName: "invalid"},
+			{ListenerPort: 81, ListenerProtocol: nlbmodel.TCP, ServerGroupName: "valid"},
+			{ListenerPort: 82, ListenerProtocol: nlbmodel.TCP, ServerGroupName: "missing"},
+		},
+		ServerGroups: []*nlbmodel.ServerGroup{
+			{ServerGroupName: "invalid", InvalidServers: []nlbmodel.ServerGroupServer{{ServerIp: "10.0.0.1", Invalid: true}}},
+			{ServerGroupName: "valid"},
+		},
+	}
+	remote := &nlbmodel.NetworkLoadBalancer{
+		LoadBalancerAttribute: &nlbmodel.LoadBalancerAttribute{},
+		Listeners: []*nlbmodel.ListenerAttribute{
+			{ListenerId: "lsn-invalid", ListenerPort: 80, ListenerProtocol: nlbmodel.TCP, ServerGroupId: "sg-invalid"},
+			{ListenerId: "lsn-valid", ListenerPort: 81, ListenerProtocol: nlbmodel.TCP, ServerGroupId: "sg-valid"},
+			{ListenerId: "lsn-missing", ListenerPort: 82, ListenerProtocol: nlbmodel.TCP, ServerGroupId: "sg-missing"},
+		},
+		ServerGroups: []*nlbmodel.ServerGroup{
+			{ServerGroupId: "sg-invalid", ServerGroupName: "invalid"},
+			{ServerGroupId: "sg-valid", ServerGroupName: "valid"},
+		},
+	}
+
+	serverGroupActions, err := (&ModelApplier{}).buildServerGroupCreateAndUpdateActions(reqCtx, local, remote)
+	assert.NoError(t, err)
+	if assert.Len(t, serverGroupActions, 1) {
+		assert.Equal(t, "valid", serverGroupActions[0].Local.ServerGroupName)
+	}
+	assert.Equal(t, "sg-invalid", local.ServerGroups[0].ServerGroupId)
+
+	listenerActions, err := buildActionsForListeners(reqCtx, local, remote)
+	assert.NoError(t, err)
+	if assert.Len(t, listenerActions, 1) {
+		assert.Equal(t, listenerActionUpdate, listenerActions[0].Action)
+		assert.Equal(t, int32(81), listenerActions[0].Local.ListenerPort)
+	}
+
+	err = (&ModelApplier{}).cleanup(reqCtx,
+		&nlbmodel.NetworkLoadBalancer{
+			LoadBalancerAttribute: &nlbmodel.LoadBalancerAttribute{},
+			Listeners:             []*nlbmodel.ListenerAttribute{{ServerGroupName: "missing"}},
+		},
+		&nlbmodel.NetworkLoadBalancer{
+			LoadBalancerAttribute: &nlbmodel.LoadBalancerAttribute{},
+			ServerGroups:          []*nlbmodel.ServerGroup{{ServerGroupId: "sg-missing", ServerGroupName: "missing"}},
+		})
+	assert.NoError(t, err)
 }

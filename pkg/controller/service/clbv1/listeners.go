@@ -648,18 +648,33 @@ func buildActionsForListeners(reqCtx *svcCtx.RequestContext, local *model.LoadBa
 		updateActions []UpdateAction
 		deleteActions []DeleteAction
 	)
+	type listenerPortKey struct {
+		port     int
+		protocol string
+	}
+	keyFor := func(listener model.ListenerAttribute) listenerPortKey {
+		return listenerPortKey{port: listener.ListenerPort, protocol: listener.Protocol}
+	}
+	ignored := map[listenerPortKey]struct{}{}
+
 	// associate listener and vGroup
 	for i := range local.Listeners {
-		if local.Listeners[i].VGroupId != "" {
-			continue
-		}
 		if err := findVServerGroup(local.VServerGroups, &local.Listeners[i]); err != nil {
-			return createActions, updateActions, deleteActions, fmt.Errorf("find vservergroup error: %s", err.Error())
+			message := fmt.Sprintf("skip listener %s/%d: %s",
+				local.Listeners[i].Protocol, local.Listeners[i].ListenerPort, err.Error())
+			reqCtx.Log.Error(err, message)
+			reqCtx.Recorder.Event(reqCtx.Service, v1.EventTypeWarning, helper.SkipSyncBackends, message)
+			ignored[keyFor(local.Listeners[i])] = struct{}{}
 		}
 	}
 
 	// For update and deletions
 	for _, rlis := range remote.Listeners {
+		if _, ok := ignored[keyFor(rlis)]; ok {
+			reqCtx.Log.Info("skip listener managed by invalid vgroup",
+				"protocol", rlis.Protocol, "port", rlis.ListenerPort)
+			continue
+		}
 		found := false
 		for _, llis := range local.Listeners {
 			if rlis.ListenerPort == llis.ListenerPort && rlis.Protocol == llis.Protocol {
@@ -690,6 +705,9 @@ func buildActionsForListeners(reqCtx *svcCtx.RequestContext, local *model.LoadBa
 
 	// For additions
 	for _, llis := range local.Listeners {
+		if _, ok := ignored[keyFor(llis)]; ok {
+			continue
+		}
 		found := false
 		for _, rlis := range remote.Listeners {
 			if llis.ListenerPort == rlis.ListenerPort && llis.Protocol == rlis.Protocol {
@@ -1100,10 +1118,19 @@ func isNeedUpdate(reqCtx *svcCtx.RequestContext, local model.ListenerAttribute, 
 
 func findVServerGroup(vgs []model.VServerGroup, port *model.ListenerAttribute) error {
 	for _, vg := range vgs {
-		if vg.VGroupName == port.VGroupName {
-			port.VGroupId = vg.VGroupId
-			return nil
+		if vg.VGroupName != port.VGroupName && (port.VGroupId == "" || vg.VGroupId != port.VGroupId) {
+			continue
 		}
+		if len(vg.InvalidBackends) > 0 {
+			return fmt.Errorf("vgroup %s has %d invalid backends", vg.VGroupName, len(vg.InvalidBackends))
+		}
+		if port.VGroupId == "" {
+			port.VGroupId = vg.VGroupId
+		}
+		return nil
+	}
+	if port.VGroupId != "" {
+		return nil
 	}
 	return fmt.Errorf("can not find vgroup by name %s", port.VGroupName)
 }

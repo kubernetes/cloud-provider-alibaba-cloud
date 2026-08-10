@@ -23,6 +23,14 @@ import (
 	"k8s.io/klog/v2/klogr"
 )
 
+type unresolvedENIProvider struct {
+	prvd.Provider
+}
+
+func (p *unresolvedENIProvider) DescribeNetworkInterfaces(string, []string, model.AddressIPVersionType) (map[string]string, error) {
+	return map[string]string{}, nil
+}
+
 func TestVGroupManager_BatchSyncVServerGroupBackendServers(t *testing.T) {
 	vgroupManager, _ := getTestVGroupManager()
 
@@ -1617,6 +1625,16 @@ func TestVGroupManager_BuildLocalModel(t *testing.T) {
 		assert.NoError(t, err)
 		assert.NotNil(t, m.VServerGroups)
 	})
+	t.Run("skips invalid vgroup without blocking the model", func(t *testing.T) {
+		svc := getDefaultService()
+		svc.Annotations[annotation.Annotation(annotation.DefaultWeight)] = "invalid"
+		m := &model.LoadBalancer{}
+
+		err := mgr.BuildLocalModel(getReqCtx(svc), m)
+
+		assert.NoError(t, err)
+		assert.Empty(t, m.VServerGroups)
+	})
 
 	t.Run("with ENI backends", func(t *testing.T) {
 		svc := getDefaultService()
@@ -1628,6 +1646,24 @@ func TestVGroupManager_BuildLocalModel(t *testing.T) {
 		err = mgr.BuildLocalModel(reqCtx, m)
 		assert.NoError(t, err)
 		assert.NotNil(t, m.VServerGroups)
+	})
+
+	t.Run("isolates unresolved ENI backends in their vgroup", func(t *testing.T) {
+		cloud := &unresolvedENIProvider{Provider: getMockCloudProvider()}
+		mgr, err := NewVGroupManager(getFakeKubeClient(), cloud)
+		assert.NoError(t, err)
+		svc := getDefaultService()
+		svc.Annotations[annotation.BackendType] = model.ENIBackendType
+		m := &model.LoadBalancer{}
+
+		err = mgr.BuildLocalModel(getReqCtx(svc), m)
+
+		assert.NoError(t, err)
+		if assert.Len(t, m.VServerGroups, 1) {
+			assert.Empty(t, m.VServerGroups[0].Backends)
+			assert.Len(t, m.VServerGroups[0].InvalidBackends, 1)
+			assert.Equal(t, "10.96.0.15", m.VServerGroups[0].InvalidBackends[0].ServerIp)
+		}
 	})
 
 	t.Run("updateVServerGroupENIBackendID DescribeNetworkInterfaces error", func(t *testing.T) {

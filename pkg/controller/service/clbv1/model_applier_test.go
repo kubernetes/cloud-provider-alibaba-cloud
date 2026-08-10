@@ -961,3 +961,49 @@ func TestModelApplier_Apply_ErrorCases(t *testing.T) {
 		assert.NotNil(t, remote)
 	})
 }
+
+func TestBuildActionsSkipProblemVGroups(t *testing.T) {
+	reqCtx := getReqCtx(getDefaultService())
+	local := &model.LoadBalancer{
+		Listeners: []model.ListenerAttribute{
+			{ListenerPort: 80, Protocol: model.TCP, VGroupName: "invalid"},
+			{ListenerPort: 81, Protocol: model.TCP, VGroupName: "valid"},
+			{ListenerPort: 82, Protocol: model.TCP, VGroupName: "missing"},
+		},
+		VServerGroups: []model.VServerGroup{
+			{VGroupName: "invalid", InvalidBackends: []model.BackendAttribute{{ServerIp: "10.0.0.1", Invalid: true}}},
+			{VGroupName: "valid", Backends: []model.BackendAttribute{{ServerIp: "10.0.0.2"}}},
+		},
+	}
+	remote := &model.LoadBalancer{
+		Listeners: []model.ListenerAttribute{
+			{ListenerPort: 80, Protocol: model.TCP, VGroupId: "rsp-invalid"},
+			{ListenerPort: 81, Protocol: model.TCP, VGroupId: "rsp-valid"},
+			{ListenerPort: 82, Protocol: model.TCP, VGroupId: "rsp-missing"},
+		},
+		VServerGroups: []model.VServerGroup{
+			{VGroupId: "rsp-invalid", VGroupName: "invalid"},
+			{VGroupId: "rsp-valid", VGroupName: "valid"},
+		},
+	}
+
+	vgroupActions, err := buildVGroupCreateAndUpdateActions(reqCtx, local, remote)
+	assert.NoError(t, err)
+	if assert.Len(t, vgroupActions, 1) {
+		assert.Equal(t, "valid", vgroupActions[0].Local.VGroupName)
+	}
+	assert.Equal(t, "rsp-invalid", local.VServerGroups[0].VGroupId)
+
+	createActions, updateActions, deleteActions, err := buildActionsForListeners(reqCtx, local, remote)
+	assert.NoError(t, err)
+	assert.Empty(t, createActions)
+	assert.Empty(t, deleteActions)
+	if assert.Len(t, updateActions, 1) {
+		assert.Equal(t, 81, updateActions[0].local.ListenerPort)
+	}
+
+	err = (&ModelApplier{}).cleanup(reqCtx,
+		&model.LoadBalancer{Listeners: []model.ListenerAttribute{{VGroupName: "missing"}}},
+		&model.LoadBalancer{VServerGroups: []model.VServerGroup{{VGroupId: "rsp-missing", VGroupName: "missing"}}})
+	assert.NoError(t, err)
+}

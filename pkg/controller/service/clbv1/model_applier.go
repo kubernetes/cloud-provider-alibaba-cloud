@@ -408,6 +408,14 @@ func buildVGroupCreateAndUpdateActions(reqCtx *svcCtx.RequestContext, local, rem
 			}
 		}
 
+		if len(local.VServerGroups[i].InvalidBackends) > 0 {
+			reqCtx.Log.Info("skip invalid vgroup",
+				"vgroupID", local.VServerGroups[i].VGroupId,
+				"vgroupName", local.VServerGroups[i].VGroupName,
+				"invalidBackendCount", len(local.VServerGroups[i].InvalidBackends))
+			continue
+		}
+
 		if updatedVGroups[sgKey] {
 			reqCtx.Log.Info("already updated vgroup, skip",
 				"vgroupID", local.VServerGroups[i].VGroupId, "vgroupName", local.VServerGroups[i].VGroupName)
@@ -456,6 +464,16 @@ func (m *ModelApplier) cleanup(reqCtx *svcCtx.RequestContext, local *model.LoadB
 			if vg.VGroupId == l.VGroupId {
 				found = true
 				break
+			}
+		}
+		if !found {
+			for _, listener := range local.Listeners {
+				if listener.VGroupName == vg.VGroupName {
+					found = true
+					reqCtx.Log.Info("preserve vgroup referenced by a skipped listener",
+						"vgroupID", vg.VGroupId, "vgroupName", vg.VGroupName)
+					break
+				}
 			}
 		}
 

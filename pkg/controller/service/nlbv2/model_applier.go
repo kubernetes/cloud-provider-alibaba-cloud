@@ -301,6 +301,14 @@ func (m *ModelApplier) buildServerGroupCreateAndUpdateActions(reqCtx *svcCtx.Req
 			}
 		}
 
+		if len(local.ServerGroups[i].InvalidServers) > 0 {
+			reqCtx.Log.Info("skip invalid server group",
+				"serverGroupID", local.ServerGroups[i].ServerGroupId,
+				"serverGroupName", local.ServerGroups[i].ServerGroupName,
+				"invalidServerCount", len(local.ServerGroups[i].InvalidServers))
+			continue
+		}
+
 		if updatedServerGroups[sgKey] {
 			reqCtx.Log.Info("already updated server group, skip",
 				"sgID", local.ServerGroups[i].ServerGroupId, "sgName", local.ServerGroups[i].ServerGroupId)
@@ -462,19 +470,30 @@ func buildActionsForListeners(reqCtx *svcCtx.RequestContext, local, remote *nlbm
 	}
 
 	var actions []listenerAction
+	keyFor := func(listener *nlbmodel.ListenerAttribute) string {
+		return fmt.Sprintf("%s/%s", listener.ListenerProtocol, listener.PortString())
+	}
+	ignored := map[string]struct{}{}
 
-	// associate listener and vGroup
+	// Associate listeners with server groups. A listener whose group is invalid
+	// must not block unrelated listener actions.
 	for i := range local.Listeners {
-		if local.Listeners[i].ServerGroupId != "" {
-			continue
-		}
 		if err := findServerGroup(local.ServerGroups, local.Listeners[i]); err != nil {
-			return nil, fmt.Errorf("find servergroup error: %s", err.Error())
+			message := fmt.Sprintf("skip listener %s: %s", keyFor(local.Listeners[i]), err.Error())
+			reqCtx.Log.Error(err, message)
+			reqCtx.Recorder.Event(reqCtx.Service, v1.EventTypeWarning, helper.SkipSyncBackends, message)
+			ignored[keyFor(local.Listeners[i])] = struct{}{}
 		}
 	}
 
 	// delete
 	for _, r := range remote.Listeners {
+		if _, ok := ignored[keyFor(r)]; ok {
+			reqCtx.Log.Info("skip listener managed by invalid server group",
+				"protocol", r.ListenerProtocol, "port", r.PortString())
+			continue
+		}
+
 		found := false
 		for i, l := range local.Listeners {
 			if isListenerPortMatch(l, r) && r.ListenerProtocol == l.ListenerProtocol {
@@ -500,6 +519,10 @@ func buildActionsForListeners(reqCtx *svcCtx.RequestContext, local, remote *nlbm
 	}
 
 	for i := range local.Listeners {
+		if _, ok := ignored[keyFor(local.Listeners[i])]; ok {
+			continue
+		}
+
 		found := false
 		for j := range remote.Listeners {
 			if local.Listeners[i].ListenerId == remote.Listeners[j].ListenerId {
@@ -563,6 +586,16 @@ func (m *ModelApplier) cleanup(reqCtx *svcCtx.RequestContext, local, remote *nlb
 			if l.ServerGroupId == r.ServerGroupId {
 				found = true
 				break
+			}
+		}
+		if !found {
+			for _, listener := range local.Listeners {
+				if listener.ServerGroupName == r.ServerGroupName {
+					found = true
+					reqCtx.Log.Info("preserve server group referenced by a skipped listener",
+						"serverGroupID", r.ServerGroupId, "serverGroupName", r.ServerGroupName)
+					break
+				}
 			}
 		}
 
@@ -649,13 +682,22 @@ func isNLBReusable(service *v1.Service, tags []tag.Tag, dnsName string) (bool, s
 
 func findServerGroup(sgs []*nlbmodel.ServerGroup, lis *nlbmodel.ListenerAttribute) error {
 	for _, sg := range sgs {
-		if sg.ServerGroupName == lis.ServerGroupName {
-			lis.ServerGroupId = sg.ServerGroupId
-			return nil
+		if sg.ServerGroupName != lis.ServerGroupName &&
+			(lis.ServerGroupId == "" || sg.ServerGroupId != lis.ServerGroupId) {
+			continue
 		}
+		if len(sg.InvalidServers) > 0 {
+			return fmt.Errorf("server group %s has %d invalid servers", sg.ServerGroupName, len(sg.InvalidServers))
+		}
+		if lis.ServerGroupId == "" {
+			lis.ServerGroupId = sg.ServerGroupId
+		}
+		return nil
+	}
+	if lis.ServerGroupId != "" {
+		return nil
 	}
 	return fmt.Errorf("can not find server group by name %s", lis.ServerGroupName)
-
 }
 
 func isListenerPortMatch(l, r *nlbmodel.ListenerAttribute) bool {

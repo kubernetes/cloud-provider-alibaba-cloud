@@ -17,11 +17,20 @@ import (
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/model"
 	nlbmodel "k8s.io/cloud-provider-alibaba-cloud/pkg/model/nlb"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/model/tag"
+	prvd "k8s.io/cloud-provider-alibaba-cloud/pkg/provider"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/util"
 	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
+
+type unresolvedNLBENIProvider struct {
+	prvd.Provider
+}
+
+func (p *unresolvedNLBENIProvider) DescribeNetworkInterfaces(string, []string, model.AddressIPVersionType) (map[string]string, error) {
+	return map[string]string{}, nil
+}
 
 func makeNLBBackends(n int) []nlbmodel.ServerGroupServer {
 	backends := make([]nlbmodel.ServerGroupServer, n)
@@ -4385,6 +4394,30 @@ func TestServerGroupManager_BuildLocalModel(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestUpdateServerGroupENIBackendID_Unresolved(t *testing.T) {
+	mgr := &ServerGroupManager{
+		cloud: &unresolvedNLBENIProvider{Provider: getMockCloudProvider()},
+		vpcId: "vpc-id",
+	}
+	svc := newSvcWithAnnotations(nil)
+	reqCtx := getReqCtx(svc)
+	reqCtx.Recorder = record.NewFakeRecorder(10)
+	sgs := []*nlbmodel.ServerGroup{{
+		Servers: []nlbmodel.ServerGroupServer{{
+			ServerIp:   "10.96.0.15",
+			ServerType: nlbmodel.EniServerType,
+		}},
+	}}
+
+	err := mgr.updateServerGroupENIBackendID(reqCtx, sgs)
+
+	assert.NoError(t, err)
+	assert.Empty(t, sgs[0].Servers)
+	if assert.Len(t, sgs[0].InvalidServers, 1) {
+		assert.Equal(t, "10.96.0.15", sgs[0].InvalidServers[0].ServerIp)
 	}
 }
 

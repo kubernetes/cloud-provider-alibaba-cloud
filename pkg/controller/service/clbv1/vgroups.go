@@ -73,12 +73,13 @@ func (mgr *VGroupManager) BuildLocalModel(reqCtx *svcCtx.RequestContext, m *mode
 	}
 
 	var vgs []model.VServerGroup
-	errs := make([]error, len(reqCtx.Service.Spec.Ports))
 	containsPotentialReadyEndpoints := false
 	for _, port := range reqCtx.Service.Spec.Ports {
 		vg, cpr, err := mgr.buildVGroupForServicePort(reqCtx, port, candidates, m.LoadBalancerAttribute.IsUserManaged)
 		if err != nil {
-			errs = append(errs, err)
+			message := fmt.Sprintf("skip vgroup for port %d: %s", port.Port, err.Error())
+			reqCtx.Log.Error(err, message)
+			reqCtx.Recorder.Event(reqCtx.Service, v1.EventTypeWarning, helper.SkipSyncBackends, message)
 			continue
 		}
 		vgs = append(vgs, vg)
@@ -116,6 +117,7 @@ func (mgr *VGroupManager) updateVServerGroupENIBackendID(reqCtx *svcCtx.RequestC
 	}
 
 	var vpcCIDRs []*net.IPNet
+
 	for i := range vgs {
 		var filteredBackends, invalidBackends []model.BackendAttribute
 		var skipIPs []string
@@ -164,15 +166,14 @@ func (mgr *VGroupManager) updateVServerGroupENIBackendID(reqCtx *svcCtx.RequestC
 			)
 		}
 		if len(invalidBackends) > 0 {
-			var invalidIps []string
+			invalidIPs := make([]string, 0, len(invalidBackends))
 			for _, b := range invalidBackends {
-				invalidIps = append(invalidIps, b.ServerIp)
+				invalidIPs = append(invalidIPs, b.ServerIp)
 			}
-			reqCtx.Recorder.Event(
-				reqCtx.Service,
-				v1.EventTypeWarning,
-				helper.SkipSyncBackends,
-				fmt.Sprintf("Not sync pods [%s] whose eni is invalid", strings.Join(invalidIps, ",")))
+			message := fmt.Sprintf(
+				"skip CLB vgroup %s because backend IPs [%s] cannot be resolved to ENIs; CLB ENI backends require IPs assigned directly to ENIs and do not support delegated IP-prefix addresses; use NLB with annotation %s=Ip for Terway IP Prefix workloads",
+				vgs[i].VGroupName, strings.Join(invalidIPs, ","), annotation.Annotation(annotation.ServerGroupType))
+			reqCtx.Recorder.Event(reqCtx.Service, v1.EventTypeWarning, helper.FeatureNotSupported, message)
 		}
 	}
 

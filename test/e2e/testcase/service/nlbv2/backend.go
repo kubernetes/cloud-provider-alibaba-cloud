@@ -720,10 +720,15 @@ func RunBackendTestCases(f *framework.Framework) {
 		ginkgo.Context("server-group-type", func() {
 			ginkgo.It("ip", func() {
 				rawsvc := f.Client.KubeClient.DefaultNLBService()
-				rawsvc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyTypeLocal
 				rawsvc.Annotations = map[string]string{
 					annotation.Annotation(annotation.ZoneMaps):        options.TestConfig.NLBZoneMaps,
 					annotation.Annotation(annotation.ServerGroupType): string(nlb.IpServerGroupType),
+				}
+				if options.TestConfig.Network == options.Terway {
+					// Use direct Pod IPs so this also covers nodes using delegated IP prefixes.
+					rawsvc.Annotations[annotation.BackendType] = model.ENIBackendType
+				} else {
+					rawsvc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyTypeLocal
 				}
 				svc, err := f.Client.KubeClient.CreateService(rawsvc)
 				gomega.Expect(err).To(gomega.BeNil())
@@ -1229,7 +1234,7 @@ func RunBackendTestCases(f *framework.Framework) {
 
 		ginkgo.Context("invalid backends", func() {
 			if options.TestConfig.Network == options.Terway {
-				ginkgo.It("not found eni id", func() {
+				ginkgo.It("isolates a server whose eni id is not found", func() {
 					pods, err := f.Client.KubeClient.GetDeploymentPods()
 					gomega.Expect(err).To(gomega.BeNil())
 					gomega.Expect(pods).NotTo(gomega.BeEmpty())
@@ -1246,6 +1251,7 @@ func RunBackendTestCases(f *framework.Framework) {
 					svc, err := f.Client.KubeClient.CreateNLBServiceWithoutSelector(map[string]string{
 						annotation.Annotation(annotation.LoadBalancerId):   options.TestConfig.InternetNetworkLoadBalancerID,
 						annotation.Annotation(annotation.OverrideListener): "true",
+						annotation.BackendType:                             model.ENIBackendType,
 					})
 					gomega.Expect(err).To(gomega.BeNil())
 					_, err = f.Client.KubeClient.CreateEndpointsWithIPs(svc, ips)
@@ -1253,7 +1259,7 @@ func RunBackendTestCases(f *framework.Framework) {
 
 					err = f.ExpectNetworkLoadBalancerEqual(svc)
 					gomega.Expect(err).To(gomega.BeNil())
-					err = f.ExpectLoadBalancerEvent(svc, helper.SkipSyncBackends, ip.String())
+					err = f.ExpectLoadBalancerEvent(svc, helper.SkipSyncBackends, annotation.Annotation(annotation.ServerGroupType)+"=Ip")
 					gomega.Expect(err).To(gomega.BeNil())
 				})
 			}

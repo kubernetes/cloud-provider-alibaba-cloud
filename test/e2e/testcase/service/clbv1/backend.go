@@ -821,7 +821,7 @@ func RunBackendTestCases(f *framework.Framework) {
 
 		ginkgo.Context("invalid backend", func() {
 			if options.TestConfig.Network == options.Terway {
-				ginkgo.It("not found eni id", func() {
+				ginkgo.It("isolates a backend whose eni id is not found", func() {
 					pods, err := f.Client.KubeClient.GetDeploymentPods()
 					gomega.Expect(err).To(gomega.BeNil())
 					gomega.Expect(pods).NotTo(gomega.BeEmpty())
@@ -836,6 +836,7 @@ func RunBackendTestCases(f *framework.Framework) {
 					ips = append(ips, ip.String())
 
 					svc, err := f.Client.KubeClient.CreateServiceWithoutSelector(map[string]string{
+						annotation.BackendType: model.ENIBackendType,
 						annotation.Annotation(framework.TestAnnotationIgnoreBackends): ip.String(),
 					})
 					gomega.Expect(err).To(gomega.BeNil())
@@ -844,7 +845,7 @@ func RunBackendTestCases(f *framework.Framework) {
 
 					err = f.ExpectLoadBalancerEqual(svc)
 					gomega.Expect(err).To(gomega.BeNil())
-					err = f.ExpectLoadBalancerEvent(svc, helper.SkipSyncBackends, ip.String())
+					err = f.ExpectLoadBalancerEvent(svc, helper.FeatureNotSupported, annotation.Annotation(annotation.ServerGroupType)+"=Ip")
 					gomega.Expect(err).To(gomega.BeNil())
 				})
 			}
