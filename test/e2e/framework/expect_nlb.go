@@ -47,7 +47,7 @@ func (f *Framework) ExpectNetworkLoadBalancerEqual(svc *v1.Service) error {
 			}
 		}()
 
-		svc, remote, err := f.FindNetworkLoadBalancer()
+		svc, remote, err := f.findNetworkLoadBalancerOnce()
 		if err != nil {
 			retErr = fmt.Errorf("find loadbalancer: %w", err)
 			return false, nil
@@ -132,6 +132,12 @@ func (f *Framework) ExpectNetworkLoadBalancerDeleted(svc *v1.Service) error {
 		}
 		err = lbManager.Find(reqCtx, lbMdl)
 		if err != nil {
+			// Find may locate the NLB by tag immediately before it disappears.
+			// In that case GetLoadBalancerAttribute returns not found, which is
+			// exactly the state this assertion is waiting for.
+			if isNetworkLoadBalancerNotFound(err) {
+				return true, nil
+			}
 			return false, err
 		}
 		if lbMdl.LoadBalancerAttribute.LoadBalancerId != "" {
@@ -141,24 +147,43 @@ func (f *Framework) ExpectNetworkLoadBalancerDeleted(svc *v1.Service) error {
 	})
 }
 
+func isNetworkLoadBalancerNotFound(err error) bool {
+	return err != nil && strings.Contains(err.Error(), "ResourceNotFound.loadBalancer")
+}
+
 func (f *Framework) FindNetworkLoadBalancer() (*v1.Service, *nlbmodel.NetworkLoadBalancer, error) {
 	// wait until service created successfully
 	var svc *v1.Service
+	var remote *nlbmodel.NetworkLoadBalancer
+	var retErr error
 	err := wait.PollImmediate(10*time.Second, 60*time.Second, func() (done bool, err error) {
-		svc, err = f.Client.KubeClient.GetService()
-		if err != nil {
+		svc, remote, retErr = f.findNetworkLoadBalancerOnce()
+		if retErr != nil {
 			return false, nil
 		}
-		klog.Infof("wait nlb service running, ingress: %+v", svc.Status.LoadBalancer.Ingress)
-		if len(svc.Status.LoadBalancer.Ingress) == 1 &&
-			(svc.Status.LoadBalancer.Ingress[0].IP != "" ||
-				svc.Status.LoadBalancer.Ingress[0].Hostname != "") {
-			return true, nil
-		}
-		return false, nil
+		return true, nil
 	})
 	if err != nil {
+		if retErr != nil {
+			return svc, nil, retErr
+		}
 		return svc, nil, err
+	}
+	return svc, remote, nil
+}
+
+// findNetworkLoadBalancerOnce performs one Kubernetes and cloud observation.
+// Callers that already own a retry deadline must use this method so nested
+// polling cannot overrun the outer timeout.
+func (f *Framework) findNetworkLoadBalancerOnce() (*v1.Service, *nlbmodel.NetworkLoadBalancer, error) {
+	svc, err := f.Client.KubeClient.GetService()
+	if err != nil {
+		return svc, nil, err
+	}
+	klog.Infof("wait nlb service running, ingress: %+v", svc.Status.LoadBalancer.Ingress)
+	if len(svc.Status.LoadBalancer.Ingress) != 1 ||
+		(svc.Status.LoadBalancer.Ingress[0].IP == "" && svc.Status.LoadBalancer.Ingress[0].Hostname == "") {
+		return svc, nil, fmt.Errorf("nlb service ingress is not ready")
 	}
 
 	klog.Infof("try get nlb from svc %s", svc.Name)
@@ -841,7 +866,10 @@ func lookupENIsByIPVersion(f *Framework, servers []nlbmodel.ServerGroupServer, i
 func buildServerGroupENIBackends(f *Framework, eps []discovery.EndpointSlice, sg *nlbmodel.ServerGroup, ipVersion model.AddressIPVersionType) ([]nlbmodel.ServerGroupServer, error) {
 	var ret []nlbmodel.ServerGroupServer
 	for _, es := range eps {
-		backendPort := getBackendProtFromEndpointSlice(*sg.ServicePort, es.Ports)
+		backendPort, found := getBackendPortFromEndpointSlice(*sg.ServicePort, es.Ports)
+		if !found {
+			continue
+		}
 		for _, ep := range es.Endpoints {
 			if ep.TargetRef == nil || ep.TargetRef.Kind != "Pod" {
 				continue

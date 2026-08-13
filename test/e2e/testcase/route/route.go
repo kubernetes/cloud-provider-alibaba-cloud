@@ -14,7 +14,7 @@ import (
 )
 
 func RunRouteControllerTestCases(f *framework.Framework) {
-	ginkgo.Describe("route controller", func() {
+	ginkgo.Describe("route controller", ginkgo.Serial, ginkgo.Label("cluster-serial"), func() {
 
 		ginkgo.Context("reconcile", func() {
 			ginkgo.It("route-reconcile", func() {

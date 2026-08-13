@@ -3,6 +3,8 @@ package options
 import (
 	"flag"
 	"fmt"
+	"strings"
+	"time"
 )
 
 const (
@@ -19,6 +21,16 @@ type E2EConfig struct {
 	ClusterType              string `json:"clusterType"`
 	ClusterId                string `json:"clusterId"`
 	AllowCreateCloudResource bool   `json:"allowCreateCloudResource"` // whether to create cloud resources for test
+	CleanupOnly              bool   `json:"cleanupOnly"`
+	CleanupProcess           int    `json:"-"`
+	CleanupTotal             int    `json:"-"`
+	CloudResourceTypes       string `json:"cloudResourceTypes"`
+	// RunID is kept as a deprecated, ignored flag so existing local commands do
+	// not break. Resource ownership is derived from suite family and worker index.
+	RunID               string        `json:"runId,omitempty"`
+	ParallelProcess     int           `json:"parallelProcess"`
+	ParallelTotal       int           `json:"parallelTotal"`
+	FixtureReadyTimeout time.Duration `json:"fixtureReadyTimeout"`
 
 	// need provided
 	VPCLoadBalancerID string `json:"VPCLoadBalancerID"` // lb in other vpc
@@ -49,8 +61,8 @@ type E2EConfig struct {
 	IntranetLoadBalancerID        string `json:"IntranetLoadBalancerID"`
 	InternetNetworkLoadBalancerID string `json:"InternetNetworkLoadBalancerID"`
 	IntranetNetworkLoadBalancerID string `json:"IntranetNetworkLoadbalancerID"`
-	VServerGroupID                string `json:"VServerGroupID"`  // vServerGroupID of InternetLoadBalancerID
-	VServerGroupID2               string `json:"VServerGroupID2"` // vServerGroupID of InternetLoadBalancerID
+	VServerGroupID                string `json:"VServerGroupID"`  // vServerGroupID of IntranetLoadBalancerID
+	VServerGroupID2               string `json:"VServerGroupID2"` // vServerGroupID of IntranetLoadBalancerID
 	NLBServerGroupID              string `json:"NLBServerGroupID"`
 	NLBServerGroupID2             string `json:"NLBServerGroupID2"`
 	AclID                         string `json:"AclID"`
@@ -65,6 +77,12 @@ func (e *E2EConfig) BindFlags() {
 	flag.StringVar(&e.RegionId, "region-id", "", "the region id of cluster")
 	flag.StringVar(&e.ClusterId, "cluster-id", "", "the id of cluster which is used to run e2e test")
 	flag.BoolVar(&e.AllowCreateCloudResource, "allow-create-cloud-resources", false, "whether allow to create cloud resources, including the Kubernetes Cluster, SLB, ECS, etc.")
+	flag.BoolVar(&e.CleanupOnly, "cleanup-only", false, "find and delete worker-scoped cloud fixtures without running specs")
+	flag.IntVar(&e.CleanupProcess, "cleanup-process", 1, "cleanup worker index (cleanup-only mode)")
+	flag.IntVar(&e.CleanupTotal, "cleanup-total", 1, "number of cleanup workers (cleanup-only mode)")
+	flag.StringVar(&e.CloudResourceTypes, "cloud-resource-types", "clb,nlb", "comma-separated cloud resource families to prepare: clb,nlb")
+	flag.StringVar(&e.RunID, "run-id", "", "deprecated and ignored; e2e resources use fixed suite and worker names")
+	flag.DurationVar(&e.FixtureReadyTimeout, "fixture-ready-timeout", 10*time.Minute, "maximum time to wait for each worker's backend deployment to become ready")
 	flag.StringVar(&e.EipLoadBalancerID, "eip-lb-id", "", "reused intranet slb id which has eip")
 	flag.StringVar(&e.VPCLoadBalancerID, "vpc-lb-id", "", "reused intranet slb id which in other vpc")
 	flag.StringVar(&e.MasterZoneID, "master-zone-id", "", "master zone id")
@@ -106,5 +124,96 @@ func (e *E2EConfig) Validate() error {
 	if e.ClusterId == "" {
 		return fmt.Errorf("cluster id can not be empty")
 	}
+	if e.FixtureReadyTimeout <= 0 {
+		return fmt.Errorf("fixture ready timeout must be positive")
+	}
+	if _, err := e.cloudResourceTypeSet(); err != nil {
+		return err
+	}
 	return nil
+}
+
+// NeedsCloudResource reports whether the named service family should have its
+// shared test fixtures prepared. Empty preserves the historical clb,nlb set.
+func (e *E2EConfig) NeedsCloudResource(resourceType string) bool {
+	types, err := e.cloudResourceTypeSet()
+	if err != nil {
+		return false
+	}
+	return types[resourceType]
+}
+
+func (e *E2EConfig) cloudResourceTypeSet() (map[string]bool, error) {
+	value := strings.TrimSpace(strings.ToLower(e.CloudResourceTypes))
+	if value == "" {
+		value = "clb,nlb"
+	}
+	types := make(map[string]bool, 2)
+	for _, resourceType := range strings.Split(value, ",") {
+		resourceType = strings.TrimSpace(resourceType)
+		switch resourceType {
+		case "clb", "nlb":
+			types[resourceType] = true
+		default:
+			return nil, fmt.Errorf("unsupported cloud resource type %q; expected clb, nlb, or both", resourceType)
+		}
+	}
+	return types, nil
+}
+
+// ConfigureParallel records the Ginkgo worker identity. Kubernetes and cloud
+// resources use a fixed suite-family/worker identity so their names are
+// predictable before a run starts.
+func (e *E2EConfig) ConfigureParallel(process, total int) error {
+	if total < 1 {
+		return fmt.Errorf("parallel total must be positive, got %d", total)
+	}
+	if process < 1 || process > total {
+		return fmt.Errorf("parallel process must be in [1,%d], got %d", total, process)
+	}
+
+	e.ParallelProcess = process
+	e.ParallelTotal = total
+	if total > 1 && e.hasSharedMutableResources() {
+		return fmt.Errorf("parallel runs cannot reuse explicitly supplied LB, server-group, ACL, or EIP resources; let each worker create isolated resources")
+	}
+	return nil
+}
+
+// SuiteName is the fixed resource family name used in namespaces and cloud
+// fixture names. "all" is used by the serial phase that prepares both types.
+func (e *E2EConfig) SuiteName() string {
+	types, err := e.cloudResourceTypeSet()
+	if err != nil {
+		return "invalid"
+	}
+	if types["clb"] && types["nlb"] {
+		return "all"
+	}
+	if types["clb"] {
+		return "clb"
+	}
+	return "nlb"
+}
+
+// WorkerScope is the fixed, DNS-compatible identity shared by the worker's
+// Kubernetes namespace, node-label key, logs, and cloud fixtures.
+func (e *E2EConfig) WorkerScope() string {
+	return fmt.Sprintf("ccm-e2e-%s-w%d", e.SuiteName(), e.ParallelProcess)
+}
+
+func (e *E2EConfig) hasSharedMutableResources() bool {
+	return e.VPCLoadBalancerID != "" ||
+		e.EipLoadBalancerID != "" ||
+		e.InternetLoadBalancerID != "" ||
+		e.IntranetLoadBalancerID != "" ||
+		e.InternetNetworkLoadBalancerID != "" ||
+		e.IntranetNetworkLoadBalancerID != "" ||
+		e.VServerGroupID != "" ||
+		e.VServerGroupID2 != "" ||
+		e.NLBServerGroupID != "" ||
+		e.NLBServerGroupID2 != "" ||
+		e.AclID != "" ||
+		e.AclID2 != "" ||
+		e.EIPID != ""
 }

@@ -499,8 +499,18 @@ func (r *VPCProvider) DescribeEipIdByName(ctx context.Context, name string) (str
 
 // AllocateEipAddress used for e2etest
 func (r *VPCProvider) AllocateEipAddress(ctx context.Context, name string) (string, error) {
+	return r.AllocateEipAddressWithChargeType(ctx, name, "")
+}
+
+// AllocateEipAddressWithChargeType is used by e2e tests that require a
+// specific EIP billing mode. AllocateEipAddress keeps its historical API
+// default, while NLB fixtures explicitly request PayByTraffic.
+func (r *VPCProvider) AllocateEipAddressWithChargeType(ctx context.Context, name, chargeType string) (string, error) {
 	req := vpc.CreateAllocateEipAddressRequest()
 	req.Name = name
+	if chargeType != "" {
+		req.InternetChargeType = chargeType
+	}
 	resp, err := r.auth.VPC.AllocateEipAddress(req)
 	if err != nil {
 		return "", err
