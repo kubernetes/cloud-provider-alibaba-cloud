@@ -60,7 +60,7 @@ func (f *Framework) BeforeSuit() error {
 	err := f.Client.KubeClient.CreateNamespace()
 	if err != nil {
 		if apierrors.IsAlreadyExists(err) {
-			return fmt.Errorf("test namespace %s already exists; another run may be active or cleanup-only is required", client.Namespace)
+			return fmt.Errorf("test namespace %s already exists; another run may be active or manual cleanup is required", client.Namespace)
 		} else {
 			return err
 		}
@@ -91,7 +91,7 @@ func (f *Framework) AfterSuit() error {
 			serviceCleaned = false
 		}
 	}
-	if f.namespaceCreated && (options.TestConfig.AllowCreateCloudResource || options.TestConfig.CleanupOnly) {
+	if f.namespaceCreated && options.TestConfig.AllowCreateCloudResource {
 		// Lazy fixtures are created from specs. If the cloud accepted a create
 		// request but its response was lost, the ID was never recorded locally.
 		// Fixed worker-scoped names let teardown rediscover and remove it.
@@ -112,14 +112,6 @@ func (f *Framework) AfterSuit() error {
 		}
 	}
 	return utilerrors.NewAggregate(errs)
-}
-
-// CleanupWorkerScope recovers a fixed worker after an interrupted run. The
-// caller explicitly authorizes ownership of that scope; teardown still keeps
-// its namespace lock if any Service or cloud resource cannot be cleaned.
-func (f *Framework) CleanupWorkerScope() error {
-	f.namespaceCreated = true
-	return f.AfterSuit()
 }
 
 func (f *Framework) AfterEach() error {

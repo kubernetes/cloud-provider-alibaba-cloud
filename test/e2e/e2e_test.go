@@ -30,25 +30,10 @@ func TestE2E(t *testing.T) {
 	}
 	suiteConfig, _ := ginkgo.GinkgoConfiguration()
 	parallelProcess, parallelTotal := suiteConfig.ParallelProcess, suiteConfig.ParallelTotal
-	if options.TestConfig.CleanupOnly {
-		parallelProcess, parallelTotal = options.TestConfig.CleanupProcess, options.TestConfig.CleanupTotal
-	}
 	if err := options.TestConfig.ConfigureParallel(parallelProcess, parallelTotal); err != nil {
 		t.Fatalf("configure parallel test resources: %s", err.Error())
 	}
 	client.ConfigureTestResources(options.TestConfig.WorkerScope(), options.TestConfig.FixtureReadyTimeout)
-
-	if options.TestConfig.CleanupOnly {
-		c, err := client.NewClient()
-		if err != nil {
-			t.Fatalf("create client error: %s", err.Error())
-		}
-		f := framework.NewFrameWork(c)
-		if err := f.CleanupWorkerScope(); err != nil {
-			t.Fatalf("cleanup worker-scoped cloud resources: %s", err.Error())
-		}
-		return
-	}
 
 	c, err := client.NewClient()
 	if err != nil {

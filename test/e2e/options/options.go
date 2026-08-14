@@ -21,9 +21,6 @@ type E2EConfig struct {
 	ClusterType              string `json:"clusterType"`
 	ClusterId                string `json:"clusterId"`
 	AllowCreateCloudResource bool   `json:"allowCreateCloudResource"` // whether to create cloud resources for test
-	CleanupOnly              bool   `json:"cleanupOnly"`
-	CleanupProcess           int    `json:"-"`
-	CleanupTotal             int    `json:"-"`
 	CloudResourceTypes       string `json:"cloudResourceTypes"`
 	// RunID is kept as a deprecated, ignored flag so existing local commands do
 	// not break. Resource ownership is derived from suite family and worker index.
@@ -77,9 +74,6 @@ func (e *E2EConfig) BindFlags() {
 	flag.StringVar(&e.RegionId, "region-id", "", "the region id of cluster")
 	flag.StringVar(&e.ClusterId, "cluster-id", "", "the id of cluster which is used to run e2e test")
 	flag.BoolVar(&e.AllowCreateCloudResource, "allow-create-cloud-resources", false, "whether allow to create cloud resources, including the Kubernetes Cluster, SLB, ECS, etc.")
-	flag.BoolVar(&e.CleanupOnly, "cleanup-only", false, "find and delete worker-scoped cloud fixtures without running specs")
-	flag.IntVar(&e.CleanupProcess, "cleanup-process", 1, "cleanup worker index (cleanup-only mode)")
-	flag.IntVar(&e.CleanupTotal, "cleanup-total", 1, "number of cleanup workers (cleanup-only mode)")
 	flag.StringVar(&e.CloudResourceTypes, "cloud-resource-types", "clb,nlb", "comma-separated cloud resource families to prepare: clb,nlb")
 	flag.StringVar(&e.RunID, "run-id", "", "deprecated and ignored; e2e resources use fixed suite and worker names")
 	flag.DurationVar(&e.FixtureReadyTimeout, "fixture-ready-timeout", 10*time.Minute, "maximum time to wait for each worker's backend deployment to become ready")
