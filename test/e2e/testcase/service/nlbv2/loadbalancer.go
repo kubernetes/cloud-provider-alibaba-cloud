@@ -4,15 +4,18 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/helper"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/service/reconcile/annotation"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/model"
 	nlbmodel "k8s.io/cloud-provider-alibaba-cloud/pkg/model/nlb"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/model/tag"
+	e2eclient "k8s.io/cloud-provider-alibaba-cloud/test/e2e/client"
 	"k8s.io/cloud-provider-alibaba-cloud/test/e2e/framework"
 	"k8s.io/cloud-provider-alibaba-cloud/test/e2e/options"
 )
@@ -169,6 +172,23 @@ func RunLoadBalancerTestCases(f *framework.Framework) {
 		})
 
 		ginkgo.Context("nlb address-type", func() {
+			ginkgo.It("address-type defaults to internet when annotation is omitted", func() {
+				svc := f.Client.KubeClient.DefaultNLBService()
+				svc.Annotations = map[string]string{
+					annotation.Annotation(annotation.ZoneMaps): options.TestConfig.NLBZoneMaps,
+				}
+				svc, err := f.Client.KubeClient.CoreV1().Services(e2eclient.Namespace).
+					Create(context.TODO(), svc, metav1.CreateOptions{})
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(svc.Annotations).NotTo(gomega.HaveKey(annotation.Annotation(annotation.AddressType)))
+
+				err = f.ExpectNetworkLoadBalancerEqual(svc)
+				gomega.Expect(err).To(gomega.BeNil())
+				_, remote, err := f.FindNetworkLoadBalancer()
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(remote.LoadBalancerAttribute.AddressType).To(gomega.Equal(nlbmodel.InternetAddressType))
+			})
+
 			ginkgo.It("address-type=internet", func() {
 				svc, err := f.Client.KubeClient.CreateNLBServiceByAnno(
 					map[string]string{
@@ -755,7 +775,7 @@ func RunLoadBalancerTestCases(f *framework.Framework) {
 			err = f.DeleteNetworkLoadBalancerAndWait(slb.LoadBalancerAttribute.LoadBalancerId)
 			gomega.Expect(err).To(gomega.BeNil())
 
-			err = f.ExpectNetworkLoadBalancerDeleted(oldSvc)
+			err = f.ExpectNetworkLoadBalancerAbsentFor(oldSvc, time.Minute)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		})
 

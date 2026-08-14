@@ -3,5 +3,6 @@
 projectFilesBackup/
 coverage.txt
 alicloud-controller-manager
+/_output/
 /.circleci/
 /cloud-provider-alibaba-cloud.iml

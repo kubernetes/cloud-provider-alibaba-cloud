@@ -147,6 +147,46 @@ func (f *Framework) ExpectNetworkLoadBalancerDeleted(svc *v1.Service) error {
 	})
 }
 
+// ExpectNetworkLoadBalancerAbsentFor verifies that an NLB stays absent for the
+// complete observation window. This is intentionally different from
+// ExpectNetworkLoadBalancerDeleted, which succeeds on the first absent sample.
+func (f *Framework) ExpectNetworkLoadBalancerAbsentFor(svc *v1.Service, duration time.Duration) error {
+	if duration <= 0 {
+		return fmt.Errorf("absence observation duration must be positive")
+	}
+
+	reqCtx := &svcCtx.RequestContext{
+		Service: svc,
+		Anno:    annotation.NewAnnotationRequest(svc),
+	}
+	lbManager := nlbv2.NewNLBManager(f.Client.CloudClient)
+	deadline := time.Now().Add(duration)
+
+	for {
+		lbMdl := &nlbmodel.NetworkLoadBalancer{
+			NamespacedName:        util.NamespacedName(svc),
+			LoadBalancerAttribute: &nlbmodel.LoadBalancerAttribute{},
+		}
+		err := lbManager.Find(reqCtx, lbMdl)
+		if err != nil && !isNetworkLoadBalancerNotFound(err) {
+			return fmt.Errorf("check that nlb stays absent: %w", err)
+		}
+		if err == nil && lbMdl.LoadBalancerAttribute.LoadBalancerId != "" {
+			return fmt.Errorf("nlb %s reappeared while it should remain absent",
+				lbMdl.LoadBalancerAttribute.LoadBalancerId)
+		}
+
+		remaining := time.Until(deadline)
+		if remaining <= 0 {
+			return nil
+		}
+		if remaining > 5*time.Second {
+			remaining = 5 * time.Second
+		}
+		time.Sleep(remaining)
+	}
+}
+
 func isNetworkLoadBalancerNotFound(err error) bool {
 	return err != nil && strings.Contains(err.Error(), "ResourceNotFound.loadBalancer")
 }
