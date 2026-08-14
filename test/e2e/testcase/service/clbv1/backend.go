@@ -269,21 +269,22 @@ func RunBackendTestCases(f *framework.Framework) {
 					err = f.ExpectLoadBalancerEqual(svc)
 					gomega.Expect(err).NotTo(gomega.BeNil())
 				})
-				if options.TestConfig.AllowCreateCloudResource {
-					ginkgo.It("vgroup-port: rsp-id belongs to other slb", func() {
-						otherLBID, err := f.EnsureSecondaryIntranetLoadBalancer()
-						gomega.Expect(err).To(gomega.BeNil())
-						vGroupPort := fmt.Sprintf("%s:%d", options.TestConfig.VServerGroupID, 80)
-						svc, err := f.Client.KubeClient.CreateServiceByAnno(map[string]string{
-							annotation.Annotation(annotation.VGroupPort):       vGroupPort,
-							annotation.Annotation(annotation.LoadBalancerId):   otherLBID,
-							annotation.Annotation(annotation.OverrideListener): "false",
-						})
-						gomega.Expect(err).To(gomega.BeNil())
-						err = f.ExpectLoadBalancerEqual(svc)
-						gomega.Expect(err).NotTo(gomega.BeNil())
+				ginkgo.It("vgroup-port: rsp-id belongs to other slb", func() {
+					if !options.TestConfig.AllowCreateCloudResource {
+						ginkgo.Skip("requires --allow-create-cloud-resources")
+					}
+					otherLBID, err := f.EnsureSecondaryIntranetLoadBalancer()
+					gomega.Expect(err).To(gomega.BeNil())
+					vGroupPort := fmt.Sprintf("%s:%d", options.TestConfig.VServerGroupID, 80)
+					svc, err := f.Client.KubeClient.CreateServiceByAnno(map[string]string{
+						annotation.Annotation(annotation.VGroupPort):       vGroupPort,
+						annotation.Annotation(annotation.LoadBalancerId):   otherLBID,
+						annotation.Annotation(annotation.OverrideListener): "false",
 					})
-				}
+					gomega.Expect(err).To(gomega.BeNil())
+					err = f.ExpectLoadBalancerEqual(svc)
+					gomega.Expect(err).NotTo(gomega.BeNil())
+				})
 			})
 
 			ginkgo.Context("weight", func() {

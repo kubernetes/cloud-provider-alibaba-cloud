@@ -56,17 +56,14 @@ func RunBackendTestCases(f *framework.Framework) {
 		}
 		lbClass := helper.NLBClass
 		testsvc.Spec.LoadBalancerClass = &lbClass
-		newTestService := func() *v1.Service {
-			svc := testsvc.DeepCopy()
-			// The worker fixture is created in BeforeSuite, after the Ginkgo tree
-			// and this template are built.
-			svc.Annotations[annotation.Annotation(annotation.LoadBalancerId)] = options.TestConfig.IntranetNetworkLoadBalancerID
-			return svc
-		}
+		ginkgo.BeforeEach(func() {
+			// The worker fixture is created after the Ginkgo tree and this template.
+			testsvc.Annotations[annotation.Annotation(annotation.LoadBalancerId)] = options.TestConfig.IntranetNetworkLoadBalancerID
+		})
 
 		ginkgo.Describe("health check", func() {
 			ginkgo.It("tcp health check", func() {
-				svc := newTestService()
+				svc := testsvc.DeepCopy()
 				svc.Annotations[annotation.Annotation(annotation.HealthCheckFlag)] = string(model.OnFlag)
 				svc.Annotations[annotation.Annotation(annotation.HealthCheckType)] = "tcp"
 				svc.Annotations[annotation.Annotation(annotation.HealthCheckConnectTimeout)] = "12"
@@ -81,7 +78,7 @@ func RunBackendTestCases(f *framework.Framework) {
 			})
 
 			ginkgo.It("http", func() {
-				svc := newTestService()
+				svc := testsvc.DeepCopy()
 				svc.Annotations[annotation.Annotation(annotation.HealthCheckFlag)] = string(model.OnFlag)
 				svc.Annotations[annotation.Annotation(annotation.HealthCheckType)] = "http"
 				svc.Annotations[annotation.Annotation(annotation.HealthCheckURI)] = "/"
@@ -97,7 +94,7 @@ func RunBackendTestCases(f *framework.Framework) {
 			})
 
 			ginkgo.It("udp", func() {
-				svc := newTestService()
+				svc := testsvc.DeepCopy()
 				svc.Annotations[annotation.Annotation(annotation.HealthCheckFlag)] = string(model.OnFlag)
 				svc.Annotations[annotation.Annotation(annotation.HealthCheckType)] = "udp"
 				svc.Annotations[annotation.Annotation(annotation.HealthyThreshold)] = "4"
@@ -116,7 +113,7 @@ func RunBackendTestCases(f *framework.Framework) {
 			})
 
 			ginkgo.It("udp with tcp port", func() {
-				svc := newTestService()
+				svc := testsvc.DeepCopy()
 				svc.Annotations[annotation.Annotation(annotation.HealthCheckFlag)] = string(model.OnFlag)
 				svc.Annotations[annotation.Annotation(annotation.HealthCheckType)] = "udp"
 				svc.Annotations[annotation.Annotation(annotation.HealthyThreshold)] = "4"
@@ -133,7 +130,7 @@ func RunBackendTestCases(f *framework.Framework) {
 			})
 
 			ginkgo.It("health check: none -> tcp", func() {
-				oldsvc := newTestService()
+				oldsvc := testsvc.DeepCopy()
 				oldsvc, err := f.Client.KubeClient.CreateService(oldsvc)
 				gomega.Expect(err).To(gomega.BeNil())
 				err = f.ExpectNetworkLoadBalancerEqual(oldsvc)
@@ -152,7 +149,7 @@ func RunBackendTestCases(f *framework.Framework) {
 			})
 
 			ginkgo.It("health check: none -> http", func() {
-				oldsvc := newTestService()
+				oldsvc := testsvc.DeepCopy()
 				oldsvc, err := f.Client.KubeClient.CreateService(oldsvc)
 				gomega.Expect(err).To(gomega.BeNil())
 				err = f.ExpectNetworkLoadBalancerEqual(oldsvc)
@@ -174,7 +171,7 @@ func RunBackendTestCases(f *framework.Framework) {
 			})
 
 			ginkgo.It("flag on with listener port range", func() {
-				svc := newTestService()
+				svc := testsvc.DeepCopy()
 				svc.Annotations[annotation.Annotation(annotation.HealthCheckFlag)] = string(model.OnFlag)
 				svc.Annotations[annotation.Annotation(annotation.ListenerPortRange)] = "40-53:53,60-80:80"
 
@@ -185,7 +182,7 @@ func RunBackendTestCases(f *framework.Framework) {
 			})
 
 			ginkgo.It("udp type with listener port range", func() {
-				svc := newTestService()
+				svc := testsvc.DeepCopy()
 				svc.Annotations[annotation.Annotation(annotation.HealthCheckFlag)] = string(model.OnFlag)
 				svc.Annotations[annotation.Annotation(annotation.HealthCheckType)] = string(model.UDP)
 				svc.Annotations[annotation.Annotation(annotation.ListenerPortRange)] = "40-53:53,60-80:80"

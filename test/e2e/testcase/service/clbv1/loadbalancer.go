@@ -151,45 +151,46 @@ func RunLoadBalancerTestCases(f *framework.Framework) {
 		})
 
 		ginkgo.Context("reuse lb", func() {
+			internetFixtureCases := func() {
+				ginkgo.It("reuse internet lb", func() {
+					err := f.EnsureInternetLoadBalancer()
+					gomega.Expect(err).To(gomega.BeNil())
+					svc, err := f.Client.KubeClient.CreateServiceByAnno(map[string]string{
+						annotation.Annotation(annotation.AddressType):    string(model.InternetAddressType),
+						annotation.Annotation(annotation.LoadBalancerId): options.TestConfig.InternetLoadBalancerID,
+					})
+					gomega.Expect(err).To(gomega.BeNil())
+					err = f.ExpectLoadBalancerEqual(svc)
+					gomega.Expect(err).To(gomega.BeNil())
+				})
+				ginkgo.It("reuse internet lb with override-listener=false", func() {
+					err := f.EnsureInternetLoadBalancer()
+					gomega.Expect(err).To(gomega.BeNil())
+					svc, err := f.Client.KubeClient.CreateServiceByAnno(map[string]string{
+						annotation.Annotation(annotation.AddressType):      string(model.InternetAddressType),
+						annotation.Annotation(annotation.LoadBalancerId):   options.TestConfig.InternetLoadBalancerID,
+						annotation.Annotation(annotation.OverrideListener): "false",
+					})
+					gomega.Expect(err).To(gomega.BeNil())
+					err = f.ExpectLoadBalancerEqual(svc)
+					gomega.Expect(err).To(gomega.BeNil())
+				})
+				ginkgo.It("reuse internet lb with override-listener=true", func() {
+					err := f.EnsureInternetLoadBalancer()
+					gomega.Expect(err).To(gomega.BeNil())
+					svc, err := f.Client.KubeClient.CreateServiceByAnno(map[string]string{
+						annotation.Annotation(annotation.AddressType):      string(model.InternetAddressType),
+						annotation.Annotation(annotation.LoadBalancerId):   options.TestConfig.InternetLoadBalancerID,
+						annotation.Annotation(annotation.OverrideListener): "true",
+					})
+					gomega.Expect(err).To(gomega.BeNil())
+					err = f.ExpectLoadBalancerEqual(svc)
+					gomega.Expect(err).To(gomega.BeNil())
+				})
+			}
 			if (options.TestConfig.NeedsCloudResource("clb") && options.TestConfig.AllowCreateCloudResource) ||
 				options.TestConfig.InternetLoadBalancerID != "" {
-				ginkgo.Context("internet fixture", ginkgo.Ordered, func() {
-					ginkgo.It("reuse internet lb", func() {
-						err := f.EnsureInternetLoadBalancer()
-						gomega.Expect(err).To(gomega.BeNil())
-						svc, err := f.Client.KubeClient.CreateServiceByAnno(map[string]string{
-							annotation.Annotation(annotation.AddressType):    string(model.InternetAddressType),
-							annotation.Annotation(annotation.LoadBalancerId): options.TestConfig.InternetLoadBalancerID,
-						})
-						gomega.Expect(err).To(gomega.BeNil())
-						err = f.ExpectLoadBalancerEqual(svc)
-						gomega.Expect(err).To(gomega.BeNil())
-					})
-					ginkgo.It("reuse internet lb with override-listener=false", func() {
-						err := f.EnsureInternetLoadBalancer()
-						gomega.Expect(err).To(gomega.BeNil())
-						svc, err := f.Client.KubeClient.CreateServiceByAnno(map[string]string{
-							annotation.Annotation(annotation.AddressType):      string(model.InternetAddressType),
-							annotation.Annotation(annotation.LoadBalancerId):   options.TestConfig.InternetLoadBalancerID,
-							annotation.Annotation(annotation.OverrideListener): "false",
-						})
-						gomega.Expect(err).To(gomega.BeNil())
-						err = f.ExpectLoadBalancerEqual(svc)
-						gomega.Expect(err).To(gomega.BeNil())
-					})
-					ginkgo.It("reuse internet lb with override-listener=true", func() {
-						err := f.EnsureInternetLoadBalancer()
-						gomega.Expect(err).To(gomega.BeNil())
-						svc, err := f.Client.KubeClient.CreateServiceByAnno(map[string]string{
-							annotation.Annotation(annotation.AddressType):      string(model.InternetAddressType),
-							annotation.Annotation(annotation.LoadBalancerId):   options.TestConfig.InternetLoadBalancerID,
-							annotation.Annotation(annotation.OverrideListener): "true",
-						})
-						gomega.Expect(err).To(gomega.BeNil())
-						err = f.ExpectLoadBalancerEqual(svc)
-						gomega.Expect(err).To(gomega.BeNil())
-					})
-				})
+				ginkgo.Context("internet fixture", ginkgo.Ordered, internetFixtureCases)
 			}
 
 			if (options.TestConfig.NeedsCloudResource("clb") && options.TestConfig.AllowCreateCloudResource) ||

@@ -638,17 +638,14 @@ func RunListenerTestCases(f *framework.Framework) {
 		}
 		lbClass := helper.NLBClass
 		testsvc.Spec.LoadBalancerClass = &lbClass
-		newTestService := func() *v1.Service {
-			svc := testsvc.DeepCopy()
-			// The worker fixture is created in BeforeSuite, after the Ginkgo tree
-			// and this template are built.
-			svc.Annotations[annotation.Annotation(annotation.LoadBalancerId)] = options.TestConfig.IntranetNetworkLoadBalancerID
-			return svc
-		}
+		ginkgo.BeforeEach(func() {
+			// The worker fixture is created after the Ginkgo tree and this template.
+			testsvc.Annotations[annotation.Annotation(annotation.LoadBalancerId)] = options.TestConfig.IntranetNetworkLoadBalancerID
+		})
 
 		ginkgo.Context("proxy protocol", func() {
 			ginkgo.It("proxy-protocol on", func() {
-				svc := newTestService()
+				svc := testsvc.DeepCopy()
 				svc.Annotations[annotation.Annotation(annotation.ProxyProtocol)] = string(model.OnFlag)
 				svc, err := f.Client.KubeClient.CreateService(svc)
 				gomega.Expect(err).To(gomega.BeNil())
@@ -657,7 +654,7 @@ func RunListenerTestCases(f *framework.Framework) {
 			})
 
 			ginkgo.It("proxy-protocol off -> on", func() {
-				oldsvc := newTestService()
+				oldsvc := testsvc.DeepCopy()
 				oldsvc, err := f.Client.KubeClient.CreateService(oldsvc)
 				gomega.Expect(err).To(gomega.BeNil())
 				err = f.ExpectNetworkLoadBalancerEqual(oldsvc)
@@ -672,7 +669,7 @@ func RunListenerTestCases(f *framework.Framework) {
 			})
 
 			ginkgo.It("proxy-protocol on -> off", func() {
-				oldsvc := newTestService()
+				oldsvc := testsvc.DeepCopy()
 				oldsvc.Annotations[annotation.Annotation(annotation.ProxyProtocol)] = string(model.OnFlag)
 				oldsvc, err := f.Client.KubeClient.CreateService(oldsvc)
 				gomega.Expect(err).To(gomega.BeNil())
@@ -690,7 +687,7 @@ func RunListenerTestCases(f *framework.Framework) {
 
 		ginkgo.Context("cps", func() {
 			ginkgo.It("cps on", func() {
-				svc := newTestService()
+				svc := testsvc.DeepCopy()
 				svc.Annotations[annotation.Annotation(annotation.Cps)] = "100"
 				svc, err := f.Client.KubeClient.CreateService(svc)
 				gomega.Expect(err).To(gomega.BeNil())
@@ -699,7 +696,7 @@ func RunListenerTestCases(f *framework.Framework) {
 			})
 
 			ginkgo.It("cps off -> 100", func() {
-				oldsvc := newTestService()
+				oldsvc := testsvc.DeepCopy()
 				oldsvc, err := f.Client.KubeClient.CreateService(oldsvc)
 				gomega.Expect(err).To(gomega.BeNil())
 				err = f.ExpectNetworkLoadBalancerEqual(oldsvc)
@@ -716,7 +713,7 @@ func RunListenerTestCases(f *framework.Framework) {
 
 		ginkgo.Context("idle timeout", func() {
 			ginkgo.It("idle-timeout 20", func() {
-				svc := newTestService()
+				svc := testsvc.DeepCopy()
 				svc.Annotations[annotation.Annotation(annotation.IdleTimeout)] = "20"
 				svc, err := f.Client.KubeClient.CreateService(svc)
 				gomega.Expect(err).To(gomega.BeNil())
@@ -725,7 +722,7 @@ func RunListenerTestCases(f *framework.Framework) {
 			})
 
 			ginkgo.It("idle timeout default -> 20", func() {
-				oldsvc := newTestService()
+				oldsvc := testsvc.DeepCopy()
 				oldsvc, err := f.Client.KubeClient.CreateService(oldsvc)
 				gomega.Expect(err).To(gomega.BeNil())
 				err = f.ExpectNetworkLoadBalancerEqual(oldsvc)
@@ -743,7 +740,7 @@ func RunListenerTestCases(f *framework.Framework) {
 
 		ginkgo.Context("ppv2 privatelink", func() {
 			ginkgo.It("all features on", func() {
-				svc := newTestService()
+				svc := testsvc.DeepCopy()
 				svc.Annotations[annotation.Annotation(annotation.ProxyProtocol)] = string(model.OnFlag)
 				svc.Annotations[annotation.Annotation(annotation.Ppv2PrivateLinkEpIdEnabled)] = string(model.OnFlag)
 				svc.Annotations[annotation.Annotation(annotation.Ppv2PrivateLinkEpsIdEnabled)] = string(model.OnFlag)
@@ -755,7 +752,7 @@ func RunListenerTestCases(f *framework.Framework) {
 			})
 
 			ginkgo.It("all features off -> on", func() {
-				oldsvc := newTestService()
+				oldsvc := testsvc.DeepCopy()
 				oldsvc, err := f.Client.KubeClient.CreateService(oldsvc)
 				gomega.Expect(err).To(gomega.BeNil())
 				err = f.ExpectNetworkLoadBalancerEqual(oldsvc)
@@ -773,7 +770,7 @@ func RunListenerTestCases(f *framework.Framework) {
 			})
 
 			ginkgo.It("only proxy protocol on -> all features on", func() {
-				oldsvc := newTestService()
+				oldsvc := testsvc.DeepCopy()
 				oldsvc.Annotations[annotation.Annotation(annotation.ProxyProtocol)] = string(model.OnFlag)
 				oldsvc, err := f.Client.KubeClient.CreateService(oldsvc)
 				gomega.Expect(err).To(gomega.BeNil())
@@ -792,7 +789,7 @@ func RunListenerTestCases(f *framework.Framework) {
 			})
 
 			ginkgo.It("all features on -> only proxy protocol on ", func() {
-				oldsvc := newTestService()
+				oldsvc := testsvc.DeepCopy()
 				oldsvc.Annotations[annotation.Annotation(annotation.ProxyProtocol)] = string(model.OnFlag)
 				oldsvc.Annotations[annotation.Annotation(annotation.Ppv2PrivateLinkEpIdEnabled)] = string(model.OnFlag)
 				oldsvc.Annotations[annotation.Annotation(annotation.Ppv2PrivateLinkEpsIdEnabled)] = string(model.OnFlag)
