@@ -26,13 +26,19 @@ import (
 	"k8s.io/klog/v2"
 )
 
+const (
+	defaultNamespace = "e2e-test"
+	defaultNodeLabel = "e2etest"
+	Service          = "basic-service"
+	Deployment       = "nginx"
+	VKDeployment     = "nginx-vk"
+	ExcludeNodeLabel = "service.beta.kubernetes.io/exclude-node"
+)
+
 var (
-	Namespace           = "e2e-test"
-	Service             = "basic-service"
-	Deployment          = "nginx"
-	VKDeployment        = "nginx-vk"
-	NodeLabel           = "e2etest"
-	ExcludeNodeLabel    = "service.beta.kubernetes.io/exclude-node"
+	// Keep the historical names until the E2E entrypoint assigns a worker scope.
+	Namespace           = defaultNamespace
+	NodeLabel           = defaultNodeLabel
 	FixtureReadyTimeout = 10 * time.Minute
 	namespaceOwner      = string(uuid.NewUUID())
 )
@@ -41,13 +47,10 @@ var (
 // labels.  Ginkgo parallel workers are separate processes, so these package
 // values remain process-local and do not introduce data races.
 func ConfigureTestResources(workerScope string, fixtureReadyTimeout time.Duration) {
-	Namespace = "e2e-test"
-	Service = "basic-service"
-	Deployment = "nginx"
-	VKDeployment = "nginx-vk"
-	NodeLabel = "e2etest"
 	FixtureReadyTimeout = fixtureReadyTimeout
 	if workerScope == "" {
+		Namespace = defaultNamespace
+		NodeLabel = defaultNodeLabel
 		return
 	}
 
@@ -834,7 +837,7 @@ func (client *KubeClient) ScheduledNode(nodeName string) error {
 }
 
 func (client *KubeClient) AddTaint(nodeName string, taint v1.Taint) (bool, error) {
-	added := false
+	addedByTest := false
 	err := wait.PollImmediate(2*time.Second, 30*time.Second, func() (done bool, err error) {
 		n, err := client.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
 		if err != nil {
@@ -842,9 +845,12 @@ func (client *KubeClient) AddTaint(nodeName string, taint v1.Taint) (bool, error
 		}
 		for _, existing := range n.Spec.Taints {
 			if existing.MatchTaint(&taint) {
-				if added {
-					added = existing.Value == taint.Value
+				// A retry can observe an Update whose response was lost. Preserve
+				// ownership only when the value on the Node is the one we wrote.
+				if addedByTest {
+					addedByTest = existing.Value == taint.Value
 				}
+				// done=true stops polling; addedByTest is still returned to the case.
 				return true, nil
 			}
 		}
@@ -852,14 +858,14 @@ func (client *KubeClient) AddTaint(nodeName string, taint v1.Taint) (bool, error
 		// Claim ownership before Update: the API server can accept the write
 		// even when the client loses its response. Exact-value removal below
 		// makes cleanup harmless if the write was not persisted.
-		added = true
+		addedByTest = true
 		_, err = client.CoreV1().Nodes().Update(context.TODO(), n, metav1.UpdateOptions{})
 		if err != nil {
 			return false, nil
 		}
 		return true, nil
 	})
-	return added, err
+	return addedByTest, err
 }
 
 func (client *KubeClient) RemoveTaint(nodeName string, taint v1.Taint) error {

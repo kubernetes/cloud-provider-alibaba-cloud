@@ -23,6 +23,8 @@ import (
 func RunBackendTestCases(f *framework.Framework) {
 
 	ginkgo.Describe("clb service controller: backend", func() {
+		// NodeLabel is worker-scoped, so parallel workers use distinct keys on
+		// the shared Node and clean up only the label they own.
 		ginkgo.Context("backend-label", func() {
 			ginkgo.It("backend-label", func() {
 				// label node
@@ -98,6 +100,8 @@ func RunBackendTestCases(f *framework.Framework) {
 
 		ginkgo.Context("remove-unscheduled-backend", ginkgo.Serial, ginkgo.Label("cluster-serial"), func() {
 			ginkgo.It("remove-unscheduled-backend: off; node: unschedulable -> schedulable", func() {
+				// With the feature off, an unschedulable Node must remain a backend;
+				// making it schedulable again must leave the backend set unchanged.
 				// unscheduled node
 				node, err := f.Client.KubeClient.GetLatestNode()
 				gomega.Expect(err).To(gomega.BeNil())
@@ -121,7 +125,9 @@ func RunBackendTestCases(f *framework.Framework) {
 				err = f.ExpectLoadBalancerEqual(oldSvc)
 				gomega.Expect(err).To(gomega.BeNil())
 			})
-			ginkgo.It("remove-unscheduled-backend: on;  node: schedulable -> unschedulable", func() {
+			ginkgo.It("remove-unscheduled-backend: on; node: schedulable -> unschedulable", func() {
+				// With the feature on, the Node starts as a backend and must be
+				// removed after it becomes unschedulable.
 				oldSvc, err := f.Client.KubeClient.CreateServiceByAnno(map[string]string{
 					annotation.Annotation(annotation.RemoveUnscheduled): string(model.OnFlag),
 				})
