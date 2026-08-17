@@ -89,7 +89,7 @@ func TestE2E(t *testing.T) {
 				// run additional cases on top of an unclean fixture.
 				klog.Warningf("Service cleanup will be retried before the next case: %v", err)
 			}
-			gomega.Expect(err).NotTo(gomega.HaveOccurred(), "clean Service after case")
+			gomega.Expect(err).To(gomega.BeNil(), "clean Service after case")
 		})
 		AddControllerTests(f)
 	})

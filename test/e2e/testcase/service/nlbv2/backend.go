@@ -986,7 +986,7 @@ func RunBackendTestCases(f *framework.Framework) {
 				gomega.Expect(err).NotTo(gomega.BeNil())
 
 				_, current, err := f.FindNetworkLoadBalancer()
-				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				gomega.Expect(err).To(gomega.BeNil())
 				gomega.Expect(current.ServerGroups).NotTo(gomega.BeEmpty())
 				gomega.Expect(current.ServerGroups[0].Servers).NotTo(gomega.BeEmpty())
 				gomega.Expect(current.ServerGroups[0].Servers[0].Weight).To(gomega.Equal(b[0].Weight))

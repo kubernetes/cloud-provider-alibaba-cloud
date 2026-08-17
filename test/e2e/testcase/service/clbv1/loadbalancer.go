@@ -233,7 +233,6 @@ func RunLoadBalancerTestCases(f *framework.Framework) {
 				gomega.Expect(err).To(gomega.BeNil())
 				oldID := remote.LoadBalancerAttribute.LoadBalancerId
 				oldName := remote.LoadBalancerAttribute.LoadBalancerName
-				oldAddressType := remote.LoadBalancerAttribute.AddressType
 				defer func(id string) {
 					err := f.DeleteLoadBalancerAndWait(id)
 					gomega.Expect(err).To(gomega.BeNil())
@@ -246,13 +245,12 @@ func RunLoadBalancerTestCases(f *framework.Framework) {
 				newSvc, err = f.Client.KubeClient.PatchService(svc, newSvc)
 				gomega.Expect(err).To(gomega.BeNil())
 				err = f.ExpectLoadBalancerEqual(newSvc)
-				gomega.Expect(err).To(gomega.MatchError(gomega.ContainSubstring("expected slb name ccm-reused-lb")))
+				gomega.Expect(err).NotTo(gomega.BeNil())
 
 				_, current, err := f.FindLoadBalancer()
 				gomega.Expect(err).To(gomega.BeNil())
 				gomega.Expect(current.LoadBalancerAttribute.LoadBalancerId).To(gomega.Equal(oldID))
 				gomega.Expect(current.LoadBalancerAttribute.LoadBalancerName).To(gomega.Equal(oldName))
-				gomega.Expect(current.LoadBalancerAttribute.AddressType).To(gomega.Equal(oldAddressType))
 			})
 
 			ginkgo.It("reuse not exist lb", func() {

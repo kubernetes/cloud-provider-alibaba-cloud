@@ -84,7 +84,7 @@ func RunLoadBalancerTestCases(f *framework.Framework) {
 				err = f.ExpectNetworkLoadBalancerEqual(oldSvc)
 				gomega.Expect(err).To(gomega.BeNil())
 				_, oldRemote, err := f.FindNetworkLoadBalancer()
-				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				gomega.Expect(err).To(gomega.BeNil())
 
 				newSvc := oldSvc.DeepCopy()
 				newSvc.Annotations[annotation.Annotation(annotation.ZoneMaps)] = strings.Join(zoneMaps, ",")
@@ -94,7 +94,7 @@ func RunLoadBalancerTestCases(f *framework.Framework) {
 				err = f.ExpectNetworkLoadBalancerEqual(newSvc)
 				gomega.Expect(err).NotTo(gomega.BeNil())
 				_, current, err := f.FindNetworkLoadBalancer()
-				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				gomega.Expect(err).To(gomega.BeNil())
 				gomega.Expect(current.LoadBalancerAttribute.ZoneMappings).
 					To(gomega.Equal(oldRemote.LoadBalancerAttribute.ZoneMappings))
 			})
@@ -146,7 +146,7 @@ func RunLoadBalancerTestCases(f *framework.Framework) {
 					err = f.ExpectNetworkLoadBalancerEqual(oldSvc)
 					gomega.Expect(err).To(gomega.BeNil())
 					_, oldRemote, err := f.FindNetworkLoadBalancer()
-					gomega.Expect(err).NotTo(gomega.HaveOccurred())
+					gomega.Expect(err).To(gomega.BeNil())
 
 					newSvc := oldSvc.DeepCopy()
 					newSvc.Annotations[annotation.Annotation(annotation.ZoneMaps)] = strings.Join(zoneMaps, ",")
@@ -156,7 +156,7 @@ func RunLoadBalancerTestCases(f *framework.Framework) {
 					err = f.ExpectNetworkLoadBalancerEqual(newSvc)
 					gomega.Expect(err).NotTo(gomega.BeNil())
 					_, current, err := f.FindNetworkLoadBalancer()
-					gomega.Expect(err).NotTo(gomega.HaveOccurred())
+					gomega.Expect(err).To(gomega.BeNil())
 					gomega.Expect(current.LoadBalancerAttribute.ZoneMappings).
 						To(gomega.Equal(oldRemote.LoadBalancerAttribute.ZoneMappings))
 				})
@@ -517,7 +517,7 @@ func RunLoadBalancerTestCases(f *framework.Framework) {
 			err = f.ExpectNetworkLoadBalancerEqual(oldSvc)
 			gomega.Expect(err).To(gomega.BeNil())
 			_, oldRemote, err := f.FindNetworkLoadBalancer()
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(err).To(gomega.BeNil())
 
 			newSvc := oldSvc.DeepCopy()
 			newSvc.Annotations[annotation.Annotation(annotation.IPVersion)] = string(model.DualStack)
@@ -527,7 +527,7 @@ func RunLoadBalancerTestCases(f *framework.Framework) {
 			err = f.ExpectNetworkLoadBalancerEqual(newSvc)
 			gomega.Expect(err).NotTo(gomega.BeNil())
 			_, current, err := f.FindNetworkLoadBalancer()
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(err).To(gomega.BeNil())
 			gomega.Expect(current.LoadBalancerAttribute.AddressIpVersion).
 				To(gomega.Equal(oldRemote.LoadBalancerAttribute.AddressIpVersion))
 		})
@@ -544,7 +544,7 @@ func RunLoadBalancerTestCases(f *framework.Framework) {
 			err = f.ExpectNetworkLoadBalancerEqual(oldSvc)
 			gomega.Expect(err).To(gomega.BeNil())
 			_, oldRemote, err := f.FindNetworkLoadBalancer()
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(err).To(gomega.BeNil())
 
 			newSvc := oldSvc.DeepCopy()
 			newSvc.Annotations[annotation.Annotation(annotation.IPVersion)] = string(model.IPv4)
@@ -554,7 +554,7 @@ func RunLoadBalancerTestCases(f *framework.Framework) {
 			err = f.ExpectNetworkLoadBalancerEqual(newSvc)
 			gomega.Expect(err).NotTo(gomega.BeNil())
 			_, current, err := f.FindNetworkLoadBalancer()
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(err).To(gomega.BeNil())
 			gomega.Expect(current.LoadBalancerAttribute.AddressIpVersion).
 				To(gomega.Equal(oldRemote.LoadBalancerAttribute.AddressIpVersion))
 		})
@@ -580,7 +580,7 @@ func RunLoadBalancerTestCases(f *framework.Framework) {
 				err = f.ExpectNetworkLoadBalancerEqual(oldSvc)
 				gomega.Expect(err).To(gomega.BeNil())
 				_, oldRemote, err := f.FindNetworkLoadBalancer()
-				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				gomega.Expect(err).To(gomega.BeNil())
 
 				newSvc := oldSvc.DeepCopy()
 				newSvc.Annotations[annotation.Annotation(annotation.ResourceGroupId)] = options.TestConfig.ResourceGroupID
@@ -590,7 +590,7 @@ func RunLoadBalancerTestCases(f *framework.Framework) {
 				err = f.ExpectNetworkLoadBalancerEqual(newSvc)
 				gomega.Expect(err).NotTo(gomega.BeNil())
 				_, current, err := f.FindNetworkLoadBalancer()
-				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				gomega.Expect(err).To(gomega.BeNil())
 				gomega.Expect(current.LoadBalancerAttribute.ResourceGroupId).
 					To(gomega.Equal(oldRemote.LoadBalancerAttribute.ResourceGroupId))
 			})
@@ -766,7 +766,7 @@ func RunLoadBalancerTestCases(f *framework.Framework) {
 			gomega.Expect(err).To(gomega.BeNil())
 
 			err = f.ExpectNetworkLoadBalancerAbsentFor(oldSvc, time.Minute)
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(err).To(gomega.BeNil())
 		})
 
 		ginkgo.It("auto-created nlb & delete tag", func() {
@@ -826,7 +826,7 @@ func RunLoadBalancerTestCases(f *framework.Framework) {
 			// Without the ownership tag and with a non-default name, CCM must no
 			// longer resolve this NLB as belonging to the Service.
 			err = f.ExpectNetworkLoadBalancerDeleted(oldSvc)
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(err).To(gomega.BeNil())
 		})
 	})
 
@@ -1074,7 +1074,7 @@ func RunLoadBalancerTestCases(f *framework.Framework) {
 			gomega.Expect(sg).NotTo(gomega.BeNil())
 			sgId := sg.ID
 			_, remote, err := f.FindNetworkLoadBalancer()
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(err).To(gomega.BeNil())
 			lbId := remote.LoadBalancerAttribute.LoadBalancerId
 			cleanupDone := false
 			defer func() {
@@ -1088,10 +1088,10 @@ func RunLoadBalancerTestCases(f *framework.Framework) {
 			}()
 
 			err = f.AfterEach()
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(err).To(gomega.BeNil())
 
 			err = f.DeleteSecurityGroupAndWait(sgId)
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(err).To(gomega.BeNil())
 			cleanupDone = true
 		})
 
@@ -1148,9 +1148,9 @@ func RunLoadBalancerTestCases(f *framework.Framework) {
 			gomega.Expect(sg.ID).To(gomega.Equal(sgId))
 
 			err = f.DeleteNetworkLoadBalancerAndWait(lbId)
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(err).To(gomega.BeNil())
 			err = f.DeleteSecurityGroupAndWait(sgId)
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(err).To(gomega.BeNil())
 			cleanupDone = true
 		})
 
