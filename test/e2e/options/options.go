@@ -58,8 +58,8 @@ type E2EConfig struct {
 	IntranetLoadBalancerID        string `json:"IntranetLoadBalancerID"`
 	InternetNetworkLoadBalancerID string `json:"InternetNetworkLoadBalancerID"`
 	IntranetNetworkLoadBalancerID string `json:"IntranetNetworkLoadbalancerID"`
-	VServerGroupID                string `json:"VServerGroupID"`  // vServerGroupID of IntranetLoadBalancerID
-	VServerGroupID2               string `json:"VServerGroupID2"` // vServerGroupID of IntranetLoadBalancerID
+	VServerGroupID                string `json:"VServerGroupID"`  // vServerGroupID of InternetLoadBalancerID
+	VServerGroupID2               string `json:"VServerGroupID2"` // vServerGroupID of InternetLoadBalancerID
 	NLBServerGroupID              string `json:"NLBServerGroupID"`
 	NLBServerGroupID2             string `json:"NLBServerGroupID2"`
 	AclID                         string `json:"AclID"`

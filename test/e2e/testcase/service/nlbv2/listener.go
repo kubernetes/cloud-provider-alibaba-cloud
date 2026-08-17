@@ -18,7 +18,7 @@ func RunListenerTestCases(f *framework.Framework) {
 			ginkgo.It("tcp port", func() {
 				oldsvc, err := f.Client.KubeClient.CreateNLBServiceByAnno(map[string]string{
 					annotation.Annotation(annotation.ZoneMaps):         options.TestConfig.NLBZoneMaps,
-					annotation.Annotation(annotation.LoadBalancerId):   options.TestConfig.IntranetNetworkLoadBalancerID,
+					annotation.Annotation(annotation.LoadBalancerId):   options.TestConfig.InternetNetworkLoadBalancerID,
 					annotation.Annotation(annotation.OverrideListener): "true",
 				})
 				gomega.Expect(err).To(gomega.BeNil())
@@ -30,7 +30,7 @@ func RunListenerTestCases(f *framework.Framework) {
 				svc := f.Client.KubeClient.DefaultService()
 				svc.Annotations = map[string]string{
 					annotation.Annotation(annotation.ZoneMaps):         options.TestConfig.NLBZoneMaps,
-					annotation.Annotation(annotation.LoadBalancerId):   options.TestConfig.IntranetNetworkLoadBalancerID,
+					annotation.Annotation(annotation.LoadBalancerId):   options.TestConfig.InternetNetworkLoadBalancerID,
 					annotation.Annotation(annotation.OverrideListener): "true",
 				}
 				svc.Spec.Ports = []v1.ServicePort{
@@ -59,7 +59,7 @@ func RunListenerTestCases(f *framework.Framework) {
 			ginkgo.It("port: 80 -> 81; protocol: tcp", func() {
 				oldsvc, err := f.Client.KubeClient.CreateNLBServiceByAnno(map[string]string{
 					annotation.Annotation(annotation.ZoneMaps):         options.TestConfig.NLBZoneMaps,
-					annotation.Annotation(annotation.LoadBalancerId):   options.TestConfig.IntranetNetworkLoadBalancerID,
+					annotation.Annotation(annotation.LoadBalancerId):   options.TestConfig.InternetNetworkLoadBalancerID,
 					annotation.Annotation(annotation.OverrideListener): "true",
 				})
 				gomega.Expect(err).To(gomega.BeNil())
@@ -85,7 +85,7 @@ func RunListenerTestCases(f *framework.Framework) {
 			ginkgo.It("port: 80; protocol: tcp -> udp", func() {
 				oldsvc, err := f.Client.KubeClient.CreateNLBServiceByAnno(map[string]string{
 					annotation.Annotation(annotation.ZoneMaps):         options.TestConfig.NLBZoneMaps,
-					annotation.Annotation(annotation.LoadBalancerId):   options.TestConfig.IntranetNetworkLoadBalancerID,
+					annotation.Annotation(annotation.LoadBalancerId):   options.TestConfig.InternetNetworkLoadBalancerID,
 					annotation.Annotation(annotation.OverrideListener): "true",
 				})
 				gomega.Expect(err).To(gomega.BeNil())
@@ -112,7 +112,7 @@ func RunListenerTestCases(f *framework.Framework) {
 				oldsvc := f.Client.KubeClient.DefaultService()
 				oldsvc.Annotations = map[string]string{
 					annotation.Annotation(annotation.ZoneMaps):         options.TestConfig.NLBZoneMaps,
-					annotation.Annotation(annotation.LoadBalancerId):   options.TestConfig.IntranetNetworkLoadBalancerID,
+					annotation.Annotation(annotation.LoadBalancerId):   options.TestConfig.InternetNetworkLoadBalancerID,
 					annotation.Annotation(annotation.OverrideListener): "true",
 				}
 				oldsvc.Spec.Ports = []v1.ServicePort{
@@ -156,7 +156,7 @@ func RunListenerTestCases(f *framework.Framework) {
 				oldsvc := f.Client.KubeClient.DefaultService()
 				oldsvc.Annotations = map[string]string{
 					annotation.Annotation(annotation.ZoneMaps):         options.TestConfig.NLBZoneMaps,
-					annotation.Annotation(annotation.LoadBalancerId):   options.TestConfig.IntranetNetworkLoadBalancerID,
+					annotation.Annotation(annotation.LoadBalancerId):   options.TestConfig.InternetNetworkLoadBalancerID,
 					annotation.Annotation(annotation.OverrideListener): "true",
 				}
 				oldsvc.Spec.Ports = []v1.ServicePort{
@@ -200,7 +200,7 @@ func RunListenerTestCases(f *framework.Framework) {
 				oldsvc := f.Client.KubeClient.DefaultService()
 				oldsvc.Annotations = map[string]string{
 					annotation.Annotation(annotation.ZoneMaps):         options.TestConfig.NLBZoneMaps,
-					annotation.Annotation(annotation.LoadBalancerId):   options.TestConfig.IntranetNetworkLoadBalancerID,
+					annotation.Annotation(annotation.LoadBalancerId):   options.TestConfig.InternetNetworkLoadBalancerID,
 					annotation.Annotation(annotation.OverrideListener): "true",
 				}
 				oldsvc.Spec.Ports = []v1.ServicePort{
@@ -247,7 +247,7 @@ func RunListenerTestCases(f *framework.Framework) {
 						annotation.Annotation(annotation.ZoneMaps):         options.TestConfig.NLBZoneMaps,
 						annotation.Annotation(annotation.ProtocolPort):     "tcpssl:443",
 						annotation.Annotation(annotation.CertID):           options.TestConfig.NLBCertID,
-						annotation.Annotation(annotation.LoadBalancerId):   options.TestConfig.IntranetNetworkLoadBalancerID,
+						annotation.Annotation(annotation.LoadBalancerId):   options.TestConfig.InternetNetworkLoadBalancerID,
 						annotation.Annotation(annotation.OverrideListener): "true",
 					}
 					lbClass := helper.NLBClass
@@ -262,7 +262,7 @@ func RunListenerTestCases(f *framework.Framework) {
 				ginkgo.It("port: 80; protocol: tcp -> tcpssl", func() {
 					oldsvc, err := f.Client.KubeClient.CreateNLBServiceByAnno(map[string]string{
 						annotation.Annotation(annotation.ZoneMaps):         options.TestConfig.NLBZoneMaps,
-						annotation.Annotation(annotation.LoadBalancerId):   options.TestConfig.IntranetNetworkLoadBalancerID,
+						annotation.Annotation(annotation.LoadBalancerId):   options.TestConfig.InternetNetworkLoadBalancerID,
 						annotation.Annotation(annotation.OverrideListener): "true",
 					})
 					gomega.Expect(err).To(gomega.BeNil())
@@ -284,7 +284,7 @@ func RunListenerTestCases(f *framework.Framework) {
 						annotation.Annotation(annotation.ZoneMaps):         options.TestConfig.NLBZoneMaps,
 						annotation.Annotation(annotation.CertID):           options.TestConfig.NLBCertID,
 						annotation.Annotation(annotation.ProtocolPort):     "tcpssl:443",
-						annotation.Annotation(annotation.LoadBalancerId):   options.TestConfig.IntranetNetworkLoadBalancerID,
+						annotation.Annotation(annotation.LoadBalancerId):   options.TestConfig.InternetNetworkLoadBalancerID,
 						annotation.Annotation(annotation.OverrideListener): "true",
 					})
 					gomega.Expect(err).To(gomega.BeNil())
@@ -295,7 +295,7 @@ func RunListenerTestCases(f *framework.Framework) {
 					newsvc := oldsvc.DeepCopy()
 					newsvc.Annotations = map[string]string{
 						annotation.Annotation(annotation.ZoneMaps):         options.TestConfig.NLBZoneMaps,
-						annotation.Annotation(annotation.LoadBalancerId):   options.TestConfig.IntranetNetworkLoadBalancerID,
+						annotation.Annotation(annotation.LoadBalancerId):   options.TestConfig.InternetNetworkLoadBalancerID,
 						annotation.Annotation(annotation.OverrideListener): "true",
 					}
 
@@ -310,7 +310,7 @@ func RunListenerTestCases(f *framework.Framework) {
 						annotation.Annotation(annotation.ZoneMaps):         options.TestConfig.NLBZoneMaps,
 						annotation.Annotation(annotation.ProtocolPort):     "tcpssl:443",
 						annotation.Annotation(annotation.CertID):           options.TestConfig.NLBCertID,
-						annotation.Annotation(annotation.LoadBalancerId):   options.TestConfig.IntranetNetworkLoadBalancerID,
+						annotation.Annotation(annotation.LoadBalancerId):   options.TestConfig.InternetNetworkLoadBalancerID,
 						annotation.Annotation(annotation.OverrideListener): "true",
 					})
 					gomega.Expect(err).To(gomega.BeNil())
@@ -343,7 +343,7 @@ func RunListenerTestCases(f *framework.Framework) {
 						annotation.Annotation(annotation.ZoneMaps):         options.TestConfig.NLBZoneMaps,
 						annotation.Annotation(annotation.ProtocolPort):     "tcpssl:443",
 						annotation.Annotation(annotation.CertID):           "000000-cn-hangzhou",
-						annotation.Annotation(annotation.LoadBalancerId):   options.TestConfig.IntranetNetworkLoadBalancerID,
+						annotation.Annotation(annotation.LoadBalancerId):   options.TestConfig.InternetNetworkLoadBalancerID,
 						annotation.Annotation(annotation.OverrideListener): "true",
 					})
 					gomega.Expect(err).To(gomega.BeNil())
@@ -356,7 +356,7 @@ func RunListenerTestCases(f *framework.Framework) {
 							annotation.Annotation(annotation.ZoneMaps):         options.TestConfig.NLBZoneMaps,
 							annotation.Annotation(annotation.ProtocolPort):     "tcpssl:443",
 							annotation.Annotation(annotation.CertID):           options.TestConfig.NLBCertID,
-							annotation.Annotation(annotation.LoadBalancerId):   options.TestConfig.IntranetNetworkLoadBalancerID,
+							annotation.Annotation(annotation.LoadBalancerId):   options.TestConfig.InternetNetworkLoadBalancerID,
 							annotation.Annotation(annotation.OverrideListener): "true",
 						})
 						gomega.Expect(err).To(gomega.BeNil())
@@ -377,7 +377,7 @@ func RunListenerTestCases(f *framework.Framework) {
 						annotation.Annotation(annotation.ZoneMaps):          options.TestConfig.NLBZoneMaps,
 						annotation.Annotation(annotation.ProtocolPort):      "tcpssl:443",
 						annotation.Annotation(annotation.CertID):            options.TestConfig.NLBCertID,
-						annotation.Annotation(annotation.LoadBalancerId):    options.TestConfig.IntranetNetworkLoadBalancerID,
+						annotation.Annotation(annotation.LoadBalancerId):    options.TestConfig.InternetNetworkLoadBalancerID,
 						annotation.Annotation(annotation.OverrideListener):  "true",
 						annotation.Annotation(annotation.AdditionalCertIds): options.TestConfig.NLBCertID2,
 					})
@@ -390,7 +390,7 @@ func RunListenerTestCases(f *framework.Framework) {
 						annotation.Annotation(annotation.ZoneMaps):         options.TestConfig.NLBZoneMaps,
 						annotation.Annotation(annotation.ProtocolPort):     "tcpssl:443",
 						annotation.Annotation(annotation.CertID):           options.TestConfig.NLBCertID,
-						annotation.Annotation(annotation.LoadBalancerId):   options.TestConfig.IntranetNetworkLoadBalancerID,
+						annotation.Annotation(annotation.LoadBalancerId):   options.TestConfig.InternetNetworkLoadBalancerID,
 						annotation.Annotation(annotation.OverrideListener): "true",
 					})
 					gomega.Expect(err).To(gomega.BeNil())
@@ -408,7 +408,7 @@ func RunListenerTestCases(f *framework.Framework) {
 						annotation.Annotation(annotation.ZoneMaps):          options.TestConfig.NLBZoneMaps,
 						annotation.Annotation(annotation.ProtocolPort):      "tcpssl:443",
 						annotation.Annotation(annotation.CertID):            options.TestConfig.NLBCertID,
-						annotation.Annotation(annotation.LoadBalancerId):    options.TestConfig.IntranetNetworkLoadBalancerID,
+						annotation.Annotation(annotation.LoadBalancerId):    options.TestConfig.InternetNetworkLoadBalancerID,
 						annotation.Annotation(annotation.OverrideListener):  "true",
 						annotation.Annotation(annotation.AdditionalCertIds): options.TestConfig.NLBCertID2,
 					})
@@ -427,7 +427,7 @@ func RunListenerTestCases(f *framework.Framework) {
 			ginkgo.Context("tcpssl alpn", func() {
 				ginkgo.It("alpn: on", func() {
 					oldsvc, err := f.Client.KubeClient.CreateNLBServiceByAnno(map[string]string{
-						annotation.Annotation(annotation.LoadBalancerId):   options.TestConfig.IntranetNetworkLoadBalancerID,
+						annotation.Annotation(annotation.LoadBalancerId):   options.TestConfig.InternetNetworkLoadBalancerID,
 						annotation.Annotation(annotation.ProtocolPort):     "tcpssl:443",
 						annotation.Annotation(annotation.CertID):           options.TestConfig.NLBCertID,
 						annotation.Annotation(annotation.OverrideListener): "true",
@@ -441,7 +441,7 @@ func RunListenerTestCases(f *framework.Framework) {
 
 				ginkgo.It("alpn: off -> on with alpn-policy", func() {
 					oldsvc, err := f.Client.KubeClient.CreateNLBServiceByAnno(map[string]string{
-						annotation.Annotation(annotation.LoadBalancerId):   options.TestConfig.IntranetNetworkLoadBalancerID,
+						annotation.Annotation(annotation.LoadBalancerId):   options.TestConfig.InternetNetworkLoadBalancerID,
 						annotation.Annotation(annotation.ProtocolPort):     "tcpssl:443",
 						annotation.Annotation(annotation.CertID):           options.TestConfig.NLBCertID,
 						annotation.Annotation(annotation.OverrideListener): "true",
@@ -462,7 +462,7 @@ func RunListenerTestCases(f *framework.Framework) {
 
 				ginkgo.It("alpn: on -> off", func() {
 					oldsvc, err := f.Client.KubeClient.CreateNLBServiceByAnno(map[string]string{
-						annotation.Annotation(annotation.LoadBalancerId):   options.TestConfig.IntranetNetworkLoadBalancerID,
+						annotation.Annotation(annotation.LoadBalancerId):   options.TestConfig.InternetNetworkLoadBalancerID,
 						annotation.Annotation(annotation.ProtocolPort):     "tcpssl:443",
 						annotation.Annotation(annotation.CertID):           options.TestConfig.NLBCertID,
 						annotation.Annotation(annotation.OverrideListener): "true",
@@ -483,7 +483,7 @@ func RunListenerTestCases(f *framework.Framework) {
 
 				ginkgo.It("alpn: HTTP1Only -> HTTP2Only", func() {
 					oldsvc, err := f.Client.KubeClient.CreateNLBServiceByAnno(map[string]string{
-						annotation.Annotation(annotation.LoadBalancerId):   options.TestConfig.IntranetNetworkLoadBalancerID,
+						annotation.Annotation(annotation.LoadBalancerId):   options.TestConfig.InternetNetworkLoadBalancerID,
 						annotation.Annotation(annotation.ProtocolPort):     "tcpssl:443",
 						annotation.Annotation(annotation.CertID):           options.TestConfig.NLBCertID,
 						annotation.Annotation(annotation.OverrideListener): "true",
@@ -509,7 +509,7 @@ func RunListenerTestCases(f *framework.Framework) {
 						annotation.Annotation(annotation.ProtocolPort):     "tcpssl:443",
 						annotation.Annotation(annotation.TLSCipherPolicy):  "tls_cipher_policy_1_2_strict_with_1_3",
 						annotation.Annotation(annotation.CertID):           options.TestConfig.NLBCertID,
-						annotation.Annotation(annotation.LoadBalancerId):   options.TestConfig.IntranetNetworkLoadBalancerID,
+						annotation.Annotation(annotation.LoadBalancerId):   options.TestConfig.InternetNetworkLoadBalancerID,
 						annotation.Annotation(annotation.OverrideListener): "true",
 					})
 					gomega.Expect(err).To(gomega.BeNil())
@@ -522,7 +522,7 @@ func RunListenerTestCases(f *framework.Framework) {
 						annotation.Annotation(annotation.ZoneMaps):         options.TestConfig.NLBZoneMaps,
 						annotation.Annotation(annotation.ProtocolPort):     "tcpssl:443",
 						annotation.Annotation(annotation.CertID):           options.TestConfig.NLBCertID,
-						annotation.Annotation(annotation.LoadBalancerId):   options.TestConfig.IntranetNetworkLoadBalancerID,
+						annotation.Annotation(annotation.LoadBalancerId):   options.TestConfig.InternetNetworkLoadBalancerID,
 						annotation.Annotation(annotation.OverrideListener): "true",
 					})
 					gomega.Expect(err).To(gomega.BeNil())
@@ -547,7 +547,7 @@ func RunListenerTestCases(f *framework.Framework) {
 							annotation.Annotation(annotation.CertID):           options.TestConfig.NLBCertID,
 							annotation.Annotation(annotation.CaCert):           string(model.OnFlag),
 							annotation.Annotation(annotation.CaCertID):         options.TestConfig.NLBCACertID,
-							annotation.Annotation(annotation.LoadBalancerId):   options.TestConfig.IntranetNetworkLoadBalancerID,
+							annotation.Annotation(annotation.LoadBalancerId):   options.TestConfig.InternetNetworkLoadBalancerID,
 							annotation.Annotation(annotation.OverrideListener): "true",
 						})
 
@@ -561,7 +561,7 @@ func RunListenerTestCases(f *framework.Framework) {
 							annotation.Annotation(annotation.ZoneMaps):         options.TestConfig.NLBZoneMaps,
 							annotation.Annotation(annotation.ProtocolPort):     "tcpssl:443",
 							annotation.Annotation(annotation.CertID):           options.TestConfig.NLBCertID,
-							annotation.Annotation(annotation.LoadBalancerId):   options.TestConfig.IntranetNetworkLoadBalancerID,
+							annotation.Annotation(annotation.LoadBalancerId):   options.TestConfig.InternetNetworkLoadBalancerID,
 							annotation.Annotation(annotation.OverrideListener): "true",
 						})
 
@@ -585,7 +585,7 @@ func RunListenerTestCases(f *framework.Framework) {
 							annotation.Annotation(annotation.CertID):           options.TestConfig.NLBCertID,
 							annotation.Annotation(annotation.CaCert):           string(model.OnFlag),
 							annotation.Annotation(annotation.CaCertID):         options.TestConfig.NLBCACertID,
-							annotation.Annotation(annotation.LoadBalancerId):   options.TestConfig.IntranetNetworkLoadBalancerID,
+							annotation.Annotation(annotation.LoadBalancerId):   options.TestConfig.InternetNetworkLoadBalancerID,
 							annotation.Annotation(annotation.OverrideListener): "true",
 						})
 
@@ -640,7 +640,7 @@ func RunListenerTestCases(f *framework.Framework) {
 		testsvc.Spec.LoadBalancerClass = &lbClass
 		ginkgo.BeforeEach(func() {
 			// The worker fixture is created after the Ginkgo tree and this template.
-			testsvc.Annotations[annotation.Annotation(annotation.LoadBalancerId)] = options.TestConfig.IntranetNetworkLoadBalancerID
+			testsvc.Annotations[annotation.Annotation(annotation.LoadBalancerId)] = options.TestConfig.InternetNetworkLoadBalancerID
 		})
 
 		ginkgo.Context("proxy protocol", func() {
@@ -814,7 +814,7 @@ func RunListenerTestCases(f *framework.Framework) {
 				ginkgo.It("80-400", func() {
 					svc, err := f.Client.KubeClient.CreateNLBServiceByAnno(map[string]string{
 						annotation.Annotation(annotation.ListenerPortRange): "80-400:80",
-						annotation.Annotation(annotation.LoadBalancerId):    options.TestConfig.IntranetNetworkLoadBalancerID,
+						annotation.Annotation(annotation.LoadBalancerId):    options.TestConfig.InternetNetworkLoadBalancerID,
 						annotation.Annotation(annotation.OverrideListener):  "true",
 					})
 					gomega.Expect(err).To(gomega.BeNil())
@@ -824,7 +824,7 @@ func RunListenerTestCases(f *framework.Framework) {
 
 				ginkgo.It("80 to 80-400", func() {
 					oldsvc, err := f.Client.KubeClient.CreateNLBServiceByAnno(map[string]string{
-						annotation.Annotation(annotation.LoadBalancerId):   options.TestConfig.IntranetNetworkLoadBalancerID,
+						annotation.Annotation(annotation.LoadBalancerId):   options.TestConfig.InternetNetworkLoadBalancerID,
 						annotation.Annotation(annotation.OverrideListener): "true",
 					})
 					gomega.Expect(err).To(gomega.BeNil())
@@ -842,7 +842,7 @@ func RunListenerTestCases(f *framework.Framework) {
 				ginkgo.It("80-400 to 80", func() {
 					oldsvc, err := f.Client.KubeClient.CreateNLBServiceByAnno(map[string]string{
 						annotation.Annotation(annotation.ListenerPortRange): "80-400:80",
-						annotation.Annotation(annotation.LoadBalancerId):    options.TestConfig.IntranetNetworkLoadBalancerID,
+						annotation.Annotation(annotation.LoadBalancerId):    options.TestConfig.InternetNetworkLoadBalancerID,
 						annotation.Annotation(annotation.OverrideListener):  "true",
 					})
 					gomega.Expect(err).To(gomega.BeNil())
@@ -860,7 +860,7 @@ func RunListenerTestCases(f *framework.Framework) {
 				ginkgo.It("80-443, conflict with 443", func() {
 					svc, err := f.Client.KubeClient.CreateNLBServiceByAnno(map[string]string{
 						annotation.Annotation(annotation.ListenerPortRange): "80-443:80",
-						annotation.Annotation(annotation.LoadBalancerId):    options.TestConfig.IntranetNetworkLoadBalancerID,
+						annotation.Annotation(annotation.LoadBalancerId):    options.TestConfig.InternetNetworkLoadBalancerID,
 						annotation.Annotation(annotation.OverrideListener):  "true",
 					})
 					gomega.Expect(err).To(gomega.BeNil())
@@ -872,7 +872,7 @@ func RunListenerTestCases(f *framework.Framework) {
 					svc := f.Client.KubeClient.DefaultNLBService()
 					svc.Annotations = map[string]string{
 						annotation.Annotation(annotation.ListenerPortRange): "80-443:80,50-100:443",
-						annotation.Annotation(annotation.LoadBalancerId):    options.TestConfig.IntranetNetworkLoadBalancerID,
+						annotation.Annotation(annotation.LoadBalancerId):    options.TestConfig.InternetNetworkLoadBalancerID,
 						annotation.Annotation(annotation.OverrideListener):  "true",
 					}
 					svc.Spec.Ports = []v1.ServicePort{

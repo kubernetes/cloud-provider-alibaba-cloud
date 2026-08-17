@@ -151,10 +151,9 @@ func RunLoadBalancerTestCases(f *framework.Framework) {
 		})
 
 		ginkgo.Context("reuse lb", func() {
-			internetFixtureCases := func() {
+			if (options.TestConfig.NeedsCloudResource("clb") && options.TestConfig.AllowCreateCloudResource) ||
+				options.TestConfig.InternetLoadBalancerID != "" {
 				ginkgo.It("reuse internet lb", func() {
-					err := f.EnsureInternetLoadBalancer()
-					gomega.Expect(err).To(gomega.BeNil())
 					svc, err := f.Client.KubeClient.CreateServiceByAnno(map[string]string{
 						annotation.Annotation(annotation.AddressType):    string(model.InternetAddressType),
 						annotation.Annotation(annotation.LoadBalancerId): options.TestConfig.InternetLoadBalancerID,
@@ -164,8 +163,6 @@ func RunLoadBalancerTestCases(f *framework.Framework) {
 					gomega.Expect(err).To(gomega.BeNil())
 				})
 				ginkgo.It("reuse internet lb with override-listener=false", func() {
-					err := f.EnsureInternetLoadBalancer()
-					gomega.Expect(err).To(gomega.BeNil())
 					svc, err := f.Client.KubeClient.CreateServiceByAnno(map[string]string{
 						annotation.Annotation(annotation.AddressType):      string(model.InternetAddressType),
 						annotation.Annotation(annotation.LoadBalancerId):   options.TestConfig.InternetLoadBalancerID,
@@ -176,8 +173,6 @@ func RunLoadBalancerTestCases(f *framework.Framework) {
 					gomega.Expect(err).To(gomega.BeNil())
 				})
 				ginkgo.It("reuse internet lb with override-listener=true", func() {
-					err := f.EnsureInternetLoadBalancer()
-					gomega.Expect(err).To(gomega.BeNil())
 					svc, err := f.Client.KubeClient.CreateServiceByAnno(map[string]string{
 						annotation.Annotation(annotation.AddressType):      string(model.InternetAddressType),
 						annotation.Annotation(annotation.LoadBalancerId):   options.TestConfig.InternetLoadBalancerID,
@@ -188,13 +183,9 @@ func RunLoadBalancerTestCases(f *framework.Framework) {
 					gomega.Expect(err).To(gomega.BeNil())
 				})
 			}
-			if (options.TestConfig.NeedsCloudResource("clb") && options.TestConfig.AllowCreateCloudResource) ||
-				options.TestConfig.InternetLoadBalancerID != "" {
-				ginkgo.Context("internet fixture", ginkgo.Ordered, internetFixtureCases)
-			}
 
 			if (options.TestConfig.NeedsCloudResource("clb") && options.TestConfig.AllowCreateCloudResource) ||
-				options.TestConfig.IntranetLoadBalancerID != "" {
+				options.TestConfig.InternetLoadBalancerID != "" {
 				ginkgo.It("ccm created slb -> reused slb", func() {
 					oldSvc, err := f.Client.KubeClient.CreateServiceByAnno(nil)
 					gomega.Expect(err).To(gomega.BeNil())
@@ -209,7 +200,7 @@ func RunLoadBalancerTestCases(f *framework.Framework) {
 
 					newsvc := oldSvc.DeepCopy()
 					newsvc.Annotations = map[string]string{
-						annotation.Annotation(annotation.LoadBalancerId): options.TestConfig.IntranetLoadBalancerID,
+						annotation.Annotation(annotation.LoadBalancerId): options.TestConfig.InternetLoadBalancerID,
 					}
 					newsvc, err = f.Client.KubeClient.PatchService(oldSvc, newsvc)
 					gomega.Expect(err).To(gomega.BeNil())
@@ -217,6 +208,10 @@ func RunLoadBalancerTestCases(f *framework.Framework) {
 					err = f.ExpectLoadBalancerEqual(newsvc)
 					gomega.Expect(err).NotTo(gomega.BeNil())
 				})
+			}
+
+			if (options.TestConfig.NeedsCloudResource("clb") && options.TestConfig.AllowCreateCloudResource) ||
+				options.TestConfig.IntranetLoadBalancerID != "" {
 				ginkgo.It("reuse intranet lb with override-listener=true", func() {
 					svc, err := f.Client.KubeClient.CreateServiceByAnno(map[string]string{
 						annotation.Annotation(annotation.AddressType):      string(model.IntranetAddressType),
@@ -537,7 +532,7 @@ func RunLoadBalancerTestCases(f *framework.Framework) {
 				ginkgo.It("reuse lb and set resource-group-id is inconsistent with lb", func() {
 					svc, err := f.Client.KubeClient.CreateServiceByAnno(map[string]string{
 						annotation.Annotation(annotation.ResourceGroupId): options.TestConfig.ResourceGroupID,
-						annotation.Annotation(annotation.LoadBalancerId):  options.TestConfig.IntranetLoadBalancerID,
+						annotation.Annotation(annotation.LoadBalancerId):  options.TestConfig.InternetLoadBalancerID,
 					})
 					gomega.Expect(err).To(gomega.BeNil())
 					err = f.ExpectLoadBalancerEqual(svc)
@@ -558,8 +553,7 @@ func RunLoadBalancerTestCases(f *framework.Framework) {
 
 			ginkgo.It("ip-version: ipv6", func() {
 				svc, err := f.Client.KubeClient.CreateServiceByAnno(map[string]string{
-					annotation.Annotation(annotation.AddressType): string(model.InternetAddressType),
-					annotation.Annotation(annotation.IPVersion):   string(model.IPv6),
+					annotation.Annotation(annotation.IPVersion): string(model.IPv6),
 				})
 				gomega.Expect(err).To(gomega.BeNil())
 				err = f.ExpectLoadBalancerEqual(svc)
@@ -630,7 +624,7 @@ func RunLoadBalancerTestCases(f *framework.Framework) {
 			ginkgo.It("add tag for reused lb", func() {
 				svc, err := f.Client.KubeClient.CreateServiceByAnno(map[string]string{
 					annotation.Annotation(annotation.AdditionalTags): "Key1=Value1,Key2=Value2",
-					annotation.Annotation(annotation.LoadBalancerId): options.TestConfig.IntranetLoadBalancerID,
+					annotation.Annotation(annotation.LoadBalancerId): options.TestConfig.InternetLoadBalancerID,
 				})
 				gomega.Expect(err).To(gomega.BeNil())
 				err = f.ExpectLoadBalancerEqual(svc)

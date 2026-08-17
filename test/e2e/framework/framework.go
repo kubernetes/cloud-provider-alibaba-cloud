@@ -38,11 +38,10 @@ func scopedResourceName(role string) string {
 }
 
 type Framework struct {
-	Client                          *client.E2EClient
-	CreatedResource                 map[string]string
-	secondaryIntranetLoadBalancerID string
-	pendingServiceCleanup           *v1.Service
-	namespaceCreated                bool
+	Client                *client.E2EClient
+	CreatedResource       map[string]string
+	pendingServiceCleanup *v1.Service
+	namespaceCreated      bool
 }
 
 type cloudResource struct {
@@ -245,6 +244,33 @@ func (f *Framework) CreateCloudResource() error {
 		}
 	}
 
+	manageInternetCLBFixture := options.TestConfig.NeedsCloudResource("clb") &&
+		options.TestConfig.InternetLoadBalancerID == ""
+	if manageInternetCLBFixture {
+		slbM := &model.LoadBalancer{LoadBalancerAttribute: model.LoadBalancerAttribute{
+			AddressType:      model.InternetAddressType,
+			LoadBalancerSpec: model.S1Small,
+			RegionId:         region,
+			LoadBalancerName: scopedResourceName("public-clb"),
+		}}
+		if err := f.Client.CloudClient.FindLoadBalancerByName(slbM); err != nil {
+			return err
+		}
+		if slbM.LoadBalancerAttribute.LoadBalancerId == "" {
+			if err := f.Client.CloudClient.CreateLoadBalancer(context.TODO(), slbM, ""); err != nil {
+				return fmt.Errorf("create internet slb error: %s", err.Error())
+			}
+		}
+		options.TestConfig.InternetLoadBalancerID = slbM.LoadBalancerAttribute.LoadBalancerId
+		f.CreatedResource[options.TestConfig.InternetLoadBalancerID] = SLBResource
+	}
+
+	if manageInternetCLBFixture && options.TestConfig.VServerGroupID == "" {
+		if err := f.ensureCLBVServerGroups(options.TestConfig.InternetLoadBalancerID); err != nil {
+			return err
+		}
+	}
+
 	manageIntranetCLBFixture := options.TestConfig.NeedsCloudResource("clb") &&
 		options.TestConfig.IntranetLoadBalancerID == ""
 	if manageIntranetCLBFixture {
@@ -273,10 +299,23 @@ func (f *Framework) CreateCloudResource() error {
 		f.CreatedResource[options.TestConfig.IntranetLoadBalancerID] = SLBResource
 	}
 
-	if manageIntranetCLBFixture && options.TestConfig.VServerGroupID == "" {
-		if err := f.ensureCLBVServerGroups(options.TestConfig.IntranetLoadBalancerID); err != nil {
+	if options.TestConfig.NeedsCloudResource("nlb") && options.TestConfig.InternetNetworkLoadBalancerID == "" {
+		slbM := &nlbmodel.NetworkLoadBalancer{LoadBalancerAttribute: &nlbmodel.LoadBalancerAttribute{
+			AddressType:  nlbmodel.InternetAddressType,
+			ZoneMappings: zoneMappings,
+			VpcId:        options.TestConfig.VPCID,
+			Name:         scopedResourceName("public-nlb"),
+		}}
+		if err := f.Client.CloudClient.FindNLBByName(context.TODO(), slbM); err != nil {
 			return err
 		}
+		if slbM.LoadBalancerAttribute.LoadBalancerId == "" {
+			if err := f.Client.CloudClient.CreateNLB(context.TODO(), slbM, ""); err != nil {
+				return fmt.Errorf("create internet nlb error: %s", err.Error())
+			}
+		}
+		options.TestConfig.InternetNetworkLoadBalancerID = slbM.LoadBalancerAttribute.LoadBalancerId
+		f.CreatedResource[options.TestConfig.InternetNetworkLoadBalancerID] = NLBResource
 	}
 
 	if options.TestConfig.NeedsCloudResource("nlb") && options.TestConfig.IntranetNetworkLoadBalancerID == "" {
@@ -333,122 +372,23 @@ func (f *Framework) CreateCloudResource() error {
 		f.CreatedResource[aclId] = ACLResource
 	}
 
-	klog.Infof("created resource: %s", util.PrettyJson(f.CreatedResource))
-	return nil
-}
-
-// EnsureInternetLoadBalancer lazily creates the public CLB fixture. Most E2E
-// specs use the intranet fixture; only specs that explicitly verify public-LB
-// behavior should call this method.
-func (f *Framework) EnsureInternetLoadBalancer() error {
-	if options.TestConfig.InternetLoadBalancerID != "" {
-		return nil
-	}
-	region, err := f.Client.CloudClient.Region()
-	if err != nil {
-		return err
-	}
-	lb := &model.LoadBalancer{LoadBalancerAttribute: model.LoadBalancerAttribute{
-		AddressType:      model.InternetAddressType,
-		LoadBalancerSpec: model.S1Small,
-		RegionId:         region,
-		LoadBalancerName: scopedResourceName("public-clb"),
-	}}
-	if err := f.Client.CloudClient.FindLoadBalancerByName(lb); err != nil {
-		return err
-	}
-	if lb.LoadBalancerAttribute.LoadBalancerId == "" {
-		if err := f.Client.CloudClient.CreateLoadBalancer(context.TODO(), lb, ""); err != nil {
-			return fmt.Errorf("create internet slb: %w", err)
-		}
-	}
-	options.TestConfig.InternetLoadBalancerID = lb.LoadBalancerAttribute.LoadBalancerId
-	f.CreatedResource[options.TestConfig.InternetLoadBalancerID] = SLBResource
-	return nil
-}
-
-// EnsureSecondaryIntranetLoadBalancer lazily creates a second private CLB for
-// cases that must verify a resource belongs to a different load balancer.
-func (f *Framework) EnsureSecondaryIntranetLoadBalancer() (string, error) {
-	if f.secondaryIntranetLoadBalancerID != "" {
-		return f.secondaryIntranetLoadBalancerID, nil
-	}
-	region, err := f.Client.CloudClient.Region()
-	if err != nil {
-		return "", err
-	}
-	vswitchID, err := f.Client.CloudClient.VswitchID()
-	if err != nil {
-		return "", err
-	}
-	lb := &model.LoadBalancer{LoadBalancerAttribute: model.LoadBalancerAttribute{
-		AddressType:      model.IntranetAddressType,
-		LoadBalancerSpec: model.S1Small,
-		RegionId:         region,
-		VSwitchId:        vswitchID,
-		LoadBalancerName: scopedResourceName("secondary-private-clb"),
-	}}
-	if err := f.Client.CloudClient.FindLoadBalancerByName(lb); err != nil {
-		return "", err
-	}
-	if lb.LoadBalancerAttribute.LoadBalancerId == "" {
-		if err := f.Client.CloudClient.CreateLoadBalancer(context.TODO(), lb, ""); err != nil {
-			return "", fmt.Errorf("create secondary intranet slb: %w", err)
-		}
-	}
-	f.secondaryIntranetLoadBalancerID = lb.LoadBalancerAttribute.LoadBalancerId
-	f.CreatedResource[f.secondaryIntranetLoadBalancerID] = SLBResource
-	return f.secondaryIntranetLoadBalancerID, nil
-}
-
-// EnsureInternetNetworkLoadBalancer lazily creates the public NLB fixture for
-// the small set of specs that explicitly exercise public-NLB behavior.
-func (f *Framework) EnsureInternetNetworkLoadBalancer() error {
-	if options.TestConfig.InternetNetworkLoadBalancerID != "" {
-		return nil
-	}
-	zoneMappings, err := ParseNLBZoneMappings(options.TestConfig.NLBZoneMaps)
-	if err != nil {
-		return err
-	}
-	lb := &nlbmodel.NetworkLoadBalancer{LoadBalancerAttribute: &nlbmodel.LoadBalancerAttribute{
-		AddressType:  nlbmodel.InternetAddressType,
-		ZoneMappings: zoneMappings,
-		VpcId:        options.TestConfig.VPCID,
-		Name:         scopedResourceName("public-nlb"),
-	}}
-	if err := f.Client.CloudClient.FindNLBByName(context.TODO(), lb); err != nil {
-		return err
-	}
-	if lb.LoadBalancerAttribute.LoadBalancerId == "" {
-		if err := f.Client.CloudClient.CreateNLB(context.TODO(), lb, ""); err != nil {
-			return fmt.Errorf("create internet nlb: %w", err)
-		}
-	}
-	options.TestConfig.InternetNetworkLoadBalancerID = lb.LoadBalancerAttribute.LoadBalancerId
-	f.CreatedResource[options.TestConfig.InternetNetworkLoadBalancerID] = NLBResource
-	return nil
-}
-
-// EnsureEIPAddress lazily allocates the EIP fixture for the zone-mapping specs
-// that explicitly exercise public addresses.
-func (f *Framework) EnsureEIPAddress() error {
-	if options.TestConfig.EIPID != "" {
-		return nil
-	}
-	name := scopedResourceName("eip")
-	id, err := f.Client.CloudClient.DescribeEipIdByName(context.TODO(), name)
-	if err != nil {
-		return fmt.Errorf("describe eip by name: %w", err)
-	}
-	if id == "" {
-		id, err = f.Client.CloudClient.AllocateEipAddressWithChargeType(context.TODO(), name, "PayByTraffic")
+	if options.TestConfig.NeedsCloudResource("nlb") && options.TestConfig.EIPID == "" {
+		name := scopedResourceName("eip")
+		id, err := f.Client.CloudClient.DescribeEipIdByName(context.TODO(), name)
 		if err != nil {
-			return fmt.Errorf("allocate eip address: %w", err)
+			return fmt.Errorf("describe eip by name: %w", err)
 		}
+		if id == "" {
+			id, err = f.Client.CloudClient.AllocateEipAddressWithChargeType(context.TODO(), name, "PayByTraffic")
+			if err != nil {
+				return fmt.Errorf("allocate eip address: %w", err)
+			}
+		}
+		options.TestConfig.EIPID = id
+		f.CreatedResource[id] = EIPResource
 	}
-	options.TestConfig.EIPID = id
-	f.CreatedResource[id] = EIPResource
+
+	klog.Infof("created resource: %s", util.PrettyJson(f.CreatedResource))
 	return nil
 }
 
@@ -499,16 +439,6 @@ func (f *Framework) FindWorkerScopedCloudResources() error {
 			if lb.LoadBalancerAttribute.LoadBalancerId != "" {
 				f.CreatedResource[lb.LoadBalancerAttribute.LoadBalancerId] = SLBResource
 			}
-		}
-		secondary := &model.LoadBalancer{LoadBalancerAttribute: model.LoadBalancerAttribute{
-			RegionId:         region,
-			LoadBalancerName: scopedResourceName("secondary-private-clb"),
-		}}
-		if err := f.Client.CloudClient.FindLoadBalancerByName(secondary); err != nil {
-			return err
-		}
-		if secondary.LoadBalancerAttribute.LoadBalancerId != "" {
-			f.CreatedResource[secondary.LoadBalancerAttribute.LoadBalancerId] = SLBResource
 		}
 		for _, suffix := range []string{"a", "b"} {
 			name := scopedResourceName("acl-" + suffix)

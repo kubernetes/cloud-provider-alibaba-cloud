@@ -21,8 +21,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/helper"
-	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/service/reconcile/annotation"
-	"k8s.io/cloud-provider-alibaba-cloud/pkg/model"
 	"k8s.io/klog/v2"
 )
 
@@ -185,28 +183,13 @@ func (client *KubeClient) CreateService(svc *v1.Service) (*v1.Service, error) {
 	if svc == nil {
 		return nil, fmt.Errorf("svc is nil")
 	}
-	defaultTestServiceToIntranet(svc)
 	return client.CoreV1().Services(Namespace).Create(context.TODO(), svc, metav1.CreateOptions{})
-}
-
-// defaultTestServiceToIntranet keeps ordinary E2E cases off public load
-// balancers. Cases that explicitly exercise public behavior set AddressType to
-// Internet and are left unchanged.
-func defaultTestServiceToIntranet(svc *v1.Service) {
-	if svc.Annotations == nil {
-		svc.Annotations = make(map[string]string)
-	}
-	key := annotation.Annotation(annotation.AddressType)
-	if _, ok := svc.Annotations[key]; !ok {
-		svc.Annotations[key] = string(model.IntranetAddressType)
-	}
 }
 
 func (client *KubeClient) PatchService(oldSvc, newSvc *v1.Service) (*v1.Service, error) {
 	if newSvc == nil {
 		return nil, fmt.Errorf("new svc is nil")
 	}
-	preserveOrDefaultTestServiceAddressType(oldSvc, newSvc)
 	oldStr, _ := json.Marshal(oldSvc)
 	newStr, _ := json.Marshal(newSvc)
 	patchBytes, patchErr := strategicpatch.CreateTwoWayMergePatch(oldStr, newStr, &v1.Service{})
@@ -216,24 +199,6 @@ func (client *KubeClient) PatchService(oldSvc, newSvc *v1.Service) (*v1.Service,
 	return client.CoreV1().Services(Namespace).Patch(context.TODO(), Service, types.StrategicMergePatchType,
 		patchBytes, metav1.PatchOptions{})
 }
-
-func preserveOrDefaultTestServiceAddressType(oldSvc, newSvc *v1.Service) {
-	key := annotation.Annotation(annotation.AddressType)
-	if _, ok := newSvc.Annotations[key]; ok {
-		return
-	}
-	if oldSvc != nil && oldSvc.Annotations != nil {
-		if addressType, ok := oldSvc.Annotations[key]; ok {
-			if newSvc.Annotations == nil {
-				newSvc.Annotations = make(map[string]string)
-			}
-			newSvc.Annotations[key] = addressType
-			return
-		}
-	}
-	defaultTestServiceToIntranet(newSvc)
-}
-
 func (client *KubeClient) CreateServiceWithoutSelector(anno map[string]string) (*v1.Service, error) {
 	svc := &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{

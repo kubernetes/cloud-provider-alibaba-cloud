@@ -1341,11 +1341,11 @@ func RunListenerTestCases(f *framework.Framework) {
 				gomega.Expect(err).To(gomega.BeNil())
 			})
 			if (options.TestConfig.NeedsCloudResource("clb") && options.TestConfig.AllowCreateCloudResource) ||
-				options.TestConfig.IntranetLoadBalancerID != "" {
+				options.TestConfig.InternetLoadBalancerID != "" {
 				ginkgo.It("delete listener of reused slb", func() {
 					oldsvc, err := f.Client.KubeClient.CreateServiceByAnno(map[string]string{
 						annotation.Annotation(annotation.Spec):             model.S1Small,
-						annotation.Annotation(annotation.LoadBalancerId):   options.TestConfig.IntranetLoadBalancerID,
+						annotation.Annotation(annotation.LoadBalancerId):   options.TestConfig.InternetLoadBalancerID,
 						annotation.Annotation(annotation.OverrideListener): "true",
 					})
 					gomega.Expect(err).To(gomega.BeNil())
