@@ -1691,8 +1691,8 @@ func (f *Framework) WaitForBackendRemoved(svc *v1.Service, serverIp string) erro
 			retErr = nil
 			return true, nil
 		}
-		retErr = nil
-		return true, nil
+		retErr = fmt.Errorf("vgroup %s not found while waiting for backend %s removal", name, serverIp)
+		return false, nil
 	})
 	return retErr
 }
