@@ -49,16 +49,13 @@ func TestE2E(t *testing.T) {
 	ginkgo.BeforeSuite(func() {
 		setupErr := initErr
 		if setupErr == nil {
-			klog.Infof("test config: %s", util.PrettyJson(options.TestConfig))
 			setupErr = f.BeforeSuit()
 		}
 		if setupErr == nil && options.TestConfig.AllowCreateCloudResource {
 			setupErr = f.CreateCloudResource()
 		}
-		if setupErr != nil && f.Client != nil {
-			if cleanupErr := f.AfterSuit(); cleanupErr != nil {
-				klog.Errorf("cleanup partial setup: %s", cleanupErr)
-			}
+		if setupErr == nil {
+			klog.Infof("test config: %s", util.PrettyJson(options.TestConfig))
 		}
 		gomega.Expect(setupErr).To(gomega.BeNil())
 	})
