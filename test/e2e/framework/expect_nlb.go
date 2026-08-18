@@ -1611,20 +1611,25 @@ func (f *Framework) WaitForNLBBackendWeight(svc *v1.Service, serverIp string, ex
 			retErr = fmt.Errorf("build nlb remote model: %s", err.Error())
 			return false, nil
 		}
+		found := false
 		for _, sg := range remote.ServerGroups {
 			for _, b := range sg.Servers {
 				if b.ServerIp == serverIp {
-					if b.Weight == expectedWeight {
-						retErr = nil
-						return true, nil
+					found = true
+					if b.Weight != expectedWeight {
+						retErr = fmt.Errorf("nlb backend %s in server group %s weight: expect %d, got %d",
+							serverIp, sg.ServerGroupId, expectedWeight, b.Weight)
+						return false, nil
 					}
-					retErr = fmt.Errorf("nlb backend %s weight: expect %d, got %d", serverIp, expectedWeight, b.Weight)
-					return false, nil
 				}
 			}
 		}
-		retErr = fmt.Errorf("nlb backend %s not found", serverIp)
-		return false, nil
+		if !found {
+			retErr = fmt.Errorf("nlb backend %s not found", serverIp)
+			return false, nil
+		}
+		retErr = nil
+		return true, nil
 	})
 	return retErr
 }
@@ -1635,6 +1640,10 @@ func (f *Framework) WaitForNLBBackendRemoved(svc *v1.Service, serverIp string) e
 		remote, err := buildNLBRemoteModel(f, svc)
 		if err != nil {
 			retErr = fmt.Errorf("build nlb remote model: %s", err.Error())
+			return false, nil
+		}
+		if len(remote.ServerGroups) == 0 {
+			retErr = fmt.Errorf("no NLB server groups found while waiting for backend %s removal", serverIp)
 			return false, nil
 		}
 		for _, sg := range remote.ServerGroups {
