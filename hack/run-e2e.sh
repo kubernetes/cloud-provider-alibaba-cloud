@@ -123,12 +123,10 @@ run_phase() {
 	local name=$1
 	local procs=$2
 	local label_filter=$3
-	local resource_types=$4
 	local phase_dir="$output_dir/$name"
 
 	mkdir -p "$phase_dir"
-	printf '[%s] start: procs=%s labels=%s resources=%s\n' \
-		"$name" "$procs" "$label_filter" "$resource_types"
+	printf '[%s] start: procs=%s labels=%s\n' "$name" "$procs" "$label_filter"
 
 	(
 		cd "$repo_root"
@@ -142,7 +140,6 @@ run_phase() {
 			--output-dir="$phase_dir" \
 			./test/e2e -- \
 			"${common_test_args[@]}" \
-			"--cloud-resource-types=$resource_types" \
 			"${extra_test_args[@]}"
 	) 2>&1 | tee "$phase_dir/run.log"
 }
@@ -152,9 +149,9 @@ printf 'Kubeconfig: %s\n' "$KUBECONFIG"
 printf 'Cloud config: %s\n' "$cloud_config"
 printf 'Output: %s\n' "$output_dir"
 
-run_phase clb "$clb_procs" 'clb && !cluster-serial' clb &
+run_phase clb "$clb_procs" 'clb && !cluster-serial' &
 clb_pid=$!
-run_phase nlb "$nlb_procs" 'nlb && !cluster-serial' nlb &
+run_phase nlb "$nlb_procs" 'nlb && !cluster-serial' &
 nlb_pid=$!
 
 set +e
@@ -170,6 +167,6 @@ if ((clb_status != 0 || nlb_status != 0)); then
 	exit 1
 fi
 
-run_phase cluster-serial 1 'cluster-serial' 'clb,nlb'
+run_phase cluster-serial 1 'cluster-serial'
 
 printf 'all E2E phases passed; reports are in %s\n' "$output_dir"

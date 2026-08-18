@@ -3,7 +3,6 @@ package options
 import (
 	"flag"
 	"fmt"
-	"strings"
 	"time"
 )
 
@@ -15,19 +14,16 @@ const (
 var TestConfig = &E2EConfig{}
 
 type E2EConfig struct {
-	CloudConfig              string `json:"cloudConfig"`
-	Controllers              string `json:"controller"`
-	RegionId                 string `json:"regionId"`
-	ClusterType              string `json:"clusterType"`
-	ClusterId                string `json:"clusterId"`
-	AllowCreateCloudResource bool   `json:"allowCreateCloudResource"` // whether to create cloud resources for test
-	CloudResourceTypes       string `json:"cloudResourceTypes"`
-	// RunID is kept as a deprecated, ignored flag so existing local commands do
-	// not break. Resource ownership is derived from suite family and worker index.
-	RunID               string        `json:"runId,omitempty"`
-	ParallelProcess     int           `json:"parallelProcess"`
-	ParallelTotal       int           `json:"parallelTotal"`
-	FixtureReadyTimeout time.Duration `json:"fixtureReadyTimeout"`
+	CloudConfig              string        `json:"cloudConfig"`
+	Controllers              string        `json:"controller"`
+	RegionId                 string        `json:"regionId"`
+	ClusterType              string        `json:"clusterType"`
+	ClusterId                string        `json:"clusterId"`
+	AllowCreateCloudResource bool          `json:"allowCreateCloudResource"` // whether to create cloud resources for test
+	ParallelProcess          int           `json:"parallelProcess"`
+	FixtureReadyTimeout      time.Duration `json:"fixtureReadyTimeout"`
+	needsCLBResource         bool
+	needsNLBResource         bool
 
 	// need provided
 	VPCLoadBalancerID string `json:"VPCLoadBalancerID"` // lb in other vpc
@@ -74,8 +70,6 @@ func (e *E2EConfig) BindFlags() {
 	flag.StringVar(&e.RegionId, "region-id", "", "the region id of cluster")
 	flag.StringVar(&e.ClusterId, "cluster-id", "", "the id of cluster which is used to run e2e test")
 	flag.BoolVar(&e.AllowCreateCloudResource, "allow-create-cloud-resources", false, "whether allow to create cloud resources, including the Kubernetes Cluster, SLB, ECS, etc.")
-	flag.StringVar(&e.CloudResourceTypes, "cloud-resource-types", "clb,nlb", "comma-separated cloud resource families to prepare: clb,nlb")
-	flag.StringVar(&e.RunID, "run-id", "", "deprecated and ignored; e2e resources use fixed suite and worker names")
 	flag.DurationVar(&e.FixtureReadyTimeout, "fixture-ready-timeout", 10*time.Minute, "maximum time to wait for each worker's backend deployment to become ready")
 	flag.StringVar(&e.EipLoadBalancerID, "eip-lb-id", "", "reused intranet slb id which has eip")
 	flag.StringVar(&e.VPCLoadBalancerID, "vpc-lb-id", "", "reused intranet slb id which in other vpc")
@@ -121,44 +115,25 @@ func (e *E2EConfig) Validate() error {
 	if e.FixtureReadyTimeout <= 0 {
 		return fmt.Errorf("fixture ready timeout must be positive")
 	}
-	if _, err := e.cloudResourceTypeSet(); err != nil {
-		return err
-	}
 	return nil
 }
 
-// NeedsCloudResource reports whether the named service family should have its
-// shared test fixtures prepared. Empty preserves the historical clb,nlb set.
+// NeedsCloudResource reports whether the Ginkgo label filter selects specs
+// that need fixtures for the named service family.
 func (e *E2EConfig) NeedsCloudResource(resourceType string) bool {
-	types, err := e.cloudResourceTypeSet()
-	if err != nil {
+	switch resourceType {
+	case "clb":
+		return e.needsCLBResource
+	case "nlb":
+		return e.needsNLBResource
+	default:
 		return false
 	}
-	return types[resourceType]
 }
 
-func (e *E2EConfig) cloudResourceTypeSet() (map[string]bool, error) {
-	value := strings.TrimSpace(strings.ToLower(e.CloudResourceTypes))
-	if value == "" {
-		value = "clb,nlb"
-	}
-	types := make(map[string]bool, 2)
-	for _, resourceType := range strings.Split(value, ",") {
-		resourceType = strings.TrimSpace(resourceType)
-		switch resourceType {
-		case "clb", "nlb":
-			types[resourceType] = true
-		default:
-			return nil, fmt.Errorf("unsupported cloud resource type %q; expected clb, nlb, or both", resourceType)
-		}
-	}
-	return types, nil
-}
-
-// ConfigureParallel records the Ginkgo worker identity. Kubernetes and cloud
-// resources use a fixed suite-family/worker identity so their names are
-// predictable before a run starts.
-func (e *E2EConfig) ConfigureParallel(process, total int) error {
+// ConfigureSuite records the Ginkgo worker identity and the cloud fixture
+// families derived from the suite's label filter.
+func (e *E2EConfig) ConfigureSuite(process, total int, needsCLBResource, needsNLBResource bool) error {
 	if total < 1 {
 		return fmt.Errorf("parallel total must be positive, got %d", total)
 	}
@@ -167,7 +142,8 @@ func (e *E2EConfig) ConfigureParallel(process, total int) error {
 	}
 
 	e.ParallelProcess = process
-	e.ParallelTotal = total
+	e.needsCLBResource = needsCLBResource
+	e.needsNLBResource = needsNLBResource
 	if total > 1 && e.hasSharedMutableResources() {
 		return fmt.Errorf("parallel runs cannot reuse explicitly supplied LB, server-group, ACL, or EIP resources; let each worker create isolated resources")
 	}
@@ -175,19 +151,18 @@ func (e *E2EConfig) ConfigureParallel(process, total int) error {
 }
 
 // SuiteName is the fixed resource family name used in namespaces and cloud
-// fixture names. "all" is used by the serial phase that prepares both types.
+// fixture names. "all" is used by suites that prepare both types.
 func (e *E2EConfig) SuiteName() string {
-	types, err := e.cloudResourceTypeSet()
-	if err != nil {
-		return "invalid"
-	}
-	if types["clb"] && types["nlb"] {
+	if e.needsCLBResource && e.needsNLBResource {
 		return "all"
 	}
-	if types["clb"] {
+	if e.needsCLBResource {
 		return "clb"
 	}
-	return "nlb"
+	if e.needsNLBResource {
+		return "nlb"
+	}
+	return "cluster"
 }
 
 // WorkerScope is the fixed, DNS-compatible identity shared by the worker's

@@ -30,7 +30,8 @@ func TestE2E(t *testing.T) {
 	}
 	suiteConfig, _ := ginkgo.GinkgoConfiguration()
 	parallelProcess, parallelTotal := suiteConfig.ParallelProcess, suiteConfig.ParallelTotal
-	if err := options.TestConfig.ConfigureParallel(parallelProcess, parallelTotal); err != nil {
+	needsCLBResource, needsNLBResource := selectedCloudResourceFamilies(suiteConfig.LabelFilter)
+	if err := options.TestConfig.ConfigureSuite(parallelProcess, parallelTotal, needsCLBResource, needsNLBResource); err != nil {
 		t.Fatalf("configure parallel test resources: %s", err.Error())
 	}
 	client.ConfigureTestResources(options.TestConfig.WorkerScope(), options.TestConfig.FixtureReadyTimeout)
@@ -95,6 +96,15 @@ func TestE2E(t *testing.T) {
 	})
 
 	ginkgo.RunSpecs(t, "run ccm e2e test")
+}
+
+func selectedCloudResourceFamilies(labelFilter string) (bool, bool) {
+	matches := func(labels ...string) bool {
+		return ginkgo.Label(labels...).MatchesLabelFilter(labelFilter)
+	}
+	needsCLBResource := matches("service", "clb") || matches("service", "clb", "cluster-serial")
+	needsNLBResource := matches("service", "nlb") || matches("service", "nlb", "cluster-serial")
+	return needsCLBResource, needsNLBResource
 }
 
 func initOptionsWithRetry(c *client.E2EClient) error {
