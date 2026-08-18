@@ -6,11 +6,9 @@ import (
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/helper"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/service/reconcile/annotation"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/model"
-	e2eclient "k8s.io/cloud-provider-alibaba-cloud/test/e2e/client"
 	"k8s.io/cloud-provider-alibaba-cloud/test/e2e/framework"
 	"k8s.io/cloud-provider-alibaba-cloud/test/e2e/options"
 )
@@ -21,8 +19,7 @@ func RunLoadBalancerTestCases(f *framework.Framework) {
 		ginkgo.Context("address-type", func() {
 			ginkgo.It("address-type defaults to internet when annotation is omitted", func() {
 				svc := f.Client.KubeClient.DefaultService()
-				svc, err := f.Client.KubeClient.CoreV1().Services(e2eclient.Namespace).
-					Create(context.TODO(), svc, metav1.CreateOptions{})
+				svc, err := f.Client.KubeClient.CreateService(svc)
 				gomega.Expect(err).To(gomega.BeNil())
 				gomega.Expect(svc.Annotations).NotTo(gomega.HaveKey(annotation.Annotation(annotation.AddressType)))
 
@@ -194,6 +191,12 @@ func RunLoadBalancerTestCases(f *framework.Framework) {
 
 					lbid := oldlb.LoadBalancerAttribute.LoadBalancerId
 					defer func(id string) {
+						f.CreatedResource[id] = framework.SLBResource
+						cleanupErr := f.AfterEach()
+						gomega.Expect(cleanupErr).To(gomega.BeNil())
+						if cleanupErr != nil {
+							return
+						}
 						err := f.DeleteLoadBalancerAndWait(id)
 						gomega.Expect(err).To(gomega.BeNil())
 					}(lbid)
@@ -234,6 +237,12 @@ func RunLoadBalancerTestCases(f *framework.Framework) {
 				oldID := remote.LoadBalancerAttribute.LoadBalancerId
 				oldName := remote.LoadBalancerAttribute.LoadBalancerName
 				defer func(id string) {
+					f.CreatedResource[id] = framework.SLBResource
+					cleanupErr := f.AfterEach()
+					gomega.Expect(cleanupErr).To(gomega.BeNil())
+					if cleanupErr != nil {
+						return
+					}
 					err := f.DeleteLoadBalancerAndWait(id)
 					gomega.Expect(err).To(gomega.BeNil())
 				}(oldID)

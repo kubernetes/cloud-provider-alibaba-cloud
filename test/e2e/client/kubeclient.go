@@ -127,14 +127,14 @@ func (client *KubeClient) DefaultNLBService() *v1.Service {
 func (client *KubeClient) CreateServiceByAnno(anno map[string]string) (*v1.Service, error) {
 	svc := client.DefaultService()
 	svc.Annotations = anno
-	return client.CreateService(svc)
+	return client.CoreV1().Services(Namespace).Create(context.TODO(), svc, metav1.CreateOptions{})
 }
 
 func (client *KubeClient) CreateNLBServiceByAnno(anno map[string]string) (*v1.Service, error) {
 	svc := client.DefaultNLBService()
 	svc.Annotations = anno
 
-	return client.CreateService(svc)
+	return client.CoreV1().Services(Namespace).Create(context.TODO(), svc, metav1.CreateOptions{})
 }
 
 func (client *KubeClient) CreateServiceWithStringTargetPort(anno map[string]string) (*v1.Service, error) {
@@ -154,7 +154,7 @@ func (client *KubeClient) CreateServiceWithStringTargetPort(anno map[string]stri
 			Protocol:   v1.ProtocolTCP,
 		},
 	}
-	return client.CreateService(svc)
+	return client.CoreV1().Services(Namespace).Create(context.TODO(), svc, metav1.CreateOptions{})
 }
 
 func (client *KubeClient) CreateNLBServiceWithStringTargetPort(anno map[string]string) (*v1.Service, error) {
@@ -176,7 +176,7 @@ func (client *KubeClient) CreateNLBServiceWithStringTargetPort(anno map[string]s
 			Protocol:   v1.ProtocolTCP,
 		},
 	}
-	return client.CreateService(svc)
+	return client.CoreV1().Services(Namespace).Create(context.TODO(), svc, metav1.CreateOptions{})
 }
 
 func (client *KubeClient) CreateService(svc *v1.Service) (*v1.Service, error) {
@@ -187,9 +187,6 @@ func (client *KubeClient) CreateService(svc *v1.Service) (*v1.Service, error) {
 }
 
 func (client *KubeClient) PatchService(oldSvc, newSvc *v1.Service) (*v1.Service, error) {
-	if newSvc == nil {
-		return nil, fmt.Errorf("new svc is nil")
-	}
 	oldStr, _ := json.Marshal(oldSvc)
 	newStr, _ := json.Marshal(newSvc)
 	patchBytes, patchErr := strategicpatch.CreateTwoWayMergePatch(oldStr, newStr, &v1.Service{})
@@ -225,7 +222,7 @@ func (client *KubeClient) CreateServiceWithoutSelector(anno map[string]string) (
 		},
 	}
 
-	return client.CreateService(svc)
+	return client.CoreV1().Services(Namespace).Create(context.TODO(), svc, metav1.CreateOptions{})
 }
 
 func (client *KubeClient) CreateNLBServiceWithoutSelector(anno map[string]string) (*v1.Service, error) {
@@ -256,7 +253,7 @@ func (client *KubeClient) CreateNLBServiceWithoutSelector(anno map[string]string
 		},
 	}
 
-	return client.CreateService(svc)
+	return client.CoreV1().Services(Namespace).Create(context.TODO(), svc, metav1.CreateOptions{})
 }
 
 func (client *KubeClient) DeleteService() error {
@@ -275,13 +272,12 @@ func (client *KubeClient) DeleteService() error {
 func (client *KubeClient) DeleteServiceByName(name string) error {
 	return wait.PollImmediate(3*time.Second, 3*time.Minute, func() (done bool, err error) {
 		err = client.CoreV1().Services(Namespace).Delete(context.TODO(), name, metav1.DeleteOptions{})
-		if err == nil || apierrors.IsNotFound(err) {
-			return true, nil
+		if err != nil {
+			if apierrors.IsNotFound(err) {
+				return true, nil
+			}
 		}
-		if isRetryableKubeAPIError(err) {
-			return false, nil
-		}
-		return false, err
+		return false, nil
 	})
 }
 
@@ -769,6 +765,13 @@ func (client *KubeClient) UnLabelNode(nodeName string, key string) error {
 	})
 }
 
+func (client *KubeClient) RestoreNodeLabel(nodeName, key string, originalLabels map[string]string) error {
+	if value, existed := originalLabels[key]; existed {
+		return client.LabelNode(nodeName, key, value)
+	}
+	return client.UnLabelNode(nodeName, key)
+}
+
 func (client *KubeClient) UnscheduledNode(nodeName string) error {
 	return wait.PollImmediate(2*time.Second, time.Minute, func() (done bool, err error) {
 		n, err := client.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
@@ -1084,7 +1087,7 @@ func isPodReady(pod *v1.Pod) bool {
 }
 
 func (client *KubeClient) WaitForTerminatingEndpoint(serviceName, podName, podIP string) error {
-	return wait.PollImmediate(time.Second, 30*time.Second, func() (bool, error) {
+	return wait.PollImmediate(time.Second, 2*time.Minute, func() (bool, error) {
 		slices, err := client.DiscoveryV1().EndpointSlices(Namespace).List(context.TODO(), metav1.ListOptions{
 			LabelSelector: discovery.LabelServiceName + "=" + serviceName,
 		})

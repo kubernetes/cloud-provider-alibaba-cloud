@@ -32,7 +32,7 @@ func RunBackendTestCases(f *framework.Framework) {
 				gomega.Expect(err).To(gomega.BeNil())
 				gomega.Expect(node).NotTo(gomega.BeNil())
 				defer func() {
-					_ = f.Client.KubeClient.UnLabelNode(node.Name, client.NodeLabel)
+					_ = f.Client.KubeClient.RestoreNodeLabel(node.Name, client.NodeLabel, node.Labels)
 				}()
 				err = f.Client.KubeClient.LabelNode(node.Name, client.NodeLabel, client.NodeLabel)
 				gomega.Expect(err).To(gomega.BeNil())
@@ -552,7 +552,7 @@ func RunBackendTestCases(f *framework.Framework) {
 				gomega.Expect(err).To(gomega.BeNil())
 				gomega.Expect(node).NotTo(gomega.BeNil())
 				defer func() {
-					_ = f.Client.KubeClient.UnLabelNode(node.Name, helper.LabelNodeExcludeBalancer)
+					_ = f.Client.KubeClient.RestoreNodeLabel(node.Name, helper.LabelNodeExcludeBalancer, node.Labels)
 				}()
 				err = f.Client.KubeClient.LabelNode(node.Name, helper.LabelNodeExcludeBalancer, "true")
 				gomega.Expect(err).To(gomega.BeNil())
@@ -571,7 +571,7 @@ func RunBackendTestCases(f *framework.Framework) {
 				gomega.Expect(err).To(gomega.BeNil())
 				gomega.Expect(node).NotTo(gomega.BeNil())
 				defer func() {
-					_ = f.Client.KubeClient.UnLabelNode(node.Name, client.ExcludeNodeLabel)
+					_ = f.Client.KubeClient.RestoreNodeLabel(node.Name, client.ExcludeNodeLabel, node.Labels)
 				}()
 				err = f.Client.KubeClient.LabelNode(node.Name, client.ExcludeNodeLabel, "true")
 				gomega.Expect(err).To(gomega.BeNil())
@@ -921,7 +921,9 @@ func RunGracefulShutdownTestCases(f *framework.Framework) {
 
 			ginkgo.By("finishing pod termination after observing weight=0")
 			err = f.Client.KubeClient.ForceDeletePod(targetPod.Name)
-			gomega.Expect(err == nil || apierrors.IsNotFound(err)).To(gomega.BeTrue())
+			if err != nil {
+				gomega.Expect(apierrors.IsNotFound(err)).To(gomega.BeTrue(), "force delete pod returned unexpected error: %v", err)
+			}
 
 			ginkgo.By("waiting for backend removal after termination")
 			err = f.WaitForBackendRemoved(svc, targetIP)

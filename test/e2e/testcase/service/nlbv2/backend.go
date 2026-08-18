@@ -657,7 +657,7 @@ func RunBackendTestCases(f *framework.Framework) {
 				gomega.Expect(err).To(gomega.BeNil())
 				gomega.Expect(node).NotTo(gomega.BeNil())
 				defer func() {
-					_ = f.Client.KubeClient.UnLabelNode(node.Name, helper.LabelNodeExcludeBalancer)
+					_ = f.Client.KubeClient.RestoreNodeLabel(node.Name, helper.LabelNodeExcludeBalancer, node.Labels)
 				}()
 				err = f.Client.KubeClient.LabelNode(node.Name, helper.LabelNodeExcludeBalancer, "true")
 				gomega.Expect(err).To(gomega.BeNil())
@@ -680,7 +680,7 @@ func RunBackendTestCases(f *framework.Framework) {
 				gomega.Expect(err).To(gomega.BeNil())
 				gomega.Expect(node).NotTo(gomega.BeNil())
 				defer func() {
-					_ = f.Client.KubeClient.UnLabelNode(node.Name, client.ExcludeNodeLabel)
+					_ = f.Client.KubeClient.RestoreNodeLabel(node.Name, client.ExcludeNodeLabel, node.Labels)
 				}()
 				err = f.Client.KubeClient.LabelNode(node.Name, client.ExcludeNodeLabel, "true")
 				gomega.Expect(err).To(gomega.BeNil())
@@ -974,8 +974,10 @@ func RunBackendTestCases(f *framework.Framework) {
 				} else {
 					b[0].Weight += 1
 				}
+				targetServerGroupID := lb.ServerGroups[0].ServerGroupId
+				targetBackend := b[0]
 
-				err = f.Client.CloudClient.UpdateNLBServers(context.TODO(), lb.ServerGroups[0].ServerGroupId, b)
+				err = f.Client.CloudClient.UpdateNLBServers(context.TODO(), targetServerGroupID, b)
 				gomega.Expect(err).To(gomega.BeNil())
 
 				newSvc := oldsvc.DeepCopy()
@@ -987,9 +989,21 @@ func RunBackendTestCases(f *framework.Framework) {
 
 				_, current, err := f.FindNetworkLoadBalancer()
 				gomega.Expect(err).To(gomega.BeNil())
-				gomega.Expect(current.ServerGroups).NotTo(gomega.BeEmpty())
-				gomega.Expect(current.ServerGroups[0].Servers).NotTo(gomega.BeEmpty())
-				gomega.Expect(current.ServerGroups[0].Servers[0].Weight).To(gomega.Equal(b[0].Weight))
+				var currentBackend *nlb.ServerGroupServer
+				for i := range current.ServerGroups {
+					if current.ServerGroups[i].ServerGroupId != targetServerGroupID {
+						continue
+					}
+					for j := range current.ServerGroups[i].Servers {
+						backend := &current.ServerGroups[i].Servers[j]
+						if backend.ServerId == targetBackend.ServerId && backend.ServerIp == targetBackend.ServerIp {
+							currentBackend = backend
+							break
+						}
+					}
+				}
+				gomega.Expect(currentBackend).NotTo(gomega.BeNil())
+				gomega.Expect(currentBackend.Weight).To(gomega.Equal(targetBackend.Weight))
 			})
 		})
 
@@ -1327,7 +1341,9 @@ func RunGracefulShutdownTestCases(f *framework.Framework) {
 
 			ginkgo.By("finishing pod termination after observing weight=0")
 			err = f.Client.KubeClient.ForceDeletePod(targetPod.Name)
-			gomega.Expect(err == nil || apierrors.IsNotFound(err)).To(gomega.BeTrue())
+			if err != nil {
+				gomega.Expect(apierrors.IsNotFound(err)).To(gomega.BeTrue(), "force delete pod returned unexpected error: %v", err)
+			}
 
 			ginkgo.By("waiting for backend removal after termination")
 			err = f.WaitForNLBBackendRemoved(svc, targetIP)

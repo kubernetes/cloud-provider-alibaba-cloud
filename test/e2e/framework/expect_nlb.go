@@ -908,7 +908,7 @@ func buildServerGroupENIBackends(f *Framework, eps []discovery.EndpointSlice, sg
 	for _, es := range eps {
 		backendPort, found := getBackendPortFromEndpointSlice(*sg.ServicePort, es.Ports)
 		if !found {
-			continue
+			return nil, fmt.Errorf("endpoint slice %s does not contain backend port for service port %s", es.Name, sg.ServicePort.Name)
 		}
 		for _, ep := range es.Endpoints {
 			if ep.TargetRef == nil || ep.TargetRef.Kind != "Pod" {
@@ -1485,6 +1485,10 @@ func (f *Framework) ExpectNLBSourceRangesSecurityGroupEqual(sourceRanges []strin
 	var retErr error
 	_ = wait.PollImmediate(10*time.Second, 3*time.Minute, func() (bool, error) {
 		svc, err := f.Client.KubeClient.GetService()
+		if err != nil {
+			retErr = fmt.Errorf("get service: %w", err)
+			return false, nil
+		}
 		sg, err := f.FindNLBAssociatedSecurityGroup(svc)
 		if err != nil {
 			retErr = fmt.Errorf("find associated security group: %w", err)

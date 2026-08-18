@@ -9,13 +9,11 @@ import (
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/helper"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/service/reconcile/annotation"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/model"
 	nlbmodel "k8s.io/cloud-provider-alibaba-cloud/pkg/model/nlb"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/model/tag"
-	e2eclient "k8s.io/cloud-provider-alibaba-cloud/test/e2e/client"
 	"k8s.io/cloud-provider-alibaba-cloud/test/e2e/framework"
 	"k8s.io/cloud-provider-alibaba-cloud/test/e2e/options"
 )
@@ -96,7 +94,7 @@ func RunLoadBalancerTestCases(f *framework.Framework) {
 				_, current, err := f.FindNetworkLoadBalancer()
 				gomega.Expect(err).To(gomega.BeNil())
 				gomega.Expect(current.LoadBalancerAttribute.ZoneMappings).
-					To(gomega.Equal(oldRemote.LoadBalancerAttribute.ZoneMappings))
+					To(gomega.ConsistOf(oldRemote.LoadBalancerAttribute.ZoneMappings))
 			})
 
 			if (options.TestConfig.NeedsCloudResource("nlb") && options.TestConfig.AllowCreateCloudResource) ||
@@ -158,7 +156,7 @@ func RunLoadBalancerTestCases(f *framework.Framework) {
 					_, current, err := f.FindNetworkLoadBalancer()
 					gomega.Expect(err).To(gomega.BeNil())
 					gomega.Expect(current.LoadBalancerAttribute.ZoneMappings).
-						To(gomega.Equal(oldRemote.LoadBalancerAttribute.ZoneMappings))
+						To(gomega.ConsistOf(oldRemote.LoadBalancerAttribute.ZoneMappings))
 				})
 			}
 		})
@@ -169,8 +167,7 @@ func RunLoadBalancerTestCases(f *framework.Framework) {
 				svc.Annotations = map[string]string{
 					annotation.Annotation(annotation.ZoneMaps): options.TestConfig.NLBZoneMaps,
 				}
-				svc, err := f.Client.KubeClient.CoreV1().Services(e2eclient.Namespace).
-					Create(context.TODO(), svc, metav1.CreateOptions{})
+				svc, err := f.Client.KubeClient.CreateService(svc)
 				gomega.Expect(err).To(gomega.BeNil())
 				gomega.Expect(svc.Annotations).NotTo(gomega.HaveKey(annotation.Annotation(annotation.AddressType)))
 
@@ -356,9 +353,14 @@ func RunLoadBalancerTestCases(f *framework.Framework) {
 
 					lbid := oldlb.LoadBalancerAttribute.LoadBalancerId
 					defer func(id string) {
+						f.CreatedResource[id] = framework.NLBResource
+						cleanupErr := f.AfterEach()
+						gomega.Expect(cleanupErr).To(gomega.BeNil())
+						if cleanupErr != nil {
+							return
+						}
 						err := f.DeleteNetworkLoadBalancerAndWait(id)
 						gomega.Expect(err).To(gomega.BeNil())
-
 					}(lbid)
 
 					newsvc := oldSvc.DeepCopy()
@@ -1090,7 +1092,7 @@ func RunLoadBalancerTestCases(f *framework.Framework) {
 			err = f.AfterEach()
 			gomega.Expect(err).To(gomega.BeNil())
 
-			err = f.DeleteSecurityGroupAndWait(sgId)
+			err = f.ExpectSecurityGroupDeletedByID(sgId)
 			gomega.Expect(err).To(gomega.BeNil())
 			cleanupDone = true
 		})

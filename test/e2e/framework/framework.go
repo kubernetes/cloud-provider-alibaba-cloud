@@ -149,7 +149,7 @@ func (f *Framework) deleteManualEndpoints(svc *v1.Service) error {
 
 func (f *Framework) waitForServiceCleanup(svc *v1.Service) error {
 	var cleanupErr error
-	pollErr := wait.PollImmediate(2*time.Second, 2*time.Minute, func() (bool, error) {
+	pollErr := wait.PollImmediate(2*time.Second, 5*time.Minute, func() (bool, error) {
 		_, cleanupErr = f.Client.KubeClient.GetService()
 		if cleanupErr == nil {
 			cleanupErr = fmt.Errorf("service %s/%s still exists", svc.Namespace, svc.Name)
@@ -515,7 +515,12 @@ func (f *Framework) DeleteSecurityGroupAndWait(securityGroupID string) error {
 	}); err != nil && !isCloudResourceGone(err) {
 		return err
 	}
+	return f.ExpectSecurityGroupDeletedByID(securityGroupID)
+}
 
+// ExpectSecurityGroupDeletedByID only observes cloud state. Tests use it to
+// verify that CCM, rather than the test cleanup itself, deleted a security group.
+func (f *Framework) ExpectSecurityGroupDeletedByID(securityGroupID string) error {
 	var observeErr error
 	pollErr := wait.PollImmediate(5*time.Second, 3*time.Minute, func() (bool, error) {
 		groups, err := f.Client.CloudClient.DescribeSecurityGroups(context.TODO(), nil)

@@ -56,7 +56,10 @@ func NewClient() (*E2EClient, error) {
 		NLBProvider:  nlb.NewNLBProvider(mgr),
 	}
 
-	cfg := config.GetConfigOrDie()
+	cfg, err := config.GetConfig()
+	if err != nil {
+		return nil, fmt.Errorf("get Kubernetes config: %w", err)
+	}
 	kubeClient, err := kubernetes.NewForConfig(cfg)
 	if err != nil {
 		return nil, fmt.Errorf("new Kubernetes client: %w", err)
