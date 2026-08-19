@@ -1281,7 +1281,7 @@ func RunBackendTestCases(f *framework.Framework) {
 
 					err = f.ExpectNetworkLoadBalancerEqual(svc)
 					gomega.Expect(err).To(gomega.BeNil())
-					err = f.WaitForNLBBackendRemoved(svc, ip.String())
+					err = f.ExpectLoadBalancerEvent(svc, helper.SkipSyncBackends, ip.String())
 					gomega.Expect(err).To(gomega.BeNil())
 				})
 			}

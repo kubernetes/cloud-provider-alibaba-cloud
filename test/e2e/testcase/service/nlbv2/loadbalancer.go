@@ -730,6 +730,13 @@ func RunLoadBalancerTestCases(f *framework.Framework) {
 			err = f.DeleteNetworkLoadBalancerAndWait(slb.LoadBalancerAttribute.LoadBalancerId)
 			gomega.Expect(err).To(gomega.BeNil())
 
+			defer func() {
+				err = f.Client.KubeClient.ScaleDeployment(3)
+				gomega.Expect(err).To(gomega.BeNil())
+			}()
+			err = f.Client.KubeClient.ScaleDeployment(0)
+			gomega.Expect(err).To(gomega.BeNil())
+
 			err = f.ExpectNetworkLoadBalancerAbsentFor(oldSvc, time.Minute)
 			gomega.Expect(err).To(gomega.BeNil())
 		})
@@ -786,7 +793,11 @@ func RunLoadBalancerTestCases(f *framework.Framework) {
 				defaultTag := tag.Tag{Key: key, Value: annotation.NewAnnotationRequest(oldSvc).GetDefaultLoadBalancerName()}
 				err = f.Client.CloudClient.TagNLBResource(context.TODO(), slb.LoadBalancerAttribute.LoadBalancerId, nlbmodel.LoadBalancerTagType, []tag.Tag{defaultTag})
 				gomega.Expect(err).To(gomega.BeNil())
+				err = f.Client.KubeClient.ScaleDeployment(3)
+				gomega.Expect(err).To(gomega.BeNil())
 			}()
+			err = f.Client.KubeClient.ScaleDeployment(0)
+			gomega.Expect(err).To(gomega.BeNil())
 
 			// Without the ownership tag and with a non-default name, CCM must no
 			// longer resolve this NLB as belonging to the Service.
