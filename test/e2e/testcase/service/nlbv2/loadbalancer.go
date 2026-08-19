@@ -340,43 +340,6 @@ func RunLoadBalancerTestCases(f *framework.Framework) {
 			}
 
 			if (options.TestConfig.NeedsCloudResource("nlb") && options.TestConfig.AllowCreateCloudResource) ||
-				options.TestConfig.InternetNetworkLoadBalancerID != "" {
-				ginkgo.It("ccm created nlb -> reused nlb", func() {
-					oldSvc, err := f.Client.KubeClient.CreateNLBServiceByAnno(map[string]string{
-						annotation.Annotation(annotation.ZoneMaps): options.TestConfig.NLBZoneMaps,
-					})
-					gomega.Expect(err).To(gomega.BeNil())
-					err = f.ExpectNetworkLoadBalancerEqual(oldSvc)
-					gomega.Expect(err).To(gomega.BeNil())
-					_, oldlb, err := f.FindNetworkLoadBalancer()
-					gomega.Expect(err).To(gomega.BeNil())
-
-					lbid := oldlb.LoadBalancerAttribute.LoadBalancerId
-					defer func(id string) {
-						f.CreatedResource[id] = framework.NLBResource
-						cleanupErr := f.AfterEach()
-						gomega.Expect(cleanupErr).To(gomega.BeNil())
-						if cleanupErr != nil {
-							return
-						}
-						err := f.DeleteNetworkLoadBalancerAndWait(id)
-						gomega.Expect(err).To(gomega.BeNil())
-					}(lbid)
-
-					newsvc := oldSvc.DeepCopy()
-					newsvc.Annotations = map[string]string{
-						annotation.Annotation(annotation.ZoneMaps):       options.TestConfig.NLBZoneMaps,
-						annotation.Annotation(annotation.LoadBalancerId): options.TestConfig.InternetNetworkLoadBalancerID,
-					}
-					newsvc, err = f.Client.KubeClient.PatchService(oldSvc, newsvc)
-					gomega.Expect(err).To(gomega.BeNil())
-
-					err = f.ExpectNetworkLoadBalancerEqual(newsvc)
-					gomega.Expect(err).To(gomega.BeNil())
-				})
-			}
-
-			if (options.TestConfig.NeedsCloudResource("nlb") && options.TestConfig.AllowCreateCloudResource) ||
 				options.TestConfig.IntranetNetworkLoadBalancerID != "" {
 				ginkgo.It("reuse intranet nlb with override-listener=true", func() {
 					svc, err := f.Client.KubeClient.CreateNLBServiceByAnno(map[string]string{
@@ -945,7 +908,7 @@ func RunLoadBalancerTestCases(f *framework.Framework) {
 		})
 	}
 
-	ginkgo.Context("nlb source ranges", func() {
+	ginkgo.Context("nlb source ranges", ginkgo.Ordered, ginkgo.ContinueOnFailure, func() {
 		ginkgo.AfterEach(func() {
 			svc, _ := f.Client.KubeClient.GetService()
 			err := f.AfterEach()

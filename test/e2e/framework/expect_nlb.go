@@ -188,7 +188,7 @@ func (f *Framework) ExpectNetworkLoadBalancerAbsentFor(svc *v1.Service, duration
 }
 
 func isNetworkLoadBalancerNotFound(err error) bool {
-	return err != nil && strings.Contains(err.Error(), "ResourceNotFound.loadBalancer")
+	return err != nil && strings.Contains(strings.ToLower(err.Error()), "resourcenotfound.loadbalancer")
 }
 
 func (f *Framework) FindNetworkLoadBalancer() (*v1.Service, *nlbmodel.NetworkLoadBalancer, error) {
@@ -908,7 +908,10 @@ func buildServerGroupENIBackends(f *Framework, eps []discovery.EndpointSlice, sg
 	for _, es := range eps {
 		backendPort, found := getBackendPortFromEndpointSlice(*sg.ServicePort, es.Ports)
 		if !found {
-			return nil, fmt.Errorf("endpoint slice %s does not contain backend port for service port %s", es.Name, sg.ServicePort.Name)
+			// EndpointSlices are grouped by their port set. A slice that does
+			// not expose this named target port contributes no backends to the
+			// corresponding server group.
+			continue
 		}
 		for _, ep := range es.Endpoints {
 			if ep.TargetRef == nil || ep.TargetRef.Kind != "Pod" {
@@ -1611,8 +1614,13 @@ func (f *Framework) WaitForNLBBackendWeight(svc *v1.Service, serverIp string, ex
 			retErr = fmt.Errorf("build nlb remote model: %s", err.Error())
 			return false, nil
 		}
-		found := false
-		for _, sg := range remote.ServerGroups {
+		serverGroups, err := expectedNLBServerGroups(svc, remote)
+		if err != nil {
+			retErr = err
+			return false, nil
+		}
+		for _, sg := range serverGroups {
+			found := false
 			for _, b := range sg.Servers {
 				if b.ServerIp == serverIp {
 					found = true
@@ -1623,10 +1631,10 @@ func (f *Framework) WaitForNLBBackendWeight(svc *v1.Service, serverIp string, ex
 					}
 				}
 			}
-		}
-		if !found {
-			retErr = fmt.Errorf("nlb backend %s not found", serverIp)
-			return false, nil
+			if !found {
+				retErr = fmt.Errorf("nlb backend %s not found in server group %s", serverIp, sg.ServerGroupId)
+				return false, nil
+			}
 		}
 		retErr = nil
 		return true, nil
@@ -1642,14 +1650,16 @@ func (f *Framework) WaitForNLBBackendRemoved(svc *v1.Service, serverIp string) e
 			retErr = fmt.Errorf("build nlb remote model: %s", err.Error())
 			return false, nil
 		}
-		if len(remote.ServerGroups) == 0 {
-			retErr = fmt.Errorf("no NLB server groups found while waiting for backend %s removal", serverIp)
+		serverGroups, err := expectedNLBServerGroups(svc, remote)
+		if err != nil {
+			retErr = err
 			return false, nil
 		}
-		for _, sg := range remote.ServerGroups {
+		for _, sg := range serverGroups {
 			for _, b := range sg.Servers {
 				if b.ServerIp == serverIp {
-					retErr = fmt.Errorf("nlb backend %s still present with weight %d", serverIp, b.Weight)
+					retErr = fmt.Errorf("nlb backend %s still present in server group %s with weight %d",
+						serverIp, sg.ServerGroupId, b.Weight)
 					return false, nil
 				}
 			}
@@ -1658,4 +1668,57 @@ func (f *Framework) WaitForNLBBackendRemoved(svc *v1.Service, serverIp string) e
 		return true, nil
 	})
 	return retErr
+}
+
+func expectedNLBServerGroups(svc *v1.Service, remote *nlbmodel.NetworkLoadBalancer) ([]*nlbmodel.ServerGroup, error) {
+	reqCtx := &svcCtx.RequestContext{
+		Service: svc,
+		Anno:    annotation.NewAnnotationRequest(svc),
+	}
+	portRanges, err := nlbListenerPortRange(reqCtx)
+	if err != nil {
+		return nil, err
+	}
+
+	serverGroups := make([]*nlbmodel.ServerGroup, 0, len(svc.Spec.Ports))
+	seen := make(map[string]struct{}, len(svc.Spec.Ports))
+	for _, port := range svc.Spec.Ports {
+		protocol, err := nlbListenerProtocol(reqCtx.Anno.Get(annotation.ProtocolPort), port)
+		if err != nil {
+			return nil, err
+		}
+		name := getServerGroupName(svc, protocol, &port)
+		if portRange, ok := portRanges[port.Port]; ok {
+			name = getAnyPortServerGroupName(svc, protocol, portRange[0], portRange[1])
+		}
+
+		groupID := ""
+		if vgroupPort := reqCtx.Anno.Get(annotation.VGroupPort); vgroupPort != "" {
+			groupID, err = getVGroupID(vgroupPort, port)
+			if err != nil {
+				return nil, fmt.Errorf("parse vgroup port annotation %s: %w", vgroupPort, err)
+			}
+		}
+
+		found := false
+		for _, sg := range remote.ServerGroups {
+			if sg.ServerGroupName != name && (groupID == "" || sg.ServerGroupId != groupID) {
+				continue
+			}
+			found = true
+			key := sg.ServerGroupId
+			if key == "" {
+				key = sg.ServerGroupName
+			}
+			if _, ok := seen[key]; !ok {
+				seen[key] = struct{}{}
+				serverGroups = append(serverGroups, sg)
+			}
+			break
+		}
+		if !found {
+			return nil, fmt.Errorf("expected NLB server group %s for service port %d not found", name, port.Port)
+		}
+	}
+	return serverGroups, nil
 }
