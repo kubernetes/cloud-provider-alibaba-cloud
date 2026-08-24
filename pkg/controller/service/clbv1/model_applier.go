@@ -70,12 +70,14 @@ func (m *ModelApplier) Apply(reqCtx *svcCtx.RequestContext, local *model.LoadBal
 			return remote, fmt.Errorf("update lb attribute error: %s", err.Error())
 		}
 
-		tasks = append(tasks, func() error {
-			if err := m.slbMgr.Update(reqCtx, local, remote); err != nil {
-				return fmt.Errorf("update lb attribute error: %s", err.Error())
-			}
-			return nil
-		})
+		if !helper.NeedDeleteLoadBalancer(reqCtx.Service) {
+			tasks = append(tasks, func() error {
+				if err := m.slbMgr.Update(reqCtx, local, remote); err != nil {
+					return fmt.Errorf("update lb attribute error: %s", err.Error())
+				}
+				return nil
+			})
+		}
 	}
 
 	if remote.LoadBalancerAttribute.LoadBalancerId == "" {
