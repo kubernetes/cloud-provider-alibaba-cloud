@@ -16,13 +16,6 @@ import (
 
 func RunListenerTestCases(f *framework.Framework) {
 	ginkgo.Describe("clb service controller: listener", func() {
-
-		ginkgo.AfterEach(func() {
-			ginkgo.By("delete service")
-			err := f.AfterEach()
-			gomega.Expect(err).To(gomega.BeNil())
-		})
-
 		ginkgo.Context("scheduler", func() {
 			ginkgo.It("scheduler: rr", func() {
 				svc, err := f.Client.KubeClient.CreateServiceByAnno(map[string]string{
@@ -69,7 +62,8 @@ func RunListenerTestCases(f *framework.Framework) {
 			})
 		})
 
-		if options.TestConfig.AclID != "" {
+		if (options.TestConfig.NeedsCloudResource("clb") && options.TestConfig.AllowCreateCloudResource) ||
+			options.TestConfig.AclID != "" {
 			ginkgo.Context("acl", func() {
 				ginkgo.It("acl-type: white -> black", func() {
 					oldsvc, err := f.Client.KubeClient.CreateServiceByAnno(map[string]string{
@@ -108,7 +102,8 @@ func RunListenerTestCases(f *framework.Framework) {
 					err = f.ExpectLoadBalancerEqual(newsvc)
 					gomega.Expect(err).To(gomega.BeNil())
 				})
-				if options.TestConfig.AclID2 != "" {
+				if (options.TestConfig.NeedsCloudResource("clb") && options.TestConfig.AllowCreateCloudResource) ||
+					options.TestConfig.AclID2 != "" {
 					ginkgo.It("update acl-id", func() {
 						oldsvc, err := f.Client.KubeClient.CreateServiceByAnno(map[string]string{
 							annotation.Annotation(annotation.AclID):     options.TestConfig.AclID,
@@ -335,6 +330,9 @@ func RunListenerTestCases(f *framework.Framework) {
 
 		ginkgo.Context("request timeout", func() {
 			ginkgo.It("request-timeout: 1 -> 40", func() {
+				if options.TestConfig.CertID == "" {
+					ginkgo.Skip("requires --cert-id")
+				}
 				oldsvc, err := f.Client.KubeClient.CreateServiceByAnno(map[string]string{
 					annotation.Annotation(annotation.ProtocolPort):   "https:443",
 					annotation.Annotation(annotation.CertID):         options.TestConfig.CertID,
@@ -520,6 +518,9 @@ func RunListenerTestCases(f *framework.Framework) {
 				gomega.Expect(err).To(gomega.BeNil())
 			})
 			ginkgo.It("health-check: https", func() {
+				if options.TestConfig.CertID == "" {
+					ginkgo.Skip("requires --cert-id")
+				}
 				oldsvc, err := f.Client.KubeClient.CreateServiceByAnno(map[string]string{
 					annotation.Annotation(annotation.ProtocolPort):        "https:443",
 					annotation.Annotation(annotation.CertID):              options.TestConfig.CertID,
@@ -1339,7 +1340,8 @@ func RunListenerTestCases(f *framework.Framework) {
 				err = f.ExpectLoadBalancerEqual(newSvc)
 				gomega.Expect(err).To(gomega.BeNil())
 			})
-			if options.TestConfig.InternetLoadBalancerID != "" {
+			if (options.TestConfig.NeedsCloudResource("clb") && options.TestConfig.AllowCreateCloudResource) ||
+				options.TestConfig.InternetLoadBalancerID != "" {
 				ginkgo.It("delete listener of reused slb", func() {
 					oldsvc, err := f.Client.KubeClient.CreateServiceByAnno(map[string]string{
 						annotation.Annotation(annotation.Spec):             model.S1Small,

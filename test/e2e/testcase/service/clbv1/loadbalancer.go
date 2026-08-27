@@ -16,14 +16,20 @@ import (
 func RunLoadBalancerTestCases(f *framework.Framework) {
 
 	ginkgo.Describe("clb service controller: loadbalancer", func() {
-
-		ginkgo.AfterEach(func() {
-			ginkgo.By("delete service")
-			err := f.AfterEach()
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
-		})
-
 		ginkgo.Context("address-type", func() {
+			ginkgo.It("address-type defaults to internet when annotation is omitted", func() {
+				svc := f.Client.KubeClient.DefaultService()
+				svc, err := f.Client.KubeClient.CreateService(svc)
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(svc.Annotations).NotTo(gomega.HaveKey(annotation.Annotation(annotation.AddressType)))
+
+				err = f.ExpectLoadBalancerEqual(svc)
+				gomega.Expect(err).To(gomega.BeNil())
+				_, remote, err := f.FindLoadBalancer()
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(remote.LoadBalancerAttribute.AddressType).To(gomega.Equal(model.InternetAddressType))
+			})
+
 			ginkgo.It("address-type=internet", func() {
 				svc, err := f.Client.KubeClient.CreateServiceByAnno(
 					map[string]string{
@@ -142,7 +148,8 @@ func RunLoadBalancerTestCases(f *framework.Framework) {
 		})
 
 		ginkgo.Context("reuse lb", func() {
-			if options.TestConfig.InternetLoadBalancerID != "" {
+			if (options.TestConfig.NeedsCloudResource("clb") && options.TestConfig.AllowCreateCloudResource) ||
+				options.TestConfig.InternetLoadBalancerID != "" {
 				ginkgo.It("reuse internet lb", func() {
 					svc, err := f.Client.KubeClient.CreateServiceByAnno(map[string]string{
 						annotation.Annotation(annotation.AddressType):    string(model.InternetAddressType),
@@ -172,6 +179,10 @@ func RunLoadBalancerTestCases(f *framework.Framework) {
 					err = f.ExpectLoadBalancerEqual(svc)
 					gomega.Expect(err).To(gomega.BeNil())
 				})
+			}
+
+			if (options.TestConfig.NeedsCloudResource("clb") && options.TestConfig.AllowCreateCloudResource) ||
+				options.TestConfig.InternetLoadBalancerID != "" {
 				ginkgo.It("ccm created slb -> reused slb", func() {
 					oldSvc, err := f.Client.KubeClient.CreateServiceByAnno(nil)
 					gomega.Expect(err).To(gomega.BeNil())
@@ -180,7 +191,13 @@ func RunLoadBalancerTestCases(f *framework.Framework) {
 
 					lbid := oldlb.LoadBalancerAttribute.LoadBalancerId
 					defer func(id string) {
-						err := f.DeleteLoadBalancer(id)
+						f.CreatedResource[id] = framework.SLBResource
+						cleanupErr := f.AfterEach()
+						gomega.Expect(cleanupErr).To(gomega.BeNil())
+						if cleanupErr != nil {
+							return
+						}
+						err := f.DeleteLoadBalancerAndWait(id)
 						gomega.Expect(err).To(gomega.BeNil())
 					}(lbid)
 
@@ -194,7 +211,10 @@ func RunLoadBalancerTestCases(f *framework.Framework) {
 					err = f.ExpectLoadBalancerEqual(newsvc)
 					gomega.Expect(err).NotTo(gomega.BeNil())
 				})
+			}
 
+			if (options.TestConfig.NeedsCloudResource("clb") && options.TestConfig.AllowCreateCloudResource) ||
+				options.TestConfig.IntranetLoadBalancerID != "" {
 				ginkgo.It("reuse intranet lb with override-listener=true", func() {
 					svc, err := f.Client.KubeClient.CreateServiceByAnno(map[string]string{
 						annotation.Annotation(annotation.AddressType):      string(model.IntranetAddressType),
@@ -214,22 +234,32 @@ func RunLoadBalancerTestCases(f *framework.Framework) {
 				gomega.Expect(err).To(gomega.BeNil())
 				svc, remote, err := f.FindLoadBalancer()
 				gomega.Expect(err).To(gomega.BeNil())
+				oldID := remote.LoadBalancerAttribute.LoadBalancerId
+				oldName := remote.LoadBalancerAttribute.LoadBalancerName
 				defer func(id string) {
-					err := f.DeleteLoadBalancer(id)
+					f.CreatedResource[id] = framework.SLBResource
+					cleanupErr := f.AfterEach()
+					gomega.Expect(cleanupErr).To(gomega.BeNil())
+					if cleanupErr != nil {
+						return
+					}
+					err := f.DeleteLoadBalancerAndWait(id)
 					gomega.Expect(err).To(gomega.BeNil())
-				}(remote.LoadBalancerAttribute.LoadBalancerId)
+				}(oldID)
 
 				newSvc := svc.DeepCopy()
-				newSvc.Annotations = map[string]string{
-					annotation.Annotation(annotation.AddressType):      string(model.InternetAddressType),
-					annotation.Annotation(annotation.LoadBalancerId):   remote.LoadBalancerAttribute.LoadBalancerId,
-					annotation.Annotation(annotation.OverrideListener): "true",
-					annotation.Annotation(annotation.LoadBalancerName): "ccm-reused-lb",
-				}
-				_, err = f.Client.KubeClient.PatchService(svc, newSvc)
+				newSvc.Annotations[annotation.Annotation(annotation.LoadBalancerId)] = oldID
+				newSvc.Annotations[annotation.Annotation(annotation.OverrideListener)] = "true"
+				newSvc.Annotations[annotation.Annotation(annotation.LoadBalancerName)] = "ccm-reused-lb"
+				newSvc, err = f.Client.KubeClient.PatchService(svc, newSvc)
 				gomega.Expect(err).To(gomega.BeNil())
 				err = f.ExpectLoadBalancerEqual(newSvc)
 				gomega.Expect(err).NotTo(gomega.BeNil())
+
+				_, current, err := f.FindLoadBalancer()
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(current.LoadBalancerAttribute.LoadBalancerId).To(gomega.Equal(oldID))
+				gomega.Expect(current.LoadBalancerAttribute.LoadBalancerName).To(gomega.Equal(oldName))
 			})
 
 			ginkgo.It("reuse not exist lb", func() {
@@ -653,6 +683,15 @@ func RunLoadBalancerTestCases(f *framework.Framework) {
 		}
 
 		ginkgo.Context("instance-charge-type", func() {
+			expectPayBySpecUpdateUnsupported := func(svc *v1.Service) {
+				err := f.ExpectLoadBalancerEqual(svc)
+				gomega.Expect(err).NotTo(gomega.BeNil())
+
+				_, remote, err := f.FindLoadBalancer()
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(remote.LoadBalancerAttribute.InstanceChargeType).To(gomega.Equal(model.PayByCLCU))
+			}
+
 			ginkgo.It("instance-charge-type: PayBySpec -> PayByCLCU", func() {
 				oldsvc, err := f.Client.KubeClient.CreateServiceByAnno(map[string]string{
 					annotation.Annotation(annotation.InstanceChargeType): "PayBySpec",
@@ -668,7 +707,7 @@ func RunLoadBalancerTestCases(f *framework.Framework) {
 				err = f.ExpectLoadBalancerEqual(newsvc)
 				gomega.Expect(err).To(gomega.BeNil())
 			})
-			ginkgo.It("instance-charge-type: PayByCLCU -> PayBySpec without loadbalancer-spec", func() {
+			ginkgo.It("instance-charge-type: PayByCLCU -> PayBySpec without loadbalancer-spec is unsupported", func() {
 				oldsvc, err := f.Client.KubeClient.CreateServiceByAnno(map[string]string{
 					annotation.Annotation(annotation.InstanceChargeType): "PayByCLCU",
 				})
@@ -681,10 +720,9 @@ func RunLoadBalancerTestCases(f *framework.Framework) {
 				newsvc.Annotations[annotation.Annotation(annotation.InstanceChargeType)] = "PayBySpec"
 				newsvc, err = f.Client.KubeClient.PatchService(oldsvc, newsvc)
 				gomega.Expect(err).To(gomega.BeNil())
-				err = f.ExpectLoadBalancerEqual(newsvc)
-				gomega.Expect(err).To(gomega.BeNil())
+				expectPayBySpecUpdateUnsupported(newsvc)
 			})
-			ginkgo.It("instance-charge-type: PayByCLCU -> PayBySpec with loadbalancer-spec", func() {
+			ginkgo.It("instance-charge-type: PayByCLCU -> PayBySpec with loadbalancer-spec is unsupported", func() {
 				oldsvc, err := f.Client.KubeClient.CreateServiceByAnno(map[string]string{
 					annotation.Annotation(annotation.InstanceChargeType): "PayByCLCU",
 				})
@@ -698,8 +736,7 @@ func RunLoadBalancerTestCases(f *framework.Framework) {
 				newsvc.Annotations[annotation.Annotation(annotation.InstanceChargeType)] = "PayBySpec"
 				newsvc, err = f.Client.KubeClient.PatchService(oldsvc, newsvc)
 				gomega.Expect(err).To(gomega.BeNil())
-				err = f.ExpectLoadBalancerEqual(newsvc)
-				gomega.Expect(err).To(gomega.BeNil())
+				expectPayBySpecUpdateUnsupported(newsvc)
 			})
 			ginkgo.It("instance-charge-type: PayByCLCU & spec annotation", func() {
 				oldsvc, err := f.Client.KubeClient.CreateServiceByAnno(map[string]string{
@@ -842,15 +879,15 @@ func RunLoadBalancerTestCases(f *framework.Framework) {
 				gomega.Expect(err).To(gomega.BeNil())
 
 				_, slb, err := f.FindLoadBalancer()
-				err = f.DeleteLoadBalancer(slb.LoadBalancerAttribute.LoadBalancerId)
+				err = f.DeleteLoadBalancerAndWait(slb.LoadBalancerAttribute.LoadBalancerId)
 				gomega.Expect(err).To(gomega.BeNil())
 
-				err = f.Client.KubeClient.ScaleDeployment(0)
-				gomega.Expect(err).To(gomega.BeNil())
 				defer func() {
 					err = f.Client.KubeClient.ScaleDeployment(3)
 					gomega.Expect(err).To(gomega.BeNil())
 				}()
+				err = f.Client.KubeClient.ScaleDeployment(0)
+				gomega.Expect(err).To(gomega.BeNil())
 				// can not find slb
 				err = f.ExpectLoadBalancerEqual(oldSvc)
 				gomega.Expect(err).NotTo(gomega.BeNil())
@@ -868,12 +905,12 @@ func RunLoadBalancerTestCases(f *framework.Framework) {
 					slb.LoadBalancerAttribute.LoadBalancerId, &[]string{helper.TAGKEY})
 				gomega.Expect(err).To(gomega.BeNil())
 
-				err = f.Client.KubeClient.ScaleDeployment(0)
-				gomega.Expect(err).To(gomega.BeNil())
 				defer func() {
 					err = f.Client.KubeClient.ScaleDeployment(3)
 					gomega.Expect(err).To(gomega.BeNil())
 				}()
+				err = f.Client.KubeClient.ScaleDeployment(0)
+				gomega.Expect(err).To(gomega.BeNil())
 
 				// find slb by name
 				err = f.ExpectLoadBalancerEqual(oldSvc)
@@ -895,12 +932,12 @@ func RunLoadBalancerTestCases(f *framework.Framework) {
 					slb.LoadBalancerAttribute.LoadBalancerId, &[]string{helper.TAGKEY})
 				gomega.Expect(err).To(gomega.BeNil())
 
-				err = f.Client.KubeClient.ScaleDeployment(0)
-				gomega.Expect(err).To(gomega.BeNil())
 				defer func() {
 					err = f.Client.KubeClient.ScaleDeployment(3)
 					gomega.Expect(err).To(gomega.BeNil())
 				}()
+				err = f.Client.KubeClient.ScaleDeployment(0)
+				gomega.Expect(err).To(gomega.BeNil())
 
 				// can not find slb
 				err = f.ExpectLoadBalancerEqual(oldSvc)

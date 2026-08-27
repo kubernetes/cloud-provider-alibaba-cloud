@@ -14,13 +14,6 @@ import (
 
 func RunListenerTestCases(f *framework.Framework) {
 	ginkgo.Describe("nlb service controller: listener", func() {
-
-		ginkgo.AfterEach(func() {
-			ginkgo.By("delete service")
-			err := f.AfterEach()
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
-		})
-
 		ginkgo.Context("service port", func() {
 			ginkgo.It("tcp port", func() {
 				oldsvc, err := f.Client.KubeClient.CreateNLBServiceByAnno(map[string]string{
@@ -616,7 +609,6 @@ func RunListenerTestCases(f *framework.Framework) {
 		testsvc.Annotations = map[string]string{
 			annotation.Annotation(annotation.ZoneMaps):         options.TestConfig.NLBZoneMaps,
 			annotation.Annotation(annotation.ProtocolPort):     "udp:53",
-			annotation.Annotation(annotation.LoadBalancerId):   options.TestConfig.InternetNetworkLoadBalancerID,
 			annotation.Annotation(annotation.OverrideListener): "true",
 		}
 		testsvc.Spec.Ports = []v1.ServicePort{
@@ -646,6 +638,10 @@ func RunListenerTestCases(f *framework.Framework) {
 		}
 		lbClass := helper.NLBClass
 		testsvc.Spec.LoadBalancerClass = &lbClass
+		ginkgo.BeforeEach(func() {
+			// The worker fixture is created after the Ginkgo tree and this template.
+			testsvc.Annotations[annotation.Annotation(annotation.LoadBalancerId)] = options.TestConfig.InternetNetworkLoadBalancerID
+		})
 
 		ginkgo.Context("proxy protocol", func() {
 			ginkgo.It("proxy-protocol on", func() {

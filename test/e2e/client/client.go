@@ -33,11 +33,11 @@ func NewClient() (*E2EClient, error) {
 
 	ackClient, err := NewACKClient()
 	if err != nil {
-		panic(fmt.Sprintf("initialize alibaba client: %s", err.Error()))
+		return nil, fmt.Errorf("initialize alibaba client: %w", err)
 	}
 
 	if err := InitCloudConfig(ackClient); err != nil {
-		panic(fmt.Sprintf("init cloud config error: %s", err.Error()))
+		return nil, fmt.Errorf("init cloud config: %w", err)
 	}
 	mgr, err := base.NewClientMgr()
 	if err != nil || mgr == nil {
@@ -56,15 +56,18 @@ func NewClient() (*E2EClient, error) {
 		NLBProvider:  nlb.NewNLBProvider(mgr),
 	}
 
-	cfg := config.GetConfigOrDie()
+	cfg, err := config.GetConfig()
+	if err != nil {
+		return nil, fmt.Errorf("get Kubernetes config: %w", err)
+	}
 	kubeClient, err := kubernetes.NewForConfig(cfg)
 	if err != nil {
-		panic(fmt.Sprintf("new client : %s", err.Error()))
+		return nil, fmt.Errorf("new Kubernetes client: %w", err)
 	}
 
 	runtimeClient, err := runtime.New(cfg, runtime.Options{})
 	if err != nil {
-		panic(fmt.Sprintf("new runtime client error: %s", err.Error()))
+		return nil, fmt.Errorf("new runtime client: %w", err)
 	}
 
 	return &E2EClient{

@@ -12,6 +12,7 @@ import (
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/model"
 	"k8s.io/cloud-provider-alibaba-cloud/test/e2e/client"
@@ -22,17 +23,10 @@ import (
 func RunBackendTestCases(f *framework.Framework) {
 
 	ginkgo.Describe("nlb service controller: backend", func() {
-		ginkgo.AfterEach(func() {
-			ginkgo.By("delete service")
-			err := f.AfterEach()
-			gomega.Expect(err).To(gomega.BeNil())
-		})
-
 		testsvc := f.Client.KubeClient.DefaultService()
 		testsvc.Annotations = map[string]string{
 			annotation.Annotation(annotation.ZoneMaps):         options.TestConfig.NLBZoneMaps,
 			annotation.Annotation(annotation.ProtocolPort):     "udp:53",
-			annotation.Annotation(annotation.LoadBalancerId):   options.TestConfig.InternetNetworkLoadBalancerID,
 			annotation.Annotation(annotation.OverrideListener): "true",
 		}
 		testsvc.Spec.Ports = []v1.ServicePort{
@@ -62,6 +56,10 @@ func RunBackendTestCases(f *framework.Framework) {
 		}
 		lbClass := helper.NLBClass
 		testsvc.Spec.LoadBalancerClass = &lbClass
+		ginkgo.BeforeEach(func() {
+			// The worker fixture is created after the Ginkgo tree and this template.
+			testsvc.Annotations[annotation.Annotation(annotation.LoadBalancerId)] = options.TestConfig.InternetNetworkLoadBalancerID
+		})
 
 		ginkgo.Describe("health check", func() {
 			ginkgo.It("tcp health check", func() {
@@ -403,7 +401,7 @@ func RunBackendTestCases(f *framework.Framework) {
 			}
 		})
 
-		ginkgo.Context("to-be-deleted-taint", func() {
+		ginkgo.Context("to-be-deleted-taint", ginkgo.Serial, ginkgo.Label("cluster-serial"), func() {
 			ginkgo.It("node: to-be-deleted-taint", func() {
 				taint := v1.Taint{
 					Key:    helper.ToBeDeletedTaint,
@@ -414,8 +412,14 @@ func RunBackendTestCases(f *framework.Framework) {
 				node, err := f.Client.KubeClient.GetLatestNode()
 				gomega.Expect(err).To(gomega.BeNil())
 				gomega.Expect(node).NotTo(gomega.BeNil())
-				err = f.Client.KubeClient.AddTaint(node.Name, taint)
+				taintAdded, err := f.Client.KubeClient.AddTaint(node.Name, taint)
+				defer func() {
+					if taintAdded {
+						_ = f.Client.KubeClient.RemoveTaint(node.Name, taint)
+					}
+				}()
 				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(taintAdded).To(gomega.BeTrue(), "target node already has the autoscaler taint")
 
 				oldSvc, err := f.Client.KubeClient.CreateNLBServiceByAnno(map[string]string{
 					annotation.Annotation(annotation.ZoneMaps):         options.TestConfig.NLBZoneMaps,
@@ -426,8 +430,10 @@ func RunBackendTestCases(f *framework.Framework) {
 				err = f.ExpectNetworkLoadBalancerEqual(oldSvc)
 				gomega.Expect(err).To(gomega.BeNil())
 
-				err = f.Client.KubeClient.RemoveTaint(node.Name, taint)
-				gomega.Expect(err).To(gomega.BeNil())
+				if taintAdded {
+					err = f.Client.KubeClient.RemoveTaint(node.Name, taint)
+					gomega.Expect(err).To(gomega.BeNil())
+				}
 				err = f.ExpectNetworkLoadBalancerEqual(oldSvc)
 				gomega.Expect(err).To(gomega.BeNil())
 			})
@@ -644,17 +650,17 @@ func RunBackendTestCases(f *framework.Framework) {
 			}
 		})
 
-		ginkgo.Context("exclude-balancer", func() {
+		ginkgo.Context("exclude-balancer", ginkgo.Serial, ginkgo.Label("cluster-serial"), func() {
 			ginkgo.It("exclude-balancer", func() {
 				// label node
 				node, err := f.Client.KubeClient.GetLatestNode()
 				gomega.Expect(err).To(gomega.BeNil())
 				gomega.Expect(node).NotTo(gomega.BeNil())
+				defer func() {
+					_ = f.Client.KubeClient.RestoreNodeLabel(node.Name, helper.LabelNodeExcludeBalancer, node.Labels)
+				}()
 				err = f.Client.KubeClient.LabelNode(node.Name, helper.LabelNodeExcludeBalancer, "true")
 				gomega.Expect(err).To(gomega.BeNil())
-				defer func() {
-					_ = f.Client.KubeClient.UnLabelNode(node.Name, helper.LabelNodeExcludeBalancer)
-				}()
 
 				oldSvc, err := f.Client.KubeClient.CreateNLBServiceByAnno(map[string]string{
 					annotation.Annotation(annotation.ZoneMaps):         options.TestConfig.NLBZoneMaps,
@@ -667,17 +673,17 @@ func RunBackendTestCases(f *framework.Framework) {
 			})
 		})
 
-		ginkgo.Context("exclude-node", func() {
+		ginkgo.Context("exclude-node", ginkgo.Serial, ginkgo.Label("cluster-serial"), func() {
 			ginkgo.It("exclude-node", func() {
 				// label node
 				node, err := f.Client.KubeClient.GetLatestNode()
 				gomega.Expect(err).To(gomega.BeNil())
 				gomega.Expect(node).NotTo(gomega.BeNil())
+				defer func() {
+					_ = f.Client.KubeClient.RestoreNodeLabel(node.Name, client.ExcludeNodeLabel, node.Labels)
+				}()
 				err = f.Client.KubeClient.LabelNode(node.Name, client.ExcludeNodeLabel, "true")
 				gomega.Expect(err).To(gomega.BeNil())
-				defer func() {
-					_ = f.Client.KubeClient.UnLabelNode(node.Name, client.ExcludeNodeLabel)
-				}()
 
 				oldSvc, err := f.Client.KubeClient.CreateNLBServiceByAnno(map[string]string{
 					annotation.Annotation(annotation.ZoneMaps):         options.TestConfig.NLBZoneMaps,
@@ -705,12 +711,12 @@ func RunBackendTestCases(f *framework.Framework) {
 				gomega.Expect(err).To(gomega.BeNil())
 
 				// scale deploy
-				err = f.Client.KubeClient.ScaleDeployment(1)
-				gomega.Expect(err).To(gomega.BeNil())
 				defer func() {
 					err = f.Client.KubeClient.ScaleDeployment(3)
 					gomega.Expect(err).To(gomega.BeNil())
 				}()
+				err = f.Client.KubeClient.ScaleDeployment(1)
+				gomega.Expect(err).To(gomega.BeNil())
 
 				err = f.ExpectNetworkLoadBalancerEqual(oldSvc)
 				gomega.Expect(err).To(gomega.BeNil())
@@ -968,8 +974,10 @@ func RunBackendTestCases(f *framework.Framework) {
 				} else {
 					b[0].Weight += 1
 				}
+				targetServerGroupID := lb.ServerGroups[0].ServerGroupId
+				targetBackend := b[0]
 
-				err = f.Client.CloudClient.UpdateNLBServers(context.TODO(), lb.ServerGroups[0].ServerGroupId, b)
+				err = f.Client.CloudClient.UpdateNLBServers(context.TODO(), targetServerGroupID, b)
 				gomega.Expect(err).To(gomega.BeNil())
 
 				newSvc := oldsvc.DeepCopy()
@@ -978,6 +986,24 @@ func RunBackendTestCases(f *framework.Framework) {
 				gomega.Expect(err).To(gomega.BeNil())
 				err = f.ExpectNetworkLoadBalancerEqual(newSvc)
 				gomega.Expect(err).NotTo(gomega.BeNil())
+
+				_, current, err := f.FindNetworkLoadBalancer()
+				gomega.Expect(err).To(gomega.BeNil())
+				var currentBackend *nlb.ServerGroupServer
+				for i := range current.ServerGroups {
+					if current.ServerGroups[i].ServerGroupId != targetServerGroupID {
+						continue
+					}
+					for j := range current.ServerGroups[i].Servers {
+						backend := &current.ServerGroups[i].Servers[j]
+						if backend.ServerId == targetBackend.ServerId && backend.ServerIp == targetBackend.ServerIp {
+							currentBackend = backend
+							break
+						}
+					}
+				}
+				gomega.Expect(currentBackend).NotTo(gomega.BeNil())
+				gomega.Expect(currentBackend.Weight).To(gomega.Equal(targetBackend.Weight))
 			})
 		})
 
@@ -1121,12 +1147,12 @@ func RunBackendTestCases(f *framework.Framework) {
 			})
 
 			ginkgo.It("named port select partial pods", func() {
+				defer func() {
+					cleanupErr := f.Client.KubeClient.DeleteSecondaryDeployment()
+					gomega.Expect(cleanupErr).To(gomega.BeNil())
+				}()
 				err := f.Client.KubeClient.CreateSecondaryDeployment()
 				gomega.Expect(err).To(gomega.BeNil())
-				defer func() {
-					err = f.Client.KubeClient.DeleteSecondaryDeployment()
-					gomega.Expect(err).To(gomega.BeNil())
-				}()
 
 				svc := f.Client.KubeClient.DefaultNLBService()
 				svc.Annotations = map[string]string{
@@ -1162,6 +1188,8 @@ func RunBackendTestCases(f *framework.Framework) {
 		})
 
 		if options.TestConfig.IPv6 {
+			// Private IPv6 is not guaranteed in the test environment, so these
+			// IPv6-specific cases intentionally use a public IPv6 frontend.
 			ginkgo.Context("backend-ip-version", func() {
 				ginkgo.It("backend-ip-version: ipv6", func() {
 					svc, err := f.Client.KubeClient.CreateNLBServiceByAnno(map[string]string{
@@ -1267,19 +1295,13 @@ func RunGracefulShutdownTestCases(f *framework.Framework) {
 	}
 
 	ginkgo.Describe("nlb service controller: graceful-shutdown", func() {
-		ginkgo.AfterEach(func() {
-			ginkgo.By("delete service")
-			err := f.AfterEach()
-			gomega.Expect(err).To(gomega.BeNil())
-		})
-
 		ginkgo.It("terminating pod weight should be 0", func() {
 			ginkgo.By("creating dedicated deployment with preStop hook")
-			err := f.Client.KubeClient.CreateGracefulShutdownDeployment()
-			gomega.Expect(err).To(gomega.BeNil())
 			defer func() {
 				_ = f.Client.KubeClient.DeleteGracefulShutdownDeployment()
 			}()
+			err := f.Client.KubeClient.CreateGracefulShutdownDeployment()
+			gomega.Expect(err).To(gomega.BeNil())
 
 			rawSvc := f.Client.KubeClient.DefaultNLBService()
 			rawSvc.Spec.Selector = map[string]string{"run": "nginx-graceful"}
@@ -1300,14 +1322,28 @@ func RunGracefulShutdownTestCases(f *framework.Framework) {
 
 			targetPod := pods[0]
 			targetIP := targetPod.Status.PodIP
+			ginkgo.By("verifying target pod is an active backend")
+			err = f.WaitForNLBBackendWeight(svc, targetIP, 100)
+			gomega.Expect(err).To(gomega.BeNil())
+			defer func() {
+				_ = f.Client.KubeClient.ForceDeletePod(targetPod.Name)
+			}()
 			ginkgo.By(fmt.Sprintf("deleting pod %s (ip: %s)", targetPod.Name, targetIP))
 
 			err = f.Client.KubeClient.DeletePod(targetPod.Name)
+			gomega.Expect(err).To(gomega.BeNil())
+			err = f.Client.KubeClient.WaitForTerminatingEndpoint(svc.Name, targetPod.Name, targetIP)
 			gomega.Expect(err).To(gomega.BeNil())
 
 			ginkgo.By("waiting for backend weight=0")
 			err = f.WaitForNLBBackendWeight(svc, targetIP, 0)
 			gomega.Expect(err).To(gomega.BeNil())
+
+			ginkgo.By("finishing pod termination after observing weight=0")
+			err = f.Client.KubeClient.ForceDeletePod(targetPod.Name)
+			if err != nil {
+				gomega.Expect(apierrors.IsNotFound(err)).To(gomega.BeTrue(), "force delete pod returned unexpected error: %v", err)
+			}
 
 			ginkgo.By("waiting for backend removal after termination")
 			err = f.WaitForNLBBackendRemoved(svc, targetIP)

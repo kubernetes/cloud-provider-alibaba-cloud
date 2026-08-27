@@ -3,6 +3,7 @@ package options
 import (
 	"flag"
 	"fmt"
+	"time"
 )
 
 const (
@@ -13,12 +14,16 @@ const (
 var TestConfig = &E2EConfig{}
 
 type E2EConfig struct {
-	CloudConfig              string `json:"cloudConfig"`
-	Controllers              string `json:"controller"`
-	RegionId                 string `json:"regionId"`
-	ClusterType              string `json:"clusterType"`
-	ClusterId                string `json:"clusterId"`
-	AllowCreateCloudResource bool   `json:"allowCreateCloudResource"` // whether to create cloud resources for test
+	CloudConfig              string        `json:"cloudConfig"`
+	Controllers              string        `json:"controller"`
+	RegionId                 string        `json:"regionId"`
+	ClusterType              string        `json:"clusterType"`
+	ClusterId                string        `json:"clusterId"`
+	AllowCreateCloudResource bool          `json:"allowCreateCloudResource"` // whether to create cloud resources for test
+	ParallelProcess          int           `json:"parallelProcess"`
+	FixtureReadyTimeout      time.Duration `json:"fixtureReadyTimeout"`
+	needsCLBResource         bool
+	needsNLBResource         bool
 
 	// need provided
 	VPCLoadBalancerID string `json:"VPCLoadBalancerID"` // lb in other vpc
@@ -65,6 +70,7 @@ func (e *E2EConfig) BindFlags() {
 	flag.StringVar(&e.RegionId, "region-id", "", "the region id of cluster")
 	flag.StringVar(&e.ClusterId, "cluster-id", "", "the id of cluster which is used to run e2e test")
 	flag.BoolVar(&e.AllowCreateCloudResource, "allow-create-cloud-resources", false, "whether allow to create cloud resources, including the Kubernetes Cluster, SLB, ECS, etc.")
+	flag.DurationVar(&e.FixtureReadyTimeout, "fixture-ready-timeout", 10*time.Minute, "maximum time to wait for each worker's backend deployment to become ready")
 	flag.StringVar(&e.EipLoadBalancerID, "eip-lb-id", "", "reused intranet slb id which has eip")
 	flag.StringVar(&e.VPCLoadBalancerID, "vpc-lb-id", "", "reused intranet slb id which in other vpc")
 	flag.StringVar(&e.MasterZoneID, "master-zone-id", "", "master zone id")
@@ -106,5 +112,77 @@ func (e *E2EConfig) Validate() error {
 	if e.ClusterId == "" {
 		return fmt.Errorf("cluster id can not be empty")
 	}
+	if e.FixtureReadyTimeout <= 0 {
+		return fmt.Errorf("fixture ready timeout must be positive")
+	}
 	return nil
+}
+
+// NeedsCloudResource reports whether the Ginkgo label filter selects specs
+// that need fixtures for the named service family.
+func (e *E2EConfig) NeedsCloudResource(resourceType string) bool {
+	switch resourceType {
+	case "clb":
+		return e.needsCLBResource
+	case "nlb":
+		return e.needsNLBResource
+	default:
+		return false
+	}
+}
+
+// ConfigureSuite records the Ginkgo worker identity and the cloud fixture
+// families derived from the suite's label filter.
+func (e *E2EConfig) ConfigureSuite(process, total int, needsCLBResource, needsNLBResource bool) error {
+	if total < 1 {
+		return fmt.Errorf("parallel total must be positive, got %d", total)
+	}
+	if process < 1 || process > total {
+		return fmt.Errorf("parallel process must be in [1,%d], got %d", total, process)
+	}
+
+	e.ParallelProcess = process
+	e.needsCLBResource = needsCLBResource
+	e.needsNLBResource = needsNLBResource
+	if total > 1 && e.hasSharedMutableResources() {
+		return fmt.Errorf("parallel runs cannot reuse explicitly supplied LB, server-group, ACL, or EIP resources; let each worker create isolated resources")
+	}
+	return nil
+}
+
+// SuiteName is the fixed resource family name used in namespaces and cloud
+// fixture names. "all" is used by suites that prepare both types.
+func (e *E2EConfig) SuiteName() string {
+	if e.needsCLBResource && e.needsNLBResource {
+		return "all"
+	}
+	if e.needsCLBResource {
+		return "clb"
+	}
+	if e.needsNLBResource {
+		return "nlb"
+	}
+	return "cluster"
+}
+
+// WorkerScope is the fixed, DNS-compatible identity shared by the worker's
+// Kubernetes namespace, node-label key, logs, and cloud fixtures.
+func (e *E2EConfig) WorkerScope() string {
+	return fmt.Sprintf("ccm-e2e-%s-w%d", e.SuiteName(), e.ParallelProcess)
+}
+
+func (e *E2EConfig) hasSharedMutableResources() bool {
+	return e.VPCLoadBalancerID != "" ||
+		e.EipLoadBalancerID != "" ||
+		e.InternetLoadBalancerID != "" ||
+		e.IntranetLoadBalancerID != "" ||
+		e.InternetNetworkLoadBalancerID != "" ||
+		e.IntranetNetworkLoadBalancerID != "" ||
+		e.VServerGroupID != "" ||
+		e.VServerGroupID2 != "" ||
+		e.NLBServerGroupID != "" ||
+		e.NLBServerGroupID2 != "" ||
+		e.AclID != "" ||
+		e.AclID2 != "" ||
+		e.EIPID != ""
 }

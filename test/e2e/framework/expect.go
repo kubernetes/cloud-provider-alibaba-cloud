@@ -43,11 +43,10 @@ func (f *Framework) ExpectLoadBalancerEqual(svc *v1.Service) error {
 
 	var retErr error
 	_ = wait.PollImmediate(5*time.Second, 30*time.Second, func() (done bool, err error) {
-		// if not find slb, skip retry
-		svc, remote, err := f.FindLoadBalancer()
+		svc, remote, err := f.findLoadBalancerOnce()
 		if err != nil {
 			retErr = err
-			return false, err
+			return false, nil
 		}
 
 		// check whether the slb and svc is reconciled
@@ -1277,17 +1276,17 @@ func getBackendPort(port v1.ServicePort, subset v1.EndpointSubset) int {
 	return 0
 }
 
-func getBackendProtFromEndpointSlice(port v1.ServicePort, ep []discovery.EndpointPort) int {
+func getBackendPortFromEndpointSlice(port v1.ServicePort, ep []discovery.EndpointPort) (int, bool) {
 	if port.TargetPort.Type == intstr.Int {
-		return port.TargetPort.IntValue()
+		return port.TargetPort.IntValue(), true
 	}
 
 	for _, p := range ep {
-		if pointer.StringDeref(p.Name, "") == port.Name {
-			return int(pointer.Int32Deref(p.Port, 0))
+		if pointer.StringDeref(p.Name, "") == port.Name && p.Port != nil {
+			return int(*p.Port), true
 		}
 	}
-	return 0
+	return 0, false
 }
 
 func findNodeByNodeName(nodes []v1.Node, nodeName string) *v1.Node {
@@ -1561,20 +1560,34 @@ func (f *Framework) ExpectRouteEqual() error {
 func (f *Framework) FindLoadBalancer() (*v1.Service, *model.LoadBalancer, error) {
 	// wait until service created successfully
 	var svc *v1.Service
+	var remote *model.LoadBalancer
+	var retErr error
 	err := wait.PollImmediate(5*time.Second, 30*time.Second, func() (done bool, err error) {
-		svc, err = f.Client.KubeClient.GetService()
-		if err != nil {
+		svc, remote, retErr = f.findLoadBalancerOnce()
+		if retErr != nil {
 			return false, nil
 		}
-		if len(svc.Status.LoadBalancer.Ingress) == 1 &&
-			(svc.Status.LoadBalancer.Ingress[0].IP != "" ||
-				svc.Status.LoadBalancer.Ingress[0].Hostname != "") {
-			return true, nil
-		}
-		return false, nil
+		return true, nil
 	})
 	if err != nil {
+		if retErr != nil {
+			return svc, nil, retErr
+		}
 		return svc, nil, err
+	}
+	return svc, remote, nil
+}
+
+// findLoadBalancerOnce performs one Kubernetes and cloud observation. Callers
+// that already own a retry deadline use it to avoid nested polling.
+func (f *Framework) findLoadBalancerOnce() (*v1.Service, *model.LoadBalancer, error) {
+	svc, err := f.Client.KubeClient.GetService()
+	if err != nil {
+		return svc, nil, err
+	}
+	if len(svc.Status.LoadBalancer.Ingress) != 1 ||
+		(svc.Status.LoadBalancer.Ingress[0].IP == "" && svc.Status.LoadBalancer.Ingress[0].Hostname == "") {
+		return svc, nil, fmt.Errorf("slb service ingress is not ready")
 	}
 
 	remote, err := buildRemoteModel(f, svc)
@@ -1700,8 +1713,8 @@ func (f *Framework) WaitForBackendRemoved(svc *v1.Service, serverIp string) erro
 			retErr = nil
 			return true, nil
 		}
-		retErr = nil
-		return true, nil
+		retErr = fmt.Errorf("vgroup %s not found while waiting for backend %s removal", name, serverIp)
+		return false, nil
 	})
 	return retErr
 }

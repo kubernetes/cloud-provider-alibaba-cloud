@@ -9,7 +9,7 @@ import (
 )
 
 func RunNodeControllerTestCases(f *framework.Framework) {
-	ginkgo.Describe("node controller", func() {
+	ginkgo.Describe("node controller", ginkgo.Serial, ginkgo.Label("cluster-serial"), func() {
 
 		ginkgo.Context("reconcile", func() {
 			ginkgo.It("node-reconcile", func() {

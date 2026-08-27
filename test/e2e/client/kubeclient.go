@@ -15,7 +15,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
+	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/helper"
@@ -23,13 +25,36 @@ import (
 )
 
 const (
-	Namespace        = "e2e-test"
+	defaultNamespace = "e2e-test"
+	defaultNodeLabel = "e2etest"
 	Service          = "basic-service"
 	Deployment       = "nginx"
 	VKDeployment     = "nginx-vk"
-	NodeLabel        = "e2etest"
 	ExcludeNodeLabel = "service.beta.kubernetes.io/exclude-node"
 )
+
+var (
+	// Keep the historical names until the E2E entrypoint assigns a worker scope.
+	Namespace           = defaultNamespace
+	NodeLabel           = defaultNodeLabel
+	FixtureReadyTimeout = 10 * time.Minute
+	namespaceOwner      = string(uuid.NewUUID())
+)
+
+// ConfigureTestResources isolates namespaced fixtures and worker-owned node
+// labels.  Ginkgo parallel workers are separate processes, so these package
+// values remain process-local and do not introduce data races.
+func ConfigureTestResources(workerScope string, fixtureReadyTimeout time.Duration) {
+	FixtureReadyTimeout = fixtureReadyTimeout
+	if workerScope == "" {
+		Namespace = defaultNamespace
+		NodeLabel = defaultNodeLabel
+		return
+	}
+
+	Namespace = workerScope
+	NodeLabel = workerScope
+}
 
 type KubeClient struct {
 	kubernetes.Interface
@@ -171,7 +196,6 @@ func (client *KubeClient) PatchService(oldSvc, newSvc *v1.Service) (*v1.Service,
 	return client.CoreV1().Services(Namespace).Patch(context.TODO(), Service, types.StrategicMergePatchType,
 		patchBytes, metav1.PatchOptions{})
 }
-
 func (client *KubeClient) CreateServiceWithoutSelector(anno map[string]string) (*v1.Service, error) {
 	svc := &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
@@ -235,12 +259,13 @@ func (client *KubeClient) CreateNLBServiceWithoutSelector(anno map[string]string
 func (client *KubeClient) DeleteService() error {
 	return wait.PollImmediate(3*time.Second, 5*time.Minute, func() (done bool, err error) {
 		err = client.CoreV1().Services(Namespace).Delete(context.TODO(), Service, metav1.DeleteOptions{})
-		if err != nil {
-			if apierrors.IsNotFound(err) {
-				return true, nil
-			}
+		if err == nil || apierrors.IsNotFound(err) {
+			return true, nil
 		}
-		return false, nil
+		if isRetryableKubeAPIError(err) {
+			return false, nil
+		}
+		return false, err
 	})
 }
 
@@ -254,6 +279,14 @@ func (client *KubeClient) DeleteServiceByName(name string) error {
 		}
 		return false, nil
 	})
+}
+
+func (client *KubeClient) DeleteEndpoints() error {
+	err := client.CoreV1().Endpoints(Namespace).Delete(context.TODO(), Service, metav1.DeleteOptions{})
+	if err == nil || apierrors.IsNotFound(err) {
+		return nil
+	}
+	return err
 }
 
 func (client *KubeClient) GetService() (*v1.Service, error) {
@@ -409,7 +442,7 @@ func (client *KubeClient) CreateDeployment() error {
 			return fmt.Errorf("create nginx error: %s", err.Error())
 		}
 	}
-	return wait.Poll(5*time.Second, 2*time.Minute, func() (done bool, err error) {
+	return wait.Poll(5*time.Second, FixtureReadyTimeout, func() (done bool, err error) {
 		pods, err := client.CoreV1().Pods(nginx.Namespace).List(context.Background(), metav1.ListOptions{LabelSelector: "run=nginx"})
 		if err != nil {
 			klog.Infof("wait for nginx pod ready: %s", err.Error())
@@ -419,9 +452,9 @@ func (client *KubeClient) CreateDeployment() error {
 			klog.Infof("wait for nginx pod replicas: %d", len(pods.Items))
 			return false, nil
 		}
-		for _, pod := range pods.Items {
-			if pod.Status.Phase != "Running" {
-				klog.Infof("wait for nginx pod Running: %s", pod.Name)
+		for i := range pods.Items {
+			if !isPodReady(&pods.Items[i]) {
+				klog.Infof("wait for nginx pod Ready: %s", pods.Items[i].Name)
 				return false, nil
 			}
 		}
@@ -496,9 +529,9 @@ func (client *KubeClient) CreateSecondaryDeployment() error {
 			klog.Infof("wait for nginx pod replicas: %d", len(pods.Items))
 			return false, nil
 		}
-		for _, pod := range pods.Items {
-			if pod.Status.Phase != "Running" {
-				klog.Infof("wait for nginx pod Running: %s", pod.Name)
+		for i := range pods.Items {
+			if !isPodReady(&pods.Items[i]) {
+				klog.Infof("wait for nginx pod Ready: %s", pods.Items[i].Name)
 				return false, nil
 			}
 		}
@@ -509,7 +542,11 @@ func (client *KubeClient) CreateSecondaryDeployment() error {
 
 func (client *KubeClient) DeleteSecondaryDeployment() error {
 	name := fmt.Sprintf("%s-2", Deployment)
-	return client.AppsV1().Deployments(Namespace).Delete(context.TODO(), name, metav1.DeleteOptions{})
+	err := client.AppsV1().Deployments(Namespace).Delete(context.TODO(), name, metav1.DeleteOptions{})
+	if err == nil || apierrors.IsNotFound(err) {
+		return nil
+	}
+	return err
 }
 
 func (client *KubeClient) ScaleDeployment(replica int32) error {
@@ -532,9 +569,9 @@ func (client *KubeClient) ScaleDeployment(replica int32) error {
 			klog.Infof("wait for nginx pod replicas: %d", len(pods.Items))
 			return false, nil
 		}
-		for _, pod := range pods.Items {
-			if pod.Status.Phase != "Running" {
-				klog.Infof("wait for nginx pod Running: %s", pod.Name)
+		for i := range pods.Items {
+			if !isPodReady(&pods.Items[i]) {
+				klog.Infof("wait for nginx pod Ready: %s", pods.Items[i].Name)
 				return false, nil
 			}
 		}
@@ -617,9 +654,9 @@ func (client *KubeClient) CreateVKDeployment() error {
 			klog.Infof("wait for nginx pod replicas: %d", len(pods.Items))
 			return false, nil
 		}
-		for _, pod := range pods.Items {
-			if pod.Status.Phase != "Running" {
-				klog.Infof("wait for nginx pod Running: %s", pod.Name)
+		for i := range pods.Items {
+			if !isPodReady(&pods.Items[i]) {
+				klog.Infof("wait for nginx pod Ready: %s", pods.Items[i].Name)
 				return false, nil
 			}
 		}
@@ -631,26 +668,66 @@ func (client *KubeClient) CreateVKDeployment() error {
 
 // namespace
 func (client *KubeClient) CreateNamespace() error {
+	const ownerLabel = "e2e.cloud-provider-alibaba/owner"
 	ns := &v1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      Namespace,
 			Namespace: Namespace,
+			Labels:    map[string]string{ownerLabel: namespaceOwner},
 		},
 	}
-	_, err := client.CoreV1().Namespaces().Create(context.TODO(), ns, metav1.CreateOptions{})
+	var lastErr error
+	err := wait.PollImmediate(2*time.Second, 3*time.Minute, func() (bool, error) {
+		_, lastErr = client.CoreV1().Namespaces().Create(context.TODO(), ns, metav1.CreateOptions{})
+		if lastErr == nil {
+			return true, nil
+		}
+		if apierrors.IsAlreadyExists(lastErr) {
+			existing, getErr := client.CoreV1().Namespaces().Get(context.TODO(), Namespace, metav1.GetOptions{})
+			if getErr != nil {
+				lastErr = getErr
+				if isRetryableKubeAPIError(getErr) {
+					return false, nil
+				}
+				return false, getErr
+			}
+			if existing.Labels[ownerLabel] == namespaceOwner {
+				return true, nil
+			}
+			return false, lastErr
+		}
+		if isRetryableKubeAPIError(lastErr) {
+			klog.Warningf("retry creating test namespace %s: %s", Namespace, lastErr)
+			return false, nil
+		}
+		return false, lastErr
+	})
+	if err != nil && lastErr != nil {
+		return lastErr
+	}
 	return err
+}
+
+func isRetryableKubeAPIError(err error) bool {
+	return apierrors.IsTimeout(err) || apierrors.IsServerTimeout(err) ||
+		apierrors.IsServiceUnavailable(err) || apierrors.IsTooManyRequests(err) ||
+		utilnet.IsTimeout(err) || utilnet.IsConnectionReset(err) || utilnet.IsConnectionRefused(err)
 }
 
 func (client *KubeClient) DeleteNamespace() error {
 	return wait.PollImmediate(5*time.Second, 3*time.Minute,
 		func() (done bool, err error) {
 			err = client.CoreV1().Namespaces().Delete(context.TODO(), Namespace, metav1.DeleteOptions{})
-			if err != nil {
-				if apierrors.IsNotFound(err) {
-					return true, nil
-				}
+			if apierrors.IsNotFound(err) {
+				return true, nil
 			}
-			return false, nil
+			if err == nil {
+				return false, nil
+			}
+			if isRetryableKubeAPIError(err) {
+				return false, nil
+			}
+			return false, err
 		})
 }
 
@@ -658,6 +735,12 @@ func (client *KubeClient) DeleteNamespace() error {
 func (client *KubeClient) LabelNode(nodeName string, key string, value string) error {
 	return wait.PollImmediate(2*time.Second, time.Minute, func() (done bool, err error) {
 		n, err := client.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
+		if err != nil || n == nil {
+			return false, nil
+		}
+		if n.Labels == nil {
+			n.Labels = make(map[string]string)
+		}
 		n.ObjectMeta.Labels[key] = value
 		_, err = client.CoreV1().Nodes().Update(context.TODO(), n, metav1.UpdateOptions{})
 		if err != nil {
@@ -670,6 +753,9 @@ func (client *KubeClient) LabelNode(nodeName string, key string, value string) e
 func (client *KubeClient) UnLabelNode(nodeName string, key string) error {
 	return wait.PollImmediate(2*time.Second, time.Minute, func() (done bool, err error) {
 		n, err := client.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
+		if err != nil || n == nil {
+			return false, nil
+		}
 		delete(n.ObjectMeta.Labels, key)
 		_, err = client.CoreV1().Nodes().Update(context.TODO(), n, metav1.UpdateOptions{})
 		if err != nil {
@@ -677,6 +763,13 @@ func (client *KubeClient) UnLabelNode(nodeName string, key string) error {
 		}
 		return true, nil
 	})
+}
+
+func (client *KubeClient) RestoreNodeLabel(nodeName, key string, originalLabels map[string]string) error {
+	if value, existed := originalLabels[key]; existed {
+		return client.LabelNode(nodeName, key, value)
+	}
+	return client.UnLabelNode(nodeName, key)
 }
 
 func (client *KubeClient) UnscheduledNode(nodeName string) error {
@@ -711,24 +804,36 @@ func (client *KubeClient) ScheduledNode(nodeName string) error {
 
 }
 
-func (client *KubeClient) AddTaint(nodeName string, taint v1.Taint) error {
-	return wait.PollImmediate(2*time.Second, 30*time.Second, func() (done bool, err error) {
+func (client *KubeClient) AddTaint(nodeName string, taint v1.Taint) (bool, error) {
+	addedByTest := false
+	err := wait.PollImmediate(2*time.Second, 30*time.Second, func() (done bool, err error) {
 		n, err := client.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
 		if err != nil {
 			return false, nil
 		}
-		for _, taint := range n.Spec.Taints {
-			if taint.Key == taint.Key {
+		for _, existing := range n.Spec.Taints {
+			if existing.MatchTaint(&taint) {
+				// A retry can observe an Update whose response was lost. Preserve
+				// ownership only when the value on the Node is the one we wrote.
+				if addedByTest {
+					addedByTest = existing.Value == taint.Value
+				}
+				// done=true stops polling; addedByTest is still returned to the case.
 				return true, nil
 			}
 		}
 		n.Spec.Taints = append(n.Spec.Taints, taint)
+		// Claim ownership before Update: the API server can accept the write
+		// even when the client loses its response. Exact-value removal below
+		// makes cleanup harmless if the write was not persisted.
+		addedByTest = true
 		_, err = client.CoreV1().Nodes().Update(context.TODO(), n, metav1.UpdateOptions{})
 		if err != nil {
 			return false, nil
 		}
 		return true, nil
 	})
+	return addedByTest, err
 }
 
 func (client *KubeClient) RemoveTaint(nodeName string, taint v1.Taint) error {
@@ -738,12 +843,18 @@ func (client *KubeClient) RemoveTaint(nodeName string, taint v1.Taint) error {
 			return false, nil
 		}
 		var updateTaints []v1.Taint
+		found := false
 		for _, t := range n.Spec.Taints {
-			if t.Key == taint.Key {
+			if t.MatchTaint(&taint) && t.Value == taint.Value {
+				found = true
 				continue
 			}
 			updateTaints = append(updateTaints, t)
 		}
+		if !found {
+			return true, nil
+		}
+		n.Spec.Taints = updateTaints
 		_, err = client.CoreV1().Nodes().Update(context.TODO(), n, metav1.UpdateOptions{})
 		if err != nil {
 			return false, nil
@@ -789,6 +900,9 @@ func (client *KubeClient) GetLatestNode() (*v1.Node, error) {
 			ret = node
 		}
 	}
+	if ret.Name == "" {
+		return nil, nil
+	}
 	klog.Infof("return node:%s", ret.Name)
 	return &ret, nil
 }
@@ -826,6 +940,13 @@ func (client *KubeClient) GetDeploymentPods() ([]v1.Pod, error) {
 
 func (client *KubeClient) DeletePod(name string) error {
 	return client.CoreV1().Pods(Namespace).Delete(context.TODO(), name, metav1.DeleteOptions{})
+}
+
+func (client *KubeClient) ForceDeletePod(name string) error {
+	gracePeriod := int64(0)
+	return client.CoreV1().Pods(Namespace).Delete(context.TODO(), name, metav1.DeleteOptions{
+		GracePeriodSeconds: &gracePeriod,
+	})
 }
 
 func (client *KubeClient) CreateGracefulShutdownDeployment() error {
@@ -892,7 +1013,7 @@ func (client *KubeClient) CreateGracefulShutdownDeployment() error {
 			return false, nil
 		}
 		for _, pod := range pods.Items {
-			if pod.Status.Phase != v1.PodRunning {
+			if !isPodReady(&pod) {
 				return false, nil
 			}
 		}
@@ -906,11 +1027,23 @@ func (client *KubeClient) DeleteGracefulShutdownDeployment() error {
 	err := client.AppsV1().Deployments(Namespace).Delete(context.TODO(), name, metav1.DeleteOptions{
 		PropagationPolicy: &propagation,
 	})
-	if err != nil {
-		if apierrors.IsNotFound(err) {
-			return nil
-		}
+	if err != nil && !apierrors.IsNotFound(err) {
 		return err
+	}
+
+	// Start foreground owner deletion first so it cannot replace Pods. Forcing
+	// the deliberately slow Pods down then lets garbage collection finish fast
+	// without leaving an old ReplicaSet that can race a same-name recreation.
+	pods, listErr := client.CoreV1().Pods(Namespace).List(context.TODO(), metav1.ListOptions{
+		LabelSelector: "run=" + name,
+	})
+	if listErr != nil {
+		return listErr
+	}
+	for i := range pods.Items {
+		if err := client.ForceDeletePod(pods.Items[i].Name); err != nil && !apierrors.IsNotFound(err) {
+			return err
+		}
 	}
 
 	return wait.PollImmediate(5*time.Second, 2*time.Minute, func() (done bool, err error) {
@@ -932,7 +1065,56 @@ func (client *KubeClient) GetGracefulShutdownPods() ([]v1.Pod, error) {
 	if err != nil {
 		return nil, err
 	}
-	return podList.Items, nil
+	readyPods := make([]v1.Pod, 0, len(podList.Items))
+	for i := range podList.Items {
+		if podList.Items[i].DeletionTimestamp == nil && isPodReady(&podList.Items[i]) {
+			readyPods = append(readyPods, podList.Items[i])
+		}
+	}
+	return readyPods, nil
+}
+
+func isPodReady(pod *v1.Pod) bool {
+	if pod == nil || pod.Status.Phase != v1.PodRunning {
+		return false
+	}
+	for _, condition := range pod.Status.Conditions {
+		if condition.Type == v1.PodReady {
+			return condition.Status == v1.ConditionTrue
+		}
+	}
+	return false
+}
+
+func (client *KubeClient) WaitForTerminatingEndpoint(serviceName, podName, podIP string) error {
+	return wait.PollImmediate(time.Second, 2*time.Minute, func() (bool, error) {
+		slices, err := client.DiscoveryV1().EndpointSlices(Namespace).List(context.TODO(), metav1.ListOptions{
+			LabelSelector: discovery.LabelServiceName + "=" + serviceName,
+		})
+		if err != nil {
+			return false, nil
+		}
+		for i := range slices.Items {
+			for j := range slices.Items[i].Endpoints {
+				ep := &slices.Items[i].Endpoints[j]
+				if ep.TargetRef == nil || ep.TargetRef.Name != podName || !containsString(ep.Addresses, podIP) {
+					continue
+				}
+				return ep.Conditions.Terminating != nil && *ep.Conditions.Terminating &&
+					ep.Conditions.Serving != nil && *ep.Conditions.Serving, nil
+			}
+		}
+		return false, nil
+	})
+}
+
+func containsString(values []string, want string) bool {
+	for _, value := range values {
+		if value == want {
+			return true
+		}
+	}
+	return false
 }
 
 func (client *KubeClient) ListServiceEvents(svc *v1.Service, reason string) ([]v1.Event, error) {
