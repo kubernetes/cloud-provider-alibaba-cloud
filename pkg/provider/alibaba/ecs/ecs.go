@@ -121,6 +121,7 @@ func (e *ECSProvider) DescribeSecurityGroupAttribute(ctx context.Context, sgId s
 	return ecsmodel.SecurityGroup{
 		Name:              resp.SecurityGroupName,
 		ID:                resp.SecurityGroupId,
+		VpcID:             resp.VpcId,
 		InnerAccessPolicy: resp.InnerAccessPolicy,
 		Description:       resp.Description,
 		Permissions:       permissions,

@@ -449,6 +449,12 @@ func (mgr *NLBManager) CreateAssociatedSecurityGroup(reqCtx *svcCtx.RequestConte
 	if mdl.LoadBalancerAttribute.VpcId != "" {
 		vpcId = mdl.LoadBalancerAttribute.VpcId
 	}
+	if vpcId == "" {
+		// without a vpc the group is created in the default vpc of the account and can
+		// never be attached to this nlb
+		return fmt.Errorf("can not create security group for nlb, svc [%s]: vpc id is unknown",
+			util.Key(reqCtx.Anno.Service))
+	}
 	rgId := ctrlCfg.CloudCFG.Global.ResourceGroupID
 	if mdl.LoadBalancerAttribute.ResourceGroupId != "" {
 		rgId = mdl.LoadBalancerAttribute.ResourceGroupId
