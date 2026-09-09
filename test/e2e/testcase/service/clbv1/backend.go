@@ -30,7 +30,9 @@ func RunBackendTestCases(f *framework.Framework) {
 				// label node
 				node, err := f.Client.KubeClient.GetLatestNode()
 				gomega.Expect(err).To(gomega.BeNil())
-				gomega.Expect(node).NotTo(gomega.BeNil())
+				if node == nil {
+					ginkgo.Skip("backend-label test requires an eligible real node")
+				}
 				defer func() {
 					_ = f.Client.KubeClient.RestoreNodeLabel(node.Name, client.NodeLabel, node.Labels)
 				}()
@@ -105,7 +107,9 @@ func RunBackendTestCases(f *framework.Framework) {
 				// unscheduled node
 				node, err := f.Client.KubeClient.GetLatestNode()
 				gomega.Expect(err).To(gomega.BeNil())
-				gomega.Expect(node).NotTo(gomega.BeNil())
+				if node == nil {
+					ginkgo.Skip("unschedulable filtering test requires an eligible real node")
+				}
 				gomega.Expect(node.Spec.Unschedulable).To(gomega.BeFalse(), "target node must initially be schedulable")
 				defer func() {
 					_ = f.Client.KubeClient.ScheduledNode(node.Name)
@@ -128,6 +132,11 @@ func RunBackendTestCases(f *framework.Framework) {
 			ginkgo.It("remove-unscheduled-backend: on; node: schedulable -> unschedulable", func() {
 				// With the feature on, the Node starts as a backend and must be
 				// removed after it becomes unschedulable.
+				node, err := f.Client.KubeClient.GetLatestNode()
+				gomega.Expect(err).To(gomega.BeNil())
+				if node == nil {
+					ginkgo.Skip("unschedulable filtering test requires an eligible real node")
+				}
 				oldSvc, err := f.Client.KubeClient.CreateServiceByAnno(map[string]string{
 					annotation.Annotation(annotation.RemoveUnscheduled): string(model.OnFlag),
 				})
@@ -136,9 +145,6 @@ func RunBackendTestCases(f *framework.Framework) {
 				gomega.Expect(err).To(gomega.BeNil())
 
 				// unscheduled node
-				node, err := f.Client.KubeClient.GetLatestNode()
-				gomega.Expect(err).To(gomega.BeNil())
-				gomega.Expect(node).NotTo(gomega.BeNil())
 				gomega.Expect(node.Spec.Unschedulable).To(gomega.BeFalse(), "target node must initially be schedulable")
 				defer func() {
 					_ = f.Client.KubeClient.ScheduledNode(node.Name)
@@ -161,7 +167,9 @@ func RunBackendTestCases(f *framework.Framework) {
 				// add ToBeDeletedTaint
 				node, err := f.Client.KubeClient.GetLatestNode()
 				gomega.Expect(err).To(gomega.BeNil())
-				gomega.Expect(node).NotTo(gomega.BeNil())
+				if node == nil {
+					ginkgo.Skip("autoscaler taint test requires an eligible real node")
+				}
 				taintAdded, err := f.Client.KubeClient.AddTaint(node.Name, taint)
 				defer func() {
 					if taintAdded {
@@ -550,7 +558,9 @@ func RunBackendTestCases(f *framework.Framework) {
 				// label node
 				node, err := f.Client.KubeClient.GetLatestNode()
 				gomega.Expect(err).To(gomega.BeNil())
-				gomega.Expect(node).NotTo(gomega.BeNil())
+				if node == nil {
+					ginkgo.Skip("exclude-balancer test requires an eligible real node")
+				}
 				defer func() {
 					_ = f.Client.KubeClient.RestoreNodeLabel(node.Name, helper.LabelNodeExcludeBalancer, node.Labels)
 				}()
@@ -569,7 +579,9 @@ func RunBackendTestCases(f *framework.Framework) {
 				// label node
 				node, err := f.Client.KubeClient.GetLatestNode()
 				gomega.Expect(err).To(gomega.BeNil())
-				gomega.Expect(node).NotTo(gomega.BeNil())
+				if node == nil {
+					ginkgo.Skip("exclude-node test requires an eligible real node")
+				}
 				defer func() {
 					_ = f.Client.KubeClient.RestoreNodeLabel(node.Name, client.ExcludeNodeLabel, node.Labels)
 				}()

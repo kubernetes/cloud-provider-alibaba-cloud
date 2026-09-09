@@ -10,6 +10,13 @@ import (
 
 func RunNodeControllerTestCases(f *framework.Framework) {
 	ginkgo.Describe("node controller", ginkgo.Serial, ginkgo.Label("cluster-serial"), func() {
+		ginkgo.BeforeEach(func() {
+			node, err := f.Client.KubeClient.GetLatestNode()
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			if node == nil {
+				ginkgo.Skip("node controller tests require an eligible real node")
+			}
+		})
 
 		ginkgo.Context("reconcile", func() {
 			ginkgo.It("node-reconcile", func() {
@@ -19,6 +26,7 @@ func RunNodeControllerTestCases(f *framework.Framework) {
 			ginkgo.It("node-address-changed", func() {
 				oldNode, err := f.Client.KubeClient.GetLatestNode()
 				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(oldNode).NotTo(gomega.BeNil())
 
 				newNode := oldNode.DeepCopy()
 				for index, value := range newNode.Status.Addresses {
@@ -35,6 +43,7 @@ func RunNodeControllerTestCases(f *framework.Framework) {
 			ginkgo.It("node-label-changed", func() {
 				oldNode, err := f.Client.KubeClient.GetLatestNode()
 				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(oldNode).NotTo(gomega.BeNil())
 
 				err = f.Client.KubeClient.LabelNode(oldNode.Name, v1.LabelInstanceType, "test-type")
 				gomega.Expect(err).To(gomega.BeNil())
