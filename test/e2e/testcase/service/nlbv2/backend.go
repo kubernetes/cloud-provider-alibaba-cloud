@@ -403,25 +403,18 @@ func RunBackendTestCases(f *framework.Framework) {
 
 		ginkgo.Context("to-be-deleted-taint", ginkgo.Serial, ginkgo.Label("cluster-serial"), func() {
 			ginkgo.It("node: to-be-deleted-taint", func() {
-				taint := v1.Taint{
-					Key:    helper.ToBeDeletedTaint,
-					Value:  fmt.Sprint(time.Now().Unix()),
-					Effect: v1.TaintEffectNoSchedule,
-				}
-				// add ToBeDeletedTaint
+				// The autoscaler taint excludes nodes, so the Service has to use ECS
+				// backends: on terway clusters the default backend type is eni, whose
+				// backends are pod IPs and never look at node taints.
 				node, err := f.Client.KubeClient.GetLatestNode()
 				gomega.Expect(err).To(gomega.BeNil())
 				gomega.Expect(node).NotTo(gomega.BeNil())
-				taintAdded, err := f.Client.KubeClient.AddTaint(node.Name, taint)
-				defer func() {
-					if taintAdded {
-						_ = f.Client.KubeClient.RemoveTaint(node.Name, taint)
-					}
-				}()
+				nodeIP, err := helper.GetNodeInternalIP(node)
 				gomega.Expect(err).To(gomega.BeNil())
-				gomega.Expect(taintAdded).To(gomega.BeTrue(), "target node already has the autoscaler taint")
 
+				ginkgo.By("creating a service whose backends include the node")
 				oldSvc, err := f.Client.KubeClient.CreateNLBServiceByAnno(map[string]string{
+					annotation.BackendType:                             model.ECSBackendType,
 					annotation.Annotation(annotation.ZoneMaps):         options.TestConfig.NLBZoneMaps,
 					annotation.Annotation(annotation.LoadBalancerId):   options.TestConfig.InternetNetworkLoadBalancerID,
 					annotation.Annotation(annotation.OverrideListener): "true",
@@ -430,10 +423,31 @@ func RunBackendTestCases(f *framework.Framework) {
 				err = f.ExpectNetworkLoadBalancerEqual(oldSvc)
 				gomega.Expect(err).To(gomega.BeNil())
 
-				if taintAdded {
-					err = f.Client.KubeClient.RemoveTaint(node.Name, taint)
-					gomega.Expect(err).To(gomega.BeNil())
+				taint := v1.Taint{
+					Key:    helper.ToBeDeletedTaint,
+					Value:  fmt.Sprint(time.Now().Unix()),
+					Effect: v1.TaintEffectNoSchedule,
 				}
+				ginkgo.By(fmt.Sprintf("tainting node %s, backend %s must go away", node.Name, nodeIP))
+				taintAdded, err := f.Client.KubeClient.AddTaint(node.Name, taint)
+				defer func() {
+					if taintAdded {
+						_ = f.Client.KubeClient.RemoveTaint(node.Name, taint)
+					}
+				}()
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(taintAdded).To(gomega.BeTrue(), "target node already has the autoscaler taint")
+				// ExpectNetworkLoadBalancerEqual only reports expected backends that
+				// are missing remotely, so the removal needs an explicit absence check.
+				err = f.WaitForNLBBackendRemoved(oldSvc, nodeIP)
+				gomega.Expect(err).To(gomega.BeNil())
+				err = f.ExpectNetworkLoadBalancerEqual(oldSvc)
+				gomega.Expect(err).To(gomega.BeNil())
+
+				ginkgo.By("removing the taint, the backend must come back")
+				err = f.Client.KubeClient.RemoveTaint(node.Name, taint)
+				gomega.Expect(err).To(gomega.BeNil())
+				taintAdded = false
 				err = f.ExpectNetworkLoadBalancerEqual(oldSvc)
 				gomega.Expect(err).To(gomega.BeNil())
 			})

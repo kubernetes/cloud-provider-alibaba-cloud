@@ -243,6 +243,20 @@ func IsExcludedNode(node *v1.Node) bool {
 	return false
 }
 
+// HasToBeDeletedTaint reports whether the cluster autoscaler marked the node
+// for deletion. It is the only taint that affects load balancer backends.
+func HasToBeDeletedTaint(node *v1.Node) bool {
+	if node == nil {
+		return false
+	}
+	for _, taint := range node.Spec.Taints {
+		if taint.Key == ToBeDeletedTaint {
+			return true
+		}
+	}
+	return false
+}
+
 func FindNodeByNodeName(nodes []v1.Node, nodeName string) *v1.Node {
 	for _, n := range nodes {
 		if n.Name == nodeName {
