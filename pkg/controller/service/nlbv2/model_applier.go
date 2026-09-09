@@ -534,8 +534,21 @@ func (m *ModelApplier) prepareAssociatedSecurityGroup(reqCtx *svcCtx.RequestCont
 	if err != nil {
 		return err
 	}
+	if sg != nil && sg.VpcID != "" && remote.LoadBalancerAttribute.VpcId != "" &&
+		sg.VpcID != remote.LoadBalancerAttribute.VpcId {
+		// left behind by an older version that created the group without a vpc, it can
+		// never be attached to this nlb
+		return fmt.Errorf("security group [%s] of service %s is in vpc [%s], but the nlb is in vpc [%s],"+
+			" delete the security group", sg.ID, util.Key(reqCtx.Service), sg.VpcID,
+			remote.LoadBalancerAttribute.VpcId)
+	}
 	needCreateSecurityGroup := len(local.LoadBalancerAttribute.SourceRanges) != 0
 	if sg == nil && needCreateSecurityGroup {
+		// the local model has no vpc unless the nlb is being created in this reconcile,
+		// take it from the nlb the group is attached to
+		if remote.LoadBalancerAttribute.VpcId != "" {
+			local.LoadBalancerAttribute.VpcId = remote.LoadBalancerAttribute.VpcId
+		}
 		err = m.nlbMgr.CreateAssociatedSecurityGroup(reqCtx, local)
 		if err != nil {
 			return err

@@ -978,11 +978,14 @@ func TestAssociatedSecurityGroupOperations(t *testing.T) {
 		local := &nlbmodel.NetworkLoadBalancer{
 			LoadBalancerAttribute: &nlbmodel.LoadBalancerAttribute{
 				SourceRanges: []string{"192.168.1.0/24"},
+				VpcId:        "vpc-nlb",
 			},
 			NamespacedName: util.NamespacedName(svc),
 		}
-		err := mgr.CreateAssociatedSecurityGroup(reqCtx, local)
-		assert.NoError(t, err)
+		assert.NoError(t, mgr.CreateAssociatedSecurityGroup(reqCtx, local))
+		local.LoadBalancerAttribute.VpcId = ""
+		assert.Error(t, mgr.CreateAssociatedSecurityGroup(reqCtx, local),
+			"a group in an unknown vpc can never be attached to the nlb")
 	})
 
 	t.Run("update associated security group early return", func(t *testing.T) {
