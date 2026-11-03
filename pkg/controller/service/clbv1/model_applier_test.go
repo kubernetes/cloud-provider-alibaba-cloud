@@ -1,6 +1,7 @@
 package clbv1
 
 import (
+	"context"
 	"fmt"
 	"github.com/stretchr/testify/assert"
 	v1 "k8s.io/api/core/v1"
@@ -20,6 +21,18 @@ import (
 	"testing"
 	"time"
 )
+
+type ipv6MockCloud struct {
+	vmock.MockCloud
+}
+
+func (m *ipv6MockCloud) DescribeLoadBalancer(ctx context.Context, mdl *model.LoadBalancer) error {
+	if err := m.MockCloud.DescribeLoadBalancer(ctx, mdl); err != nil {
+		return err
+	}
+	mdl.LoadBalancerAttribute.AddressIPVersion = model.IPv6
+	return nil
+}
 
 func TestCreateLB(t *testing.T) {
 	vgm, err := getTestVGroupManager()
@@ -223,6 +236,36 @@ func TestDeleteLB(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
+}
+
+func TestModelApplier_Apply_PreserveIPv6LoadBalancerOnDelete(t *testing.T) {
+	cloud := &ipv6MockCloud{MockCloud: getMockCloudProvider().(vmock.MockCloud)}
+	vgm, err := NewVGroupManager(getFakeKubeClient(), cloud)
+	assert.NoError(t, err)
+
+	builder := NewModelBuilder(
+		NewLoadBalancerManager(cloud),
+		NewListenerManager(cloud),
+		vgm,
+	)
+	applier := NewModelApplier(
+		NewLoadBalancerManager(cloud),
+		NewListenerManager(cloud),
+		vgm,
+	)
+
+	svc := getDefaultService()
+	svc.UID = types.UID(SvcUID)
+	svc.DeletionTimestamp = &metav1.Time{Time: time.Now()}
+	svc.Annotations[annotation.Annotation(annotation.PreserveLBOnDelete)] = "true"
+
+	reqCtx := getReqCtx(svc)
+	localModel, err := builder.Instance(LocalModel).Build(reqCtx)
+	assert.NoError(t, err)
+	assert.True(t, localModel.LoadBalancerAttribute.PreserveOnDelete)
+
+	_, err = applier.Apply(reqCtx, localModel)
+	assert.NoError(t, err)
 }
 
 func TestBuildRemoteModel(t *testing.T) {
