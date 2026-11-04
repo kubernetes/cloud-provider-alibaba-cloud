@@ -38,7 +38,7 @@ func NewModelApplier(nlbMgr *NLBManager, lisMgr *ListenerManager, serverGroupMan
 	}
 }
 
-func (m *ModelApplier) Apply(reqCtx *svcCtx.RequestContext, local *nlbmodel.NetworkLoadBalancer) (*nlbmodel.NetworkLoadBalancer, error) {
+func (m *ModelApplier) Apply(reqCtx *svcCtx.RequestContext, local *nlbmodel.NetworkLoadBalancer) (_ *nlbmodel.NetworkLoadBalancer, retErr error) {
 	if local == nil {
 		return nil, fmt.Errorf("local or remote mdl is nil")
 	}
@@ -67,6 +67,12 @@ func (m *ModelApplier) Apply(reqCtx *svcCtx.RequestContext, local *nlbmodel.Netw
 
 	var tasks []func() error
 	var errs []error
+	// Preserve source-range errors even when a later apply or cleanup step fails.
+	defer func() {
+		if len(errs) != 0 {
+			retErr = utilerrors.NewAggregate(append(errs, retErr))
+		}
+	}()
 	if hashChangedOrDryRun {
 		err := m.prepareLoadBalancer(reqCtx, local, remote)
 		if err != nil {
