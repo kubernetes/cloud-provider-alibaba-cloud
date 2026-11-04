@@ -1714,6 +1714,38 @@ func (f *Framework) WaitForBackendWeight(svc *v1.Service, serverIp string, expec
 	return retErr
 }
 
+func (f *Framework) WaitForECSBackend(svc *v1.Service, serverID string, present bool) error {
+	if serverID == "" {
+		return fmt.Errorf("ECS backend server ID must not be empty")
+	}
+	port := svc.Spec.Ports[0]
+	name := getVGroupName(svc, port)
+	err := wait.PollImmediate(5*time.Second, 120*time.Second, func() (bool, error) {
+		remote, err := buildRemoteModel(f, svc)
+		if err != nil {
+			return false, err
+		}
+		for _, vg := range remote.VServerGroups {
+			if vg.VGroupName != name {
+				continue
+			}
+			found := false
+			for _, b := range vg.Backends {
+				if b.Type == model.ECSBackendType && b.ServerId == serverID && b.Port == int(port.NodePort) {
+					found = true
+					break
+				}
+			}
+			return found == present, nil
+		}
+		return false, fmt.Errorf("vgroup %s not found while waiting for ECS backend %s (present=%t)", name, serverID, present)
+	})
+	if err != nil {
+		return fmt.Errorf("wait for ECS backend %s:%d in vgroup %s (present=%t): %w", serverID, port.NodePort, name, present, err)
+	}
+	return nil
+}
+
 func (f *Framework) WaitForBackendRemoved(svc *v1.Service, serverIp string) error {
 	var retErr error
 	_ = wait.PollImmediate(5*time.Second, 120*time.Second, func() (done bool, err error) {

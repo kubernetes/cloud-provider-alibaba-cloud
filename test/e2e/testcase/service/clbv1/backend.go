@@ -167,7 +167,7 @@ func RunBackendTestCases(f *framework.Framework) {
 				if node == nil {
 					ginkgo.Skip("autoscaler taint test requires an eligible real node")
 				}
-				nodeIP, err := helper.GetNodeInternalIP(node)
+				_, serverID, err := helper.NodeFromProviderID(node.Spec.ProviderID)
 				gomega.Expect(err).To(gomega.BeNil())
 
 				ginkgo.By("creating a service whose backends include the node")
@@ -177,13 +177,15 @@ func RunBackendTestCases(f *framework.Framework) {
 				gomega.Expect(err).To(gomega.BeNil())
 				err = f.ExpectLoadBalancerEqual(oldSvc)
 				gomega.Expect(err).To(gomega.BeNil())
+				err = f.WaitForECSBackend(oldSvc, serverID, true)
+				gomega.Expect(err).To(gomega.BeNil())
 
 				taint := v1.Taint{
 					Key:    helper.ToBeDeletedTaint,
 					Value:  fmt.Sprint(time.Now().Unix()),
 					Effect: v1.TaintEffectNoSchedule,
 				}
-				ginkgo.By(fmt.Sprintf("tainting node %s, backend %s must go away", node.Name, nodeIP))
+				ginkgo.By(fmt.Sprintf("tainting node %s, backend %s must go away", node.Name, serverID))
 				taintAdded, err := f.Client.KubeClient.AddTaint(node.Name, taint)
 				defer func() {
 					if taintAdded {
@@ -194,7 +196,7 @@ func RunBackendTestCases(f *framework.Framework) {
 				gomega.Expect(taintAdded).To(gomega.BeTrue(), "target node already has the autoscaler taint")
 				// ExpectLoadBalancerEqual only reports expected backends that are
 				// missing remotely, so the removal needs an explicit absence check.
-				err = f.WaitForBackendRemoved(oldSvc, nodeIP)
+				err = f.WaitForECSBackend(oldSvc, serverID, false)
 				gomega.Expect(err).To(gomega.BeNil())
 				err = f.ExpectLoadBalancerEqual(oldSvc)
 				gomega.Expect(err).To(gomega.BeNil())
@@ -203,6 +205,8 @@ func RunBackendTestCases(f *framework.Framework) {
 				err = f.Client.KubeClient.RemoveTaint(node.Name, taint)
 				gomega.Expect(err).To(gomega.BeNil())
 				taintAdded = false
+				err = f.WaitForECSBackend(oldSvc, serverID, true)
+				gomega.Expect(err).To(gomega.BeNil())
 				err = f.ExpectLoadBalancerEqual(oldSvc)
 				gomega.Expect(err).To(gomega.BeNil())
 			})
