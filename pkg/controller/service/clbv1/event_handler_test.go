@@ -217,6 +217,17 @@ func TestNodeSpecChanged(t *testing.T) {
 	newN = oldN.DeepCopy()
 	newN.Labels["ack.aliyun.com"] = "new"
 	assert.Equal(t, nodeSpecChanged(oldN, newN), true)
+
+	// the autoscaler taint decides whether the node is a backend, so adding and
+	// removing it must both enqueue; other taints must not
+	taintedN := oldN.DeepCopy()
+	taintedN.Spec.Taints = []v1.Taint{{Key: helper.ToBeDeletedTaint, Effect: v1.TaintEffectNoSchedule}}
+	assert.Equal(t, nodeSpecChanged(oldN, taintedN), true)
+	assert.Equal(t, nodeSpecChanged(taintedN, oldN), true)
+
+	newN = oldN.DeepCopy()
+	newN.Spec.Taints = []v1.Taint{{Key: v1.TaintNodeUnschedulable, Effect: v1.TaintEffectNoSchedule}}
+	assert.Equal(t, nodeSpecChanged(oldN, newN), false)
 }
 
 func TestEnqueueRequestForEndpointSliceEvent(t *testing.T) {

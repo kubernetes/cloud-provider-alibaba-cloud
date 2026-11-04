@@ -311,6 +311,17 @@ func Test_nodeSpecChanged(t *testing.T) {
 
 	newN.Spec.Unschedulable = true
 	assert.Equal(t, nodeSpecChanged(oldN, newN), true)
+
+	// the autoscaler taint decides whether the node is a backend, so adding and
+	// removing it must both enqueue; other taints must not
+	taintedN := oldN.DeepCopy()
+	taintedN.Spec.Taints = []v1.Taint{{Key: helper.ToBeDeletedTaint, Effect: v1.TaintEffectNoSchedule}}
+	assert.Equal(t, nodeSpecChanged(oldN, taintedN), true)
+	assert.Equal(t, nodeSpecChanged(taintedN, oldN), true)
+
+	newN = oldN.DeepCopy()
+	newN.Spec.Taints = []v1.Taint{{Key: v1.TaintNodeUnschedulable, Effect: v1.TaintEffectNoSchedule}}
+	assert.Equal(t, nodeSpecChanged(oldN, newN), false)
 }
 
 func Test_checkServiceAffected(t *testing.T) {

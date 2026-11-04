@@ -465,6 +465,14 @@ func nodeSpecChanged(oldNode, newNode *v1.Node) bool {
 	if nodeReadyChanged(oldNode, newNode) {
 		return true
 	}
+	// the autoscaler taint decides whether the node is a load balancer backend,
+	// so adding or removing it must reconcile; other taints are ignored on
+	// purpose to avoid enqueueing every service on unrelated taint churn
+	if oldT, newT := helper.HasToBeDeletedTaint(oldNode), helper.HasToBeDeletedTaint(newNode); oldT != newT {
+		util.NLBLog.Info(fmt.Sprintf("node changed: %s, %s taint from=%t, to=%t",
+			newNode.Name, helper.ToBeDeletedTaint, oldT, newT), "node", newNode.Name)
+		return true
+	}
 	return false
 }
 
