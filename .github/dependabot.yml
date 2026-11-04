@@ -1,0 +1,34 @@
+version: 2
+updates:
+  - package-ecosystem: "gomod"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    cooldown:
+      default-days: 7
+    groups:
+      k8s-deps:
+        patterns:
+          - "*k8s.io*"
+      non-k8s-deps:
+        patterns:
+          - "*"
+        exclude-patterns:
+          - "*k8s.io*"
+    labels:
+      - "area/dependency"
+      - "release-note-none"
+
+  - package-ecosystem: "docker"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    cooldown:
+      default-days: 7
+    groups:
+      docker-images:
+        patterns:
+          - "*"
+    labels:
+      - "area/dependency"
+      - "release-note-none"
