@@ -1047,10 +1047,12 @@ func isBackendEqual(client *client.KubeClient, reqCtx *svcCtx.RequestContext, vg
 		}
 		found := false
 		for _, r := range vg.Backends {
-			if policy == helper.ENITrafficPolicy {
+			// Match by the backend's own type: cluster/local modes on VK-only
+			// clusters also produce ENI backends.
+			if l.Type == model.ENIBackendType {
 				if l.ServerIp == r.ServerIp &&
 					l.Port == r.Port &&
-					l.Type == model.ENIBackendType {
+					r.Type == model.ENIBackendType {
 					if !vg.IsUserManaged && l.Description != r.Description {
 						return false, fmt.Errorf("mode %s expected vgroup [%s] backend %s description not equal,"+
 							" expect %s, got %s", policy, vg.VGroupId, l.ServerIp, l.Description, r.Description)
@@ -1062,10 +1064,10 @@ func isBackendEqual(client *client.KubeClient, reqCtx *svcCtx.RequestContext, vg
 					found = true
 					break
 				}
-			} else {
+			} else if l.Type == model.ECSBackendType {
 				if l.ServerId == r.ServerId &&
 					l.Port == r.Port &&
-					l.Type == model.ECSBackendType {
+					r.Type == model.ECSBackendType {
 					if !vg.IsUserManaged && l.Description != r.Description {
 						return false, fmt.Errorf("mode %s expected vgroup [%s] backend %s description not equal,"+
 							" expect %s, got %s", policy, vg.VGroupId, l.ServerIp, l.Description, r.Description)
@@ -1215,12 +1217,19 @@ func podNumberAlgorithm(mode helper.TrafficPolicy, backends []model.BackendAttri
 	}
 
 	// LocalTrafficPolicy
+	// Keep in sync with podNumberAlgorithm in pkg/controller/service/clbv1.
 	ecsPods := make(map[string]int)
 	for _, b := range backends {
-		ecsPods[b.ServerId] += 1
+		if b.ServerId != "" {
+			ecsPods[b.ServerId] += 1
+		}
 	}
 	for i := range backends {
-		backends[i].Weight = ecsPods[backends[i].ServerId]
+		if backends[i].Type != model.ECSBackendType {
+			backends[i].Weight = 1
+		} else {
+			backends[i].Weight = ecsPods[backends[i].ServerId]
+		}
 	}
 	return backends
 }
@@ -1250,12 +1259,20 @@ func podPercentAlgorithm(mode helper.TrafficPolicy, backends []model.BackendAttr
 	}
 
 	// LocalTrafficPolicy
+	// Keep in sync with podPercentAlgorithm in pkg/controller/service/clbv1.
 	ecsPods := make(map[string]int)
 	for _, b := range backends {
-		ecsPods[b.ServerId] += 1
+		if b.ServerId != "" {
+			ecsPods[b.ServerId] += 1
+		}
 	}
 	for i := range backends {
-		backends[i].Weight = weight * ecsPods[backends[i].ServerId] / len(backends)
+		if backends[i].Type != model.ECSBackendType {
+			backends[i].Weight = weight * 1 / len(backends)
+			continue
+		} else {
+			backends[i].Weight = weight * ecsPods[backends[i].ServerId] / len(backends)
+		}
 		if backends[i].Weight < 1 {
 			backends[i].Weight = 1
 		}
@@ -1352,6 +1369,9 @@ func (f *Framework) ExpectNodeEqual() error {
 		}
 		var instanceIds []string
 		for _, node := range nodes {
+			if isVKNode(node) {
+				continue
+			}
 			for _, taint := range node.Spec.Taints {
 				if taint.Key == api.TaintExternalCloudProvider {
 					retErr = fmt.Errorf("node %s has uninitialized taint", node.Name)
@@ -1366,6 +1386,10 @@ func (f *Framework) ExpectNodeEqual() error {
 			}
 			instanceIds = append(instanceIds, node.Spec.ProviderID)
 		}
+		if len(instanceIds) == 0 {
+			retErr = fmt.Errorf("node reconciliation requires real nodes")
+			return false, retErr
+		}
 		instances, err := f.Client.CloudClient.ListInstances(context.TODO(), instanceIds)
 		if err != nil {
 			retErr = err
@@ -1373,13 +1397,13 @@ func (f *Framework) ExpectNodeEqual() error {
 		}
 
 		for _, node := range nodes {
+			if isVKNode(node) {
+				continue
+			}
 			cloudTaint := findCloudTaint(node.Spec.Taints)
 			if cloudTaint != nil {
 				retErr = fmt.Errorf("node %s still has uninitialized taint", node.Name)
 				return false, nil
-			}
-			if isVKNode(node) {
-				continue
 			}
 			_, id, err := helper.NodeFromProviderID(node.Spec.ProviderID)
 			if err != nil {

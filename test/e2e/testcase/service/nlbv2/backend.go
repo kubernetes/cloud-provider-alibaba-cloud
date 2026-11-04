@@ -172,6 +172,9 @@ func RunBackendTestCases(f *framework.Framework) {
 
 			ginkgo.It("flag on with listener port range", func() {
 				svc := testsvc.DeepCopy()
+				if !helper.IsENIBackendType(svc) {
+					ginkgo.Skip("listener port range requires ENI backends")
+				}
 				svc.Annotations[annotation.Annotation(annotation.HealthCheckFlag)] = string(model.OnFlag)
 				svc.Annotations[annotation.Annotation(annotation.ListenerPortRange)] = "40-53:53,60-80:80"
 
@@ -183,6 +186,9 @@ func RunBackendTestCases(f *framework.Framework) {
 
 			ginkgo.It("udp type with listener port range", func() {
 				svc := testsvc.DeepCopy()
+				if !helper.IsENIBackendType(svc) {
+					ginkgo.Skip("listener port range requires ENI backends")
+				}
 				svc.Annotations[annotation.Annotation(annotation.HealthCheckFlag)] = string(model.OnFlag)
 				svc.Annotations[annotation.Annotation(annotation.HealthCheckType)] = string(model.UDP)
 				svc.Annotations[annotation.Annotation(annotation.ListenerPortRange)] = "40-53:53,60-80:80"
@@ -411,7 +417,9 @@ func RunBackendTestCases(f *framework.Framework) {
 				// add ToBeDeletedTaint
 				node, err := f.Client.KubeClient.GetLatestNode()
 				gomega.Expect(err).To(gomega.BeNil())
-				gomega.Expect(node).NotTo(gomega.BeNil())
+				if node == nil {
+					ginkgo.Skip("autoscaler taint test requires an eligible real node")
+				}
 				taintAdded, err := f.Client.KubeClient.AddTaint(node.Name, taint)
 				defer func() {
 					if taintAdded {
@@ -655,7 +663,9 @@ func RunBackendTestCases(f *framework.Framework) {
 				// label node
 				node, err := f.Client.KubeClient.GetLatestNode()
 				gomega.Expect(err).To(gomega.BeNil())
-				gomega.Expect(node).NotTo(gomega.BeNil())
+				if node == nil {
+					ginkgo.Skip("exclude-balancer test requires an eligible real node")
+				}
 				defer func() {
 					_ = f.Client.KubeClient.RestoreNodeLabel(node.Name, helper.LabelNodeExcludeBalancer, node.Labels)
 				}()
@@ -678,7 +688,9 @@ func RunBackendTestCases(f *framework.Framework) {
 				// label node
 				node, err := f.Client.KubeClient.GetLatestNode()
 				gomega.Expect(err).To(gomega.BeNil())
-				gomega.Expect(node).NotTo(gomega.BeNil())
+				if node == nil {
+					ginkgo.Skip("exclude-node test requires an eligible real node")
+				}
 				defer func() {
 					_ = f.Client.KubeClient.RestoreNodeLabel(node.Name, client.ExcludeNodeLabel, node.Labels)
 				}()

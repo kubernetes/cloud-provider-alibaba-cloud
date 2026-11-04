@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	ctrlCfg "k8s.io/cloud-provider-alibaba-cloud/pkg/config"
 	ecsmodel "k8s.io/cloud-provider-alibaba-cloud/pkg/model/ecs"
@@ -967,6 +968,45 @@ func buildServerGroupENIBackends(f *Framework, eps []discovery.EndpointSlice, sg
 }
 
 func buildServerGroupLocalBackends(f *Framework, anno *annotation.AnnotationRequest, eps []discovery.EndpointSlice, nodes []v1.Node, sg *nlbmodel.ServerGroup) ([]nlbmodel.ServerGroupServer, error) {
+	// Local mode excludes terminating endpoints, but permits container-ready
+	// pods waiting for this Service's readiness gate, just like the controller.
+	readinessGate := helper.BuildReadinessGatePodConditionTypeWithPrefix(helper.TargetHealthPodConditionServiceTypePrefix, anno.Service.Name)
+	var readySlices []discovery.EndpointSlice
+	podEndpoints, readyEndpoints := 0, 0
+	for _, es := range eps {
+		if es.AddressType != discovery.AddressTypeIPv4 {
+			continue
+		}
+		filtered := es
+		filtered.Endpoints = nil
+		for _, ep := range es.Endpoints {
+			if ep.TargetRef == nil || ep.TargetRef.Kind != "Pod" ||
+				(ep.Conditions.Terminating != nil && *ep.Conditions.Terminating) {
+				continue
+			}
+			podEndpoints++
+			if ep.Conditions.Ready == nil || !*ep.Conditions.Ready {
+				pod, err := f.Client.KubeClient.CoreV1().Pods(ep.TargetRef.Namespace).Get(context.Background(), ep.TargetRef.Name, metav1.GetOptions{})
+				if errors.IsNotFound(err) {
+					continue
+				}
+				if err != nil {
+					return nil, fmt.Errorf("get endpoint pod %s/%s: %w", ep.TargetRef.Namespace, ep.TargetRef.Name, err)
+				}
+				if !helper.IsPodHasReadinessGate(pod, string(readinessGate)) || !helper.IsPodContainersReady(pod) {
+					continue
+				}
+			}
+			filtered.Endpoints = append(filtered.Endpoints, ep)
+			readyEndpoints++
+		}
+		readySlices = append(readySlices, filtered)
+	}
+	if podEndpoints > 0 && readyEndpoints == 0 {
+		return nil, fmt.Errorf("service %s/%s has no ready Local backend pods (%d non-terminating pod endpoints)", anno.Service.Namespace, anno.Service.Name, podEndpoints)
+	}
+	eps = readySlices
+
 	var ret []nlbmodel.ServerGroupServer
 	for _, es := range eps {
 		if es.AddressType != discovery.AddressTypeIPv4 {
@@ -1028,6 +1068,10 @@ func buildServerGroupECIBackendsFromSlices(eps []discovery.EndpointSlice, nodes 
 		if es.AddressType != discovery.AddressTypeIPv4 {
 			continue
 		}
+		port, found := getBackendPortFromEndpointSlice(*sg.ServicePort, es.Ports)
+		if !found || port == 0 {
+			continue
+		}
 		for _, ep := range es.Endpoints {
 			if ep.TargetRef == nil || ep.TargetRef.Kind != "Pod" {
 				continue
@@ -1040,20 +1084,13 @@ func buildServerGroupECIBackendsFromSlices(eps []discovery.EndpointSlice, nodes 
 				continue
 			}
 			if isVKNode(*node) {
-				port := int32(0)
-				for _, p := range es.Ports {
-					if p.Port != nil {
-						port = *p.Port
-						break
-					}
-				}
 				if sg.ServerGroupType == nlbmodel.IpServerGroupType {
 					for _, addr := range ep.Addresses {
 						ret = append(ret, nlbmodel.ServerGroupServer{
 							Description: sg.ServerGroupName,
 							ServerId:    addr,
 							ServerIp:    addr,
-							Port:        port,
+							Port:        int32(port),
 							ServerType:  nlbmodel.IpServerType,
 						})
 					}
@@ -1062,8 +1099,8 @@ func buildServerGroupECIBackendsFromSlices(eps []discovery.EndpointSlice, nodes 
 						ret = append(ret, nlbmodel.ServerGroupServer{
 							Description: sg.ServerGroupName,
 							ServerIp:    addr,
-							Port:        port,
-							ServerType:  model.ENIBackendType,
+							Port:        int32(port),
+							ServerType:  nlbmodel.EniServerType,
 						})
 					}
 				}
@@ -1132,12 +1169,19 @@ func nlbPodNumberAlgorithm(mode helper.TrafficPolicy, backends []nlbmodel.Server
 	}
 
 	// LocalTrafficPolicy
+	// Keep in sync with podNumberAlgorithm in pkg/controller/service/nlbv2.
 	ecsPods := make(map[string]int32)
 	for _, b := range backends {
-		ecsPods[b.ServerId] += 1
+		if b.ServerId != "" {
+			ecsPods[b.ServerId] += 1
+		}
 	}
 	for i := range backends {
-		backends[i].Weight = ecsPods[backends[i].ServerId]
+		if backends[i].ServerType != nlbmodel.EcsServerType {
+			backends[i].Weight = 1
+		} else {
+			backends[i].Weight = ecsPods[backends[i].ServerId]
+		}
 	}
 	return backends
 }
@@ -1167,12 +1211,19 @@ func nlbPodPercentAlgorithm(mode helper.TrafficPolicy, backends []nlbmodel.Serve
 	}
 
 	// LocalTrafficPolicy
+	// Keep in sync with podPercentAlgorithm in pkg/controller/service/nlbv2.
 	ecsPods := make(map[string]int)
 	for _, b := range backends {
-		ecsPods[b.ServerId] += 1
+		if b.ServerId != "" {
+			ecsPods[b.ServerId] += 1
+		}
 	}
 	for i := range backends {
-		backends[i].Weight = int32(weight * ecsPods[backends[i].ServerId] / len(backends))
+		if backends[i].ServerType != nlbmodel.EcsServerType {
+			backends[i].Weight = int32(weight * 1 / len(backends))
+		} else {
+			backends[i].Weight = int32(weight * ecsPods[backends[i].ServerId] / len(backends))
+		}
 		if backends[i].Weight < 1 {
 			backends[i].Weight = 1
 		}

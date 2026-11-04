@@ -894,6 +894,9 @@ func (client *KubeClient) GetLatestNode() (*v1.Node, error) {
 		if _, isVK := node.Labels[helper.LabelNodeTypeVK]; isVK {
 			continue
 		}
+		if node.Labels["type"] == helper.LabelNodeTypeVK {
+			continue
+		}
 		if ret.Name == "" {
 			ret = node
 		} else if ret.CreationTimestamp.Before(&node.CreationTimestamp) {
