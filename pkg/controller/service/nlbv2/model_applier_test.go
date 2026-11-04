@@ -2,6 +2,7 @@ package nlbv2
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -13,11 +14,76 @@ import (
 	ctrlCfg "k8s.io/cloud-provider-alibaba-cloud/pkg/config"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/helper"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/controller/service/reconcile/annotation"
+	ecsmodel "k8s.io/cloud-provider-alibaba-cloud/pkg/model/ecs"
 	nlbmodel "k8s.io/cloud-provider-alibaba-cloud/pkg/model/nlb"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/model/tag"
+	prvd "k8s.io/cloud-provider-alibaba-cloud/pkg/provider"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/provider/vmock"
 	"k8s.io/cloud-provider-alibaba-cloud/pkg/util"
 )
+
+type securityGroupFailureCloud struct {
+	prvd.Provider
+	findErr   error
+	updateErr error
+}
+
+func (c securityGroupFailureCloud) UpdateNLB(ctx context.Context, mdl *nlbmodel.NetworkLoadBalancer) error {
+	if c.updateErr != nil {
+		return c.updateErr
+	}
+	return c.Provider.UpdateNLB(ctx, mdl)
+}
+
+func (c securityGroupFailureCloud) DescribeSecurityGroups(context.Context, []tag.Tag) ([]ecsmodel.SecurityGroup, error) {
+	return []ecsmodel.SecurityGroup{{ID: "sg-wrong-vpc"}}, c.findErr
+}
+
+func (c securityGroupFailureCloud) DescribeSecurityGroupAttribute(context.Context, string) (ecsmodel.SecurityGroup, error) {
+	return ecsmodel.SecurityGroup{ID: "sg-wrong-vpc", VpcID: "vpc-other"}, nil
+}
+
+func TestModelApplier_Apply_SourceRangesFailure(t *testing.T) {
+	for _, tc := range []struct {
+		name      string
+		findErr   error
+		updateErr error
+		want      string
+	}{
+		{name: "security group lookup fails", findErr: fmt.Errorf("security group lookup failed"), want: "security group lookup failed"},
+		{name: "security group belongs to another vpc", want: "sg-wrong-vpc"},
+		{name: "security group and load balancer update fail", findErr: fmt.Errorf("security group lookup failed"), updateErr: fmt.Errorf("load balancer update failed"), want: "security group lookup failed"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			recon, err := getReconcileNLB()
+			if !assert.NoError(t, err) {
+				t.FailNow()
+			}
+			svc := &v1.Service{}
+			if !assert.NoError(t, recon.kubeClient.Get(context.Background(), types.NamespacedName{Namespace: v1.NamespaceDefault, Name: ServiceName}, svc)) {
+				t.FailNow()
+			}
+			svc.Spec.LoadBalancerSourceRanges = []string{"192.168.1.0/24"}
+			reqCtx := getReqCtx(svc)
+			local, err := recon.builder.Instance(LocalModel).Build(reqCtx)
+			if !assert.NoError(t, err) {
+				t.FailNow()
+			}
+			local.LoadBalancerAttribute.Name = "new-nlb-name"
+			recon.applier.nlbMgr.cloud = securityGroupFailureCloud{Provider: recon.cloud, findErr: tc.findErr, updateErr: tc.updateErr}
+			_, err = recon.applier.Apply(reqCtx, local)
+			assert.ErrorContains(t, err, "update source ranges error")
+			assert.ErrorContains(t, err, tc.want)
+			if tc.updateErr != nil {
+				assert.ErrorContains(t, err, tc.updateErr.Error())
+			}
+			if tc.findErr == nil {
+				assert.ErrorContains(t, err, "vpc-other")
+				assert.ErrorContains(t, err, "vpc-id")
+			}
+		})
+	}
+}
 
 func TestModelApplier_Apply_CreateNLB(t *testing.T) {
 	recon, err := getReconcileNLB()
