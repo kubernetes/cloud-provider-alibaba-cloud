@@ -43,9 +43,11 @@ func (s *Addon) SetName(v string) *Addon {
 
 type DataDisk struct {
 	AutoSnapshotPolicyId *string `json:"auto_snapshot_policy_id,omitempty" xml:"auto_snapshot_policy_id,omitempty"`
+	BurstingEnabled      *bool   `json:"bursting_enabled,omitempty" xml:"bursting_enabled,omitempty"`
 	Category             *string `json:"category,omitempty" xml:"category,omitempty"`
 	Encrypted            *string `json:"encrypted,omitempty" xml:"encrypted,omitempty"`
 	PerformanceLevel     *string `json:"performance_level,omitempty" xml:"performance_level,omitempty"`
+	ProvisionedIops      *int64  `json:"provisioned_iops,omitempty" xml:"provisioned_iops,omitempty"`
 	Size                 *int64  `json:"size,omitempty" xml:"size,omitempty"`
 }
 
@@ -62,6 +64,11 @@ func (s *DataDisk) SetAutoSnapshotPolicyId(v string) *DataDisk {
 	return s
 }
 
+func (s *DataDisk) SetBurstingEnabled(v bool) *DataDisk {
+	s.BurstingEnabled = &v
+	return s
+}
+
 func (s *DataDisk) SetCategory(v string) *DataDisk {
 	s.Category = &v
 	return s
@@ -74,6 +81,11 @@ func (s *DataDisk) SetEncrypted(v string) *DataDisk {
 
 func (s *DataDisk) SetPerformanceLevel(v string) *DataDisk {
 	s.PerformanceLevel = &v
+	return s
+}
+
+func (s *DataDisk) SetProvisionedIops(v int64) *DataDisk {
+	s.ProvisionedIops = &v
 	return s
 }
 
@@ -114,6 +126,646 @@ func (s *MaintenanceWindow) SetMaintenanceTime(v string) *MaintenanceWindow {
 
 func (s *MaintenanceWindow) SetWeeklyPeriod(v string) *MaintenanceWindow {
 	s.WeeklyPeriod = &v
+	return s
+}
+
+type Nodepool struct {
+	AutoScaling *NodepoolAutoScaling `json:"auto_scaling,omitempty" xml:"auto_scaling,omitempty" type:"Struct"`
+	// Deprecated
+	Count *int64 `json:"count,omitempty" xml:"count,omitempty"`
+	// Deprecated
+	InterconnectConfig *NodepoolInterconnectConfig `json:"interconnect_config,omitempty" xml:"interconnect_config,omitempty" type:"Struct"`
+	InterconnectMode   *string                     `json:"interconnect_mode,omitempty" xml:"interconnect_mode,omitempty"`
+	KubernetesConfig   *NodepoolKubernetesConfig   `json:"kubernetes_config,omitempty" xml:"kubernetes_config,omitempty" type:"Struct"`
+	Management         *NodepoolManagement         `json:"management,omitempty" xml:"management,omitempty" type:"Struct"`
+	MaxNodes           *int64                      `json:"max_nodes,omitempty" xml:"max_nodes,omitempty"`
+	NodepoolInfo       *NodepoolNodepoolInfo       `json:"nodepool_info,omitempty" xml:"nodepool_info,omitempty" type:"Struct"`
+	ScalingGroup       *NodepoolScalingGroup       `json:"scaling_group,omitempty" xml:"scaling_group,omitempty" type:"Struct"`
+	TeeConfig          *NodepoolTeeConfig          `json:"tee_config,omitempty" xml:"tee_config,omitempty" type:"Struct"`
+}
+
+func (s Nodepool) String() string {
+	return tea.Prettify(s)
+}
+
+func (s Nodepool) GoString() string {
+	return s.String()
+}
+
+func (s *Nodepool) SetAutoScaling(v *NodepoolAutoScaling) *Nodepool {
+	s.AutoScaling = v
+	return s
+}
+
+func (s *Nodepool) SetCount(v int64) *Nodepool {
+	s.Count = &v
+	return s
+}
+
+func (s *Nodepool) SetInterconnectConfig(v *NodepoolInterconnectConfig) *Nodepool {
+	s.InterconnectConfig = v
+	return s
+}
+
+func (s *Nodepool) SetInterconnectMode(v string) *Nodepool {
+	s.InterconnectMode = &v
+	return s
+}
+
+func (s *Nodepool) SetKubernetesConfig(v *NodepoolKubernetesConfig) *Nodepool {
+	s.KubernetesConfig = v
+	return s
+}
+
+func (s *Nodepool) SetManagement(v *NodepoolManagement) *Nodepool {
+	s.Management = v
+	return s
+}
+
+func (s *Nodepool) SetMaxNodes(v int64) *Nodepool {
+	s.MaxNodes = &v
+	return s
+}
+
+func (s *Nodepool) SetNodepoolInfo(v *NodepoolNodepoolInfo) *Nodepool {
+	s.NodepoolInfo = v
+	return s
+}
+
+func (s *Nodepool) SetScalingGroup(v *NodepoolScalingGroup) *Nodepool {
+	s.ScalingGroup = v
+	return s
+}
+
+func (s *Nodepool) SetTeeConfig(v *NodepoolTeeConfig) *Nodepool {
+	s.TeeConfig = v
+	return s
+}
+
+type NodepoolAutoScaling struct {
+	// Deprecated
+	EipBandwidth *int64 `json:"eip_bandwidth,omitempty" xml:"eip_bandwidth,omitempty"`
+	// Deprecated
+	EipInternetChargeType *string `json:"eip_internet_charge_type,omitempty" xml:"eip_internet_charge_type,omitempty"`
+	Enable                *bool   `json:"enable,omitempty" xml:"enable,omitempty"`
+	// Deprecated
+	IsBondEip    *bool   `json:"is_bond_eip,omitempty" xml:"is_bond_eip,omitempty"`
+	MaxInstances *int64  `json:"max_instances,omitempty" xml:"max_instances,omitempty"`
+	MinInstances *int64  `json:"min_instances,omitempty" xml:"min_instances,omitempty"`
+	Type         *string `json:"type,omitempty" xml:"type,omitempty"`
+}
+
+func (s NodepoolAutoScaling) String() string {
+	return tea.Prettify(s)
+}
+
+func (s NodepoolAutoScaling) GoString() string {
+	return s.String()
+}
+
+func (s *NodepoolAutoScaling) SetEipBandwidth(v int64) *NodepoolAutoScaling {
+	s.EipBandwidth = &v
+	return s
+}
+
+func (s *NodepoolAutoScaling) SetEipInternetChargeType(v string) *NodepoolAutoScaling {
+	s.EipInternetChargeType = &v
+	return s
+}
+
+func (s *NodepoolAutoScaling) SetEnable(v bool) *NodepoolAutoScaling {
+	s.Enable = &v
+	return s
+}
+
+func (s *NodepoolAutoScaling) SetIsBondEip(v bool) *NodepoolAutoScaling {
+	s.IsBondEip = &v
+	return s
+}
+
+func (s *NodepoolAutoScaling) SetMaxInstances(v int64) *NodepoolAutoScaling {
+	s.MaxInstances = &v
+	return s
+}
+
+func (s *NodepoolAutoScaling) SetMinInstances(v int64) *NodepoolAutoScaling {
+	s.MinInstances = &v
+	return s
+}
+
+func (s *NodepoolAutoScaling) SetType(v string) *NodepoolAutoScaling {
+	s.Type = &v
+	return s
+}
+
+type NodepoolInterconnectConfig struct {
+	// Deprecated
+	Bandwidth *int64 `json:"bandwidth,omitempty" xml:"bandwidth,omitempty"`
+	// Deprecated
+	CcnId *string `json:"ccn_id,omitempty" xml:"ccn_id,omitempty"`
+	// Deprecated
+	CcnRegionId *string `json:"ccn_region_id,omitempty" xml:"ccn_region_id,omitempty"`
+	// Deprecated
+	CenId *string `json:"cen_id,omitempty" xml:"cen_id,omitempty"`
+	// Deprecated
+	ImprovedPeriod *string `json:"improved_period,omitempty" xml:"improved_period,omitempty"`
+}
+
+func (s NodepoolInterconnectConfig) String() string {
+	return tea.Prettify(s)
+}
+
+func (s NodepoolInterconnectConfig) GoString() string {
+	return s.String()
+}
+
+func (s *NodepoolInterconnectConfig) SetBandwidth(v int64) *NodepoolInterconnectConfig {
+	s.Bandwidth = &v
+	return s
+}
+
+func (s *NodepoolInterconnectConfig) SetCcnId(v string) *NodepoolInterconnectConfig {
+	s.CcnId = &v
+	return s
+}
+
+func (s *NodepoolInterconnectConfig) SetCcnRegionId(v string) *NodepoolInterconnectConfig {
+	s.CcnRegionId = &v
+	return s
+}
+
+func (s *NodepoolInterconnectConfig) SetCenId(v string) *NodepoolInterconnectConfig {
+	s.CenId = &v
+	return s
+}
+
+func (s *NodepoolInterconnectConfig) SetImprovedPeriod(v string) *NodepoolInterconnectConfig {
+	s.ImprovedPeriod = &v
+	return s
+}
+
+type NodepoolKubernetesConfig struct {
+	CmsEnabled     *bool    `json:"cms_enabled,omitempty" xml:"cms_enabled,omitempty"`
+	CpuPolicy      *string  `json:"cpu_policy,omitempty" xml:"cpu_policy,omitempty"`
+	Labels         []*Tag   `json:"labels,omitempty" xml:"labels,omitempty" type:"Repeated"`
+	NodeNameMode   *string  `json:"node_name_mode,omitempty" xml:"node_name_mode,omitempty"`
+	Runtime        *string  `json:"runtime,omitempty" xml:"runtime,omitempty"`
+	RuntimeVersion *string  `json:"runtime_version,omitempty" xml:"runtime_version,omitempty"`
+	Taints         []*Taint `json:"taints,omitempty" xml:"taints,omitempty" type:"Repeated"`
+	UserData       *string  `json:"user_data,omitempty" xml:"user_data,omitempty"`
+}
+
+func (s NodepoolKubernetesConfig) String() string {
+	return tea.Prettify(s)
+}
+
+func (s NodepoolKubernetesConfig) GoString() string {
+	return s.String()
+}
+
+func (s *NodepoolKubernetesConfig) SetCmsEnabled(v bool) *NodepoolKubernetesConfig {
+	s.CmsEnabled = &v
+	return s
+}
+
+func (s *NodepoolKubernetesConfig) SetCpuPolicy(v string) *NodepoolKubernetesConfig {
+	s.CpuPolicy = &v
+	return s
+}
+
+func (s *NodepoolKubernetesConfig) SetLabels(v []*Tag) *NodepoolKubernetesConfig {
+	s.Labels = v
+	return s
+}
+
+func (s *NodepoolKubernetesConfig) SetNodeNameMode(v string) *NodepoolKubernetesConfig {
+	s.NodeNameMode = &v
+	return s
+}
+
+func (s *NodepoolKubernetesConfig) SetRuntime(v string) *NodepoolKubernetesConfig {
+	s.Runtime = &v
+	return s
+}
+
+func (s *NodepoolKubernetesConfig) SetRuntimeVersion(v string) *NodepoolKubernetesConfig {
+	s.RuntimeVersion = &v
+	return s
+}
+
+func (s *NodepoolKubernetesConfig) SetTaints(v []*Taint) *NodepoolKubernetesConfig {
+	s.Taints = v
+	return s
+}
+
+func (s *NodepoolKubernetesConfig) SetUserData(v string) *NodepoolKubernetesConfig {
+	s.UserData = &v
+	return s
+}
+
+type NodepoolManagement struct {
+	AutoRepair    *bool                            `json:"auto_repair,omitempty" xml:"auto_repair,omitempty"`
+	Enable        *bool                            `json:"enable,omitempty" xml:"enable,omitempty"`
+	UpgradeConfig *NodepoolManagementUpgradeConfig `json:"upgrade_config,omitempty" xml:"upgrade_config,omitempty" type:"Struct"`
+}
+
+func (s NodepoolManagement) String() string {
+	return tea.Prettify(s)
+}
+
+func (s NodepoolManagement) GoString() string {
+	return s.String()
+}
+
+func (s *NodepoolManagement) SetAutoRepair(v bool) *NodepoolManagement {
+	s.AutoRepair = &v
+	return s
+}
+
+func (s *NodepoolManagement) SetEnable(v bool) *NodepoolManagement {
+	s.Enable = &v
+	return s
+}
+
+func (s *NodepoolManagement) SetUpgradeConfig(v *NodepoolManagementUpgradeConfig) *NodepoolManagement {
+	s.UpgradeConfig = v
+	return s
+}
+
+type NodepoolManagementUpgradeConfig struct {
+	AutoUpgrade     *bool  `json:"auto_upgrade,omitempty" xml:"auto_upgrade,omitempty"`
+	MaxUnavailable  *int64 `json:"max_unavailable,omitempty" xml:"max_unavailable,omitempty"`
+	Surge           *int64 `json:"surge,omitempty" xml:"surge,omitempty"`
+	SurgePercentage *int64 `json:"surge_percentage,omitempty" xml:"surge_percentage,omitempty"`
+}
+
+func (s NodepoolManagementUpgradeConfig) String() string {
+	return tea.Prettify(s)
+}
+
+func (s NodepoolManagementUpgradeConfig) GoString() string {
+	return s.String()
+}
+
+func (s *NodepoolManagementUpgradeConfig) SetAutoUpgrade(v bool) *NodepoolManagementUpgradeConfig {
+	s.AutoUpgrade = &v
+	return s
+}
+
+func (s *NodepoolManagementUpgradeConfig) SetMaxUnavailable(v int64) *NodepoolManagementUpgradeConfig {
+	s.MaxUnavailable = &v
+	return s
+}
+
+func (s *NodepoolManagementUpgradeConfig) SetSurge(v int64) *NodepoolManagementUpgradeConfig {
+	s.Surge = &v
+	return s
+}
+
+func (s *NodepoolManagementUpgradeConfig) SetSurgePercentage(v int64) *NodepoolManagementUpgradeConfig {
+	s.SurgePercentage = &v
+	return s
+}
+
+type NodepoolNodepoolInfo struct {
+	Name            *string `json:"name,omitempty" xml:"name,omitempty"`
+	ResourceGroupId *string `json:"resource_group_id,omitempty" xml:"resource_group_id,omitempty"`
+	Type            *string `json:"type,omitempty" xml:"type,omitempty"`
+}
+
+func (s NodepoolNodepoolInfo) String() string {
+	return tea.Prettify(s)
+}
+
+func (s NodepoolNodepoolInfo) GoString() string {
+	return s.String()
+}
+
+func (s *NodepoolNodepoolInfo) SetName(v string) *NodepoolNodepoolInfo {
+	s.Name = &v
+	return s
+}
+
+func (s *NodepoolNodepoolInfo) SetResourceGroupId(v string) *NodepoolNodepoolInfo {
+	s.ResourceGroupId = &v
+	return s
+}
+
+func (s *NodepoolNodepoolInfo) SetType(v string) *NodepoolNodepoolInfo {
+	s.Type = &v
+	return s
+}
+
+type NodepoolScalingGroup struct {
+	AutoRenew                           *bool                                   `json:"auto_renew,omitempty" xml:"auto_renew,omitempty"`
+	AutoRenewPeriod                     *int64                                  `json:"auto_renew_period,omitempty" xml:"auto_renew_period,omitempty"`
+	CompensateWithOnDemand              *bool                                   `json:"compensate_with_on_demand,omitempty" xml:"compensate_with_on_demand,omitempty"`
+	DataDisks                           []*DataDisk                             `json:"data_disks,omitempty" xml:"data_disks,omitempty" type:"Repeated"`
+	DeploymentsetId                     *string                                 `json:"deploymentset_id,omitempty" xml:"deploymentset_id,omitempty"`
+	DesiredSize                         *int64                                  `json:"desired_size,omitempty" xml:"desired_size,omitempty"`
+	ImageId                             *string                                 `json:"image_id,omitempty" xml:"image_id,omitempty"`
+	ImageType                           *string                                 `json:"image_type,omitempty" xml:"image_type,omitempty"`
+	InstanceChargeType                  *string                                 `json:"instance_charge_type,omitempty" xml:"instance_charge_type,omitempty"`
+	InstanceTypes                       []*string                               `json:"instance_types,omitempty" xml:"instance_types,omitempty" type:"Repeated"`
+	InternetChargeType                  *string                                 `json:"internet_charge_type,omitempty" xml:"internet_charge_type,omitempty"`
+	InternetMaxBandwidthOut             *int64                                  `json:"internet_max_bandwidth_out,omitempty" xml:"internet_max_bandwidth_out,omitempty"`
+	KeyPair                             *string                                 `json:"key_pair,omitempty" xml:"key_pair,omitempty"`
+	LoginPassword                       *string                                 `json:"login_password,omitempty" xml:"login_password,omitempty"`
+	MultiAzPolicy                       *string                                 `json:"multi_az_policy,omitempty" xml:"multi_az_policy,omitempty"`
+	OnDemandBaseCapacity                *int64                                  `json:"on_demand_base_capacity,omitempty" xml:"on_demand_base_capacity,omitempty"`
+	OnDemandPercentageAboveBaseCapacity *int64                                  `json:"on_demand_percentage_above_base_capacity,omitempty" xml:"on_demand_percentage_above_base_capacity,omitempty"`
+	Period                              *int64                                  `json:"period,omitempty" xml:"period,omitempty"`
+	PeriodUnit                          *string                                 `json:"period_unit,omitempty" xml:"period_unit,omitempty"`
+	Platform                            *string                                 `json:"platform,omitempty" xml:"platform,omitempty"`
+	PrivatePoolOptions                  *NodepoolScalingGroupPrivatePoolOptions `json:"private_pool_options,omitempty" xml:"private_pool_options,omitempty" type:"Struct"`
+	RdsInstances                        []*string                               `json:"rds_instances,omitempty" xml:"rds_instances,omitempty" type:"Repeated"`
+	ScalingPolicy                       *string                                 `json:"scaling_policy,omitempty" xml:"scaling_policy,omitempty"`
+	SecurityGroupId                     *string                                 `json:"security_group_id,omitempty" xml:"security_group_id,omitempty"`
+	SecurityGroupIds                    []*string                               `json:"security_group_ids,omitempty" xml:"security_group_ids,omitempty" type:"Repeated"`
+	SpotInstancePools                   *int64                                  `json:"spot_instance_pools,omitempty" xml:"spot_instance_pools,omitempty"`
+	SpotInstanceRemedy                  *bool                                   `json:"spot_instance_remedy,omitempty" xml:"spot_instance_remedy,omitempty"`
+	SpotPriceLimit                      []*NodepoolScalingGroupSpotPriceLimit   `json:"spot_price_limit,omitempty" xml:"spot_price_limit,omitempty" type:"Repeated"`
+	SpotStrategy                        *string                                 `json:"spot_strategy,omitempty" xml:"spot_strategy,omitempty"`
+	SystemDiskBurstingEnabled           *bool                                   `json:"system_disk_bursting_enabled,omitempty" xml:"system_disk_bursting_enabled,omitempty"`
+	SystemDiskCategory                  *string                                 `json:"system_disk_category,omitempty" xml:"system_disk_category,omitempty"`
+	SystemDiskPerformanceLevel          *string                                 `json:"system_disk_performance_level,omitempty" xml:"system_disk_performance_level,omitempty"`
+	SystemDiskProvisionedIops           *int64                                  `json:"system_disk_provisioned_iops,omitempty" xml:"system_disk_provisioned_iops,omitempty"`
+	SystemDiskSize                      *int64                                  `json:"system_disk_size,omitempty" xml:"system_disk_size,omitempty"`
+	Tags                                []*NodepoolScalingGroupTags             `json:"tags,omitempty" xml:"tags,omitempty" type:"Repeated"`
+	VswitchIds                          []*string                               `json:"vswitch_ids,omitempty" xml:"vswitch_ids,omitempty" type:"Repeated"`
+}
+
+func (s NodepoolScalingGroup) String() string {
+	return tea.Prettify(s)
+}
+
+func (s NodepoolScalingGroup) GoString() string {
+	return s.String()
+}
+
+func (s *NodepoolScalingGroup) SetAutoRenew(v bool) *NodepoolScalingGroup {
+	s.AutoRenew = &v
+	return s
+}
+
+func (s *NodepoolScalingGroup) SetAutoRenewPeriod(v int64) *NodepoolScalingGroup {
+	s.AutoRenewPeriod = &v
+	return s
+}
+
+func (s *NodepoolScalingGroup) SetCompensateWithOnDemand(v bool) *NodepoolScalingGroup {
+	s.CompensateWithOnDemand = &v
+	return s
+}
+
+func (s *NodepoolScalingGroup) SetDataDisks(v []*DataDisk) *NodepoolScalingGroup {
+	s.DataDisks = v
+	return s
+}
+
+func (s *NodepoolScalingGroup) SetDeploymentsetId(v string) *NodepoolScalingGroup {
+	s.DeploymentsetId = &v
+	return s
+}
+
+func (s *NodepoolScalingGroup) SetDesiredSize(v int64) *NodepoolScalingGroup {
+	s.DesiredSize = &v
+	return s
+}
+
+func (s *NodepoolScalingGroup) SetImageId(v string) *NodepoolScalingGroup {
+	s.ImageId = &v
+	return s
+}
+
+func (s *NodepoolScalingGroup) SetImageType(v string) *NodepoolScalingGroup {
+	s.ImageType = &v
+	return s
+}
+
+func (s *NodepoolScalingGroup) SetInstanceChargeType(v string) *NodepoolScalingGroup {
+	s.InstanceChargeType = &v
+	return s
+}
+
+func (s *NodepoolScalingGroup) SetInstanceTypes(v []*string) *NodepoolScalingGroup {
+	s.InstanceTypes = v
+	return s
+}
+
+func (s *NodepoolScalingGroup) SetInternetChargeType(v string) *NodepoolScalingGroup {
+	s.InternetChargeType = &v
+	return s
+}
+
+func (s *NodepoolScalingGroup) SetInternetMaxBandwidthOut(v int64) *NodepoolScalingGroup {
+	s.InternetMaxBandwidthOut = &v
+	return s
+}
+
+func (s *NodepoolScalingGroup) SetKeyPair(v string) *NodepoolScalingGroup {
+	s.KeyPair = &v
+	return s
+}
+
+func (s *NodepoolScalingGroup) SetLoginPassword(v string) *NodepoolScalingGroup {
+	s.LoginPassword = &v
+	return s
+}
+
+func (s *NodepoolScalingGroup) SetMultiAzPolicy(v string) *NodepoolScalingGroup {
+	s.MultiAzPolicy = &v
+	return s
+}
+
+func (s *NodepoolScalingGroup) SetOnDemandBaseCapacity(v int64) *NodepoolScalingGroup {
+	s.OnDemandBaseCapacity = &v
+	return s
+}
+
+func (s *NodepoolScalingGroup) SetOnDemandPercentageAboveBaseCapacity(v int64) *NodepoolScalingGroup {
+	s.OnDemandPercentageAboveBaseCapacity = &v
+	return s
+}
+
+func (s *NodepoolScalingGroup) SetPeriod(v int64) *NodepoolScalingGroup {
+	s.Period = &v
+	return s
+}
+
+func (s *NodepoolScalingGroup) SetPeriodUnit(v string) *NodepoolScalingGroup {
+	s.PeriodUnit = &v
+	return s
+}
+
+func (s *NodepoolScalingGroup) SetPlatform(v string) *NodepoolScalingGroup {
+	s.Platform = &v
+	return s
+}
+
+func (s *NodepoolScalingGroup) SetPrivatePoolOptions(v *NodepoolScalingGroupPrivatePoolOptions) *NodepoolScalingGroup {
+	s.PrivatePoolOptions = v
+	return s
+}
+
+func (s *NodepoolScalingGroup) SetRdsInstances(v []*string) *NodepoolScalingGroup {
+	s.RdsInstances = v
+	return s
+}
+
+func (s *NodepoolScalingGroup) SetScalingPolicy(v string) *NodepoolScalingGroup {
+	s.ScalingPolicy = &v
+	return s
+}
+
+func (s *NodepoolScalingGroup) SetSecurityGroupId(v string) *NodepoolScalingGroup {
+	s.SecurityGroupId = &v
+	return s
+}
+
+func (s *NodepoolScalingGroup) SetSecurityGroupIds(v []*string) *NodepoolScalingGroup {
+	s.SecurityGroupIds = v
+	return s
+}
+
+func (s *NodepoolScalingGroup) SetSpotInstancePools(v int64) *NodepoolScalingGroup {
+	s.SpotInstancePools = &v
+	return s
+}
+
+func (s *NodepoolScalingGroup) SetSpotInstanceRemedy(v bool) *NodepoolScalingGroup {
+	s.SpotInstanceRemedy = &v
+	return s
+}
+
+func (s *NodepoolScalingGroup) SetSpotPriceLimit(v []*NodepoolScalingGroupSpotPriceLimit) *NodepoolScalingGroup {
+	s.SpotPriceLimit = v
+	return s
+}
+
+func (s *NodepoolScalingGroup) SetSpotStrategy(v string) *NodepoolScalingGroup {
+	s.SpotStrategy = &v
+	return s
+}
+
+func (s *NodepoolScalingGroup) SetSystemDiskBurstingEnabled(v bool) *NodepoolScalingGroup {
+	s.SystemDiskBurstingEnabled = &v
+	return s
+}
+
+func (s *NodepoolScalingGroup) SetSystemDiskCategory(v string) *NodepoolScalingGroup {
+	s.SystemDiskCategory = &v
+	return s
+}
+
+func (s *NodepoolScalingGroup) SetSystemDiskPerformanceLevel(v string) *NodepoolScalingGroup {
+	s.SystemDiskPerformanceLevel = &v
+	return s
+}
+
+func (s *NodepoolScalingGroup) SetSystemDiskProvisionedIops(v int64) *NodepoolScalingGroup {
+	s.SystemDiskProvisionedIops = &v
+	return s
+}
+
+func (s *NodepoolScalingGroup) SetSystemDiskSize(v int64) *NodepoolScalingGroup {
+	s.SystemDiskSize = &v
+	return s
+}
+
+func (s *NodepoolScalingGroup) SetTags(v []*NodepoolScalingGroupTags) *NodepoolScalingGroup {
+	s.Tags = v
+	return s
+}
+
+func (s *NodepoolScalingGroup) SetVswitchIds(v []*string) *NodepoolScalingGroup {
+	s.VswitchIds = v
+	return s
+}
+
+type NodepoolScalingGroupPrivatePoolOptions struct {
+	Id            *string `json:"id,omitempty" xml:"id,omitempty"`
+	MatchCriteria *string `json:"match_criteria,omitempty" xml:"match_criteria,omitempty"`
+}
+
+func (s NodepoolScalingGroupPrivatePoolOptions) String() string {
+	return tea.Prettify(s)
+}
+
+func (s NodepoolScalingGroupPrivatePoolOptions) GoString() string {
+	return s.String()
+}
+
+func (s *NodepoolScalingGroupPrivatePoolOptions) SetId(v string) *NodepoolScalingGroupPrivatePoolOptions {
+	s.Id = &v
+	return s
+}
+
+func (s *NodepoolScalingGroupPrivatePoolOptions) SetMatchCriteria(v string) *NodepoolScalingGroupPrivatePoolOptions {
+	s.MatchCriteria = &v
+	return s
+}
+
+type NodepoolScalingGroupSpotPriceLimit struct {
+	InstanceType *string `json:"instance_type,omitempty" xml:"instance_type,omitempty"`
+	PriceLimit   *string `json:"price_limit,omitempty" xml:"price_limit,omitempty"`
+}
+
+func (s NodepoolScalingGroupSpotPriceLimit) String() string {
+	return tea.Prettify(s)
+}
+
+func (s NodepoolScalingGroupSpotPriceLimit) GoString() string {
+	return s.String()
+}
+
+func (s *NodepoolScalingGroupSpotPriceLimit) SetInstanceType(v string) *NodepoolScalingGroupSpotPriceLimit {
+	s.InstanceType = &v
+	return s
+}
+
+func (s *NodepoolScalingGroupSpotPriceLimit) SetPriceLimit(v string) *NodepoolScalingGroupSpotPriceLimit {
+	s.PriceLimit = &v
+	return s
+}
+
+type NodepoolScalingGroupTags struct {
+	Key   *string `json:"key,omitempty" xml:"key,omitempty"`
+	Value *string `json:"value,omitempty" xml:"value,omitempty"`
+}
+
+func (s NodepoolScalingGroupTags) String() string {
+	return tea.Prettify(s)
+}
+
+func (s NodepoolScalingGroupTags) GoString() string {
+	return s.String()
+}
+
+func (s *NodepoolScalingGroupTags) SetKey(v string) *NodepoolScalingGroupTags {
+	s.Key = &v
+	return s
+}
+
+func (s *NodepoolScalingGroupTags) SetValue(v string) *NodepoolScalingGroupTags {
+	s.Value = &v
+	return s
+}
+
+type NodepoolTeeConfig struct {
+	TeeEnable *bool `json:"tee_enable,omitempty" xml:"tee_enable,omitempty"`
+}
+
+func (s NodepoolTeeConfig) String() string {
+	return tea.Prettify(s)
+}
+
+func (s NodepoolTeeConfig) GoString() string {
+	return s.String()
+}
+
+func (s *NodepoolTeeConfig) SetTeeEnable(v bool) *NodepoolTeeConfig {
+	s.TeeEnable = &v
 	return s
 }
 
@@ -233,6 +885,41 @@ func (s *StandardComponentsValue) SetDisabled(v bool) *StandardComponentsValue {
 	return s
 }
 
+type QuotasValue struct {
+	Quota         *string `json:"quota,omitempty" xml:"quota,omitempty"`
+	OperationCode *string `json:"operation_code,omitempty" xml:"operation_code,omitempty"`
+	Adjustable    *bool   `json:"adjustable,omitempty" xml:"adjustable,omitempty"`
+	Unit          *string `json:"unit,omitempty" xml:"unit,omitempty"`
+}
+
+func (s QuotasValue) String() string {
+	return tea.Prettify(s)
+}
+
+func (s QuotasValue) GoString() string {
+	return s.String()
+}
+
+func (s *QuotasValue) SetQuota(v string) *QuotasValue {
+	s.Quota = &v
+	return s
+}
+
+func (s *QuotasValue) SetOperationCode(v string) *QuotasValue {
+	s.OperationCode = &v
+	return s
+}
+
+func (s *QuotasValue) SetAdjustable(v bool) *QuotasValue {
+	s.Adjustable = &v
+	return s
+}
+
+func (s *QuotasValue) SetUnit(v string) *QuotasValue {
+	s.Unit = &v
+	return s
+}
+
 type AttachInstancesRequest struct {
 	CpuPolicy        *string   `json:"cpu_policy,omitempty" xml:"cpu_policy,omitempty"`
 	FormatDisk       *bool     `json:"format_disk,omitempty" xml:"format_disk,omitempty"`
@@ -323,8 +1010,10 @@ func (s *AttachInstancesRequest) SetUserData(v string) *AttachInstancesRequest {
 }
 
 type AttachInstancesResponseBody struct {
-	List   []*AttachInstancesResponseBodyList `json:"list,omitempty" xml:"list,omitempty" type:"Repeated"`
-	TaskId *string                            `json:"task_id,omitempty" xml:"task_id,omitempty"`
+	// The details of the added nodes.
+	List []*AttachInstancesResponseBodyList `json:"list,omitempty" xml:"list,omitempty" type:"Repeated"`
+	// The ID of the task.
+	TaskId *string `json:"task_id,omitempty" xml:"task_id,omitempty"`
 }
 
 func (s AttachInstancesResponseBody) String() string {
@@ -346,9 +1035,12 @@ func (s *AttachInstancesResponseBody) SetTaskId(v string) *AttachInstancesRespon
 }
 
 type AttachInstancesResponseBodyList struct {
-	Code       *string `json:"code,omitempty" xml:"code,omitempty"`
+	// The code that indicates the task result.
+	Code *string `json:"code,omitempty" xml:"code,omitempty"`
+	// The ID of the instance.
 	InstanceId *string `json:"instanceId,omitempty" xml:"instanceId,omitempty"`
-	Message    *string `json:"message,omitempty" xml:"message,omitempty"`
+	// Indicates whether the ECS instances are successfully added to the ACK cluster.
+	Message *string `json:"message,omitempty" xml:"message,omitempty"`
 }
 
 func (s AttachInstancesResponseBodyList) String() string {
@@ -399,6 +1091,93 @@ func (s *AttachInstancesResponse) SetStatusCode(v int32) *AttachInstancesRespons
 }
 
 func (s *AttachInstancesResponse) SetBody(v *AttachInstancesResponseBody) *AttachInstancesResponse {
+	s.Body = v
+	return s
+}
+
+type AttachInstancesToNodePoolRequest struct {
+	FormatDisk       *bool     `json:"format_disk,omitempty" xml:"format_disk,omitempty"`
+	Instances        []*string `json:"instances,omitempty" xml:"instances,omitempty" type:"Repeated"`
+	KeepInstanceName *bool     `json:"keep_instance_name,omitempty" xml:"keep_instance_name,omitempty"`
+	Password         *string   `json:"password,omitempty" xml:"password,omitempty"`
+}
+
+func (s AttachInstancesToNodePoolRequest) String() string {
+	return tea.Prettify(s)
+}
+
+func (s AttachInstancesToNodePoolRequest) GoString() string {
+	return s.String()
+}
+
+func (s *AttachInstancesToNodePoolRequest) SetFormatDisk(v bool) *AttachInstancesToNodePoolRequest {
+	s.FormatDisk = &v
+	return s
+}
+
+func (s *AttachInstancesToNodePoolRequest) SetInstances(v []*string) *AttachInstancesToNodePoolRequest {
+	s.Instances = v
+	return s
+}
+
+func (s *AttachInstancesToNodePoolRequest) SetKeepInstanceName(v bool) *AttachInstancesToNodePoolRequest {
+	s.KeepInstanceName = &v
+	return s
+}
+
+func (s *AttachInstancesToNodePoolRequest) SetPassword(v string) *AttachInstancesToNodePoolRequest {
+	s.Password = &v
+	return s
+}
+
+type AttachInstancesToNodePoolResponseBody struct {
+	RequestId *string `json:"request_id,omitempty" xml:"request_id,omitempty"`
+	TaskId    *string `json:"task_id,omitempty" xml:"task_id,omitempty"`
+}
+
+func (s AttachInstancesToNodePoolResponseBody) String() string {
+	return tea.Prettify(s)
+}
+
+func (s AttachInstancesToNodePoolResponseBody) GoString() string {
+	return s.String()
+}
+
+func (s *AttachInstancesToNodePoolResponseBody) SetRequestId(v string) *AttachInstancesToNodePoolResponseBody {
+	s.RequestId = &v
+	return s
+}
+
+func (s *AttachInstancesToNodePoolResponseBody) SetTaskId(v string) *AttachInstancesToNodePoolResponseBody {
+	s.TaskId = &v
+	return s
+}
+
+type AttachInstancesToNodePoolResponse struct {
+	Headers    map[string]*string                     `json:"headers,omitempty" xml:"headers,omitempty" require:"true"`
+	StatusCode *int32                                 `json:"statusCode,omitempty" xml:"statusCode,omitempty" require:"true"`
+	Body       *AttachInstancesToNodePoolResponseBody `json:"body,omitempty" xml:"body,omitempty" require:"true"`
+}
+
+func (s AttachInstancesToNodePoolResponse) String() string {
+	return tea.Prettify(s)
+}
+
+func (s AttachInstancesToNodePoolResponse) GoString() string {
+	return s.String()
+}
+
+func (s *AttachInstancesToNodePoolResponse) SetHeaders(v map[string]*string) *AttachInstancesToNodePoolResponse {
+	s.Headers = v
+	return s
+}
+
+func (s *AttachInstancesToNodePoolResponse) SetStatusCode(v int32) *AttachInstancesToNodePoolResponse {
+	s.StatusCode = &v
+	return s
+}
+
+func (s *AttachInstancesToNodePoolResponse) SetBody(v *AttachInstancesToNodePoolResponseBody) *AttachInstancesToNodePoolResponse {
 	s.Body = v
 	return s
 }
@@ -512,14 +1291,85 @@ func (s *CancelWorkflowResponse) SetStatusCode(v int32) *CancelWorkflowResponse 
 	return s
 }
 
+type CheckControlPlaneLogEnableResponseBody struct {
+	Aliuid     *string   `json:"aliuid,omitempty" xml:"aliuid,omitempty"`
+	Components []*string `json:"components,omitempty" xml:"components,omitempty" type:"Repeated"`
+	LogProject *string   `json:"log_project,omitempty" xml:"log_project,omitempty"`
+	LogTtl     *string   `json:"log_ttl,omitempty" xml:"log_ttl,omitempty"`
+}
+
+func (s CheckControlPlaneLogEnableResponseBody) String() string {
+	return tea.Prettify(s)
+}
+
+func (s CheckControlPlaneLogEnableResponseBody) GoString() string {
+	return s.String()
+}
+
+func (s *CheckControlPlaneLogEnableResponseBody) SetAliuid(v string) *CheckControlPlaneLogEnableResponseBody {
+	s.Aliuid = &v
+	return s
+}
+
+func (s *CheckControlPlaneLogEnableResponseBody) SetComponents(v []*string) *CheckControlPlaneLogEnableResponseBody {
+	s.Components = v
+	return s
+}
+
+func (s *CheckControlPlaneLogEnableResponseBody) SetLogProject(v string) *CheckControlPlaneLogEnableResponseBody {
+	s.LogProject = &v
+	return s
+}
+
+func (s *CheckControlPlaneLogEnableResponseBody) SetLogTtl(v string) *CheckControlPlaneLogEnableResponseBody {
+	s.LogTtl = &v
+	return s
+}
+
+type CheckControlPlaneLogEnableResponse struct {
+	Headers    map[string]*string                      `json:"headers,omitempty" xml:"headers,omitempty" require:"true"`
+	StatusCode *int32                                  `json:"statusCode,omitempty" xml:"statusCode,omitempty" require:"true"`
+	Body       *CheckControlPlaneLogEnableResponseBody `json:"body,omitempty" xml:"body,omitempty" require:"true"`
+}
+
+func (s CheckControlPlaneLogEnableResponse) String() string {
+	return tea.Prettify(s)
+}
+
+func (s CheckControlPlaneLogEnableResponse) GoString() string {
+	return s.String()
+}
+
+func (s *CheckControlPlaneLogEnableResponse) SetHeaders(v map[string]*string) *CheckControlPlaneLogEnableResponse {
+	s.Headers = v
+	return s
+}
+
+func (s *CheckControlPlaneLogEnableResponse) SetStatusCode(v int32) *CheckControlPlaneLogEnableResponse {
+	s.StatusCode = &v
+	return s
+}
+
+func (s *CheckControlPlaneLogEnableResponse) SetBody(v *CheckControlPlaneLogEnableResponseBody) *CheckControlPlaneLogEnableResponse {
+	s.Body = v
+	return s
+}
+
 type CreateAutoscalingConfigRequest struct {
-	CoolDownDuration        *string `json:"cool_down_duration,omitempty" xml:"cool_down_duration,omitempty"`
-	Expander                *string `json:"expander,omitempty" xml:"expander,omitempty"`
-	GpuUtilizationThreshold *string `json:"gpu_utilization_threshold,omitempty" xml:"gpu_utilization_threshold,omitempty"`
-	ScaleDownEnabled        *bool   `json:"scale_down_enabled,omitempty" xml:"scale_down_enabled,omitempty"`
-	ScanInterval            *string `json:"scan_interval,omitempty" xml:"scan_interval,omitempty"`
-	UnneededDuration        *string `json:"unneeded_duration,omitempty" xml:"unneeded_duration,omitempty"`
-	UtilizationThreshold    *string `json:"utilization_threshold,omitempty" xml:"utilization_threshold,omitempty"`
+	CoolDownDuration           *string `json:"cool_down_duration,omitempty" xml:"cool_down_duration,omitempty"`
+	DaemonsetEvictionForNodes  *bool   `json:"daemonset_eviction_for_nodes,omitempty" xml:"daemonset_eviction_for_nodes,omitempty"`
+	Expander                   *string `json:"expander,omitempty" xml:"expander,omitempty"`
+	GpuUtilizationThreshold    *string `json:"gpu_utilization_threshold,omitempty" xml:"gpu_utilization_threshold,omitempty"`
+	MaxGracefulTerminationSec  *int32  `json:"max_graceful_termination_sec,omitempty" xml:"max_graceful_termination_sec,omitempty"`
+	MinReplicaCount            *int32  `json:"min_replica_count,omitempty" xml:"min_replica_count,omitempty"`
+	RecycleNodeDeletionEnabled *bool   `json:"recycle_node_deletion_enabled,omitempty" xml:"recycle_node_deletion_enabled,omitempty"`
+	ScaleDownEnabled           *bool   `json:"scale_down_enabled,omitempty" xml:"scale_down_enabled,omitempty"`
+	ScaleUpFromZero            *bool   `json:"scale_up_from_zero,omitempty" xml:"scale_up_from_zero,omitempty"`
+	ScanInterval               *string `json:"scan_interval,omitempty" xml:"scan_interval,omitempty"`
+	SkipNodesWithLocalStorage  *bool   `json:"skip_nodes_with_local_storage,omitempty" xml:"skip_nodes_with_local_storage,omitempty"`
+	SkipNodesWithSystemPods    *bool   `json:"skip_nodes_with_system_pods,omitempty" xml:"skip_nodes_with_system_pods,omitempty"`
+	UnneededDuration           *string `json:"unneeded_duration,omitempty" xml:"unneeded_duration,omitempty"`
+	UtilizationThreshold       *string `json:"utilization_threshold,omitempty" xml:"utilization_threshold,omitempty"`
 }
 
 func (s CreateAutoscalingConfigRequest) String() string {
@@ -535,6 +1385,11 @@ func (s *CreateAutoscalingConfigRequest) SetCoolDownDuration(v string) *CreateAu
 	return s
 }
 
+func (s *CreateAutoscalingConfigRequest) SetDaemonsetEvictionForNodes(v bool) *CreateAutoscalingConfigRequest {
+	s.DaemonsetEvictionForNodes = &v
+	return s
+}
+
 func (s *CreateAutoscalingConfigRequest) SetExpander(v string) *CreateAutoscalingConfigRequest {
 	s.Expander = &v
 	return s
@@ -545,13 +1400,43 @@ func (s *CreateAutoscalingConfigRequest) SetGpuUtilizationThreshold(v string) *C
 	return s
 }
 
+func (s *CreateAutoscalingConfigRequest) SetMaxGracefulTerminationSec(v int32) *CreateAutoscalingConfigRequest {
+	s.MaxGracefulTerminationSec = &v
+	return s
+}
+
+func (s *CreateAutoscalingConfigRequest) SetMinReplicaCount(v int32) *CreateAutoscalingConfigRequest {
+	s.MinReplicaCount = &v
+	return s
+}
+
+func (s *CreateAutoscalingConfigRequest) SetRecycleNodeDeletionEnabled(v bool) *CreateAutoscalingConfigRequest {
+	s.RecycleNodeDeletionEnabled = &v
+	return s
+}
+
 func (s *CreateAutoscalingConfigRequest) SetScaleDownEnabled(v bool) *CreateAutoscalingConfigRequest {
 	s.ScaleDownEnabled = &v
 	return s
 }
 
+func (s *CreateAutoscalingConfigRequest) SetScaleUpFromZero(v bool) *CreateAutoscalingConfigRequest {
+	s.ScaleUpFromZero = &v
+	return s
+}
+
 func (s *CreateAutoscalingConfigRequest) SetScanInterval(v string) *CreateAutoscalingConfigRequest {
 	s.ScanInterval = &v
+	return s
+}
+
+func (s *CreateAutoscalingConfigRequest) SetSkipNodesWithLocalStorage(v bool) *CreateAutoscalingConfigRequest {
+	s.SkipNodesWithLocalStorage = &v
+	return s
+}
+
+func (s *CreateAutoscalingConfigRequest) SetSkipNodesWithSystemPods(v bool) *CreateAutoscalingConfigRequest {
+	s.SkipNodesWithSystemPods = &v
 	return s
 }
 
@@ -589,94 +1474,108 @@ func (s *CreateAutoscalingConfigResponse) SetStatusCode(v int32) *CreateAutoscal
 }
 
 type CreateClusterRequest struct {
-	Addons                           []*Addon                               `json:"addons,omitempty" xml:"addons,omitempty" type:"Repeated"`
-	ApiAudiences                     *string                                `json:"api_audiences,omitempty" xml:"api_audiences,omitempty"`
-	ChargeType                       *string                                `json:"charge_type,omitempty" xml:"charge_type,omitempty"`
-	CisEnabled                       *bool                                  `json:"cis_enabled,omitempty" xml:"cis_enabled,omitempty"`
-	CloudMonitorFlags                *bool                                  `json:"cloud_monitor_flags,omitempty" xml:"cloud_monitor_flags,omitempty"`
-	ClusterDomain                    *string                                `json:"cluster_domain,omitempty" xml:"cluster_domain,omitempty"`
-	ClusterSpec                      *string                                `json:"cluster_spec,omitempty" xml:"cluster_spec,omitempty"`
-	ClusterType                      *string                                `json:"cluster_type,omitempty" xml:"cluster_type,omitempty"`
-	ContainerCidr                    *string                                `json:"container_cidr,omitempty" xml:"container_cidr,omitempty"`
-	ControlplaneLogComponents        []*string                              `json:"controlplane_log_components,omitempty" xml:"controlplane_log_components,omitempty" type:"Repeated"`
-	ControlplaneLogProject           *string                                `json:"controlplane_log_project,omitempty" xml:"controlplane_log_project,omitempty"`
-	ControlplaneLogTtl               *string                                `json:"controlplane_log_ttl,omitempty" xml:"controlplane_log_ttl,omitempty"`
-	CpuPolicy                        *string                                `json:"cpu_policy,omitempty" xml:"cpu_policy,omitempty"`
-	CustomSan                        *string                                `json:"custom_san,omitempty" xml:"custom_san,omitempty"`
-	DeletionProtection               *bool                                  `json:"deletion_protection,omitempty" xml:"deletion_protection,omitempty"`
-	DisableRollback                  *bool                                  `json:"disable_rollback,omitempty" xml:"disable_rollback,omitempty"`
-	EnableRrsa                       *bool                                  `json:"enable_rrsa,omitempty" xml:"enable_rrsa,omitempty"`
-	EncryptionProviderKey            *string                                `json:"encryption_provider_key,omitempty" xml:"encryption_provider_key,omitempty"`
-	EndpointPublicAccess             *bool                                  `json:"endpoint_public_access,omitempty" xml:"endpoint_public_access,omitempty"`
-	FormatDisk                       *bool                                  `json:"format_disk,omitempty" xml:"format_disk,omitempty"`
-	ImageId                          *string                                `json:"image_id,omitempty" xml:"image_id,omitempty"`
-	ImageType                        *string                                `json:"image_type,omitempty" xml:"image_type,omitempty"`
-	Instances                        []*string                              `json:"instances,omitempty" xml:"instances,omitempty" type:"Repeated"`
-	IpStack                          *string                                `json:"ip_stack,omitempty" xml:"ip_stack,omitempty"`
-	IsEnterpriseSecurityGroup        *bool                                  `json:"is_enterprise_security_group,omitempty" xml:"is_enterprise_security_group,omitempty"`
-	KeepInstanceName                 *bool                                  `json:"keep_instance_name,omitempty" xml:"keep_instance_name,omitempty"`
-	KeyPair                          *string                                `json:"key_pair,omitempty" xml:"key_pair,omitempty"`
-	KubernetesVersion                *string                                `json:"kubernetes_version,omitempty" xml:"kubernetes_version,omitempty"`
-	LoadBalancerSpec                 *string                                `json:"load_balancer_spec,omitempty" xml:"load_balancer_spec,omitempty"`
-	LoggingType                      *string                                `json:"logging_type,omitempty" xml:"logging_type,omitempty"`
-	LoginPassword                    *string                                `json:"login_password,omitempty" xml:"login_password,omitempty"`
-	MasterAutoRenew                  *bool                                  `json:"master_auto_renew,omitempty" xml:"master_auto_renew,omitempty"`
-	MasterAutoRenewPeriod            *int64                                 `json:"master_auto_renew_period,omitempty" xml:"master_auto_renew_period,omitempty"`
-	MasterCount                      *int64                                 `json:"master_count,omitempty" xml:"master_count,omitempty"`
-	MasterInstanceChargeType         *string                                `json:"master_instance_charge_type,omitempty" xml:"master_instance_charge_type,omitempty"`
-	MasterInstanceTypes              []*string                              `json:"master_instance_types,omitempty" xml:"master_instance_types,omitempty" type:"Repeated"`
-	MasterPeriod                     *int64                                 `json:"master_period,omitempty" xml:"master_period,omitempty"`
-	MasterPeriodUnit                 *string                                `json:"master_period_unit,omitempty" xml:"master_period_unit,omitempty"`
-	MasterSystemDiskCategory         *string                                `json:"master_system_disk_category,omitempty" xml:"master_system_disk_category,omitempty"`
-	MasterSystemDiskPerformanceLevel *string                                `json:"master_system_disk_performance_level,omitempty" xml:"master_system_disk_performance_level,omitempty"`
-	MasterSystemDiskSize             *int64                                 `json:"master_system_disk_size,omitempty" xml:"master_system_disk_size,omitempty"`
-	MasterSystemDiskSnapshotPolicyId *string                                `json:"master_system_disk_snapshot_policy_id,omitempty" xml:"master_system_disk_snapshot_policy_id,omitempty"`
-	MasterVswitchIds                 []*string                              `json:"master_vswitch_ids,omitempty" xml:"master_vswitch_ids,omitempty" type:"Repeated"`
-	Name                             *string                                `json:"name,omitempty" xml:"name,omitempty"`
-	NatGateway                       *bool                                  `json:"nat_gateway,omitempty" xml:"nat_gateway,omitempty"`
-	NodeCidrMask                     *string                                `json:"node_cidr_mask,omitempty" xml:"node_cidr_mask,omitempty"`
-	NodeNameMode                     *string                                `json:"node_name_mode,omitempty" xml:"node_name_mode,omitempty"`
-	NodePortRange                    *string                                `json:"node_port_range,omitempty" xml:"node_port_range,omitempty"`
-	NumOfNodes                       *int64                                 `json:"num_of_nodes,omitempty" xml:"num_of_nodes,omitempty"`
-	OsType                           *string                                `json:"os_type,omitempty" xml:"os_type,omitempty"`
-	Period                           *int64                                 `json:"period,omitempty" xml:"period,omitempty"`
-	PeriodUnit                       *string                                `json:"period_unit,omitempty" xml:"period_unit,omitempty"`
-	Platform                         *string                                `json:"platform,omitempty" xml:"platform,omitempty"`
-	PodVswitchIds                    []*string                              `json:"pod_vswitch_ids,omitempty" xml:"pod_vswitch_ids,omitempty" type:"Repeated"`
-	Profile                          *string                                `json:"profile,omitempty" xml:"profile,omitempty"`
-	ProxyMode                        *string                                `json:"proxy_mode,omitempty" xml:"proxy_mode,omitempty"`
-	RdsInstances                     []*string                              `json:"rds_instances,omitempty" xml:"rds_instances,omitempty" type:"Repeated"`
-	RegionId                         *string                                `json:"region_id,omitempty" xml:"region_id,omitempty"`
-	ResourceGroupId                  *string                                `json:"resource_group_id,omitempty" xml:"resource_group_id,omitempty"`
-	Runtime                          *Runtime                               `json:"runtime,omitempty" xml:"runtime,omitempty"`
-	SecurityGroupId                  *string                                `json:"security_group_id,omitempty" xml:"security_group_id,omitempty"`
-	ServiceAccountIssuer             *string                                `json:"service_account_issuer,omitempty" xml:"service_account_issuer,omitempty"`
-	ServiceCidr                      *string                                `json:"service_cidr,omitempty" xml:"service_cidr,omitempty"`
-	ServiceDiscoveryTypes            []*string                              `json:"service_discovery_types,omitempty" xml:"service_discovery_types,omitempty" type:"Repeated"`
-	SnatEntry                        *bool                                  `json:"snat_entry,omitempty" xml:"snat_entry,omitempty"`
-	SocEnabled                       *bool                                  `json:"soc_enabled,omitempty" xml:"soc_enabled,omitempty"`
-	SshFlags                         *bool                                  `json:"ssh_flags,omitempty" xml:"ssh_flags,omitempty"`
-	Tags                             []*Tag                                 `json:"tags,omitempty" xml:"tags,omitempty" type:"Repeated"`
-	Taints                           []*Taint                               `json:"taints,omitempty" xml:"taints,omitempty" type:"Repeated"`
-	TimeoutMins                      *int64                                 `json:"timeout_mins,omitempty" xml:"timeout_mins,omitempty"`
-	Timezone                         *string                                `json:"timezone,omitempty" xml:"timezone,omitempty"`
-	UserCa                           *string                                `json:"user_ca,omitempty" xml:"user_ca,omitempty"`
-	UserData                         *string                                `json:"user_data,omitempty" xml:"user_data,omitempty"`
-	Vpcid                            *string                                `json:"vpcid,omitempty" xml:"vpcid,omitempty"`
-	VswitchIds                       []*string                              `json:"vswitch_ids,omitempty" xml:"vswitch_ids,omitempty" type:"Repeated"`
-	WorkerAutoRenew                  *bool                                  `json:"worker_auto_renew,omitempty" xml:"worker_auto_renew,omitempty"`
-	WorkerAutoRenewPeriod            *int64                                 `json:"worker_auto_renew_period,omitempty" xml:"worker_auto_renew_period,omitempty"`
-	WorkerDataDisks                  []*CreateClusterRequestWorkerDataDisks `json:"worker_data_disks,omitempty" xml:"worker_data_disks,omitempty" type:"Repeated"`
-	WorkerInstanceChargeType         *string                                `json:"worker_instance_charge_type,omitempty" xml:"worker_instance_charge_type,omitempty"`
-	WorkerInstanceTypes              []*string                              `json:"worker_instance_types,omitempty" xml:"worker_instance_types,omitempty" type:"Repeated"`
-	WorkerPeriod                     *int64                                 `json:"worker_period,omitempty" xml:"worker_period,omitempty"`
-	WorkerPeriodUnit                 *string                                `json:"worker_period_unit,omitempty" xml:"worker_period_unit,omitempty"`
-	WorkerSystemDiskCategory         *string                                `json:"worker_system_disk_category,omitempty" xml:"worker_system_disk_category,omitempty"`
-	WorkerSystemDiskPerformanceLevel *string                                `json:"worker_system_disk_performance_level,omitempty" xml:"worker_system_disk_performance_level,omitempty"`
-	WorkerSystemDiskSize             *int64                                 `json:"worker_system_disk_size,omitempty" xml:"worker_system_disk_size,omitempty"`
-	WorkerSystemDiskSnapshotPolicyId *string                                `json:"worker_system_disk_snapshot_policy_id,omitempty" xml:"worker_system_disk_snapshot_policy_id,omitempty"`
-	WorkerVswitchIds                 []*string                              `json:"worker_vswitch_ids,omitempty" xml:"worker_vswitch_ids,omitempty" type:"Repeated"`
-	ZoneId                           *string                                `json:"zone_id,omitempty" xml:"zone_id,omitempty"`
+	Addons                           []*Addon    `json:"addons,omitempty" xml:"addons,omitempty" type:"Repeated"`
+	ApiAudiences                     *string     `json:"api_audiences,omitempty" xml:"api_audiences,omitempty"`
+	ChargeType                       *string     `json:"charge_type,omitempty" xml:"charge_type,omitempty"`
+	CisEnabled                       *bool       `json:"cis_enabled,omitempty" xml:"cis_enabled,omitempty"`
+	CloudMonitorFlags                *bool       `json:"cloud_monitor_flags,omitempty" xml:"cloud_monitor_flags,omitempty"`
+	ClusterDomain                    *string     `json:"cluster_domain,omitempty" xml:"cluster_domain,omitempty"`
+	ClusterSpec                      *string     `json:"cluster_spec,omitempty" xml:"cluster_spec,omitempty"`
+	ClusterType                      *string     `json:"cluster_type,omitempty" xml:"cluster_type,omitempty"`
+	ContainerCidr                    *string     `json:"container_cidr,omitempty" xml:"container_cidr,omitempty"`
+	ControlplaneLogComponents        []*string   `json:"controlplane_log_components,omitempty" xml:"controlplane_log_components,omitempty" type:"Repeated"`
+	ControlplaneLogProject           *string     `json:"controlplane_log_project,omitempty" xml:"controlplane_log_project,omitempty"`
+	ControlplaneLogTtl               *string     `json:"controlplane_log_ttl,omitempty" xml:"controlplane_log_ttl,omitempty"`
+	CpuPolicy                        *string     `json:"cpu_policy,omitempty" xml:"cpu_policy,omitempty"`
+	CustomSan                        *string     `json:"custom_san,omitempty" xml:"custom_san,omitempty"`
+	DeletionProtection               *bool       `json:"deletion_protection,omitempty" xml:"deletion_protection,omitempty"`
+	DisableRollback                  *bool       `json:"disable_rollback,omitempty" xml:"disable_rollback,omitempty"`
+	EnableRrsa                       *bool       `json:"enable_rrsa,omitempty" xml:"enable_rrsa,omitempty"`
+	EncryptionProviderKey            *string     `json:"encryption_provider_key,omitempty" xml:"encryption_provider_key,omitempty"`
+	EndpointPublicAccess             *bool       `json:"endpoint_public_access,omitempty" xml:"endpoint_public_access,omitempty"`
+	FormatDisk                       *bool       `json:"format_disk,omitempty" xml:"format_disk,omitempty"`
+	ImageId                          *string     `json:"image_id,omitempty" xml:"image_id,omitempty"`
+	ImageType                        *string     `json:"image_type,omitempty" xml:"image_type,omitempty"`
+	Instances                        []*string   `json:"instances,omitempty" xml:"instances,omitempty" type:"Repeated"`
+	IpStack                          *string     `json:"ip_stack,omitempty" xml:"ip_stack,omitempty"`
+	IsEnterpriseSecurityGroup        *bool       `json:"is_enterprise_security_group,omitempty" xml:"is_enterprise_security_group,omitempty"`
+	KeepInstanceName                 *bool       `json:"keep_instance_name,omitempty" xml:"keep_instance_name,omitempty"`
+	KeyPair                          *string     `json:"key_pair,omitempty" xml:"key_pair,omitempty"`
+	KubernetesVersion                *string     `json:"kubernetes_version,omitempty" xml:"kubernetes_version,omitempty"`
+	LoadBalancerSpec                 *string     `json:"load_balancer_spec,omitempty" xml:"load_balancer_spec,omitempty"`
+	LoggingType                      *string     `json:"logging_type,omitempty" xml:"logging_type,omitempty"`
+	LoginPassword                    *string     `json:"login_password,omitempty" xml:"login_password,omitempty"`
+	MasterAutoRenew                  *bool       `json:"master_auto_renew,omitempty" xml:"master_auto_renew,omitempty"`
+	MasterAutoRenewPeriod            *int64      `json:"master_auto_renew_period,omitempty" xml:"master_auto_renew_period,omitempty"`
+	MasterCount                      *int64      `json:"master_count,omitempty" xml:"master_count,omitempty"`
+	MasterInstanceChargeType         *string     `json:"master_instance_charge_type,omitempty" xml:"master_instance_charge_type,omitempty"`
+	MasterInstanceTypes              []*string   `json:"master_instance_types,omitempty" xml:"master_instance_types,omitempty" type:"Repeated"`
+	MasterPeriod                     *int64      `json:"master_period,omitempty" xml:"master_period,omitempty"`
+	MasterPeriodUnit                 *string     `json:"master_period_unit,omitempty" xml:"master_period_unit,omitempty"`
+	MasterSystemDiskCategory         *string     `json:"master_system_disk_category,omitempty" xml:"master_system_disk_category,omitempty"`
+	MasterSystemDiskPerformanceLevel *string     `json:"master_system_disk_performance_level,omitempty" xml:"master_system_disk_performance_level,omitempty"`
+	MasterSystemDiskSize             *int64      `json:"master_system_disk_size,omitempty" xml:"master_system_disk_size,omitempty"`
+	MasterSystemDiskSnapshotPolicyId *string     `json:"master_system_disk_snapshot_policy_id,omitempty" xml:"master_system_disk_snapshot_policy_id,omitempty"`
+	MasterVswitchIds                 []*string   `json:"master_vswitch_ids,omitempty" xml:"master_vswitch_ids,omitempty" type:"Repeated"`
+	Name                             *string     `json:"name,omitempty" xml:"name,omitempty"`
+	NatGateway                       *bool       `json:"nat_gateway,omitempty" xml:"nat_gateway,omitempty"`
+	NodeCidrMask                     *string     `json:"node_cidr_mask,omitempty" xml:"node_cidr_mask,omitempty"`
+	NodeNameMode                     *string     `json:"node_name_mode,omitempty" xml:"node_name_mode,omitempty"`
+	NodePortRange                    *string     `json:"node_port_range,omitempty" xml:"node_port_range,omitempty"`
+	Nodepools                        []*Nodepool `json:"nodepools,omitempty" xml:"nodepools,omitempty" type:"Repeated"`
+	// Deprecated
+	NumOfNodes            *int64    `json:"num_of_nodes,omitempty" xml:"num_of_nodes,omitempty"`
+	OsType                *string   `json:"os_type,omitempty" xml:"os_type,omitempty"`
+	Period                *int64    `json:"period,omitempty" xml:"period,omitempty"`
+	PeriodUnit            *string   `json:"period_unit,omitempty" xml:"period_unit,omitempty"`
+	Platform              *string   `json:"platform,omitempty" xml:"platform,omitempty"`
+	PodVswitchIds         []*string `json:"pod_vswitch_ids,omitempty" xml:"pod_vswitch_ids,omitempty" type:"Repeated"`
+	Profile               *string   `json:"profile,omitempty" xml:"profile,omitempty"`
+	ProxyMode             *string   `json:"proxy_mode,omitempty" xml:"proxy_mode,omitempty"`
+	RdsInstances          []*string `json:"rds_instances,omitempty" xml:"rds_instances,omitempty" type:"Repeated"`
+	RegionId              *string   `json:"region_id,omitempty" xml:"region_id,omitempty"`
+	ResourceGroupId       *string   `json:"resource_group_id,omitempty" xml:"resource_group_id,omitempty"`
+	Runtime               *Runtime  `json:"runtime,omitempty" xml:"runtime,omitempty"`
+	SecurityGroupId       *string   `json:"security_group_id,omitempty" xml:"security_group_id,omitempty"`
+	ServiceAccountIssuer  *string   `json:"service_account_issuer,omitempty" xml:"service_account_issuer,omitempty"`
+	ServiceCidr           *string   `json:"service_cidr,omitempty" xml:"service_cidr,omitempty"`
+	ServiceDiscoveryTypes []*string `json:"service_discovery_types,omitempty" xml:"service_discovery_types,omitempty" type:"Repeated"`
+	SnatEntry             *bool     `json:"snat_entry,omitempty" xml:"snat_entry,omitempty"`
+	SocEnabled            *bool     `json:"soc_enabled,omitempty" xml:"soc_enabled,omitempty"`
+	SshFlags              *bool     `json:"ssh_flags,omitempty" xml:"ssh_flags,omitempty"`
+	Tags                  []*Tag    `json:"tags,omitempty" xml:"tags,omitempty" type:"Repeated"`
+	Taints                []*Taint  `json:"taints,omitempty" xml:"taints,omitempty" type:"Repeated"`
+	TimeoutMins           *int64    `json:"timeout_mins,omitempty" xml:"timeout_mins,omitempty"`
+	Timezone              *string   `json:"timezone,omitempty" xml:"timezone,omitempty"`
+	UserCa                *string   `json:"user_ca,omitempty" xml:"user_ca,omitempty"`
+	UserData              *string   `json:"user_data,omitempty" xml:"user_data,omitempty"`
+	Vpcid                 *string   `json:"vpcid,omitempty" xml:"vpcid,omitempty"`
+	VswitchIds            []*string `json:"vswitch_ids,omitempty" xml:"vswitch_ids,omitempty" type:"Repeated"`
+	// Deprecated
+	WorkerAutoRenew *bool `json:"worker_auto_renew,omitempty" xml:"worker_auto_renew,omitempty"`
+	// Deprecated
+	WorkerAutoRenewPeriod *int64 `json:"worker_auto_renew_period,omitempty" xml:"worker_auto_renew_period,omitempty"`
+	// Deprecated
+	WorkerDataDisks []*CreateClusterRequestWorkerDataDisks `json:"worker_data_disks,omitempty" xml:"worker_data_disks,omitempty" type:"Repeated"`
+	// Deprecated
+	WorkerInstanceChargeType *string `json:"worker_instance_charge_type,omitempty" xml:"worker_instance_charge_type,omitempty"`
+	// Deprecated
+	WorkerInstanceTypes []*string `json:"worker_instance_types,omitempty" xml:"worker_instance_types,omitempty" type:"Repeated"`
+	// Deprecated
+	WorkerPeriod *int64 `json:"worker_period,omitempty" xml:"worker_period,omitempty"`
+	// Deprecated
+	WorkerPeriodUnit *string `json:"worker_period_unit,omitempty" xml:"worker_period_unit,omitempty"`
+	// Deprecated
+	WorkerSystemDiskCategory *string `json:"worker_system_disk_category,omitempty" xml:"worker_system_disk_category,omitempty"`
+	// Deprecated
+	WorkerSystemDiskPerformanceLevel *string `json:"worker_system_disk_performance_level,omitempty" xml:"worker_system_disk_performance_level,omitempty"`
+	// Deprecated
+	WorkerSystemDiskSize *int64 `json:"worker_system_disk_size,omitempty" xml:"worker_system_disk_size,omitempty"`
+	// Deprecated
+	WorkerSystemDiskSnapshotPolicyId *string `json:"worker_system_disk_snapshot_policy_id,omitempty" xml:"worker_system_disk_snapshot_policy_id,omitempty"`
+	// Deprecated
+	WorkerVswitchIds []*string `json:"worker_vswitch_ids,omitempty" xml:"worker_vswitch_ids,omitempty" type:"Repeated"`
+	ZoneId           *string   `json:"zone_id,omitempty" xml:"zone_id,omitempty"`
 }
 
 func (s CreateClusterRequest) String() string {
@@ -927,6 +1826,11 @@ func (s *CreateClusterRequest) SetNodePortRange(v string) *CreateClusterRequest 
 	return s
 }
 
+func (s *CreateClusterRequest) SetNodepools(v []*Nodepool) *CreateClusterRequest {
+	s.Nodepools = v
+	return s
+}
+
 func (s *CreateClusterRequest) SetNumOfNodes(v int64) *CreateClusterRequest {
 	s.NumOfNodes = &v
 	return s
@@ -1163,9 +2067,12 @@ func (s *CreateClusterRequestWorkerDataDisks) SetSize(v string) *CreateClusterRe
 }
 
 type CreateClusterResponseBody struct {
+	// The ID of the cluster.
 	ClusterId *string `json:"cluster_id,omitempty" xml:"cluster_id,omitempty"`
+	// The ID of the request.
 	RequestId *string `json:"request_id,omitempty" xml:"request_id,omitempty"`
-	TaskId    *string `json:"task_id,omitempty" xml:"task_id,omitempty"`
+	// The ID of the task.
+	TaskId *string `json:"task_id,omitempty" xml:"task_id,omitempty"`
 }
 
 func (s CreateClusterResponseBody) String() string {
@@ -1538,39 +2445,42 @@ func (s *CreateClusterNodePoolRequestNodepoolInfo) SetType(v string) *CreateClus
 }
 
 type CreateClusterNodePoolRequestScalingGroup struct {
-	AutoRenew                           *bool                                                     `json:"auto_renew,omitempty" xml:"auto_renew,omitempty"`
-	AutoRenewPeriod                     *int64                                                    `json:"auto_renew_period,omitempty" xml:"auto_renew_period,omitempty"`
-	CompensateWithOnDemand              *bool                                                     `json:"compensate_with_on_demand,omitempty" xml:"compensate_with_on_demand,omitempty"`
-	DataDisks                           []*DataDisk                                               `json:"data_disks,omitempty" xml:"data_disks,omitempty" type:"Repeated"`
-	DeploymentsetId                     *string                                                   `json:"deploymentset_id,omitempty" xml:"deploymentset_id,omitempty"`
-	DesiredSize                         *int64                                                    `json:"desired_size,omitempty" xml:"desired_size,omitempty"`
-	ImageId                             *string                                                   `json:"image_id,omitempty" xml:"image_id,omitempty"`
-	ImageType                           *string                                                   `json:"image_type,omitempty" xml:"image_type,omitempty"`
-	InstanceChargeType                  *string                                                   `json:"instance_charge_type,omitempty" xml:"instance_charge_type,omitempty"`
-	InstanceTypes                       []*string                                                 `json:"instance_types,omitempty" xml:"instance_types,omitempty" type:"Repeated"`
-	InternetChargeType                  *string                                                   `json:"internet_charge_type,omitempty" xml:"internet_charge_type,omitempty"`
-	InternetMaxBandwidthOut             *int64                                                    `json:"internet_max_bandwidth_out,omitempty" xml:"internet_max_bandwidth_out,omitempty"`
-	KeyPair                             *string                                                   `json:"key_pair,omitempty" xml:"key_pair,omitempty"`
-	LoginPassword                       *string                                                   `json:"login_password,omitempty" xml:"login_password,omitempty"`
-	MultiAzPolicy                       *string                                                   `json:"multi_az_policy,omitempty" xml:"multi_az_policy,omitempty"`
-	OnDemandBaseCapacity                *int64                                                    `json:"on_demand_base_capacity,omitempty" xml:"on_demand_base_capacity,omitempty"`
-	OnDemandPercentageAboveBaseCapacity *int64                                                    `json:"on_demand_percentage_above_base_capacity,omitempty" xml:"on_demand_percentage_above_base_capacity,omitempty"`
-	Period                              *int64                                                    `json:"period,omitempty" xml:"period,omitempty"`
-	PeriodUnit                          *string                                                   `json:"period_unit,omitempty" xml:"period_unit,omitempty"`
-	Platform                            *string                                                   `json:"platform,omitempty" xml:"platform,omitempty"`
-	RdsInstances                        []*string                                                 `json:"rds_instances,omitempty" xml:"rds_instances,omitempty" type:"Repeated"`
-	ScalingPolicy                       *string                                                   `json:"scaling_policy,omitempty" xml:"scaling_policy,omitempty"`
-	SecurityGroupId                     *string                                                   `json:"security_group_id,omitempty" xml:"security_group_id,omitempty"`
-	SecurityGroupIds                    []*string                                                 `json:"security_group_ids,omitempty" xml:"security_group_ids,omitempty" type:"Repeated"`
-	SpotInstancePools                   *int64                                                    `json:"spot_instance_pools,omitempty" xml:"spot_instance_pools,omitempty"`
-	SpotInstanceRemedy                  *bool                                                     `json:"spot_instance_remedy,omitempty" xml:"spot_instance_remedy,omitempty"`
-	SpotPriceLimit                      []*CreateClusterNodePoolRequestScalingGroupSpotPriceLimit `json:"spot_price_limit,omitempty" xml:"spot_price_limit,omitempty" type:"Repeated"`
-	SpotStrategy                        *string                                                   `json:"spot_strategy,omitempty" xml:"spot_strategy,omitempty"`
-	SystemDiskCategory                  *string                                                   `json:"system_disk_category,omitempty" xml:"system_disk_category,omitempty"`
-	SystemDiskPerformanceLevel          *string                                                   `json:"system_disk_performance_level,omitempty" xml:"system_disk_performance_level,omitempty"`
-	SystemDiskSize                      *int64                                                    `json:"system_disk_size,omitempty" xml:"system_disk_size,omitempty"`
-	Tags                                []*CreateClusterNodePoolRequestScalingGroupTags           `json:"tags,omitempty" xml:"tags,omitempty" type:"Repeated"`
-	VswitchIds                          []*string                                                 `json:"vswitch_ids,omitempty" xml:"vswitch_ids,omitempty" type:"Repeated"`
+	AutoRenew                           *bool                                                       `json:"auto_renew,omitempty" xml:"auto_renew,omitempty"`
+	AutoRenewPeriod                     *int64                                                      `json:"auto_renew_period,omitempty" xml:"auto_renew_period,omitempty"`
+	CompensateWithOnDemand              *bool                                                       `json:"compensate_with_on_demand,omitempty" xml:"compensate_with_on_demand,omitempty"`
+	DataDisks                           []*DataDisk                                                 `json:"data_disks,omitempty" xml:"data_disks,omitempty" type:"Repeated"`
+	DeploymentsetId                     *string                                                     `json:"deploymentset_id,omitempty" xml:"deploymentset_id,omitempty"`
+	DesiredSize                         *int64                                                      `json:"desired_size,omitempty" xml:"desired_size,omitempty"`
+	ImageId                             *string                                                     `json:"image_id,omitempty" xml:"image_id,omitempty"`
+	ImageType                           *string                                                     `json:"image_type,omitempty" xml:"image_type,omitempty"`
+	InstanceChargeType                  *string                                                     `json:"instance_charge_type,omitempty" xml:"instance_charge_type,omitempty"`
+	InstanceTypes                       []*string                                                   `json:"instance_types,omitempty" xml:"instance_types,omitempty" type:"Repeated"`
+	InternetChargeType                  *string                                                     `json:"internet_charge_type,omitempty" xml:"internet_charge_type,omitempty"`
+	InternetMaxBandwidthOut             *int64                                                      `json:"internet_max_bandwidth_out,omitempty" xml:"internet_max_bandwidth_out,omitempty"`
+	KeyPair                             *string                                                     `json:"key_pair,omitempty" xml:"key_pair,omitempty"`
+	LoginPassword                       *string                                                     `json:"login_password,omitempty" xml:"login_password,omitempty"`
+	MultiAzPolicy                       *string                                                     `json:"multi_az_policy,omitempty" xml:"multi_az_policy,omitempty"`
+	OnDemandBaseCapacity                *int64                                                      `json:"on_demand_base_capacity,omitempty" xml:"on_demand_base_capacity,omitempty"`
+	OnDemandPercentageAboveBaseCapacity *int64                                                      `json:"on_demand_percentage_above_base_capacity,omitempty" xml:"on_demand_percentage_above_base_capacity,omitempty"`
+	Period                              *int64                                                      `json:"period,omitempty" xml:"period,omitempty"`
+	PeriodUnit                          *string                                                     `json:"period_unit,omitempty" xml:"period_unit,omitempty"`
+	Platform                            *string                                                     `json:"platform,omitempty" xml:"platform,omitempty"`
+	PrivatePoolOptions                  *CreateClusterNodePoolRequestScalingGroupPrivatePoolOptions `json:"private_pool_options,omitempty" xml:"private_pool_options,omitempty" type:"Struct"`
+	RdsInstances                        []*string                                                   `json:"rds_instances,omitempty" xml:"rds_instances,omitempty" type:"Repeated"`
+	ScalingPolicy                       *string                                                     `json:"scaling_policy,omitempty" xml:"scaling_policy,omitempty"`
+	SecurityGroupId                     *string                                                     `json:"security_group_id,omitempty" xml:"security_group_id,omitempty"`
+	SecurityGroupIds                    []*string                                                   `json:"security_group_ids,omitempty" xml:"security_group_ids,omitempty" type:"Repeated"`
+	SpotInstancePools                   *int64                                                      `json:"spot_instance_pools,omitempty" xml:"spot_instance_pools,omitempty"`
+	SpotInstanceRemedy                  *bool                                                       `json:"spot_instance_remedy,omitempty" xml:"spot_instance_remedy,omitempty"`
+	SpotPriceLimit                      []*CreateClusterNodePoolRequestScalingGroupSpotPriceLimit   `json:"spot_price_limit,omitempty" xml:"spot_price_limit,omitempty" type:"Repeated"`
+	SpotStrategy                        *string                                                     `json:"spot_strategy,omitempty" xml:"spot_strategy,omitempty"`
+	SystemDiskBurstingEnabled           *bool                                                       `json:"system_disk_bursting_enabled,omitempty" xml:"system_disk_bursting_enabled,omitempty"`
+	SystemDiskCategory                  *string                                                     `json:"system_disk_category,omitempty" xml:"system_disk_category,omitempty"`
+	SystemDiskPerformanceLevel          *string                                                     `json:"system_disk_performance_level,omitempty" xml:"system_disk_performance_level,omitempty"`
+	SystemDiskProvisionedIops           *int64                                                      `json:"system_disk_provisioned_iops,omitempty" xml:"system_disk_provisioned_iops,omitempty"`
+	SystemDiskSize                      *int64                                                      `json:"system_disk_size,omitempty" xml:"system_disk_size,omitempty"`
+	Tags                                []*CreateClusterNodePoolRequestScalingGroupTags             `json:"tags,omitempty" xml:"tags,omitempty" type:"Repeated"`
+	VswitchIds                          []*string                                                   `json:"vswitch_ids,omitempty" xml:"vswitch_ids,omitempty" type:"Repeated"`
 }
 
 func (s CreateClusterNodePoolRequestScalingGroup) String() string {
@@ -1681,6 +2591,11 @@ func (s *CreateClusterNodePoolRequestScalingGroup) SetPlatform(v string) *Create
 	return s
 }
 
+func (s *CreateClusterNodePoolRequestScalingGroup) SetPrivatePoolOptions(v *CreateClusterNodePoolRequestScalingGroupPrivatePoolOptions) *CreateClusterNodePoolRequestScalingGroup {
+	s.PrivatePoolOptions = v
+	return s
+}
+
 func (s *CreateClusterNodePoolRequestScalingGroup) SetRdsInstances(v []*string) *CreateClusterNodePoolRequestScalingGroup {
 	s.RdsInstances = v
 	return s
@@ -1721,6 +2636,11 @@ func (s *CreateClusterNodePoolRequestScalingGroup) SetSpotStrategy(v string) *Cr
 	return s
 }
 
+func (s *CreateClusterNodePoolRequestScalingGroup) SetSystemDiskBurstingEnabled(v bool) *CreateClusterNodePoolRequestScalingGroup {
+	s.SystemDiskBurstingEnabled = &v
+	return s
+}
+
 func (s *CreateClusterNodePoolRequestScalingGroup) SetSystemDiskCategory(v string) *CreateClusterNodePoolRequestScalingGroup {
 	s.SystemDiskCategory = &v
 	return s
@@ -1728,6 +2648,11 @@ func (s *CreateClusterNodePoolRequestScalingGroup) SetSystemDiskCategory(v strin
 
 func (s *CreateClusterNodePoolRequestScalingGroup) SetSystemDiskPerformanceLevel(v string) *CreateClusterNodePoolRequestScalingGroup {
 	s.SystemDiskPerformanceLevel = &v
+	return s
+}
+
+func (s *CreateClusterNodePoolRequestScalingGroup) SetSystemDiskProvisionedIops(v int64) *CreateClusterNodePoolRequestScalingGroup {
+	s.SystemDiskProvisionedIops = &v
 	return s
 }
 
@@ -1743,6 +2668,29 @@ func (s *CreateClusterNodePoolRequestScalingGroup) SetTags(v []*CreateClusterNod
 
 func (s *CreateClusterNodePoolRequestScalingGroup) SetVswitchIds(v []*string) *CreateClusterNodePoolRequestScalingGroup {
 	s.VswitchIds = v
+	return s
+}
+
+type CreateClusterNodePoolRequestScalingGroupPrivatePoolOptions struct {
+	Id            *string `json:"id,omitempty" xml:"id,omitempty"`
+	MatchCriteria *string `json:"match_criteria,omitempty" xml:"match_criteria,omitempty"`
+}
+
+func (s CreateClusterNodePoolRequestScalingGroupPrivatePoolOptions) String() string {
+	return tea.Prettify(s)
+}
+
+func (s CreateClusterNodePoolRequestScalingGroupPrivatePoolOptions) GoString() string {
+	return s.String()
+}
+
+func (s *CreateClusterNodePoolRequestScalingGroupPrivatePoolOptions) SetId(v string) *CreateClusterNodePoolRequestScalingGroupPrivatePoolOptions {
+	s.Id = &v
+	return s
+}
+
+func (s *CreateClusterNodePoolRequestScalingGroupPrivatePoolOptions) SetMatchCriteria(v string) *CreateClusterNodePoolRequestScalingGroupPrivatePoolOptions {
+	s.MatchCriteria = &v
 	return s
 }
 
@@ -1810,6 +2758,7 @@ func (s *CreateClusterNodePoolRequestTeeConfig) SetTeeEnable(v bool) *CreateClus
 }
 
 type CreateClusterNodePoolResponseBody struct {
+	// The ID of the node pool that is created.
 	NodepoolId *string `json:"nodepool_id,omitempty" xml:"nodepool_id,omitempty"`
 }
 
@@ -1885,8 +2834,10 @@ func (s *CreateEdgeMachineRequest) SetSn(v string) *CreateEdgeMachineRequest {
 }
 
 type CreateEdgeMachineResponseBody struct {
+	// The ID of the cloud-native box.
 	EdgeMachineId *string `json:"edge_machine_id,omitempty" xml:"edge_machine_id,omitempty"`
-	RequestId     *string `json:"request_id,omitempty" xml:"request_id,omitempty"`
+	// The ID of the request.
+	RequestId *string `json:"request_id,omitempty" xml:"request_id,omitempty"`
 }
 
 func (s CreateEdgeMachineResponseBody) String() string {
@@ -1972,11 +2923,21 @@ func (s *CreateKubernetesTriggerRequest) SetType(v string) *CreateKubernetesTrig
 }
 
 type CreateKubernetesTriggerResponseBody struct {
-	Action    *string `json:"action,omitempty" xml:"action,omitempty"`
+	// The action that the trigger performs. For example, a value of `redeploy` indicates that the trigger redeploys the application.
+	Action *string `json:"action,omitempty" xml:"action,omitempty"`
+	// The ID of the ACK cluster.
 	ClusterId *string `json:"cluster_id,omitempty" xml:"cluster_id,omitempty"`
-	Id        *string `json:"id,omitempty" xml:"id,omitempty"`
+	// The ID of the trigger.
+	Id *string `json:"id,omitempty" xml:"id,omitempty"`
+	// The name of the project.
 	ProjectId *string `json:"project_id,omitempty" xml:"project_id,omitempty"`
-	Type      *string `json:"type,omitempty" xml:"type,omitempty"`
+	// The type of trigger.
+	//
+	// Valid values:
+	//
+	// *   `deployment`: performs actions on Deployments.
+	// *   `application`: performs actions on applications that are deployed in Application Center.
+	Type *string `json:"type,omitempty" xml:"type,omitempty"`
 }
 
 func (s CreateKubernetesTriggerResponseBody) String() string {
@@ -2083,6 +3044,7 @@ func (s *CreateTemplateRequest) SetTemplateType(v string) *CreateTemplateRequest
 }
 
 type CreateTemplateResponseBody struct {
+	// The ID of the template.
 	TemplateId *string `json:"template_id,omitempty" xml:"template_id,omitempty"`
 }
 
@@ -2164,11 +3126,16 @@ func (s *CreateTriggerRequest) SetType(v string) *CreateTriggerRequest {
 }
 
 type CreateTriggerResponseBody struct {
-	Action    *string `json:"action,omitempty" xml:"action,omitempty"`
+	// The action that the trigger performs. For example, a value of `redeploy` indicates that the trigger redeploys the application.
+	Action *string `json:"action,omitempty" xml:"action,omitempty"`
+	// The ID of the cluster.
 	ClusterId *string `json:"cluster_id,omitempty" xml:"cluster_id,omitempty"`
-	Id        *string `json:"id,omitempty" xml:"id,omitempty"`
+	// The ID of the trigger.
+	Id *string `json:"id,omitempty" xml:"id,omitempty"`
+	// The name of the project.
 	ProjectId *string `json:"project_id,omitempty" xml:"project_id,omitempty"`
-	Type      *string `json:"type,omitempty" xml:"type,omitempty"`
+	// The type of trigger. Default value: deployment.
+	Type *string `json:"type,omitempty" xml:"type,omitempty"`
 }
 
 func (s CreateTriggerResponseBody) String() string {
@@ -2337,9 +3304,28 @@ func (s *DeleteClusterShrinkRequest) SetRetainResourcesShrink(v string) *DeleteC
 	return s
 }
 
+type DeleteClusterResponseBody struct {
+	// 任务ID。
+	TaskId *string `json:"task_id,omitempty" xml:"task_id,omitempty"`
+}
+
+func (s DeleteClusterResponseBody) String() string {
+	return tea.Prettify(s)
+}
+
+func (s DeleteClusterResponseBody) GoString() string {
+	return s.String()
+}
+
+func (s *DeleteClusterResponseBody) SetTaskId(v string) *DeleteClusterResponseBody {
+	s.TaskId = &v
+	return s
+}
+
 type DeleteClusterResponse struct {
-	Headers    map[string]*string `json:"headers,omitempty" xml:"headers,omitempty" require:"true"`
-	StatusCode *int32             `json:"statusCode,omitempty" xml:"statusCode,omitempty" require:"true"`
+	Headers    map[string]*string         `json:"headers,omitempty" xml:"headers,omitempty" require:"true"`
+	StatusCode *int32                     `json:"statusCode,omitempty" xml:"statusCode,omitempty" require:"true"`
+	Body       *DeleteClusterResponseBody `json:"body,omitempty" xml:"body,omitempty" require:"true"`
 }
 
 func (s DeleteClusterResponse) String() string {
@@ -2360,7 +3346,13 @@ func (s *DeleteClusterResponse) SetStatusCode(v int32) *DeleteClusterResponse {
 	return s
 }
 
+func (s *DeleteClusterResponse) SetBody(v *DeleteClusterResponseBody) *DeleteClusterResponse {
+	s.Body = v
+	return s
+}
+
 type DeleteClusterNodepoolRequest struct {
+	// false
 	Force *bool `json:"force,omitempty" xml:"force,omitempty"`
 }
 
@@ -2378,6 +3370,7 @@ func (s *DeleteClusterNodepoolRequest) SetForce(v bool) *DeleteClusterNodepoolRe
 }
 
 type DeleteClusterNodepoolResponseBody struct {
+	// The ID of the request.
 	RequestId *string `json:"request_id,omitempty" xml:"request_id,omitempty"`
 }
 
@@ -2453,9 +3446,12 @@ func (s *DeleteClusterNodesRequest) SetReleaseNode(v bool) *DeleteClusterNodesRe
 }
 
 type DeleteClusterNodesResponseBody struct {
+	// The ID of the ACK cluster.
 	ClusterId *string `json:"cluster_id,omitempty" xml:"cluster_id,omitempty"`
+	// The ID of the request.
 	RequestId *string `json:"request_id,omitempty" xml:"request_id,omitempty"`
-	TaskId    *string `json:"task_id,omitempty" xml:"task_id,omitempty"`
+	// The ID of the task.
+	TaskId *string `json:"task_id,omitempty" xml:"task_id,omitempty"`
 }
 
 func (s DeleteClusterNodesResponseBody) String() string {
@@ -2591,6 +3587,7 @@ func (s *DeletePolicyInstanceRequest) SetInstanceName(v string) *DeletePolicyIns
 }
 
 type DeletePolicyInstanceResponseBody struct {
+	// The policy instances that are deleted.
 	Instances []*string `json:"instances,omitempty" xml:"instances,omitempty" type:"Repeated"`
 }
 
@@ -2712,6 +3709,7 @@ func (s *DeployPolicyInstanceRequest) SetParameters(v map[string]interface{}) *D
 }
 
 type DeployPolicyInstanceResponseBody struct {
+	// The policy instances that are deployed.
 	Instances []*string `json:"instances,omitempty" xml:"instances,omitempty" type:"Repeated"`
 }
 
@@ -2758,17 +3756,28 @@ func (s *DeployPolicyInstanceResponse) SetBody(v *DeployPolicyInstanceResponseBo
 }
 
 type DescirbeWorkflowResponseBody struct {
-	CreateTime     *string `json:"create_time,omitempty" xml:"create_time,omitempty"`
-	Duration       *string `json:"duration,omitempty" xml:"duration,omitempty"`
-	FinishTime     *string `json:"finish_time,omitempty" xml:"finish_time,omitempty"`
-	InputDataSize  *string `json:"input_data_size,omitempty" xml:"input_data_size,omitempty"`
-	JobName        *string `json:"job_name,omitempty" xml:"job_name,omitempty"`
-	JobNamespace   *string `json:"job_namespace,omitempty" xml:"job_namespace,omitempty"`
+	// The time when the workflow was created.
+	CreateTime *string `json:"create_time,omitempty" xml:"create_time,omitempty"`
+	// The duration of the workflow.
+	Duration *string `json:"duration,omitempty" xml:"duration,omitempty"`
+	// The time when the workflow ended.
+	FinishTime *string `json:"finish_time,omitempty" xml:"finish_time,omitempty"`
+	// The size of the input data.
+	InputDataSize *string `json:"input_data_size,omitempty" xml:"input_data_size,omitempty"`
+	// The name of the workflow.
+	JobName *string `json:"job_name,omitempty" xml:"job_name,omitempty"`
+	// The namespace to which the workflow belongs.
+	JobNamespace *string `json:"job_namespace,omitempty" xml:"job_namespace,omitempty"`
+	// The size of the output data.
 	OutputDataSize *string `json:"output_data_size,omitempty" xml:"output_data_size,omitempty"`
-	Status         *string `json:"status,omitempty" xml:"status,omitempty"`
-	TotalBases     *string `json:"total_bases,omitempty" xml:"total_bases,omitempty"`
-	TotalReads     *string `json:"total_reads,omitempty" xml:"total_reads,omitempty"`
-	UserInputData  *string `json:"user_input_data,omitempty" xml:"user_input_data,omitempty"`
+	// The current state of the workflow.
+	Status *string `json:"status,omitempty" xml:"status,omitempty"`
+	// The number of base pairs.
+	TotalBases *string `json:"total_bases,omitempty" xml:"total_bases,omitempty"`
+	// The number of reads.
+	TotalReads *string `json:"total_reads,omitempty" xml:"total_reads,omitempty"`
+	// The user input parameters.
+	UserInputData *string `json:"user_input_data,omitempty" xml:"user_input_data,omitempty"`
 }
 
 func (s DescirbeWorkflowResponseBody) String() string {
@@ -2864,8 +3873,11 @@ func (s *DescirbeWorkflowResponse) SetBody(v *DescirbeWorkflowResponseBody) *Des
 }
 
 type DescribeAddonsRequest struct {
-	ClusterType *string `json:"cluster_type,omitempty" xml:"cluster_type,omitempty"`
-	Region      *string `json:"region,omitempty" xml:"region,omitempty"`
+	ClusterProfile *string `json:"cluster_profile,omitempty" xml:"cluster_profile,omitempty"`
+	ClusterSpec    *string `json:"cluster_spec,omitempty" xml:"cluster_spec,omitempty"`
+	ClusterType    *string `json:"cluster_type,omitempty" xml:"cluster_type,omitempty"`
+	ClusterVersion *string `json:"cluster_version,omitempty" xml:"cluster_version,omitempty"`
+	Region         *string `json:"region,omitempty" xml:"region,omitempty"`
 }
 
 func (s DescribeAddonsRequest) String() string {
@@ -2876,8 +3888,23 @@ func (s DescribeAddonsRequest) GoString() string {
 	return s.String()
 }
 
+func (s *DescribeAddonsRequest) SetClusterProfile(v string) *DescribeAddonsRequest {
+	s.ClusterProfile = &v
+	return s
+}
+
+func (s *DescribeAddonsRequest) SetClusterSpec(v string) *DescribeAddonsRequest {
+	s.ClusterSpec = &v
+	return s
+}
+
 func (s *DescribeAddonsRequest) SetClusterType(v string) *DescribeAddonsRequest {
 	s.ClusterType = &v
+	return s
+}
+
+func (s *DescribeAddonsRequest) SetClusterVersion(v string) *DescribeAddonsRequest {
+	s.ClusterVersion = &v
 	return s
 }
 
@@ -2887,6 +3914,7 @@ func (s *DescribeAddonsRequest) SetRegion(v string) *DescribeAddonsRequest {
 }
 
 type DescribeAddonsResponseBody struct {
+	// The details of the returned components.
 	ComponentGroups    []*DescribeAddonsResponseBodyComponentGroups `json:"ComponentGroups,omitempty" xml:"ComponentGroups,omitempty" type:"Repeated"`
 	StandardComponents map[string]*StandardComponentsValue          `json:"StandardComponents,omitempty" xml:"StandardComponents,omitempty"`
 }
@@ -2910,8 +3938,10 @@ func (s *DescribeAddonsResponseBody) SetStandardComponents(v map[string]*Standar
 }
 
 type DescribeAddonsResponseBodyComponentGroups struct {
-	GroupName *string                                           `json:"group_name,omitempty" xml:"group_name,omitempty"`
-	Items     []*DescribeAddonsResponseBodyComponentGroupsItems `json:"items,omitempty" xml:"items,omitempty" type:"Repeated"`
+	// The name of the component group.
+	GroupName *string `json:"group_name,omitempty" xml:"group_name,omitempty"`
+	// The names of the components in the component group.
+	Items []*DescribeAddonsResponseBodyComponentGroupsItems `json:"items,omitempty" xml:"items,omitempty" type:"Repeated"`
 }
 
 func (s DescribeAddonsResponseBodyComponentGroups) String() string {
@@ -2933,6 +3963,7 @@ func (s *DescribeAddonsResponseBodyComponentGroups) SetItems(v []*DescribeAddons
 }
 
 type DescribeAddonsResponseBodyComponentGroupsItems struct {
+	// The name of the component.
 	Name *string `json:"name,omitempty" xml:"name,omitempty"`
 }
 
@@ -2978,10 +4009,77 @@ func (s *DescribeAddonsResponse) SetBody(v *DescribeAddonsResponseBody) *Describ
 	return s
 }
 
+type DescribeClusterAddonInstanceResponseBody struct {
+	Config  *string `json:"config,omitempty" xml:"config,omitempty"`
+	Name    *string `json:"name,omitempty" xml:"name,omitempty"`
+	State   *string `json:"state,omitempty" xml:"state,omitempty"`
+	Version *string `json:"version,omitempty" xml:"version,omitempty"`
+}
+
+func (s DescribeClusterAddonInstanceResponseBody) String() string {
+	return tea.Prettify(s)
+}
+
+func (s DescribeClusterAddonInstanceResponseBody) GoString() string {
+	return s.String()
+}
+
+func (s *DescribeClusterAddonInstanceResponseBody) SetConfig(v string) *DescribeClusterAddonInstanceResponseBody {
+	s.Config = &v
+	return s
+}
+
+func (s *DescribeClusterAddonInstanceResponseBody) SetName(v string) *DescribeClusterAddonInstanceResponseBody {
+	s.Name = &v
+	return s
+}
+
+func (s *DescribeClusterAddonInstanceResponseBody) SetState(v string) *DescribeClusterAddonInstanceResponseBody {
+	s.State = &v
+	return s
+}
+
+func (s *DescribeClusterAddonInstanceResponseBody) SetVersion(v string) *DescribeClusterAddonInstanceResponseBody {
+	s.Version = &v
+	return s
+}
+
+type DescribeClusterAddonInstanceResponse struct {
+	Headers    map[string]*string                        `json:"headers,omitempty" xml:"headers,omitempty" require:"true"`
+	StatusCode *int32                                    `json:"statusCode,omitempty" xml:"statusCode,omitempty" require:"true"`
+	Body       *DescribeClusterAddonInstanceResponseBody `json:"body,omitempty" xml:"body,omitempty" require:"true"`
+}
+
+func (s DescribeClusterAddonInstanceResponse) String() string {
+	return tea.Prettify(s)
+}
+
+func (s DescribeClusterAddonInstanceResponse) GoString() string {
+	return s.String()
+}
+
+func (s *DescribeClusterAddonInstanceResponse) SetHeaders(v map[string]*string) *DescribeClusterAddonInstanceResponse {
+	s.Headers = v
+	return s
+}
+
+func (s *DescribeClusterAddonInstanceResponse) SetStatusCode(v int32) *DescribeClusterAddonInstanceResponse {
+	s.StatusCode = &v
+	return s
+}
+
+func (s *DescribeClusterAddonInstanceResponse) SetBody(v *DescribeClusterAddonInstanceResponseBody) *DescribeClusterAddonInstanceResponse {
+	s.Body = v
+	return s
+}
+
 type DescribeClusterAddonMetadataResponseBody struct {
+	// The schema of component parameters.
 	ConfigSchema *string `json:"config_schema,omitempty" xml:"config_schema,omitempty"`
-	Name         *string `json:"name,omitempty" xml:"name,omitempty"`
-	Version      *string `json:"version,omitempty" xml:"version,omitempty"`
+	// The name of the component.
+	Name *string `json:"name,omitempty" xml:"name,omitempty"`
+	// The version of the component.
+	Version *string `json:"version,omitempty" xml:"version,omitempty"`
 }
 
 func (s DescribeClusterAddonMetadataResponseBody) String() string {
@@ -3234,35 +4332,112 @@ func (s *DescribeClusterAttachScriptsResponse) SetBody(v string) *DescribeCluste
 }
 
 type DescribeClusterDetailResponseBody struct {
-	ClusterId              *string            `json:"cluster_id,omitempty" xml:"cluster_id,omitempty"`
-	ClusterSpec            *string            `json:"cluster_spec,omitempty" xml:"cluster_spec,omitempty"`
-	ClusterType            *string            `json:"cluster_type,omitempty" xml:"cluster_type,omitempty"`
-	Created                *string            `json:"created,omitempty" xml:"created,omitempty"`
-	CurrentVersion         *string            `json:"current_version,omitempty" xml:"current_version,omitempty"`
-	DeletionProtection     *bool              `json:"deletion_protection,omitempty" xml:"deletion_protection,omitempty"`
-	DockerVersion          *string            `json:"docker_version,omitempty" xml:"docker_version,omitempty"`
-	ExternalLoadbalancerId *string            `json:"external_loadbalancer_id,omitempty" xml:"external_loadbalancer_id,omitempty"`
-	InitVersion            *string            `json:"init_version,omitempty" xml:"init_version,omitempty"`
-	MaintenanceWindow      *MaintenanceWindow `json:"maintenance_window,omitempty" xml:"maintenance_window,omitempty"`
-	MasterUrl              *string            `json:"master_url,omitempty" xml:"master_url,omitempty"`
-	MetaData               *string            `json:"meta_data,omitempty" xml:"meta_data,omitempty"`
-	Name                   *string            `json:"name,omitempty" xml:"name,omitempty"`
-	NetworkMode            *string            `json:"network_mode,omitempty" xml:"network_mode,omitempty"`
-	NextVersion            *string            `json:"next_version,omitempty" xml:"next_version,omitempty"`
-	PrivateZone            *bool              `json:"private_zone,omitempty" xml:"private_zone,omitempty"`
-	Profile                *string            `json:"profile,omitempty" xml:"profile,omitempty"`
-	RegionId               *string            `json:"region_id,omitempty" xml:"region_id,omitempty"`
-	ResourceGroupId        *string            `json:"resource_group_id,omitempty" xml:"resource_group_id,omitempty"`
-	SecurityGroupId        *string            `json:"security_group_id,omitempty" xml:"security_group_id,omitempty"`
-	Size                   *int64             `json:"size,omitempty" xml:"size,omitempty"`
-	State                  *string            `json:"state,omitempty" xml:"state,omitempty"`
-	SubnetCidr             *string            `json:"subnet_cidr,omitempty" xml:"subnet_cidr,omitempty"`
-	Tags                   []*Tag             `json:"tags,omitempty" xml:"tags,omitempty" type:"Repeated"`
-	Updated                *string            `json:"updated,omitempty" xml:"updated,omitempty"`
-	VpcId                  *string            `json:"vpc_id,omitempty" xml:"vpc_id,omitempty"`
-	VswitchId              *string            `json:"vswitch_id,omitempty" xml:"vswitch_id,omitempty"`
-	WorkerRamRoleName      *string            `json:"worker_ram_role_name,omitempty" xml:"worker_ram_role_name,omitempty"`
-	ZoneId                 *string            `json:"zone_id,omitempty" xml:"zone_id,omitempty"`
+	// The ID of the queried ACK cluster.
+	ClusterId *string `json:"cluster_id,omitempty" xml:"cluster_id,omitempty"`
+	// The type of the managed Kubernetes cluster. This parameter is returned for a managed Kubernetes cluster. Valid values:
+	//
+	// *   `ack.pro.small`: professional managed Kubernetes cluster.
+	// *   `ack.standard`: standard managed Kubernetes cluster.
+	ClusterSpec *string `json:"cluster_spec,omitempty" xml:"cluster_spec,omitempty"`
+	// The type of the cluster. Valid values:
+	//
+	// *   `Kubernetes`: dedicated Kubernetes cluster
+	// *   `ManagedKubernetes`: managed Kubernetes cluster
+	// *   `Ask`: ASK cluster
+	// *   `ExternalKubernetes`: registered external Kubernetes cluster
+	ClusterType *string `json:"cluster_type,omitempty" xml:"cluster_type,omitempty"`
+	// The time when the cluster was created.
+	Created *string `json:"created,omitempty" xml:"created,omitempty"`
+	// The current Kubernetes version of the cluster. For more information about the Kubernetes versions supported by ACK, see [Release notes for Kubernetes versions](~~185269~~).
+	CurrentVersion *string `json:"current_version,omitempty" xml:"current_version,omitempty"`
+	// Indicates whether deletion protection is enabled. If deletion protection is enabled, the cluster cannot be deleted in the ACK console or by calling the API. Valid values:
+	//
+	// *   `true`: Deletion protection is enabled. You cannot delete the cluster in the ACK console or by calling the API.
+	// *   `false`: Deletion protection is not enabled. You can delete the cluster in the ACK console or by calling the API.
+	DeletionProtection *bool `json:"deletion_protection,omitempty" xml:"deletion_protection,omitempty"`
+	// The Docker version that is used by the cluster.
+	DockerVersion *string `json:"docker_version,omitempty" xml:"docker_version,omitempty"`
+	// The ID of the Server Load Balancer (SLB) instance that is used for the Ingress of the cluster.
+	ExternalLoadbalancerId *string `json:"external_loadbalancer_id,omitempty" xml:"external_loadbalancer_id,omitempty"`
+	// The Kubernetes version that is initially used by the cluster.
+	InitVersion *string `json:"init_version,omitempty" xml:"init_version,omitempty"`
+	// The maintenance window of the cluster. This feature is available in only professional managed Kubernetes clusters.
+	MaintenanceWindow *MaintenanceWindow `json:"maintenance_window,omitempty" xml:"maintenance_window,omitempty"`
+	// The address of the cluster. It includes an internal endpoint and a public endpoint.
+	MasterUrl *string `json:"master_url,omitempty" xml:"master_url,omitempty"`
+	// The metadata of the cluster.
+	MetaData *string `json:"meta_data,omitempty" xml:"meta_data,omitempty"`
+	// The name of the cluster.
+	//
+	// The name must be 1 to 63 characters in length, and can contain digits, letters, and hyphens (-). It cannot start with a hyphen (-).
+	Name *string `json:"name,omitempty" xml:"name,omitempty"`
+	// The network mode of the cluster. Valid values:
+	//
+	// *   `classic`: the classic network
+	// *   `vpc`: virtual private cloud (VPC)
+	// *   `overlay`: overlay network
+	// *   `calico`: network powered by Calico
+	//
+	// Default value`: vpc`.
+	NetworkMode *string `json:"network_mode,omitempty" xml:"network_mode,omitempty"`
+	// The Kubernetes version to which the cluster can be upgraded.
+	NextVersion *string            `json:"next_version,omitempty" xml:"next_version,omitempty"`
+	Parameters  map[string]*string `json:"parameters,omitempty" xml:"parameters,omitempty"`
+	// Indicates whether Alibaba Cloud DNS PrivateZone is enabled.
+	//
+	// *   `true`: indicates that Alibaba Cloud DNS PrivateZone is enabled.
+	// *   `false`: indicates that Alibaba Cloud DNS PrivateZone is not enabled.
+	PrivateZone *bool `json:"private_zone,omitempty" xml:"private_zone,omitempty"`
+	// Indicates the scenario in which the cluster is used. Valid values:
+	//
+	// *   `Default`: indicates that the cluster is used in non-edge computing scenarios.
+	// *   `Edge`: indicates that the ACK cluster is used in edge computing scenarios.
+	Profile *string `json:"profile,omitempty" xml:"profile,omitempty"`
+	// The ID of the region where the cluster is deployed.
+	RegionId *string `json:"region_id,omitempty" xml:"region_id,omitempty"`
+	// The ID of the resource group to which the cluster belongs.
+	ResourceGroupId *string `json:"resource_group_id,omitempty" xml:"resource_group_id,omitempty"`
+	// The ID of the security group to which the instances of the cluster belong.
+	SecurityGroupId *string `json:"security_group_id,omitempty" xml:"security_group_id,omitempty"`
+	// The number of nodes in the cluster. Master nodes and worker nodes are included.
+	Size *int64 `json:"size,omitempty" xml:"size,omitempty"`
+	// The state of the cluster. Valid values:
+	//
+	// *   `initial`: The cluster is being created.
+	// *   `failed`: The cluster failed to be created.
+	// *   `running`: The cluster is running.
+	// *   `updating`: The cluster is being upgraded.
+	// *   `updating_failed`: The cluster failed to be upgraded.
+	// *   `scaling`: The cluster is being scaled.
+	// *   `waiting`: The registered cluster is waiting for connecting.
+	// *   `disconnected`: The registeredcluster is disconnected.
+	// *   `stopped`: The cluster is stopped.
+	// *   `deleting`: The cluster is being deleted.
+	// *   `deleted`: The cluster is deleted.
+	// *   `delete_failed`: The cluster failed to be deleted.
+	State *string `json:"state,omitempty" xml:"state,omitempty"`
+	// The pod CIDR block. It must be a valid and private CIDR block, and must be one of the following CIDR blocks or their subnets:
+	//
+	// *   10.0.0.0/8
+	// *   172.16-31.0.0/12-16
+	// *   192.168.0.0/16
+	//
+	// The pod CIDR block cannot overlap with that of the VPC or those of the ACK clusters that are deployed in the VPC.
+	//
+	// For more information about the network segmentation of ACK clusters, see [Plan CIDR blocks for ACK clusters in a VPC](~~186964~~).
+	SubnetCidr *string `json:"subnet_cidr,omitempty" xml:"subnet_cidr,omitempty"`
+	// The labels of the cluster.
+	Tags []*Tag `json:"tags,omitempty" xml:"tags,omitempty" type:"Repeated"`
+	// The time when the cluster was updated.
+	Updated *string `json:"updated,omitempty" xml:"updated,omitempty"`
+	// The ID of the VPC where the cluster is deployed. This parameter is required when you create an ACK cluster.
+	VpcId *string `json:"vpc_id,omitempty" xml:"vpc_id,omitempty"`
+	// The IDs of the vSwitches. You can select one to three vSwitches when you create an ACK cluster. vSwitches in different zones are recommended to ensure high availability.
+	VswitchId *string `json:"vswitch_id,omitempty" xml:"vswitch_id,omitempty"`
+	// The name of the worker RAM role. The RAM role is assigned to the worker nodes of the cluster and allows the worker nodes to manage Elastic Compute Service (ECS) instances.
+	WorkerRamRoleName *string `json:"worker_ram_role_name,omitempty" xml:"worker_ram_role_name,omitempty"`
+	// The ID of the zone where the cluster is deployed.
+	ZoneId *string `json:"zone_id,omitempty" xml:"zone_id,omitempty"`
 }
 
 func (s DescribeClusterDetailResponseBody) String() string {
@@ -3345,6 +4520,11 @@ func (s *DescribeClusterDetailResponseBody) SetNetworkMode(v string) *DescribeCl
 
 func (s *DescribeClusterDetailResponseBody) SetNextVersion(v string) *DescribeClusterDetailResponseBody {
 	s.NextVersion = &v
+	return s
+}
+
+func (s *DescribeClusterDetailResponseBody) SetParameters(v map[string]*string) *DescribeClusterDetailResponseBody {
+	s.Parameters = v
 	return s
 }
 
@@ -3448,9 +4628,9 @@ func (s *DescribeClusterDetailResponse) SetBody(v *DescribeClusterDetailResponse
 }
 
 type DescribeClusterEventsRequest struct {
-	PageNumber *int64 `json:"page_number,omitempty" xml:"page_number,omitempty"`
-	PageSize   *int64 `json:"page_size,omitempty" xml:"page_size,omitempty"`
-	TaskId     *int64 `json:"task_id,omitempty" xml:"task_id,omitempty"`
+	PageNumber *int64  `json:"page_number,omitempty" xml:"page_number,omitempty"`
+	PageSize   *int64  `json:"page_size,omitempty" xml:"page_size,omitempty"`
+	TaskId     *string `json:"task_id,omitempty" xml:"task_id,omitempty"`
 }
 
 func (s DescribeClusterEventsRequest) String() string {
@@ -3471,7 +4651,7 @@ func (s *DescribeClusterEventsRequest) SetPageSize(v int64) *DescribeClusterEven
 	return s
 }
 
-func (s *DescribeClusterEventsRequest) SetTaskId(v int64) *DescribeClusterEventsRequest {
+func (s *DescribeClusterEventsRequest) SetTaskId(v string) *DescribeClusterEventsRequest {
 	s.TaskId = &v
 	return s
 }
@@ -3710,16 +4890,24 @@ func (s *DescribeClusterLogsResponseBody) SetUpdated(v string) *DescribeClusterL
 }
 
 type DescribeClusterNodePoolDetailResponseBody struct {
+	// The auto scaling configurations of the queried node pool.
 	AutoScaling        *DescribeClusterNodePoolDetailResponseBodyAutoScaling        `json:"auto_scaling,omitempty" xml:"auto_scaling,omitempty" type:"Struct"`
 	InterconnectConfig *DescribeClusterNodePoolDetailResponseBodyInterconnectConfig `json:"interconnect_config,omitempty" xml:"interconnect_config,omitempty" type:"Struct"`
-	InterconnectMode   *string                                                      `json:"interconnect_mode,omitempty" xml:"interconnect_mode,omitempty"`
-	KubernetesConfig   *DescribeClusterNodePoolDetailResponseBodyKubernetesConfig   `json:"kubernetes_config,omitempty" xml:"kubernetes_config,omitempty" type:"Struct"`
-	Management         *DescribeClusterNodePoolDetailResponseBodyManagement         `json:"management,omitempty" xml:"management,omitempty" type:"Struct"`
-	MaxNodes           *int64                                                       `json:"max_nodes,omitempty" xml:"max_nodes,omitempty"`
-	NodepoolInfo       *DescribeClusterNodePoolDetailResponseBodyNodepoolInfo       `json:"nodepool_info,omitempty" xml:"nodepool_info,omitempty" type:"Struct"`
-	ScalingGroup       *DescribeClusterNodePoolDetailResponseBodyScalingGroup       `json:"scaling_group,omitempty" xml:"scaling_group,omitempty" type:"Struct"`
-	Status             *DescribeClusterNodePoolDetailResponseBodyStatus             `json:"status,omitempty" xml:"status,omitempty" type:"Struct"`
-	TeeConfig          *DescribeClusterNodePoolDetailResponseBodyTeeConfig          `json:"tee_config,omitempty" xml:"tee_config,omitempty" type:"Struct"`
+	// The network type of the edge node pool. Valid values: basic and enhanced. This parameter takes effect only for edge node pools.
+	InterconnectMode *string `json:"interconnect_mode,omitempty" xml:"interconnect_mode,omitempty"`
+	// The configurations of the cluster where the node pool is deployed.
+	KubernetesConfig *DescribeClusterNodePoolDetailResponseBodyKubernetesConfig `json:"kubernetes_config,omitempty" xml:"kubernetes_config,omitempty" type:"Struct"`
+	// The configurations about the managed node pool feature.
+	Management *DescribeClusterNodePoolDetailResponseBodyManagement `json:"management,omitempty" xml:"management,omitempty" type:"Struct"`
+	// The maximum number of nodes that are supported by the edge node pool. The value of this parameter must be equal to or greater than 0. A value of 0 indicates that the number of nodes in the node pool is limited only by the quota of nodes in the cluster. In most cases, this parameter is set to a value larger than 0 for edge node pools. This parameter is set to 0 for node pools of the ess type or default edge node pools.
+	MaxNodes *int64 `json:"max_nodes,omitempty" xml:"max_nodes,omitempty"`
+	// The configurations of the node pool.
+	NodepoolInfo *DescribeClusterNodePoolDetailResponseBodyNodepoolInfo `json:"nodepool_info,omitempty" xml:"nodepool_info,omitempty" type:"Struct"`
+	// The configurations of the scaling group.
+	ScalingGroup *DescribeClusterNodePoolDetailResponseBodyScalingGroup `json:"scaling_group,omitempty" xml:"scaling_group,omitempty" type:"Struct"`
+	Status       *DescribeClusterNodePoolDetailResponseBodyStatus       `json:"status,omitempty" xml:"status,omitempty" type:"Struct"`
+	// The configurations of confidential computing.
+	TeeConfig *DescribeClusterNodePoolDetailResponseBodyTeeConfig `json:"tee_config,omitempty" xml:"tee_config,omitempty" type:"Struct"`
 }
 
 func (s DescribeClusterNodePoolDetailResponseBody) String() string {
@@ -3781,13 +4969,34 @@ func (s *DescribeClusterNodePoolDetailResponseBody) SetTeeConfig(v *DescribeClus
 }
 
 type DescribeClusterNodePoolDetailResponseBodyAutoScaling struct {
-	EipBandwidth          *int64  `json:"eip_bandwidth,omitempty" xml:"eip_bandwidth,omitempty"`
+	// The peak bandwidth of the elastic IP address (EIP) that is associated with the node pool.
+	EipBandwidth *int64 `json:"eip_bandwidth,omitempty" xml:"eip_bandwidth,omitempty"`
+	// The billing method of the EIP. Valid values:
+	//
+	// *   `PayByBandwidth`: pay-by-bandwidth
+	// *   `PayByTraffic`: pay-by-data-transfer
 	EipInternetChargeType *string `json:"eip_internet_charge_type,omitempty" xml:"eip_internet_charge_type,omitempty"`
-	Enable                *bool   `json:"enable,omitempty" xml:"enable,omitempty"`
-	IsBondEip             *bool   `json:"is_bond_eip,omitempty" xml:"is_bond_eip,omitempty"`
-	MaxInstances          *int64  `json:"max_instances,omitempty" xml:"max_instances,omitempty"`
-	MinInstances          *int64  `json:"min_instances,omitempty" xml:"min_instances,omitempty"`
-	Type                  *string `json:"type,omitempty" xml:"type,omitempty"`
+	// Indicates whether auto scaling is enabled. Valid values:
+	//
+	// *   `true`: Auto scaling is enabled.
+	// *   `false`: Auto scaling is disabled. If this parameter is set to false, other parameters in the `auto_scaling` section do not take effect.
+	Enable *bool `json:"enable,omitempty" xml:"enable,omitempty"`
+	// Indicates whether an EIP is associated with the node pool. Valid values:
+	//
+	// *   `true`: An EIP is associated with the node pool.
+	// *   `false`: No EIP is associated with the node pool.
+	IsBondEip *bool `json:"is_bond_eip,omitempty" xml:"is_bond_eip,omitempty"`
+	// The maximum number of Elastic Compute Service (ECS) instances supported by the node pool.
+	MaxInstances *int64 `json:"max_instances,omitempty" xml:"max_instances,omitempty"`
+	// The minimum number of ECS instances that must be kept in the node pool.
+	MinInstances *int64 `json:"min_instances,omitempty" xml:"min_instances,omitempty"`
+	// The instance types that can be used for the auto scaling of the node pool. Valid values:
+	//
+	// *   `cpu`: regular instance
+	// *   `gpu`: GPU-accelerated instance
+	// *   `gpushare`: shared GPU-accelerated instance
+	// *   `spot`: preemptible instance
+	Type *string `json:"type,omitempty" xml:"type,omitempty"`
 }
 
 func (s DescribeClusterNodePoolDetailResponseBodyAutoScaling) String() string {
@@ -3875,14 +5084,36 @@ func (s *DescribeClusterNodePoolDetailResponseBodyInterconnectConfig) SetImprove
 }
 
 type DescribeClusterNodePoolDetailResponseBodyKubernetesConfig struct {
-	CmsEnabled     *bool    `json:"cms_enabled,omitempty" xml:"cms_enabled,omitempty"`
-	CpuPolicy      *string  `json:"cpu_policy,omitempty" xml:"cpu_policy,omitempty"`
-	Labels         []*Tag   `json:"labels,omitempty" xml:"labels,omitempty" type:"Repeated"`
-	NodeNameMode   *string  `json:"node_name_mode,omitempty" xml:"node_name_mode,omitempty"`
-	Runtime        *string  `json:"runtime,omitempty" xml:"runtime,omitempty"`
-	RuntimeVersion *string  `json:"runtime_version,omitempty" xml:"runtime_version,omitempty"`
-	Taints         []*Taint `json:"taints,omitempty" xml:"taints,omitempty" type:"Repeated"`
-	UserData       *string  `json:"user_data,omitempty" xml:"user_data,omitempty"`
+	// Indicates whether the CloudMonitor agent is installed on ECS nodes in the cluster. After the CloudMonitor agent is installed, you can view monitoring information about the ECS instances in the CloudMonitor console. Installation is recommended. Valid values:
+	//
+	// *   `true`: The CloudMonitor agent is installed on ECS nodes.
+	// *   `false`: The CloudMonitor agent is not installed on ECS nodes.
+	CmsEnabled *bool `json:"cms_enabled,omitempty" xml:"cms_enabled,omitempty"`
+	// The CPU management policy of the nodes in the node pool. The following policies are supported if the Kubernetes version of the cluster is 1.12.6 or later.
+	//
+	// *   `static`: allows pods with specific resource characteristics on the node to be granted enhanced CPU affinity and exclusivity.
+	// *   `none`: indicates that the default CPU affinity is used.
+	CpuPolicy *string `json:"cpu_policy,omitempty" xml:"cpu_policy,omitempty"`
+	// The labels of the nodes in the node pool. You can add labels to the nodes in the cluster. You must add labels based on the following rules:
+	//
+	// *   Each label is a case-sensitive key-value pair. You can add up to 20 labels.
+	// *   A key must be unique and cannot exceed 64 characters in length. A value can be empty and cannot exceed 128 characters in length. Keys and values cannot start with `aliyun`, `acs:`, `https://`, or `http://`. For more information, see [Labels and Selectors](https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#syntax-and-character-set).
+	Labels []*Tag `json:"labels,omitempty" xml:"labels,omitempty" type:"Repeated"`
+	// A custom node name consists of a prefix, an IP substring, and a suffix.
+	//
+	// *   The prefix and suffix can contain multiple parts that are separated by periods (.). Each part can contain lowercase letters, digits, and hyphens (-). A custom node name must start and end with a digit or lowercase letter.
+	// *   The IP substring length specifies the number of digits to be truncated from the end of the node IP address. The IP substring length ranges from 5 to 12.
+	//
+	// For example, if the node IP address is 192.168.0.55, the prefix is aliyun.com, the IP substring length is 5, and the suffix is test, the node name will be aliyun.com00055test.
+	NodeNameMode *string `json:"node_name_mode,omitempty" xml:"node_name_mode,omitempty"`
+	// The name of the container runtime.
+	Runtime *string `json:"runtime,omitempty" xml:"runtime,omitempty"`
+	// The version of the container runtime.
+	RuntimeVersion *string `json:"runtime_version,omitempty" xml:"runtime_version,omitempty"`
+	// The taints of the nodes. Taints are added to nodes to prevent pods from being scheduled to inappropriate nodes. However, toleration rules allow pods to be scheduled to nodes with matching taints. For more information, see [taint-and-toleration](https://kubernetes.io/zh/docs/concepts/scheduling-eviction/taint-and-toleration/).
+	Taints []*Taint `json:"taints,omitempty" xml:"taints,omitempty" type:"Repeated"`
+	// The user-defined data of the node pool. For more information, see [Generate user-defined data](~~49121~~).
+	UserData *string `json:"user_data,omitempty" xml:"user_data,omitempty"`
 }
 
 func (s DescribeClusterNodePoolDetailResponseBodyKubernetesConfig) String() string {
@@ -3934,8 +5165,17 @@ func (s *DescribeClusterNodePoolDetailResponseBodyKubernetesConfig) SetUserData(
 }
 
 type DescribeClusterNodePoolDetailResponseBodyManagement struct {
-	AutoRepair    *bool                                                             `json:"auto_repair,omitempty" xml:"auto_repair,omitempty"`
-	Enable        *bool                                                             `json:"enable,omitempty" xml:"enable,omitempty"`
+	// Indicates whether enable auto repair is enabled. This parameter takes effect only when `enable=true` is specified.
+	//
+	// *   `true`: Auto repair is enabled.
+	// *   `false`: Auto repair is disabled.
+	AutoRepair *bool `json:"auto_repair,omitempty" xml:"auto_repair,omitempty"`
+	// Indicates whether to enable the managed node pool feature is enabled. Valid values:
+	//
+	// *   `true`: The managed node pool feature is enabled.
+	// *   `false`: The managed node pool feature is disabled. Other parameters in this section take effect only when `enable=true` is specified.
+	Enable *bool `json:"enable,omitempty" xml:"enable,omitempty"`
+	// The configurations of auto upgrade. The configurations take effect only when `enable=true` is specified.
 	UpgradeConfig *DescribeClusterNodePoolDetailResponseBodyManagementUpgradeConfig `json:"upgrade_config,omitempty" xml:"upgrade_config,omitempty" type:"Struct"`
 }
 
@@ -3963,9 +5203,18 @@ func (s *DescribeClusterNodePoolDetailResponseBodyManagement) SetUpgradeConfig(v
 }
 
 type DescribeClusterNodePoolDetailResponseBodyManagementUpgradeConfig struct {
-	AutoUpgrade     *bool  `json:"auto_upgrade,omitempty" xml:"auto_upgrade,omitempty"`
-	MaxUnavailable  *int64 `json:"max_unavailable,omitempty" xml:"max_unavailable,omitempty"`
-	Surge           *int64 `json:"surge,omitempty" xml:"surge,omitempty"`
+	// Indicates whether auto upgrade is enabled. Valid values:
+	//
+	// *   `true`: Auto upgrade is enabled.
+	// *   `false`: Auto upgrade is disabled.
+	AutoUpgrade *bool `json:"auto_upgrade,omitempty" xml:"auto_upgrade,omitempty"`
+	// The maximum number of nodes that can be in the Unavailable state. Valid values: 1 to 1000.
+	//
+	// Default value: 1
+	MaxUnavailable *int64 `json:"max_unavailable,omitempty" xml:"max_unavailable,omitempty"`
+	// The number of nodes that are temporarily added to the node pool during an auto upgrade.
+	Surge *int64 `json:"surge,omitempty" xml:"surge,omitempty"`
+	// The percentage of temporary nodes to the nodes in the node pool. You must set this parameter or `surge`.
 	SurgePercentage *int64 `json:"surge_percentage,omitempty" xml:"surge_percentage,omitempty"`
 }
 
@@ -3998,14 +5247,28 @@ func (s *DescribeClusterNodePoolDetailResponseBodyManagementUpgradeConfig) SetSu
 }
 
 type DescribeClusterNodePoolDetailResponseBodyNodepoolInfo struct {
-	Created         *string `json:"created,omitempty" xml:"created,omitempty"`
-	IsDefault       *bool   `json:"is_default,omitempty" xml:"is_default,omitempty"`
-	Name            *string `json:"name,omitempty" xml:"name,omitempty"`
-	NodepoolId      *string `json:"nodepool_id,omitempty" xml:"nodepool_id,omitempty"`
-	RegionId        *string `json:"region_id,omitempty" xml:"region_id,omitempty"`
+	// The time when the node pool was created.
+	Created *string `json:"created,omitempty" xml:"created,omitempty"`
+	// Indicates whether the node pool is a default node pool. A Container Service for Kubernetes (ACK) cluster usually has only one default node pool. Valid values:
+	//
+	// `true`: The node pool is a default node pool.
+	//
+	// `false`: The node pool is not a default node pool.
+	IsDefault *bool `json:"is_default,omitempty" xml:"is_default,omitempty"`
+	// The name of the node pool.
+	//
+	// The name must be 1 to 63 characters in length, and can contain digits, letters, and hyphens (-). It cannot start with a hyphen (-).
+	Name *string `json:"name,omitempty" xml:"name,omitempty"`
+	// The ID of the node pool.
+	NodepoolId *string `json:"nodepool_id,omitempty" xml:"nodepool_id,omitempty"`
+	// The ID of the region where the node pool is deployed.
+	RegionId *string `json:"region_id,omitempty" xml:"region_id,omitempty"`
+	// The ID of the resource group to which the node pool belongs.
 	ResourceGroupId *string `json:"resource_group_id,omitempty" xml:"resource_group_id,omitempty"`
-	Type            *string `json:"type,omitempty" xml:"type,omitempty"`
-	Updated         *string `json:"updated,omitempty" xml:"updated,omitempty"`
+	// The type of the node pool.
+	Type *string `json:"type,omitempty" xml:"type,omitempty"`
+	// The time when the node pool was last updated.
+	Updated *string `json:"updated,omitempty" xml:"updated,omitempty"`
 }
 
 func (s DescribeClusterNodePoolDetailResponseBodyNodepoolInfo) String() string {
@@ -4057,40 +5320,129 @@ func (s *DescribeClusterNodePoolDetailResponseBodyNodepoolInfo) SetUpdated(v str
 }
 
 type DescribeClusterNodePoolDetailResponseBodyScalingGroup struct {
-	AutoRenew                           *bool                                                                  `json:"auto_renew,omitempty" xml:"auto_renew,omitempty"`
-	AutoRenewPeriod                     *int64                                                                 `json:"auto_renew_period,omitempty" xml:"auto_renew_period,omitempty"`
-	CompensateWithOnDemand              *bool                                                                  `json:"compensate_with_on_demand,omitempty" xml:"compensate_with_on_demand,omitempty"`
-	DataDisks                           []*DataDisk                                                            `json:"data_disks,omitempty" xml:"data_disks,omitempty" type:"Repeated"`
-	DeploymentsetId                     *string                                                                `json:"deploymentset_id,omitempty" xml:"deploymentset_id,omitempty"`
-	DesiredSize                         *int64                                                                 `json:"desired_size,omitempty" xml:"desired_size,omitempty"`
-	ImageId                             *string                                                                `json:"image_id,omitempty" xml:"image_id,omitempty"`
-	InstanceChargeType                  *string                                                                `json:"instance_charge_type,omitempty" xml:"instance_charge_type,omitempty"`
-	InstanceTypes                       []*string                                                              `json:"instance_types,omitempty" xml:"instance_types,omitempty" type:"Repeated"`
-	InternetChargeType                  *string                                                                `json:"internet_charge_type,omitempty" xml:"internet_charge_type,omitempty"`
-	InternetMaxBandwidthOut             *int64                                                                 `json:"internet_max_bandwidth_out,omitempty" xml:"internet_max_bandwidth_out,omitempty"`
-	KeyPair                             *string                                                                `json:"key_pair,omitempty" xml:"key_pair,omitempty"`
-	LoginPassword                       *string                                                                `json:"login_password,omitempty" xml:"login_password,omitempty"`
-	MultiAzPolicy                       *string                                                                `json:"multi_az_policy,omitempty" xml:"multi_az_policy,omitempty"`
-	OnDemandBaseCapacity                *int64                                                                 `json:"on_demand_base_capacity,omitempty" xml:"on_demand_base_capacity,omitempty"`
-	OnDemandPercentageAboveBaseCapacity *int64                                                                 `json:"on_demand_percentage_above_base_capacity,omitempty" xml:"on_demand_percentage_above_base_capacity,omitempty"`
-	Period                              *int64                                                                 `json:"period,omitempty" xml:"period,omitempty"`
-	PeriodUnit                          *string                                                                `json:"period_unit,omitempty" xml:"period_unit,omitempty"`
-	Platform                            *string                                                                `json:"platform,omitempty" xml:"platform,omitempty"`
-	RamPolicy                           *string                                                                `json:"ram_policy,omitempty" xml:"ram_policy,omitempty"`
-	RdsInstances                        []*string                                                              `json:"rds_instances,omitempty" xml:"rds_instances,omitempty" type:"Repeated"`
-	ScalingGroupId                      *string                                                                `json:"scaling_group_id,omitempty" xml:"scaling_group_id,omitempty"`
-	ScalingPolicy                       *string                                                                `json:"scaling_policy,omitempty" xml:"scaling_policy,omitempty"`
-	SecurityGroupId                     *string                                                                `json:"security_group_id,omitempty" xml:"security_group_id,omitempty"`
-	SecurityGroupIds                    []*string                                                              `json:"security_group_ids,omitempty" xml:"security_group_ids,omitempty" type:"Repeated"`
-	SpotInstancePools                   *int64                                                                 `json:"spot_instance_pools,omitempty" xml:"spot_instance_pools,omitempty"`
-	SpotInstanceRemedy                  *bool                                                                  `json:"spot_instance_remedy,omitempty" xml:"spot_instance_remedy,omitempty"`
-	SpotPriceLimit                      []*DescribeClusterNodePoolDetailResponseBodyScalingGroupSpotPriceLimit `json:"spot_price_limit,omitempty" xml:"spot_price_limit,omitempty" type:"Repeated"`
-	SpotStrategy                        *string                                                                `json:"spot_strategy,omitempty" xml:"spot_strategy,omitempty"`
-	SystemDiskCategory                  *string                                                                `json:"system_disk_category,omitempty" xml:"system_disk_category,omitempty"`
-	SystemDiskPerformanceLevel          *string                                                                `json:"system_disk_performance_level,omitempty" xml:"system_disk_performance_level,omitempty"`
-	SystemDiskSize                      *int64                                                                 `json:"system_disk_size,omitempty" xml:"system_disk_size,omitempty"`
-	Tags                                []*Tag                                                                 `json:"tags,omitempty" xml:"tags,omitempty" type:"Repeated"`
-	VswitchIds                          []*string                                                              `json:"vswitch_ids,omitempty" xml:"vswitch_ids,omitempty" type:"Repeated"`
+	// Indicates whether auto-renewal is enabled for the nodes in the node pool. This parameter takes effect only when `instance_charge_type` is set to `PrePaid`. Valid values:
+	//
+	// *   `true`: Auto-renewal is enabled.
+	// *   `false`: Auto-renewal is disabled.
+	AutoRenew *bool `json:"auto_renew,omitempty" xml:"auto_renew,omitempty"`
+	// The duration of the auto-renewal. This parameter takes effect and is required only when `instance_charge_type` is set to `PrePaid`.
+	//
+	// If you specify `PeriodUnit=Month`, the valid values are 1, 2, 3, 6, and 12.
+	AutoRenewPeriod *int64 `json:"auto_renew_period,omitempty" xml:"auto_renew_period,omitempty"`
+	// Indicates whether pay-as-you-go instances are automatically created to meet the required number of ECS instances if preemptible instances cannot be created due to reasons such as cost or insufficient inventory. This parameter takes effect when `multi_az_policy` is set to `COST_OPTIMIZED`. Valid values:
+	//
+	// *   `true`: Pay-as-you-go instances are automatically created to meet the required number of ECS instances if preemptible instances cannot be created.
+	// *   `false`: Pay-as-you-go instances are not automatically created to meet the required number of ECS instances if preemptible instances cannot be created.
+	CompensateWithOnDemand *bool `json:"compensate_with_on_demand,omitempty" xml:"compensate_with_on_demand,omitempty"`
+	// The configurations of the data disks that are attached to the nodes in the node pool. The configurations include the disk type and disk size.
+	DataDisks []*DataDisk `json:"data_disks,omitempty" xml:"data_disks,omitempty" type:"Repeated"`
+	// The ID of the deployment set to which the ECS instances in the node pool belong.
+	DeploymentsetId *string `json:"deploymentset_id,omitempty" xml:"deploymentset_id,omitempty"`
+	// The expected number of nodes in the node pool.
+	DesiredSize *int64 `json:"desired_size,omitempty" xml:"desired_size,omitempty"`
+	// The ID of the custom image. You can call the `DescribeKubernetesVersionMetadata` operation to query the images supported by ACK.
+	ImageId *string `json:"image_id,omitempty" xml:"image_id,omitempty"`
+	// The billing method of the nodes in the node pool. Valid values:
+	//
+	// *   `PrePaid`: subscription
+	// *   `PostPaid`: pay-as-you-go
+	InstanceChargeType *string `json:"instance_charge_type,omitempty" xml:"instance_charge_type,omitempty"`
+	// The instance types of the nodes in the node pool.
+	InstanceTypes []*string `json:"instance_types,omitempty" xml:"instance_types,omitempty" type:"Repeated"`
+	// The billing method of the public IP address of the node.
+	InternetChargeType *string `json:"internet_charge_type,omitempty" xml:"internet_charge_type,omitempty"`
+	// The maximum outbound bandwidth of the public IP address of the node. Unit: Mbit/s. Valid values: 1 to 100.
+	InternetMaxBandwidthOut *int64 `json:"internet_max_bandwidth_out,omitempty" xml:"internet_max_bandwidth_out,omitempty"`
+	// The name of the key pair. You must set this parameter or the `login_password` parameter. You must set `key_pair` if the node pool is a managed node pool.
+	KeyPair *string `json:"key_pair,omitempty" xml:"key_pair,omitempty"`
+	// The password for SSH logon. You must set this parameter or the `key_pair` parameter. The password must be 8 to 30 characters in length, and must contain at least three of the following character types: uppercase letters, lowercase letters, digits, and special characters.
+	//
+	// For security purposes, the returned password is encrypted.
+	LoginPassword *string `json:"login_password,omitempty" xml:"login_password,omitempty"`
+	// The ECS instance scaling policy for a multi-zone scaling group. Valid values:
+	//
+	// *   `PRIORITY`: the scaling group is scaled based on the VSwitchIds.N parameter. If an ECS instance cannot be created in the zone where the vSwitch that has the highest priority resides, Auto Scaling creates the ECS instance in the zone where the vSwitch that has the next highest priority resides.
+	//
+	// *   `COST_OPTIMIZED`: ECS instances are created based on the vCPU unit price in ascending order. Preemptible instances are preferably created when preemptible instance types are specified in the scaling configuration. You can set the `CompensateWithOnDemand` parameter to specify whether to automatically create pay-as-you-go instances when preemptible instances cannot be created due to insufficient resources.
+	//
+	//     **
+	//
+	//     **Note** `COST_OPTIMIZED` is valid only when multiple instance types are specified or at least one preemptible instance type is specified.
+	//
+	// *   `BALANCE`: ECS instances are evenly distributed across multiple zones specified by the scaling group. If ECS instances become imbalanced among multiple zones due to insufficient inventory, you can call the RebalanceInstances operation of Auto Scaling to balance the instance distribution among zones. For more information, see [RebalanceInstances](~~71516~~)
+	//
+	// Default value: `PRIORITY`
+	MultiAzPolicy *string `json:"multi_az_policy,omitempty" xml:"multi_az_policy,omitempty"`
+	// The minimum number of pay-as-you-go instances that must be kept in the scaling group. Valid values: 0 to 1000. If the number of pay-as-you-go instances is less than the value of this parameter, Auto Scaling preferably creates pay-as-you-go instances.
+	OnDemandBaseCapacity *int64 `json:"on_demand_base_capacity,omitempty" xml:"on_demand_base_capacity,omitempty"`
+	// The percentage of pay-as-you-go instances among the extra instances that exceed the number specified by `on_demand_base_capacity`. Valid values: 0 to 100.
+	OnDemandPercentageAboveBaseCapacity *int64 `json:"on_demand_percentage_above_base_capacity,omitempty" xml:"on_demand_percentage_above_base_capacity,omitempty"`
+	// The subscription duration of worker nodes. This parameter takes effect and is required only when `instance_charge_type` is set to `PrePaid`.
+	//
+	// If `PeriodUnit=Month` is specified, the valid values are 1, 2, 3, 6, 12, 24, 36, 48, and 60.
+	Period *int64 `json:"period,omitempty" xml:"period,omitempty"`
+	// The billing cycle of the nodes. This parameter is required if `instance_charge_type` is set to `PrePaid`.
+	//
+	// Valid value: `Month`
+	PeriodUnit *string `json:"period_unit,omitempty" xml:"period_unit,omitempty"`
+	// The release version of the operating system. Valid values:
+	//
+	// *   `CentOS`
+	// *   `AliyunLinux`
+	// *   `Windows`
+	// *   `WindowsCore`
+	Platform *string `json:"platform,omitempty" xml:"platform,omitempty"`
+	// The configurations of the private node pool.
+	PrivatePoolOptions *DescribeClusterNodePoolDetailResponseBodyScalingGroupPrivatePoolOptions `json:"private_pool_options,omitempty" xml:"private_pool_options,omitempty" type:"Struct"`
+	// The name of the worker Resource Access Management (RAM) role. The RAM role is assigned to the worker nodes of the cluster to allow the worker nodes to manage ECS instances.
+	RamPolicy *string `json:"ram_policy,omitempty" xml:"ram_policy,omitempty"`
+	// The IDs of the ApsaraDB RDS instances.
+	RdsInstances []*string `json:"rds_instances,omitempty" xml:"rds_instances,omitempty" type:"Repeated"`
+	// The ID of the scaling group.
+	ScalingGroupId *string `json:"scaling_group_id,omitempty" xml:"scaling_group_id,omitempty"`
+	// The scaling mode of the scaling group. Valid values:
+	//
+	// *   `release`: the standard mode. ECS instances are created and released based on the resource usage.
+	// *   `recycle`: the swift mode. ECS instances are created, stopped, or started during scaling events. This reduces the time required for the next scale-out event. When the instance is stopped, you are charged only for the storage service. This does not apply to ECS instances attached with local disks.
+	ScalingPolicy *string `json:"scaling_policy,omitempty" xml:"scaling_policy,omitempty"`
+	// The ID of the security group to which the node pool is added. If the node pool is added to multiple security groups, the first ID in the value of `security_group_ids` is returned.
+	SecurityGroupId *string `json:"security_group_id,omitempty" xml:"security_group_id,omitempty"`
+	// The IDs of the security groups to which the node pool is added.
+	SecurityGroupIds []*string `json:"security_group_ids,omitempty" xml:"security_group_ids,omitempty" type:"Repeated"`
+	// The number of instance types that are available for creating preemptible instances. Auto Scaling creates preemptible instances of multiple instance types that are available at the lowest cost. Valid values: 1 to 10.
+	SpotInstancePools *int64 `json:"spot_instance_pools,omitempty" xml:"spot_instance_pools,omitempty"`
+	// Indicates whether preemptible instances are supplemented when the number of preemptible instances drops below the specified minimum number. If this parameter is set to true, when the scaling group receives a system message that a preemptible instance is to be reclaimed, the scaling group attempts to create a new instance to replace this instance. Valid values: Valid values:
+	//
+	// *   `true`: Supplementation of preemptible instances is enabled.
+	// *   `false`: Supplementation of preemptible instances is disabled.
+	SpotInstanceRemedy *bool `json:"spot_instance_remedy,omitempty" xml:"spot_instance_remedy,omitempty"`
+	// The bid configurations of preemptible instances.
+	SpotPriceLimit []*DescribeClusterNodePoolDetailResponseBodyScalingGroupSpotPriceLimit `json:"spot_price_limit,omitempty" xml:"spot_price_limit,omitempty" type:"Repeated"`
+	// The bidding policy of preemptible instances. Valid values:
+	//
+	// *   NoSpot: a non-preemptible instance.
+	// *   SpotWithPriceLimit: a preemptible instance that is configured with the highest bid price.
+	// *   SpotAsPriceGo: a preemptible instance for which the system automatically bids based on the current market price.
+	//
+	// For more information, see [Preemptible instances](~~157759~~).
+	SpotStrategy *string `json:"spot_strategy,omitempty" xml:"spot_strategy,omitempty"`
+	// The type of system disk. Valid values:
+	//
+	// *   `cloud_efficiency`: ultra disk
+	// *   `cloud_ssd`: standard SSD
+	SystemDiskCategory *string `json:"system_disk_category,omitempty" xml:"system_disk_category,omitempty"`
+	// The performance level (PL) of the system disk that you want to use for the node. This parameter takes effect only for enhanced SSDs (ESSDs).
+	SystemDiskPerformanceLevel *string `json:"system_disk_performance_level,omitempty" xml:"system_disk_performance_level,omitempty"`
+	// The system disk size of a node. Unit: GiB.
+	//
+	// Valid values: 20 to 500
+	SystemDiskSize *int64 `json:"system_disk_size,omitempty" xml:"system_disk_size,omitempty"`
+	// The labels that you want to add to the ECS instances.
+	//
+	// A key must be unique and cannot exceed 128 characters in length. Neither keys nor values can start with aliyun or acs:. Neither keys nor values can contain https:// or http://.
+	Tags []*Tag `json:"tags,omitempty" xml:"tags,omitempty" type:"Repeated"`
+	// The IDs of vSwitches.
+	VswitchIds []*string `json:"vswitch_ids,omitempty" xml:"vswitch_ids,omitempty" type:"Repeated"`
 }
 
 func (s DescribeClusterNodePoolDetailResponseBodyScalingGroup) String() string {
@@ -4196,6 +5548,11 @@ func (s *DescribeClusterNodePoolDetailResponseBodyScalingGroup) SetPlatform(v st
 	return s
 }
 
+func (s *DescribeClusterNodePoolDetailResponseBodyScalingGroup) SetPrivatePoolOptions(v *DescribeClusterNodePoolDetailResponseBodyScalingGroupPrivatePoolOptions) *DescribeClusterNodePoolDetailResponseBodyScalingGroup {
+	s.PrivatePoolOptions = v
+	return s
+}
+
 func (s *DescribeClusterNodePoolDetailResponseBodyScalingGroup) SetRamPolicy(v string) *DescribeClusterNodePoolDetailResponseBodyScalingGroup {
 	s.RamPolicy = &v
 	return s
@@ -4271,9 +5628,42 @@ func (s *DescribeClusterNodePoolDetailResponseBodyScalingGroup) SetVswitchIds(v 
 	return s
 }
 
+type DescribeClusterNodePoolDetailResponseBodyScalingGroupPrivatePoolOptions struct {
+	// The ID of the private node pool.
+	Id *string `json:"id,omitempty" xml:"id,omitempty"`
+	// The type of private node pool. This parameter specifies the type of the private pool that you want to use to create instances. A private pool is generated when an elasticity assurance or a capacity reservation takes effect. You can select a private pool to start instances. Valid values:
+	//
+	// *   `Open`: open private pool. The system selects an open private pool to start instances. If no matching open private pools are available, the resources in the public pool are used.
+	// *   `Target`: specific private pool. The system uses the resources of the specified private pool to start instances. If the specified private pool is unavailable, instances cannot be started.
+	// *   `None`: no private pool is used. The resources of private pools are not used to start instances.
+	MatchCriteria *string `json:"match_criteria,omitempty" xml:"match_criteria,omitempty"`
+}
+
+func (s DescribeClusterNodePoolDetailResponseBodyScalingGroupPrivatePoolOptions) String() string {
+	return tea.Prettify(s)
+}
+
+func (s DescribeClusterNodePoolDetailResponseBodyScalingGroupPrivatePoolOptions) GoString() string {
+	return s.String()
+}
+
+func (s *DescribeClusterNodePoolDetailResponseBodyScalingGroupPrivatePoolOptions) SetId(v string) *DescribeClusterNodePoolDetailResponseBodyScalingGroupPrivatePoolOptions {
+	s.Id = &v
+	return s
+}
+
+func (s *DescribeClusterNodePoolDetailResponseBodyScalingGroupPrivatePoolOptions) SetMatchCriteria(v string) *DescribeClusterNodePoolDetailResponseBodyScalingGroupPrivatePoolOptions {
+	s.MatchCriteria = &v
+	return s
+}
+
 type DescribeClusterNodePoolDetailResponseBodyScalingGroupSpotPriceLimit struct {
+	// The instance type of preemptible instances.
 	InstanceType *string `json:"instance_type,omitempty" xml:"instance_type,omitempty"`
-	PriceLimit   *string `json:"price_limit,omitempty" xml:"price_limit,omitempty"`
+	// The price limit of a preemptible instance.
+	//
+	// Unit: USD/hour.
+	PriceLimit *string `json:"price_limit,omitempty" xml:"price_limit,omitempty"`
 }
 
 func (s DescribeClusterNodePoolDetailResponseBodyScalingGroupSpotPriceLimit) String() string {
@@ -4354,6 +5744,10 @@ func (s *DescribeClusterNodePoolDetailResponseBodyStatus) SetTotalNodes(v int64)
 }
 
 type DescribeClusterNodePoolDetailResponseBodyTeeConfig struct {
+	// Indicates whether confidential computing is enabled. Valid values:
+	//
+	// *   `true`: Confidential computing is enabled.
+	// *   `false`: Confidential computing is disabled.
 	TeeEnable *bool `json:"tee_enable,omitempty" xml:"tee_enable,omitempty"`
 }
 
@@ -4400,6 +5794,7 @@ func (s *DescribeClusterNodePoolDetailResponse) SetBody(v *DescribeClusterNodePo
 }
 
 type DescribeClusterNodePoolsResponseBody struct {
+	// The list of the returned node pools.
 	Nodepools []*DescribeClusterNodePoolsResponseBodyNodepools `json:"nodepools,omitempty" xml:"nodepools,omitempty" type:"Repeated"`
 }
 
@@ -4417,16 +5812,23 @@ func (s *DescribeClusterNodePoolsResponseBody) SetNodepools(v []*DescribeCluster
 }
 
 type DescribeClusterNodePoolsResponseBodyNodepools struct {
+	// The configurations of auto scaling.
 	AutoScaling        *DescribeClusterNodePoolsResponseBodyNodepoolsAutoScaling        `json:"auto_scaling,omitempty" xml:"auto_scaling,omitempty" type:"Struct"`
 	InterconnectConfig *DescribeClusterNodePoolsResponseBodyNodepoolsInterconnectConfig `json:"interconnect_config,omitempty" xml:"interconnect_config,omitempty" type:"Struct"`
 	InterconnectMode   *string                                                          `json:"interconnect_mode,omitempty" xml:"interconnect_mode,omitempty"`
-	KubernetesConfig   *DescribeClusterNodePoolsResponseBodyNodepoolsKubernetesConfig   `json:"kubernetes_config,omitempty" xml:"kubernetes_config,omitempty" type:"Struct"`
-	Management         *DescribeClusterNodePoolsResponseBodyNodepoolsManagement         `json:"management,omitempty" xml:"management,omitempty" type:"Struct"`
-	MaxNodes           *int64                                                           `json:"max_nodes,omitempty" xml:"max_nodes,omitempty"`
-	NodepoolInfo       *DescribeClusterNodePoolsResponseBodyNodepoolsNodepoolInfo       `json:"nodepool_info,omitempty" xml:"nodepool_info,omitempty" type:"Struct"`
-	ScalingGroup       *DescribeClusterNodePoolsResponseBodyNodepoolsScalingGroup       `json:"scaling_group,omitempty" xml:"scaling_group,omitempty" type:"Struct"`
-	Status             *DescribeClusterNodePoolsResponseBodyNodepoolsStatus             `json:"status,omitempty" xml:"status,omitempty" type:"Struct"`
-	TeeConfig          *DescribeClusterNodePoolsResponseBodyNodepoolsTeeConfig          `json:"tee_config,omitempty" xml:"tee_config,omitempty" type:"Struct"`
+	// The configurations of the cluster.
+	KubernetesConfig *DescribeClusterNodePoolsResponseBodyNodepoolsKubernetesConfig `json:"kubernetes_config,omitempty" xml:"kubernetes_config,omitempty" type:"Struct"`
+	// The configurations of managed node pools. Managed node pools are available only in professional managed Kubernetes clusters.
+	Management *DescribeClusterNodePoolsResponseBodyNodepoolsManagement `json:"management,omitempty" xml:"management,omitempty" type:"Struct"`
+	MaxNodes   *int64                                                   `json:"max_nodes,omitempty" xml:"max_nodes,omitempty"`
+	// The information about the node pool.
+	NodepoolInfo *DescribeClusterNodePoolsResponseBodyNodepoolsNodepoolInfo `json:"nodepool_info,omitempty" xml:"nodepool_info,omitempty" type:"Struct"`
+	// The configurations of the scaling group.
+	ScalingGroup *DescribeClusterNodePoolsResponseBodyNodepoolsScalingGroup `json:"scaling_group,omitempty" xml:"scaling_group,omitempty" type:"Struct"`
+	// The status details about the node pool.
+	Status *DescribeClusterNodePoolsResponseBodyNodepoolsStatus `json:"status,omitempty" xml:"status,omitempty" type:"Struct"`
+	// The configurations of confidential computing.
+	TeeConfig *DescribeClusterNodePoolsResponseBodyNodepoolsTeeConfig `json:"tee_config,omitempty" xml:"tee_config,omitempty" type:"Struct"`
 }
 
 func (s DescribeClusterNodePoolsResponseBodyNodepools) String() string {
@@ -4488,13 +5890,34 @@ func (s *DescribeClusterNodePoolsResponseBodyNodepools) SetTeeConfig(v *Describe
 }
 
 type DescribeClusterNodePoolsResponseBodyNodepoolsAutoScaling struct {
-	EipBandwidth          *int64  `json:"eip_bandwidth,omitempty" xml:"eip_bandwidth,omitempty"`
+	// The peak bandwidth of the elastic IP address (EIP).
+	EipBandwidth *int64 `json:"eip_bandwidth,omitempty" xml:"eip_bandwidth,omitempty"`
+	// The billing method of the EIP. Valid values:
+	//
+	// *   `PayByBandwidth`: pay-by-bandwidth
+	// *   `PayByTraffic`: pay-by-data-transfer
 	EipInternetChargeType *string `json:"eip_internet_charge_type,omitempty" xml:"eip_internet_charge_type,omitempty"`
-	Enable                *bool   `json:"enable,omitempty" xml:"enable,omitempty"`
-	IsBondEip             *bool   `json:"is_bond_eip,omitempty" xml:"is_bond_eip,omitempty"`
-	MaxInstances          *int64  `json:"max_instances,omitempty" xml:"max_instances,omitempty"`
-	MinInstances          *int64  `json:"min_instances,omitempty" xml:"min_instances,omitempty"`
-	Type                  *string `json:"type,omitempty" xml:"type,omitempty"`
+	// Indicates whether auto scaling is enabled.
+	//
+	// *   `true`: Auto scaling is enabled for the node pool.
+	// *   `false`: Auto scaling is disabled for the node pool. If you set this parameter to `false`, other parameters in the `auto_scaling` section does not take effect.
+	Enable *bool `json:"enable,omitempty" xml:"enable,omitempty"`
+	// Indicates whether an EIP is associated with the node pool. Valid values:
+	//
+	// *   `true`: An EIP is associated with the node pool.
+	// *   `false`: No EIP is associated with the node pool.
+	IsBondEip *bool `json:"is_bond_eip,omitempty" xml:"is_bond_eip,omitempty"`
+	// The maximum number of Elastic Compute Service (ECS) instances supported by the node pool.
+	MaxInstances *int64 `json:"max_instances,omitempty" xml:"max_instances,omitempty"`
+	// The minimum number of ECS instances.
+	MinInstances *int64 `json:"min_instances,omitempty" xml:"min_instances,omitempty"`
+	// The minimum number of ECS instances that must be kept in the node pool. Valid values:
+	//
+	// *   `cpu`: regular instance
+	// *   `gpu`: GPU-accelerated instance
+	// *   `gpushare`: shared GPU-accelerated instance
+	// *   `spot`: preemptible instance
+	Type *string `json:"type,omitempty" xml:"type,omitempty"`
 }
 
 func (s DescribeClusterNodePoolsResponseBodyNodepoolsAutoScaling) String() string {
@@ -4582,14 +6005,30 @@ func (s *DescribeClusterNodePoolsResponseBodyNodepoolsInterconnectConfig) SetImp
 }
 
 type DescribeClusterNodePoolsResponseBodyNodepoolsKubernetesConfig struct {
-	CmsEnabled     *bool    `json:"cms_enabled,omitempty" xml:"cms_enabled,omitempty"`
-	CpuPolicy      *string  `json:"cpu_policy,omitempty" xml:"cpu_policy,omitempty"`
-	Labels         []*Tag   `json:"labels,omitempty" xml:"labels,omitempty" type:"Repeated"`
-	NodeNameMode   *string  `json:"node_name_mode,omitempty" xml:"node_name_mode,omitempty"`
-	Runtime        *string  `json:"runtime,omitempty" xml:"runtime,omitempty"`
-	RuntimeVersion *string  `json:"runtime_version,omitempty" xml:"runtime_version,omitempty"`
-	Taints         []*Taint `json:"taints,omitempty" xml:"taints,omitempty" type:"Repeated"`
-	UserData       *string  `json:"user_data,omitempty" xml:"user_data,omitempty"`
+	// Indicates where the CloudMonitor agent is installed on ECS nodes of the cluster. After the CloudMonitor agent is installed, you can view monitoring information about the ECS instances in the CloudMonitor console. Installation is recommended. Valid values:
+	//
+	// *   `true` The CloudMonitor agent is installed on ECS nodes.
+	// *   `false`: The CloudMonitor agent is not installed on ECS nodes.
+	CmsEnabled *bool `json:"cms_enabled,omitempty" xml:"cms_enabled,omitempty"`
+	// The CPU management policy. The following policies are supported if the Kubernetes version of the cluster is 1.12.6 or later.
+	//
+	// *   `static`: This policy allows pods with specific resource characteristics on the node to be granted with enhanced CPU affinity and exclusivity.
+	// *   `none`: indicates that the default CPU affinity is used.
+	CpuPolicy *string `json:"cpu_policy,omitempty" xml:"cpu_policy,omitempty"`
+	// The labels of the nodes. You can add labels to the nodes in the cluster. You must add labels based on the following rules:
+	//
+	// *   Each label is a case-sensitive key-value pair. You can add up to 20 labels.
+	// *   A key must be unique and cannot exceed 64 characters in length. A value can be empty and cannot exceed 128 characters in length. Keys and values cannot start with `aliyun`, `acs:`, `https://`, or `http://`. For more information, see [Labels and Selectors](https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#syntax-and-character-set).
+	Labels       []*Tag  `json:"labels,omitempty" xml:"labels,omitempty" type:"Repeated"`
+	NodeNameMode *string `json:"node_name_mode,omitempty" xml:"node_name_mode,omitempty"`
+	// The name of the container runtime.
+	Runtime *string `json:"runtime,omitempty" xml:"runtime,omitempty"`
+	// The version of the container runtime.
+	RuntimeVersion *string `json:"runtime_version,omitempty" xml:"runtime_version,omitempty"`
+	// The taints that are added to nodes. Taints are added to nodes to prevent pods from being scheduled to inappropriate nodes. However, toleration rules allow pods to be scheduled to nodes with matching taints. For more information, see [taint-and-toleration](https://kubernetes.io/zh/docs/concepts/scheduling-eviction/taint-and-toleration/).
+	Taints []*Taint `json:"taints,omitempty" xml:"taints,omitempty" type:"Repeated"`
+	// The user-defined data of the node pool. For more information, see [Generate user-defined data](~~49121~~).
+	UserData *string `json:"user_data,omitempty" xml:"user_data,omitempty"`
 }
 
 func (s DescribeClusterNodePoolsResponseBodyNodepoolsKubernetesConfig) String() string {
@@ -4641,8 +6080,17 @@ func (s *DescribeClusterNodePoolsResponseBodyNodepoolsKubernetesConfig) SetUserD
 }
 
 type DescribeClusterNodePoolsResponseBodyNodepoolsManagement struct {
-	AutoRepair    *bool                                                                 `json:"auto_repair,omitempty" xml:"auto_repair,omitempty"`
-	Enable        *bool                                                                 `json:"enable,omitempty" xml:"enable,omitempty"`
+	// Indicates whether auto repair is enabled. Auto repair is enabled only when `enable=true` is specified.
+	//
+	// *   `true`: Auto repair is enabled.
+	// *   `false`: Auto repair is disabled.
+	AutoRepair *bool `json:"auto_repair,omitempty" xml:"auto_repair,omitempty"`
+	// Indicates whether managed node pools are enabled. Valid values:
+	//
+	// *   `true`: Managed node pools are enabled.
+	// *   `false`: Managed node pools are disabled. Other parameters in this section take effect only when `enable=true` is specified.
+	Enable *bool `json:"enable,omitempty" xml:"enable,omitempty"`
+	// The configurations of auto upgrade. The configurations take effect only when `enable=true` is specified.
 	UpgradeConfig *DescribeClusterNodePoolsResponseBodyNodepoolsManagementUpgradeConfig `json:"upgrade_config,omitempty" xml:"upgrade_config,omitempty" type:"Struct"`
 }
 
@@ -4670,9 +6118,20 @@ func (s *DescribeClusterNodePoolsResponseBodyNodepoolsManagement) SetUpgradeConf
 }
 
 type DescribeClusterNodePoolsResponseBodyNodepoolsManagementUpgradeConfig struct {
-	AutoUpgrade     *bool  `json:"auto_upgrade,omitempty" xml:"auto_upgrade,omitempty"`
-	MaxUnavailable  *int64 `json:"max_unavailable,omitempty" xml:"max_unavailable,omitempty"`
-	Surge           *int64 `json:"surge,omitempty" xml:"surge,omitempty"`
+	// Indicates whether auto upgrade is enabled. Valid values:
+	//
+	// *   `true`: Auto upgrade is enabled.
+	// *   `true`: Auto upgrade is disabled.
+	AutoUpgrade *bool `json:"auto_upgrade,omitempty" xml:"auto_upgrade,omitempty"`
+	// The maximum number of nodes that can be in the unschedulable state. Valid values: 1 to 1000.
+	//
+	// Default value: 1
+	MaxUnavailable *int64 `json:"max_unavailable,omitempty" xml:"max_unavailable,omitempty"`
+	// The number of nodes that are temporarily added to the node pool during an auto upgrade.
+	Surge *int64 `json:"surge,omitempty" xml:"surge,omitempty"`
+	// The percentage of temporary nodes to the nodes in the node pool. You must set this parameter or `surge`.
+	//
+	// The number of extra nodes = The percentage of extra nodes × The number of nodes in the node pool. For example, the percentage of extra nodes is set to 50% and the number of nodes in the node pool is six. The number of extra nodes will be three.
 	SurgePercentage *int64 `json:"surge_percentage,omitempty" xml:"surge_percentage,omitempty"`
 }
 
@@ -4705,14 +6164,30 @@ func (s *DescribeClusterNodePoolsResponseBodyNodepoolsManagementUpgradeConfig) S
 }
 
 type DescribeClusterNodePoolsResponseBodyNodepoolsNodepoolInfo struct {
-	Created         *string `json:"created,omitempty" xml:"created,omitempty"`
-	IsDefault       *bool   `json:"is_default,omitempty" xml:"is_default,omitempty"`
-	Name            *string `json:"name,omitempty" xml:"name,omitempty"`
-	NodepoolId      *string `json:"nodepool_id,omitempty" xml:"nodepool_id,omitempty"`
-	RegionId        *string `json:"region_id,omitempty" xml:"region_id,omitempty"`
+	// The time when the node pool was created.
+	Created *string `json:"created,omitempty" xml:"created,omitempty"`
+	// Indicates whether the node pool is a default node pool. An ACK cluster usually has only one default node pool. Valid values:
+	//
+	// *   `true`: The node pool is a default node pool.
+	// *   `false`: The node pool is not a default node pool.
+	IsDefault *bool `json:"is_default,omitempty" xml:"is_default,omitempty"`
+	// The name of the node pool.
+	//
+	// The name must be 1 to 63 characters in length, and can contain digits, letters, and hyphens (-). It cannot start with a hyphen (-).
+	Name *string `json:"name,omitempty" xml:"name,omitempty"`
+	// The ID of the node pool.
+	NodepoolId *string `json:"nodepool_id,omitempty" xml:"nodepool_id,omitempty"`
+	// The ID of the region where the node pool is deployed.
+	RegionId *string `json:"region_id,omitempty" xml:"region_id,omitempty"`
+	// The ID of the resource group to which the node pool belongs.
 	ResourceGroupId *string `json:"resource_group_id,omitempty" xml:"resource_group_id,omitempty"`
-	Type            *string `json:"type,omitempty" xml:"type,omitempty"`
-	Updated         *string `json:"updated,omitempty" xml:"updated,omitempty"`
+	// The type of the node pool. Valid values:
+	//
+	// *   `edge`: edge node pools.
+	// *   `ess`: cloud node pools.
+	Type *string `json:"type,omitempty" xml:"type,omitempty"`
+	// The time when the node pool was last updated.
+	Updated *string `json:"updated,omitempty" xml:"updated,omitempty"`
 }
 
 func (s DescribeClusterNodePoolsResponseBodyNodepoolsNodepoolInfo) String() string {
@@ -4764,40 +6239,125 @@ func (s *DescribeClusterNodePoolsResponseBodyNodepoolsNodepoolInfo) SetUpdated(v
 }
 
 type DescribeClusterNodePoolsResponseBodyNodepoolsScalingGroup struct {
-	AutoRenew                           *bool                                                                      `json:"auto_renew,omitempty" xml:"auto_renew,omitempty"`
-	AutoRenewPeriod                     *int64                                                                     `json:"auto_renew_period,omitempty" xml:"auto_renew_period,omitempty"`
-	CompensateWithOnDemand              *bool                                                                      `json:"compensate_with_on_demand,omitempty" xml:"compensate_with_on_demand,omitempty"`
-	DataDisks                           []*DataDisk                                                                `json:"data_disks,omitempty" xml:"data_disks,omitempty" type:"Repeated"`
-	DeploymentsetId                     *string                                                                    `json:"deploymentset_id,omitempty" xml:"deploymentset_id,omitempty"`
-	DesiredSize                         *int64                                                                     `json:"desired_size,omitempty" xml:"desired_size,omitempty"`
-	ImageId                             *string                                                                    `json:"image_id,omitempty" xml:"image_id,omitempty"`
-	InstanceChargeType                  *string                                                                    `json:"instance_charge_type,omitempty" xml:"instance_charge_type,omitempty"`
-	InstanceTypes                       []*string                                                                  `json:"instance_types,omitempty" xml:"instance_types,omitempty" type:"Repeated"`
-	InternetChargeType                  *string                                                                    `json:"internet_charge_type,omitempty" xml:"internet_charge_type,omitempty"`
-	InternetMaxBandwidthOut             *int64                                                                     `json:"internet_max_bandwidth_out,omitempty" xml:"internet_max_bandwidth_out,omitempty"`
-	KeyPair                             *string                                                                    `json:"key_pair,omitempty" xml:"key_pair,omitempty"`
-	LoginPassword                       *string                                                                    `json:"login_password,omitempty" xml:"login_password,omitempty"`
-	MultiAzPolicy                       *string                                                                    `json:"multi_az_policy,omitempty" xml:"multi_az_policy,omitempty"`
-	OnDemandBaseCapacity                *int64                                                                     `json:"on_demand_base_capacity,omitempty" xml:"on_demand_base_capacity,omitempty"`
-	OnDemandPercentageAboveBaseCapacity *int64                                                                     `json:"on_demand_percentage_above_base_capacity,omitempty" xml:"on_demand_percentage_above_base_capacity,omitempty"`
-	Period                              *int64                                                                     `json:"period,omitempty" xml:"period,omitempty"`
-	PeriodUnit                          *string                                                                    `json:"period_unit,omitempty" xml:"period_unit,omitempty"`
-	Platform                            *string                                                                    `json:"platform,omitempty" xml:"platform,omitempty"`
-	RamPolicy                           *string                                                                    `json:"ram_policy,omitempty" xml:"ram_policy,omitempty"`
-	RdsInstances                        []*string                                                                  `json:"rds_instances,omitempty" xml:"rds_instances,omitempty" type:"Repeated"`
-	ScalingGroupId                      *string                                                                    `json:"scaling_group_id,omitempty" xml:"scaling_group_id,omitempty"`
-	ScalingPolicy                       *string                                                                    `json:"scaling_policy,omitempty" xml:"scaling_policy,omitempty"`
-	SecurityGroupId                     *string                                                                    `json:"security_group_id,omitempty" xml:"security_group_id,omitempty"`
-	SecurityGroupIds                    []*string                                                                  `json:"security_group_ids,omitempty" xml:"security_group_ids,omitempty" type:"Repeated"`
-	SpotInstancePools                   *int64                                                                     `json:"spot_instance_pools,omitempty" xml:"spot_instance_pools,omitempty"`
-	SpotInstanceRemedy                  *bool                                                                      `json:"spot_instance_remedy,omitempty" xml:"spot_instance_remedy,omitempty"`
-	SpotPriceLimit                      []*DescribeClusterNodePoolsResponseBodyNodepoolsScalingGroupSpotPriceLimit `json:"spot_price_limit,omitempty" xml:"spot_price_limit,omitempty" type:"Repeated"`
-	SpotStrategy                        *string                                                                    `json:"spot_strategy,omitempty" xml:"spot_strategy,omitempty"`
-	SystemDiskCategory                  *string                                                                    `json:"system_disk_category,omitempty" xml:"system_disk_category,omitempty"`
-	SystemDiskPerformanceLevel          *string                                                                    `json:"system_disk_performance_level,omitempty" xml:"system_disk_performance_level,omitempty"`
-	SystemDiskSize                      *int64                                                                     `json:"system_disk_size,omitempty" xml:"system_disk_size,omitempty"`
-	Tags                                []*Tag                                                                     `json:"tags,omitempty" xml:"tags,omitempty" type:"Repeated"`
-	VswitchIds                          []*string                                                                  `json:"vswitch_ids,omitempty" xml:"vswitch_ids,omitempty" type:"Repeated"`
+	// Indicates whether auto-renewal is enabled for the nodes in the node pool. This parameter takes effect only when `instance_charge_type` is set to `PrePaid`. Valid values:
+	//
+	// *   `true`: Auto-renewal is enabled.
+	// *   `false`: Auto-renewal is disabled.
+	AutoRenew *bool `json:"auto_renew,omitempty" xml:"auto_renew,omitempty"`
+	// The duration of the auto-renewal. This parameter takes effect and is required only when `instance_charge_type` is set to `PrePaid`.
+	//
+	// If `PeriodUnit=Month` is specified, the valid values are 1, 2, 3, 6, and 12.
+	AutoRenewPeriod *int64 `json:"auto_renew_period,omitempty" xml:"auto_renew_period,omitempty"`
+	// Indicates whether pay-as-you-go instances are automatically created to meet the required number of ECS instances when the preemptible instances cannot be created due to reasons such as the cost or inventory availability. This parameter takes effect when `multi_az_policy` is set to `COST_OPTIMIZED`. Valid values:
+	//
+	// *   `true`: Pay-as-you-go instances are automatically created to meet the required number of ECS instances if preemptible instances cannot be created.
+	// *   `false`: Pay-as-you-go instances are not created to meet the required number of ECS instances if preemptible instances cannot be created.
+	CompensateWithOnDemand *bool `json:"compensate_with_on_demand,omitempty" xml:"compensate_with_on_demand,omitempty"`
+	// The configurations of the data disks attached to the nodes in the node pool. The configurations include the disk type and disk size.
+	DataDisks       []*DataDisk `json:"data_disks,omitempty" xml:"data_disks,omitempty" type:"Repeated"`
+	DeploymentsetId *string     `json:"deploymentset_id,omitempty" xml:"deploymentset_id,omitempty"`
+	DesiredSize     *int64      `json:"desired_size,omitempty" xml:"desired_size,omitempty"`
+	// The ID of the custom image. You can call `DescribeKubernetesVersionMetadata` to query the images supported by ACK.
+	ImageId *string `json:"image_id,omitempty" xml:"image_id,omitempty"`
+	// The billing method of the nodes in the node pool. Valid values:
+	//
+	// *   `PrePaid`: subscription
+	// *   `PostPaid`: pay-as-you-go
+	InstanceChargeType *string `json:"instance_charge_type,omitempty" xml:"instance_charge_type,omitempty"`
+	// The instance types of the nodes in the node pool.
+	InstanceTypes []*string `json:"instance_types,omitempty" xml:"instance_types,omitempty" type:"Repeated"`
+	// The billing method of the public IP address of the node.
+	InternetChargeType *string `json:"internet_charge_type,omitempty" xml:"internet_charge_type,omitempty"`
+	// The maximum outbound bandwidth of the public IP address of the node. Unit: Mbit/s. Valid values: 1 to 100.
+	InternetMaxBandwidthOut *int64 `json:"internet_max_bandwidth_out,omitempty" xml:"internet_max_bandwidth_out,omitempty"`
+	// The name of the key pair. You must set this parameter or the `login_password` parameter.
+	//
+	// You must set `key_pair` if the node pool is a managed node pool.
+	KeyPair *string `json:"key_pair,omitempty" xml:"key_pair,omitempty"`
+	// The password for SSH logon. You must set this parameter or the `key_pair` parameter. The password must be 8 to 30 characters in length, and must contain at least three of the following character types: uppercase letters, lowercase letters, digits, and special characters.
+	//
+	// For security purposes, the returned password is encrypted.
+	LoginPassword *string `json:"login_password,omitempty" xml:"login_password,omitempty"`
+	// The ECS instance scaling policy for a multi-zone scaling group. Valid values:
+	//
+	// *   `PRIORITY`: the scaling group is scaled based on the VSwitchIds.N parameter. When an ECS instance cannot be created in the zone where the vSwitch with the highest priority resides, the system uses the vSwitch with the next highest priority to create the ECS instance.
+	//
+	// *   `COST_OPTIMIZED`: ECS instances are created based on the vCPU unit price in ascending order. Preemptible instances are preferentially created when multiple instance types are specified in the scaling configurations. You can set the `CompensateWithOnDemand` parameter to specify whether to automatically create pay-as-you-go instances when preemptible instances cannot be created due to insufficient resources.
+	//
+	//     **
+	//
+	//     **Note** `COST_OPTIMIZED` is valid only when multiple instance types are specified or at least one preemptible instance type is specified.
+	//
+	// *   `BALANCE`: ECS instances are evenly distributed across multiple zones specified by the scaling group. If ECS instances become imbalanced among multiple zones due to insufficient inventory, you can call `RebalanceInstances` of Auto Scaling (ESS) to balance the instance distribution among zones. For more information, see [RebalanceInstances](~~71516~~).
+	MultiAzPolicy *string `json:"multi_az_policy,omitempty" xml:"multi_az_policy,omitempty"`
+	// The minimum number of pay-as-you-go instances that must be kept in the scaling group. Valid values: 0 to 1000. When the number of pay-as-you-go instances is lower than this value, pay-as-you-go instances are preferentially created to meet the required number.
+	OnDemandBaseCapacity *int64 `json:"on_demand_base_capacity,omitempty" xml:"on_demand_base_capacity,omitempty"`
+	// The percentage of pay-as-you-go instances among the extra instances that exceed the number specified by `on_demand_base_capacity`. Valid values: 0 to 100.
+	OnDemandPercentageAboveBaseCapacity *int64 `json:"on_demand_percentage_above_base_capacity,omitempty" xml:"on_demand_percentage_above_base_capacity,omitempty"`
+	// The subscription duration of worker nodes. This parameter takes effect and is required only when `instance_charge_type` is set to `PrePaid`.
+	//
+	// If `PeriodUnit=Month` is specified, the valid values are 1, 2, 3, 6, 12, 24, 36, 48, and 60.
+	Period *int64 `json:"period,omitempty" xml:"period,omitempty"`
+	// The billing cycle of the nodes. This parameter takes effect only when `instance_charge_type` is set to `PrePaid`.
+	//
+	// Valid value: `Month`
+	PeriodUnit *string `json:"period_unit,omitempty" xml:"period_unit,omitempty"`
+	// The release version of the operating system. Valid values:
+	//
+	// *   `CentOS`
+	// *   `AliyunLinux`
+	// *   `Windows`
+	// *   `WindowsCore`
+	Platform           *string                                                                      `json:"platform,omitempty" xml:"platform,omitempty"`
+	PrivatePoolOptions *DescribeClusterNodePoolsResponseBodyNodepoolsScalingGroupPrivatePoolOptions `json:"private_pool_options,omitempty" xml:"private_pool_options,omitempty" type:"Struct"`
+	// The name of the worker Resource Access Management (RAM) role. The RAM role is assigned to the worker nodes of the cluster to allow the worker nodes to manage ECS instances.
+	RamPolicy *string `json:"ram_policy,omitempty" xml:"ram_policy,omitempty"`
+	// The IDs of the ApsaraDB RDS instances.
+	RdsInstances []*string `json:"rds_instances,omitempty" xml:"rds_instances,omitempty" type:"Repeated"`
+	// The ID of the scaling group.
+	ScalingGroupId *string `json:"scaling_group_id,omitempty" xml:"scaling_group_id,omitempty"`
+	// The scaling mode of the scaling group. Valid values:
+	//
+	// *   `release`: the standard mode. ECS instances are created and released based on the resource usage.
+	// *   `recycle`: the swift mode. ECS instances are created, stopped, or started during scaling events. This reduces the time required for the next scale-out event. When the instance is stopped, you are charged only for the storage service. This does not apply to ECS instances attached with local disks.
+	ScalingPolicy *string `json:"scaling_policy,omitempty" xml:"scaling_policy,omitempty"`
+	// The ID of the security group to which the node pool is added. If the node pool is added to multiple security groups, the first ID in the value of `security_group_ids` is returned.
+	SecurityGroupId *string `json:"security_group_id,omitempty" xml:"security_group_id,omitempty"`
+	// The IDs of the security groups to which the node pool is added.
+	SecurityGroupIds []*string `json:"security_group_ids,omitempty" xml:"security_group_ids,omitempty" type:"Repeated"`
+	// The number of available instance types. The scaling group creates preemptible instances of multiple instance types at the lowest cost. Valid values: 1 to 10.
+	SpotInstancePools *int64 `json:"spot_instance_pools,omitempty" xml:"spot_instance_pools,omitempty"`
+	// Indicates whether preemptible instances are supplemented when the number of preemptible instances drops below the specified minimum number. If this parameter is set to true, when the scaling group receives a system message that a preemptible instance is to be reclaimed, the scaling group attempts to create a new instance to replace this instance. Valid values:
+	//
+	// *   `true`: Supplement to preemptible instances is enabled.
+	// *   `false`: Supplement to preemptible instances is disabled.
+	SpotInstanceRemedy *bool `json:"spot_instance_remedy,omitempty" xml:"spot_instance_remedy,omitempty"`
+	// The bid configurations of preemptible instances.
+	SpotPriceLimit []*DescribeClusterNodePoolsResponseBodyNodepoolsScalingGroupSpotPriceLimit `json:"spot_price_limit,omitempty" xml:"spot_price_limit,omitempty" type:"Repeated"`
+	// The bidding policy of preemptible instances. Valid values:
+	//
+	// *   NoSpot: non-preemptible instance.
+	// *   SpotWithPriceLimit: specifies the highest bid for the preemptible instance.
+	// *   SpotAsPriceGo: automatically submits bids based on the up-to-date market price.
+	//
+	// For more information, see [Preemptible instances](~~157759~~).
+	SpotStrategy *string `json:"spot_strategy,omitempty" xml:"spot_strategy,omitempty"`
+	// The type of system disk. Valid values:
+	//
+	// *   `cloud_efficiency`: ultra disk
+	// *   `cloud_ssd`: standard SSD
+	SystemDiskCategory         *string `json:"system_disk_category,omitempty" xml:"system_disk_category,omitempty"`
+	SystemDiskPerformanceLevel *string `json:"system_disk_performance_level,omitempty" xml:"system_disk_performance_level,omitempty"`
+	// The system disk size of a worker node. Unit: GiB.
+	//
+	// Valid values: 20 to 500
+	SystemDiskSize *int64 `json:"system_disk_size,omitempty" xml:"system_disk_size,omitempty"`
+	// The labels that are added only to ECS instances.
+	//
+	// A key must be unique and cannot exceed 128 characters in length. Neither keys nor values can start with aliyun or acs:. Neither keys nor values can contain https:// or http://.
+	Tags []*Tag `json:"tags,omitempty" xml:"tags,omitempty" type:"Repeated"`
+	// The IDs of vSwitches.
+	VswitchIds []*string `json:"vswitch_ids,omitempty" xml:"vswitch_ids,omitempty" type:"Repeated"`
 }
 
 func (s DescribeClusterNodePoolsResponseBodyNodepoolsScalingGroup) String() string {
@@ -4903,6 +6463,11 @@ func (s *DescribeClusterNodePoolsResponseBodyNodepoolsScalingGroup) SetPlatform(
 	return s
 }
 
+func (s *DescribeClusterNodePoolsResponseBodyNodepoolsScalingGroup) SetPrivatePoolOptions(v *DescribeClusterNodePoolsResponseBodyNodepoolsScalingGroupPrivatePoolOptions) *DescribeClusterNodePoolsResponseBodyNodepoolsScalingGroup {
+	s.PrivatePoolOptions = v
+	return s
+}
+
 func (s *DescribeClusterNodePoolsResponseBodyNodepoolsScalingGroup) SetRamPolicy(v string) *DescribeClusterNodePoolsResponseBodyNodepoolsScalingGroup {
 	s.RamPolicy = &v
 	return s
@@ -4978,9 +6543,34 @@ func (s *DescribeClusterNodePoolsResponseBodyNodepoolsScalingGroup) SetVswitchId
 	return s
 }
 
+type DescribeClusterNodePoolsResponseBodyNodepoolsScalingGroupPrivatePoolOptions struct {
+	Id            *string `json:"id,omitempty" xml:"id,omitempty"`
+	MatchCriteria *string `json:"match_criteria,omitempty" xml:"match_criteria,omitempty"`
+}
+
+func (s DescribeClusterNodePoolsResponseBodyNodepoolsScalingGroupPrivatePoolOptions) String() string {
+	return tea.Prettify(s)
+}
+
+func (s DescribeClusterNodePoolsResponseBodyNodepoolsScalingGroupPrivatePoolOptions) GoString() string {
+	return s.String()
+}
+
+func (s *DescribeClusterNodePoolsResponseBodyNodepoolsScalingGroupPrivatePoolOptions) SetId(v string) *DescribeClusterNodePoolsResponseBodyNodepoolsScalingGroupPrivatePoolOptions {
+	s.Id = &v
+	return s
+}
+
+func (s *DescribeClusterNodePoolsResponseBodyNodepoolsScalingGroupPrivatePoolOptions) SetMatchCriteria(v string) *DescribeClusterNodePoolsResponseBodyNodepoolsScalingGroupPrivatePoolOptions {
+	s.MatchCriteria = &v
+	return s
+}
+
 type DescribeClusterNodePoolsResponseBodyNodepoolsScalingGroupSpotPriceLimit struct {
+	// The instance type for preemptible instances.
 	InstanceType *string `json:"instance_type,omitempty" xml:"instance_type,omitempty"`
-	PriceLimit   *string `json:"price_limit,omitempty" xml:"price_limit,omitempty"`
+	// The price limit of a preemptible instance. Unit: USD/hour.
+	PriceLimit *string `json:"price_limit,omitempty" xml:"price_limit,omitempty"`
 }
 
 func (s DescribeClusterNodePoolsResponseBodyNodepoolsScalingGroupSpotPriceLimit) String() string {
@@ -5002,14 +6592,28 @@ func (s *DescribeClusterNodePoolsResponseBodyNodepoolsScalingGroupSpotPriceLimit
 }
 
 type DescribeClusterNodePoolsResponseBodyNodepoolsStatus struct {
-	FailedNodes   *int64  `json:"failed_nodes,omitempty" xml:"failed_nodes,omitempty"`
-	HealthyNodes  *int64  `json:"healthy_nodes,omitempty" xml:"healthy_nodes,omitempty"`
-	InitialNodes  *int64  `json:"initial_nodes,omitempty" xml:"initial_nodes,omitempty"`
-	OfflineNodes  *int64  `json:"offline_nodes,omitempty" xml:"offline_nodes,omitempty"`
-	RemovingNodes *int64  `json:"removing_nodes,omitempty" xml:"removing_nodes,omitempty"`
-	ServingNodes  *int64  `json:"serving_nodes,omitempty" xml:"serving_nodes,omitempty"`
-	State         *string `json:"state,omitempty" xml:"state,omitempty"`
-	TotalNodes    *int64  `json:"total_nodes,omitempty" xml:"total_nodes,omitempty"`
+	// The number of failed nodes.
+	FailedNodes *int64 `json:"failed_nodes,omitempty" xml:"failed_nodes,omitempty"`
+	// The number of healthy nodes.
+	HealthyNodes *int64 `json:"healthy_nodes,omitempty" xml:"healthy_nodes,omitempty"`
+	// The number of nodes that are being created.
+	InitialNodes *int64 `json:"initial_nodes,omitempty" xml:"initial_nodes,omitempty"`
+	// The number of offline nodes.
+	OfflineNodes *int64 `json:"offline_nodes,omitempty" xml:"offline_nodes,omitempty"`
+	// The number of nodes that are being removed.
+	RemovingNodes *int64 `json:"removing_nodes,omitempty" xml:"removing_nodes,omitempty"`
+	// The number of running nodes.
+	ServingNodes *int64 `json:"serving_nodes,omitempty" xml:"serving_nodes,omitempty"`
+	// The status of the node pool. Valid values:
+	//
+	// *   `active`: The node pool is active.
+	// *   `scaling`: The node pool is being scaled.
+	// *   `removing`: Nodes are being removed from the node pool.
+	// *   `deleting`: The node pool is being deleted.
+	// *   `updating`: The node pool is being updated.
+	State *string `json:"state,omitempty" xml:"state,omitempty"`
+	// The total number of nodes in the node pool.
+	TotalNodes *int64 `json:"total_nodes,omitempty" xml:"total_nodes,omitempty"`
 }
 
 func (s DescribeClusterNodePoolsResponseBodyNodepoolsStatus) String() string {
@@ -5061,6 +6665,10 @@ func (s *DescribeClusterNodePoolsResponseBodyNodepoolsStatus) SetTotalNodes(v in
 }
 
 type DescribeClusterNodePoolsResponseBodyNodepoolsTeeConfig struct {
+	// Indicates whether confidential computing is enabled. Valid values:
+	//
+	// *   `true`: confidential computing is enabled.
+	// *   `false`: confidential computing is disabled.
 	TeeEnable *bool `json:"tee_enable,omitempty" xml:"tee_enable,omitempty"`
 }
 
@@ -5148,8 +6756,10 @@ func (s *DescribeClusterNodesRequest) SetState(v string) *DescribeClusterNodesRe
 }
 
 type DescribeClusterNodesResponseBody struct {
+	// The details of the nodes that are returned.
 	Nodes []*DescribeClusterNodesResponseBodyNodes `json:"nodes,omitempty" xml:"nodes,omitempty" type:"Repeated"`
-	Page  *DescribeClusterNodesResponseBodyPage    `json:"page,omitempty" xml:"page,omitempty" type:"Struct"`
+	// The pagination details.
+	Page *DescribeClusterNodesResponseBodyPage `json:"page,omitempty" xml:"page,omitempty" type:"Struct"`
 }
 
 func (s DescribeClusterNodesResponseBody) String() string {
@@ -5171,26 +6781,70 @@ func (s *DescribeClusterNodesResponseBody) SetPage(v *DescribeClusterNodesRespon
 }
 
 type DescribeClusterNodesResponseBodyNodes struct {
-	CreationTime       *string   `json:"creation_time,omitempty" xml:"creation_time,omitempty"`
-	ErrorMessage       *string   `json:"error_message,omitempty" xml:"error_message,omitempty"`
-	ExpiredTime        *string   `json:"expired_time,omitempty" xml:"expired_time,omitempty"`
-	HostName           *string   `json:"host_name,omitempty" xml:"host_name,omitempty"`
-	ImageId            *string   `json:"image_id,omitempty" xml:"image_id,omitempty"`
-	InstanceChargeType *string   `json:"instance_charge_type,omitempty" xml:"instance_charge_type,omitempty"`
-	InstanceId         *string   `json:"instance_id,omitempty" xml:"instance_id,omitempty"`
-	InstanceName       *string   `json:"instance_name,omitempty" xml:"instance_name,omitempty"`
-	InstanceRole       *string   `json:"instance_role,omitempty" xml:"instance_role,omitempty"`
-	InstanceStatus     *string   `json:"instance_status,omitempty" xml:"instance_status,omitempty"`
-	InstanceType       *string   `json:"instance_type,omitempty" xml:"instance_type,omitempty"`
-	InstanceTypeFamily *string   `json:"instance_type_family,omitempty" xml:"instance_type_family,omitempty"`
-	IpAddress          []*string `json:"ip_address,omitempty" xml:"ip_address,omitempty" type:"Repeated"`
-	IsAliyunNode       *bool     `json:"is_aliyun_node,omitempty" xml:"is_aliyun_node,omitempty"`
-	NodeName           *string   `json:"node_name,omitempty" xml:"node_name,omitempty"`
-	NodeStatus         *string   `json:"node_status,omitempty" xml:"node_status,omitempty"`
-	NodepoolId         *string   `json:"nodepool_id,omitempty" xml:"nodepool_id,omitempty"`
-	Source             *string   `json:"source,omitempty" xml:"source,omitempty"`
-	SpotStrategy       *string   `json:"spot_strategy,omitempty" xml:"spot_strategy,omitempty"`
-	State              *string   `json:"state,omitempty" xml:"state,omitempty"`
+	// The time when the node was created.
+	CreationTime *string `json:"creation_time,omitempty" xml:"creation_time,omitempty"`
+	// The error message that was generated when the node was created.
+	ErrorMessage *string `json:"error_message,omitempty" xml:"error_message,omitempty"`
+	// The expiration time of the node.
+	ExpiredTime *string `json:"expired_time,omitempty" xml:"expired_time,omitempty"`
+	// The name of the host.
+	HostName *string `json:"host_name,omitempty" xml:"host_name,omitempty"`
+	// The ID of the system image that is used by the node.
+	ImageId *string `json:"image_id,omitempty" xml:"image_id,omitempty"`
+	// The billing method of the instance on which the node is deployed. Valid values:
+	//
+	// *   `PrePaid`: the subscription billing method. If the value is PrePaid, make sure that you have a sufficient balance or credit in your account. Otherwise, an `InvalidPayMethod` error is returned.
+	// *   `PostPaid`: the pay-as-you-go billing method.
+	InstanceChargeType *string `json:"instance_charge_type,omitempty" xml:"instance_charge_type,omitempty"`
+	// The ID of the instance on which the node is deployed.
+	InstanceId *string `json:"instance_id,omitempty" xml:"instance_id,omitempty"`
+	// The name of the instance on which the node is deployed.
+	InstanceName *string `json:"instance_name,omitempty" xml:"instance_name,omitempty"`
+	// The role of the node. Valid values:
+	//
+	// *   Master: master node
+	// *   Worker: worker node
+	InstanceRole *string `json:"instance_role,omitempty" xml:"instance_role,omitempty"`
+	// The status of the node.
+	InstanceStatus *string `json:"instance_status,omitempty" xml:"instance_status,omitempty"`
+	// The instance type of the node.
+	InstanceType *string `json:"instance_type,omitempty" xml:"instance_type,omitempty"`
+	// The Elastic Compute Service (ECS) instance family of the node.
+	InstanceTypeFamily *string `json:"instance_type_family,omitempty" xml:"instance_type_family,omitempty"`
+	// The IP address of the node.
+	IpAddress []*string `json:"ip_address,omitempty" xml:"ip_address,omitempty" type:"Repeated"`
+	// Indicates whether the instance on which the node is deployed is provided by Alibaba Cloud. Valid values:
+	//
+	// *   `true`: The instance is provided by Alibaba Cloud.
+	// *   `false`: The instance is not provided by Alibaba Cloud.
+	IsAliyunNode *bool `json:"is_aliyun_node,omitempty" xml:"is_aliyun_node,omitempty"`
+	// The name of the node. This name is the identifier of the node in the cluster.
+	NodeName *string `json:"node_name,omitempty" xml:"node_name,omitempty"`
+	// Indicates whether the node is ready. Valid values:
+	//
+	// *   `Ready`: The node is ready.
+	// *   `NotReady`: The node is not ready.
+	// *   `Unknown`: The status of the node is unknown.
+	// *   `Offline`: The node is offline.
+	NodeStatus *string `json:"node_status,omitempty" xml:"node_status,omitempty"`
+	// The ID of the node pool.
+	NodepoolId *string `json:"nodepool_id,omitempty" xml:"nodepool_id,omitempty"`
+	// Indicates how the node is initialized. A node can be manually created or created by using Resource Orchestration Service (ROS).
+	Source *string `json:"source,omitempty" xml:"source,omitempty"`
+	// The type of the preemptible instance. Valid values:
+	//
+	// *   NoSpot: a non-preemptible instance.
+	// *   SpotWithPriceLimit: a preemptible instance that is configured with the highest bid price.
+	// *   SpotAsPriceGo: a preemptible instance for which the system automatically bids based on the current market price.
+	SpotStrategy *string `json:"spot_strategy,omitempty" xml:"spot_strategy,omitempty"`
+	// The status of the node. Valid values:
+	//
+	// *   `pending`: The node is being created.
+	// *   `running`: The node is running.
+	// *   `starting`: The node is being started.
+	// *   `stopping`: The node is being stopped.
+	// *   `stopped`: The node is stopped.
+	State *string `json:"state,omitempty" xml:"state,omitempty"`
 }
 
 func (s DescribeClusterNodesResponseBodyNodes) String() string {
@@ -5302,8 +6956,11 @@ func (s *DescribeClusterNodesResponseBodyNodes) SetState(v string) *DescribeClus
 }
 
 type DescribeClusterNodesResponseBodyPage struct {
+	// The page number of the returned page.
 	PageNumber *int32 `json:"page_number,omitempty" xml:"page_number,omitempty"`
-	PageSize   *int32 `json:"page_size,omitempty" xml:"page_size,omitempty"`
+	// The number of entries returned per page.
+	PageSize *int32 `json:"page_size,omitempty" xml:"page_size,omitempty"`
+	// The total number of entries returned.
 	TotalCount *int32 `json:"total_count,omitempty" xml:"total_count,omitempty"`
 }
 
@@ -5622,7 +7279,9 @@ func (s *DescribeClusterUserKubeconfigRequest) SetTemporaryDurationMinutes(v int
 }
 
 type DescribeClusterUserKubeconfigResponseBody struct {
-	Config     *string `json:"config,omitempty" xml:"config,omitempty"`
+	// The content of the kubeconfig file. For more information about the content of the kubeconfig file, see [Configure cluster credentials](~~86494~~).
+	Config *string `json:"config,omitempty" xml:"config,omitempty"`
+	// The expiration time of the kubeconfig file. The value is the UTC time displayed in RFC3339 format.
 	Expiration *string `json:"expiration,omitempty" xml:"expiration,omitempty"`
 }
 
@@ -5736,9 +7395,116 @@ func (s *DescribeClusterV2UserKubeconfigResponse) SetBody(v *DescribeClusterV2Us
 	return s
 }
 
+type DescribeClusterVulsResponseBody struct {
+	VulRecords []*DescribeClusterVulsResponseBodyVulRecords `json:"vul_records,omitempty" xml:"vul_records,omitempty" type:"Repeated"`
+}
+
+func (s DescribeClusterVulsResponseBody) String() string {
+	return tea.Prettify(s)
+}
+
+func (s DescribeClusterVulsResponseBody) GoString() string {
+	return s.String()
+}
+
+func (s *DescribeClusterVulsResponseBody) SetVulRecords(v []*DescribeClusterVulsResponseBodyVulRecords) *DescribeClusterVulsResponseBody {
+	s.VulRecords = v
+	return s
+}
+
+type DescribeClusterVulsResponseBodyVulRecords struct {
+	CveList      []*string `json:"cve_list,omitempty" xml:"cve_list,omitempty" type:"Repeated"`
+	Necessity    *string   `json:"necessity,omitempty" xml:"necessity,omitempty"`
+	NodeCount    *int32    `json:"node_count,omitempty" xml:"node_count,omitempty"`
+	NodepoolId   *string   `json:"nodepool_id,omitempty" xml:"nodepool_id,omitempty"`
+	NodepoolName *string   `json:"nodepool_name,omitempty" xml:"nodepool_name,omitempty"`
+	VulAliasName *string   `json:"vul_alias_name,omitempty" xml:"vul_alias_name,omitempty"`
+	VulName      *string   `json:"vul_name,omitempty" xml:"vul_name,omitempty"`
+	VulType      *string   `json:"vul_type,omitempty" xml:"vul_type,omitempty"`
+}
+
+func (s DescribeClusterVulsResponseBodyVulRecords) String() string {
+	return tea.Prettify(s)
+}
+
+func (s DescribeClusterVulsResponseBodyVulRecords) GoString() string {
+	return s.String()
+}
+
+func (s *DescribeClusterVulsResponseBodyVulRecords) SetCveList(v []*string) *DescribeClusterVulsResponseBodyVulRecords {
+	s.CveList = v
+	return s
+}
+
+func (s *DescribeClusterVulsResponseBodyVulRecords) SetNecessity(v string) *DescribeClusterVulsResponseBodyVulRecords {
+	s.Necessity = &v
+	return s
+}
+
+func (s *DescribeClusterVulsResponseBodyVulRecords) SetNodeCount(v int32) *DescribeClusterVulsResponseBodyVulRecords {
+	s.NodeCount = &v
+	return s
+}
+
+func (s *DescribeClusterVulsResponseBodyVulRecords) SetNodepoolId(v string) *DescribeClusterVulsResponseBodyVulRecords {
+	s.NodepoolId = &v
+	return s
+}
+
+func (s *DescribeClusterVulsResponseBodyVulRecords) SetNodepoolName(v string) *DescribeClusterVulsResponseBodyVulRecords {
+	s.NodepoolName = &v
+	return s
+}
+
+func (s *DescribeClusterVulsResponseBodyVulRecords) SetVulAliasName(v string) *DescribeClusterVulsResponseBodyVulRecords {
+	s.VulAliasName = &v
+	return s
+}
+
+func (s *DescribeClusterVulsResponseBodyVulRecords) SetVulName(v string) *DescribeClusterVulsResponseBodyVulRecords {
+	s.VulName = &v
+	return s
+}
+
+func (s *DescribeClusterVulsResponseBodyVulRecords) SetVulType(v string) *DescribeClusterVulsResponseBodyVulRecords {
+	s.VulType = &v
+	return s
+}
+
+type DescribeClusterVulsResponse struct {
+	Headers    map[string]*string               `json:"headers,omitempty" xml:"headers,omitempty" require:"true"`
+	StatusCode *int32                           `json:"statusCode,omitempty" xml:"statusCode,omitempty" require:"true"`
+	Body       *DescribeClusterVulsResponseBody `json:"body,omitempty" xml:"body,omitempty" require:"true"`
+}
+
+func (s DescribeClusterVulsResponse) String() string {
+	return tea.Prettify(s)
+}
+
+func (s DescribeClusterVulsResponse) GoString() string {
+	return s.String()
+}
+
+func (s *DescribeClusterVulsResponse) SetHeaders(v map[string]*string) *DescribeClusterVulsResponse {
+	s.Headers = v
+	return s
+}
+
+func (s *DescribeClusterVulsResponse) SetStatusCode(v int32) *DescribeClusterVulsResponse {
+	s.StatusCode = &v
+	return s
+}
+
+func (s *DescribeClusterVulsResponse) SetBody(v *DescribeClusterVulsResponseBody) *DescribeClusterVulsResponse {
+	s.Body = v
+	return s
+}
+
 type DescribeClustersRequest struct {
+	// The cluster type.
 	ClusterType *string `json:"clusterType,omitempty" xml:"clusterType,omitempty"`
-	Name        *string `json:"name,omitempty" xml:"name,omitempty"`
+	// The cluster name based on which the system performs fuzzy searches among the clusters that belong to the current Alibaba Cloud account.
+	Name *string `json:"name,omitempty" xml:"name,omitempty"`
 }
 
 func (s DescribeClustersRequest) String() string {
@@ -6050,8 +7816,10 @@ func (s *DescribeClustersV1Request) SetRegionId(v string) *DescribeClustersV1Req
 }
 
 type DescribeClustersV1ResponseBody struct {
+	// The list of the details of the queried cluster.
 	Clusters []*DescribeClustersV1ResponseBodyClusters `json:"clusters,omitempty" xml:"clusters,omitempty" type:"Repeated"`
-	PageInfo *DescribeClustersV1ResponseBodyPageInfo   `json:"page_info,omitempty" xml:"page_info,omitempty" type:"Struct"`
+	// The pagination details.
+	PageInfo *DescribeClustersV1ResponseBodyPageInfo `json:"page_info,omitempty" xml:"page_info,omitempty" type:"Struct"`
 }
 
 func (s DescribeClustersV1ResponseBody) String() string {
@@ -6073,35 +7841,111 @@ func (s *DescribeClustersV1ResponseBody) SetPageInfo(v *DescribeClustersV1Respon
 }
 
 type DescribeClustersV1ResponseBodyClusters struct {
-	ClusterId              *string            `json:"cluster_id,omitempty" xml:"cluster_id,omitempty"`
-	ClusterSpec            *string            `json:"cluster_spec,omitempty" xml:"cluster_spec,omitempty"`
-	ClusterType            *string            `json:"cluster_type,omitempty" xml:"cluster_type,omitempty"`
-	Created                *string            `json:"created,omitempty" xml:"created,omitempty"`
-	CurrentVersion         *string            `json:"current_version,omitempty" xml:"current_version,omitempty"`
-	DeletionProtection     *bool              `json:"deletion_protection,omitempty" xml:"deletion_protection,omitempty"`
-	DockerVersion          *string            `json:"docker_version,omitempty" xml:"docker_version,omitempty"`
-	ExternalLoadbalancerId *string            `json:"external_loadbalancer_id,omitempty" xml:"external_loadbalancer_id,omitempty"`
-	InitVersion            *string            `json:"init_version,omitempty" xml:"init_version,omitempty"`
-	MaintenanceWindow      *MaintenanceWindow `json:"maintenance_window,omitempty" xml:"maintenance_window,omitempty"`
-	MasterUrl              *string            `json:"master_url,omitempty" xml:"master_url,omitempty"`
-	MetaData               *string            `json:"meta_data,omitempty" xml:"meta_data,omitempty"`
-	Name                   *string            `json:"name,omitempty" xml:"name,omitempty"`
-	NetworkMode            *string            `json:"network_mode,omitempty" xml:"network_mode,omitempty"`
-	NextVersion            *string            `json:"next_version,omitempty" xml:"next_version,omitempty"`
-	PrivateZone            *bool              `json:"private_zone,omitempty" xml:"private_zone,omitempty"`
-	Profile                *string            `json:"profile,omitempty" xml:"profile,omitempty"`
-	RegionId               *string            `json:"region_id,omitempty" xml:"region_id,omitempty"`
-	ResourceGroupId        *string            `json:"resource_group_id,omitempty" xml:"resource_group_id,omitempty"`
-	SecurityGroupId        *string            `json:"security_group_id,omitempty" xml:"security_group_id,omitempty"`
-	Size                   *int64             `json:"size,omitempty" xml:"size,omitempty"`
-	State                  *string            `json:"state,omitempty" xml:"state,omitempty"`
-	SubnetCidr             *string            `json:"subnet_cidr,omitempty" xml:"subnet_cidr,omitempty"`
-	Tags                   []*Tag             `json:"tags,omitempty" xml:"tags,omitempty" type:"Repeated"`
-	Updated                *string            `json:"updated,omitempty" xml:"updated,omitempty"`
-	VpcId                  *string            `json:"vpc_id,omitempty" xml:"vpc_id,omitempty"`
-	VswitchId              *string            `json:"vswitch_id,omitempty" xml:"vswitch_id,omitempty"`
-	WorkerRamRoleName      *string            `json:"worker_ram_role_name,omitempty" xml:"worker_ram_role_name,omitempty"`
-	ZoneId                 *string            `json:"zone_id,omitempty" xml:"zone_id,omitempty"`
+	// The ID of the queried cluster.
+	ClusterId *string `json:"cluster_id,omitempty" xml:"cluster_id,omitempty"`
+	// The type of the managed Kubernetes cluster. This parameter is returned for a managed Kubernetes cluster. Valid values:
+	//
+	// *   `ack.pro.small`: professional managed Kubernetes cluster
+	// *   `ack.standard`: standard managed Kubernetes cluster
+	ClusterSpec *string `json:"cluster_spec,omitempty" xml:"cluster_spec,omitempty"`
+	// The type of the cluster. Valid values:
+	//
+	// *   `Kubernetes`: dedicated Kubernetes cluster
+	// *   `ManagedKubernetes`: managed Kubernetes cluster
+	// *   `Ask`: ASK cluster
+	// *   `ExternalKubernetes`: registered external cluster
+	ClusterType *string `json:"cluster_type,omitempty" xml:"cluster_type,omitempty"`
+	// The time when the cluster was created.
+	Created *string `json:"created,omitempty" xml:"created,omitempty"`
+	// The Kubernetes version of the cluster.
+	CurrentVersion *string `json:"current_version,omitempty" xml:"current_version,omitempty"`
+	// Indicates whether deletion protection is enabled for the cluster. After deletion protection is enabled, the cluster cannot be deleted in the console or by calling API operations. Valid values:
+	//
+	// *   `true`: deletion protection is enabled for the cluster. The cluster cannot be deleted in the ACK console or by calling API operations.
+	// *   `false`: deletion protection is disabled for the cluster. The cluster can be deleted in the ACK console or by calling API operations.
+	DeletionProtection *bool `json:"deletion_protection,omitempty" xml:"deletion_protection,omitempty"`
+	// The Docker version that is used by the cluster.
+	DockerVersion *string `json:"docker_version,omitempty" xml:"docker_version,omitempty"`
+	// The ID of the Server Load Balancer (SLB) instance that is used for the Ingress of the cluster.
+	//
+	// The default SLB specification is slb.s1.small, which belongs to the high-performance instance type.
+	ExternalLoadbalancerId *string `json:"external_loadbalancer_id,omitempty" xml:"external_loadbalancer_id,omitempty"`
+	// The Kubernetes version of the cluster. The Kubernetes versions provided by ACK are consistent with the open source Kubernetes versions. We recommend that you select the latest Kubernetes version. If you do not specify a Kubernetes version, the latest Kubernetes version is used by default.
+	//
+	// You can create clusters of the latest two Kubernetes versions in the ACK console. You can create ACK clusters of earlier Kubernetes versions by calling API operations. For more information about the Kubernetes versions supported by ACK, see [Release notes for Kubernetes versions](~~185269~~).
+	InitVersion *string `json:"init_version,omitempty" xml:"init_version,omitempty"`
+	// The maintenance window of the cluster. This feature is available only in professional managed Kubernetes clusters.
+	MaintenanceWindow *MaintenanceWindow `json:"maintenance_window,omitempty" xml:"maintenance_window,omitempty"`
+	// The address of the cluster API server. It includes an internal endpoint and a public endpoint.
+	MasterUrl *string `json:"master_url,omitempty" xml:"master_url,omitempty"`
+	// The metadata of the cluster.
+	MetaData *string `json:"meta_data,omitempty" xml:"meta_data,omitempty"`
+	// The name of the cluster.
+	//
+	// The name must be 1 to 63 characters in length, and can contain digits, letters, and hyphens (-). It cannot start with a hyphen (-).
+	Name *string `json:"name,omitempty" xml:"name,omitempty"`
+	// The network mode of the cluster. Valid values:
+	//
+	// *   `classic`: classic network
+	// *   `vpc`: virtual private cloud (VPC)
+	// *   `overlay`: overlay network
+	// *   `calico`: network powered by Calico
+	NetworkMode *string `json:"network_mode,omitempty" xml:"network_mode,omitempty"`
+	// The Kubernetes version to which the cluster can be upgraded.
+	NextVersion *string `json:"next_version,omitempty" xml:"next_version,omitempty"`
+	// Indicates whether Alibaba Cloud DNS PrivateZone is enabled. Valid values:
+	//
+	// *   `true`: Alibaba Cloud DNS PrivateZone is enabled.
+	// *   `false`: Alibaba Cloud DNS PrivateZone is disabled.
+	PrivateZone *bool `json:"private_zone,omitempty" xml:"private_zone,omitempty"`
+	// The identifier of the cluster. Valid values:
+	//
+	// *   `Edge`: The cluster is a managed edge Kubernetes cluster.
+	// *   `Default`: The cluster is not a managed edge Kubernetes cluster.
+	Profile *string `json:"profile,omitempty" xml:"profile,omitempty"`
+	// The ID of the region where the cluster is deployed.
+	RegionId *string `json:"region_id,omitempty" xml:"region_id,omitempty"`
+	// The ID of the resource group to which the cluster belongs.
+	ResourceGroupId *string `json:"resource_group_id,omitempty" xml:"resource_group_id,omitempty"`
+	// The ID of the security group to which the instances of the cluster belong.
+	SecurityGroupId *string `json:"security_group_id,omitempty" xml:"security_group_id,omitempty"`
+	// The number of nodes in the cluster. Master nodes and worker nodes are included.
+	Size *int64 `json:"size,omitempty" xml:"size,omitempty"`
+	// The status of the cluster. Valid values:
+	//
+	// *   `initial`: The cluster is being created.
+	// *   `failed`: The cluster failed to be created.
+	// *   `running`: The cluster is running.
+	// *   `updating`: The cluster is being upgraded.
+	// *   `updating_failed`: The cluster failed to be upgraded.
+	// *   `scaling`: The cluster is being scaled.
+	// *   `stopped`: The cluster is stopped.
+	// *   `deleting`: The cluster is being deleted.
+	// *   `deleted`: The cluster is deleted.
+	// *   `delete_failed`: The cluster failed to be deleted.
+	State *string `json:"state,omitempty" xml:"state,omitempty"`
+	// The pod CIDR block. It must be a valid and private CIDR block, and must be one of the following CIDR blocks or their subnets:
+	//
+	// *   10.0.0.0/8
+	// *   172.16-31.0.0/12-16
+	// *   192.168.0.0/16
+	//
+	// The CIDR block of pods cannot overlap with the CIDR block of the VPC in which the cluster is deployed and the CIDR blocks of existing clusters in the VPC. You cannot modify the pod CIDR block after the cluster is created.
+	//
+	// For more information about subnetting for ACK clusters, see [Plan CIDR blocks for ACK clusters in a VPC](~~86500~~).
+	SubnetCidr *string `json:"subnet_cidr,omitempty" xml:"subnet_cidr,omitempty"`
+	// The labels of the cluster.
+	Tags []*Tag `json:"tags,omitempty" xml:"tags,omitempty" type:"Repeated"`
+	// The time when the cluster was updated.
+	Updated *string `json:"updated,omitempty" xml:"updated,omitempty"`
+	// The ID of the VPC where the cluster is deployed. You must specify a VPC when you create a cluster.
+	VpcId *string `json:"vpc_id,omitempty" xml:"vpc_id,omitempty"`
+	// The IDs of the vSwitches. You can select one to three vSwitches when you create a cluster. We recommend that you select vSwitches in different zones to ensure high availability.
+	VswitchId *string `json:"vswitch_id,omitempty" xml:"vswitch_id,omitempty"`
+	// The name of the worker Resource Access Management (RAM) role. The RAM role is assigned to the worker nodes that are created on Elastic Compute Service (ECS) instances.
+	WorkerRamRoleName *string `json:"worker_ram_role_name,omitempty" xml:"worker_ram_role_name,omitempty"`
+	// The ID of the zone where the cluster is deployed.
+	ZoneId *string `json:"zone_id,omitempty" xml:"zone_id,omitempty"`
 }
 
 func (s DescribeClustersV1ResponseBodyClusters) String() string {
@@ -6258,8 +8102,11 @@ func (s *DescribeClustersV1ResponseBodyClusters) SetZoneId(v string) *DescribeCl
 }
 
 type DescribeClustersV1ResponseBodyPageInfo struct {
+	// The number of the returned page.
 	PageNumber *int32 `json:"page_number,omitempty" xml:"page_number,omitempty"`
-	PageSize   *int32 `json:"page_size,omitempty" xml:"page_size,omitempty"`
+	// The number of entries returned per page.
+	PageSize *int32 `json:"page_size,omitempty" xml:"page_size,omitempty"`
+	// The total number of entries returned.
 	TotalCount *int32 `json:"total_count,omitempty" xml:"total_count,omitempty"`
 }
 
@@ -6316,11 +8163,16 @@ func (s *DescribeClustersV1Response) SetBody(v *DescribeClustersV1ResponseBody) 
 }
 
 type DescribeEdgeMachineActiveProcessResponseBody struct {
-	Logs      *string `json:"logs,omitempty" xml:"logs,omitempty"`
-	Progress  *int64  `json:"progress,omitempty" xml:"progress,omitempty"`
+	// The list of details about the activation progress.
+	Logs *string `json:"logs,omitempty" xml:"logs,omitempty"`
+	// The activation progress.
+	Progress *int64 `json:"progress,omitempty" xml:"progress,omitempty"`
+	// The ID of the request.
 	RequestId *string `json:"request_id,omitempty" xml:"request_id,omitempty"`
-	State     *string `json:"state,omitempty" xml:"state,omitempty"`
-	Step      *string `json:"step,omitempty" xml:"step,omitempty"`
+	// The status of the cloud-native box.
+	State *string `json:"state,omitempty" xml:"state,omitempty"`
+	// The current step of the activation process.
+	Step *string `json:"step,omitempty" xml:"step,omitempty"`
 }
 
 func (s DescribeEdgeMachineActiveProcessResponseBody) String() string {
@@ -6386,6 +8238,7 @@ func (s *DescribeEdgeMachineActiveProcessResponse) SetBody(v *DescribeEdgeMachin
 }
 
 type DescribeEdgeMachineModelsResponseBody struct {
+	// The list of details about the models of cloud-native boxes.
 	Models []*DescribeEdgeMachineModelsResponseBodyModels `json:"models,omitempty" xml:"models,omitempty" type:"Repeated"`
 }
 
@@ -6403,14 +8256,22 @@ func (s *DescribeEdgeMachineModelsResponseBody) SetModels(v []*DescribeEdgeMachi
 }
 
 type DescribeEdgeMachineModelsResponseBodyModels struct {
-	Cpu           *int32  `json:"cpu,omitempty" xml:"cpu,omitempty"`
-	CpuArch       *string `json:"cpu_arch,omitempty" xml:"cpu_arch,omitempty"`
-	Created       *string `json:"created,omitempty" xml:"created,omitempty"`
-	Description   *string `json:"description,omitempty" xml:"description,omitempty"`
-	ManageRuntime *int32  `json:"manage_runtime,omitempty" xml:"manage_runtime,omitempty"`
-	Memory        *int32  `json:"memory,omitempty" xml:"memory,omitempty"`
-	Model         *string `json:"model,omitempty" xml:"model,omitempty"`
-	ModelId       *string `json:"model_id,omitempty" xml:"model_id,omitempty"`
+	// The number of CPU cores.
+	Cpu *int32 `json:"cpu,omitempty" xml:"cpu,omitempty"`
+	// The CPU architecture.
+	CpuArch *string `json:"cpu_arch,omitempty" xml:"cpu_arch,omitempty"`
+	// The time when the cloud-native box was created.
+	Created *string `json:"created,omitempty" xml:"created,omitempty"`
+	// The description.
+	Description *string `json:"description,omitempty" xml:"description,omitempty"`
+	// Indicates whether the Docker runtime is managed.
+	ManageRuntime *int32 `json:"manage_runtime,omitempty" xml:"manage_runtime,omitempty"`
+	// The memory size. Unit: GB.
+	Memory *int32 `json:"memory,omitempty" xml:"memory,omitempty"`
+	// The model of the cloud-native box.
+	Model *string `json:"model,omitempty" xml:"model,omitempty"`
+	// The ID of the cloud-native box.
+	ModelId *string `json:"model_id,omitempty" xml:"model_id,omitempty"`
 }
 
 func (s DescribeEdgeMachineModelsResponseBodyModels) String() string {
@@ -6491,12 +8352,19 @@ func (s *DescribeEdgeMachineModelsResponse) SetBody(v *DescribeEdgeMachineModels
 }
 
 type DescribeEdgeMachineTunnelConfigDetailResponseBody struct {
-	DeviceName     *string `json:"device_name,omitempty" xml:"device_name,omitempty"`
-	Model          *string `json:"model,omitempty" xml:"model,omitempty"`
-	ProductKey     *string `json:"product_key,omitempty" xml:"product_key,omitempty"`
-	RequestId      *string `json:"request_id,omitempty" xml:"request_id,omitempty"`
-	Sn             *string `json:"sn,omitempty" xml:"sn,omitempty"`
-	Token          *string `json:"token,omitempty" xml:"token,omitempty"`
+	// The name of the cloud-native box.
+	DeviceName *string `json:"device_name,omitempty" xml:"device_name,omitempty"`
+	// The model of the cloud-native box.
+	Model *string `json:"model,omitempty" xml:"model,omitempty"`
+	// The product key.
+	ProductKey *string `json:"product_key,omitempty" xml:"product_key,omitempty"`
+	// The ID of the request.
+	RequestId *string `json:"request_id,omitempty" xml:"request_id,omitempty"`
+	// The serial number of the cloud-native box.
+	Sn *string `json:"sn,omitempty" xml:"sn,omitempty"`
+	// The token.
+	Token *string `json:"token,omitempty" xml:"token,omitempty"`
+	// The backend endpoint of the tunnel.
 	TunnelEndpoint *string `json:"tunnel_endpoint,omitempty" xml:"tunnel_endpoint,omitempty"`
 }
 
@@ -6620,8 +8488,10 @@ func (s *DescribeEdgeMachinesRequest) SetPageSize(v int64) *DescribeEdgeMachines
 }
 
 type DescribeEdgeMachinesResponseBody struct {
+	// The list of details about cloud-native boxes.
 	EdgeMachines []*DescribeEdgeMachinesResponseBodyEdgeMachines `json:"edge_machines,omitempty" xml:"edge_machines,omitempty" type:"Repeated"`
-	PageInfo     *DescribeEdgeMachinesResponseBodyPageInfo       `json:"page_info,omitempty" xml:"page_info,omitempty" type:"Struct"`
+	// The pagination details.
+	PageInfo *DescribeEdgeMachinesResponseBodyPageInfo `json:"page_info,omitempty" xml:"page_info,omitempty" type:"Struct"`
 }
 
 func (s DescribeEdgeMachinesResponseBody) String() string {
@@ -6643,16 +8513,26 @@ func (s *DescribeEdgeMachinesResponseBody) SetPageInfo(v *DescribeEdgeMachinesRe
 }
 
 type DescribeEdgeMachinesResponseBodyEdgeMachines struct {
-	ActiveTime    *string `json:"active_time,omitempty" xml:"active_time,omitempty"`
-	Created       *string `json:"created,omitempty" xml:"created,omitempty"`
+	// The time when the cloud-native box was activated.
+	ActiveTime *string `json:"active_time,omitempty" xml:"active_time,omitempty"`
+	// The time when the cloud-native box was created.
+	Created *string `json:"created,omitempty" xml:"created,omitempty"`
+	// The ID of the cloud-native box.
 	EdgeMachineId *string `json:"edge_machine_id,omitempty" xml:"edge_machine_id,omitempty"`
-	Hostname      *string `json:"hostname,omitempty" xml:"hostname,omitempty"`
-	LifeState     *string `json:"life_state,omitempty" xml:"life_state,omitempty"`
-	Model         *string `json:"model,omitempty" xml:"model,omitempty"`
-	Name          *string `json:"name,omitempty" xml:"name,omitempty"`
-	OnlineState   *string `json:"online_state,omitempty" xml:"online_state,omitempty"`
-	Sn            *string `json:"sn,omitempty" xml:"sn,omitempty"`
-	Updated       *string `json:"updated,omitempty" xml:"updated,omitempty"`
+	// The `hostname` of the cloud-native box.
+	Hostname *string `json:"hostname,omitempty" xml:"hostname,omitempty"`
+	// The lifecycle status of the cloud-native box.
+	LifeState *string `json:"life_state,omitempty" xml:"life_state,omitempty"`
+	// The model of the cloud-native box.
+	Model *string `json:"model,omitempty" xml:"model,omitempty"`
+	// The name of the cloud-native box.
+	Name *string `json:"name,omitempty" xml:"name,omitempty"`
+	// The online status of the cloud-native box.
+	OnlineState *string `json:"online_state,omitempty" xml:"online_state,omitempty"`
+	// The serial number of the cloud-native box.
+	Sn *string `json:"sn,omitempty" xml:"sn,omitempty"`
+	// The time when the cloud-native box was last updated.
+	Updated *string `json:"updated,omitempty" xml:"updated,omitempty"`
 }
 
 func (s DescribeEdgeMachinesResponseBodyEdgeMachines) String() string {
@@ -6714,8 +8594,11 @@ func (s *DescribeEdgeMachinesResponseBodyEdgeMachines) SetUpdated(v string) *Des
 }
 
 type DescribeEdgeMachinesResponseBodyPageInfo struct {
+	// The page number of the returned page.
 	PageNumber *int32 `json:"page_number,omitempty" xml:"page_number,omitempty"`
-	PageSize   *int32 `json:"page_size,omitempty" xml:"page_size,omitempty"`
+	// The number of entries returned per page.
+	PageSize *int32 `json:"page_size,omitempty" xml:"page_size,omitempty"`
+	// The total number of entries returned.
 	TotalCount *int32 `json:"total_count,omitempty" xml:"total_count,omitempty"`
 }
 
@@ -6807,6 +8690,7 @@ func (s *DescribeEventsRequest) SetType(v string) *DescribeEventsRequest {
 }
 
 type DescribeEventsResponseBody struct {
+	// The details of the event.
 	Events   []*DescribeEventsResponseBodyEvents `json:"events,omitempty" xml:"events,omitempty" type:"Repeated"`
 	PageInfo *DescribeEventsResponseBodyPageInfo `json:"page_info,omitempty" xml:"page_info,omitempty" type:"Struct"`
 }
@@ -6830,13 +8714,37 @@ func (s *DescribeEventsResponseBody) SetPageInfo(v *DescribeEventsResponseBodyPa
 }
 
 type DescribeEventsResponseBodyEvents struct {
-	ClusterId *string                               `json:"cluster_id,omitempty" xml:"cluster_id,omitempty"`
-	Data      *DescribeEventsResponseBodyEventsData `json:"data,omitempty" xml:"data,omitempty" type:"Struct"`
-	EventId   *string                               `json:"event_id,omitempty" xml:"event_id,omitempty"`
-	Source    *string                               `json:"source,omitempty" xml:"source,omitempty"`
-	Subject   *string                               `json:"subject,omitempty" xml:"subject,omitempty"`
-	Time      *string                               `json:"time,omitempty" xml:"time,omitempty"`
-	Type      *string                               `json:"type,omitempty" xml:"type,omitempty"`
+	// The ID of the cluster.
+	ClusterId *string `json:"cluster_id,omitempty" xml:"cluster_id,omitempty"`
+	// The description of the event.
+	Data *DescribeEventsResponseBodyEventsData `json:"data,omitempty" xml:"data,omitempty" type:"Struct"`
+	// The ID of the event.
+	EventId *string `json:"event_id,omitempty" xml:"event_id,omitempty"`
+	// The source of the event.
+	Source *string `json:"source,omitempty" xml:"source,omitempty"`
+	// The subject of the event.
+	Subject *string `json:"subject,omitempty" xml:"subject,omitempty"`
+	// The time when the event started.
+	Time *string `json:"time,omitempty" xml:"time,omitempty"`
+	// The type of the event. Valid values:
+	//
+	// *   `cluster_create`: cluster creation.
+	// *   `cluster_scaleout`: cluster scale-out.
+	// *   `cluster_attach`: adding existing nodes.
+	// *   `cluster_delete`: cluster deletion.
+	// *   `cluster_upgrade`: cluster upgrades.
+	// *   `cluster_migrate`: cluster migration.
+	// *   `cluster_node_delete`: node removal.
+	// *   `cluster_node_drain`: node draining.
+	// *   `cluster_modify`: cluster modifications.
+	// *   `cluster_configuration_modify`: modifications to cluster control configurations.
+	// *   `cluster_addon_install`: component installation.
+	// *   `cluster_addon_upgrade`: component upgrades.
+	// *   `cluster_addon_uninstall`: component uninstallation.
+	// *   `runtime_upgrade`: runtime upgrades.
+	// *   `nodepool_upgrade`: node pool upgrades.
+	// *   `nodepool_update`: node pool updates.
+	Type *string `json:"type,omitempty" xml:"type,omitempty"`
 }
 
 func (s DescribeEventsResponseBodyEvents) String() string {
@@ -6883,9 +8791,12 @@ func (s *DescribeEventsResponseBodyEvents) SetType(v string) *DescribeEventsResp
 }
 
 type DescribeEventsResponseBodyEventsData struct {
-	Level   *string `json:"level,omitempty" xml:"level,omitempty"`
+	// The level of the event.
+	Level *string `json:"level,omitempty" xml:"level,omitempty"`
+	// The details of the event.
 	Message *string `json:"message,omitempty" xml:"message,omitempty"`
-	Reason  *string `json:"reason,omitempty" xml:"reason,omitempty"`
+	// The state of the event.
+	Reason *string `json:"reason,omitempty" xml:"reason,omitempty"`
 }
 
 func (s DescribeEventsResponseBodyEventsData) String() string {
@@ -6970,6 +8881,7 @@ func (s *DescribeEventsResponse) SetBody(v *DescribeEventsResponseBody) *Describ
 }
 
 type DescribeExternalAgentRequest struct {
+	AgentMode        *string `json:"AgentMode,omitempty" xml:"AgentMode,omitempty"`
 	PrivateIpAddress *string `json:"PrivateIpAddress,omitempty" xml:"PrivateIpAddress,omitempty"`
 }
 
@@ -6981,12 +8893,18 @@ func (s DescribeExternalAgentRequest) GoString() string {
 	return s.String()
 }
 
+func (s *DescribeExternalAgentRequest) SetAgentMode(v string) *DescribeExternalAgentRequest {
+	s.AgentMode = &v
+	return s
+}
+
 func (s *DescribeExternalAgentRequest) SetPrivateIpAddress(v string) *DescribeExternalAgentRequest {
 	s.PrivateIpAddress = &v
 	return s
 }
 
 type DescribeExternalAgentResponseBody struct {
+	// The agent configurations in YAML format.
 	Config *string `json:"config,omitempty" xml:"config,omitempty"`
 }
 
@@ -7035,6 +8953,7 @@ func (s *DescribeExternalAgentResponse) SetBody(v *DescribeExternalAgentResponse
 type DescribeKubernetesVersionMetadataRequest struct {
 	ClusterType       *string `json:"ClusterType,omitempty" xml:"ClusterType,omitempty"`
 	KubernetesVersion *string `json:"KubernetesVersion,omitempty" xml:"KubernetesVersion,omitempty"`
+	Mode              *string `json:"Mode,omitempty" xml:"Mode,omitempty"`
 	Profile           *string `json:"Profile,omitempty" xml:"Profile,omitempty"`
 	Region            *string `json:"Region,omitempty" xml:"Region,omitempty"`
 	Runtime           *string `json:"runtime,omitempty" xml:"runtime,omitempty"`
@@ -7055,6 +8974,11 @@ func (s *DescribeKubernetesVersionMetadataRequest) SetClusterType(v string) *Des
 
 func (s *DescribeKubernetesVersionMetadataRequest) SetKubernetesVersion(v string) *DescribeKubernetesVersionMetadataRequest {
 	s.KubernetesVersion = &v
+	return s
+}
+
+func (s *DescribeKubernetesVersionMetadataRequest) SetMode(v string) *DescribeKubernetesVersionMetadataRequest {
+	s.Mode = &v
 	return s
 }
 
@@ -7103,12 +9027,14 @@ func (s *DescribeKubernetesVersionMetadataResponse) SetBody(v []*DescribeKuberne
 }
 
 type DescribeKubernetesVersionMetadataResponseBody struct {
-	Capabilities map[string]interface{}                                 `json:"capabilities,omitempty" xml:"capabilities,omitempty"`
-	Images       []*DescribeKubernetesVersionMetadataResponseBodyImages `json:"images,omitempty" xml:"images,omitempty" type:"Repeated"`
-	MetaData     map[string]interface{}                                 `json:"meta_data,omitempty" xml:"meta_data,omitempty"`
-	Runtimes     []*Runtime                                             `json:"runtimes,omitempty" xml:"runtimes,omitempty" type:"Repeated"`
-	Version      *string                                                `json:"version,omitempty" xml:"version,omitempty"`
-	MultiAz      *string                                                `json:"multi_az,omitempty" xml:"multi_az,omitempty"`
+	Capabilities   map[string]interface{}                                 `json:"capabilities,omitempty" xml:"capabilities,omitempty"`
+	Images         []*DescribeKubernetesVersionMetadataResponseBodyImages `json:"images,omitempty" xml:"images,omitempty" type:"Repeated"`
+	MetaData       map[string]interface{}                                 `json:"meta_data,omitempty" xml:"meta_data,omitempty"`
+	Runtimes       []*Runtime                                             `json:"runtimes,omitempty" xml:"runtimes,omitempty" type:"Repeated"`
+	Version        *string                                                `json:"version,omitempty" xml:"version,omitempty"`
+	ReleaseDate    *string                                                `json:"release_date,omitempty" xml:"release_date,omitempty"`
+	ExpirationDate *string                                                `json:"expiration_date,omitempty" xml:"expiration_date,omitempty"`
+	Creatable      *bool                                                  `json:"creatable,omitempty" xml:"creatable,omitempty"`
 }
 
 func (s DescribeKubernetesVersionMetadataResponseBody) String() string {
@@ -7144,8 +9070,18 @@ func (s *DescribeKubernetesVersionMetadataResponseBody) SetVersion(v string) *De
 	return s
 }
 
-func (s *DescribeKubernetesVersionMetadataResponseBody) SetMultiAz(v string) *DescribeKubernetesVersionMetadataResponseBody {
-	s.MultiAz = &v
+func (s *DescribeKubernetesVersionMetadataResponseBody) SetReleaseDate(v string) *DescribeKubernetesVersionMetadataResponseBody {
+	s.ReleaseDate = &v
+	return s
+}
+
+func (s *DescribeKubernetesVersionMetadataResponseBody) SetExpirationDate(v string) *DescribeKubernetesVersionMetadataResponseBody {
+	s.ExpirationDate = &v
+	return s
+}
+
+func (s *DescribeKubernetesVersionMetadataResponseBody) SetCreatable(v bool) *DescribeKubernetesVersionMetadataResponseBody {
+	s.Creatable = &v
 	return s
 }
 
@@ -7157,6 +9093,7 @@ type DescribeKubernetesVersionMetadataResponseBodyImages struct {
 	ImageType     *string `json:"image_type,omitempty" xml:"image_type,omitempty"`
 	OsType        *string `json:"os_type,omitempty" xml:"os_type,omitempty"`
 	ImageCategory *string `json:"image_category,omitempty" xml:"image_category,omitempty"`
+	Architecture  *string `json:"architecture,omitempty" xml:"architecture,omitempty"`
 }
 
 func (s DescribeKubernetesVersionMetadataResponseBodyImages) String() string {
@@ -7202,6 +9139,28 @@ func (s *DescribeKubernetesVersionMetadataResponseBodyImages) SetImageCategory(v
 	return s
 }
 
+func (s *DescribeKubernetesVersionMetadataResponseBodyImages) SetArchitecture(v string) *DescribeKubernetesVersionMetadataResponseBodyImages {
+	s.Architecture = &v
+	return s
+}
+
+type DescribeNodePoolVulsRequest struct {
+	Necessity *string `json:"necessity,omitempty" xml:"necessity,omitempty"`
+}
+
+func (s DescribeNodePoolVulsRequest) String() string {
+	return tea.Prettify(s)
+}
+
+func (s DescribeNodePoolVulsRequest) GoString() string {
+	return s.String()
+}
+
+func (s *DescribeNodePoolVulsRequest) SetNecessity(v string) *DescribeNodePoolVulsRequest {
+	s.Necessity = &v
+	return s
+}
+
 type DescribeNodePoolVulsResponseBody struct {
 	VulRecords              []*DescribeNodePoolVulsResponseBodyVulRecords `json:"vul_records,omitempty" xml:"vul_records,omitempty" type:"Repeated"`
 	VulsFixServicePurchased *bool                                         `json:"vuls_fix_service_purchased,omitempty" xml:"vuls_fix_service_purchased,omitempty"`
@@ -7227,6 +9186,7 @@ func (s *DescribeNodePoolVulsResponseBody) SetVulsFixServicePurchased(v bool) *D
 
 type DescribeNodePoolVulsResponseBodyVulRecords struct {
 	InstanceId *string                                              `json:"instance_id,omitempty" xml:"instance_id,omitempty"`
+	NodeName   *string                                              `json:"node_name,omitempty" xml:"node_name,omitempty"`
 	VulList    []*DescribeNodePoolVulsResponseBodyVulRecordsVulList `json:"vul_list,omitempty" xml:"vul_list,omitempty" type:"Repeated"`
 }
 
@@ -7240,6 +9200,11 @@ func (s DescribeNodePoolVulsResponseBodyVulRecords) GoString() string {
 
 func (s *DescribeNodePoolVulsResponseBodyVulRecords) SetInstanceId(v string) *DescribeNodePoolVulsResponseBodyVulRecords {
 	s.InstanceId = &v
+	return s
+}
+
+func (s *DescribeNodePoolVulsResponseBodyVulRecords) SetNodeName(v string) *DescribeNodePoolVulsResponseBodyVulRecords {
+	s.NodeName = &v
 	return s
 }
 
@@ -7342,14 +9307,35 @@ func (s *DescribePoliciesResponse) SetBody(v map[string]interface{}) *DescribePo
 }
 
 type DescribePolicyDetailsResponseBody struct {
-	Action      *string `json:"action,omitempty" xml:"action,omitempty"`
-	Category    *string `json:"category,omitempty" xml:"category,omitempty"`
+	// The action of the policy. Valid values:
+	//
+	// *   `enforce`: blocks deployments that match the policy.
+	// *   `inform`: generates alerts for deployments that match the policy.
+	Action *string `json:"action,omitempty" xml:"action,omitempty"`
+	// The type of the policy.
+	Category *string `json:"category,omitempty" xml:"category,omitempty"`
+	// The description of the policy.
 	Description *string `json:"description,omitempty" xml:"description,omitempty"`
-	IsDeleted   *int32  `json:"is_deleted,omitempty" xml:"is_deleted,omitempty"`
-	Name        *string `json:"name,omitempty" xml:"name,omitempty"`
-	NoConfig    *int32  `json:"no_config,omitempty" xml:"no_config,omitempty"`
-	Severity    *string `json:"severity,omitempty" xml:"severity,omitempty"`
-	Template    *string `json:"template,omitempty" xml:"template,omitempty"`
+	// Indicates whether the policy is deleted. Valid values:
+	//
+	// *   0: The policy is not deleted.
+	// *   1: The policy is deleted.
+	IsDeleted *int32 `json:"is_deleted,omitempty" xml:"is_deleted,omitempty"`
+	// The name of the policy that is returned.
+	Name *string `json:"name,omitempty" xml:"name,omitempty"`
+	// Indicates whether parameters are required. Valid values:
+	//
+	// *   0: Parameters are required.
+	// *   1: Parameters are optional.
+	NoConfig *int32 `json:"no_config,omitempty" xml:"no_config,omitempty"`
+	// The severity level of the policy. Valid values:
+	//
+	// *   `high`
+	// *   `medium`
+	// *   `low`
+	Severity *string `json:"severity,omitempty" xml:"severity,omitempty"`
+	// The content of the policy.
+	Template *string `json:"template,omitempty" xml:"template,omitempty"`
 }
 
 func (s DescribePolicyDetailsResponseBody) String() string {
@@ -7430,7 +9416,9 @@ func (s *DescribePolicyDetailsResponse) SetBody(v *DescribePolicyDetailsResponse
 }
 
 type DescribePolicyGovernanceInClusterResponseBody struct {
-	AdmitLog        *DescribePolicyGovernanceInClusterResponseBodyAdmitLog        `json:"admit_log,omitempty" xml:"admit_log,omitempty" type:"Struct"`
+	// The audit logs of policies in the cluster.
+	AdmitLog *DescribePolicyGovernanceInClusterResponseBodyAdmitLog `json:"admit_log,omitempty" xml:"admit_log,omitempty" type:"Struct"`
+	// Details about the policies of different severity levels that are enabled for the cluster.
 	OnState         []*DescribePolicyGovernanceInClusterResponseBodyOnState       `json:"on_state,omitempty" xml:"on_state,omitempty" type:"Repeated"`
 	TotalViolations *DescribePolicyGovernanceInClusterResponseBodyTotalViolations `json:"totalViolations,omitempty" xml:"totalViolations,omitempty" type:"Struct"`
 	Violations      *DescribePolicyGovernanceInClusterResponseBodyViolations      `json:"violations,omitempty" xml:"violations,omitempty" type:"Struct"`
@@ -7465,9 +9453,15 @@ func (s *DescribePolicyGovernanceInClusterResponseBody) SetViolations(v *Describ
 }
 
 type DescribePolicyGovernanceInClusterResponseBodyAdmitLog struct {
-	Count    *int64                                                    `json:"count,omitempty" xml:"count,omitempty"`
-	Log      *DescribePolicyGovernanceInClusterResponseBodyAdmitLogLog `json:"log,omitempty" xml:"log,omitempty" type:"Struct"`
-	Progress *string                                                   `json:"progress,omitempty" xml:"progress,omitempty"`
+	// The number of audit log entries.
+	Count *int64 `json:"count,omitempty" xml:"count,omitempty"`
+	// The audit log content.
+	Log *DescribePolicyGovernanceInClusterResponseBodyAdmitLogLog `json:"log,omitempty" xml:"log,omitempty" type:"Struct"`
+	// The status of the query. Valid values:
+	//
+	// *   `Complete`: The query succeeded and the complete query result is returned.
+	// *   `Incomplete`: The query succeeded but the query result is incomplete. To obtain the complete query result, you must repeat the request.
+	Progress *string `json:"progress,omitempty" xml:"progress,omitempty"`
 }
 
 func (s DescribePolicyGovernanceInClusterResponseBodyAdmitLog) String() string {
@@ -7494,11 +9488,17 @@ func (s *DescribePolicyGovernanceInClusterResponseBodyAdmitLog) SetProgress(v st
 }
 
 type DescribePolicyGovernanceInClusterResponseBodyAdmitLogLog struct {
-	ClusterId         *string `json:"cluster_id,omitempty" xml:"cluster_id,omitempty"`
-	ConstraintKind    *string `json:"constraint_kind,omitempty" xml:"constraint_kind,omitempty"`
-	Msg               *string `json:"msg,omitempty" xml:"msg,omitempty"`
-	ResourceKind      *string `json:"resource_kind,omitempty" xml:"resource_kind,omitempty"`
-	ResourceName      *string `json:"resource_name,omitempty" xml:"resource_name,omitempty"`
+	// The ID of the cluster that you want to query.
+	ClusterId *string `json:"cluster_id,omitempty" xml:"cluster_id,omitempty"`
+	// The type of the policy.
+	ConstraintKind *string `json:"constraint_kind,omitempty" xml:"constraint_kind,omitempty"`
+	// The message that appears when an event is generated by a policy.
+	Msg *string `json:"msg,omitempty" xml:"msg,omitempty"`
+	// The type of the resource.
+	ResourceKind *string `json:"resource_kind,omitempty" xml:"resource_kind,omitempty"`
+	// The name of the resource.
+	ResourceName *string `json:"resource_name,omitempty" xml:"resource_name,omitempty"`
+	// The namespace to which the resource belongs.
 	ResourceNamespace *string `json:"resource_namespace,omitempty" xml:"resource_namespace,omitempty"`
 }
 
@@ -7541,9 +9541,12 @@ func (s *DescribePolicyGovernanceInClusterResponseBodyAdmitLogLog) SetResourceNa
 }
 
 type DescribePolicyGovernanceInClusterResponseBodyOnState struct {
-	EnabledCount *int32  `json:"enabled_count,omitempty" xml:"enabled_count,omitempty"`
-	Severity     *string `json:"severity,omitempty" xml:"severity,omitempty"`
-	Total        *int32  `json:"total,omitempty" xml:"total,omitempty"`
+	// The number of policies that are enabled.
+	EnabledCount *int32 `json:"enabled_count,omitempty" xml:"enabled_count,omitempty"`
+	// The severity level of the policy.
+	Severity *string `json:"severity,omitempty" xml:"severity,omitempty"`
+	// The total number of policies of the severity level.
+	Total *int32 `json:"total,omitempty" xml:"total,omitempty"`
 }
 
 func (s DescribePolicyGovernanceInClusterResponseBodyOnState) String() string {
@@ -7884,8 +9887,10 @@ func (s *DescribePolicyInstancesResponseBody) SetPolicyAction(v string) *Describ
 }
 
 type DescribePolicyInstancesStatusResponseBody struct {
-	InstancesSeverityCount map[string]interface{}                                      `json:"instances_severity_count,omitempty" xml:"instances_severity_count,omitempty"`
-	PolicyInstances        []*DescribePolicyInstancesStatusResponseBodyPolicyInstances `json:"policy_instances,omitempty" xml:"policy_instances,omitempty" type:"Repeated"`
+	// Information about the number of policy instances of each severity level.
+	InstancesSeverityCount map[string]interface{} `json:"instances_severity_count,omitempty" xml:"instances_severity_count,omitempty"`
+	// Details about policy instances of different types.
+	PolicyInstances []*DescribePolicyInstancesStatusResponseBodyPolicyInstances `json:"policy_instances,omitempty" xml:"policy_instances,omitempty" type:"Repeated"`
 }
 
 func (s DescribePolicyInstancesStatusResponseBody) String() string {
@@ -7907,11 +9912,16 @@ func (s *DescribePolicyInstancesStatusResponseBody) SetPolicyInstances(v []*Desc
 }
 
 type DescribePolicyInstancesStatusResponseBodyPolicyInstances struct {
-	PolicyCategory       *string `json:"policy_category,omitempty" xml:"policy_category,omitempty"`
-	PolicyDescription    *string `json:"policy_description,omitempty" xml:"policy_description,omitempty"`
-	PolicyInstancesCount *int64  `json:"policy_instances_count,omitempty" xml:"policy_instances_count,omitempty"`
-	PolicyName           *string `json:"policy_name,omitempty" xml:"policy_name,omitempty"`
-	PolicySeverity       *string `json:"policy_severity,omitempty" xml:"policy_severity,omitempty"`
+	// The type of the policy. For more information about different types of policies and their descriptions, see [Predefined security policies of ACK](https://www.alibabacloud.com/help/doc-detail/359819.html).
+	PolicyCategory *string `json:"policy_category,omitempty" xml:"policy_category,omitempty"`
+	// The description of the policy.
+	PolicyDescription *string `json:"policy_description,omitempty" xml:"policy_description,omitempty"`
+	// The number of policy instances that are deployed. If this parameter is empty, it indicates that no policy instance is deployed from the policy.
+	PolicyInstancesCount *int64 `json:"policy_instances_count,omitempty" xml:"policy_instances_count,omitempty"`
+	// The name of the policy.
+	PolicyName *string `json:"policy_name,omitempty" xml:"policy_name,omitempty"`
+	// The severity level of the policy.
+	PolicySeverity *string `json:"policy_severity,omitempty" xml:"policy_severity,omitempty"`
 }
 
 func (s DescribePolicyInstancesStatusResponseBodyPolicyInstances) String() string {
@@ -7976,20 +9986,108 @@ func (s *DescribePolicyInstancesStatusResponse) SetBody(v *DescribePolicyInstanc
 	return s
 }
 
+type DescribeSubaccountK8sClusterUserConfigRequest struct {
+	PrivateIpAddress         *bool  `json:"PrivateIpAddress,omitempty" xml:"PrivateIpAddress,omitempty"`
+	TemporaryDurationMinutes *int64 `json:"TemporaryDurationMinutes,omitempty" xml:"TemporaryDurationMinutes,omitempty"`
+}
+
+func (s DescribeSubaccountK8sClusterUserConfigRequest) String() string {
+	return tea.Prettify(s)
+}
+
+func (s DescribeSubaccountK8sClusterUserConfigRequest) GoString() string {
+	return s.String()
+}
+
+func (s *DescribeSubaccountK8sClusterUserConfigRequest) SetPrivateIpAddress(v bool) *DescribeSubaccountK8sClusterUserConfigRequest {
+	s.PrivateIpAddress = &v
+	return s
+}
+
+func (s *DescribeSubaccountK8sClusterUserConfigRequest) SetTemporaryDurationMinutes(v int64) *DescribeSubaccountK8sClusterUserConfigRequest {
+	s.TemporaryDurationMinutes = &v
+	return s
+}
+
+type DescribeSubaccountK8sClusterUserConfigResponseBody struct {
+	// The content of the KubeConfig file. For more information about the content of the KubeConfig file, see [Configure cluster credentials](~~86494~~).
+	Config *string `json:"config,omitempty" xml:"config,omitempty"`
+	// The expiration time of the KubeConfig file. The value is the UTC time displayed in RFC3339 format.
+	Expiration *string `json:"expiration,omitempty" xml:"expiration,omitempty"`
+}
+
+func (s DescribeSubaccountK8sClusterUserConfigResponseBody) String() string {
+	return tea.Prettify(s)
+}
+
+func (s DescribeSubaccountK8sClusterUserConfigResponseBody) GoString() string {
+	return s.String()
+}
+
+func (s *DescribeSubaccountK8sClusterUserConfigResponseBody) SetConfig(v string) *DescribeSubaccountK8sClusterUserConfigResponseBody {
+	s.Config = &v
+	return s
+}
+
+func (s *DescribeSubaccountK8sClusterUserConfigResponseBody) SetExpiration(v string) *DescribeSubaccountK8sClusterUserConfigResponseBody {
+	s.Expiration = &v
+	return s
+}
+
+type DescribeSubaccountK8sClusterUserConfigResponse struct {
+	Headers    map[string]*string                                  `json:"headers,omitempty" xml:"headers,omitempty" require:"true"`
+	StatusCode *int32                                              `json:"statusCode,omitempty" xml:"statusCode,omitempty" require:"true"`
+	Body       *DescribeSubaccountK8sClusterUserConfigResponseBody `json:"body,omitempty" xml:"body,omitempty" require:"true"`
+}
+
+func (s DescribeSubaccountK8sClusterUserConfigResponse) String() string {
+	return tea.Prettify(s)
+}
+
+func (s DescribeSubaccountK8sClusterUserConfigResponse) GoString() string {
+	return s.String()
+}
+
+func (s *DescribeSubaccountK8sClusterUserConfigResponse) SetHeaders(v map[string]*string) *DescribeSubaccountK8sClusterUserConfigResponse {
+	s.Headers = v
+	return s
+}
+
+func (s *DescribeSubaccountK8sClusterUserConfigResponse) SetStatusCode(v int32) *DescribeSubaccountK8sClusterUserConfigResponse {
+	s.StatusCode = &v
+	return s
+}
+
+func (s *DescribeSubaccountK8sClusterUserConfigResponse) SetBody(v *DescribeSubaccountK8sClusterUserConfigResponseBody) *DescribeSubaccountK8sClusterUserConfigResponse {
+	s.Body = v
+	return s
+}
+
 type DescribeTaskInfoResponseBody struct {
-	ClusterId    *string                                   `json:"cluster_id,omitempty" xml:"cluster_id,omitempty"`
-	Created      *string                                   `json:"created,omitempty" xml:"created,omitempty"`
-	CurrentStage *string                                   `json:"current_stage,omitempty" xml:"current_stage,omitempty"`
-	Error        *DescribeTaskInfoResponseBodyError        `json:"error,omitempty" xml:"error,omitempty" type:"Struct"`
-	Events       []*DescribeTaskInfoResponseBodyEvents     `json:"events,omitempty" xml:"events,omitempty" type:"Repeated"`
-	Parameters   map[string]interface{}                    `json:"parameters,omitempty" xml:"parameters,omitempty"`
-	Stages       []*DescribeTaskInfoResponseBodyStages     `json:"stages,omitempty" xml:"stages,omitempty" type:"Repeated"`
-	State        *string                                   `json:"state,omitempty" xml:"state,omitempty"`
-	Target       *DescribeTaskInfoResponseBodyTarget       `json:"target,omitempty" xml:"target,omitempty" type:"Struct"`
-	TaskId       *string                                   `json:"task_id,omitempty" xml:"task_id,omitempty"`
-	TaskResult   []*DescribeTaskInfoResponseBodyTaskResult `json:"task_result,omitempty" xml:"task_result,omitempty" type:"Repeated"`
-	TaskType     *string                                   `json:"task_type,omitempty" xml:"task_type,omitempty"`
-	Updated      *string                                   `json:"updated,omitempty" xml:"updated,omitempty"`
+	// The ID of the ACK cluster.
+	ClusterId *string `json:"cluster_id,omitempty" xml:"cluster_id,omitempty"`
+	// The time when the task was created.
+	Created      *string                               `json:"created,omitempty" xml:"created,omitempty"`
+	CurrentStage *string                               `json:"current_stage,omitempty" xml:"current_stage,omitempty"`
+	Error        *DescribeTaskInfoResponseBodyError    `json:"error,omitempty" xml:"error,omitempty" type:"Struct"`
+	Events       []*DescribeTaskInfoResponseBodyEvents `json:"events,omitempty" xml:"events,omitempty" type:"Repeated"`
+	Parameters   map[string]interface{}                `json:"parameters,omitempty" xml:"parameters,omitempty"`
+	Stages       []*DescribeTaskInfoResponseBodyStages `json:"stages,omitempty" xml:"stages,omitempty" type:"Repeated"`
+	// The state of the task. Valid values:
+	//
+	// *   `running`: The task is running.
+	// *   `fail`: The task failed.
+	// *   `success`: The task is complete.
+	State  *string                             `json:"state,omitempty" xml:"state,omitempty"`
+	Target *DescribeTaskInfoResponseBodyTarget `json:"target,omitempty" xml:"target,omitempty" type:"Struct"`
+	// The ID of the task.
+	TaskId *string `json:"task_id,omitempty" xml:"task_id,omitempty"`
+	// The execution result of the task.
+	TaskResult []*DescribeTaskInfoResponseBodyTaskResult `json:"task_result,omitempty" xml:"task_result,omitempty" type:"Repeated"`
+	// The task type. A value of `cluster_scaleout` indicates a scale-out task.
+	TaskType *string `json:"task_type,omitempty" xml:"task_type,omitempty"`
+	// The time when the task was updated.
+	Updated *string `json:"updated,omitempty" xml:"updated,omitempty"`
 }
 
 func (s DescribeTaskInfoResponseBody) String() string {
@@ -8200,7 +10298,13 @@ func (s *DescribeTaskInfoResponseBodyTarget) SetType(v string) *DescribeTaskInfo
 }
 
 type DescribeTaskInfoResponseBodyTaskResult struct {
-	Data   *string `json:"data,omitempty" xml:"data,omitempty"`
+	// The resources that are managed by the task. For a scale-out task, the value of this parameter the ID of the instance that is added by the task.
+	Data *string `json:"data,omitempty" xml:"data,omitempty"`
+	// The state of the scaling of the resource. Valid values:
+	//
+	// *   `success`: The scale-out task is successful.
+	// *   `failed`: The scale-out task failed.
+	// *   `initail`: The scale-out task is initializing.
 	Status *string `json:"status,omitempty" xml:"status,omitempty"`
 }
 
@@ -8398,7 +10502,9 @@ func (s *DescribeTemplatesRequest) SetTemplateType(v string) *DescribeTemplatesR
 }
 
 type DescribeTemplatesResponseBody struct {
-	PageInfo  *DescribeTemplatesResponseBodyPageInfo    `json:"page_info,omitempty" xml:"page_info,omitempty" type:"Struct"`
+	// The pagination details.
+	PageInfo *DescribeTemplatesResponseBodyPageInfo `json:"page_info,omitempty" xml:"page_info,omitempty" type:"Struct"`
+	// The list of the templates returned .
 	Templates []*DescribeTemplatesResponseBodyTemplates `json:"templates,omitempty" xml:"templates,omitempty" type:"Repeated"`
 }
 
@@ -8421,8 +10527,11 @@ func (s *DescribeTemplatesResponseBody) SetTemplates(v []*DescribeTemplatesRespo
 }
 
 type DescribeTemplatesResponseBodyPageInfo struct {
+	// The page number of the returned page.
 	PageNumber *int64 `json:"page_number,omitempty" xml:"page_number,omitempty"`
-	PageSize   *int64 `json:"page_size,omitempty" xml:"page_size,omitempty"`
+	// The maximum number of entries returned per page.
+	PageSize *int64 `json:"page_size,omitempty" xml:"page_size,omitempty"`
+	// The total number of entries returned.
 	TotalCount *int64 `json:"total_count,omitempty" xml:"total_count,omitempty"`
 }
 
@@ -8450,16 +10559,35 @@ func (s *DescribeTemplatesResponseBodyPageInfo) SetTotalCount(v int64) *Describe
 }
 
 type DescribeTemplatesResponseBodyTemplates struct {
-	Acl                *string `json:"acl,omitempty" xml:"acl,omitempty"`
-	Created            *string `json:"created,omitempty" xml:"created,omitempty"`
-	Description        *string `json:"description,omitempty" xml:"description,omitempty"`
-	Id                 *string `json:"id,omitempty" xml:"id,omitempty"`
-	Name               *string `json:"name,omitempty" xml:"name,omitempty"`
-	Tags               *string `json:"tags,omitempty" xml:"tags,omitempty"`
-	Template           *string `json:"template,omitempty" xml:"template,omitempty"`
-	TemplateType       *string `json:"template_type,omitempty" xml:"template_type,omitempty"`
+	// The access control policy of the template. Valid values:
+	//
+	// *   `private`: The template is private.
+	// *   `public`: The template is public.
+	// *   `shared`: The template can be shared.
+	//
+	// Default value: `private`.
+	Acl *string `json:"acl,omitempty" xml:"acl,omitempty"`
+	// The time when the template was created.
+	Created *string `json:"created,omitempty" xml:"created,omitempty"`
+	// The description of the template.
+	Description *string `json:"description,omitempty" xml:"description,omitempty"`
+	// The ID of the template.
+	Id *string `json:"id,omitempty" xml:"id,omitempty"`
+	// The name of the template.
+	Name *string `json:"name,omitempty" xml:"name,omitempty"`
+	// The tag of the template. By default, the value is the name of the template.
+	Tags *string `json:"tags,omitempty" xml:"tags,omitempty"`
+	// The template content in YAML format.
+	Template *string `json:"template,omitempty" xml:"template,omitempty"`
+	// The type of the template. The value can be a custom value.
+	//
+	// *   If the value is `kubernetes`, it indicates that the template is displayed on the Templates page in the ACK console.
+	// *   If the value is `compose`, it indicates that the template is displayed on the Container Service - Swarm page in the console. However, Container Service for Swarm is deprecated.
+	TemplateType *string `json:"template_type,omitempty" xml:"template_type,omitempty"`
+	// The ID of the parent template. The value of `template_with_hist_id` is the same for each template version. This allows you to manage different template versions.
 	TemplateWithHistId *string `json:"template_with_hist_id,omitempty" xml:"template_with_hist_id,omitempty"`
-	Updated            *string `json:"updated,omitempty" xml:"updated,omitempty"`
+	// The time when the template was updated.
+	Updated *string `json:"updated,omitempty" xml:"updated,omitempty"`
 }
 
 func (s DescribeTemplatesResponseBodyTemplates) String() string {
@@ -8666,6 +10794,35 @@ func (s *DescribeTriggerResponseBody) SetToken(v string) *DescribeTriggerRespons
 	return s
 }
 
+type DescribeUserClusterNamespacesResponse struct {
+	Headers    map[string]*string `json:"headers,omitempty" xml:"headers,omitempty" require:"true"`
+	StatusCode *int32             `json:"statusCode,omitempty" xml:"statusCode,omitempty" require:"true"`
+	Body       []*string          `json:"body,omitempty" xml:"body,omitempty" require:"true" type:"Repeated"`
+}
+
+func (s DescribeUserClusterNamespacesResponse) String() string {
+	return tea.Prettify(s)
+}
+
+func (s DescribeUserClusterNamespacesResponse) GoString() string {
+	return s.String()
+}
+
+func (s *DescribeUserClusterNamespacesResponse) SetHeaders(v map[string]*string) *DescribeUserClusterNamespacesResponse {
+	s.Headers = v
+	return s
+}
+
+func (s *DescribeUserClusterNamespacesResponse) SetStatusCode(v int32) *DescribeUserClusterNamespacesResponse {
+	s.StatusCode = &v
+	return s
+}
+
+func (s *DescribeUserClusterNamespacesResponse) SetBody(v []*string) *DescribeUserClusterNamespacesResponse {
+	s.Body = v
+	return s
+}
+
 type DescribeUserPermissionResponse struct {
 	Headers    map[string]*string                    `json:"headers,omitempty" xml:"headers,omitempty" require:"true"`
 	StatusCode *int32                                `json:"statusCode,omitempty" xml:"statusCode,omitempty" require:"true"`
@@ -8743,11 +10900,19 @@ func (s *DescribeUserPermissionResponseBody) SetIsRamRole(v int64) *DescribeUser
 }
 
 type DescribeUserQuotaResponseBody struct {
-	AmkClusterQuota      *int64 `json:"amk_cluster_quota,omitempty" xml:"amk_cluster_quota,omitempty"`
-	AskClusterQuota      *int64 `json:"ask_cluster_quota,omitempty" xml:"ask_cluster_quota,omitempty"`
+	// The quota of Container Service for Kubernetes (ACK) managed clusters. Default value: 20. To increase the quota, [go to the Quota Center page to submit a ticket](https://quotas.console.aliyun.com/products/csk/quotas).
+	AmkClusterQuota *int64 `json:"amk_cluster_quota,omitempty" xml:"amk_cluster_quota,omitempty"`
+	// The quota of serverless Kubernetes (ASK) clusters. Default value: 20. To increase the quota, [go to the Quota Center page to submit a ticket](https://quotas.console.aliyun.com/products/csk/quotas).
+	AskClusterQuota *int64 `json:"ask_cluster_quota,omitempty" xml:"ask_cluster_quota,omitempty"`
+	// The quota of node pools in an ACK cluster. Default value: 20. To increase the quota, [go to the Quota Center page to submit a ticket](https://quotas.console.aliyun.com/products/csk/quotas).
 	ClusterNodepoolQuota *int64 `json:"cluster_nodepool_quota,omitempty" xml:"cluster_nodepool_quota,omitempty"`
-	ClusterQuota         *int64 `json:"cluster_quota,omitempty" xml:"cluster_quota,omitempty"`
-	NodeQuota            *int64 `json:"node_quota,omitempty" xml:"node_quota,omitempty"`
+	// The quota of clusters within an Alibaba Cloud account. Default value: 50. To increase the quota, [go to the Quota Center page to submit a ticket](https://quotas.console.aliyun.com/products/csk/quotas).
+	ClusterQuota *int64 `json:"cluster_quota,omitempty" xml:"cluster_quota,omitempty"`
+	// The quota of enhanced edge node pools.
+	EdgeImprovedNodepoolQuota *DescribeUserQuotaResponseBodyEdgeImprovedNodepoolQuota `json:"edge_improved_nodepool_quota,omitempty" xml:"edge_improved_nodepool_quota,omitempty" type:"Struct"`
+	// The quota of nodes in an ACK cluster. Default value: 100. To increase the quota, [go to the Quota Center page to submit a ticket](https://quotas.console.aliyun.com/products/csk/quotas).
+	NodeQuota *int64                  `json:"node_quota,omitempty" xml:"node_quota,omitempty"`
+	Quotas    map[string]*QuotasValue `json:"quotas,omitempty" xml:"quotas,omitempty"`
 }
 
 func (s DescribeUserQuotaResponseBody) String() string {
@@ -8778,8 +10943,52 @@ func (s *DescribeUserQuotaResponseBody) SetClusterQuota(v int64) *DescribeUserQu
 	return s
 }
 
+func (s *DescribeUserQuotaResponseBody) SetEdgeImprovedNodepoolQuota(v *DescribeUserQuotaResponseBodyEdgeImprovedNodepoolQuota) *DescribeUserQuotaResponseBody {
+	s.EdgeImprovedNodepoolQuota = v
+	return s
+}
+
 func (s *DescribeUserQuotaResponseBody) SetNodeQuota(v int64) *DescribeUserQuotaResponseBody {
 	s.NodeQuota = &v
+	return s
+}
+
+func (s *DescribeUserQuotaResponseBody) SetQuotas(v map[string]*QuotasValue) *DescribeUserQuotaResponseBody {
+	s.Quotas = v
+	return s
+}
+
+type DescribeUserQuotaResponseBodyEdgeImprovedNodepoolQuota struct {
+	// The maximum bandwidth of each enhanced node pool. Unit: Mbit/s.
+	Bandwidth *int32 `json:"bandwidth,omitempty" xml:"bandwidth,omitempty"`
+	// The quota of enhanced edge node pools within an Alibaba Cloud account.
+	Count *int32 `json:"count,omitempty" xml:"count,omitempty"`
+	// The maximum subscription duration of an enhanced edge node pool. Unit: months.
+	//
+	// >  Enhanced node pools use the pay-as-you-go billing method. Therefore, this parameter is not required.
+	Period *int32 `json:"period,omitempty" xml:"period,omitempty"`
+}
+
+func (s DescribeUserQuotaResponseBodyEdgeImprovedNodepoolQuota) String() string {
+	return tea.Prettify(s)
+}
+
+func (s DescribeUserQuotaResponseBodyEdgeImprovedNodepoolQuota) GoString() string {
+	return s.String()
+}
+
+func (s *DescribeUserQuotaResponseBodyEdgeImprovedNodepoolQuota) SetBandwidth(v int32) *DescribeUserQuotaResponseBodyEdgeImprovedNodepoolQuota {
+	s.Bandwidth = &v
+	return s
+}
+
+func (s *DescribeUserQuotaResponseBodyEdgeImprovedNodepoolQuota) SetCount(v int32) *DescribeUserQuotaResponseBodyEdgeImprovedNodepoolQuota {
+	s.Count = &v
+	return s
+}
+
+func (s *DescribeUserQuotaResponseBodyEdgeImprovedNodepoolQuota) SetPeriod(v int32) *DescribeUserQuotaResponseBodyEdgeImprovedNodepoolQuota {
+	s.Period = &v
 	return s
 }
 
@@ -8813,6 +11022,7 @@ func (s *DescribeUserQuotaResponse) SetBody(v *DescribeUserQuotaResponseBody) *D
 }
 
 type DescribeWorkflowsResponseBody struct {
+	// The list of the jobs.
 	Jobs []*DescribeWorkflowsResponseBodyJobs `json:"jobs,omitempty" xml:"jobs,omitempty" type:"Repeated"`
 }
 
@@ -8830,9 +11040,12 @@ func (s *DescribeWorkflowsResponseBody) SetJobs(v []*DescribeWorkflowsResponseBo
 }
 
 type DescribeWorkflowsResponseBodyJobs struct {
-	ClusterId  *string `json:"cluster_id,omitempty" xml:"cluster_id,omitempty"`
+	// The ID of the ACK cluster.
+	ClusterId *string `json:"cluster_id,omitempty" xml:"cluster_id,omitempty"`
+	// The time when the workflow was created.
 	CreateTime *string `json:"create_time,omitempty" xml:"create_time,omitempty"`
-	JobName    *string `json:"job_name,omitempty" xml:"job_name,omitempty"`
+	// The name of the workflow.
+	JobName *string `json:"job_name,omitempty" xml:"job_name,omitempty"`
 }
 
 func (s DescribeWorkflowsResponseBodyJobs) String() string {
@@ -8917,8 +11130,10 @@ func (s *EdgeClusterAddEdgeMachineRequest) SetOptions(v string) *EdgeClusterAddE
 }
 
 type EdgeClusterAddEdgeMachineResponseBody struct {
+	// The ID of the cloud-native box.
 	EdgeMachineId *string `json:"edge_machine_id,omitempty" xml:"edge_machine_id,omitempty"`
-	RequestId     *string `json:"request_id,omitempty" xml:"request_id,omitempty"`
+	// The ID of the request.
+	RequestId *string `json:"request_id,omitempty" xml:"request_id,omitempty"`
 }
 
 func (s EdgeClusterAddEdgeMachineResponseBody) String() string {
@@ -8971,7 +11186,7 @@ func (s *EdgeClusterAddEdgeMachineResponse) SetBody(v *EdgeClusterAddEdgeMachine
 type FixNodePoolVulsRequest struct {
 	Nodes         []*string                            `json:"nodes,omitempty" xml:"nodes,omitempty" type:"Repeated"`
 	RolloutPolicy *FixNodePoolVulsRequestRolloutPolicy `json:"rollout_policy,omitempty" xml:"rollout_policy,omitempty" type:"Struct"`
-	VulList       []*string                            `json:"vul_list,omitempty" xml:"vul_list,omitempty" type:"Repeated"`
+	Vuls          []*string                            `json:"vuls,omitempty" xml:"vuls,omitempty" type:"Repeated"`
 }
 
 func (s FixNodePoolVulsRequest) String() string {
@@ -8992,8 +11207,8 @@ func (s *FixNodePoolVulsRequest) SetRolloutPolicy(v *FixNodePoolVulsRequestRollo
 	return s
 }
 
-func (s *FixNodePoolVulsRequest) SetVulList(v []*string) *FixNodePoolVulsRequest {
-	s.VulList = v
+func (s *FixNodePoolVulsRequest) SetVuls(v []*string) *FixNodePoolVulsRequest {
+	s.Vuls = v
 	return s
 }
 
@@ -9131,7 +11346,8 @@ type GetKubernetesTriggerResponseBody struct {
 	ProjectId *string `json:"project_id,omitempty" xml:"project_id,omitempty"`
 	Type      *string `json:"type,omitempty" xml:"type,omitempty"`
 	Action    *string `json:"action,omitempty" xml:"action,omitempty"`
-	Token     *string `json:"token,omitempty" xml:"token,omitempty"`
+	// Token
+	Token *string `json:"token,omitempty" xml:"token,omitempty"`
 }
 
 func (s GetKubernetesTriggerResponseBody) String() string {
@@ -9178,11 +11394,27 @@ func (s *GetKubernetesTriggerResponseBody) SetToken(v string) *GetKubernetesTrig
 }
 
 type GetUpgradeStatusResponseBody struct {
-	ErrorMessage     *string                                  `json:"error_message,omitempty" xml:"error_message,omitempty"`
-	PrecheckReportId *string                                  `json:"precheck_report_id,omitempty" xml:"precheck_report_id,omitempty"`
-	Status           *string                                  `json:"status,omitempty" xml:"status,omitempty"`
-	UpgradeStep      *string                                  `json:"upgrade_step,omitempty" xml:"upgrade_step,omitempty"`
-	UpgradeTask      *GetUpgradeStatusResponseBodyUpgradeTask `json:"upgrade_task,omitempty" xml:"upgrade_task,omitempty" type:"Struct"`
+	// The error message returned during the update.
+	ErrorMessage *string `json:"error_message,omitempty" xml:"error_message,omitempty"`
+	// The ID of the precheck report.
+	PrecheckReportId *string `json:"precheck_report_id,omitempty" xml:"precheck_report_id,omitempty"`
+	// The status of the update. Valid values:
+	//
+	// *   `success`: The update is successful.
+	// *   `fail`: The update failed.
+	// *   `pause`: The update is paused.
+	// *   `running`: The update is in progress.
+	Status *string `json:"status,omitempty" xml:"status,omitempty"`
+	// The current phase of the update. Valid values:
+	//
+	// *   `not_start`: The update is not started.
+	// *   `prechecking`: The precheck is in progress.
+	// *   `upgrading`: The update is in progress.
+	// *   `pause`: The update is paused.
+	// *   `success`: The update is successful.
+	UpgradeStep *string `json:"upgrade_step,omitempty" xml:"upgrade_step,omitempty"`
+	// The details of the update task.
+	UpgradeTask *GetUpgradeStatusResponseBodyUpgradeTask `json:"upgrade_task,omitempty" xml:"upgrade_task,omitempty" type:"Struct"`
 }
 
 func (s GetUpgradeStatusResponseBody) String() string {
@@ -9219,8 +11451,14 @@ func (s *GetUpgradeStatusResponseBody) SetUpgradeTask(v *GetUpgradeStatusRespons
 }
 
 type GetUpgradeStatusResponseBodyUpgradeTask struct {
+	// The description of the update task.
 	Message *string `json:"message,omitempty" xml:"message,omitempty"`
-	Status  *string `json:"status,omitempty" xml:"status,omitempty"`
+	// The status of the update task. Valid values:
+	//
+	// *   `running`: The update task is being executed.
+	// *   `Success`: The update task is successfully executed.
+	// *   `Failed`: The update task failed.
+	Status *string `json:"status,omitempty" xml:"status,omitempty"`
 }
 
 func (s GetUpgradeStatusResponseBodyUpgradeTask) String() string {
@@ -9509,8 +11747,11 @@ func (s *ListTagResourcesShrinkRequest) SetTagsShrink(v string) *ListTagResource
 }
 
 type ListTagResourcesResponseBody struct {
-	NextToken    *string                                   `json:"next_token,omitempty" xml:"next_token,omitempty"`
-	RequestId    *string                                   `json:"request_id,omitempty" xml:"request_id,omitempty"`
+	// The token that is used to start the next query.
+	NextToken *string `json:"next_token,omitempty" xml:"next_token,omitempty"`
+	// The ID of the request.
+	RequestId *string `json:"request_id,omitempty" xml:"request_id,omitempty"`
+	// The details of the queried labels and resources.
 	TagResources *ListTagResourcesResponseBodyTagResources `json:"tag_resources,omitempty" xml:"tag_resources,omitempty" type:"Struct"`
 }
 
@@ -9538,6 +11779,7 @@ func (s *ListTagResourcesResponseBody) SetTagResources(v *ListTagResourcesRespon
 }
 
 type ListTagResourcesResponseBodyTagResources struct {
+	// The labels of the resource.
 	TagResource []*ListTagResourcesResponseBodyTagResourcesTagResource `json:"tag_resource,omitempty" xml:"tag_resource,omitempty" type:"Repeated"`
 }
 
@@ -9555,10 +11797,14 @@ func (s *ListTagResourcesResponseBodyTagResources) SetTagResource(v []*ListTagRe
 }
 
 type ListTagResourcesResponseBodyTagResourcesTagResource struct {
-	ResourceId   *string `json:"resource_id,omitempty" xml:"resource_id,omitempty"`
+	// The ID of the resource.
+	ResourceId *string `json:"resource_id,omitempty" xml:"resource_id,omitempty"`
+	// The type of the resource. For more information, see [Labels](~~110425~~).
 	ResourceType *string `json:"resource_type,omitempty" xml:"resource_type,omitempty"`
-	TagKey       *string `json:"tag_key,omitempty" xml:"tag_key,omitempty"`
-	TagValue     *string `json:"tag_value,omitempty" xml:"tag_value,omitempty"`
+	// The key of the label.
+	TagKey *string `json:"tag_key,omitempty" xml:"tag_key,omitempty"`
+	// The value of the label.
+	TagValue *string `json:"tag_value,omitempty" xml:"tag_value,omitempty"`
 }
 
 func (s ListTagResourcesResponseBodyTagResourcesTagResource) String() string {
@@ -9642,9 +11888,12 @@ func (s *MigrateClusterRequest) SetOssBucketName(v string) *MigrateClusterReques
 }
 
 type MigrateClusterResponseBody struct {
+	// The ID of the cluster.
 	ClusterId *string `json:"cluster_id,omitempty" xml:"cluster_id,omitempty"`
+	// The ID of the request.
 	RequestId *string `json:"request_id,omitempty" xml:"request_id,omitempty"`
-	TaskId    *string `json:"task_id,omitempty" xml:"task_id,omitempty"`
+	// The ID of the task.
+	TaskId *string `json:"task_id,omitempty" xml:"task_id,omitempty"`
 }
 
 func (s MigrateClusterResponseBody) String() string {
@@ -9765,9 +12014,12 @@ func (s *ModifyClusterRequest) SetResourceGroupId(v string) *ModifyClusterReques
 }
 
 type ModifyClusterResponseBody struct {
+	// The ID of the cluster.
 	ClusterId *string `json:"cluster_id,omitempty" xml:"cluster_id,omitempty"`
+	// The ID of the request.
 	RequestId *string `json:"request_id,omitempty" xml:"request_id,omitempty"`
-	TaskId    *string `json:"task_id,omitempty" xml:"task_id,omitempty"`
+	// The ID of the task.
+	TaskId *string `json:"task_id,omitempty" xml:"task_id,omitempty"`
 }
 
 func (s ModifyClusterResponseBody) String() string {
@@ -10195,35 +12447,36 @@ func (s *ModifyClusterNodePoolRequestNodepoolInfo) SetResourceGroupId(v string) 
 }
 
 type ModifyClusterNodePoolRequestScalingGroup struct {
-	AutoRenew                           *bool                                                     `json:"auto_renew,omitempty" xml:"auto_renew,omitempty"`
-	AutoRenewPeriod                     *int64                                                    `json:"auto_renew_period,omitempty" xml:"auto_renew_period,omitempty"`
-	CompensateWithOnDemand              *bool                                                     `json:"compensate_with_on_demand,omitempty" xml:"compensate_with_on_demand,omitempty"`
-	DataDisks                           []*DataDisk                                               `json:"data_disks,omitempty" xml:"data_disks,omitempty" type:"Repeated"`
-	DesiredSize                         *int64                                                    `json:"desired_size,omitempty" xml:"desired_size,omitempty"`
-	ImageId                             *string                                                   `json:"image_id,omitempty" xml:"image_id,omitempty"`
-	InstanceChargeType                  *string                                                   `json:"instance_charge_type,omitempty" xml:"instance_charge_type,omitempty"`
-	InstanceTypes                       []*string                                                 `json:"instance_types,omitempty" xml:"instance_types,omitempty" type:"Repeated"`
-	InternetChargeType                  *string                                                   `json:"internet_charge_type,omitempty" xml:"internet_charge_type,omitempty"`
-	InternetMaxBandwidthOut             *int64                                                    `json:"internet_max_bandwidth_out,omitempty" xml:"internet_max_bandwidth_out,omitempty"`
-	KeyPair                             *string                                                   `json:"key_pair,omitempty" xml:"key_pair,omitempty"`
-	LoginPassword                       *string                                                   `json:"login_password,omitempty" xml:"login_password,omitempty"`
-	MultiAzPolicy                       *string                                                   `json:"multi_az_policy,omitempty" xml:"multi_az_policy,omitempty"`
-	OnDemandBaseCapacity                *int64                                                    `json:"on_demand_base_capacity,omitempty" xml:"on_demand_base_capacity,omitempty"`
-	OnDemandPercentageAboveBaseCapacity *int64                                                    `json:"on_demand_percentage_above_base_capacity,omitempty" xml:"on_demand_percentage_above_base_capacity,omitempty"`
-	Period                              *int64                                                    `json:"period,omitempty" xml:"period,omitempty"`
-	PeriodUnit                          *string                                                   `json:"period_unit,omitempty" xml:"period_unit,omitempty"`
-	Platform                            *string                                                   `json:"platform,omitempty" xml:"platform,omitempty"`
-	RdsInstances                        []*string                                                 `json:"rds_instances,omitempty" xml:"rds_instances,omitempty" type:"Repeated"`
-	ScalingPolicy                       *string                                                   `json:"scaling_policy,omitempty" xml:"scaling_policy,omitempty"`
-	SpotInstancePools                   *int64                                                    `json:"spot_instance_pools,omitempty" xml:"spot_instance_pools,omitempty"`
-	SpotInstanceRemedy                  *bool                                                     `json:"spot_instance_remedy,omitempty" xml:"spot_instance_remedy,omitempty"`
-	SpotPriceLimit                      []*ModifyClusterNodePoolRequestScalingGroupSpotPriceLimit `json:"spot_price_limit,omitempty" xml:"spot_price_limit,omitempty" type:"Repeated"`
-	SpotStrategy                        *string                                                   `json:"spot_strategy,omitempty" xml:"spot_strategy,omitempty"`
-	SystemDiskCategory                  *string                                                   `json:"system_disk_category,omitempty" xml:"system_disk_category,omitempty"`
-	SystemDiskPerformanceLevel          *string                                                   `json:"system_disk_performance_level,omitempty" xml:"system_disk_performance_level,omitempty"`
-	SystemDiskSize                      *int64                                                    `json:"system_disk_size,omitempty" xml:"system_disk_size,omitempty"`
-	Tags                                []*Tag                                                    `json:"tags,omitempty" xml:"tags,omitempty" type:"Repeated"`
-	VswitchIds                          []*string                                                 `json:"vswitch_ids,omitempty" xml:"vswitch_ids,omitempty" type:"Repeated"`
+	AutoRenew                           *bool                                                       `json:"auto_renew,omitempty" xml:"auto_renew,omitempty"`
+	AutoRenewPeriod                     *int64                                                      `json:"auto_renew_period,omitempty" xml:"auto_renew_period,omitempty"`
+	CompensateWithOnDemand              *bool                                                       `json:"compensate_with_on_demand,omitempty" xml:"compensate_with_on_demand,omitempty"`
+	DataDisks                           []*DataDisk                                                 `json:"data_disks,omitempty" xml:"data_disks,omitempty" type:"Repeated"`
+	DesiredSize                         *int64                                                      `json:"desired_size,omitempty" xml:"desired_size,omitempty"`
+	ImageId                             *string                                                     `json:"image_id,omitempty" xml:"image_id,omitempty"`
+	InstanceChargeType                  *string                                                     `json:"instance_charge_type,omitempty" xml:"instance_charge_type,omitempty"`
+	InstanceTypes                       []*string                                                   `json:"instance_types,omitempty" xml:"instance_types,omitempty" type:"Repeated"`
+	InternetChargeType                  *string                                                     `json:"internet_charge_type,omitempty" xml:"internet_charge_type,omitempty"`
+	InternetMaxBandwidthOut             *int64                                                      `json:"internet_max_bandwidth_out,omitempty" xml:"internet_max_bandwidth_out,omitempty"`
+	KeyPair                             *string                                                     `json:"key_pair,omitempty" xml:"key_pair,omitempty"`
+	LoginPassword                       *string                                                     `json:"login_password,omitempty" xml:"login_password,omitempty"`
+	MultiAzPolicy                       *string                                                     `json:"multi_az_policy,omitempty" xml:"multi_az_policy,omitempty"`
+	OnDemandBaseCapacity                *int64                                                      `json:"on_demand_base_capacity,omitempty" xml:"on_demand_base_capacity,omitempty"`
+	OnDemandPercentageAboveBaseCapacity *int64                                                      `json:"on_demand_percentage_above_base_capacity,omitempty" xml:"on_demand_percentage_above_base_capacity,omitempty"`
+	Period                              *int64                                                      `json:"period,omitempty" xml:"period,omitempty"`
+	PeriodUnit                          *string                                                     `json:"period_unit,omitempty" xml:"period_unit,omitempty"`
+	Platform                            *string                                                     `json:"platform,omitempty" xml:"platform,omitempty"`
+	PrivatePoolOptions                  *ModifyClusterNodePoolRequestScalingGroupPrivatePoolOptions `json:"private_pool_options,omitempty" xml:"private_pool_options,omitempty" type:"Struct"`
+	RdsInstances                        []*string                                                   `json:"rds_instances,omitempty" xml:"rds_instances,omitempty" type:"Repeated"`
+	ScalingPolicy                       *string                                                     `json:"scaling_policy,omitempty" xml:"scaling_policy,omitempty"`
+	SpotInstancePools                   *int64                                                      `json:"spot_instance_pools,omitempty" xml:"spot_instance_pools,omitempty"`
+	SpotInstanceRemedy                  *bool                                                       `json:"spot_instance_remedy,omitempty" xml:"spot_instance_remedy,omitempty"`
+	SpotPriceLimit                      []*ModifyClusterNodePoolRequestScalingGroupSpotPriceLimit   `json:"spot_price_limit,omitempty" xml:"spot_price_limit,omitempty" type:"Repeated"`
+	SpotStrategy                        *string                                                     `json:"spot_strategy,omitempty" xml:"spot_strategy,omitempty"`
+	SystemDiskCategory                  *string                                                     `json:"system_disk_category,omitempty" xml:"system_disk_category,omitempty"`
+	SystemDiskPerformanceLevel          *string                                                     `json:"system_disk_performance_level,omitempty" xml:"system_disk_performance_level,omitempty"`
+	SystemDiskSize                      *int64                                                      `json:"system_disk_size,omitempty" xml:"system_disk_size,omitempty"`
+	Tags                                []*Tag                                                      `json:"tags,omitempty" xml:"tags,omitempty" type:"Repeated"`
+	VswitchIds                          []*string                                                   `json:"vswitch_ids,omitempty" xml:"vswitch_ids,omitempty" type:"Repeated"`
 }
 
 func (s ModifyClusterNodePoolRequestScalingGroup) String() string {
@@ -10324,6 +12577,11 @@ func (s *ModifyClusterNodePoolRequestScalingGroup) SetPlatform(v string) *Modify
 	return s
 }
 
+func (s *ModifyClusterNodePoolRequestScalingGroup) SetPrivatePoolOptions(v *ModifyClusterNodePoolRequestScalingGroupPrivatePoolOptions) *ModifyClusterNodePoolRequestScalingGroup {
+	s.PrivatePoolOptions = v
+	return s
+}
+
 func (s *ModifyClusterNodePoolRequestScalingGroup) SetRdsInstances(v []*string) *ModifyClusterNodePoolRequestScalingGroup {
 	s.RdsInstances = v
 	return s
@@ -10379,6 +12637,29 @@ func (s *ModifyClusterNodePoolRequestScalingGroup) SetVswitchIds(v []*string) *M
 	return s
 }
 
+type ModifyClusterNodePoolRequestScalingGroupPrivatePoolOptions struct {
+	Id            *string `json:"id,omitempty" xml:"id,omitempty"`
+	MatchCriteria *string `json:"match_criteria,omitempty" xml:"match_criteria,omitempty"`
+}
+
+func (s ModifyClusterNodePoolRequestScalingGroupPrivatePoolOptions) String() string {
+	return tea.Prettify(s)
+}
+
+func (s ModifyClusterNodePoolRequestScalingGroupPrivatePoolOptions) GoString() string {
+	return s.String()
+}
+
+func (s *ModifyClusterNodePoolRequestScalingGroupPrivatePoolOptions) SetId(v string) *ModifyClusterNodePoolRequestScalingGroupPrivatePoolOptions {
+	s.Id = &v
+	return s
+}
+
+func (s *ModifyClusterNodePoolRequestScalingGroupPrivatePoolOptions) SetMatchCriteria(v string) *ModifyClusterNodePoolRequestScalingGroupPrivatePoolOptions {
+	s.MatchCriteria = &v
+	return s
+}
+
 type ModifyClusterNodePoolRequestScalingGroupSpotPriceLimit struct {
 	InstanceType *string `json:"instance_type,omitempty" xml:"instance_type,omitempty"`
 	PriceLimit   *string `json:"price_limit,omitempty" xml:"price_limit,omitempty"`
@@ -10420,8 +12701,10 @@ func (s *ModifyClusterNodePoolRequestTeeConfig) SetTeeEnable(v bool) *ModifyClus
 }
 
 type ModifyClusterNodePoolResponseBody struct {
+	// The ID of the node pool.
 	NodepoolId *string `json:"nodepool_id,omitempty" xml:"nodepool_id,omitempty"`
-	TaskId     *string `json:"task_id,omitempty" xml:"task_id,omitempty"`
+	// The ID of the task.
+	TaskId *string `json:"task_id,omitempty" xml:"task_id,omitempty"`
 }
 
 func (s ModifyClusterNodePoolResponseBody) String() string {
@@ -10734,6 +13017,7 @@ func (s *ModifyPolicyInstanceRequest) SetParameters(v map[string]interface{}) *M
 }
 
 type ModifyPolicyInstanceResponseBody struct {
+	// The policy instance that is updated.
 	Instances []*string `json:"instances,omitempty" xml:"instances,omitempty" type:"Repeated"`
 }
 
@@ -10797,7 +13081,9 @@ func (s *OpenAckServiceRequest) SetType(v string) *OpenAckServiceRequest {
 }
 
 type OpenAckServiceResponseBody struct {
-	OrderId   *string `json:"order_id,omitempty" xml:"order_id,omitempty"`
+	// The ID of the order.
+	OrderId *string `json:"order_id,omitempty" xml:"order_id,omitempty"`
+	// The ID of the request.
 	RequestId *string `json:"request_id,omitempty" xml:"request_id,omitempty"`
 }
 
@@ -10970,9 +13256,14 @@ func (s *RemoveClusterNodesResponse) SetStatusCode(v int32) *RemoveClusterNodesR
 }
 
 type RemoveNodePoolNodesRequest struct {
-	DrainNode   *bool     `json:"drain_node,omitempty" xml:"drain_node,omitempty"`
-	Nodes       []*string `json:"nodes,omitempty" xml:"nodes,omitempty" type:"Repeated"`
-	ReleaseNode *bool     `json:"release_node,omitempty" xml:"release_node,omitempty"`
+	// true
+	DrainNode *bool `json:"drain_node,omitempty" xml:"drain_node,omitempty"`
+	// i-bp1c70fqbv1nlu9xxxxx
+	InstanceIds []*string `json:"instance_ids,omitempty" xml:"instance_ids,omitempty" type:"Repeated"`
+	// cn-hangzhou.172.16.xxx.xxx
+	Nodes []*string `json:"nodes,omitempty" xml:"nodes,omitempty" type:"Repeated"`
+	// true
+	ReleaseNode *bool `json:"release_node,omitempty" xml:"release_node,omitempty"`
 }
 
 func (s RemoveNodePoolNodesRequest) String() string {
@@ -10988,6 +13279,11 @@ func (s *RemoveNodePoolNodesRequest) SetDrainNode(v bool) *RemoveNodePoolNodesRe
 	return s
 }
 
+func (s *RemoveNodePoolNodesRequest) SetInstanceIds(v []*string) *RemoveNodePoolNodesRequest {
+	s.InstanceIds = v
+	return s
+}
+
 func (s *RemoveNodePoolNodesRequest) SetNodes(v []*string) *RemoveNodePoolNodesRequest {
 	s.Nodes = v
 	return s
@@ -10999,9 +13295,14 @@ func (s *RemoveNodePoolNodesRequest) SetReleaseNode(v bool) *RemoveNodePoolNodes
 }
 
 type RemoveNodePoolNodesShrinkRequest struct {
-	DrainNode   *bool   `json:"drain_node,omitempty" xml:"drain_node,omitempty"`
+	// true
+	DrainNode *bool `json:"drain_node,omitempty" xml:"drain_node,omitempty"`
+	// i-bp1c70fqbv1nlu9xxxxx
+	InstanceIdsShrink *string `json:"instance_ids,omitempty" xml:"instance_ids,omitempty"`
+	// cn-hangzhou.172.16.xxx.xxx
 	NodesShrink *string `json:"nodes,omitempty" xml:"nodes,omitempty"`
-	ReleaseNode *bool   `json:"release_node,omitempty" xml:"release_node,omitempty"`
+	// true
+	ReleaseNode *bool `json:"release_node,omitempty" xml:"release_node,omitempty"`
 }
 
 func (s RemoveNodePoolNodesShrinkRequest) String() string {
@@ -11017,6 +13318,11 @@ func (s *RemoveNodePoolNodesShrinkRequest) SetDrainNode(v bool) *RemoveNodePoolN
 	return s
 }
 
+func (s *RemoveNodePoolNodesShrinkRequest) SetInstanceIdsShrink(v string) *RemoveNodePoolNodesShrinkRequest {
+	s.InstanceIdsShrink = &v
+	return s
+}
+
 func (s *RemoveNodePoolNodesShrinkRequest) SetNodesShrink(v string) *RemoveNodePoolNodesShrinkRequest {
 	s.NodesShrink = &v
 	return s
@@ -11028,8 +13334,10 @@ func (s *RemoveNodePoolNodesShrinkRequest) SetReleaseNode(v bool) *RemoveNodePoo
 }
 
 type RemoveNodePoolNodesResponseBody struct {
+	// The ID of the request.
 	RequestId *string `json:"request_id,omitempty" xml:"request_id,omitempty"`
-	TaskId    *string `json:"task_id,omitempty" xml:"task_id,omitempty"`
+	// The ID of the task.
+	TaskId *string `json:"task_id,omitempty" xml:"task_id,omitempty"`
 }
 
 func (s RemoveNodePoolNodesResponseBody) String() string {
@@ -11120,8 +13428,10 @@ func (s *RepairClusterNodePoolRequest) SetNodes(v []*string) *RepairClusterNodeP
 }
 
 type RepairClusterNodePoolResponseBody struct {
+	// The ID of the request.
 	RequestId *string `json:"request_id,omitempty" xml:"request_id,omitempty"`
-	TaskId    *string `json:"task_id,omitempty" xml:"task_id,omitempty"`
+	// The ID of the task.
+	TaskId *string `json:"task_id,omitempty" xml:"task_id,omitempty"`
 }
 
 func (s RepairClusterNodePoolResponseBody) String() string {
@@ -11516,6 +13826,7 @@ func (s *ScaleClusterNodePoolRequest) SetCount(v int64) *ScaleClusterNodePoolReq
 }
 
 type ScaleClusterNodePoolResponseBody struct {
+	// The ID of the scaling task.
 	TaskId *string `json:"task_id,omitempty" xml:"task_id,omitempty"`
 }
 
@@ -11734,9 +14045,12 @@ func (s *ScaleOutClusterRequestWorkerDataDisks) SetSize(v string) *ScaleOutClust
 }
 
 type ScaleOutClusterResponseBody struct {
+	// The ID of the cluster.
 	ClusterId *string `json:"cluster_id,omitempty" xml:"cluster_id,omitempty"`
+	// The ID of the request.
 	RequestId *string `json:"request_id,omitempty" xml:"request_id,omitempty"`
-	TaskId    *string `json:"task_id,omitempty" xml:"task_id,omitempty"`
+	// The ID of the task.
+	TaskId *string `json:"task_id,omitempty" xml:"task_id,omitempty"`
 }
 
 func (s ScaleOutClusterResponseBody) String() string {
@@ -11787,6 +14101,112 @@ func (s *ScaleOutClusterResponse) SetStatusCode(v int32) *ScaleOutClusterRespons
 }
 
 func (s *ScaleOutClusterResponse) SetBody(v *ScaleOutClusterResponseBody) *ScaleOutClusterResponse {
+	s.Body = v
+	return s
+}
+
+type ScanClusterVulsResponseBody struct {
+	RequestId *string `json:"request_id,omitempty" xml:"request_id,omitempty"`
+	TaskId    *string `json:"task_id,omitempty" xml:"task_id,omitempty"`
+}
+
+func (s ScanClusterVulsResponseBody) String() string {
+	return tea.Prettify(s)
+}
+
+func (s ScanClusterVulsResponseBody) GoString() string {
+	return s.String()
+}
+
+func (s *ScanClusterVulsResponseBody) SetRequestId(v string) *ScanClusterVulsResponseBody {
+	s.RequestId = &v
+	return s
+}
+
+func (s *ScanClusterVulsResponseBody) SetTaskId(v string) *ScanClusterVulsResponseBody {
+	s.TaskId = &v
+	return s
+}
+
+type ScanClusterVulsResponse struct {
+	Headers    map[string]*string           `json:"headers,omitempty" xml:"headers,omitempty" require:"true"`
+	StatusCode *int32                       `json:"statusCode,omitempty" xml:"statusCode,omitempty" require:"true"`
+	Body       *ScanClusterVulsResponseBody `json:"body,omitempty" xml:"body,omitempty" require:"true"`
+}
+
+func (s ScanClusterVulsResponse) String() string {
+	return tea.Prettify(s)
+}
+
+func (s ScanClusterVulsResponse) GoString() string {
+	return s.String()
+}
+
+func (s *ScanClusterVulsResponse) SetHeaders(v map[string]*string) *ScanClusterVulsResponse {
+	s.Headers = v
+	return s
+}
+
+func (s *ScanClusterVulsResponse) SetStatusCode(v int32) *ScanClusterVulsResponse {
+	s.StatusCode = &v
+	return s
+}
+
+func (s *ScanClusterVulsResponse) SetBody(v *ScanClusterVulsResponseBody) *ScanClusterVulsResponse {
+	s.Body = v
+	return s
+}
+
+type StartAlertResponseBody struct {
+	// The message returned.
+	Msg *string `json:"msg,omitempty" xml:"msg,omitempty"`
+	// The status.
+	Status *bool `json:"status,omitempty" xml:"status,omitempty"`
+}
+
+func (s StartAlertResponseBody) String() string {
+	return tea.Prettify(s)
+}
+
+func (s StartAlertResponseBody) GoString() string {
+	return s.String()
+}
+
+func (s *StartAlertResponseBody) SetMsg(v string) *StartAlertResponseBody {
+	s.Msg = &v
+	return s
+}
+
+func (s *StartAlertResponseBody) SetStatus(v bool) *StartAlertResponseBody {
+	s.Status = &v
+	return s
+}
+
+type StartAlertResponse struct {
+	Headers    map[string]*string      `json:"headers,omitempty" xml:"headers,omitempty" require:"true"`
+	StatusCode *int32                  `json:"statusCode,omitempty" xml:"statusCode,omitempty" require:"true"`
+	Body       *StartAlertResponseBody `json:"body,omitempty" xml:"body,omitempty" require:"true"`
+}
+
+func (s StartAlertResponse) String() string {
+	return tea.Prettify(s)
+}
+
+func (s StartAlertResponse) GoString() string {
+	return s.String()
+}
+
+func (s *StartAlertResponse) SetHeaders(v map[string]*string) *StartAlertResponse {
+	s.Headers = v
+	return s
+}
+
+func (s *StartAlertResponse) SetStatusCode(v int32) *StartAlertResponse {
+	s.StatusCode = &v
+	return s
+}
+
+func (s *StartAlertResponse) SetBody(v *StartAlertResponseBody) *StartAlertResponse {
 	s.Body = v
 	return s
 }
@@ -11917,6 +14337,7 @@ func (s *StartWorkflowRequest) SetWorkflowType(v string) *StartWorkflowRequest {
 }
 
 type StartWorkflowResponseBody struct {
+	// The name of the workflow that is created.
 	JobName *string `json:"JobName,omitempty" xml:"JobName,omitempty"`
 }
 
@@ -11958,6 +14379,106 @@ func (s *StartWorkflowResponse) SetStatusCode(v int32) *StartWorkflowResponse {
 }
 
 func (s *StartWorkflowResponse) SetBody(v *StartWorkflowResponseBody) *StartWorkflowResponse {
+	s.Body = v
+	return s
+}
+
+type StopAlertResponseBody struct {
+	// The error message returned if the call fails.
+	Msg *string `json:"msg,omitempty" xml:"msg,omitempty"`
+	// A value of True indicates that the call succeeds. A value of False indicates that the call failed.
+	Status *bool `json:"status,omitempty" xml:"status,omitempty"`
+}
+
+func (s StopAlertResponseBody) String() string {
+	return tea.Prettify(s)
+}
+
+func (s StopAlertResponseBody) GoString() string {
+	return s.String()
+}
+
+func (s *StopAlertResponseBody) SetMsg(v string) *StopAlertResponseBody {
+	s.Msg = &v
+	return s
+}
+
+func (s *StopAlertResponseBody) SetStatus(v bool) *StopAlertResponseBody {
+	s.Status = &v
+	return s
+}
+
+type StopAlertResponse struct {
+	Headers    map[string]*string     `json:"headers,omitempty" xml:"headers,omitempty" require:"true"`
+	StatusCode *int32                 `json:"statusCode,omitempty" xml:"statusCode,omitempty" require:"true"`
+	Body       *StopAlertResponseBody `json:"body,omitempty" xml:"body,omitempty" require:"true"`
+}
+
+func (s StopAlertResponse) String() string {
+	return tea.Prettify(s)
+}
+
+func (s StopAlertResponse) GoString() string {
+	return s.String()
+}
+
+func (s *StopAlertResponse) SetHeaders(v map[string]*string) *StopAlertResponse {
+	s.Headers = v
+	return s
+}
+
+func (s *StopAlertResponse) SetStatusCode(v int32) *StopAlertResponse {
+	s.StatusCode = &v
+	return s
+}
+
+func (s *StopAlertResponse) SetBody(v *StopAlertResponseBody) *StopAlertResponse {
+	s.Body = v
+	return s
+}
+
+type SyncClusterNodePoolResponseBody struct {
+	RequestId *string `json:"RequestId,omitempty" xml:"RequestId,omitempty"`
+}
+
+func (s SyncClusterNodePoolResponseBody) String() string {
+	return tea.Prettify(s)
+}
+
+func (s SyncClusterNodePoolResponseBody) GoString() string {
+	return s.String()
+}
+
+func (s *SyncClusterNodePoolResponseBody) SetRequestId(v string) *SyncClusterNodePoolResponseBody {
+	s.RequestId = &v
+	return s
+}
+
+type SyncClusterNodePoolResponse struct {
+	Headers    map[string]*string               `json:"headers,omitempty" xml:"headers,omitempty" require:"true"`
+	StatusCode *int32                           `json:"statusCode,omitempty" xml:"statusCode,omitempty" require:"true"`
+	Body       *SyncClusterNodePoolResponseBody `json:"body,omitempty" xml:"body,omitempty" require:"true"`
+}
+
+func (s SyncClusterNodePoolResponse) String() string {
+	return tea.Prettify(s)
+}
+
+func (s SyncClusterNodePoolResponse) GoString() string {
+	return s.String()
+}
+
+func (s *SyncClusterNodePoolResponse) SetHeaders(v map[string]*string) *SyncClusterNodePoolResponse {
+	s.Headers = v
+	return s
+}
+
+func (s *SyncClusterNodePoolResponse) SetStatusCode(v int32) *SyncClusterNodePoolResponse {
+	s.StatusCode = &v
+	return s
+}
+
+func (s *SyncClusterNodePoolResponse) SetBody(v *SyncClusterNodePoolResponseBody) *SyncClusterNodePoolResponse {
 	s.Body = v
 	return s
 }
@@ -12141,7 +14662,49 @@ func (s *UntagResourcesRequest) SetTagKeys(v []*string) *UntagResourcesRequest {
 	return s
 }
 
+type UntagResourcesShrinkRequest struct {
+	All               *bool   `json:"all,omitempty" xml:"all,omitempty"`
+	RegionId          *string `json:"region_id,omitempty" xml:"region_id,omitempty"`
+	ResourceIdsShrink *string `json:"resource_ids,omitempty" xml:"resource_ids,omitempty"`
+	ResourceType      *string `json:"resource_type,omitempty" xml:"resource_type,omitempty"`
+	TagKeysShrink     *string `json:"tag_keys,omitempty" xml:"tag_keys,omitempty"`
+}
+
+func (s UntagResourcesShrinkRequest) String() string {
+	return tea.Prettify(s)
+}
+
+func (s UntagResourcesShrinkRequest) GoString() string {
+	return s.String()
+}
+
+func (s *UntagResourcesShrinkRequest) SetAll(v bool) *UntagResourcesShrinkRequest {
+	s.All = &v
+	return s
+}
+
+func (s *UntagResourcesShrinkRequest) SetRegionId(v string) *UntagResourcesShrinkRequest {
+	s.RegionId = &v
+	return s
+}
+
+func (s *UntagResourcesShrinkRequest) SetResourceIdsShrink(v string) *UntagResourcesShrinkRequest {
+	s.ResourceIdsShrink = &v
+	return s
+}
+
+func (s *UntagResourcesShrinkRequest) SetResourceType(v string) *UntagResourcesShrinkRequest {
+	s.ResourceType = &v
+	return s
+}
+
+func (s *UntagResourcesShrinkRequest) SetTagKeysShrink(v string) *UntagResourcesShrinkRequest {
+	s.TagKeysShrink = &v
+	return s
+}
+
 type UntagResourcesResponseBody struct {
+	// The ID of the request.
 	RequestId *string `json:"RequestId,omitempty" xml:"RequestId,omitempty"`
 }
 
@@ -12206,6 +14769,64 @@ func (s *UpdateContactGroupForAlertResponse) SetHeaders(v map[string]*string) *U
 }
 
 func (s *UpdateContactGroupForAlertResponse) SetStatusCode(v int32) *UpdateContactGroupForAlertResponse {
+	s.StatusCode = &v
+	return s
+}
+
+type UpdateControlPlaneLogRequest struct {
+	Aliuid     *string   `json:"aliuid,omitempty" xml:"aliuid,omitempty"`
+	Components []*string `json:"components,omitempty" xml:"components,omitempty" type:"Repeated"`
+	LogProject *string   `json:"log_project,omitempty" xml:"log_project,omitempty"`
+	LogTtl     *string   `json:"log_ttl,omitempty" xml:"log_ttl,omitempty"`
+}
+
+func (s UpdateControlPlaneLogRequest) String() string {
+	return tea.Prettify(s)
+}
+
+func (s UpdateControlPlaneLogRequest) GoString() string {
+	return s.String()
+}
+
+func (s *UpdateControlPlaneLogRequest) SetAliuid(v string) *UpdateControlPlaneLogRequest {
+	s.Aliuid = &v
+	return s
+}
+
+func (s *UpdateControlPlaneLogRequest) SetComponents(v []*string) *UpdateControlPlaneLogRequest {
+	s.Components = v
+	return s
+}
+
+func (s *UpdateControlPlaneLogRequest) SetLogProject(v string) *UpdateControlPlaneLogRequest {
+	s.LogProject = &v
+	return s
+}
+
+func (s *UpdateControlPlaneLogRequest) SetLogTtl(v string) *UpdateControlPlaneLogRequest {
+	s.LogTtl = &v
+	return s
+}
+
+type UpdateControlPlaneLogResponse struct {
+	Headers    map[string]*string `json:"headers,omitempty" xml:"headers,omitempty" require:"true"`
+	StatusCode *int32             `json:"statusCode,omitempty" xml:"statusCode,omitempty" require:"true"`
+}
+
+func (s UpdateControlPlaneLogResponse) String() string {
+	return tea.Prettify(s)
+}
+
+func (s UpdateControlPlaneLogResponse) GoString() string {
+	return s.String()
+}
+
+func (s *UpdateControlPlaneLogResponse) SetHeaders(v map[string]*string) *UpdateControlPlaneLogResponse {
+	s.Headers = v
+	return s
+}
+
+func (s *UpdateControlPlaneLogResponse) SetStatusCode(v int32) *UpdateControlPlaneLogResponse {
 	s.StatusCode = &v
 	return s
 }
@@ -12321,9 +14942,12 @@ func (s *UpdateTemplateResponse) SetStatusCode(v int32) *UpdateTemplateResponse 
 }
 
 type UpgradeClusterRequest struct {
+	// Deprecated
 	ComponentName *string `json:"component_name,omitempty" xml:"component_name,omitempty"`
+	MasterOnly    *bool   `json:"master_only,omitempty" xml:"master_only,omitempty"`
 	NextVersion   *string `json:"next_version,omitempty" xml:"next_version,omitempty"`
-	Version       *string `json:"version,omitempty" xml:"version,omitempty"`
+	// Deprecated
+	Version *string `json:"version,omitempty" xml:"version,omitempty"`
 }
 
 func (s UpgradeClusterRequest) String() string {
@@ -12336,6 +14960,11 @@ func (s UpgradeClusterRequest) GoString() string {
 
 func (s *UpgradeClusterRequest) SetComponentName(v string) *UpgradeClusterRequest {
 	s.ComponentName = &v
+	return s
+}
+
+func (s *UpgradeClusterRequest) SetMasterOnly(v bool) *UpgradeClusterRequest {
+	s.MasterOnly = &v
 	return s
 }
 
@@ -12393,6 +15022,7 @@ type UpgradeClusterAddonsRequestBody struct {
 	ComponentName *string `json:"component_name,omitempty" xml:"component_name,omitempty"`
 	Config        *string `json:"config,omitempty" xml:"config,omitempty"`
 	NextVersion   *string `json:"next_version,omitempty" xml:"next_version,omitempty"`
+	Policy        *string `json:"policy,omitempty" xml:"policy,omitempty"`
 	Version       *string `json:"version,omitempty" xml:"version,omitempty"`
 }
 
@@ -12416,6 +15046,11 @@ func (s *UpgradeClusterAddonsRequestBody) SetConfig(v string) *UpgradeClusterAdd
 
 func (s *UpgradeClusterAddonsRequestBody) SetNextVersion(v string) *UpgradeClusterAddonsRequestBody {
 	s.NextVersion = &v
+	return s
+}
+
+func (s *UpgradeClusterAddonsRequestBody) SetPolicy(v string) *UpgradeClusterAddonsRequestBody {
+	s.Policy = &v
 	return s
 }
 
@@ -12444,6 +15079,94 @@ func (s *UpgradeClusterAddonsResponse) SetHeaders(v map[string]*string) *Upgrade
 
 func (s *UpgradeClusterAddonsResponse) SetStatusCode(v int32) *UpgradeClusterAddonsResponse {
 	s.StatusCode = &v
+	return s
+}
+
+type UpgradeClusterNodepoolRequest struct {
+	ImageId           *string `json:"image_id,omitempty" xml:"image_id,omitempty"`
+	KubernetesVersion *string `json:"kubernetes_version,omitempty" xml:"kubernetes_version,omitempty"`
+	RuntimeType       *string `json:"runtime_type,omitempty" xml:"runtime_type,omitempty"`
+	RuntimeVersion    *string `json:"runtime_version,omitempty" xml:"runtime_version,omitempty"`
+}
+
+func (s UpgradeClusterNodepoolRequest) String() string {
+	return tea.Prettify(s)
+}
+
+func (s UpgradeClusterNodepoolRequest) GoString() string {
+	return s.String()
+}
+
+func (s *UpgradeClusterNodepoolRequest) SetImageId(v string) *UpgradeClusterNodepoolRequest {
+	s.ImageId = &v
+	return s
+}
+
+func (s *UpgradeClusterNodepoolRequest) SetKubernetesVersion(v string) *UpgradeClusterNodepoolRequest {
+	s.KubernetesVersion = &v
+	return s
+}
+
+func (s *UpgradeClusterNodepoolRequest) SetRuntimeType(v string) *UpgradeClusterNodepoolRequest {
+	s.RuntimeType = &v
+	return s
+}
+
+func (s *UpgradeClusterNodepoolRequest) SetRuntimeVersion(v string) *UpgradeClusterNodepoolRequest {
+	s.RuntimeVersion = &v
+	return s
+}
+
+type UpgradeClusterNodepoolResponseBody struct {
+	// The ID of the request.
+	RequestId *string `json:"RequestId,omitempty" xml:"RequestId,omitempty"`
+	TaskId    *string `json:"task_id,omitempty" xml:"task_id,omitempty"`
+}
+
+func (s UpgradeClusterNodepoolResponseBody) String() string {
+	return tea.Prettify(s)
+}
+
+func (s UpgradeClusterNodepoolResponseBody) GoString() string {
+	return s.String()
+}
+
+func (s *UpgradeClusterNodepoolResponseBody) SetRequestId(v string) *UpgradeClusterNodepoolResponseBody {
+	s.RequestId = &v
+	return s
+}
+
+func (s *UpgradeClusterNodepoolResponseBody) SetTaskId(v string) *UpgradeClusterNodepoolResponseBody {
+	s.TaskId = &v
+	return s
+}
+
+type UpgradeClusterNodepoolResponse struct {
+	Headers    map[string]*string                  `json:"headers,omitempty" xml:"headers,omitempty" require:"true"`
+	StatusCode *int32                              `json:"statusCode,omitempty" xml:"statusCode,omitempty" require:"true"`
+	Body       *UpgradeClusterNodepoolResponseBody `json:"body,omitempty" xml:"body,omitempty" require:"true"`
+}
+
+func (s UpgradeClusterNodepoolResponse) String() string {
+	return tea.Prettify(s)
+}
+
+func (s UpgradeClusterNodepoolResponse) GoString() string {
+	return s.String()
+}
+
+func (s *UpgradeClusterNodepoolResponse) SetHeaders(v map[string]*string) *UpgradeClusterNodepoolResponse {
+	s.Headers = v
+	return s
+}
+
+func (s *UpgradeClusterNodepoolResponse) SetStatusCode(v int32) *UpgradeClusterNodepoolResponse {
+	s.StatusCode = &v
+	return s
+}
+
+func (s *UpgradeClusterNodepoolResponse) SetBody(v *UpgradeClusterNodepoolResponseBody) *UpgradeClusterNodepoolResponse {
+	s.Body = v
 	return s
 }
 
@@ -12527,18 +15250,6 @@ func (client *Client) GetEndpoint(productId *string, regionId *string, endpointR
 	return _result, _err
 }
 
-func (client *Client) AttachInstances(ClusterId *string, request *AttachInstancesRequest) (_result *AttachInstancesResponse, _err error) {
-	runtime := &util.RuntimeOptions{}
-	headers := make(map[string]*string)
-	_result = &AttachInstancesResponse{}
-	_body, _err := client.AttachInstancesWithOptions(ClusterId, request, headers, runtime)
-	if _err != nil {
-		return _result, _err
-	}
-	_result = _body
-	return _result, _err
-}
-
 func (client *Client) AttachInstancesWithOptions(ClusterId *string, request *AttachInstancesRequest, headers map[string]*string, runtime *util.RuntimeOptions) (_result *AttachInstancesResponse, _err error) {
 	_err = util.ValidateModel(request)
 	if _err != nil {
@@ -12585,7 +15296,7 @@ func (client *Client) AttachInstancesWithOptions(ClusterId *string, request *Att
 		body["rds_instances"] = request.RdsInstances
 	}
 
-	if !tea.BoolValue(util.IsUnset(tea.ToMap(request.Runtime))) {
+	if !tea.BoolValue(util.IsUnset(request.Runtime)) {
 		body["runtime"] = request.Runtime
 	}
 
@@ -12621,11 +15332,69 @@ func (client *Client) AttachInstancesWithOptions(ClusterId *string, request *Att
 	return _result, _err
 }
 
-func (client *Client) CancelClusterUpgrade(ClusterId *string) (_result *CancelClusterUpgradeResponse, _err error) {
+func (client *Client) AttachInstances(ClusterId *string, request *AttachInstancesRequest) (_result *AttachInstancesResponse, _err error) {
 	runtime := &util.RuntimeOptions{}
 	headers := make(map[string]*string)
-	_result = &CancelClusterUpgradeResponse{}
-	_body, _err := client.CancelClusterUpgradeWithOptions(ClusterId, headers, runtime)
+	_result = &AttachInstancesResponse{}
+	_body, _err := client.AttachInstancesWithOptions(ClusterId, request, headers, runtime)
+	if _err != nil {
+		return _result, _err
+	}
+	_result = _body
+	return _result, _err
+}
+
+func (client *Client) AttachInstancesToNodePoolWithOptions(ClusterId *string, NodepoolId *string, request *AttachInstancesToNodePoolRequest, headers map[string]*string, runtime *util.RuntimeOptions) (_result *AttachInstancesToNodePoolResponse, _err error) {
+	_err = util.ValidateModel(request)
+	if _err != nil {
+		return _result, _err
+	}
+	body := map[string]interface{}{}
+	if !tea.BoolValue(util.IsUnset(request.FormatDisk)) {
+		body["format_disk"] = request.FormatDisk
+	}
+
+	if !tea.BoolValue(util.IsUnset(request.Instances)) {
+		body["instances"] = request.Instances
+	}
+
+	if !tea.BoolValue(util.IsUnset(request.KeepInstanceName)) {
+		body["keep_instance_name"] = request.KeepInstanceName
+	}
+
+	if !tea.BoolValue(util.IsUnset(request.Password)) {
+		body["password"] = request.Password
+	}
+
+	req := &openapi.OpenApiRequest{
+		Headers: headers,
+		Body:    openapiutil.ParseToMap(body),
+	}
+	params := &openapi.Params{
+		Action:      tea.String("AttachInstancesToNodePool"),
+		Version:     tea.String("2015-12-15"),
+		Protocol:    tea.String("HTTPS"),
+		Pathname:    tea.String("/clusters/" + tea.StringValue(openapiutil.GetEncodeParam(ClusterId)) + "/nodepools/" + tea.StringValue(openapiutil.GetEncodeParam(NodepoolId)) + "/attach"),
+		Method:      tea.String("POST"),
+		AuthType:    tea.String("AK"),
+		Style:       tea.String("ROA"),
+		ReqBodyType: tea.String("json"),
+		BodyType:    tea.String("json"),
+	}
+	_result = &AttachInstancesToNodePoolResponse{}
+	_body, _err := client.CallApi(params, req, runtime)
+	if _err != nil {
+		return _result, _err
+	}
+	_err = tea.Convert(_body, &_result)
+	return _result, _err
+}
+
+func (client *Client) AttachInstancesToNodePool(ClusterId *string, NodepoolId *string, request *AttachInstancesToNodePoolRequest) (_result *AttachInstancesToNodePoolResponse, _err error) {
+	runtime := &util.RuntimeOptions{}
+	headers := make(map[string]*string)
+	_result = &AttachInstancesToNodePoolResponse{}
+	_body, _err := client.AttachInstancesToNodePoolWithOptions(ClusterId, NodepoolId, request, headers, runtime)
 	if _err != nil {
 		return _result, _err
 	}
@@ -12657,11 +15426,11 @@ func (client *Client) CancelClusterUpgradeWithOptions(ClusterId *string, headers
 	return _result, _err
 }
 
-func (client *Client) CancelComponentUpgrade(clusterId *string, componentId *string) (_result *CancelComponentUpgradeResponse, _err error) {
+func (client *Client) CancelClusterUpgrade(ClusterId *string) (_result *CancelClusterUpgradeResponse, _err error) {
 	runtime := &util.RuntimeOptions{}
 	headers := make(map[string]*string)
-	_result = &CancelComponentUpgradeResponse{}
-	_body, _err := client.CancelComponentUpgradeWithOptions(clusterId, componentId, headers, runtime)
+	_result = &CancelClusterUpgradeResponse{}
+	_body, _err := client.CancelClusterUpgradeWithOptions(ClusterId, headers, runtime)
 	if _err != nil {
 		return _result, _err
 	}
@@ -12693,11 +15462,11 @@ func (client *Client) CancelComponentUpgradeWithOptions(clusterId *string, compo
 	return _result, _err
 }
 
-func (client *Client) CancelTask(taskId *string) (_result *CancelTaskResponse, _err error) {
+func (client *Client) CancelComponentUpgrade(clusterId *string, componentId *string) (_result *CancelComponentUpgradeResponse, _err error) {
 	runtime := &util.RuntimeOptions{}
 	headers := make(map[string]*string)
-	_result = &CancelTaskResponse{}
-	_body, _err := client.CancelTaskWithOptions(taskId, headers, runtime)
+	_result = &CancelComponentUpgradeResponse{}
+	_body, _err := client.CancelComponentUpgradeWithOptions(clusterId, componentId, headers, runtime)
 	if _err != nil {
 		return _result, _err
 	}
@@ -12729,11 +15498,11 @@ func (client *Client) CancelTaskWithOptions(taskId *string, headers map[string]*
 	return _result, _err
 }
 
-func (client *Client) CancelWorkflow(workflowName *string, request *CancelWorkflowRequest) (_result *CancelWorkflowResponse, _err error) {
+func (client *Client) CancelTask(taskId *string) (_result *CancelTaskResponse, _err error) {
 	runtime := &util.RuntimeOptions{}
 	headers := make(map[string]*string)
-	_result = &CancelWorkflowResponse{}
-	_body, _err := client.CancelWorkflowWithOptions(workflowName, request, headers, runtime)
+	_result = &CancelTaskResponse{}
+	_body, _err := client.CancelTaskWithOptions(taskId, headers, runtime)
 	if _err != nil {
 		return _result, _err
 	}
@@ -12775,11 +15544,47 @@ func (client *Client) CancelWorkflowWithOptions(workflowName *string, request *C
 	return _result, _err
 }
 
-func (client *Client) CreateAutoscalingConfig(ClusterId *string, request *CreateAutoscalingConfigRequest) (_result *CreateAutoscalingConfigResponse, _err error) {
+func (client *Client) CancelWorkflow(workflowName *string, request *CancelWorkflowRequest) (_result *CancelWorkflowResponse, _err error) {
 	runtime := &util.RuntimeOptions{}
 	headers := make(map[string]*string)
-	_result = &CreateAutoscalingConfigResponse{}
-	_body, _err := client.CreateAutoscalingConfigWithOptions(ClusterId, request, headers, runtime)
+	_result = &CancelWorkflowResponse{}
+	_body, _err := client.CancelWorkflowWithOptions(workflowName, request, headers, runtime)
+	if _err != nil {
+		return _result, _err
+	}
+	_result = _body
+	return _result, _err
+}
+
+func (client *Client) CheckControlPlaneLogEnableWithOptions(ClusterId *string, headers map[string]*string, runtime *util.RuntimeOptions) (_result *CheckControlPlaneLogEnableResponse, _err error) {
+	req := &openapi.OpenApiRequest{
+		Headers: headers,
+	}
+	params := &openapi.Params{
+		Action:      tea.String("CheckControlPlaneLogEnable"),
+		Version:     tea.String("2015-12-15"),
+		Protocol:    tea.String("HTTPS"),
+		Pathname:    tea.String("/clusters/" + tea.StringValue(openapiutil.GetEncodeParam(ClusterId)) + "/controlplanelog"),
+		Method:      tea.String("GET"),
+		AuthType:    tea.String("AK"),
+		Style:       tea.String("ROA"),
+		ReqBodyType: tea.String("json"),
+		BodyType:    tea.String("json"),
+	}
+	_result = &CheckControlPlaneLogEnableResponse{}
+	_body, _err := client.CallApi(params, req, runtime)
+	if _err != nil {
+		return _result, _err
+	}
+	_err = tea.Convert(_body, &_result)
+	return _result, _err
+}
+
+func (client *Client) CheckControlPlaneLogEnable(ClusterId *string) (_result *CheckControlPlaneLogEnableResponse, _err error) {
+	runtime := &util.RuntimeOptions{}
+	headers := make(map[string]*string)
+	_result = &CheckControlPlaneLogEnableResponse{}
+	_body, _err := client.CheckControlPlaneLogEnableWithOptions(ClusterId, headers, runtime)
 	if _err != nil {
 		return _result, _err
 	}
@@ -12797,6 +15602,10 @@ func (client *Client) CreateAutoscalingConfigWithOptions(ClusterId *string, requ
 		body["cool_down_duration"] = request.CoolDownDuration
 	}
 
+	if !tea.BoolValue(util.IsUnset(request.DaemonsetEvictionForNodes)) {
+		body["daemonset_eviction_for_nodes"] = request.DaemonsetEvictionForNodes
+	}
+
 	if !tea.BoolValue(util.IsUnset(request.Expander)) {
 		body["expander"] = request.Expander
 	}
@@ -12805,12 +15614,36 @@ func (client *Client) CreateAutoscalingConfigWithOptions(ClusterId *string, requ
 		body["gpu_utilization_threshold"] = request.GpuUtilizationThreshold
 	}
 
+	if !tea.BoolValue(util.IsUnset(request.MaxGracefulTerminationSec)) {
+		body["max_graceful_termination_sec"] = request.MaxGracefulTerminationSec
+	}
+
+	if !tea.BoolValue(util.IsUnset(request.MinReplicaCount)) {
+		body["min_replica_count"] = request.MinReplicaCount
+	}
+
+	if !tea.BoolValue(util.IsUnset(request.RecycleNodeDeletionEnabled)) {
+		body["recycle_node_deletion_enabled"] = request.RecycleNodeDeletionEnabled
+	}
+
 	if !tea.BoolValue(util.IsUnset(request.ScaleDownEnabled)) {
 		body["scale_down_enabled"] = request.ScaleDownEnabled
 	}
 
+	if !tea.BoolValue(util.IsUnset(request.ScaleUpFromZero)) {
+		body["scale_up_from_zero"] = request.ScaleUpFromZero
+	}
+
 	if !tea.BoolValue(util.IsUnset(request.ScanInterval)) {
 		body["scan_interval"] = request.ScanInterval
+	}
+
+	if !tea.BoolValue(util.IsUnset(request.SkipNodesWithLocalStorage)) {
+		body["skip_nodes_with_local_storage"] = request.SkipNodesWithLocalStorage
+	}
+
+	if !tea.BoolValue(util.IsUnset(request.SkipNodesWithSystemPods)) {
+		body["skip_nodes_with_system_pods"] = request.SkipNodesWithSystemPods
 	}
 
 	if !tea.BoolValue(util.IsUnset(request.UnneededDuration)) {
@@ -12845,11 +15678,11 @@ func (client *Client) CreateAutoscalingConfigWithOptions(ClusterId *string, requ
 	return _result, _err
 }
 
-func (client *Client) CreateCluster(request *CreateClusterRequest) (_result *CreateClusterResponse, _err error) {
+func (client *Client) CreateAutoscalingConfig(ClusterId *string, request *CreateAutoscalingConfigRequest) (_result *CreateAutoscalingConfigResponse, _err error) {
 	runtime := &util.RuntimeOptions{}
 	headers := make(map[string]*string)
-	_result = &CreateClusterResponse{}
-	_body, _err := client.CreateClusterWithOptions(request, headers, runtime)
+	_result = &CreateAutoscalingConfigResponse{}
+	_body, _err := client.CreateAutoscalingConfigWithOptions(ClusterId, request, headers, runtime)
 	if _err != nil {
 		return _result, _err
 	}
@@ -13055,6 +15888,10 @@ func (client *Client) CreateClusterWithOptions(request *CreateClusterRequest, he
 		body["node_port_range"] = request.NodePortRange
 	}
 
+	if !tea.BoolValue(util.IsUnset(request.Nodepools)) {
+		body["nodepools"] = request.Nodepools
+	}
+
 	if !tea.BoolValue(util.IsUnset(request.NumOfNodes)) {
 		body["num_of_nodes"] = request.NumOfNodes
 	}
@@ -13099,7 +15936,7 @@ func (client *Client) CreateClusterWithOptions(request *CreateClusterRequest, he
 		body["resource_group_id"] = request.ResourceGroupId
 	}
 
-	if !tea.BoolValue(util.IsUnset(tea.ToMap(request.Runtime))) {
+	if !tea.BoolValue(util.IsUnset(request.Runtime)) {
 		body["runtime"] = request.Runtime
 	}
 
@@ -13239,11 +16076,11 @@ func (client *Client) CreateClusterWithOptions(request *CreateClusterRequest, he
 	return _result, _err
 }
 
-func (client *Client) CreateClusterNodePool(ClusterId *string, request *CreateClusterNodePoolRequest) (_result *CreateClusterNodePoolResponse, _err error) {
+func (client *Client) CreateCluster(request *CreateClusterRequest) (_result *CreateClusterResponse, _err error) {
 	runtime := &util.RuntimeOptions{}
 	headers := make(map[string]*string)
-	_result = &CreateClusterNodePoolResponse{}
-	_body, _err := client.CreateClusterNodePoolWithOptions(ClusterId, request, headers, runtime)
+	_result = &CreateClusterResponse{}
+	_body, _err := client.CreateClusterWithOptions(request, headers, runtime)
 	if _err != nil {
 		return _result, _err
 	}
@@ -13257,7 +16094,7 @@ func (client *Client) CreateClusterNodePoolWithOptions(ClusterId *string, reques
 		return _result, _err
 	}
 	body := map[string]interface{}{}
-	if !tea.BoolValue(util.IsUnset(tea.ToMap(request.AutoScaling))) {
+	if !tea.BoolValue(util.IsUnset(request.AutoScaling)) {
 		body["auto_scaling"] = request.AutoScaling
 	}
 
@@ -13265,7 +16102,7 @@ func (client *Client) CreateClusterNodePoolWithOptions(ClusterId *string, reques
 		body["count"] = request.Count
 	}
 
-	if !tea.BoolValue(util.IsUnset(tea.ToMap(request.InterconnectConfig))) {
+	if !tea.BoolValue(util.IsUnset(request.InterconnectConfig)) {
 		body["interconnect_config"] = request.InterconnectConfig
 	}
 
@@ -13273,11 +16110,11 @@ func (client *Client) CreateClusterNodePoolWithOptions(ClusterId *string, reques
 		body["interconnect_mode"] = request.InterconnectMode
 	}
 
-	if !tea.BoolValue(util.IsUnset(tea.ToMap(request.KubernetesConfig))) {
+	if !tea.BoolValue(util.IsUnset(request.KubernetesConfig)) {
 		body["kubernetes_config"] = request.KubernetesConfig
 	}
 
-	if !tea.BoolValue(util.IsUnset(tea.ToMap(request.Management))) {
+	if !tea.BoolValue(util.IsUnset(request.Management)) {
 		body["management"] = request.Management
 	}
 
@@ -13285,15 +16122,15 @@ func (client *Client) CreateClusterNodePoolWithOptions(ClusterId *string, reques
 		body["max_nodes"] = request.MaxNodes
 	}
 
-	if !tea.BoolValue(util.IsUnset(tea.ToMap(request.NodepoolInfo))) {
+	if !tea.BoolValue(util.IsUnset(request.NodepoolInfo)) {
 		body["nodepool_info"] = request.NodepoolInfo
 	}
 
-	if !tea.BoolValue(util.IsUnset(tea.ToMap(request.ScalingGroup))) {
+	if !tea.BoolValue(util.IsUnset(request.ScalingGroup)) {
 		body["scaling_group"] = request.ScalingGroup
 	}
 
-	if !tea.BoolValue(util.IsUnset(tea.ToMap(request.TeeConfig))) {
+	if !tea.BoolValue(util.IsUnset(request.TeeConfig)) {
 		body["tee_config"] = request.TeeConfig
 	}
 
@@ -13321,11 +16158,11 @@ func (client *Client) CreateClusterNodePoolWithOptions(ClusterId *string, reques
 	return _result, _err
 }
 
-func (client *Client) CreateEdgeMachine(request *CreateEdgeMachineRequest) (_result *CreateEdgeMachineResponse, _err error) {
+func (client *Client) CreateClusterNodePool(ClusterId *string, request *CreateClusterNodePoolRequest) (_result *CreateClusterNodePoolResponse, _err error) {
 	runtime := &util.RuntimeOptions{}
 	headers := make(map[string]*string)
-	_result = &CreateEdgeMachineResponse{}
-	_body, _err := client.CreateEdgeMachineWithOptions(request, headers, runtime)
+	_result = &CreateClusterNodePoolResponse{}
+	_body, _err := client.CreateClusterNodePoolWithOptions(ClusterId, request, headers, runtime)
 	if _err != nil {
 		return _result, _err
 	}
@@ -13375,11 +16212,11 @@ func (client *Client) CreateEdgeMachineWithOptions(request *CreateEdgeMachineReq
 	return _result, _err
 }
 
-func (client *Client) CreateKubernetesTrigger(request *CreateKubernetesTriggerRequest) (_result *CreateKubernetesTriggerResponse, _err error) {
+func (client *Client) CreateEdgeMachine(request *CreateEdgeMachineRequest) (_result *CreateEdgeMachineResponse, _err error) {
 	runtime := &util.RuntimeOptions{}
 	headers := make(map[string]*string)
-	_result = &CreateKubernetesTriggerResponse{}
-	_body, _err := client.CreateKubernetesTriggerWithOptions(request, headers, runtime)
+	_result = &CreateEdgeMachineResponse{}
+	_body, _err := client.CreateEdgeMachineWithOptions(request, headers, runtime)
 	if _err != nil {
 		return _result, _err
 	}
@@ -13433,11 +16270,11 @@ func (client *Client) CreateKubernetesTriggerWithOptions(request *CreateKubernet
 	return _result, _err
 }
 
-func (client *Client) CreateTemplate(request *CreateTemplateRequest) (_result *CreateTemplateResponse, _err error) {
+func (client *Client) CreateKubernetesTrigger(request *CreateKubernetesTriggerRequest) (_result *CreateKubernetesTriggerResponse, _err error) {
 	runtime := &util.RuntimeOptions{}
 	headers := make(map[string]*string)
-	_result = &CreateTemplateResponse{}
-	_body, _err := client.CreateTemplateWithOptions(request, headers, runtime)
+	_result = &CreateKubernetesTriggerResponse{}
+	_body, _err := client.CreateKubernetesTriggerWithOptions(request, headers, runtime)
 	if _err != nil {
 		return _result, _err
 	}
@@ -13495,11 +16332,11 @@ func (client *Client) CreateTemplateWithOptions(request *CreateTemplateRequest, 
 	return _result, _err
 }
 
-func (client *Client) CreateTrigger(clusterId *string, request *CreateTriggerRequest) (_result *CreateTriggerResponse, _err error) {
+func (client *Client) CreateTemplate(request *CreateTemplateRequest) (_result *CreateTemplateResponse, _err error) {
 	runtime := &util.RuntimeOptions{}
 	headers := make(map[string]*string)
-	_result = &CreateTriggerResponse{}
-	_body, _err := client.CreateTriggerWithOptions(clusterId, request, headers, runtime)
+	_result = &CreateTemplateResponse{}
+	_body, _err := client.CreateTemplateWithOptions(request, headers, runtime)
 	if _err != nil {
 		return _result, _err
 	}
@@ -13553,11 +16390,11 @@ func (client *Client) CreateTriggerWithOptions(clusterId *string, request *Creat
 	return _result, _err
 }
 
-func (client *Client) DeleteAlertContact() (_result *DeleteAlertContactResponse, _err error) {
+func (client *Client) CreateTrigger(clusterId *string, request *CreateTriggerRequest) (_result *CreateTriggerResponse, _err error) {
 	runtime := &util.RuntimeOptions{}
 	headers := make(map[string]*string)
-	_result = &DeleteAlertContactResponse{}
-	_body, _err := client.DeleteAlertContactWithOptions(headers, runtime)
+	_result = &CreateTriggerResponse{}
+	_body, _err := client.CreateTriggerWithOptions(clusterId, request, headers, runtime)
 	if _err != nil {
 		return _result, _err
 	}
@@ -13589,11 +16426,11 @@ func (client *Client) DeleteAlertContactWithOptions(headers map[string]*string, 
 	return _result, _err
 }
 
-func (client *Client) DeleteAlertContactGroup() (_result *DeleteAlertContactGroupResponse, _err error) {
+func (client *Client) DeleteAlertContact() (_result *DeleteAlertContactResponse, _err error) {
 	runtime := &util.RuntimeOptions{}
 	headers := make(map[string]*string)
-	_result = &DeleteAlertContactGroupResponse{}
-	_body, _err := client.DeleteAlertContactGroupWithOptions(headers, runtime)
+	_result = &DeleteAlertContactResponse{}
+	_body, _err := client.DeleteAlertContactWithOptions(headers, runtime)
 	if _err != nil {
 		return _result, _err
 	}
@@ -13625,11 +16462,11 @@ func (client *Client) DeleteAlertContactGroupWithOptions(headers map[string]*str
 	return _result, _err
 }
 
-func (client *Client) DeleteCluster(ClusterId *string, request *DeleteClusterRequest) (_result *DeleteClusterResponse, _err error) {
+func (client *Client) DeleteAlertContactGroup() (_result *DeleteAlertContactGroupResponse, _err error) {
 	runtime := &util.RuntimeOptions{}
 	headers := make(map[string]*string)
-	_result = &DeleteClusterResponse{}
-	_body, _err := client.DeleteClusterWithOptions(ClusterId, request, headers, runtime)
+	_result = &DeleteAlertContactGroupResponse{}
+	_body, _err := client.DeleteAlertContactGroupWithOptions(headers, runtime)
 	if _err != nil {
 		return _result, _err
 	}
@@ -13674,7 +16511,7 @@ func (client *Client) DeleteClusterWithOptions(ClusterId *string, tmpReq *Delete
 		AuthType:    tea.String("AK"),
 		Style:       tea.String("ROA"),
 		ReqBodyType: tea.String("json"),
-		BodyType:    tea.String("none"),
+		BodyType:    tea.String("json"),
 	}
 	_result = &DeleteClusterResponse{}
 	_body, _err := client.CallApi(params, req, runtime)
@@ -13685,11 +16522,11 @@ func (client *Client) DeleteClusterWithOptions(ClusterId *string, tmpReq *Delete
 	return _result, _err
 }
 
-func (client *Client) DeleteClusterNodepool(ClusterId *string, NodepoolId *string, request *DeleteClusterNodepoolRequest) (_result *DeleteClusterNodepoolResponse, _err error) {
+func (client *Client) DeleteCluster(ClusterId *string, request *DeleteClusterRequest) (_result *DeleteClusterResponse, _err error) {
 	runtime := &util.RuntimeOptions{}
 	headers := make(map[string]*string)
-	_result = &DeleteClusterNodepoolResponse{}
-	_body, _err := client.DeleteClusterNodepoolWithOptions(ClusterId, NodepoolId, request, headers, runtime)
+	_result = &DeleteClusterResponse{}
+	_body, _err := client.DeleteClusterWithOptions(ClusterId, request, headers, runtime)
 	if _err != nil {
 		return _result, _err
 	}
@@ -13731,11 +16568,11 @@ func (client *Client) DeleteClusterNodepoolWithOptions(ClusterId *string, Nodepo
 	return _result, _err
 }
 
-func (client *Client) DeleteClusterNodes(ClusterId *string, request *DeleteClusterNodesRequest) (_result *DeleteClusterNodesResponse, _err error) {
+func (client *Client) DeleteClusterNodepool(ClusterId *string, NodepoolId *string, request *DeleteClusterNodepoolRequest) (_result *DeleteClusterNodepoolResponse, _err error) {
 	runtime := &util.RuntimeOptions{}
 	headers := make(map[string]*string)
-	_result = &DeleteClusterNodesResponse{}
-	_body, _err := client.DeleteClusterNodesWithOptions(ClusterId, request, headers, runtime)
+	_result = &DeleteClusterNodepoolResponse{}
+	_body, _err := client.DeleteClusterNodepoolWithOptions(ClusterId, NodepoolId, request, headers, runtime)
 	if _err != nil {
 		return _result, _err
 	}
@@ -13743,6 +16580,18 @@ func (client *Client) DeleteClusterNodes(ClusterId *string, request *DeleteClust
 	return _result, _err
 }
 
+/**
+ * >
+ * *   When you remove a node, the pods that run on the node are migrated to other nodes. This may cause service interruptions. We recommend that you remove nodes during off-peak hours.
+ * *   Unknown errors may occur when you remove nodes. Before you remove nodes, back up the data on the nodes.
+ * *   Nodes remain in the unschedulable state when they are being removed.
+ * *   You can remove only worker nodes by calling this operation.
+ *
+ * @param request DeleteClusterNodesRequest
+ * @param headers map
+ * @param runtime runtime options for this request RuntimeOptions
+ * @return DeleteClusterNodesResponse
+ */
 func (client *Client) DeleteClusterNodesWithOptions(ClusterId *string, request *DeleteClusterNodesRequest, headers map[string]*string, runtime *util.RuntimeOptions) (_result *DeleteClusterNodesResponse, _err error) {
 	_err = util.ValidateModel(request)
 	if _err != nil {
@@ -13785,11 +16634,21 @@ func (client *Client) DeleteClusterNodesWithOptions(ClusterId *string, request *
 	return _result, _err
 }
 
-func (client *Client) DeleteEdgeMachine(edgeMachineid *string, request *DeleteEdgeMachineRequest) (_result *DeleteEdgeMachineResponse, _err error) {
+/**
+ * >
+ * *   When you remove a node, the pods that run on the node are migrated to other nodes. This may cause service interruptions. We recommend that you remove nodes during off-peak hours.
+ * *   Unknown errors may occur when you remove nodes. Before you remove nodes, back up the data on the nodes.
+ * *   Nodes remain in the unschedulable state when they are being removed.
+ * *   You can remove only worker nodes by calling this operation.
+ *
+ * @param request DeleteClusterNodesRequest
+ * @return DeleteClusterNodesResponse
+ */
+func (client *Client) DeleteClusterNodes(ClusterId *string, request *DeleteClusterNodesRequest) (_result *DeleteClusterNodesResponse, _err error) {
 	runtime := &util.RuntimeOptions{}
 	headers := make(map[string]*string)
-	_result = &DeleteEdgeMachineResponse{}
-	_body, _err := client.DeleteEdgeMachineWithOptions(edgeMachineid, request, headers, runtime)
+	_result = &DeleteClusterNodesResponse{}
+	_body, _err := client.DeleteClusterNodesWithOptions(ClusterId, request, headers, runtime)
 	if _err != nil {
 		return _result, _err
 	}
@@ -13831,11 +16690,11 @@ func (client *Client) DeleteEdgeMachineWithOptions(edgeMachineid *string, reques
 	return _result, _err
 }
 
-func (client *Client) DeleteKubernetesTrigger(Id *string) (_result *DeleteKubernetesTriggerResponse, _err error) {
+func (client *Client) DeleteEdgeMachine(edgeMachineid *string, request *DeleteEdgeMachineRequest) (_result *DeleteEdgeMachineResponse, _err error) {
 	runtime := &util.RuntimeOptions{}
 	headers := make(map[string]*string)
-	_result = &DeleteKubernetesTriggerResponse{}
-	_body, _err := client.DeleteKubernetesTriggerWithOptions(Id, headers, runtime)
+	_result = &DeleteEdgeMachineResponse{}
+	_body, _err := client.DeleteEdgeMachineWithOptions(edgeMachineid, request, headers, runtime)
 	if _err != nil {
 		return _result, _err
 	}
@@ -13867,11 +16726,11 @@ func (client *Client) DeleteKubernetesTriggerWithOptions(Id *string, headers map
 	return _result, _err
 }
 
-func (client *Client) DeletePolicyInstance(clusterId *string, policyName *string, request *DeletePolicyInstanceRequest) (_result *DeletePolicyInstanceResponse, _err error) {
+func (client *Client) DeleteKubernetesTrigger(Id *string) (_result *DeleteKubernetesTriggerResponse, _err error) {
 	runtime := &util.RuntimeOptions{}
 	headers := make(map[string]*string)
-	_result = &DeletePolicyInstanceResponse{}
-	_body, _err := client.DeletePolicyInstanceWithOptions(clusterId, policyName, request, headers, runtime)
+	_result = &DeleteKubernetesTriggerResponse{}
+	_body, _err := client.DeleteKubernetesTriggerWithOptions(Id, headers, runtime)
 	if _err != nil {
 		return _result, _err
 	}
@@ -13913,11 +16772,11 @@ func (client *Client) DeletePolicyInstanceWithOptions(clusterId *string, policyN
 	return _result, _err
 }
 
-func (client *Client) DeleteTemplate(TemplateId *string) (_result *DeleteTemplateResponse, _err error) {
+func (client *Client) DeletePolicyInstance(clusterId *string, policyName *string, request *DeletePolicyInstanceRequest) (_result *DeletePolicyInstanceResponse, _err error) {
 	runtime := &util.RuntimeOptions{}
 	headers := make(map[string]*string)
-	_result = &DeleteTemplateResponse{}
-	_body, _err := client.DeleteTemplateWithOptions(TemplateId, headers, runtime)
+	_result = &DeletePolicyInstanceResponse{}
+	_body, _err := client.DeletePolicyInstanceWithOptions(clusterId, policyName, request, headers, runtime)
 	if _err != nil {
 		return _result, _err
 	}
@@ -13949,11 +16808,11 @@ func (client *Client) DeleteTemplateWithOptions(TemplateId *string, headers map[
 	return _result, _err
 }
 
-func (client *Client) DeleteTrigger(clusterId *string, Id *string) (_result *DeleteTriggerResponse, _err error) {
+func (client *Client) DeleteTemplate(TemplateId *string) (_result *DeleteTemplateResponse, _err error) {
 	runtime := &util.RuntimeOptions{}
 	headers := make(map[string]*string)
-	_result = &DeleteTriggerResponse{}
-	_body, _err := client.DeleteTriggerWithOptions(clusterId, Id, headers, runtime)
+	_result = &DeleteTemplateResponse{}
+	_body, _err := client.DeleteTemplateWithOptions(TemplateId, headers, runtime)
 	if _err != nil {
 		return _result, _err
 	}
@@ -13985,11 +16844,11 @@ func (client *Client) DeleteTriggerWithOptions(clusterId *string, Id *string, he
 	return _result, _err
 }
 
-func (client *Client) DeployPolicyInstance(clusterId *string, policyName *string, request *DeployPolicyInstanceRequest) (_result *DeployPolicyInstanceResponse, _err error) {
+func (client *Client) DeleteTrigger(clusterId *string, Id *string) (_result *DeleteTriggerResponse, _err error) {
 	runtime := &util.RuntimeOptions{}
 	headers := make(map[string]*string)
-	_result = &DeployPolicyInstanceResponse{}
-	_body, _err := client.DeployPolicyInstanceWithOptions(clusterId, policyName, request, headers, runtime)
+	_result = &DeleteTriggerResponse{}
+	_body, _err := client.DeleteTriggerWithOptions(clusterId, Id, headers, runtime)
 	if _err != nil {
 		return _result, _err
 	}
@@ -14039,11 +16898,11 @@ func (client *Client) DeployPolicyInstanceWithOptions(clusterId *string, policyN
 	return _result, _err
 }
 
-func (client *Client) DescirbeWorkflow(workflowName *string) (_result *DescirbeWorkflowResponse, _err error) {
+func (client *Client) DeployPolicyInstance(clusterId *string, policyName *string, request *DeployPolicyInstanceRequest) (_result *DeployPolicyInstanceResponse, _err error) {
 	runtime := &util.RuntimeOptions{}
 	headers := make(map[string]*string)
-	_result = &DescirbeWorkflowResponse{}
-	_body, _err := client.DescirbeWorkflowWithOptions(workflowName, headers, runtime)
+	_result = &DeployPolicyInstanceResponse{}
+	_body, _err := client.DeployPolicyInstanceWithOptions(clusterId, policyName, request, headers, runtime)
 	if _err != nil {
 		return _result, _err
 	}
@@ -14075,11 +16934,11 @@ func (client *Client) DescirbeWorkflowWithOptions(workflowName *string, headers 
 	return _result, _err
 }
 
-func (client *Client) DescribeAddons(request *DescribeAddonsRequest) (_result *DescribeAddonsResponse, _err error) {
+func (client *Client) DescirbeWorkflow(workflowName *string) (_result *DescirbeWorkflowResponse, _err error) {
 	runtime := &util.RuntimeOptions{}
 	headers := make(map[string]*string)
-	_result = &DescribeAddonsResponse{}
-	_body, _err := client.DescribeAddonsWithOptions(request, headers, runtime)
+	_result = &DescirbeWorkflowResponse{}
+	_body, _err := client.DescirbeWorkflowWithOptions(workflowName, headers, runtime)
 	if _err != nil {
 		return _result, _err
 	}
@@ -14093,8 +16952,20 @@ func (client *Client) DescribeAddonsWithOptions(request *DescribeAddonsRequest, 
 		return _result, _err
 	}
 	query := map[string]interface{}{}
+	if !tea.BoolValue(util.IsUnset(request.ClusterProfile)) {
+		query["cluster_profile"] = request.ClusterProfile
+	}
+
+	if !tea.BoolValue(util.IsUnset(request.ClusterSpec)) {
+		query["cluster_spec"] = request.ClusterSpec
+	}
+
 	if !tea.BoolValue(util.IsUnset(request.ClusterType)) {
 		query["cluster_type"] = request.ClusterType
+	}
+
+	if !tea.BoolValue(util.IsUnset(request.ClusterVersion)) {
+		query["cluster_version"] = request.ClusterVersion
 	}
 
 	if !tea.BoolValue(util.IsUnset(request.Region)) {
@@ -14125,11 +16996,47 @@ func (client *Client) DescribeAddonsWithOptions(request *DescribeAddonsRequest, 
 	return _result, _err
 }
 
-func (client *Client) DescribeClusterAddonMetadata(clusterId *string, componentId *string, version *string) (_result *DescribeClusterAddonMetadataResponse, _err error) {
+func (client *Client) DescribeAddons(request *DescribeAddonsRequest) (_result *DescribeAddonsResponse, _err error) {
 	runtime := &util.RuntimeOptions{}
 	headers := make(map[string]*string)
-	_result = &DescribeClusterAddonMetadataResponse{}
-	_body, _err := client.DescribeClusterAddonMetadataWithOptions(clusterId, componentId, version, headers, runtime)
+	_result = &DescribeAddonsResponse{}
+	_body, _err := client.DescribeAddonsWithOptions(request, headers, runtime)
+	if _err != nil {
+		return _result, _err
+	}
+	_result = _body
+	return _result, _err
+}
+
+func (client *Client) DescribeClusterAddonInstanceWithOptions(ClusterID *string, AddonName *string, headers map[string]*string, runtime *util.RuntimeOptions) (_result *DescribeClusterAddonInstanceResponse, _err error) {
+	req := &openapi.OpenApiRequest{
+		Headers: headers,
+	}
+	params := &openapi.Params{
+		Action:      tea.String("DescribeClusterAddonInstance"),
+		Version:     tea.String("2015-12-15"),
+		Protocol:    tea.String("HTTPS"),
+		Pathname:    tea.String("/clusters/" + tea.StringValue(openapiutil.GetEncodeParam(ClusterID)) + "/components/" + tea.StringValue(openapiutil.GetEncodeParam(AddonName)) + "/instance"),
+		Method:      tea.String("GET"),
+		AuthType:    tea.String("AK"),
+		Style:       tea.String("ROA"),
+		ReqBodyType: tea.String("json"),
+		BodyType:    tea.String("json"),
+	}
+	_result = &DescribeClusterAddonInstanceResponse{}
+	_body, _err := client.CallApi(params, req, runtime)
+	if _err != nil {
+		return _result, _err
+	}
+	_err = tea.Convert(_body, &_result)
+	return _result, _err
+}
+
+func (client *Client) DescribeClusterAddonInstance(ClusterID *string, AddonName *string) (_result *DescribeClusterAddonInstanceResponse, _err error) {
+	runtime := &util.RuntimeOptions{}
+	headers := make(map[string]*string)
+	_result = &DescribeClusterAddonInstanceResponse{}
+	_body, _err := client.DescribeClusterAddonInstanceWithOptions(ClusterID, AddonName, headers, runtime)
 	if _err != nil {
 		return _result, _err
 	}
@@ -14161,11 +17068,11 @@ func (client *Client) DescribeClusterAddonMetadataWithOptions(clusterId *string,
 	return _result, _err
 }
 
-func (client *Client) DescribeClusterAddonUpgradeStatus(ClusterId *string, ComponentId *string) (_result *DescribeClusterAddonUpgradeStatusResponse, _err error) {
+func (client *Client) DescribeClusterAddonMetadata(clusterId *string, componentId *string, version *string) (_result *DescribeClusterAddonMetadataResponse, _err error) {
 	runtime := &util.RuntimeOptions{}
 	headers := make(map[string]*string)
-	_result = &DescribeClusterAddonUpgradeStatusResponse{}
-	_body, _err := client.DescribeClusterAddonUpgradeStatusWithOptions(ClusterId, ComponentId, headers, runtime)
+	_result = &DescribeClusterAddonMetadataResponse{}
+	_body, _err := client.DescribeClusterAddonMetadataWithOptions(clusterId, componentId, version, headers, runtime)
 	if _err != nil {
 		return _result, _err
 	}
@@ -14173,6 +17080,14 @@ func (client *Client) DescribeClusterAddonUpgradeStatus(ClusterId *string, Compo
 	return _result, _err
 }
 
+/**
+ * @deprecated
+ *
+ * @param headers map
+ * @param runtime runtime options for this request RuntimeOptions
+ * @return DescribeClusterAddonUpgradeStatusResponse
+ */
+// Deprecated
 func (client *Client) DescribeClusterAddonUpgradeStatusWithOptions(ClusterId *string, ComponentId *string, headers map[string]*string, runtime *util.RuntimeOptions) (_result *DescribeClusterAddonUpgradeStatusResponse, _err error) {
 	req := &openapi.OpenApiRequest{
 		Headers: headers,
@@ -14197,11 +17112,17 @@ func (client *Client) DescribeClusterAddonUpgradeStatusWithOptions(ClusterId *st
 	return _result, _err
 }
 
-func (client *Client) DescribeClusterAddonsUpgradeStatus(ClusterId *string, request *DescribeClusterAddonsUpgradeStatusRequest) (_result *DescribeClusterAddonsUpgradeStatusResponse, _err error) {
+/**
+ * @deprecated
+ *
+ * @return DescribeClusterAddonUpgradeStatusResponse
+ */
+// Deprecated
+func (client *Client) DescribeClusterAddonUpgradeStatus(ClusterId *string, ComponentId *string) (_result *DescribeClusterAddonUpgradeStatusResponse, _err error) {
 	runtime := &util.RuntimeOptions{}
 	headers := make(map[string]*string)
-	_result = &DescribeClusterAddonsUpgradeStatusResponse{}
-	_body, _err := client.DescribeClusterAddonsUpgradeStatusWithOptions(ClusterId, request, headers, runtime)
+	_result = &DescribeClusterAddonUpgradeStatusResponse{}
+	_body, _err := client.DescribeClusterAddonUpgradeStatusWithOptions(ClusterId, ComponentId, headers, runtime)
 	if _err != nil {
 		return _result, _err
 	}
@@ -14249,11 +17170,11 @@ func (client *Client) DescribeClusterAddonsUpgradeStatusWithOptions(ClusterId *s
 	return _result, _err
 }
 
-func (client *Client) DescribeClusterAddonsVersion(ClusterId *string) (_result *DescribeClusterAddonsVersionResponse, _err error) {
+func (client *Client) DescribeClusterAddonsUpgradeStatus(ClusterId *string, request *DescribeClusterAddonsUpgradeStatusRequest) (_result *DescribeClusterAddonsUpgradeStatusResponse, _err error) {
 	runtime := &util.RuntimeOptions{}
 	headers := make(map[string]*string)
-	_result = &DescribeClusterAddonsVersionResponse{}
-	_body, _err := client.DescribeClusterAddonsVersionWithOptions(ClusterId, headers, runtime)
+	_result = &DescribeClusterAddonsUpgradeStatusResponse{}
+	_body, _err := client.DescribeClusterAddonsUpgradeStatusWithOptions(ClusterId, request, headers, runtime)
 	if _err != nil {
 		return _result, _err
 	}
@@ -14285,11 +17206,11 @@ func (client *Client) DescribeClusterAddonsVersionWithOptions(ClusterId *string,
 	return _result, _err
 }
 
-func (client *Client) DescribeClusterAttachScripts(ClusterId *string, request *DescribeClusterAttachScriptsRequest) (_result *DescribeClusterAttachScriptsResponse, _err error) {
+func (client *Client) DescribeClusterAddonsVersion(ClusterId *string) (_result *DescribeClusterAddonsVersionResponse, _err error) {
 	runtime := &util.RuntimeOptions{}
 	headers := make(map[string]*string)
-	_result = &DescribeClusterAttachScriptsResponse{}
-	_body, _err := client.DescribeClusterAttachScriptsWithOptions(ClusterId, request, headers, runtime)
+	_result = &DescribeClusterAddonsVersionResponse{}
+	_body, _err := client.DescribeClusterAddonsVersionWithOptions(ClusterId, headers, runtime)
 	if _err != nil {
 		return _result, _err
 	}
@@ -14351,11 +17272,11 @@ func (client *Client) DescribeClusterAttachScriptsWithOptions(ClusterId *string,
 	return _result, _err
 }
 
-func (client *Client) DescribeClusterDetail(ClusterId *string) (_result *DescribeClusterDetailResponse, _err error) {
+func (client *Client) DescribeClusterAttachScripts(ClusterId *string, request *DescribeClusterAttachScriptsRequest) (_result *DescribeClusterAttachScriptsResponse, _err error) {
 	runtime := &util.RuntimeOptions{}
 	headers := make(map[string]*string)
-	_result = &DescribeClusterDetailResponse{}
-	_body, _err := client.DescribeClusterDetailWithOptions(ClusterId, headers, runtime)
+	_result = &DescribeClusterAttachScriptsResponse{}
+	_body, _err := client.DescribeClusterAttachScriptsWithOptions(ClusterId, request, headers, runtime)
 	if _err != nil {
 		return _result, _err
 	}
@@ -14387,11 +17308,11 @@ func (client *Client) DescribeClusterDetailWithOptions(ClusterId *string, header
 	return _result, _err
 }
 
-func (client *Client) DescribeClusterEvents(ClusterId *string, request *DescribeClusterEventsRequest) (_result *DescribeClusterEventsResponse, _err error) {
+func (client *Client) DescribeClusterDetail(ClusterId *string) (_result *DescribeClusterDetailResponse, _err error) {
 	runtime := &util.RuntimeOptions{}
 	headers := make(map[string]*string)
-	_result = &DescribeClusterEventsResponse{}
-	_body, _err := client.DescribeClusterEventsWithOptions(ClusterId, request, headers, runtime)
+	_result = &DescribeClusterDetailResponse{}
+	_body, _err := client.DescribeClusterDetailWithOptions(ClusterId, headers, runtime)
 	if _err != nil {
 		return _result, _err
 	}
@@ -14441,11 +17362,11 @@ func (client *Client) DescribeClusterEventsWithOptions(ClusterId *string, reques
 	return _result, _err
 }
 
-func (client *Client) DescribeClusterLogs(ClusterId *string) (_result *DescribeClusterLogsResponse, _err error) {
+func (client *Client) DescribeClusterEvents(ClusterId *string, request *DescribeClusterEventsRequest) (_result *DescribeClusterEventsResponse, _err error) {
 	runtime := &util.RuntimeOptions{}
 	headers := make(map[string]*string)
-	_result = &DescribeClusterLogsResponse{}
-	_body, _err := client.DescribeClusterLogsWithOptions(ClusterId, headers, runtime)
+	_result = &DescribeClusterEventsResponse{}
+	_body, _err := client.DescribeClusterEventsWithOptions(ClusterId, request, headers, runtime)
 	if _err != nil {
 		return _result, _err
 	}
@@ -14477,11 +17398,11 @@ func (client *Client) DescribeClusterLogsWithOptions(ClusterId *string, headers 
 	return _result, _err
 }
 
-func (client *Client) DescribeClusterNodePoolDetail(ClusterId *string, NodepoolId *string) (_result *DescribeClusterNodePoolDetailResponse, _err error) {
+func (client *Client) DescribeClusterLogs(ClusterId *string) (_result *DescribeClusterLogsResponse, _err error) {
 	runtime := &util.RuntimeOptions{}
 	headers := make(map[string]*string)
-	_result = &DescribeClusterNodePoolDetailResponse{}
-	_body, _err := client.DescribeClusterNodePoolDetailWithOptions(ClusterId, NodepoolId, headers, runtime)
+	_result = &DescribeClusterLogsResponse{}
+	_body, _err := client.DescribeClusterLogsWithOptions(ClusterId, headers, runtime)
 	if _err != nil {
 		return _result, _err
 	}
@@ -14513,11 +17434,11 @@ func (client *Client) DescribeClusterNodePoolDetailWithOptions(ClusterId *string
 	return _result, _err
 }
 
-func (client *Client) DescribeClusterNodePools(ClusterId *string) (_result *DescribeClusterNodePoolsResponse, _err error) {
+func (client *Client) DescribeClusterNodePoolDetail(ClusterId *string, NodepoolId *string) (_result *DescribeClusterNodePoolDetailResponse, _err error) {
 	runtime := &util.RuntimeOptions{}
 	headers := make(map[string]*string)
-	_result = &DescribeClusterNodePoolsResponse{}
-	_body, _err := client.DescribeClusterNodePoolsWithOptions(ClusterId, headers, runtime)
+	_result = &DescribeClusterNodePoolDetailResponse{}
+	_body, _err := client.DescribeClusterNodePoolDetailWithOptions(ClusterId, NodepoolId, headers, runtime)
 	if _err != nil {
 		return _result, _err
 	}
@@ -14549,11 +17470,11 @@ func (client *Client) DescribeClusterNodePoolsWithOptions(ClusterId *string, hea
 	return _result, _err
 }
 
-func (client *Client) DescribeClusterNodes(ClusterId *string, request *DescribeClusterNodesRequest) (_result *DescribeClusterNodesResponse, _err error) {
+func (client *Client) DescribeClusterNodePools(ClusterId *string) (_result *DescribeClusterNodePoolsResponse, _err error) {
 	runtime := &util.RuntimeOptions{}
 	headers := make(map[string]*string)
-	_result = &DescribeClusterNodesResponse{}
-	_body, _err := client.DescribeClusterNodesWithOptions(ClusterId, request, headers, runtime)
+	_result = &DescribeClusterNodePoolsResponse{}
+	_body, _err := client.DescribeClusterNodePoolsWithOptions(ClusterId, headers, runtime)
 	if _err != nil {
 		return _result, _err
 	}
@@ -14611,11 +17532,11 @@ func (client *Client) DescribeClusterNodesWithOptions(ClusterId *string, request
 	return _result, _err
 }
 
-func (client *Client) DescribeClusterResources(ClusterId *string) (_result *DescribeClusterResourcesResponse, _err error) {
+func (client *Client) DescribeClusterNodes(ClusterId *string, request *DescribeClusterNodesRequest) (_result *DescribeClusterNodesResponse, _err error) {
 	runtime := &util.RuntimeOptions{}
 	headers := make(map[string]*string)
-	_result = &DescribeClusterResourcesResponse{}
-	_body, _err := client.DescribeClusterResourcesWithOptions(ClusterId, headers, runtime)
+	_result = &DescribeClusterNodesResponse{}
+	_body, _err := client.DescribeClusterNodesWithOptions(ClusterId, request, headers, runtime)
 	if _err != nil {
 		return _result, _err
 	}
@@ -14647,11 +17568,11 @@ func (client *Client) DescribeClusterResourcesWithOptions(ClusterId *string, hea
 	return _result, _err
 }
 
-func (client *Client) DescribeClusterTasks(clusterId *string) (_result *DescribeClusterTasksResponse, _err error) {
+func (client *Client) DescribeClusterResources(ClusterId *string) (_result *DescribeClusterResourcesResponse, _err error) {
 	runtime := &util.RuntimeOptions{}
 	headers := make(map[string]*string)
-	_result = &DescribeClusterTasksResponse{}
-	_body, _err := client.DescribeClusterTasksWithOptions(clusterId, headers, runtime)
+	_result = &DescribeClusterResourcesResponse{}
+	_body, _err := client.DescribeClusterResourcesWithOptions(ClusterId, headers, runtime)
 	if _err != nil {
 		return _result, _err
 	}
@@ -14683,11 +17604,11 @@ func (client *Client) DescribeClusterTasksWithOptions(clusterId *string, headers
 	return _result, _err
 }
 
-func (client *Client) DescribeClusterUserKubeconfig(ClusterId *string, request *DescribeClusterUserKubeconfigRequest) (_result *DescribeClusterUserKubeconfigResponse, _err error) {
+func (client *Client) DescribeClusterTasks(clusterId *string) (_result *DescribeClusterTasksResponse, _err error) {
 	runtime := &util.RuntimeOptions{}
 	headers := make(map[string]*string)
-	_result = &DescribeClusterUserKubeconfigResponse{}
-	_body, _err := client.DescribeClusterUserKubeconfigWithOptions(ClusterId, request, headers, runtime)
+	_result = &DescribeClusterTasksResponse{}
+	_body, _err := client.DescribeClusterTasksWithOptions(clusterId, headers, runtime)
 	if _err != nil {
 		return _result, _err
 	}
@@ -14733,11 +17654,11 @@ func (client *Client) DescribeClusterUserKubeconfigWithOptions(ClusterId *string
 	return _result, _err
 }
 
-func (client *Client) DescribeClusterV2UserKubeconfig(ClusterId *string, request *DescribeClusterV2UserKubeconfigRequest) (_result *DescribeClusterV2UserKubeconfigResponse, _err error) {
+func (client *Client) DescribeClusterUserKubeconfig(ClusterId *string, request *DescribeClusterUserKubeconfigRequest) (_result *DescribeClusterUserKubeconfigResponse, _err error) {
 	runtime := &util.RuntimeOptions{}
 	headers := make(map[string]*string)
-	_result = &DescribeClusterV2UserKubeconfigResponse{}
-	_body, _err := client.DescribeClusterV2UserKubeconfigWithOptions(ClusterId, request, headers, runtime)
+	_result = &DescribeClusterUserKubeconfigResponse{}
+	_body, _err := client.DescribeClusterUserKubeconfigWithOptions(ClusterId, request, headers, runtime)
 	if _err != nil {
 		return _result, _err
 	}
@@ -14745,6 +17666,15 @@ func (client *Client) DescribeClusterV2UserKubeconfig(ClusterId *string, request
 	return _result, _err
 }
 
+/**
+ * @deprecated
+ *
+ * @param request DescribeClusterV2UserKubeconfigRequest
+ * @param headers map
+ * @param runtime runtime options for this request RuntimeOptions
+ * @return DescribeClusterV2UserKubeconfigResponse
+ */
+// Deprecated
 func (client *Client) DescribeClusterV2UserKubeconfigWithOptions(ClusterId *string, request *DescribeClusterV2UserKubeconfigRequest, headers map[string]*string, runtime *util.RuntimeOptions) (_result *DescribeClusterV2UserKubeconfigResponse, _err error) {
 	_err = util.ValidateModel(request)
 	if _err != nil {
@@ -14779,11 +17709,18 @@ func (client *Client) DescribeClusterV2UserKubeconfigWithOptions(ClusterId *stri
 	return _result, _err
 }
 
-func (client *Client) DescribeClusters(request *DescribeClustersRequest) (_result *DescribeClustersResponse, _err error) {
+/**
+ * @deprecated
+ *
+ * @param request DescribeClusterV2UserKubeconfigRequest
+ * @return DescribeClusterV2UserKubeconfigResponse
+ */
+// Deprecated
+func (client *Client) DescribeClusterV2UserKubeconfig(ClusterId *string, request *DescribeClusterV2UserKubeconfigRequest) (_result *DescribeClusterV2UserKubeconfigResponse, _err error) {
 	runtime := &util.RuntimeOptions{}
 	headers := make(map[string]*string)
-	_result = &DescribeClustersResponse{}
-	_body, _err := client.DescribeClustersWithOptions(request, headers, runtime)
+	_result = &DescribeClusterV2UserKubeconfigResponse{}
+	_body, _err := client.DescribeClusterV2UserKubeconfigWithOptions(ClusterId, request, headers, runtime)
 	if _err != nil {
 		return _result, _err
 	}
@@ -14791,6 +17728,51 @@ func (client *Client) DescribeClusters(request *DescribeClustersRequest) (_resul
 	return _result, _err
 }
 
+func (client *Client) DescribeClusterVulsWithOptions(clusterId *string, headers map[string]*string, runtime *util.RuntimeOptions) (_result *DescribeClusterVulsResponse, _err error) {
+	req := &openapi.OpenApiRequest{
+		Headers: headers,
+	}
+	params := &openapi.Params{
+		Action:      tea.String("DescribeClusterVuls"),
+		Version:     tea.String("2015-12-15"),
+		Protocol:    tea.String("HTTPS"),
+		Pathname:    tea.String("/clusters/" + tea.StringValue(openapiutil.GetEncodeParam(clusterId)) + "/vuls"),
+		Method:      tea.String("GET"),
+		AuthType:    tea.String("AK"),
+		Style:       tea.String("ROA"),
+		ReqBodyType: tea.String("json"),
+		BodyType:    tea.String("json"),
+	}
+	_result = &DescribeClusterVulsResponse{}
+	_body, _err := client.CallApi(params, req, runtime)
+	if _err != nil {
+		return _result, _err
+	}
+	_err = tea.Convert(_body, &_result)
+	return _result, _err
+}
+
+func (client *Client) DescribeClusterVuls(clusterId *string) (_result *DescribeClusterVulsResponse, _err error) {
+	runtime := &util.RuntimeOptions{}
+	headers := make(map[string]*string)
+	_result = &DescribeClusterVulsResponse{}
+	_body, _err := client.DescribeClusterVulsWithOptions(clusterId, headers, runtime)
+	if _err != nil {
+		return _result, _err
+	}
+	_result = _body
+	return _result, _err
+}
+
+/**
+ * @deprecated
+ *
+ * @param request DescribeClustersRequest
+ * @param headers map
+ * @param runtime runtime options for this request RuntimeOptions
+ * @return DescribeClustersResponse
+ */
+// Deprecated
 func (client *Client) DescribeClustersWithOptions(request *DescribeClustersRequest, headers map[string]*string, runtime *util.RuntimeOptions) (_result *DescribeClustersResponse, _err error) {
 	_err = util.ValidateModel(request)
 	if _err != nil {
@@ -14829,11 +17811,18 @@ func (client *Client) DescribeClustersWithOptions(request *DescribeClustersReque
 	return _result, _err
 }
 
-func (client *Client) DescribeClustersV1(request *DescribeClustersV1Request) (_result *DescribeClustersV1Response, _err error) {
+/**
+ * @deprecated
+ *
+ * @param request DescribeClustersRequest
+ * @return DescribeClustersResponse
+ */
+// Deprecated
+func (client *Client) DescribeClusters(request *DescribeClustersRequest) (_result *DescribeClustersResponse, _err error) {
 	runtime := &util.RuntimeOptions{}
 	headers := make(map[string]*string)
-	_result = &DescribeClustersV1Response{}
-	_body, _err := client.DescribeClustersV1WithOptions(request, headers, runtime)
+	_result = &DescribeClustersResponse{}
+	_body, _err := client.DescribeClustersWithOptions(request, headers, runtime)
 	if _err != nil {
 		return _result, _err
 	}
@@ -14899,11 +17888,11 @@ func (client *Client) DescribeClustersV1WithOptions(request *DescribeClustersV1R
 	return _result, _err
 }
 
-func (client *Client) DescribeEdgeMachineActiveProcess(edgeMachineid *string) (_result *DescribeEdgeMachineActiveProcessResponse, _err error) {
+func (client *Client) DescribeClustersV1(request *DescribeClustersV1Request) (_result *DescribeClustersV1Response, _err error) {
 	runtime := &util.RuntimeOptions{}
 	headers := make(map[string]*string)
-	_result = &DescribeEdgeMachineActiveProcessResponse{}
-	_body, _err := client.DescribeEdgeMachineActiveProcessWithOptions(edgeMachineid, headers, runtime)
+	_result = &DescribeClustersV1Response{}
+	_body, _err := client.DescribeClustersV1WithOptions(request, headers, runtime)
 	if _err != nil {
 		return _result, _err
 	}
@@ -14935,11 +17924,11 @@ func (client *Client) DescribeEdgeMachineActiveProcessWithOptions(edgeMachineid 
 	return _result, _err
 }
 
-func (client *Client) DescribeEdgeMachineModels() (_result *DescribeEdgeMachineModelsResponse, _err error) {
+func (client *Client) DescribeEdgeMachineActiveProcess(edgeMachineid *string) (_result *DescribeEdgeMachineActiveProcessResponse, _err error) {
 	runtime := &util.RuntimeOptions{}
 	headers := make(map[string]*string)
-	_result = &DescribeEdgeMachineModelsResponse{}
-	_body, _err := client.DescribeEdgeMachineModelsWithOptions(headers, runtime)
+	_result = &DescribeEdgeMachineActiveProcessResponse{}
+	_body, _err := client.DescribeEdgeMachineActiveProcessWithOptions(edgeMachineid, headers, runtime)
 	if _err != nil {
 		return _result, _err
 	}
@@ -14971,11 +17960,11 @@ func (client *Client) DescribeEdgeMachineModelsWithOptions(headers map[string]*s
 	return _result, _err
 }
 
-func (client *Client) DescribeEdgeMachineTunnelConfigDetail(edgeMachineid *string) (_result *DescribeEdgeMachineTunnelConfigDetailResponse, _err error) {
+func (client *Client) DescribeEdgeMachineModels() (_result *DescribeEdgeMachineModelsResponse, _err error) {
 	runtime := &util.RuntimeOptions{}
 	headers := make(map[string]*string)
-	_result = &DescribeEdgeMachineTunnelConfigDetailResponse{}
-	_body, _err := client.DescribeEdgeMachineTunnelConfigDetailWithOptions(edgeMachineid, headers, runtime)
+	_result = &DescribeEdgeMachineModelsResponse{}
+	_body, _err := client.DescribeEdgeMachineModelsWithOptions(headers, runtime)
 	if _err != nil {
 		return _result, _err
 	}
@@ -15007,11 +17996,11 @@ func (client *Client) DescribeEdgeMachineTunnelConfigDetailWithOptions(edgeMachi
 	return _result, _err
 }
 
-func (client *Client) DescribeEdgeMachines(request *DescribeEdgeMachinesRequest) (_result *DescribeEdgeMachinesResponse, _err error) {
+func (client *Client) DescribeEdgeMachineTunnelConfigDetail(edgeMachineid *string) (_result *DescribeEdgeMachineTunnelConfigDetailResponse, _err error) {
 	runtime := &util.RuntimeOptions{}
 	headers := make(map[string]*string)
-	_result = &DescribeEdgeMachinesResponse{}
-	_body, _err := client.DescribeEdgeMachinesWithOptions(request, headers, runtime)
+	_result = &DescribeEdgeMachineTunnelConfigDetailResponse{}
+	_body, _err := client.DescribeEdgeMachineTunnelConfigDetailWithOptions(edgeMachineid, headers, runtime)
 	if _err != nil {
 		return _result, _err
 	}
@@ -15073,11 +18062,11 @@ func (client *Client) DescribeEdgeMachinesWithOptions(request *DescribeEdgeMachi
 	return _result, _err
 }
 
-func (client *Client) DescribeEvents(request *DescribeEventsRequest) (_result *DescribeEventsResponse, _err error) {
+func (client *Client) DescribeEdgeMachines(request *DescribeEdgeMachinesRequest) (_result *DescribeEdgeMachinesResponse, _err error) {
 	runtime := &util.RuntimeOptions{}
 	headers := make(map[string]*string)
-	_result = &DescribeEventsResponse{}
-	_body, _err := client.DescribeEventsWithOptions(request, headers, runtime)
+	_result = &DescribeEdgeMachinesResponse{}
+	_body, _err := client.DescribeEdgeMachinesWithOptions(request, headers, runtime)
 	if _err != nil {
 		return _result, _err
 	}
@@ -15131,11 +18120,11 @@ func (client *Client) DescribeEventsWithOptions(request *DescribeEventsRequest, 
 	return _result, _err
 }
 
-func (client *Client) DescribeExternalAgent(ClusterId *string, request *DescribeExternalAgentRequest) (_result *DescribeExternalAgentResponse, _err error) {
+func (client *Client) DescribeEvents(request *DescribeEventsRequest) (_result *DescribeEventsResponse, _err error) {
 	runtime := &util.RuntimeOptions{}
 	headers := make(map[string]*string)
-	_result = &DescribeExternalAgentResponse{}
-	_body, _err := client.DescribeExternalAgentWithOptions(ClusterId, request, headers, runtime)
+	_result = &DescribeEventsResponse{}
+	_body, _err := client.DescribeEventsWithOptions(request, headers, runtime)
 	if _err != nil {
 		return _result, _err
 	}
@@ -15143,12 +18132,24 @@ func (client *Client) DescribeExternalAgent(ClusterId *string, request *Describe
 	return _result, _err
 }
 
+/**
+ * For more information, see [Register an external Kubernetes cluster](~~121053~~).
+ *
+ * @param request DescribeExternalAgentRequest
+ * @param headers map
+ * @param runtime runtime options for this request RuntimeOptions
+ * @return DescribeExternalAgentResponse
+ */
 func (client *Client) DescribeExternalAgentWithOptions(ClusterId *string, request *DescribeExternalAgentRequest, headers map[string]*string, runtime *util.RuntimeOptions) (_result *DescribeExternalAgentResponse, _err error) {
 	_err = util.ValidateModel(request)
 	if _err != nil {
 		return _result, _err
 	}
 	query := map[string]interface{}{}
+	if !tea.BoolValue(util.IsUnset(request.AgentMode)) {
+		query["AgentMode"] = request.AgentMode
+	}
+
 	if !tea.BoolValue(util.IsUnset(request.PrivateIpAddress)) {
 		query["PrivateIpAddress"] = request.PrivateIpAddress
 	}
@@ -15177,11 +18178,17 @@ func (client *Client) DescribeExternalAgentWithOptions(ClusterId *string, reques
 	return _result, _err
 }
 
-func (client *Client) DescribeKubernetesVersionMetadata(request *DescribeKubernetesVersionMetadataRequest) (_result *DescribeKubernetesVersionMetadataResponse, _err error) {
+/**
+ * For more information, see [Register an external Kubernetes cluster](~~121053~~).
+ *
+ * @param request DescribeExternalAgentRequest
+ * @return DescribeExternalAgentResponse
+ */
+func (client *Client) DescribeExternalAgent(ClusterId *string, request *DescribeExternalAgentRequest) (_result *DescribeExternalAgentResponse, _err error) {
 	runtime := &util.RuntimeOptions{}
 	headers := make(map[string]*string)
-	_result = &DescribeKubernetesVersionMetadataResponse{}
-	_body, _err := client.DescribeKubernetesVersionMetadataWithOptions(request, headers, runtime)
+	_result = &DescribeExternalAgentResponse{}
+	_body, _err := client.DescribeExternalAgentWithOptions(ClusterId, request, headers, runtime)
 	if _err != nil {
 		return _result, _err
 	}
@@ -15201,6 +18208,10 @@ func (client *Client) DescribeKubernetesVersionMetadataWithOptions(request *Desc
 
 	if !tea.BoolValue(util.IsUnset(request.KubernetesVersion)) {
 		query["KubernetesVersion"] = request.KubernetesVersion
+	}
+
+	if !tea.BoolValue(util.IsUnset(request.Mode)) {
+		query["Mode"] = request.Mode
 	}
 
 	if !tea.BoolValue(util.IsUnset(request.Profile)) {
@@ -15239,11 +18250,11 @@ func (client *Client) DescribeKubernetesVersionMetadataWithOptions(request *Desc
 	return _result, _err
 }
 
-func (client *Client) DescribeNodePoolVuls(clusterId *string, nodepoolId *string) (_result *DescribeNodePoolVulsResponse, _err error) {
+func (client *Client) DescribeKubernetesVersionMetadata(request *DescribeKubernetesVersionMetadataRequest) (_result *DescribeKubernetesVersionMetadataResponse, _err error) {
 	runtime := &util.RuntimeOptions{}
 	headers := make(map[string]*string)
-	_result = &DescribeNodePoolVulsResponse{}
-	_body, _err := client.DescribeNodePoolVulsWithOptions(clusterId, nodepoolId, headers, runtime)
+	_result = &DescribeKubernetesVersionMetadataResponse{}
+	_body, _err := client.DescribeKubernetesVersionMetadataWithOptions(request, headers, runtime)
 	if _err != nil {
 		return _result, _err
 	}
@@ -15251,9 +18262,19 @@ func (client *Client) DescribeNodePoolVuls(clusterId *string, nodepoolId *string
 	return _result, _err
 }
 
-func (client *Client) DescribeNodePoolVulsWithOptions(clusterId *string, nodepoolId *string, headers map[string]*string, runtime *util.RuntimeOptions) (_result *DescribeNodePoolVulsResponse, _err error) {
+func (client *Client) DescribeNodePoolVulsWithOptions(clusterId *string, nodepoolId *string, request *DescribeNodePoolVulsRequest, headers map[string]*string, runtime *util.RuntimeOptions) (_result *DescribeNodePoolVulsResponse, _err error) {
+	_err = util.ValidateModel(request)
+	if _err != nil {
+		return _result, _err
+	}
+	query := map[string]interface{}{}
+	if !tea.BoolValue(util.IsUnset(request.Necessity)) {
+		query["necessity"] = request.Necessity
+	}
+
 	req := &openapi.OpenApiRequest{
 		Headers: headers,
+		Query:   openapiutil.Query(query),
 	}
 	params := &openapi.Params{
 		Action:      tea.String("DescribeNodePoolVuls"),
@@ -15275,11 +18296,11 @@ func (client *Client) DescribeNodePoolVulsWithOptions(clusterId *string, nodepoo
 	return _result, _err
 }
 
-func (client *Client) DescribePolicies() (_result *DescribePoliciesResponse, _err error) {
+func (client *Client) DescribeNodePoolVuls(clusterId *string, nodepoolId *string, request *DescribeNodePoolVulsRequest) (_result *DescribeNodePoolVulsResponse, _err error) {
 	runtime := &util.RuntimeOptions{}
 	headers := make(map[string]*string)
-	_result = &DescribePoliciesResponse{}
-	_body, _err := client.DescribePoliciesWithOptions(headers, runtime)
+	_result = &DescribeNodePoolVulsResponse{}
+	_body, _err := client.DescribeNodePoolVulsWithOptions(clusterId, nodepoolId, request, headers, runtime)
 	if _err != nil {
 		return _result, _err
 	}
@@ -15311,11 +18332,11 @@ func (client *Client) DescribePoliciesWithOptions(headers map[string]*string, ru
 	return _result, _err
 }
 
-func (client *Client) DescribePolicyDetails(policyName *string) (_result *DescribePolicyDetailsResponse, _err error) {
+func (client *Client) DescribePolicies() (_result *DescribePoliciesResponse, _err error) {
 	runtime := &util.RuntimeOptions{}
 	headers := make(map[string]*string)
-	_result = &DescribePolicyDetailsResponse{}
-	_body, _err := client.DescribePolicyDetailsWithOptions(policyName, headers, runtime)
+	_result = &DescribePoliciesResponse{}
+	_body, _err := client.DescribePoliciesWithOptions(headers, runtime)
 	if _err != nil {
 		return _result, _err
 	}
@@ -15347,11 +18368,11 @@ func (client *Client) DescribePolicyDetailsWithOptions(policyName *string, heade
 	return _result, _err
 }
 
-func (client *Client) DescribePolicyGovernanceInCluster(clusterId *string) (_result *DescribePolicyGovernanceInClusterResponse, _err error) {
+func (client *Client) DescribePolicyDetails(policyName *string) (_result *DescribePolicyDetailsResponse, _err error) {
 	runtime := &util.RuntimeOptions{}
 	headers := make(map[string]*string)
-	_result = &DescribePolicyGovernanceInClusterResponse{}
-	_body, _err := client.DescribePolicyGovernanceInClusterWithOptions(clusterId, headers, runtime)
+	_result = &DescribePolicyDetailsResponse{}
+	_body, _err := client.DescribePolicyDetailsWithOptions(policyName, headers, runtime)
 	if _err != nil {
 		return _result, _err
 	}
@@ -15383,11 +18404,11 @@ func (client *Client) DescribePolicyGovernanceInClusterWithOptions(clusterId *st
 	return _result, _err
 }
 
-func (client *Client) DescribePolicyInstances(clusterId *string, request *DescribePolicyInstancesRequest) (_result *DescribePolicyInstancesResponse, _err error) {
+func (client *Client) DescribePolicyGovernanceInCluster(clusterId *string) (_result *DescribePolicyGovernanceInClusterResponse, _err error) {
 	runtime := &util.RuntimeOptions{}
 	headers := make(map[string]*string)
-	_result = &DescribePolicyInstancesResponse{}
-	_body, _err := client.DescribePolicyInstancesWithOptions(clusterId, request, headers, runtime)
+	_result = &DescribePolicyGovernanceInClusterResponse{}
+	_body, _err := client.DescribePolicyGovernanceInClusterWithOptions(clusterId, headers, runtime)
 	if _err != nil {
 		return _result, _err
 	}
@@ -15433,11 +18454,11 @@ func (client *Client) DescribePolicyInstancesWithOptions(clusterId *string, requ
 	return _result, _err
 }
 
-func (client *Client) DescribePolicyInstancesStatus(clusterId *string) (_result *DescribePolicyInstancesStatusResponse, _err error) {
+func (client *Client) DescribePolicyInstances(clusterId *string, request *DescribePolicyInstancesRequest) (_result *DescribePolicyInstancesResponse, _err error) {
 	runtime := &util.RuntimeOptions{}
 	headers := make(map[string]*string)
-	_result = &DescribePolicyInstancesStatusResponse{}
-	_body, _err := client.DescribePolicyInstancesStatusWithOptions(clusterId, headers, runtime)
+	_result = &DescribePolicyInstancesResponse{}
+	_body, _err := client.DescribePolicyInstancesWithOptions(clusterId, request, headers, runtime)
 	if _err != nil {
 		return _result, _err
 	}
@@ -15469,11 +18490,75 @@ func (client *Client) DescribePolicyInstancesStatusWithOptions(clusterId *string
 	return _result, _err
 }
 
-func (client *Client) DescribeTaskInfo(taskId *string) (_result *DescribeTaskInfoResponse, _err error) {
+func (client *Client) DescribePolicyInstancesStatus(clusterId *string) (_result *DescribePolicyInstancesStatusResponse, _err error) {
 	runtime := &util.RuntimeOptions{}
 	headers := make(map[string]*string)
-	_result = &DescribeTaskInfoResponse{}
-	_body, _err := client.DescribeTaskInfoWithOptions(taskId, headers, runtime)
+	_result = &DescribePolicyInstancesStatusResponse{}
+	_body, _err := client.DescribePolicyInstancesStatusWithOptions(clusterId, headers, runtime)
+	if _err != nil {
+		return _result, _err
+	}
+	_result = _body
+	return _result, _err
+}
+
+/**
+ * >  You can call this operation only with an Alibaba Cloud account.
+ *
+ * @param request DescribeSubaccountK8sClusterUserConfigRequest
+ * @param headers map
+ * @param runtime runtime options for this request RuntimeOptions
+ * @return DescribeSubaccountK8sClusterUserConfigResponse
+ */
+func (client *Client) DescribeSubaccountK8sClusterUserConfigWithOptions(ClusterId *string, Uid *string, request *DescribeSubaccountK8sClusterUserConfigRequest, headers map[string]*string, runtime *util.RuntimeOptions) (_result *DescribeSubaccountK8sClusterUserConfigResponse, _err error) {
+	_err = util.ValidateModel(request)
+	if _err != nil {
+		return _result, _err
+	}
+	query := map[string]interface{}{}
+	if !tea.BoolValue(util.IsUnset(request.PrivateIpAddress)) {
+		query["PrivateIpAddress"] = request.PrivateIpAddress
+	}
+
+	if !tea.BoolValue(util.IsUnset(request.TemporaryDurationMinutes)) {
+		query["TemporaryDurationMinutes"] = request.TemporaryDurationMinutes
+	}
+
+	req := &openapi.OpenApiRequest{
+		Headers: headers,
+		Query:   openapiutil.Query(query),
+	}
+	params := &openapi.Params{
+		Action:      tea.String("DescribeSubaccountK8sClusterUserConfig"),
+		Version:     tea.String("2015-12-15"),
+		Protocol:    tea.String("HTTPS"),
+		Pathname:    tea.String("/k8s/" + tea.StringValue(openapiutil.GetEncodeParam(ClusterId)) + "/users/" + tea.StringValue(openapiutil.GetEncodeParam(Uid)) + "/user_config"),
+		Method:      tea.String("GET"),
+		AuthType:    tea.String("AK"),
+		Style:       tea.String("ROA"),
+		ReqBodyType: tea.String("json"),
+		BodyType:    tea.String("json"),
+	}
+	_result = &DescribeSubaccountK8sClusterUserConfigResponse{}
+	_body, _err := client.CallApi(params, req, runtime)
+	if _err != nil {
+		return _result, _err
+	}
+	_err = tea.Convert(_body, &_result)
+	return _result, _err
+}
+
+/**
+ * >  You can call this operation only with an Alibaba Cloud account.
+ *
+ * @param request DescribeSubaccountK8sClusterUserConfigRequest
+ * @return DescribeSubaccountK8sClusterUserConfigResponse
+ */
+func (client *Client) DescribeSubaccountK8sClusterUserConfig(ClusterId *string, Uid *string, request *DescribeSubaccountK8sClusterUserConfigRequest) (_result *DescribeSubaccountK8sClusterUserConfigResponse, _err error) {
+	runtime := &util.RuntimeOptions{}
+	headers := make(map[string]*string)
+	_result = &DescribeSubaccountK8sClusterUserConfigResponse{}
+	_body, _err := client.DescribeSubaccountK8sClusterUserConfigWithOptions(ClusterId, Uid, request, headers, runtime)
 	if _err != nil {
 		return _result, _err
 	}
@@ -15505,11 +18590,11 @@ func (client *Client) DescribeTaskInfoWithOptions(taskId *string, headers map[st
 	return _result, _err
 }
 
-func (client *Client) DescribeTemplateAttribute(TemplateId *string, request *DescribeTemplateAttributeRequest) (_result *DescribeTemplateAttributeResponse, _err error) {
+func (client *Client) DescribeTaskInfo(taskId *string) (_result *DescribeTaskInfoResponse, _err error) {
 	runtime := &util.RuntimeOptions{}
 	headers := make(map[string]*string)
-	_result = &DescribeTemplateAttributeResponse{}
-	_body, _err := client.DescribeTemplateAttributeWithOptions(TemplateId, request, headers, runtime)
+	_result = &DescribeTaskInfoResponse{}
+	_body, _err := client.DescribeTaskInfoWithOptions(taskId, headers, runtime)
 	if _err != nil {
 		return _result, _err
 	}
@@ -15551,11 +18636,11 @@ func (client *Client) DescribeTemplateAttributeWithOptions(TemplateId *string, r
 	return _result, _err
 }
 
-func (client *Client) DescribeTemplates(request *DescribeTemplatesRequest) (_result *DescribeTemplatesResponse, _err error) {
+func (client *Client) DescribeTemplateAttribute(TemplateId *string, request *DescribeTemplateAttributeRequest) (_result *DescribeTemplateAttributeResponse, _err error) {
 	runtime := &util.RuntimeOptions{}
 	headers := make(map[string]*string)
-	_result = &DescribeTemplatesResponse{}
-	_body, _err := client.DescribeTemplatesWithOptions(request, headers, runtime)
+	_result = &DescribeTemplateAttributeResponse{}
+	_body, _err := client.DescribeTemplateAttributeWithOptions(TemplateId, request, headers, runtime)
 	if _err != nil {
 		return _result, _err
 	}
@@ -15605,11 +18690,11 @@ func (client *Client) DescribeTemplatesWithOptions(request *DescribeTemplatesReq
 	return _result, _err
 }
 
-func (client *Client) DescribeTrigger(clusterId *string, request *DescribeTriggerRequest) (_result *DescribeTriggerResponse, _err error) {
+func (client *Client) DescribeTemplates(request *DescribeTemplatesRequest) (_result *DescribeTemplatesResponse, _err error) {
 	runtime := &util.RuntimeOptions{}
 	headers := make(map[string]*string)
-	_result = &DescribeTriggerResponse{}
-	_body, _err := client.DescribeTriggerWithOptions(clusterId, request, headers, runtime)
+	_result = &DescribeTemplatesResponse{}
+	_body, _err := client.DescribeTemplatesWithOptions(request, headers, runtime)
 	if _err != nil {
 		return _result, _err
 	}
@@ -15647,7 +18732,7 @@ func (client *Client) DescribeTriggerWithOptions(clusterId *string, request *Des
 		Action:      tea.String("DescribeTrigger"),
 		Version:     tea.String("2015-12-15"),
 		Protocol:    tea.String("HTTPS"),
-		Pathname:    tea.String("/clusters/%5Bcluster_id%5D/triggers"),
+		Pathname:    tea.String("/clusters/" + tea.StringValue(openapiutil.GetEncodeParam(clusterId)) + "/triggers"),
 		Method:      tea.String("GET"),
 		AuthType:    tea.String("AK"),
 		Style:       tea.String("ROA"),
@@ -15663,11 +18748,47 @@ func (client *Client) DescribeTriggerWithOptions(clusterId *string, request *Des
 	return _result, _err
 }
 
-func (client *Client) DescribeUserPermission(uid *string) (_result *DescribeUserPermissionResponse, _err error) {
+func (client *Client) DescribeTrigger(clusterId *string, request *DescribeTriggerRequest) (_result *DescribeTriggerResponse, _err error) {
 	runtime := &util.RuntimeOptions{}
 	headers := make(map[string]*string)
-	_result = &DescribeUserPermissionResponse{}
-	_body, _err := client.DescribeUserPermissionWithOptions(uid, headers, runtime)
+	_result = &DescribeTriggerResponse{}
+	_body, _err := client.DescribeTriggerWithOptions(clusterId, request, headers, runtime)
+	if _err != nil {
+		return _result, _err
+	}
+	_result = _body
+	return _result, _err
+}
+
+func (client *Client) DescribeUserClusterNamespacesWithOptions(ClusterId *string, headers map[string]*string, runtime *util.RuntimeOptions) (_result *DescribeUserClusterNamespacesResponse, _err error) {
+	req := &openapi.OpenApiRequest{
+		Headers: headers,
+	}
+	params := &openapi.Params{
+		Action:      tea.String("DescribeUserClusterNamespaces"),
+		Version:     tea.String("2015-12-15"),
+		Protocol:    tea.String("HTTPS"),
+		Pathname:    tea.String("/api/v2/k8s/" + tea.StringValue(openapiutil.GetEncodeParam(ClusterId)) + "/namespaces"),
+		Method:      tea.String("GET"),
+		AuthType:    tea.String("AK"),
+		Style:       tea.String("ROA"),
+		ReqBodyType: tea.String("json"),
+		BodyType:    tea.String("array"),
+	}
+	_result = &DescribeUserClusterNamespacesResponse{}
+	_body, _err := client.CallApi(params, req, runtime)
+	if _err != nil {
+		return _result, _err
+	}
+	_err = tea.Convert(_body, &_result)
+	return _result, _err
+}
+
+func (client *Client) DescribeUserClusterNamespaces(ClusterId *string) (_result *DescribeUserClusterNamespacesResponse, _err error) {
+	runtime := &util.RuntimeOptions{}
+	headers := make(map[string]*string)
+	_result = &DescribeUserClusterNamespacesResponse{}
+	_body, _err := client.DescribeUserClusterNamespacesWithOptions(ClusterId, headers, runtime)
 	if _err != nil {
 		return _result, _err
 	}
@@ -15699,11 +18820,11 @@ func (client *Client) DescribeUserPermissionWithOptions(uid *string, headers map
 	return _result, _err
 }
 
-func (client *Client) DescribeUserQuota() (_result *DescribeUserQuotaResponse, _err error) {
+func (client *Client) DescribeUserPermission(uid *string) (_result *DescribeUserPermissionResponse, _err error) {
 	runtime := &util.RuntimeOptions{}
 	headers := make(map[string]*string)
-	_result = &DescribeUserQuotaResponse{}
-	_body, _err := client.DescribeUserQuotaWithOptions(headers, runtime)
+	_result = &DescribeUserPermissionResponse{}
+	_body, _err := client.DescribeUserPermissionWithOptions(uid, headers, runtime)
 	if _err != nil {
 		return _result, _err
 	}
@@ -15735,11 +18856,11 @@ func (client *Client) DescribeUserQuotaWithOptions(headers map[string]*string, r
 	return _result, _err
 }
 
-func (client *Client) DescribeWorkflows() (_result *DescribeWorkflowsResponse, _err error) {
+func (client *Client) DescribeUserQuota() (_result *DescribeUserQuotaResponse, _err error) {
 	runtime := &util.RuntimeOptions{}
 	headers := make(map[string]*string)
-	_result = &DescribeWorkflowsResponse{}
-	_body, _err := client.DescribeWorkflowsWithOptions(headers, runtime)
+	_result = &DescribeUserQuotaResponse{}
+	_body, _err := client.DescribeUserQuotaWithOptions(headers, runtime)
 	if _err != nil {
 		return _result, _err
 	}
@@ -15771,11 +18892,11 @@ func (client *Client) DescribeWorkflowsWithOptions(headers map[string]*string, r
 	return _result, _err
 }
 
-func (client *Client) EdgeClusterAddEdgeMachine(clusterid *string, edgeMachineid *string, request *EdgeClusterAddEdgeMachineRequest) (_result *EdgeClusterAddEdgeMachineResponse, _err error) {
+func (client *Client) DescribeWorkflows() (_result *DescribeWorkflowsResponse, _err error) {
 	runtime := &util.RuntimeOptions{}
 	headers := make(map[string]*string)
-	_result = &EdgeClusterAddEdgeMachineResponse{}
-	_body, _err := client.EdgeClusterAddEdgeMachineWithOptions(clusterid, edgeMachineid, request, headers, runtime)
+	_result = &DescribeWorkflowsResponse{}
+	_body, _err := client.DescribeWorkflowsWithOptions(headers, runtime)
 	if _err != nil {
 		return _result, _err
 	}
@@ -15825,11 +18946,11 @@ func (client *Client) EdgeClusterAddEdgeMachineWithOptions(clusterid *string, ed
 	return _result, _err
 }
 
-func (client *Client) FixNodePoolVuls(clusterId *string, nodepoolId *string, request *FixNodePoolVulsRequest) (_result *FixNodePoolVulsResponse, _err error) {
+func (client *Client) EdgeClusterAddEdgeMachine(clusterid *string, edgeMachineid *string, request *EdgeClusterAddEdgeMachineRequest) (_result *EdgeClusterAddEdgeMachineResponse, _err error) {
 	runtime := &util.RuntimeOptions{}
 	headers := make(map[string]*string)
-	_result = &FixNodePoolVulsResponse{}
-	_body, _err := client.FixNodePoolVulsWithOptions(clusterId, nodepoolId, request, headers, runtime)
+	_result = &EdgeClusterAddEdgeMachineResponse{}
+	_body, _err := client.EdgeClusterAddEdgeMachineWithOptions(clusterid, edgeMachineid, request, headers, runtime)
 	if _err != nil {
 		return _result, _err
 	}
@@ -15847,12 +18968,12 @@ func (client *Client) FixNodePoolVulsWithOptions(clusterId *string, nodepoolId *
 		body["nodes"] = request.Nodes
 	}
 
-	if !tea.BoolValue(util.IsUnset(tea.ToMap(request.RolloutPolicy))) {
+	if !tea.BoolValue(util.IsUnset(request.RolloutPolicy)) {
 		body["rollout_policy"] = request.RolloutPolicy
 	}
 
-	if !tea.BoolValue(util.IsUnset(request.VulList)) {
-		body["vul_list"] = request.VulList
+	if !tea.BoolValue(util.IsUnset(request.Vuls)) {
+		body["vuls"] = request.Vuls
 	}
 
 	req := &openapi.OpenApiRequest{
@@ -15879,11 +19000,11 @@ func (client *Client) FixNodePoolVulsWithOptions(clusterId *string, nodepoolId *
 	return _result, _err
 }
 
-func (client *Client) GetKubernetesTrigger(ClusterId *string, request *GetKubernetesTriggerRequest) (_result *GetKubernetesTriggerResponse, _err error) {
+func (client *Client) FixNodePoolVuls(clusterId *string, nodepoolId *string, request *FixNodePoolVulsRequest) (_result *FixNodePoolVulsResponse, _err error) {
 	runtime := &util.RuntimeOptions{}
 	headers := make(map[string]*string)
-	_result = &GetKubernetesTriggerResponse{}
-	_body, _err := client.GetKubernetesTriggerWithOptions(ClusterId, request, headers, runtime)
+	_result = &FixNodePoolVulsResponse{}
+	_body, _err := client.FixNodePoolVulsWithOptions(clusterId, nodepoolId, request, headers, runtime)
 	if _err != nil {
 		return _result, _err
 	}
@@ -15937,11 +19058,11 @@ func (client *Client) GetKubernetesTriggerWithOptions(ClusterId *string, request
 	return _result, _err
 }
 
-func (client *Client) GetUpgradeStatus(ClusterId *string) (_result *GetUpgradeStatusResponse, _err error) {
+func (client *Client) GetKubernetesTrigger(ClusterId *string, request *GetKubernetesTriggerRequest) (_result *GetKubernetesTriggerResponse, _err error) {
 	runtime := &util.RuntimeOptions{}
 	headers := make(map[string]*string)
-	_result = &GetUpgradeStatusResponse{}
-	_body, _err := client.GetUpgradeStatusWithOptions(ClusterId, headers, runtime)
+	_result = &GetKubernetesTriggerResponse{}
+	_body, _err := client.GetKubernetesTriggerWithOptions(ClusterId, request, headers, runtime)
 	if _err != nil {
 		return _result, _err
 	}
@@ -15973,11 +19094,11 @@ func (client *Client) GetUpgradeStatusWithOptions(ClusterId *string, headers map
 	return _result, _err
 }
 
-func (client *Client) GrantPermissions(uid *string, request *GrantPermissionsRequest) (_result *GrantPermissionsResponse, _err error) {
+func (client *Client) GetUpgradeStatus(ClusterId *string) (_result *GetUpgradeStatusResponse, _err error) {
 	runtime := &util.RuntimeOptions{}
 	headers := make(map[string]*string)
-	_result = &GrantPermissionsResponse{}
-	_body, _err := client.GrantPermissionsWithOptions(uid, request, headers, runtime)
+	_result = &GetUpgradeStatusResponse{}
+	_body, _err := client.GetUpgradeStatusWithOptions(ClusterId, headers, runtime)
 	if _err != nil {
 		return _result, _err
 	}
@@ -15985,6 +19106,18 @@ func (client *Client) GrantPermissions(uid *string, request *GrantPermissionsReq
 	return _result, _err
 }
 
+/**
+ * **Precautions**:
+ * *   Make sure that you have granted the specified RAM user at least read permissions on the specified cluster by attaching RAM policies. Otherwise, the `ErrorRamPolicyConfig` error will be returned.
+ *     For more information about how to authorize a RAM user by attaching RAM policies, see [Create a custom RAM policy](~~86485~~).
+ * *   If you call this operation as a RAM user, make sure that this RAM user has the permissions to grant other RAM users the permissions to manage ACK clusters. Otherwise, the `StatusForbidden` or `ForbiddenGrantPermissions` errors will be returned. For more information, see [Use a RAM user to grant RBAC permissions to other RAM users](~~119035~~).
+ * *   This operation overwrites the permissions that have been granted to the specified RAM user. When you call this operation, make sure that the required permissions are included.
+ *
+ * @param request GrantPermissionsRequest
+ * @param headers map
+ * @param runtime runtime options for this request RuntimeOptions
+ * @return GrantPermissionsResponse
+ */
 func (client *Client) GrantPermissionsWithOptions(uid *string, request *GrantPermissionsRequest, headers map[string]*string, runtime *util.RuntimeOptions) (_result *GrantPermissionsResponse, _err error) {
 	_err = util.ValidateModel(request)
 	if _err != nil {
@@ -16014,11 +19147,21 @@ func (client *Client) GrantPermissionsWithOptions(uid *string, request *GrantPer
 	return _result, _err
 }
 
-func (client *Client) InstallClusterAddons(ClusterId *string, request *InstallClusterAddonsRequest) (_result *InstallClusterAddonsResponse, _err error) {
+/**
+ * **Precautions**:
+ * *   Make sure that you have granted the specified RAM user at least read permissions on the specified cluster by attaching RAM policies. Otherwise, the `ErrorRamPolicyConfig` error will be returned.
+ *     For more information about how to authorize a RAM user by attaching RAM policies, see [Create a custom RAM policy](~~86485~~).
+ * *   If you call this operation as a RAM user, make sure that this RAM user has the permissions to grant other RAM users the permissions to manage ACK clusters. Otherwise, the `StatusForbidden` or `ForbiddenGrantPermissions` errors will be returned. For more information, see [Use a RAM user to grant RBAC permissions to other RAM users](~~119035~~).
+ * *   This operation overwrites the permissions that have been granted to the specified RAM user. When you call this operation, make sure that the required permissions are included.
+ *
+ * @param request GrantPermissionsRequest
+ * @return GrantPermissionsResponse
+ */
+func (client *Client) GrantPermissions(uid *string, request *GrantPermissionsRequest) (_result *GrantPermissionsResponse, _err error) {
 	runtime := &util.RuntimeOptions{}
 	headers := make(map[string]*string)
-	_result = &InstallClusterAddonsResponse{}
-	_body, _err := client.InstallClusterAddonsWithOptions(ClusterId, request, headers, runtime)
+	_result = &GrantPermissionsResponse{}
+	_body, _err := client.GrantPermissionsWithOptions(uid, request, headers, runtime)
 	if _err != nil {
 		return _result, _err
 	}
@@ -16055,11 +19198,11 @@ func (client *Client) InstallClusterAddonsWithOptions(ClusterId *string, request
 	return _result, _err
 }
 
-func (client *Client) ListTagResources(request *ListTagResourcesRequest) (_result *ListTagResourcesResponse, _err error) {
+func (client *Client) InstallClusterAddons(ClusterId *string, request *InstallClusterAddonsRequest) (_result *InstallClusterAddonsResponse, _err error) {
 	runtime := &util.RuntimeOptions{}
 	headers := make(map[string]*string)
-	_result = &ListTagResourcesResponse{}
-	_body, _err := client.ListTagResourcesWithOptions(request, headers, runtime)
+	_result = &InstallClusterAddonsResponse{}
+	_body, _err := client.InstallClusterAddonsWithOptions(ClusterId, request, headers, runtime)
 	if _err != nil {
 		return _result, _err
 	}
@@ -16127,11 +19270,11 @@ func (client *Client) ListTagResourcesWithOptions(tmpReq *ListTagResourcesReques
 	return _result, _err
 }
 
-func (client *Client) MigrateCluster(clusterId *string, request *MigrateClusterRequest) (_result *MigrateClusterResponse, _err error) {
+func (client *Client) ListTagResources(request *ListTagResourcesRequest) (_result *ListTagResourcesResponse, _err error) {
 	runtime := &util.RuntimeOptions{}
 	headers := make(map[string]*string)
-	_result = &MigrateClusterResponse{}
-	_body, _err := client.MigrateClusterWithOptions(clusterId, request, headers, runtime)
+	_result = &ListTagResourcesResponse{}
+	_body, _err := client.ListTagResourcesWithOptions(request, headers, runtime)
 	if _err != nil {
 		return _result, _err
 	}
@@ -16177,11 +19320,11 @@ func (client *Client) MigrateClusterWithOptions(clusterId *string, request *Migr
 	return _result, _err
 }
 
-func (client *Client) ModifyCluster(ClusterId *string, request *ModifyClusterRequest) (_result *ModifyClusterResponse, _err error) {
+func (client *Client) MigrateCluster(clusterId *string, request *MigrateClusterRequest) (_result *MigrateClusterResponse, _err error) {
 	runtime := &util.RuntimeOptions{}
 	headers := make(map[string]*string)
-	_result = &ModifyClusterResponse{}
-	_body, _err := client.ModifyClusterWithOptions(ClusterId, request, headers, runtime)
+	_result = &MigrateClusterResponse{}
+	_body, _err := client.MigrateClusterWithOptions(clusterId, request, headers, runtime)
 	if _err != nil {
 		return _result, _err
 	}
@@ -16223,7 +19366,7 @@ func (client *Client) ModifyClusterWithOptions(ClusterId *string, request *Modif
 		body["instance_deletion_protection"] = request.InstanceDeletionProtection
 	}
 
-	if !tea.BoolValue(util.IsUnset(tea.ToMap(request.MaintenanceWindow))) {
+	if !tea.BoolValue(util.IsUnset(request.MaintenanceWindow)) {
 		body["maintenance_window"] = request.MaintenanceWindow
 	}
 
@@ -16255,11 +19398,11 @@ func (client *Client) ModifyClusterWithOptions(ClusterId *string, request *Modif
 	return _result, _err
 }
 
-func (client *Client) ModifyClusterAddon(clusterId *string, componentId *string, request *ModifyClusterAddonRequest) (_result *ModifyClusterAddonResponse, _err error) {
+func (client *Client) ModifyCluster(ClusterId *string, request *ModifyClusterRequest) (_result *ModifyClusterResponse, _err error) {
 	runtime := &util.RuntimeOptions{}
 	headers := make(map[string]*string)
-	_result = &ModifyClusterAddonResponse{}
-	_body, _err := client.ModifyClusterAddonWithOptions(clusterId, componentId, request, headers, runtime)
+	_result = &ModifyClusterResponse{}
+	_body, _err := client.ModifyClusterWithOptions(ClusterId, request, headers, runtime)
 	if _err != nil {
 		return _result, _err
 	}
@@ -16267,6 +19410,17 @@ func (client *Client) ModifyClusterAddon(clusterId *string, componentId *string,
 	return _result, _err
 }
 
+/**
+ * You can use this API operation to modify the components in a Container Service for Kubernetes (ACK) cluster or the control plane components in an ACK Pro cluster.
+ * *   To query the customizable parameters of a component, call the `DescribeClusterAddonMetadata` API operation. For more information, see [Query the metadata of a specified component version](https://www.alibabacloud.com/help/zh/container-service-for-kubernetes/latest/query).
+ * *   For more information about the customizable parameters of control plane components in ACK Pro clusters, see [Customize the parameters of control plane components in ACK Pro clusters](https://www.alibabacloud.com/help/zh/container-service-for-kubernetes/latest/customize-control-plane-parameters-for-a-professional-kubernetes-cluster).
+ * After you call this operation, the component may be redeployed and restarted. We recommend that you evaluate the impact before you call this operation.
+ *
+ * @param request ModifyClusterAddonRequest
+ * @param headers map
+ * @param runtime runtime options for this request RuntimeOptions
+ * @return ModifyClusterAddonResponse
+ */
 func (client *Client) ModifyClusterAddonWithOptions(clusterId *string, componentId *string, request *ModifyClusterAddonRequest, headers map[string]*string, runtime *util.RuntimeOptions) (_result *ModifyClusterAddonResponse, _err error) {
 	_err = util.ValidateModel(request)
 	if _err != nil {
@@ -16301,11 +19455,20 @@ func (client *Client) ModifyClusterAddonWithOptions(clusterId *string, component
 	return _result, _err
 }
 
-func (client *Client) ModifyClusterConfiguration(ClusterId *string, request *ModifyClusterConfigurationRequest) (_result *ModifyClusterConfigurationResponse, _err error) {
+/**
+ * You can use this API operation to modify the components in a Container Service for Kubernetes (ACK) cluster or the control plane components in an ACK Pro cluster.
+ * *   To query the customizable parameters of a component, call the `DescribeClusterAddonMetadata` API operation. For more information, see [Query the metadata of a specified component version](https://www.alibabacloud.com/help/zh/container-service-for-kubernetes/latest/query).
+ * *   For more information about the customizable parameters of control plane components in ACK Pro clusters, see [Customize the parameters of control plane components in ACK Pro clusters](https://www.alibabacloud.com/help/zh/container-service-for-kubernetes/latest/customize-control-plane-parameters-for-a-professional-kubernetes-cluster).
+ * After you call this operation, the component may be redeployed and restarted. We recommend that you evaluate the impact before you call this operation.
+ *
+ * @param request ModifyClusterAddonRequest
+ * @return ModifyClusterAddonResponse
+ */
+func (client *Client) ModifyClusterAddon(clusterId *string, componentId *string, request *ModifyClusterAddonRequest) (_result *ModifyClusterAddonResponse, _err error) {
 	runtime := &util.RuntimeOptions{}
 	headers := make(map[string]*string)
-	_result = &ModifyClusterConfigurationResponse{}
-	_body, _err := client.ModifyClusterConfigurationWithOptions(ClusterId, request, headers, runtime)
+	_result = &ModifyClusterAddonResponse{}
+	_body, _err := client.ModifyClusterAddonWithOptions(clusterId, componentId, request, headers, runtime)
 	if _err != nil {
 		return _result, _err
 	}
@@ -16347,11 +19510,11 @@ func (client *Client) ModifyClusterConfigurationWithOptions(ClusterId *string, r
 	return _result, _err
 }
 
-func (client *Client) ModifyClusterNodePool(ClusterId *string, NodepoolId *string, request *ModifyClusterNodePoolRequest) (_result *ModifyClusterNodePoolResponse, _err error) {
+func (client *Client) ModifyClusterConfiguration(ClusterId *string, request *ModifyClusterConfigurationRequest) (_result *ModifyClusterConfigurationResponse, _err error) {
 	runtime := &util.RuntimeOptions{}
 	headers := make(map[string]*string)
-	_result = &ModifyClusterNodePoolResponse{}
-	_body, _err := client.ModifyClusterNodePoolWithOptions(ClusterId, NodepoolId, request, headers, runtime)
+	_result = &ModifyClusterConfigurationResponse{}
+	_body, _err := client.ModifyClusterConfigurationWithOptions(ClusterId, request, headers, runtime)
 	if _err != nil {
 		return _result, _err
 	}
@@ -16365,27 +19528,27 @@ func (client *Client) ModifyClusterNodePoolWithOptions(ClusterId *string, Nodepo
 		return _result, _err
 	}
 	body := map[string]interface{}{}
-	if !tea.BoolValue(util.IsUnset(tea.ToMap(request.AutoScaling))) {
+	if !tea.BoolValue(util.IsUnset(request.AutoScaling)) {
 		body["auto_scaling"] = request.AutoScaling
 	}
 
-	if !tea.BoolValue(util.IsUnset(tea.ToMap(request.KubernetesConfig))) {
+	if !tea.BoolValue(util.IsUnset(request.KubernetesConfig)) {
 		body["kubernetes_config"] = request.KubernetesConfig
 	}
 
-	if !tea.BoolValue(util.IsUnset(tea.ToMap(request.Management))) {
+	if !tea.BoolValue(util.IsUnset(request.Management)) {
 		body["management"] = request.Management
 	}
 
-	if !tea.BoolValue(util.IsUnset(tea.ToMap(request.NodepoolInfo))) {
+	if !tea.BoolValue(util.IsUnset(request.NodepoolInfo)) {
 		body["nodepool_info"] = request.NodepoolInfo
 	}
 
-	if !tea.BoolValue(util.IsUnset(tea.ToMap(request.ScalingGroup))) {
+	if !tea.BoolValue(util.IsUnset(request.ScalingGroup)) {
 		body["scaling_group"] = request.ScalingGroup
 	}
 
-	if !tea.BoolValue(util.IsUnset(tea.ToMap(request.TeeConfig))) {
+	if !tea.BoolValue(util.IsUnset(request.TeeConfig)) {
 		body["tee_config"] = request.TeeConfig
 	}
 
@@ -16417,11 +19580,11 @@ func (client *Client) ModifyClusterNodePoolWithOptions(ClusterId *string, Nodepo
 	return _result, _err
 }
 
-func (client *Client) ModifyClusterTags(ClusterId *string, request *ModifyClusterTagsRequest) (_result *ModifyClusterTagsResponse, _err error) {
+func (client *Client) ModifyClusterNodePool(ClusterId *string, NodepoolId *string, request *ModifyClusterNodePoolRequest) (_result *ModifyClusterNodePoolResponse, _err error) {
 	runtime := &util.RuntimeOptions{}
 	headers := make(map[string]*string)
-	_result = &ModifyClusterTagsResponse{}
-	_body, _err := client.ModifyClusterTagsWithOptions(ClusterId, request, headers, runtime)
+	_result = &ModifyClusterNodePoolResponse{}
+	_body, _err := client.ModifyClusterNodePoolWithOptions(ClusterId, NodepoolId, request, headers, runtime)
 	if _err != nil {
 		return _result, _err
 	}
@@ -16458,11 +19621,11 @@ func (client *Client) ModifyClusterTagsWithOptions(ClusterId *string, request *M
 	return _result, _err
 }
 
-func (client *Client) ModifyNodePoolNodeConfig(ClusterId *string, NodepoolId *string, request *ModifyNodePoolNodeConfigRequest) (_result *ModifyNodePoolNodeConfigResponse, _err error) {
+func (client *Client) ModifyClusterTags(ClusterId *string, request *ModifyClusterTagsRequest) (_result *ModifyClusterTagsResponse, _err error) {
 	runtime := &util.RuntimeOptions{}
 	headers := make(map[string]*string)
-	_result = &ModifyNodePoolNodeConfigResponse{}
-	_body, _err := client.ModifyNodePoolNodeConfigWithOptions(ClusterId, NodepoolId, request, headers, runtime)
+	_result = &ModifyClusterTagsResponse{}
+	_body, _err := client.ModifyClusterTagsWithOptions(ClusterId, request, headers, runtime)
 	if _err != nil {
 		return _result, _err
 	}
@@ -16476,11 +19639,11 @@ func (client *Client) ModifyNodePoolNodeConfigWithOptions(ClusterId *string, Nod
 		return _result, _err
 	}
 	body := map[string]interface{}{}
-	if !tea.BoolValue(util.IsUnset(tea.ToMap(request.KubeletConfig))) {
+	if !tea.BoolValue(util.IsUnset(request.KubeletConfig)) {
 		body["kubelet_config"] = request.KubeletConfig
 	}
 
-	if !tea.BoolValue(util.IsUnset(tea.ToMap(request.RollingPolicy))) {
+	if !tea.BoolValue(util.IsUnset(request.RollingPolicy)) {
 		body["rolling_policy"] = request.RollingPolicy
 	}
 
@@ -16508,11 +19671,11 @@ func (client *Client) ModifyNodePoolNodeConfigWithOptions(ClusterId *string, Nod
 	return _result, _err
 }
 
-func (client *Client) ModifyPolicyInstance(clusterId *string, policyName *string, request *ModifyPolicyInstanceRequest) (_result *ModifyPolicyInstanceResponse, _err error) {
+func (client *Client) ModifyNodePoolNodeConfig(ClusterId *string, NodepoolId *string, request *ModifyNodePoolNodeConfigRequest) (_result *ModifyNodePoolNodeConfigResponse, _err error) {
 	runtime := &util.RuntimeOptions{}
 	headers := make(map[string]*string)
-	_result = &ModifyPolicyInstanceResponse{}
-	_body, _err := client.ModifyPolicyInstanceWithOptions(clusterId, policyName, request, headers, runtime)
+	_result = &ModifyNodePoolNodeConfigResponse{}
+	_body, _err := client.ModifyNodePoolNodeConfigWithOptions(ClusterId, NodepoolId, request, headers, runtime)
 	if _err != nil {
 		return _result, _err
 	}
@@ -16566,11 +19729,11 @@ func (client *Client) ModifyPolicyInstanceWithOptions(clusterId *string, policyN
 	return _result, _err
 }
 
-func (client *Client) OpenAckService(request *OpenAckServiceRequest) (_result *OpenAckServiceResponse, _err error) {
+func (client *Client) ModifyPolicyInstance(clusterId *string, policyName *string, request *ModifyPolicyInstanceRequest) (_result *ModifyPolicyInstanceResponse, _err error) {
 	runtime := &util.RuntimeOptions{}
 	headers := make(map[string]*string)
-	_result = &OpenAckServiceResponse{}
-	_body, _err := client.OpenAckServiceWithOptions(request, headers, runtime)
+	_result = &ModifyPolicyInstanceResponse{}
+	_body, _err := client.ModifyPolicyInstanceWithOptions(clusterId, policyName, request, headers, runtime)
 	if _err != nil {
 		return _result, _err
 	}
@@ -16578,6 +19741,14 @@ func (client *Client) OpenAckService(request *OpenAckServiceRequest) (_result *O
 	return _result, _err
 }
 
+/**
+ * You can activate ACK with Alibaba Cloud accounts or RAM users that have the authority of AdministratorAccess.
+ *
+ * @param request OpenAckServiceRequest
+ * @param headers map
+ * @param runtime runtime options for this request RuntimeOptions
+ * @return OpenAckServiceResponse
+ */
 func (client *Client) OpenAckServiceWithOptions(request *OpenAckServiceRequest, headers map[string]*string, runtime *util.RuntimeOptions) (_result *OpenAckServiceResponse, _err error) {
 	_err = util.ValidateModel(request)
 	if _err != nil {
@@ -16612,11 +19783,17 @@ func (client *Client) OpenAckServiceWithOptions(request *OpenAckServiceRequest, 
 	return _result, _err
 }
 
-func (client *Client) PauseClusterUpgrade(ClusterId *string) (_result *PauseClusterUpgradeResponse, _err error) {
+/**
+ * You can activate ACK with Alibaba Cloud accounts or RAM users that have the authority of AdministratorAccess.
+ *
+ * @param request OpenAckServiceRequest
+ * @return OpenAckServiceResponse
+ */
+func (client *Client) OpenAckService(request *OpenAckServiceRequest) (_result *OpenAckServiceResponse, _err error) {
 	runtime := &util.RuntimeOptions{}
 	headers := make(map[string]*string)
-	_result = &PauseClusterUpgradeResponse{}
-	_body, _err := client.PauseClusterUpgradeWithOptions(ClusterId, headers, runtime)
+	_result = &OpenAckServiceResponse{}
+	_body, _err := client.OpenAckServiceWithOptions(request, headers, runtime)
 	if _err != nil {
 		return _result, _err
 	}
@@ -16648,11 +19825,11 @@ func (client *Client) PauseClusterUpgradeWithOptions(ClusterId *string, headers 
 	return _result, _err
 }
 
-func (client *Client) PauseComponentUpgrade(clusterid *string, componentid *string) (_result *PauseComponentUpgradeResponse, _err error) {
+func (client *Client) PauseClusterUpgrade(ClusterId *string) (_result *PauseClusterUpgradeResponse, _err error) {
 	runtime := &util.RuntimeOptions{}
 	headers := make(map[string]*string)
-	_result = &PauseComponentUpgradeResponse{}
-	_body, _err := client.PauseComponentUpgradeWithOptions(clusterid, componentid, headers, runtime)
+	_result = &PauseClusterUpgradeResponse{}
+	_body, _err := client.PauseClusterUpgradeWithOptions(ClusterId, headers, runtime)
 	if _err != nil {
 		return _result, _err
 	}
@@ -16684,11 +19861,11 @@ func (client *Client) PauseComponentUpgradeWithOptions(clusterid *string, compon
 	return _result, _err
 }
 
-func (client *Client) PauseTask(taskId *string) (_result *PauseTaskResponse, _err error) {
+func (client *Client) PauseComponentUpgrade(clusterid *string, componentid *string) (_result *PauseComponentUpgradeResponse, _err error) {
 	runtime := &util.RuntimeOptions{}
 	headers := make(map[string]*string)
-	_result = &PauseTaskResponse{}
-	_body, _err := client.PauseTaskWithOptions(taskId, headers, runtime)
+	_result = &PauseComponentUpgradeResponse{}
+	_body, _err := client.PauseComponentUpgradeWithOptions(clusterid, componentid, headers, runtime)
 	if _err != nil {
 		return _result, _err
 	}
@@ -16720,11 +19897,11 @@ func (client *Client) PauseTaskWithOptions(taskId *string, headers map[string]*s
 	return _result, _err
 }
 
-func (client *Client) RemoveClusterNodes(ClusterId *string, request *RemoveClusterNodesRequest) (_result *RemoveClusterNodesResponse, _err error) {
+func (client *Client) PauseTask(taskId *string) (_result *PauseTaskResponse, _err error) {
 	runtime := &util.RuntimeOptions{}
 	headers := make(map[string]*string)
-	_result = &RemoveClusterNodesResponse{}
-	_body, _err := client.RemoveClusterNodesWithOptions(ClusterId, request, headers, runtime)
+	_result = &PauseTaskResponse{}
+	_body, _err := client.PauseTaskWithOptions(taskId, headers, runtime)
 	if _err != nil {
 		return _result, _err
 	}
@@ -16732,6 +19909,15 @@ func (client *Client) RemoveClusterNodes(ClusterId *string, request *RemoveClust
 	return _result, _err
 }
 
+/**
+ * @deprecated
+ *
+ * @param request RemoveClusterNodesRequest
+ * @param headers map
+ * @param runtime runtime options for this request RuntimeOptions
+ * @return RemoveClusterNodesResponse
+ */
+// Deprecated
 func (client *Client) RemoveClusterNodesWithOptions(ClusterId *string, request *RemoveClusterNodesRequest, headers map[string]*string, runtime *util.RuntimeOptions) (_result *RemoveClusterNodesResponse, _err error) {
 	_err = util.ValidateModel(request)
 	if _err != nil {
@@ -16774,11 +19960,18 @@ func (client *Client) RemoveClusterNodesWithOptions(ClusterId *string, request *
 	return _result, _err
 }
 
-func (client *Client) RemoveNodePoolNodes(ClusterId *string, NodepoolId *string, request *RemoveNodePoolNodesRequest) (_result *RemoveNodePoolNodesResponse, _err error) {
+/**
+ * @deprecated
+ *
+ * @param request RemoveClusterNodesRequest
+ * @return RemoveClusterNodesResponse
+ */
+// Deprecated
+func (client *Client) RemoveClusterNodes(ClusterId *string, request *RemoveClusterNodesRequest) (_result *RemoveClusterNodesResponse, _err error) {
 	runtime := &util.RuntimeOptions{}
 	headers := make(map[string]*string)
-	_result = &RemoveNodePoolNodesResponse{}
-	_body, _err := client.RemoveNodePoolNodesWithOptions(ClusterId, NodepoolId, request, headers, runtime)
+	_result = &RemoveClusterNodesResponse{}
+	_body, _err := client.RemoveClusterNodesWithOptions(ClusterId, request, headers, runtime)
 	if _err != nil {
 		return _result, _err
 	}
@@ -16786,6 +19979,18 @@ func (client *Client) RemoveNodePoolNodes(ClusterId *string, NodepoolId *string,
 	return _result, _err
 }
 
+/**
+ * >
+ * *   When you remove a node, the pods that run on the node are migrated to other nodes. This may cause service interruptions. We recommend that you remove nodes during off-peak hours.
+ * *   Unknown errors may occur when you remove nodes. Before you remove nodes, back up the data on the nodes.
+ * *   Nodes remain in the Unschedulable state when they are being removed.
+ * *   You can remove only worker nodes. You cannot remove control planes.
+ *
+ * @param tmpReq RemoveNodePoolNodesRequest
+ * @param headers map
+ * @param runtime runtime options for this request RuntimeOptions
+ * @return RemoveNodePoolNodesResponse
+ */
 func (client *Client) RemoveNodePoolNodesWithOptions(ClusterId *string, NodepoolId *string, tmpReq *RemoveNodePoolNodesRequest, headers map[string]*string, runtime *util.RuntimeOptions) (_result *RemoveNodePoolNodesResponse, _err error) {
 	_err = util.ValidateModel(tmpReq)
 	if _err != nil {
@@ -16793,6 +19998,10 @@ func (client *Client) RemoveNodePoolNodesWithOptions(ClusterId *string, Nodepool
 	}
 	request := &RemoveNodePoolNodesShrinkRequest{}
 	openapiutil.Convert(tmpReq, request)
+	if !tea.BoolValue(util.IsUnset(tmpReq.InstanceIds)) {
+		request.InstanceIdsShrink = openapiutil.ArrayToStringWithSpecifiedStyle(tmpReq.InstanceIds, tea.String("instance_ids"), tea.String("json"))
+	}
+
 	if !tea.BoolValue(util.IsUnset(tmpReq.Nodes)) {
 		request.NodesShrink = openapiutil.ArrayToStringWithSpecifiedStyle(tmpReq.Nodes, tea.String("nodes"), tea.String("json"))
 	}
@@ -16800,6 +20009,10 @@ func (client *Client) RemoveNodePoolNodesWithOptions(ClusterId *string, Nodepool
 	query := map[string]interface{}{}
 	if !tea.BoolValue(util.IsUnset(request.DrainNode)) {
 		query["drain_node"] = request.DrainNode
+	}
+
+	if !tea.BoolValue(util.IsUnset(request.InstanceIdsShrink)) {
+		query["instance_ids"] = request.InstanceIdsShrink
 	}
 
 	if !tea.BoolValue(util.IsUnset(request.NodesShrink)) {
@@ -16834,11 +20047,21 @@ func (client *Client) RemoveNodePoolNodesWithOptions(ClusterId *string, Nodepool
 	return _result, _err
 }
 
-func (client *Client) RemoveWorkflow(workflowName *string) (_result *RemoveWorkflowResponse, _err error) {
+/**
+ * >
+ * *   When you remove a node, the pods that run on the node are migrated to other nodes. This may cause service interruptions. We recommend that you remove nodes during off-peak hours.
+ * *   Unknown errors may occur when you remove nodes. Before you remove nodes, back up the data on the nodes.
+ * *   Nodes remain in the Unschedulable state when they are being removed.
+ * *   You can remove only worker nodes. You cannot remove control planes.
+ *
+ * @param request RemoveNodePoolNodesRequest
+ * @return RemoveNodePoolNodesResponse
+ */
+func (client *Client) RemoveNodePoolNodes(ClusterId *string, NodepoolId *string, request *RemoveNodePoolNodesRequest) (_result *RemoveNodePoolNodesResponse, _err error) {
 	runtime := &util.RuntimeOptions{}
 	headers := make(map[string]*string)
-	_result = &RemoveWorkflowResponse{}
-	_body, _err := client.RemoveWorkflowWithOptions(workflowName, headers, runtime)
+	_result = &RemoveNodePoolNodesResponse{}
+	_body, _err := client.RemoveNodePoolNodesWithOptions(ClusterId, NodepoolId, request, headers, runtime)
 	if _err != nil {
 		return _result, _err
 	}
@@ -16870,11 +20093,11 @@ func (client *Client) RemoveWorkflowWithOptions(workflowName *string, headers ma
 	return _result, _err
 }
 
-func (client *Client) RepairClusterNodePool(clusterId *string, nodepoolId *string, request *RepairClusterNodePoolRequest) (_result *RepairClusterNodePoolResponse, _err error) {
+func (client *Client) RemoveWorkflow(workflowName *string) (_result *RemoveWorkflowResponse, _err error) {
 	runtime := &util.RuntimeOptions{}
 	headers := make(map[string]*string)
-	_result = &RepairClusterNodePoolResponse{}
-	_body, _err := client.RepairClusterNodePoolWithOptions(clusterId, nodepoolId, request, headers, runtime)
+	_result = &RemoveWorkflowResponse{}
+	_body, _err := client.RemoveWorkflowWithOptions(workflowName, headers, runtime)
 	if _err != nil {
 		return _result, _err
 	}
@@ -16916,11 +20139,11 @@ func (client *Client) RepairClusterNodePoolWithOptions(clusterId *string, nodepo
 	return _result, _err
 }
 
-func (client *Client) ResumeComponentUpgrade(clusterid *string, componentid *string) (_result *ResumeComponentUpgradeResponse, _err error) {
+func (client *Client) RepairClusterNodePool(clusterId *string, nodepoolId *string, request *RepairClusterNodePoolRequest) (_result *RepairClusterNodePoolResponse, _err error) {
 	runtime := &util.RuntimeOptions{}
 	headers := make(map[string]*string)
-	_result = &ResumeComponentUpgradeResponse{}
-	_body, _err := client.ResumeComponentUpgradeWithOptions(clusterid, componentid, headers, runtime)
+	_result = &RepairClusterNodePoolResponse{}
+	_body, _err := client.RepairClusterNodePoolWithOptions(clusterId, nodepoolId, request, headers, runtime)
 	if _err != nil {
 		return _result, _err
 	}
@@ -16952,11 +20175,11 @@ func (client *Client) ResumeComponentUpgradeWithOptions(clusterid *string, compo
 	return _result, _err
 }
 
-func (client *Client) ResumeTask(taskId *string) (_result *ResumeTaskResponse, _err error) {
+func (client *Client) ResumeComponentUpgrade(clusterid *string, componentid *string) (_result *ResumeComponentUpgradeResponse, _err error) {
 	runtime := &util.RuntimeOptions{}
 	headers := make(map[string]*string)
-	_result = &ResumeTaskResponse{}
-	_body, _err := client.ResumeTaskWithOptions(taskId, headers, runtime)
+	_result = &ResumeComponentUpgradeResponse{}
+	_body, _err := client.ResumeComponentUpgradeWithOptions(clusterid, componentid, headers, runtime)
 	if _err != nil {
 		return _result, _err
 	}
@@ -16988,11 +20211,11 @@ func (client *Client) ResumeTaskWithOptions(taskId *string, headers map[string]*
 	return _result, _err
 }
 
-func (client *Client) ResumeUpgradeCluster(ClusterId *string) (_result *ResumeUpgradeClusterResponse, _err error) {
+func (client *Client) ResumeTask(taskId *string) (_result *ResumeTaskResponse, _err error) {
 	runtime := &util.RuntimeOptions{}
 	headers := make(map[string]*string)
-	_result = &ResumeUpgradeClusterResponse{}
-	_body, _err := client.ResumeUpgradeClusterWithOptions(ClusterId, headers, runtime)
+	_result = &ResumeTaskResponse{}
+	_body, _err := client.ResumeTaskWithOptions(taskId, headers, runtime)
 	if _err != nil {
 		return _result, _err
 	}
@@ -17024,11 +20247,11 @@ func (client *Client) ResumeUpgradeClusterWithOptions(ClusterId *string, headers
 	return _result, _err
 }
 
-func (client *Client) ScaleCluster(ClusterId *string, request *ScaleClusterRequest) (_result *ScaleClusterResponse, _err error) {
+func (client *Client) ResumeUpgradeCluster(ClusterId *string) (_result *ResumeUpgradeClusterResponse, _err error) {
 	runtime := &util.RuntimeOptions{}
 	headers := make(map[string]*string)
-	_result = &ScaleClusterResponse{}
-	_body, _err := client.ScaleClusterWithOptions(ClusterId, request, headers, runtime)
+	_result = &ResumeUpgradeClusterResponse{}
+	_body, _err := client.ResumeUpgradeClusterWithOptions(ClusterId, headers, runtime)
 	if _err != nil {
 		return _result, _err
 	}
@@ -17036,6 +20259,15 @@ func (client *Client) ScaleCluster(ClusterId *string, request *ScaleClusterReque
 	return _result, _err
 }
 
+/**
+ * @deprecated
+ *
+ * @param request ScaleClusterRequest
+ * @param headers map
+ * @param runtime runtime options for this request RuntimeOptions
+ * @return ScaleClusterResponse
+ */
+// Deprecated
 func (client *Client) ScaleClusterWithOptions(ClusterId *string, request *ScaleClusterRequest, headers map[string]*string, runtime *util.RuntimeOptions) (_result *ScaleClusterResponse, _err error) {
 	_err = util.ValidateModel(request)
 	if _err != nil {
@@ -17142,11 +20374,18 @@ func (client *Client) ScaleClusterWithOptions(ClusterId *string, request *ScaleC
 	return _result, _err
 }
 
-func (client *Client) ScaleClusterNodePool(ClusterId *string, NodepoolId *string, request *ScaleClusterNodePoolRequest) (_result *ScaleClusterNodePoolResponse, _err error) {
+/**
+ * @deprecated
+ *
+ * @param request ScaleClusterRequest
+ * @return ScaleClusterResponse
+ */
+// Deprecated
+func (client *Client) ScaleCluster(ClusterId *string, request *ScaleClusterRequest) (_result *ScaleClusterResponse, _err error) {
 	runtime := &util.RuntimeOptions{}
 	headers := make(map[string]*string)
-	_result = &ScaleClusterNodePoolResponse{}
-	_body, _err := client.ScaleClusterNodePoolWithOptions(ClusterId, NodepoolId, request, headers, runtime)
+	_result = &ScaleClusterResponse{}
+	_body, _err := client.ScaleClusterWithOptions(ClusterId, request, headers, runtime)
 	if _err != nil {
 		return _result, _err
 	}
@@ -17188,11 +20427,11 @@ func (client *Client) ScaleClusterNodePoolWithOptions(ClusterId *string, Nodepoo
 	return _result, _err
 }
 
-func (client *Client) ScaleOutCluster(ClusterId *string, request *ScaleOutClusterRequest) (_result *ScaleOutClusterResponse, _err error) {
+func (client *Client) ScaleClusterNodePool(ClusterId *string, NodepoolId *string, request *ScaleClusterNodePoolRequest) (_result *ScaleClusterNodePoolResponse, _err error) {
 	runtime := &util.RuntimeOptions{}
 	headers := make(map[string]*string)
-	_result = &ScaleOutClusterResponse{}
-	_body, _err := client.ScaleOutClusterWithOptions(ClusterId, request, headers, runtime)
+	_result = &ScaleClusterNodePoolResponse{}
+	_body, _err := client.ScaleClusterNodePoolWithOptions(ClusterId, NodepoolId, request, headers, runtime)
 	if _err != nil {
 		return _result, _err
 	}
@@ -17200,6 +20439,14 @@ func (client *Client) ScaleOutCluster(ClusterId *string, request *ScaleOutCluste
 	return _result, _err
 }
 
+/**
+ * >  The ScaleOutCluster API operation is phased out. You must call the node pool-related API operations to manage nodes. If you want to add worker nodes to an ACK cluster, call the ScaleClusterNodePool API operation. For more information, see [ScaleClusterNodePool](~~184928~~).
+ *
+ * @param request ScaleOutClusterRequest
+ * @param headers map
+ * @param runtime runtime options for this request RuntimeOptions
+ * @return ScaleOutClusterResponse
+ */
 func (client *Client) ScaleOutClusterWithOptions(ClusterId *string, request *ScaleOutClusterRequest, headers map[string]*string, runtime *util.RuntimeOptions) (_result *ScaleOutClusterResponse, _err error) {
 	_err = util.ValidateModel(request)
 	if _err != nil {
@@ -17234,7 +20481,7 @@ func (client *Client) ScaleOutClusterWithOptions(ClusterId *string, request *Sca
 		body["rds_instances"] = request.RdsInstances
 	}
 
-	if !tea.BoolValue(util.IsUnset(tea.ToMap(request.Runtime))) {
+	if !tea.BoolValue(util.IsUnset(request.Runtime)) {
 		body["runtime"] = request.Runtime
 	}
 
@@ -17314,11 +20561,89 @@ func (client *Client) ScaleOutClusterWithOptions(ClusterId *string, request *Sca
 	return _result, _err
 }
 
-func (client *Client) StartWorkflow(request *StartWorkflowRequest) (_result *StartWorkflowResponse, _err error) {
+/**
+ * >  The ScaleOutCluster API operation is phased out. You must call the node pool-related API operations to manage nodes. If you want to add worker nodes to an ACK cluster, call the ScaleClusterNodePool API operation. For more information, see [ScaleClusterNodePool](~~184928~~).
+ *
+ * @param request ScaleOutClusterRequest
+ * @return ScaleOutClusterResponse
+ */
+func (client *Client) ScaleOutCluster(ClusterId *string, request *ScaleOutClusterRequest) (_result *ScaleOutClusterResponse, _err error) {
 	runtime := &util.RuntimeOptions{}
 	headers := make(map[string]*string)
-	_result = &StartWorkflowResponse{}
-	_body, _err := client.StartWorkflowWithOptions(request, headers, runtime)
+	_result = &ScaleOutClusterResponse{}
+	_body, _err := client.ScaleOutClusterWithOptions(ClusterId, request, headers, runtime)
+	if _err != nil {
+		return _result, _err
+	}
+	_result = _body
+	return _result, _err
+}
+
+func (client *Client) ScanClusterVulsWithOptions(clusterId *string, headers map[string]*string, runtime *util.RuntimeOptions) (_result *ScanClusterVulsResponse, _err error) {
+	req := &openapi.OpenApiRequest{
+		Headers: headers,
+	}
+	params := &openapi.Params{
+		Action:      tea.String("ScanClusterVuls"),
+		Version:     tea.String("2015-12-15"),
+		Protocol:    tea.String("HTTPS"),
+		Pathname:    tea.String("/clusters/" + tea.StringValue(openapiutil.GetEncodeParam(clusterId)) + "/vuls/scan"),
+		Method:      tea.String("POST"),
+		AuthType:    tea.String("AK"),
+		Style:       tea.String("ROA"),
+		ReqBodyType: tea.String("json"),
+		BodyType:    tea.String("json"),
+	}
+	_result = &ScanClusterVulsResponse{}
+	_body, _err := client.CallApi(params, req, runtime)
+	if _err != nil {
+		return _result, _err
+	}
+	_err = tea.Convert(_body, &_result)
+	return _result, _err
+}
+
+func (client *Client) ScanClusterVuls(clusterId *string) (_result *ScanClusterVulsResponse, _err error) {
+	runtime := &util.RuntimeOptions{}
+	headers := make(map[string]*string)
+	_result = &ScanClusterVulsResponse{}
+	_body, _err := client.ScanClusterVulsWithOptions(clusterId, headers, runtime)
+	if _err != nil {
+		return _result, _err
+	}
+	_result = _body
+	return _result, _err
+}
+
+func (client *Client) StartAlertWithOptions(ClusterId *string, headers map[string]*string, runtime *util.RuntimeOptions) (_result *StartAlertResponse, _err error) {
+	req := &openapi.OpenApiRequest{
+		Headers: headers,
+	}
+	params := &openapi.Params{
+		Action:      tea.String("StartAlert"),
+		Version:     tea.String("2015-12-15"),
+		Protocol:    tea.String("HTTPS"),
+		Pathname:    tea.String("/alert/" + tea.StringValue(openapiutil.GetEncodeParam(ClusterId)) + "/alert_rule/start"),
+		Method:      tea.String("POST"),
+		AuthType:    tea.String("AK"),
+		Style:       tea.String("ROA"),
+		ReqBodyType: tea.String("json"),
+		BodyType:    tea.String("json"),
+	}
+	_result = &StartAlertResponse{}
+	_body, _err := client.CallApi(params, req, runtime)
+	if _err != nil {
+		return _result, _err
+	}
+	_err = tea.Convert(_body, &_result)
+	return _result, _err
+}
+
+func (client *Client) StartAlert(ClusterId *string) (_result *StartAlertResponse, _err error) {
+	runtime := &util.RuntimeOptions{}
+	headers := make(map[string]*string)
+	_result = &StartAlertResponse{}
+	_body, _err := client.StartAlertWithOptions(ClusterId, headers, runtime)
 	if _err != nil {
 		return _result, _err
 	}
@@ -17432,11 +20757,83 @@ func (client *Client) StartWorkflowWithOptions(request *StartWorkflowRequest, he
 	return _result, _err
 }
 
-func (client *Client) TagResources(request *TagResourcesRequest) (_result *TagResourcesResponse, _err error) {
+func (client *Client) StartWorkflow(request *StartWorkflowRequest) (_result *StartWorkflowResponse, _err error) {
 	runtime := &util.RuntimeOptions{}
 	headers := make(map[string]*string)
-	_result = &TagResourcesResponse{}
-	_body, _err := client.TagResourcesWithOptions(request, headers, runtime)
+	_result = &StartWorkflowResponse{}
+	_body, _err := client.StartWorkflowWithOptions(request, headers, runtime)
+	if _err != nil {
+		return _result, _err
+	}
+	_result = _body
+	return _result, _err
+}
+
+func (client *Client) StopAlertWithOptions(ClusterId *string, headers map[string]*string, runtime *util.RuntimeOptions) (_result *StopAlertResponse, _err error) {
+	req := &openapi.OpenApiRequest{
+		Headers: headers,
+	}
+	params := &openapi.Params{
+		Action:      tea.String("StopAlert"),
+		Version:     tea.String("2015-12-15"),
+		Protocol:    tea.String("HTTPS"),
+		Pathname:    tea.String("/alert/" + tea.StringValue(openapiutil.GetEncodeParam(ClusterId)) + "/alert_rule/stop"),
+		Method:      tea.String("POST"),
+		AuthType:    tea.String("AK"),
+		Style:       tea.String("ROA"),
+		ReqBodyType: tea.String("json"),
+		BodyType:    tea.String("json"),
+	}
+	_result = &StopAlertResponse{}
+	_body, _err := client.CallApi(params, req, runtime)
+	if _err != nil {
+		return _result, _err
+	}
+	_err = tea.Convert(_body, &_result)
+	return _result, _err
+}
+
+func (client *Client) StopAlert(ClusterId *string) (_result *StopAlertResponse, _err error) {
+	runtime := &util.RuntimeOptions{}
+	headers := make(map[string]*string)
+	_result = &StopAlertResponse{}
+	_body, _err := client.StopAlertWithOptions(ClusterId, headers, runtime)
+	if _err != nil {
+		return _result, _err
+	}
+	_result = _body
+	return _result, _err
+}
+
+func (client *Client) SyncClusterNodePoolWithOptions(ClusterId *string, headers map[string]*string, runtime *util.RuntimeOptions) (_result *SyncClusterNodePoolResponse, _err error) {
+	req := &openapi.OpenApiRequest{
+		Headers: headers,
+	}
+	params := &openapi.Params{
+		Action:      tea.String("SyncClusterNodePool"),
+		Version:     tea.String("2015-12-15"),
+		Protocol:    tea.String("HTTPS"),
+		Pathname:    tea.String("/clusters/" + tea.StringValue(openapiutil.GetEncodeParam(ClusterId)) + "/sync_nodepools"),
+		Method:      tea.String("POST"),
+		AuthType:    tea.String("AK"),
+		Style:       tea.String("ROA"),
+		ReqBodyType: tea.String("json"),
+		BodyType:    tea.String("json"),
+	}
+	_result = &SyncClusterNodePoolResponse{}
+	_body, _err := client.CallApi(params, req, runtime)
+	if _err != nil {
+		return _result, _err
+	}
+	_err = tea.Convert(_body, &_result)
+	return _result, _err
+}
+
+func (client *Client) SyncClusterNodePool(ClusterId *string) (_result *SyncClusterNodePoolResponse, _err error) {
+	runtime := &util.RuntimeOptions{}
+	headers := make(map[string]*string)
+	_result = &SyncClusterNodePoolResponse{}
+	_body, _err := client.SyncClusterNodePoolWithOptions(ClusterId, headers, runtime)
 	if _err != nil {
 		return _result, _err
 	}
@@ -17490,11 +20887,11 @@ func (client *Client) TagResourcesWithOptions(request *TagResourcesRequest, head
 	return _result, _err
 }
 
-func (client *Client) UnInstallClusterAddons(ClusterId *string, request *UnInstallClusterAddonsRequest) (_result *UnInstallClusterAddonsResponse, _err error) {
+func (client *Client) TagResources(request *TagResourcesRequest) (_result *TagResourcesResponse, _err error) {
 	runtime := &util.RuntimeOptions{}
 	headers := make(map[string]*string)
-	_result = &UnInstallClusterAddonsResponse{}
-	_body, _err := client.UnInstallClusterAddonsWithOptions(ClusterId, request, headers, runtime)
+	_result = &TagResourcesResponse{}
+	_body, _err := client.TagResourcesWithOptions(request, headers, runtime)
 	if _err != nil {
 		return _result, _err
 	}
@@ -17531,11 +20928,11 @@ func (client *Client) UnInstallClusterAddonsWithOptions(ClusterId *string, reque
 	return _result, _err
 }
 
-func (client *Client) UntagResources(request *UntagResourcesRequest) (_result *UntagResourcesResponse, _err error) {
+func (client *Client) UnInstallClusterAddons(ClusterId *string, request *UnInstallClusterAddonsRequest) (_result *UnInstallClusterAddonsResponse, _err error) {
 	runtime := &util.RuntimeOptions{}
 	headers := make(map[string]*string)
-	_result = &UntagResourcesResponse{}
-	_body, _err := client.UntagResourcesWithOptions(request, headers, runtime)
+	_result = &UnInstallClusterAddonsResponse{}
+	_body, _err := client.UnInstallClusterAddonsWithOptions(ClusterId, request, headers, runtime)
 	if _err != nil {
 		return _result, _err
 	}
@@ -17543,11 +20940,21 @@ func (client *Client) UntagResources(request *UntagResourcesRequest) (_result *U
 	return _result, _err
 }
 
-func (client *Client) UntagResourcesWithOptions(request *UntagResourcesRequest, headers map[string]*string, runtime *util.RuntimeOptions) (_result *UntagResourcesResponse, _err error) {
-	_err = util.ValidateModel(request)
+func (client *Client) UntagResourcesWithOptions(tmpReq *UntagResourcesRequest, headers map[string]*string, runtime *util.RuntimeOptions) (_result *UntagResourcesResponse, _err error) {
+	_err = util.ValidateModel(tmpReq)
 	if _err != nil {
 		return _result, _err
 	}
+	request := &UntagResourcesShrinkRequest{}
+	openapiutil.Convert(tmpReq, request)
+	if !tea.BoolValue(util.IsUnset(tmpReq.ResourceIds)) {
+		request.ResourceIdsShrink = openapiutil.ArrayToStringWithSpecifiedStyle(tmpReq.ResourceIds, tea.String("resource_ids"), tea.String("json"))
+	}
+
+	if !tea.BoolValue(util.IsUnset(tmpReq.TagKeys)) {
+		request.TagKeysShrink = openapiutil.ArrayToStringWithSpecifiedStyle(tmpReq.TagKeys, tea.String("tag_keys"), tea.String("json"))
+	}
+
 	query := map[string]interface{}{}
 	if !tea.BoolValue(util.IsUnset(request.All)) {
 		query["all"] = request.All
@@ -17557,16 +20964,16 @@ func (client *Client) UntagResourcesWithOptions(request *UntagResourcesRequest, 
 		query["region_id"] = request.RegionId
 	}
 
-	if !tea.BoolValue(util.IsUnset(request.ResourceIds)) {
-		query["resource_ids"] = request.ResourceIds
+	if !tea.BoolValue(util.IsUnset(request.ResourceIdsShrink)) {
+		query["resource_ids"] = request.ResourceIdsShrink
 	}
 
 	if !tea.BoolValue(util.IsUnset(request.ResourceType)) {
 		query["resource_type"] = request.ResourceType
 	}
 
-	if !tea.BoolValue(util.IsUnset(request.TagKeys)) {
-		query["tag_keys"] = request.TagKeys
+	if !tea.BoolValue(util.IsUnset(request.TagKeysShrink)) {
+		query["tag_keys"] = request.TagKeysShrink
 	}
 
 	req := &openapi.OpenApiRequest{
@@ -17593,11 +21000,11 @@ func (client *Client) UntagResourcesWithOptions(request *UntagResourcesRequest, 
 	return _result, _err
 }
 
-func (client *Client) UpdateContactGroupForAlert(ClusterId *string) (_result *UpdateContactGroupForAlertResponse, _err error) {
+func (client *Client) UntagResources(request *UntagResourcesRequest) (_result *UntagResourcesResponse, _err error) {
 	runtime := &util.RuntimeOptions{}
 	headers := make(map[string]*string)
-	_result = &UpdateContactGroupForAlertResponse{}
-	_body, _err := client.UpdateContactGroupForAlertWithOptions(ClusterId, headers, runtime)
+	_result = &UntagResourcesResponse{}
+	_body, _err := client.UntagResourcesWithOptions(request, headers, runtime)
 	if _err != nil {
 		return _result, _err
 	}
@@ -17629,11 +21036,11 @@ func (client *Client) UpdateContactGroupForAlertWithOptions(ClusterId *string, h
 	return _result, _err
 }
 
-func (client *Client) UpdateK8sClusterUserConfigExpire(ClusterId *string, request *UpdateK8sClusterUserConfigExpireRequest) (_result *UpdateK8sClusterUserConfigExpireResponse, _err error) {
+func (client *Client) UpdateContactGroupForAlert(ClusterId *string) (_result *UpdateContactGroupForAlertResponse, _err error) {
 	runtime := &util.RuntimeOptions{}
 	headers := make(map[string]*string)
-	_result = &UpdateK8sClusterUserConfigExpireResponse{}
-	_body, _err := client.UpdateK8sClusterUserConfigExpireWithOptions(ClusterId, request, headers, runtime)
+	_result = &UpdateContactGroupForAlertResponse{}
+	_body, _err := client.UpdateContactGroupForAlertWithOptions(ClusterId, headers, runtime)
 	if _err != nil {
 		return _result, _err
 	}
@@ -17641,6 +21048,74 @@ func (client *Client) UpdateK8sClusterUserConfigExpire(ClusterId *string, reques
 	return _result, _err
 }
 
+func (client *Client) UpdateControlPlaneLogWithOptions(ClusterId *string, request *UpdateControlPlaneLogRequest, headers map[string]*string, runtime *util.RuntimeOptions) (_result *UpdateControlPlaneLogResponse, _err error) {
+	_err = util.ValidateModel(request)
+	if _err != nil {
+		return _result, _err
+	}
+	body := map[string]interface{}{}
+	if !tea.BoolValue(util.IsUnset(request.Aliuid)) {
+		body["aliuid"] = request.Aliuid
+	}
+
+	if !tea.BoolValue(util.IsUnset(request.Components)) {
+		body["components"] = request.Components
+	}
+
+	if !tea.BoolValue(util.IsUnset(request.LogProject)) {
+		body["log_project"] = request.LogProject
+	}
+
+	if !tea.BoolValue(util.IsUnset(request.LogTtl)) {
+		body["log_ttl"] = request.LogTtl
+	}
+
+	req := &openapi.OpenApiRequest{
+		Headers: headers,
+		Body:    openapiutil.ParseToMap(body),
+	}
+	params := &openapi.Params{
+		Action:      tea.String("UpdateControlPlaneLog"),
+		Version:     tea.String("2015-12-15"),
+		Protocol:    tea.String("HTTPS"),
+		Pathname:    tea.String("/clusters/" + tea.StringValue(openapiutil.GetEncodeParam(ClusterId)) + "/controlplanelog"),
+		Method:      tea.String("PUT"),
+		AuthType:    tea.String("AK"),
+		Style:       tea.String("ROA"),
+		ReqBodyType: tea.String("json"),
+		BodyType:    tea.String("none"),
+	}
+	_result = &UpdateControlPlaneLogResponse{}
+	_body, _err := client.CallApi(params, req, runtime)
+	if _err != nil {
+		return _result, _err
+	}
+	_err = tea.Convert(_body, &_result)
+	return _result, _err
+}
+
+func (client *Client) UpdateControlPlaneLog(ClusterId *string, request *UpdateControlPlaneLogRequest) (_result *UpdateControlPlaneLogResponse, _err error) {
+	runtime := &util.RuntimeOptions{}
+	headers := make(map[string]*string)
+	_result = &UpdateControlPlaneLogResponse{}
+	_body, _err := client.UpdateControlPlaneLogWithOptions(ClusterId, request, headers, runtime)
+	if _err != nil {
+		return _result, _err
+	}
+	_result = _body
+	return _result, _err
+}
+
+/**
+ * >
+ * *   You can call this operation only with an Alibaba Cloud account.
+ * *   After you revoke the kubeconfig file of a cluster, the validity period of the kubeconfig file that you specified becomes invalid. You can call this API operation to specify the validity period again.
+ *
+ * @param request UpdateK8sClusterUserConfigExpireRequest
+ * @param headers map
+ * @param runtime runtime options for this request RuntimeOptions
+ * @return UpdateK8sClusterUserConfigExpireResponse
+ */
 func (client *Client) UpdateK8sClusterUserConfigExpireWithOptions(ClusterId *string, request *UpdateK8sClusterUserConfigExpireRequest, headers map[string]*string, runtime *util.RuntimeOptions) (_result *UpdateK8sClusterUserConfigExpireResponse, _err error) {
 	_err = util.ValidateModel(request)
 	if _err != nil {
@@ -17679,11 +21154,19 @@ func (client *Client) UpdateK8sClusterUserConfigExpireWithOptions(ClusterId *str
 	return _result, _err
 }
 
-func (client *Client) UpdateTemplate(TemplateId *string, request *UpdateTemplateRequest) (_result *UpdateTemplateResponse, _err error) {
+/**
+ * >
+ * *   You can call this operation only with an Alibaba Cloud account.
+ * *   After you revoke the kubeconfig file of a cluster, the validity period of the kubeconfig file that you specified becomes invalid. You can call this API operation to specify the validity period again.
+ *
+ * @param request UpdateK8sClusterUserConfigExpireRequest
+ * @return UpdateK8sClusterUserConfigExpireResponse
+ */
+func (client *Client) UpdateK8sClusterUserConfigExpire(ClusterId *string, request *UpdateK8sClusterUserConfigExpireRequest) (_result *UpdateK8sClusterUserConfigExpireResponse, _err error) {
 	runtime := &util.RuntimeOptions{}
 	headers := make(map[string]*string)
-	_result = &UpdateTemplateResponse{}
-	_body, _err := client.UpdateTemplateWithOptions(TemplateId, request, headers, runtime)
+	_result = &UpdateK8sClusterUserConfigExpireResponse{}
+	_body, _err := client.UpdateK8sClusterUserConfigExpireWithOptions(ClusterId, request, headers, runtime)
 	if _err != nil {
 		return _result, _err
 	}
@@ -17741,11 +21224,11 @@ func (client *Client) UpdateTemplateWithOptions(TemplateId *string, request *Upd
 	return _result, _err
 }
 
-func (client *Client) UpgradeCluster(ClusterId *string, request *UpgradeClusterRequest) (_result *UpgradeClusterResponse, _err error) {
+func (client *Client) UpdateTemplate(TemplateId *string, request *UpdateTemplateRequest) (_result *UpdateTemplateResponse, _err error) {
 	runtime := &util.RuntimeOptions{}
 	headers := make(map[string]*string)
-	_result = &UpgradeClusterResponse{}
-	_body, _err := client.UpgradeClusterWithOptions(ClusterId, request, headers, runtime)
+	_result = &UpdateTemplateResponse{}
+	_body, _err := client.UpdateTemplateWithOptions(TemplateId, request, headers, runtime)
 	if _err != nil {
 		return _result, _err
 	}
@@ -17761,6 +21244,10 @@ func (client *Client) UpgradeClusterWithOptions(ClusterId *string, request *Upgr
 	body := map[string]interface{}{}
 	if !tea.BoolValue(util.IsUnset(request.ComponentName)) {
 		body["component_name"] = request.ComponentName
+	}
+
+	if !tea.BoolValue(util.IsUnset(request.MasterOnly)) {
+		body["master_only"] = request.MasterOnly
 	}
 
 	if !tea.BoolValue(util.IsUnset(request.NextVersion)) {
@@ -17795,11 +21282,11 @@ func (client *Client) UpgradeClusterWithOptions(ClusterId *string, request *Upgr
 	return _result, _err
 }
 
-func (client *Client) UpgradeClusterAddons(ClusterId *string, request *UpgradeClusterAddonsRequest) (_result *UpgradeClusterAddonsResponse, _err error) {
+func (client *Client) UpgradeCluster(ClusterId *string, request *UpgradeClusterRequest) (_result *UpgradeClusterResponse, _err error) {
 	runtime := &util.RuntimeOptions{}
 	headers := make(map[string]*string)
-	_result = &UpgradeClusterAddonsResponse{}
-	_body, _err := client.UpgradeClusterAddonsWithOptions(ClusterId, request, headers, runtime)
+	_result = &UpgradeClusterResponse{}
+	_body, _err := client.UpgradeClusterWithOptions(ClusterId, request, headers, runtime)
 	if _err != nil {
 		return _result, _err
 	}
@@ -17833,5 +21320,89 @@ func (client *Client) UpgradeClusterAddonsWithOptions(ClusterId *string, request
 		return _result, _err
 	}
 	_err = tea.Convert(_body, &_result)
+	return _result, _err
+}
+
+func (client *Client) UpgradeClusterAddons(ClusterId *string, request *UpgradeClusterAddonsRequest) (_result *UpgradeClusterAddonsResponse, _err error) {
+	runtime := &util.RuntimeOptions{}
+	headers := make(map[string]*string)
+	_result = &UpgradeClusterAddonsResponse{}
+	_body, _err := client.UpgradeClusterAddonsWithOptions(ClusterId, request, headers, runtime)
+	if _err != nil {
+		return _result, _err
+	}
+	_result = _body
+	return _result, _err
+}
+
+/**
+ * You can call the UpgradeClusterNodepool operation to update the Kubernetes version, OS version, or container runtime version of the nodes in a node pool.
+ *
+ * @param request UpgradeClusterNodepoolRequest
+ * @param headers map
+ * @param runtime runtime options for this request RuntimeOptions
+ * @return UpgradeClusterNodepoolResponse
+ */
+func (client *Client) UpgradeClusterNodepoolWithOptions(ClusterId *string, NodepoolId *string, request *UpgradeClusterNodepoolRequest, headers map[string]*string, runtime *util.RuntimeOptions) (_result *UpgradeClusterNodepoolResponse, _err error) {
+	_err = util.ValidateModel(request)
+	if _err != nil {
+		return _result, _err
+	}
+	body := map[string]interface{}{}
+	if !tea.BoolValue(util.IsUnset(request.ImageId)) {
+		body["image_id"] = request.ImageId
+	}
+
+	if !tea.BoolValue(util.IsUnset(request.KubernetesVersion)) {
+		body["kubernetes_version"] = request.KubernetesVersion
+	}
+
+	if !tea.BoolValue(util.IsUnset(request.RuntimeType)) {
+		body["runtime_type"] = request.RuntimeType
+	}
+
+	if !tea.BoolValue(util.IsUnset(request.RuntimeVersion)) {
+		body["runtime_version"] = request.RuntimeVersion
+	}
+
+	req := &openapi.OpenApiRequest{
+		Headers: headers,
+		Body:    openapiutil.ParseToMap(body),
+	}
+	params := &openapi.Params{
+		Action:      tea.String("UpgradeClusterNodepool"),
+		Version:     tea.String("2015-12-15"),
+		Protocol:    tea.String("HTTPS"),
+		Pathname:    tea.String("/clusters/" + tea.StringValue(openapiutil.GetEncodeParam(ClusterId)) + "/nodepools/" + tea.StringValue(openapiutil.GetEncodeParam(NodepoolId)) + "/upgrade"),
+		Method:      tea.String("POST"),
+		AuthType:    tea.String("AK"),
+		Style:       tea.String("ROA"),
+		ReqBodyType: tea.String("json"),
+		BodyType:    tea.String("json"),
+	}
+	_result = &UpgradeClusterNodepoolResponse{}
+	_body, _err := client.CallApi(params, req, runtime)
+	if _err != nil {
+		return _result, _err
+	}
+	_err = tea.Convert(_body, &_result)
+	return _result, _err
+}
+
+/**
+ * You can call the UpgradeClusterNodepool operation to update the Kubernetes version, OS version, or container runtime version of the nodes in a node pool.
+ *
+ * @param request UpgradeClusterNodepoolRequest
+ * @return UpgradeClusterNodepoolResponse
+ */
+func (client *Client) UpgradeClusterNodepool(ClusterId *string, NodepoolId *string, request *UpgradeClusterNodepoolRequest) (_result *UpgradeClusterNodepoolResponse, _err error) {
+	runtime := &util.RuntimeOptions{}
+	headers := make(map[string]*string)
+	_result = &UpgradeClusterNodepoolResponse{}
+	_body, _err := client.UpgradeClusterNodepoolWithOptions(ClusterId, NodepoolId, request, headers, runtime)
+	if _err != nil {
+		return _result, _err
+	}
+	_result = _body
 	return _result, _err
 }
