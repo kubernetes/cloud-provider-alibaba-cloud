@@ -1414,9 +1414,11 @@ func (s *CreateClusterRequestNodeGroupsHyperNodes) Validate() error {
 }
 
 type CreateClusterRequestNodeGroupsHyperNodesDataDisk struct {
+	BurstingEnabled  *bool   `json:"BurstingEnabled,omitempty" xml:"BurstingEnabled,omitempty"`
 	Category         *string `json:"Category,omitempty" xml:"Category,omitempty"`
 	DeleteWithNode   *bool   `json:"DeleteWithNode,omitempty" xml:"DeleteWithNode,omitempty"`
 	PerformanceLevel *string `json:"PerformanceLevel,omitempty" xml:"PerformanceLevel,omitempty"`
+	ProvisionedIops  *int64  `json:"ProvisionedIops,omitempty" xml:"ProvisionedIops,omitempty"`
 	Size             *int32  `json:"Size,omitempty" xml:"Size,omitempty"`
 }
 
@@ -1426,6 +1428,10 @@ func (s CreateClusterRequestNodeGroupsHyperNodesDataDisk) String() string {
 
 func (s CreateClusterRequestNodeGroupsHyperNodesDataDisk) GoString() string {
 	return s.String()
+}
+
+func (s *CreateClusterRequestNodeGroupsHyperNodesDataDisk) GetBurstingEnabled() *bool {
+	return s.BurstingEnabled
 }
 
 func (s *CreateClusterRequestNodeGroupsHyperNodesDataDisk) GetCategory() *string {
@@ -1440,8 +1446,17 @@ func (s *CreateClusterRequestNodeGroupsHyperNodesDataDisk) GetPerformanceLevel()
 	return s.PerformanceLevel
 }
 
+func (s *CreateClusterRequestNodeGroupsHyperNodesDataDisk) GetProvisionedIops() *int64 {
+	return s.ProvisionedIops
+}
+
 func (s *CreateClusterRequestNodeGroupsHyperNodesDataDisk) GetSize() *int32 {
 	return s.Size
+}
+
+func (s *CreateClusterRequestNodeGroupsHyperNodesDataDisk) SetBurstingEnabled(v bool) *CreateClusterRequestNodeGroupsHyperNodesDataDisk {
+	s.BurstingEnabled = &v
+	return s
 }
 
 func (s *CreateClusterRequestNodeGroupsHyperNodesDataDisk) SetCategory(v string) *CreateClusterRequestNodeGroupsHyperNodesDataDisk {
@@ -1456,6 +1471,11 @@ func (s *CreateClusterRequestNodeGroupsHyperNodesDataDisk) SetDeleteWithNode(v b
 
 func (s *CreateClusterRequestNodeGroupsHyperNodesDataDisk) SetPerformanceLevel(v string) *CreateClusterRequestNodeGroupsHyperNodesDataDisk {
 	s.PerformanceLevel = &v
+	return s
+}
+
+func (s *CreateClusterRequestNodeGroupsHyperNodesDataDisk) SetProvisionedIops(v int64) *CreateClusterRequestNodeGroupsHyperNodesDataDisk {
+	s.ProvisionedIops = &v
 	return s
 }
 

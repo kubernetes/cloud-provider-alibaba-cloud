@@ -1,5 +1,44 @@
 # go-cmd/cmd Changelog
 
+## v1.4
+
+### v1.4.4 (2026-10-23)
+
+* Fixed bug: Stop doesn't kill command while it's starting (PR #119) (@yusuke-koyoshi)
+* Updated test matrix to go1.25, go1.26, and go1.27
+
+### v1.4.3 (2024-06-23)
+
+* Fixed issue 94: Command is still executed if Stop() is called during BeforeExec hooks
+* Added a note in docs about SIGINT (issue #100)
+* Updated test matrix to go1.22, go1.21, and go1.20
+
+### v1.4.2 (2023-07-08)
+
+* Added `Options.CombinedOutput` based on PR #76 by @jwomackgsa (issue #70)
+
+### v1.4.1 (2022-03-27)
+
+* Added `Options.LineBufferSize` based on PR #85 by @Crevil (issue #66)
+
+### v1.4.0 (2022-01-01)
+
+* Added `Options.BeforeExec` based on PR #53 #54 by @wenerme (issue #53)
+
+## v1.3
+
+### v1.3.1 (2021-10-13)
+
+* Fixed `Stop()` on Windows with go1.17 (PR #69) (@silisium)
+* Updated test matrix to go1.15, go1.16, and go1.17
+* Added SECURITY.md and GitHub code analysis 
+
+### v1.3.0 (2020-10-31)
+
+* Fixed last line not flushed if incomplete (PR #48) (@greut)
+* Added ErrNotStarted
+* Changed Stop() to return ErrNotStarted (issue #16)
+
 ## v1.2
 
 ### v1.2.1 (2020-07-11)
