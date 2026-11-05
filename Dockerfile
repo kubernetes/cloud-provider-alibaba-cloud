@@ -1,4 +1,4 @@
-FROM --platform=$BUILDPLATFORM golang:1.26.10 as builder
+FROM --platform=$BUILDPLATFORM golang:1.27.2 as builder
 ADD . /build
 WORKDIR /build/
 ARG TARGETOS
